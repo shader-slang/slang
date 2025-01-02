@@ -221,6 +221,8 @@ struct DifferentiableTypeConformanceContext
     IRGlobalValueWithCode* parentFunc = nullptr;
     OrderedDictionary<IRType*, IRInst*> differentiableTypeWitnessDictionary;
 
+    Dictionary<IRInst*, List<IRDifferentiableTypeAnnotation*>> annotationCache;
+
     IRFunc* existentialDAddFunc = nullptr;
 
     DifferentiableTypeConformanceContext(AutoDiffSharedContext* shared)
@@ -234,6 +236,10 @@ struct DifferentiableTypeConformanceContext
     }
 
     void setFunc(IRGlobalValueWithCode* func);
+
+    List<IRDifferentiableTypeAnnotation*> getAnnotations(IRGlobalValueWithCode* inst);
+
+    List<IRDifferentiableTypeAnnotation*> getAnnotations(IRModuleInst* inst);
 
     void buildGlobalWitnessDictionary();
 
@@ -445,6 +451,20 @@ struct DifferentiableTypeConformanceContext
         IRBuilder* builder,
         IRExtractExistentialType* extractExistentialType,
         DiffConformanceKind target);
+
+    IRInst* emitDAddOfDiffInstType(
+        IRBuilder* builder,
+        IRType* primalType,
+        IRInst* op1,
+        IRInst* op2);
+
+    IRInst* emitDAddForExistentialType(
+        IRBuilder* builder,
+        IRType* primalType,
+        IRInst* op1,
+        IRInst* op2);
+
+    IRInst* emitDZeroOfDiffInstType(IRBuilder* builder, IRType* primalType);
 };
 
 
@@ -461,9 +481,15 @@ struct DifferentialPairTypeBuilder
 
     IRInst* emitFieldAccessor(IRBuilder* builder, IRInst* baseInst, IRStructKey* key);
 
-    IRInst* emitPrimalFieldAccess(IRBuilder* builder, IRInst* baseInst);
+    IRInst* emitPrimalFieldAccess(IRBuilder* builder, IRType* loweredPairType, IRInst* baseInst);
 
-    IRInst* emitDiffFieldAccess(IRBuilder* builder, IRInst* baseInst);
+    IRInst* emitDiffFieldAccess(IRBuilder* builder, IRType* loweredPairType, IRInst* baseInst);
+
+    IRInst* emitExistentialMakePair(
+        IRBuilder* builder,
+        IRInst* type,
+        IRInst* primalInst,
+        IRInst* diffInst);
 
     IRStructKey* _getOrCreateDiffStructKey();
 
@@ -471,7 +497,11 @@ struct DifferentialPairTypeBuilder
 
     IRInst* _createDiffPairType(IRType* origBaseType, IRType* diffType);
 
+    IRInst* _createDiffPairInterfaceRequirement(IRType* origBaseType, IRType* diffType);
+
     IRInst* lowerDiffPairType(IRBuilder* builder, IRType* originalPairType);
+
+    IRInst* getOrCreateCommonDiffPairInterface(IRBuilder* builder);
 
     struct PairStructKey
     {
@@ -479,8 +509,39 @@ struct DifferentialPairTypeBuilder
         IRInst* diffType;
     };
 
-    // Cache from `IRDifferentialPairType` to materialized struct type.
+    // Cache from pair types to lowered type.
     Dictionary<IRInst*, IRInst*> pairTypeCache;
+
+    // Cache from existential pair types to their lowered interface keys.
+    // We use a different cache because an interface type can have
+    // a regular pair for the pair of interface types, as well as an
+    // interface key for the associated pair types used for its implementations
+    //
+    Dictionary<IRInst*, IRInst*> existentialPairTypeCache;
+
+    // Cache for any interface requirement keys (generated for existential
+    // pair types)
+    //
+    Dictionary<IRInst*, IRStructKey*> assocPairTypeKeyMap;
+    Dictionary<IRInst*, IRStructKey*> makePairKeyMap;
+    Dictionary<IRInst*, IRStructKey*> getPrimalKeyMap;
+    Dictionary<IRInst*, IRStructKey*> getDiffKeyMap;
+
+    // More caches for easier lookups of the types associated with the
+    // keys. (avoid having to keep recomputing or performing complicated
+    // lookups)
+    //
+    Dictionary<IRInst*, IRFuncType*> makePairFuncTypeMap;
+    Dictionary<IRInst*, IRFuncType*> getPrimalFuncTypeMap;
+    Dictionary<IRInst*, IRFuncType*> getDiffFuncTypeMap;
+
+    // Even more caches for easier access to original primal/diff types
+    // (Only used for existential pair types). For regular pair types,
+    // these are easy to find right on the type itself.
+    //
+    Dictionary<IRInst*, IRType*> primalTypeMap;
+    Dictionary<IRInst*, IRType*> diffTypeMap;
+
 
     IRStructKey* globalPrimalKey = nullptr;
 
@@ -491,6 +552,8 @@ struct DifferentialPairTypeBuilder
     List<IRInst*> generatedTypeList;
 
     AutoDiffSharedContext* sharedContext = nullptr;
+
+    IRInterfaceType* commonDiffPairInterface = nullptr;
 };
 
 void stripAutoDiffDecorations(IRModule* module);
@@ -550,6 +613,10 @@ inline bool isRelevantDifferentialPair(IRType* type)
     }
     return false;
 }
+
+bool isRuntimeType(IRType* type);
+
+IRInst* getExistentialBaseWitnessTable(IRBuilder* builder, IRType* type);
 
 UIndex addPhiOutputArg(
     IRBuilder* builder,
