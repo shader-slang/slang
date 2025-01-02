@@ -359,6 +359,8 @@ struct LegalizeWGSLEntryPointContext
 
         case SystemValueSemanticName::ViewID:
         case SystemValueSemanticName::ViewportArrayIndex:
+        case SystemValueSemanticName::StartVertexLocation:
+        case SystemValueSemanticName::StartInstanceLocation:
             {
                 result.isUnsupported = true;
                 break;

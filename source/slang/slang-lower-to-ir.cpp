@@ -4587,6 +4587,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             case BaseType::UInt64:
             case BaseType::UIntPtr:
             case BaseType::IntPtr:
+            case BaseType::Int8x4Packed:
+            case BaseType::UInt8x4Packed:
                 return LoweredValInfo::simple(getBuilder()->getIntValue(type, 0));
 
             case BaseType::Half:

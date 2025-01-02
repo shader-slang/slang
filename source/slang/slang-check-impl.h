@@ -789,12 +789,12 @@ private:
 
     InheritanceInfo _getInheritanceInfo(
         DeclRef<Decl> declRef,
-        DeclRefType* correspondingType,
+        Type* selfType,
         InheritanceCircularityInfo* circularityInfo);
     InheritanceInfo _calcInheritanceInfo(Type* type, InheritanceCircularityInfo* circularityInfo);
     InheritanceInfo _calcInheritanceInfo(
         DeclRef<Decl> declRef,
-        DeclRefType* correspondingType,
+        Type* selfType,
         InheritanceCircularityInfo* circularityInfo);
 
     void getDependentGenericParentImpl(DeclRef<GenericDecl>& genericParent, DeclRef<Decl> declRef);
@@ -1142,6 +1142,12 @@ struct OuterScopeContextRAII
     OuterScopeContextRAII _outerScopeContextRAII(          \
         context,                                           \
         decl->ownedScope ? decl->ownedScope : context->getOuterScope())
+
+struct RequirementSynthesisResult
+{
+    bool suceeded = false;
+    operator bool() const { return suceeded; }
+};
 
 struct SemanticsVisitor : public SemanticsContext
 {
@@ -1741,6 +1747,9 @@ public:
         /// The outer declaration for the conformances being checked (either a type or `extension`
         /// declaration)
         ContainerDecl* parentDecl;
+
+        // An inner diagnostic sink to store diagnostics about why requirement synthesis failed.
+        DiagnosticSink innerSink;
 
         Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
     };

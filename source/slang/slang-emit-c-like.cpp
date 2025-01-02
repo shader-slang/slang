@@ -274,6 +274,11 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
     case kIROp_UIntPtrType:
         return UnownedStringSlice("uintptr_t");
 
+    case kIROp_Int8x4PackedType:
+        return UnownedStringSlice("int8_t4_packed");
+    case kIROp_UInt8x4PackedType:
+        return UnownedStringSlice("uint8_t4_packed");
+
     case kIROp_HalfType:
         return UnownedStringSlice("half");
 
@@ -1272,6 +1277,8 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         return;
                     }
                 case BaseType::UInt:
+                case BaseType::Int8x4Packed:
+                case BaseType::UInt8x4Packed:
                     {
                         m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
                         m_writer->emit("U");
@@ -3920,6 +3927,8 @@ void CLikeSourceEmitter::emitVecNOrScalar(
                 m_writer->emit("ushort");
                 break;
             case kIROp_UIntType:
+            case kIROp_Int8x4PackedType:
+            case kIROp_UInt8x4PackedType:
                 m_writer->emit("uint");
                 break;
             case kIROp_UInt64Type:

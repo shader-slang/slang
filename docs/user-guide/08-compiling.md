@@ -924,7 +924,7 @@ meanings of their `CompilerOptionValue` encodings.
 
 |CompilerOptionName | Description |
 |:------------------ |:----------- |
-| MacroDefine        | Specifies a prepreocessor macro define entry. `stringValue0` encodes macro name, `stringValue1` encodes the macro value.
+| MacroDefine        | Specifies a preprocessor macro define entry. `stringValue0` encodes macro name, `stringValue1` encodes the macro value.
 | Include            | Specifies an additional search path. `stringValue0` encodes the additional path. |
 | Language           | Specifies the input language. `intValue0` encodes a value defined in `SlangSourceLanguage`. |
 | MatrixLayoutColumn | Use column major matrix layout as default. `intValue0` encodes a bool value for the setting. |
@@ -973,5 +973,5 @@ meanings of their `CompilerOptionValue` encodings.
 ## Debugging
 
 Slang's SPIRV backend supports generating debug information using the [NonSemantic Shader DebugInfo Instructions](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc).
-To enable debugging information when targing SPIRV, specify the `-emit-spirv-directly` and the `-g2` argument when using `slangc` tool, or set `EmitSpirvDirectly` to `1` and `DebugInformation` to `SLANG_DEBUG_INFO_LEVEL_STANDARD` when using the API.
+To enable debugging information when targeting SPIRV, specify the `-emit-spirv-directly` and the `-g2` argument when using `slangc` tool, or set `EmitSpirvDirectly` to `1` and `DebugInformation` to `SLANG_DEBUG_INFO_LEVEL_STANDARD` when using the API.
 Debugging support has been tested with RenderDoc.

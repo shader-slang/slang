@@ -1563,6 +1563,8 @@ SIMPLE_IR_TYPE(PrimitivesType, MeshOutputType)
 
 struct IRMetalMeshType : IRType
 {
+    IR_LEAF_ISA(MetalMeshType);
+
     IRType* getVerticesType() { return (IRType*)getOperand(0); }
     IRType* getPrimitivesType() { return (IRType*)getOperand(1); }
     IRInst* getNumVertices() { return (IRInst*)getOperand(2); }

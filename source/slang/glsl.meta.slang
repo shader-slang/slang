@@ -146,6 +146,8 @@ public in int gl_SampleID : SV_SampleIndex;
 public in int gl_VertexIndex : SV_VertexID;
 public in int gl_ViewIndex : SV_ViewID;
 public in int gl_ViewportIndex : SV_ViewportArrayIndex;
+public in int gl_BaseVertex : SV_StartVertexLocation;
+public in int gl_BaseInstance : SV_StartInstanceLocation;
 
 
 // Override operator* behavior to compute algebric product of matrices and vectors.
@@ -5099,6 +5101,30 @@ __glsl_extension(GL_EXT_ray_tracing)
 public bool reportIntersectionEXT(float hitT, uint hitKind)
 {
     return __reportIntersection(hitT, hitKind);
+}
+
+public property int terminateRayEXT
+{
+    [require(glsl_spirv, raytracing_anyhit)]
+    [ForceInline]
+    get
+    {
+        setupExtForRayTracingBuiltIn();
+        AcceptHitAndEndSearch();
+        return 0;
+    }
+}
+
+public property int ignoreIntersectionEXT
+{
+    [require(glsl_spirv, raytracing_anyhit)]
+    [ForceInline]
+    get
+    {
+        setupExtForRayTracingBuiltIn();
+        IgnoreHit();
+        return 0;
+    }
 }
 
 __glsl_extension(GL_EXT_ray_tracing)

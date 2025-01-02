@@ -852,6 +852,22 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
             name = "gl_PrimitiveShadingRateEXT";
         }
     }
+    else if (semanticName == "sv_startvertexlocation")
+    {
+        context->requireGLSLVersion(ProfileVersion::GLSL_460);
+
+        // uint in hlsl, int in glsl (https://www.khronos.org/opengl/wiki/Built-in_Variable_(GLSL))
+        requiredType = builder->getBasicType(BaseType::Int);
+        name = "gl_BaseVertex";
+    }
+    else if (semanticName == "sv_startinstancelocation")
+    {
+        context->requireGLSLVersion(ProfileVersion::GLSL_460);
+
+        // uint in hlsl, int in glsl (https://www.khronos.org/opengl/wiki/Built-in_Variable_(GLSL))
+        requiredType = builder->getBasicType(BaseType::Int);
+        name = "gl_BaseInstance";
+    }
 
     if (name)
     {

@@ -429,7 +429,7 @@ struct MultiArrayFloatContainer : IFloatContainer
 }
 ```
 
-In summary, an `asssociatedtype` requirement in an interface is similar to other types of requirements: a method requirement means that an implementation must provide a method matching the interface signature, while an `associatedtype` requirement means that an implementation must provide a type in its scope with the matching name and interface constraint. In general, when defining an interface that is producing and consuming an object whose actual type is implementation-dependent, the type of this object can often be modeled as an associated type in the interface.
+In summary, an `associatedtype` requirement in an interface is similar to other types of requirements: a method requirement means that an implementation must provide a method matching the interface signature, while an `associatedtype` requirement means that an implementation must provide a type in its scope with the matching name and interface constraint. In general, when defining an interface that is producing and consuming an object whose actual type is implementation-dependent, the type of this object can often be modeled as an associated type in the interface.
 
 
 ### Comparing Generics to C++ Templates
@@ -823,7 +823,7 @@ interface IEnumerator<T>
 
 interface IEnumerable<T>
 {
-    assoicatedtype Enumerator : IEnumerator<T>;
+    associatedtype Enumerator : IEnumerator<T>;
     Enumerator getEnumerator();
 }
 ```

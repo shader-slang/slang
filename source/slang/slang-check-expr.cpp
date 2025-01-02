@@ -312,12 +312,17 @@ static bool isMutableGLSLBufferBlockVarExpr(Expr* expr)
     const auto derefExpr = as<DerefExpr>(expr);
     if (!derefExpr)
         return false;
-    const auto varExpr = as<VarExpr>(derefExpr->base);
+
+    // For SSBO arrays, derefExpr is expected to be IndexExpr instead of VarExpr
+    const auto indexExpr = as<IndexExpr>(derefExpr->base);
+
+    const auto varExpr =
+        indexExpr ? as<VarExpr>(indexExpr->baseExpression) : as<VarExpr>(derefExpr->base);
     // Check the declaration type
     if (!varExpr)
         return false;
 
-    const auto varExprType = varExpr->type->getCanonicalType();
+    const auto varExprType = (indexExpr ? indexExpr->type : varExpr->type)->getCanonicalType();
     const auto ssbt = as<GLSLShaderStorageBufferType>(varExprType);
     if (!ssbt)
         return false;
@@ -1939,6 +1944,13 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
     // In HLSL, `const` is used to mark compile-time constant expressions.
     if (!decl->hasModifier<ConstModifier>())
         return nullptr;
+
+    // The values of specialization constants aren't known at compile time even
+    // if they're marked `const`.
+    if (decl->hasModifier<SpecializationConstantAttribute>() ||
+        decl->hasModifier<VkConstantIdAttribute>())
+        return nullptr;
+
     if (decl->hasModifier<ExternModifier>())
     {
         // Extern const is not considered compile-time constant by the front-end.
@@ -5309,6 +5321,10 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     // We will iterate over all the operands in all the insts and check
     // them
     bool failed = false;
+
+    // Track %id's that have been defined in this asm block.
+    HashSet<Name*> definedIds;
+
     for (auto& inst : expr->insts)
     {
         // It's not automatically a failure to not have info, we just won't
@@ -5324,6 +5340,52 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                 inst.opcode.token,
                 0);
             continue;
+        }
+        int resultIdIndex = -1;
+        if (opInfo)
+        {
+            resultIdIndex = opInfo->resultIdIndex;
+        }
+        else if (inst.opcode.flavor == SPIRVAsmOperand::TruncateMarker)
+        {
+            // If this is __truncate, register the result id in the third operand.
+            resultIdIndex = 1;
+        }
+        else
+        {
+            // If there is no opInfo, just register all Ids as defined.
+            for (auto& operand : inst.operands)
+            {
+                if (operand.flavor == SPIRVAsmOperand::Id)
+                {
+                    definedIds.add(operand.token.getName());
+                }
+            }
+        }
+
+        // Register result ID.
+        if (resultIdIndex != -1)
+        {
+            if (inst.operands.getCount() <= resultIdIndex)
+            {
+                failed = true;
+                getSink()->diagnose(
+                    inst.opcode.token,
+                    Diagnostics::spirvInstructionWithNotEnoughOperands,
+                    inst.opcode.token);
+                continue;
+            }
+            auto& resultIdOperand = inst.operands[resultIdIndex];
+
+            if (!definedIds.add(resultIdOperand.token.getName()))
+            {
+                failed = true;
+                getSink()->diagnose(
+                    inst.opcode.token,
+                    Diagnostics::spirvIdRedefinition,
+                    inst.opcode.token);
+                continue;
+            }
         }
 
         const bool isLast = &inst == &expr->insts.getLast();
@@ -5435,6 +5497,18 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                         return;
                     }
                     operand.knownValue = builtinVarKind.value();
+                }
+                else if (operand.flavor == SPIRVAsmOperand::Id)
+                {
+                    if (!definedIds.contains(operand.token.getName()))
+                    {
+                        failed = true;
+                        getSink()->diagnose(
+                            operand.token,
+                            Diagnostics::spirvUndefinedId,
+                            operand.token);
+                        return;
+                    }
                 }
                 if (operand.bitwiseOrWith.getCount() &&
                     operand.flavor != SPIRVAsmOperand::Literal &&

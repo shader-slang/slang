@@ -1236,6 +1236,8 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         return;
                     }
                 case BaseType::UInt:
+                case BaseType::Int8x4Packed:
+                case BaseType::UInt8x4Packed:
                     {
                         m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
                         m_writer->emit("U");
@@ -1984,6 +1986,8 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 break;
 
             case BaseType::UInt:
+            case BaseType::Int8x4Packed:
+            case BaseType::UInt8x4Packed:
                 if (fromType == BaseType::Float)
                 {
                     m_writer->emit("floatBitsToUint");
@@ -3050,6 +3054,18 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 #endif
             return;
         }
+    case kIROp_Int8x4PackedType:
+        {
+            _requireBaseType(BaseType::Int8x4Packed);
+            m_writer->emit("uint");
+            return;
+        }
+    case kIROp_UInt8x4PackedType:
+        {
+            _requireBaseType(BaseType::UInt8x4Packed);
+            m_writer->emit("uint");
+            return;
+        }
     case kIROp_VoidType:
     case kIROp_BoolType:
     case kIROp_Int8Type:
@@ -3123,6 +3139,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_RayQueryType:
         {
+            _requireRayQuery();
             m_writer->emit("rayQueryEXT");
             return;
         }
