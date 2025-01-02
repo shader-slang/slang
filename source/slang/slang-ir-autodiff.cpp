@@ -126,7 +126,7 @@ static IRInst* _getDiffTypeWitnessFromPairType(
 
 bool isNoDiffType(IRType* paramType)
 {
-    while(paramType)
+    while (paramType)
     {
         if (auto attrType = as<IRAttributedType>(paramType))
         {
