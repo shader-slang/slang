@@ -412,6 +412,28 @@ struct LoweredElementTypeContext
         return 4;
     }
 
+    bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config)
+    {
+        // For spirv, we always want to lower all matrix types, because SPIRV does not support
+        // specifying matrix layout/stride if the matrix type is used in places other than
+        // defining a struct field. This means that if a matrix is used to define a varying
+        // parameter, we always want to wrap it in a struct.
+        //
+        if (target->shouldEmitSPIRVDirectly())
+        {
+            return true;
+        }
+
+        if (getIntVal(matrixType->getLayout()) == defaultMatrixLayout &&
+            config.layoutRule->ruleName == IRTypeLayoutRuleName::Natural)
+        {
+            // For other targets, we only lower the matrix types if they differ from the default
+            // matrix layout.
+            return false;
+        }
+        return true;
+    }
+
     LoweredElementTypeInfo getLoweredTypeInfoImpl(IRType* type, TypeLoweringConfig config)
     {
         IRBuilder builder(type);
@@ -422,18 +444,10 @@ struct LoweredElementTypeContext
 
         if (auto matrixType = as<IRMatrixType>(type))
         {
-            // For spirv, we always want to lower all matrix types, because matrix types
-            // are considered abstract types.
-            if (!target->shouldEmitSPIRVDirectly())
+            if (!shouldLowerMatrixType(matrixType, config))
             {
-                // For other targets, we only lower the matrix types if they differ from the default
-                // matrix layout.
-                if (getIntVal(matrixType->getLayout()) == defaultMatrixLayout &&
-                    config.layoutRule->ruleName == IRTypeLayoutRuleName::Natural)
-                {
-                    info.loweredType = type;
-                    return info;
-                }
+                info.loweredType = type;
+                return info;
             }
 
             auto loweredType = builder.createStructType();
@@ -859,27 +873,24 @@ struct LoweredElementTypeContext
         {
             IRType* elementType = nullptr;
 
-            if (options.lowerBufferPointer)
+            if (auto ptrType = as<IRPtrTypeBase>(globalInst))
             {
-                if (auto ptrType = as<IRPtrTypeBase>(globalInst))
+                switch (ptrType->getAddressSpace())
                 {
-                    switch (ptrType->getAddressSpace())
-                    {
-                    case AddressSpace::UserPointer:
-                    case AddressSpace::Input:
-                    case AddressSpace::Output:
-                        elementType = ptrType->getValueType();
-                        break;
-                    }
+                case AddressSpace::UserPointer:
+                    if (!options.lowerBufferPointer)
+                        continue;
+                    [[fallthrough]];
+                case AddressSpace::Input:
+                case AddressSpace::Output:
+                    elementType = ptrType->getValueType();
+                    break;
                 }
             }
-            else
-            {
-                if (auto structBuffer = as<IRHLSLStructuredBufferTypeBase>(globalInst))
-                    elementType = structBuffer->getElementType();
-                else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
-                    elementType = constBuffer->getElementType();
-            }
+            if (auto structBuffer = as<IRHLSLStructuredBufferTypeBase>(globalInst))
+                elementType = structBuffer->getElementType();
+            else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
+                elementType = constBuffer->getElementType();
             if (as<IRTextureBufferType>(globalInst))
                 continue;
             if (!as<IRStructType>(elementType) && !as<IRMatrixType>(elementType) &&

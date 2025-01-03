@@ -20,7 +20,10 @@ struct VSOut {
 VSOut vertMain(VIn i)
 {
     VSOut o;
-    o.a = i.inA;
+    if (i.inA.hasValue)
+        o.a = i.inA;
+    else
+        o.a = 0.0;
     o.outputValues = { true, false, true };
     return o;
 }

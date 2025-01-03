@@ -4099,6 +4099,15 @@ Expr* SemanticsVisitor::maybeDereference(Expr* inExpr, CheckBaseContext checkBas
             elementType = QualType(ptrType->getValueType());
             elementType.isLeftValue = true;
         }
+        else
+        {
+            auto newExpr = maybeOpenRef(expr);
+            if (newExpr != expr)
+            {
+                expr = newExpr;
+                continue;
+            }
+        }
         if (elementType.type)
         {
             auto derefExpr = m_astBuilder->create<DerefExpr>();
@@ -4108,9 +4117,10 @@ Expr* SemanticsVisitor::maybeDereference(Expr* inExpr, CheckBaseContext checkBas
             expr = derefExpr;
             continue;
         }
-        // Default case: just use the expression as-is
-        return expr;
+        break;
     }
+    // Default case: just use the expression as-is
+    return expr;
 }
 
 Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(

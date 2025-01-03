@@ -460,6 +460,26 @@ struct ASTDumpContext
         }
     }
 
+    void dump(DeclVisibility vis)
+    {
+        switch (vis)
+        {
+        case DeclVisibility::Private:
+            m_writer->emit("private");
+            break;
+        case DeclVisibility::Internal:
+            m_writer->emit("internal");
+            break;
+        case DeclVisibility::Public:
+            m_writer->emit("public");
+            break;
+        default:
+            m_writer->emit(String((int)vis).getUnownedSlice());
+            break;
+        }
+    }
+
+
     void dump(const QualType& qualType)
     {
         if (qualType.isLeftValue)

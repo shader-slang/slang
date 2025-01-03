@@ -1,7 +1,9 @@
 // array-uniform-param.slang
 
-//TESTD:SIMPLE:-target spirv -entry computeMain -stage compute -emit-spirv-directly -force-glsl-scalar-layout
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute -emit-spirv-directly -force-glsl-scalar-layout
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -output-using-type
+
+// CHECK: OpEntryPoint
 
 // Test direct SPIR-V emit on arrays in uniforms.
 

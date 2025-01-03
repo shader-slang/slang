@@ -8101,89 +8101,139 @@ RasterizerOrderedStructuredBuffer<T> __getEquivalentStructuredBuffer<T>(Rasteriz
 
 // Attribute evaluation
 
+T __EvaluateAttributeAtCentroid<T>(__constref T x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "EvaluateAttributeAtCentroid";
+    case glsl: __intrinsic_asm "interpolateAtCentroid";
+    }
+}
+
 // TODO: The matrix cases of these functions won't actuall work
 // when compiled to GLSL, since they only support scalar/vector
 
 // TODO: Should these be constrains to `__BuiltinFloatingPointType`?
 // TODO: SPIRV-direct does not support non-floating-point types.
 
+/// Interpolates vertex attribute at centroid position.
+/// @param x The vertex attribute to interpolate.
+/// @return The interpolated attribute value.
+/// @remarks `x` must be a direct reference to a fragment shader varying input.
+/// @category interpolation Vertex Interpolation Functions
 __generic<T : __BuiltinArithmeticType>
 [__readNone]
-[require(glsl_spirv, fragmentprocessing)]
-T EvaluateAttributeAtCentroid(T x)
+[__unsafeForceInlineEarly]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
+T EvaluateAttributeAtCentroid(__constref T x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "interpolateAtCentroid";
+    case hlsl:
+    case glsl:
+        return __EvaluateAttributeAtCentroid(__ResolveVaryingInputRef(x));
     case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 InterpolateAtCentroid $x
+        OpCapability InterpolationFunction;
+        OpExtInst $$T result glsl450 InterpolateAtCentroid $__ResolveVaryingInputRef(x)
     };
     }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
-[require(glsl_spirv, fragmentprocessing)]
-vector<T,N> EvaluateAttributeAtCentroid(vector<T,N> x)
+[__unsafeForceInlineEarly]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
+vector<T,N> EvaluateAttributeAtCentroid(__constref vector<T,N> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "interpolateAtCentroid";
+    case hlsl:
+    case glsl:
+        return __EvaluateAttributeAtCentroid(__ResolveVaryingInputRef(x));
     case spirv: return spirv_asm {
-        OpExtInst $$vector<T,N> result glsl450 InterpolateAtCentroid $x
+        OpCapability InterpolationFunction;
+        OpExtInst $$vector<T,N> result glsl450 InterpolateAtCentroid $__ResolveVaryingInputRef(x)
     };
     }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [__readNone]
-[require(glsl_spirv, fragmentprocessing)]
-matrix<T,N,M> EvaluateAttributeAtCentroid(matrix<T,N,M> x)
+[__unsafeForceInlineEarly]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
+matrix<T,N,M> EvaluateAttributeAtCentroid(__constref matrix<T,N,M> x)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "interpolateAtCentroid";
+    case hlsl:
+    case glsl:
+        return __EvaluateAttributeAtCentroid(__ResolveVaryingInputRef(x));
     default:
         MATRIX_MAP_UNARY(T, N, M, EvaluateAttributeAtCentroid, x);
     }
 }
 
-__generic<T : __BuiltinArithmeticType>
-[__readNone]
-[require(glsl_spirv, fragmentprocessing)]
-T EvaluateAttributeAtSample(T x, uint sampleindex)
+T __EvaluateAttributeAtSample<T>(__constref T x, uint sampleIndex)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "interpolateAtSample($0, int($1))";
+    case hlsl: __intrinsic_asm "EvaluateAttributeAtSample";
+    case glsl: __intrinsic_asm "interpolateAtSample";
+    }
+}
+
+/// Interpolates vertex attribute at the current fragment sample position.
+/// @param x The vertex attribute to interpolate.
+/// @return The interpolated attribute value.
+/// @remarks `x` must be a direct reference to a fragment shader varying input.
+/// @category interpolation Vertex Interpolation Functions
+__generic<T : __BuiltinArithmeticType>
+[__readNone]
+[__unsafeForceInlineEarly]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
+T EvaluateAttributeAtSample(__constref T x, uint sampleindex)
+{
+    __target_switch
+    {
+    case hlsl:
+    case glsl:
+        return __EvaluateAttributeAtSample(__ResolveVaryingInputRef(x), sampleindex);
     case spirv: return spirv_asm {
-        OpExtInst $$T result glsl450 InterpolateAtSample $x $sampleindex
+        OpCapability InterpolationFunction;
+        OpExtInst $$T result glsl450 InterpolateAtSample $__ResolveVaryingInputRef(x) $sampleindex
     };
     }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
-[require(glsl_spirv, fragmentprocessing)]
-vector<T,N> EvaluateAttributeAtSample(vector<T,N> x, uint sampleindex)
+[__unsafeForceInlineEarly]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
+vector<T,N> EvaluateAttributeAtSample(__constref vector<T,N> x, uint sampleindex)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "interpolateAtSample($0, int($1))";
+    case hlsl:
+    case glsl:
+        return __EvaluateAttributeAtSample(__ResolveVaryingInputRef(x), sampleindex);
     case spirv: return spirv_asm {
-        OpExtInst $$vector<T,N> result glsl450 InterpolateAtSample $x $sampleindex
+        OpCapability InterpolationFunction;
+        OpExtInst $$vector<T,N> result glsl450 InterpolateAtSample $__ResolveVaryingInputRef(x) $sampleindex
     };
     }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [__readNone]
-[require(glsl_spirv, fragmentprocessing)]
-matrix<T,N,M> EvaluateAttributeAtSample(matrix<T,N,M> x, uint sampleindex)
+[__unsafeForceInlineEarly]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
+matrix<T,N,M> EvaluateAttributeAtSample(__constref matrix<T,N,M> x, uint sampleindex)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "interpolateAtSample($0, int($1))";
+    case hlsl:
+    case glsl:
+        return __EvaluateAttributeAtSample(__ResolveVaryingInputRef(x), sampleindex);
     default:
         matrix<T,N,M> result;
         for(int i = 0; i < N; ++i)
@@ -8194,21 +8244,59 @@ matrix<T,N,M> EvaluateAttributeAtSample(matrix<T,N,M> x, uint sampleindex)
     }
 }
 
-__generic<T : __BuiltinArithmeticType>
-[__readNone]
-[require(glsl_spirv, fragmentprocessing)]
-T EvaluateAttributeSnapped(T x, int2 offset)
+T __EvaluateAttributeSnapped<T>(__constref T x, int2 offset)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "interpolateAtOffset($0, vec2($1) / 16.0f)";
+    case hlsl: __intrinsic_asm "EvaluateAttributeSnapped";
+    case glsl: __intrinsic_asm "EvaluateAttributeSnapped";
+    }
+}
+
+/// Interpolates vertex attribute at the specified subpixel offset.
+/// @param x The vertex attribute to interpolate.
+/// @param offset The subpixel offset. Each component is a 4-bit signed integer in range [-8, 7].
+/// @return The interpolated attribute value.
+/// @remarks `x` must be a direct reference to a fragment shader varying input.
+///
+/// The valid values of each component of `offset` are:
+///
+/// - 1000 = -0.5f (-8 / 16)
+/// - 1001 = -0.4375f (-7 / 16)
+/// - 1010 = -0.375f (-6 / 16)
+/// - 1011 = -0.3125f (-5 / 16)
+/// - 1100 = -0.25f (-4 / 16)
+/// - 1101 = -0.1875f (-3 / 16)
+/// - 1110 = -0.125f (-2 / 16)
+/// - 1111 = -0.0625f (-1 / 16)
+/// - 0000 = 0.0f ( 0 / 16)
+/// - 0001 = 0.0625f ( 1 / 16)
+/// - 0010 = 0.125f ( 2 / 16)
+/// - 0011 = 0.1875f ( 3 / 16)
+/// - 0100 = 0.25f ( 4 / 16)
+/// - 0101 = 0.3125f ( 5 / 16)
+/// - 0110 = 0.375f ( 6 / 16)
+/// - 0111 = 0.4375f ( 7 / 16)
+/// @category interpolation Vertex Interpolation Functions
+__generic<T : __BuiltinArithmeticType>
+[__readNone]
+[__unsafeForceInlineEarly]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
+T EvaluateAttributeSnapped(__constref T x, int2 offset)
+{
+    __target_switch
+    {
+    case hlsl: 
+    case glsl:
+        return __EvaluateAttributeSnapped(__ResolveVaryingInputRef(x), offset);
     case spirv:
     {
         const float2 tmp = float2(16.f, 16.f);
         return spirv_asm {
+            OpCapability InterpolationFunction;
             %foffset:$$float2 = OpConvertSToF $offset;
             %offsetdiv16:$$float2 = OpFDiv %foffset $tmp;
-            result:$$T = OpExtInst glsl450 InterpolateAtOffset $x %offsetdiv16
+            result:$$T = OpExtInst glsl450 InterpolateAtOffset $__ResolveVaryingInputRef(x) %offsetdiv16
         };
     }
     }
@@ -8216,19 +8304,23 @@ T EvaluateAttributeSnapped(T x, int2 offset)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__readNone]
-[require(glsl_spirv, fragmentprocessing)]
-vector<T,N> EvaluateAttributeSnapped(vector<T,N> x, int2 offset)
+[__unsafeForceInlineEarly]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
+vector<T,N> EvaluateAttributeSnapped(__constref vector<T,N> x, int2 offset)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "interpolateAtOffset($0, vec2($1) / 16.0f)";
+    case hlsl: 
+    case glsl:
+        return __EvaluateAttributeSnapped(__ResolveVaryingInputRef(x), offset);
     case spirv:
     {
         const float2 tmp = float2(16.f, 16.f);
         return spirv_asm {
+            OpCapability InterpolationFunction;
             %foffset:$$float2 = OpConvertSToF $offset;
             %offsetdiv16:$$float2 = OpFDiv %foffset $tmp;
-            result:$$vector<T,N> = OpExtInst glsl450 InterpolateAtOffset $x %offsetdiv16
+            result:$$vector<T,N> = OpExtInst glsl450 InterpolateAtOffset $__ResolveVaryingInputRef(x) %offsetdiv16
         };
     }
     }
@@ -8236,12 +8328,15 @@ vector<T,N> EvaluateAttributeSnapped(vector<T,N> x, int2 offset)
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [__readNone]
-[require(glsl_spirv, fragmentprocessing)]
-matrix<T,N,M> EvaluateAttributeSnapped(matrix<T,N,M> x, int2 offset)
+[__unsafeForceInlineEarly]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
+matrix<T,N,M> EvaluateAttributeSnapped(__constref matrix<T,N,M> x, int2 offset)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "interpolateAtOffset($0, vec2($1) / 16.0f)";
+    case hlsl: 
+    case glsl:
+        return __EvaluateAttributeSnapped(__ResolveVaryingInputRef(x), offset);
     default:
         matrix<T,N,M> result;
         for(int i = 0; i < N; ++i)
@@ -9243,8 +9338,16 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
     }
 }
 
+__intrinsic_op($(kIROp_ResolveVaryingInputRef))
+Ref<T> __ResolveVaryingInputRef<T>(__constref T attribute);
+
 __intrinsic_op($(kIROp_GetPerVertexInputArray))
-Array<T, 3> __GetPerVertexInputArray<T>(T attribute);
+Ref<Array<T, 3>> __GetPerVertexInputArray<T>(__constref T attribute);
+
+T __GetAttributeAtVertex<T>(__constref T attribute, uint vertexIndex)
+{
+    __intrinsic_asm "GetAttributeAtVertex";
+}
 
 /// Get the value of a vertex attribute at a specific vertex.
 ///
@@ -9265,15 +9368,15 @@ __glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
 [KnownBuiltin("GetAttributeAtVertex")]
 [__unsafeForceInlineEarly]
-T GetAttributeAtVertex(T attribute, uint vertexIndex)
+T GetAttributeAtVertex(__constref T attribute, uint vertexIndex)
 {
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "GetAttributeAtVertex";
+        return __GetAttributeAtVertex(__ResolveVaryingInputRef(attribute), vertexIndex);
     case glsl:
     case spirv:
-        return __GetPerVertexInputArray(attribute)[vertexIndex];
+        return __GetPerVertexInputArray(__ResolveVaryingInputRef(attribute))[vertexIndex];
     }
 }
 
@@ -9294,20 +9397,16 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_version(450)
 __glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
-vector<T,N> GetAttributeAtVertex(vector<T,N> attribute, uint vertexIndex)
+[__unsafeForceInlineEarly]
+vector<T,N> GetAttributeAtVertex(__constref vector<T,N> attribute, uint vertexIndex)
 {
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "GetAttributeAtVertex";
-    case glsl: 
-        __intrinsic_asm "$0[$1]";
+        return __GetAttributeAtVertex(__ResolveVaryingInputRef(attribute), vertexIndex);
+    case glsl:
     case spirv:
-        return spirv_asm {
-            %_ptr_Input_vectorT = OpTypePointer Input $$vector<T,N>;
-            %addr = OpAccessChain %_ptr_Input_vectorT $attribute $vertexIndex;
-            result:$$vector<T,N> = OpLoad %addr;
-        };
+        return __GetPerVertexInputArray(__ResolveVaryingInputRef(attribute))[vertexIndex];
     }
 }
 
@@ -9328,20 +9427,16 @@ __generic<T : __BuiltinType, let N : int, let M : int>
 __glsl_version(450)
 __glsl_extension(GL_EXT_fragment_shader_barycentric)
 [require(glsl_hlsl_spirv, getattributeatvertex)]
-matrix<T,N,M> GetAttributeAtVertex(matrix<T,N,M> attribute, uint vertexIndex)
+[__unsafeForceInlineEarly]
+matrix<T,N,M> GetAttributeAtVertex(__constref matrix<T,N,M> attribute, uint vertexIndex)
 {
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "GetAttributeAtVertex";
-    case glsl: 
-        __intrinsic_asm "$0[$1]";
+        return __GetAttributeAtVertex(__ResolveVaryingInputRef(attribute), vertexIndex);
+    case glsl:
     case spirv:
-        return spirv_asm {
-            %_ptr_Input_matrixT = OpTypePointer Input $$matrix<T,N,M>;
-            %addr = OpAccessChain %_ptr_Input_matrixT $attribute $vertexIndex;
-            result:$$matrix<T,N,M> = OpLoad %addr;
-        };
+        return __GetPerVertexInputArray(__ResolveVaryingInputRef(attribute))[vertexIndex];
     }
 }
 

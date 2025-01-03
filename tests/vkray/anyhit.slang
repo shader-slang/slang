@@ -57,7 +57,6 @@ void main(
 // SPIRV: OpEntryPoint
 // SPIRV: BuiltIn HitTriangleVertexPositionsKHR
 // SPIRV: OpTypePointer HitAttribute{{NV|KHR}}
-// SPIRV: OpTypePointer HitAttribute{{NV|KHR}}
 // SPIRV: OpVariable{{.*}}HitAttribute{{NV|KHR}}
 // SPIRV: OpIgnoreIntersectionKHR
 // SPIRV: OpTerminateRayKHR
@@ -69,7 +68,6 @@ void main(
 // GL_SPIRV-DAG: OpCapability RayTracingPositionFetchKHR
 // GL_SPIRV: OpEntryPoint
 // GL_SPIRV: BuiltIn HitTriangleVertexPositionsKHR
-// GL_SPIRV-DAG: OpTypePointer HitAttribute{{NV|KHR}}
 // GL_SPIRV-DAG: OpTypePointer HitAttribute{{NV|KHR}}
 // GL_SPIRV: OpTerminateRayKHR
 // GL_SPIRV: OpIgnoreIntersectionKHR

@@ -76,8 +76,8 @@ bool testFragmentProcessingDerivativeFunctionsVector()
 }
 bool testFragmentProcessingInterpolateFunctions()
 {
-// CHECK_SPV: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtCentroid %inDataV1
-// CHECK_GLSL: interpolateAtCentroid{{.*}}inDataV1
+// CHECK_SPV-DAG: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtCentroid %inDataV1
+// CHECK_GLSL-DAG: interpolateAtCentroid{{.*}}inDataV1
 // CHECK_SPV: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtSample %inDataV1 {{.*}}
 // CHECK_GLSL: interpolateAtSample{{.*}}inDataV1
 // CHECK_SPV: {{.*}} = OpExtInst {{.*}} {{.*}} InterpolateAtOffset %inDataV1 {{.*}}
