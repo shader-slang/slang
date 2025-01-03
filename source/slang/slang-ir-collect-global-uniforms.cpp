@@ -279,6 +279,16 @@ struct CollectGlobalUniformParametersContext
                     continue;
                 }
 
+                // NumThreadsDecoration may sometimes be the user for a global
+                // parameter. This occurs when the parameter was supposed to be
+                // a specialization constant, but isn't due to that not being
+                // supported for the target. These can be skipped here and
+                // diagnosed later.
+                if (as<IRNumThreadsDecoration>(user))
+                {
+                    continue;
+                }
+
                 // For each use site for the global parameter, we will
                 // insert new code right before the instruction that uses
                 // the parameter.

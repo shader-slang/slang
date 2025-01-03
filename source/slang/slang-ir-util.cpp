@@ -1948,4 +1948,17 @@ IRType* getIRVectorBaseType(IRType* type)
     return as<IRVectorType>(type)->getElementType();
 }
 
+Int getSpecializationConstantId(IRGlobalParam* param)
+{
+    auto layout = findVarLayout(param);
+    if (!layout)
+        return 0;
+
+    auto offset = layout->findOffsetAttr(LayoutResourceKind::SpecializationConstant);
+    if (!offset)
+        return 0;
+
+    return offset->getOffset();
+}
+
 } // namespace Slang
