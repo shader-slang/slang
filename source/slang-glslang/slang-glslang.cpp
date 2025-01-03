@@ -169,7 +169,7 @@ extern "C"
 #else
     __attribute__((__visibility__("default")))
 #endif
-bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
+        bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
 {
     spv_target_env target_env = SPV_ENV_VULKAN_1_3;
 
@@ -189,7 +189,7 @@ extern "C"
 #else
     __attribute__((__visibility__("default")))
 #endif
-bool glslang_disassembleSPIRV(const uint32_t* contents, int contentsSize)
+        bool glslang_disassembleSPIRV(const uint32_t* contents, int contentsSize)
 {
     static const auto kDefaultEnvironment = SPV_ENV_UNIVERSAL_1_5;
 
@@ -200,13 +200,8 @@ bool glslang_disassembleSPIRV(const uint32_t* contents, int contentsSize)
 
     spv_diagnostic diagnostic = nullptr;
     spv_context context = spvContextCreate(kDefaultEnvironment);
-    spv_result_t error = spvBinaryToText(
-        context,
-        contents,
-        contentsSize,
-        options,
-        nullptr,
-        &diagnostic);
+    spv_result_t error =
+        spvBinaryToText(context, contents, contentsSize, options, nullptr, &diagnostic);
     spvContextDestroy(context);
     if (error)
     {
