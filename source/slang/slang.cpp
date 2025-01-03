@@ -4598,7 +4598,7 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
     if (_canExportDeclSymbol(decl->astNodeType))
     {
         // It's a reference to a declaration in another module, so first get the symbol name.
-        String mangledName = getMangledName(getASTBuilder(), decl);
+        String mangledName = getMangledName(getCurrentASTBuilder(), decl);
 
         Index index = Index(m_mangledExportPool.add(mangledName));
 

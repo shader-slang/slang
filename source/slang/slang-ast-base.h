@@ -793,7 +793,6 @@ public:
 
 private:
     SLANG_UNREFLECTED DeclRefBase* m_defaultDeclRef = nullptr;
-    SLANG_UNREFLECTED Index m_defaultDeclRefEpoch = -1;
 };
 
 class Expr : public SyntaxNode
