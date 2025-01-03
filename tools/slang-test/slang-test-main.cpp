@@ -48,9 +48,15 @@
 using namespace Slang;
 
 #if defined(_WIN32)
-extern "C" { __declspec(dllexport) extern const uint32_t D3D12SDKVersion = 711; }
+extern "C"
+{
+    __declspec(dllexport) extern const uint32_t D3D12SDKVersion = 711;
+}
 
-extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\"; }
+extern "C"
+{
+    __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\";
+}
 #endif
 
 // Options for a particular test
