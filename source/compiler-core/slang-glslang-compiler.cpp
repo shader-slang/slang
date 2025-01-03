@@ -78,7 +78,8 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_compile_1_1 = (glslang_CompileFunc_1_1)library->findFuncByName("glslang_compile_1_1");
     m_compile_1_2 = (glslang_CompileFunc_1_2)library->findFuncByName("glslang_compile_1_2");
     m_validate = (glslang_ValidateSPIRVFunc)library->findFuncByName("glslang_validateSPIRV");
-    m_disassemble = (glslang_DisassembleSPIRVFunc)library->findFuncByName("glslang_disassembleSPIRV");
+    m_disassemble =
+        (glslang_DisassembleSPIRVFunc)library->findFuncByName("glslang_disassembleSPIRV");
 
     if (m_compile_1_0 == nullptr && m_compile_1_1 == nullptr && m_compile_1_2 == nullptr)
     {
