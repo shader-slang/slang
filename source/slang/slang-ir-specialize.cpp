@@ -123,6 +123,12 @@ struct SpecializationContext
                 }
                 return false;
             }
+        case kIROp_ArrayType:
+            {
+                auto array = as<IRArrayType>(inst);
+                auto elementType = array->getElementType();
+                return isInstFullySpecialized(elementType);
+            }
         }
 
         // The default case is that a global value is always specialized.
