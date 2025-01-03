@@ -47,6 +47,8 @@ public:
         SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    disassemble(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
 
     /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
@@ -63,6 +65,7 @@ protected:
     glslang_CompileFunc_1_1 m_compile_1_1 = nullptr;
     glslang_CompileFunc_1_2 m_compile_1_2 = nullptr;
     glslang_ValidateSPIRVFunc m_validate = nullptr;
+    glslang_DisassembleSPIRVFunc m_disassemble = nullptr;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
 
@@ -75,7 +78,8 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_compile_1_1 = (glslang_CompileFunc_1_1)library->findFuncByName("glslang_compile_1_1");
     m_compile_1_2 = (glslang_CompileFunc_1_2)library->findFuncByName("glslang_compile_1_2");
     m_validate = (glslang_ValidateSPIRVFunc)library->findFuncByName("glslang_validateSPIRV");
-
+    m_disassemble =
+        (glslang_DisassembleSPIRVFunc)library->findFuncByName("glslang_disassembleSPIRV");
 
     if (m_compile_1_0 == nullptr && m_compile_1_1 == nullptr && m_compile_1_2 == nullptr)
     {
@@ -299,6 +303,20 @@ SlangResult GlslangDownstreamCompiler::validate(const uint32_t* contents, int co
     }
 
     if (m_validate(contents, contentsSize))
+    {
+        return SLANG_OK;
+    }
+    return SLANG_FAIL;
+}
+
+SlangResult GlslangDownstreamCompiler::disassemble(const uint32_t* contents, int contentsSize)
+{
+    if (m_disassemble == nullptr)
+    {
+        return SLANG_FAIL;
+    }
+
+    if (m_disassemble(contents, contentsSize))
     {
         return SLANG_OK;
     }

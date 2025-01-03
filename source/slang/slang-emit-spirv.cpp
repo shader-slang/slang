@@ -12,7 +12,6 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-lookup-spirv.h"
-#include "slang-spirv-val.h"
 #include "spirv/unified1/spirv.h"
 
 #include <type_traits>
