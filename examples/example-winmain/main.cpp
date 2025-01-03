@@ -14,7 +14,7 @@ int WinMain(
     int /*showCommand*/)
 
 {
-    FILE * logFile = fopen(g_logFileName, "w");
+    FILE* logFile = fopen(g_logFileName, "w");
     __try
     {
         int argc = 0;
