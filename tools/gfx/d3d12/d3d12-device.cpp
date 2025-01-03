@@ -2231,6 +2231,7 @@ Result DeviceImpl::createAccelerationStructure(
     IAccelerationStructure** outAS)
 {
 #if SLANG_GFX_HAS_DXR_SUPPORT
+    assert(desc.buffer != nullptr);
     RefPtr<AccelerationStructureImpl> result = new AccelerationStructureImpl();
     result->m_device5 = m_device5;
     result->m_buffer = static_cast<BufferResourceImpl*>(desc.buffer);
