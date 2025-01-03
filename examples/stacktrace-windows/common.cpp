@@ -8,9 +8,9 @@
 // dbghelp.h needs to be included after windows.h
 #include <dbghelp.h>
 
-#define SLANG_EXAMPLE_LOG_ERROR(...)                         \
-    fprintf(file, "error: %s: %d: ", __FILE__, __LINE__);    \
-    print(file, __VA_ARGS__);                                \
+#define SLANG_EXAMPLE_LOG_ERROR(...)                      \
+    fprintf(file, "error: %s: %d: ", __FILE__, __LINE__); \
+    print(file, __VA_ARGS__);                             \
     fprintf(file, "\n");
 
 static void print(FILE* /* file */) {}
