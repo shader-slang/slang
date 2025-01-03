@@ -70,4 +70,29 @@ UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr)
     return UnownedStringSlice();
 }
 
+void printDiagnosticArg(StringBuilder& sb, ParameterDirection direction)
+{
+    switch (direction)
+    {
+    case kParameterDirection_In:
+        sb << "in";
+        break;
+    case kParameterDirection_Out:
+        sb << "out";
+        break;
+    case kParameterDirection_Ref:
+        sb << "ref";
+        break;
+    case kParameterDirection_InOut:
+        sb << "inout";
+        break;
+    case kParameterDirection_ConstRef:
+        sb << "constref";
+        break;
+    default:
+        sb << "(" << int(direction) << ")";
+        break;
+    }
+}
+
 } // namespace Slang
