@@ -131,7 +131,7 @@ Result loadShaderProgram(
 }
 
 // Main body of the example.
-int main(int argc, char* argv[])
+int exampleMain(int argc, char** argv)
 {
     testBase.parseOption(argc, argv);
 

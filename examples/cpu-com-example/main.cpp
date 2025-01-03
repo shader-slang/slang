@@ -175,7 +175,7 @@ static SlangResult _innerMain(int argc, char** argv)
     return SLANG_OK;
 }
 
-int main(int argc, char** argv)
+int exampleMain(int argc, char** argv)
 {
     return SLANG_SUCCEEDED(_innerMain(argc, argv)) ? 0 : -1;
 }
