@@ -23,15 +23,7 @@ void NodeBase::_initDebug(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder)
 }
 DeclRefBase* Decl::getDefaultDeclRef()
 {
-    if (auto astBuilder = getCurrentASTBuilder())
-    {
-        const Index currentEpoch = astBuilder->getEpoch();
-        if (currentEpoch != m_defaultDeclRefEpoch || !m_defaultDeclRef)
-        {
-            m_defaultDeclRef = astBuilder->getOrCreate<DirectDeclRef>(this);
-            m_defaultDeclRefEpoch = currentEpoch;
-        }
-    }
+    SLANG_ASSERT(m_defaultDeclRef);
     return m_defaultDeclRef;
 }
 

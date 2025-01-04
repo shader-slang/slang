@@ -512,11 +512,12 @@ InstPair BackwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRF
             {
                 // If primal parameter is mutable, we need to pass in a temp var.
                 auto tempVar = builder.emitVar(primalParamPtrType->getValueType());
-                if (primalParamPtrType->getOp() == kIROp_InOutType)
-                {
-                    // If the primal parameter is inout, we need to set the initial value.
-                    builder.emitStore(tempVar, primalArg);
-                }
+
+                // We also need to setup the initial value of the temp var, otherwise
+                // the temp var will be uninitialized which could cause undefined behavior
+                // in the primal function.
+                builder.emitStore(tempVar, primalArg);
+
                 primalArgs.add(tempVar);
             }
             else

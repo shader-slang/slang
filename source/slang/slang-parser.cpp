@@ -3360,6 +3360,16 @@ static Decl* ParseBufferBlockDecl(
         reflectionNameModifier->nameAndLoc = bufferVarDecl->nameAndLoc;
         parser->ReadToken(TokenType::Semicolon);
     }
+    else if (
+        parser->options.allowGLSLInput && parser->LookAheadToken(TokenType::Identifier) &&
+        parser->LookAheadToken(TokenType::LBracket, 1))
+    {
+        // GLSL bindless buffers are denoted with [] after the name.
+        bufferVarDecl->nameAndLoc = ParseDeclName(parser);
+        bufferVarDecl->type.exp = parseBracketTypeSuffix(parser, bufferVarDecl->type.exp);
+        reflectionNameModifier->nameAndLoc = bufferVarDecl->nameAndLoc;
+        parser->ReadToken(TokenType::Semicolon);
+    }
     else
     {
         // Otherwise, we need to generate a name for the buffer variable.

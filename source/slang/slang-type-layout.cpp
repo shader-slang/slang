@@ -110,6 +110,10 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
                 sizeof(intptr_t),
                 sizeof(intptr_t));
 
+        case BaseType::Int8x4Packed:
+        case BaseType::UInt8x4Packed:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
+
         case BaseType::Half:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
         case BaseType::Float:
@@ -1891,6 +1895,19 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
         SLANG_UNUSED(baseType);
         // Everything in a metal argument buffer, including basic scalar values, occupy one `[[id]]`
         // slot.
+        return SimpleLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 1);
+    }
+
+    SimpleLayoutInfo GetVectorLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t elementCount) override
+    {
+        SLANG_UNUSED(elementType);
+        SLANG_UNUSED(elementInfo);
+        SLANG_UNUSED(elementCount);
+
+        // A vector occupies one [[id]] slot in a metal argument buffer.
         return SimpleLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 1);
     }
 

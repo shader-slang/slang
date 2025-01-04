@@ -426,7 +426,8 @@
     <Type Name="Slang::Val" Inheritable="true">
       <DisplayString Optional="true" Condition="astNodeType == Slang::ASTNodeType::DeclRefType">DeclRefType#{_debugUID} {*(Val*)(((Slang::DeclRefType*)this)->m_operands.m_buffer[0].values.nodeOperand)}</DisplayString>
       <DisplayString Condition="astNodeType == Slang::ASTNodeType::DeclRefType">DeclRefType {*(Val*)(((Slang::DeclRefType*)this)->m_operands.m_buffer[0].values.nodeOperand)}</DisplayString>
-      <DisplayString Condition="astNodeType == Slang::ASTNodeType::DirectDeclRef">DirectRef {*(Decl*)m_operands.m_buffer[0].values.nodeOperand}</DisplayString>
+      <DisplayString Optional="true" Condition="astNodeType == Slang::ASTNodeType::DirectDeclRef">DirectRef#{_debugUID} {*(Decl*)m_operands.m_buffer[0].values.nodeOperand}</DisplayString>
+      <DisplayString Condition="astNodeType == Slang::ASTNodeType::DirectDeclRef">DirectRef {*(Decl*)m_operands.m_buffer[0].values.nodeOperand}</DisplayString>  
       <DisplayString Optional="true">{astNodeType,en} #{_debugUID}</DisplayString>
       <DisplayString>{astNodeType,en}</DisplayString>
 

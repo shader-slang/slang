@@ -193,7 +193,7 @@ This method is currently only available on the `ICompileRequest` and not on the 
 
 The file system returned is held in memory, and the blob data held in the file system typically shared, so accessing items this way is typically very low overhead. 
 
-The conventions used for the file system representation could best be described as a work in progress, and may change in the future. Internally Slang stores compilation results as a hierarchy of "artifacts". An artifact consists of the main result, plus associated artifacts. An artifact can also be a container which can additionally hold children artifacts. In the current directory structure each artifact is a directory, with the root directory of the `ISlangMultableFileSystem` being the root artifact. 
+The conventions used for the file system representation could best be described as a work in progress, and may change in the future. Internally Slang stores compilation results as a hierarchy of "artifacts". An artifact consists of the main result, plus associated artifacts. An artifact can also be a container which can additionally hold children artifacts. In the current directory structure each artifact is a directory, with the root directory of the `ISlangMutableFileSystem` being the root artifact. 
 
 Given a directory representing an artifact it can contain 2 special directories `children` and `associated`. The `children` directory contains the artifacts that are children of the current directories artifact. Similarly `associated` contains directories for artifacts that are associated with the current artifact.
 
