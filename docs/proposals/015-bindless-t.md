@@ -40,7 +40,7 @@ enum ResourceKind
 }
 interface IOpaqueHandle
 {
-    static ResourceKind getResourceKind();
+    static const ResourceKind kind;
 }
 ```
 
@@ -130,7 +130,7 @@ __DynamicResource<__DynamicResourceKind.Sampler> samplerHandles[];
 
 export getResourceFromBindlessHandle<T>(uint64_t handle) where T : IOpaqueHandle
 {
-    if (T.getResourceKind() == ResourceKind.Sampler)
+    if (T.kind == ResourceKind.Sampler)
         return (T)samplerHandles[handle];
     else
         return (T)resourceHandles[handle];
@@ -150,6 +150,43 @@ struct Bindless<T> where T:IOpaqueHandle
     static const Bindless<T> invalid = Bindless<T>(uint64_t.maxValue);
 }
 ```
+
+## Alternatives Considered
+
+We initially considered to support a more general `Bindless<T>` where `T` can be any composite type, for example, allowing the following:
+
+```slang
+struct Foo
+{
+    Texture2D t;
+    SamplerState s;
+    float ordinaryData;
+}
+
+uniform Bindless<Foo> foo;
+```
+
+which is equivalent to:
+
+```slang
+struct Bindless_Foo
+{
+    Bindless<Texture2D> t;
+    Bindless<SamplerState> s;
+    float s;
+}
+uniform Bindless_Foo foo;
+```
+
+While relaxing `T` this way adds an extra layer of convenience, it introduces complicated
+semantic rules to the type system, and there is increased chance of exposing tricky corner
+cases that are hard to get right.
+
+An argument for allowing `T` to be general composite types is that it enables sharing the same
+code for both bindless systems and bindful systems. But this argument can also be countered by
+allowing the compiler to treat `Bindless<T>` as `T` in a special mode if this feature is found to be useful.
+
+For now we think that restricting `T` to be an `IOpaqueHandle` type will result in a much simpler implementation, and is likely sufficient for current needs. Given that the trend of modern GPU architecture is moving towards bindless idioms and the whole idea of opaque handles may disappear in the future, we should be cautious at inventing too many heavy weight mechanisms around opaque handles. Nevertheless, this proposal still allows us to relax this requirement in the future if it becomes clear that such feature is valuable to our users.
 
 ## Conclusion
 
