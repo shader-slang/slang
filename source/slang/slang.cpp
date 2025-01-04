@@ -608,7 +608,7 @@ Session::queryInterface(SlangUUID const& uuid, void** outObject)
         return SLANG_OK;
     }
 
-    if (uuid == ISlangUnknown::getTypeGuid() && uuid == IGlobalSession::getTypeGuid())
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == IGlobalSession::getTypeGuid())
     {
         addReference();
         *outObject = static_cast<slang::IGlobalSession*>(this);
@@ -4598,7 +4598,7 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
     if (_canExportDeclSymbol(decl->astNodeType))
     {
         // It's a reference to a declaration in another module, so first get the symbol name.
-        String mangledName = getMangledName(getASTBuilder(), decl);
+        String mangledName = getMangledName(getCurrentASTBuilder(), decl);
 
         Index index = Index(m_mangledExportPool.add(mangledName));
 
