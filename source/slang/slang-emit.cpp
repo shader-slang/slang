@@ -1311,10 +1311,6 @@ Result linkAndOptimizeIR(
 #if 0
             dumpIRIfEnabled(codeGenContext, irModule, "PRE GLSL LEGALIZED");
 #endif
-            if (target == CodeGenTarget::GLSL)
-            {
-                legalizeFunctionsForEntryPointAttributesForGLSL(irModule, irEntryPoints);
-            }
 
             legalizeEntryPointsForGLSL(
                 session,
@@ -1885,8 +1881,6 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     // Append the modules output code
     finalResult.append(code);
 
-    // Append all content that should be at the end of a module
-    sourceEmitter->emitPostModule();
     finalResult.append(sourceWriter.getContentAndClear());
 
     // Write out the result

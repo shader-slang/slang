@@ -25,9 +25,78 @@ GLSLSourceEmitter::GLSLSourceEmitter(const Desc& desc)
     SLANG_ASSERT(m_glslExtensionTracker);
 }
 
+void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
+    IRInst* parentFunc,
+    IRInst* inst,
+    IRBuilder& builder)
+{
+    if (auto requireGLSLExt = as<IRRequireGLSLExtension>(inst))
+    {
+        _requireGLSLExtension(requireGLSLExt->getExtensionName());
+        return;
+    }
+
+    // Early exit on instructions we are not interested in.
+    if (!as<IRRequireMaximallyReconverges>(inst) && !as<IRRequireQuadDerivatives>(inst) &&
+        !(as<IRRequireComputeDerivative>(inst) && (m_entryPointStage == Stage::Compute)))
+    {
+        return;
+    }
+
+    // Check for entry point specific decorations.
+    //
+    // Handle cases where "require" IR operations exist in the function body and are required
+    // as entry point decorations.
+    auto entryPoints = getReferencingEntryPoints(m_referencingEntryPoints, parentFunc);
+    if (entryPoints == nullptr)
+        return;
+
+    for (auto entryPoint : *entryPoints)
+    {
+        if (as<IRRequireMaximallyReconverges>(inst))
+        {
+            builder.addDecoration(entryPoint, kIROp_MaximallyReconvergesDecoration);
+        }
+        else if (as<IRRequireQuadDerivatives>(inst))
+        {
+            builder.addDecoration(entryPoint, kIROp_QuadDerivativesDecoration);
+        }
+        else
+        {
+            const auto requireComputeDerivative = as<IRRequireComputeDerivative>(inst);
+
+            SLANG_ASSERT(requireComputeDerivative);
+            SLANG_ASSERT(m_entryPointStage == Stage::Compute);
+
+            // Compute derivatives are quad by default, add the decoration if entry point
+            // does not not explicit linear decoration.
+            bool isQuad = !entryPoint->findDecoration<IRDerivativeGroupLinearDecoration>();
+            if (isQuad)
+            {
+                builder.addDecoration(entryPoint, kIROp_DerivativeGroupQuadDecoration);
+            }
+        }
+    }
+}
+
 void GLSLSourceEmitter::beforeComputeEmitActions(IRModule* module)
 {
     buildEntryPointReferenceGraph(this->m_referencingEntryPoints, module);
+
+    IRBuilder builder(module);
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRGlobalValueWithCode>(globalInst))
+        {
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst = block->getFirstInst(); inst; inst = inst->next)
+                {
+                    _beforeComputeEmitProcessInstruction(func, inst, builder);
+                }
+            }
+        }
+    }
 }
 
 SlangResult GLSLSourceEmitter::init()
@@ -78,8 +147,8 @@ void GLSLSourceEmitter::_requireRayQuery()
 {
     m_glslExtensionTracker->requireExtension(UnownedStringSlice::fromLiteral("GL_EXT_ray_query"));
     m_glslExtensionTracker->requireSPIRVVersion(
-        SemanticVersion(1, 4)); // required due to glslang bug which enables `SPV_KHR_ray_tracing`
-                                // regardless of context
+        SemanticVersion(1, 4)); // required due to glslang bug which enables
+                                // `SPV_KHR_ray_tracing` regardless of context
     m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_460);
 }
 
@@ -226,8 +295,8 @@ void GLSLSourceEmitter::_emitGLSLStructuredBuffer(
     m_writer->emit(") ");
 
     /*
-    If the output type is a buffer, and we can determine it is only readonly we can prefix before
-    buffer with 'readonly'
+    If the output type is a buffer, and we can determine it is only readonly we can prefix
+    before buffer with 'readonly'
 
     The actual structuredBufferType could be
 
@@ -349,8 +418,8 @@ void GLSLSourceEmitter::emitSSBOHeader(IRGlobalParam* varDecl, IRType* bufferTyp
     _emitMemoryQualifierDecorations(varDecl);
 
     /*
-    If the output type is a buffer, and we can determine it is only readonly we can prefix before
-    buffer with 'readonly'
+    If the output type is a buffer, and we can determine it is only readonly we can prefix
+    before buffer with 'readonly'
 
     HLSLByteAddressBufferType                   - This is unambiguously read only
     HLSLRWByteAddressBufferType                 - Read write
@@ -437,11 +506,11 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(
     }
 
     /*
-    With resources backed by 'buffer' on glsl, we want to output 'readonly' if that is a good match
-    for the underlying type. If uniform it's implicit it's readonly
+    With resources backed by 'buffer' on glsl, we want to output 'readonly' if that is a good
+    match for the underlying type. If uniform it's implicit it's readonly
 
-    Here this only happens with isShaderRecord which is a 'constant buffer' (ie implicitly readonly)
-    or IRGLSLShaderStorageBufferType which is read write.
+    Here this only happens with isShaderRecord which is a 'constant buffer' (ie implicitly
+    readonly) or IRGLSLShaderStorageBufferType which is read write.
     */
 
     {
@@ -653,20 +722,21 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
                 // default to rgba
                 //
                 // The SPIR-V spec
-                // (https://www.khronos.org/registry/spir-v/specs/unified1/SPIRV.pdf) section 3.11
-                // on Image Formats it does not list rgbf32.
+                // (https://www.khronos.org/registry/spir-v/specs/unified1/SPIRV.pdf)
+                // section 3.11 on Image Formats it does not list rgbf32.
                 //
                 // It seems SPIR-V can support having an image with an unknown-at-compile-time
-                // format, so long as the underlying API supports it. Ideally this would mean that
-                // we can just drop all these qualifiers when emitting GLSL for Vulkan targets.
+                // format, so long as the underlying API supports it. Ideally this would mean
+                // that we can just drop all these qualifiers when emitting GLSL for Vulkan
+                // targets.
                 //
-                // This raises the question of what to do more long term. For Vulkan hopefully we
-                // can just drop the layout. For OpenGL targets it would seem reasonable to have
-                // well-defined rules for inferring the format (and just document that 3-component
-                // formats map to 4-component formats, but that shouldn't matter because the API
-                // wouldn't let the user allocate those 3-component formats anyway), and add an
-                // attribute for specifying the format manually if you really want to override our
-                // inference (e.g., to specify r11fg11fb10f).
+                // This raises the question of what to do more long term. For Vulkan hopefully
+                // we can just drop the layout. For OpenGL targets it would seem reasonable to
+                // have well-defined rules for inferring the format (and just document that
+                // 3-component formats map to 4-component formats, but that shouldn't matter
+                // because the API wouldn't let the user allocate those 3-component formats
+                // anyway), and add an attribute for specifying the format manually if you
+                // really want to override our inference (e.g., to specify r11fg11fb10f).
 
                 m_writer->emit("rgba");
                 // Emit("rgb");
@@ -1332,11 +1402,11 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
     auto profile = entryPointDecor->getProfile();
     auto stage = profile.getStage();
 
+    IRNumThreadsDecoration* numThreadsDecor = nullptr;
     auto emitLocalSizeLayout = [&]()
     {
         Int sizeAlongAxis[kThreadGroupAxisCount];
-        getComputeThreadGroupSize(irFunc, sizeAlongAxis);
-
+        numThreadsDecor = getComputeThreadGroupSize(irFunc, sizeAlongAxis);
         m_writer->emit("layout(");
         char const* axes[] = {"x", "y", "z"};
         for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
@@ -1354,13 +1424,51 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
     switch (stage)
     {
     case Stage::Compute:
-        {
-            emitLocalSizeLayout();
-        }
+    case Stage::Mesh:
+    case Stage::Amplification:
+        emitLocalSizeLayout();
+    default:
         break;
-    case Stage::Geometry:
+    }
+
+    /// Structure to track (some) entry point attributes, to allow ordering when emitting and to
+    /// ensure decorations are only emitted once.
+    ///
+    /// These entry points attributes may be implicitly added by built-in functions and the same
+    /// function may be called multiple times, hence the need to ensure they are only emitted
+    /// once.
+    struct GLSLEntryPointAttributes
+    {
+        bool quadDerivatives;
+        bool requireFullQuads;
+        bool maximallyReconverges;
+        String computeDerivatives;
+    } attributes{};
+
+    const auto requireQuadControlExtensions = [&]()
+    {
+        _requireGLSLExtension(UnownedStringSlice("GL_KHR_shader_subgroup_vote"));
+        _requireGLSLExtension(UnownedStringSlice("GL_EXT_shader_quad_control"));
+    };
+
+    for (auto decoration : irFunc->getDecorations())
+    {
+        // Stage agnostic decorations.
+        if (as<IRMaximallyReconvergesDecoration>(decoration))
         {
-            if (auto decor = irFunc->findDecoration<IRMaxVertexCountDecoration>())
+            _requireGLSLExtension(UnownedStringSlice("GL_EXT_maximal_reconvergence"));
+            attributes.maximallyReconverges = true;
+        }
+        else if (as<IRQuadDerivativesDecoration>(decoration))
+        {
+            requireQuadControlExtensions();
+            attributes.quadDerivatives = true;
+        }
+
+        switch (stage)
+        {
+        case Stage::Geometry:
+            if (auto decor = as<IRMaxVertexCountDecoration>(decoration))
             {
                 auto count = getIntVal(decor->getCount());
                 m_writer->emit("layout(max_vertices = ");
@@ -1368,7 +1476,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
                 m_writer->emit(") out;\n");
             }
 
-            if (auto decor = irFunc->findDecoration<IRInstanceDecoration>())
+            if (auto decor = as<IRInstanceDecoration>(decoration))
             {
                 auto count = getIntVal(decor->getCount());
                 m_writer->emit("layout(invocations = ");
@@ -1379,7 +1487,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
             // These decorations were moved from the parameters to the entry point by
             // ir-glsl-legalize. The actual parameters have become potentially multiple global
             // parameters.
-            if (auto decor = irFunc->findDecoration<IRGeometryInputPrimitiveTypeDecoration>())
+            if (auto decor = as<IRGeometryInputPrimitiveTypeDecoration>(decoration))
             {
                 switch (decor->getOp())
                 {
@@ -1405,7 +1513,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
                 }
             }
 
-            if (auto decor = irFunc->findDecoration<IRStreamOutputTypeDecoration>())
+            if (auto decor = as<IRStreamOutputTypeDecoration>(decoration))
             {
                 IRType* type = decor->getStreamType();
 
@@ -1424,33 +1532,57 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
                     SLANG_ASSERT(!"Unknown stream out type");
                 }
             }
-        }
-        break;
-    case Stage::Pixel:
-        {
-            if (irFunc->findDecoration<IREarlyDepthStencilDecoration>())
+            break;
+        case Stage::Pixel:
+            if (as<IREarlyDepthStencilDecoration>(decoration))
             {
                 // https://www.khronos.org/opengl/wiki/Early_Fragment_Test
                 m_writer->emit("layout(early_fragment_tests) in;\n");
             }
+            else if (as<IRRequireFullQuadsDecoration>(decoration))
+            {
+                requireQuadControlExtensions();
+                attributes.requireFullQuads = true;
+            }
             break;
-        }
-    case Stage::Mesh:
-        {
-            emitLocalSizeLayout();
-            if (auto decor = irFunc->findDecoration<IRVerticesDecoration>())
+        case Stage::Compute:
+            if (as<IRDerivativeGroupQuadDecoration>(decoration))
+            {
+                _requireGLSLExtension(UnownedStringSlice("GL_NV_compute_shader_derivatives"));
+                verifyComputeDerivativeGroupModifiers(
+                    getSink(),
+                    decoration->sourceLoc,
+                    true,
+                    false,
+                    numThreadsDecor);
+                attributes.computeDerivatives = "layout(derivative_group_quadsNV) in;\n";
+            }
+            else if (as<IRDerivativeGroupLinearDecoration>(decoration))
+            {
+                _requireGLSLExtension(UnownedStringSlice("GL_NV_compute_shader_derivatives"));
+                verifyComputeDerivativeGroupModifiers(
+                    getSink(),
+                    decoration->sourceLoc,
+                    false,
+                    true,
+                    numThreadsDecor);
+                attributes.computeDerivatives = "layout(derivative_group_linearNV) in;\n";
+            }
+            break;
+        case Stage::Mesh:
+            if (auto decor = as<IRVerticesDecoration>(decoration))
             {
                 m_writer->emit("layout(max_vertices = ");
                 m_writer->emit(decor->getMaxSize()->getValue());
                 m_writer->emit(") out;\n");
             }
-            if (auto decor = irFunc->findDecoration<IRPrimitivesDecoration>())
+            if (auto decor = as<IRPrimitivesDecoration>(decoration))
             {
                 m_writer->emit("layout(max_primitives = ");
                 m_writer->emit(decor->getMaxSize()->getValue());
                 m_writer->emit(") out;\n");
             }
-            if (auto decor = irFunc->findDecoration<IROutputTopologyDecoration>())
+            if (auto decor = as<IROutputTopologyDecoration>(decoration))
             {
                 // TODO: Ellie validate here/elsewhere, what's allowed here is
                 // different from the tesselator
@@ -1459,27 +1591,30 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
                 m_writer->emit(decor->getTopology()->getStringSlice());
                 m_writer->emit("s) out;\n");
             }
+            break;
+        default:
+            break;
         }
-        break;
-    case Stage::Amplification:
-        {
-            emitLocalSizeLayout();
-        }
-        break;
-    // TODO: There are other stages that will need this kind of handling.
-    default:
-        break;
     }
 
-    if (irFunc->findDecoration<IRQuadDerivativesDecoration>())
+    if (attributes.quadDerivatives)
     {
         m_writer->emit("layout(quad_derivatives) in;\n");
     }
-    if (irFunc->findDecoration<IRRequireFullQuadsDecoration>())
+    if (attributes.requireFullQuads)
     {
         m_writer->emit("layout(full_quads) in;\n");
     }
-    if (irFunc->findDecoration<IRMaximallyReconvergesDecoration>())
+
+    // This must be emitted after local size when using glslang.
+    if (attributes.computeDerivatives.getLength() > 0)
+    {
+        m_writer->emit(attributes.computeDerivatives);
+    }
+
+    // This must be emitted last because GLSL's `[[..]]` attribute syntax must come right
+    // before the entry point function declaration.
+    if (attributes.maximallyReconverges)
     {
         m_writer->emit("[[maximally_reconverges]]\n");
     }
@@ -2755,63 +2890,6 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
                 version.setFromInteger(SemanticVersion::IntegerType(intValue));
                 _requireSPIRVVersion(version);
                 break;
-            }
-        }
-    }
-
-    // The function may have various requirment declaring functions its body. We also need to look
-    // for them.
-    auto func = as<IRFunc>(inst);
-    if (!func)
-        return;
-    auto block = func->getFirstBlock();
-    if (!block)
-        return;
-    for (auto childInst : block->getChildren())
-    {
-        if (auto requireGLSLExt = as<IRRequireGLSLExtension>(childInst))
-        {
-            _requireGLSLExtension(requireGLSLExt->getExtensionName());
-        }
-        else if (const auto requireComputeDerivative = as<IRRequireComputeDerivative>(childInst))
-        {
-            // only allowed 1 of derivative_group_quadsNV or derivative_group_linearNV
-            if (m_entryPointStage != Stage::Compute ||
-                m_requiredAfter.requireComputeDerivatives.getLength() > 0)
-                return;
-
-            _requireGLSLExtension(UnownedStringSlice("GL_NV_compute_shader_derivatives"));
-
-            // This will only run once per program.
-            HashSet<IRFunc*>* entryPointsUsingInst =
-                getReferencingEntryPoints(m_referencingEntryPoints, func);
-
-            for (auto entryPoint : *entryPointsUsingInst)
-            {
-                bool isQuad = !entryPoint->findDecoration<IRDerivativeGroupLinearDecoration>();
-                auto numThreadsDecor = entryPoint->findDecoration<IRNumThreadsDecoration>();
-                if (isQuad)
-                {
-                    verifyComputeDerivativeGroupModifiers(
-                        getSink(),
-                        inst->sourceLoc,
-                        true,
-                        false,
-                        numThreadsDecor);
-                    m_requiredAfter.requireComputeDerivatives =
-                        "layout(derivative_group_quadsNV) in;";
-                }
-                else
-                {
-                    verifyComputeDerivativeGroupModifiers(
-                        getSink(),
-                        inst->sourceLoc,
-                        false,
-                        true,
-                        numThreadsDecor);
-                    m_requiredAfter.requireComputeDerivatives =
-                        "layout(derivative_group_linearNV) in;";
-                }
             }
         }
     }

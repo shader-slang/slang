@@ -3525,19 +3525,33 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
 
         case kIROp_RequireMaximallyReconverges:
-            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_maximal_reconvergence"));
-            requireSPIRVExecutionMode(
-                nullptr,
-                getIRInstSpvID(getParentFunc(inst)),
-                SpvExecutionModeMaximallyReconvergesKHR);
+            if (auto entryPointsUsingInst =
+                    getReferencingEntryPoints(m_referencingEntryPoints, getParentFunc(inst)))
+            {
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_maximal_reconvergence"));
+                for (IRFunc* entryPoint : *entryPointsUsingInst)
+                {
+                    requireSPIRVExecutionMode(
+                        nullptr,
+                        getIRInstSpvID(entryPoint),
+                        SpvExecutionModeMaximallyReconvergesKHR);
+                }
+            }
             break;
         case kIROp_RequireQuadDerivatives:
-            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_quad_control"));
-            requireSPIRVCapability(SpvCapabilityQuadControlKHR);
-            requireSPIRVExecutionMode(
-                nullptr,
-                getIRInstSpvID(getParentFunc(inst)),
-                SpvExecutionModeQuadDerivativesKHR);
+            if (auto entryPointsUsingInst =
+                    getReferencingEntryPoints(m_referencingEntryPoints, getParentFunc(inst)))
+            {
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_quad_control"));
+                requireSPIRVCapability(SpvCapabilityQuadControlKHR);
+                for (IRFunc* entryPoint : *entryPointsUsingInst)
+                {
+                    requireSPIRVExecutionMode(
+                        nullptr,
+                        getIRInstSpvID(entryPoint),
+                        SpvExecutionModeQuadDerivativesKHR);
+                }
+            }
             break;
 
         case kIROp_Return:
