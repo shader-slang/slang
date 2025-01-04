@@ -129,14 +129,6 @@ void CLikeSourceEmitter::emitPreModuleImpl()
         m_writer->emit("\n");
     }
 }
-void CLikeSourceEmitter::emitPostModuleImpl()
-{
-    if (m_requiredAfter.requireComputeDerivatives.getLength() > 0)
-    {
-        m_writer->emit(m_requiredAfter.requireComputeDerivatives);
-        m_writer->emit("\n");
-    }
-}
 
 //
 // Types

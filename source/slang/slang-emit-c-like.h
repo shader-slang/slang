@@ -414,18 +414,18 @@ public:
     /// Emit type attributes that should appear after, e.g., a `struct` keyword
     void emitPostKeywordTypeAttributes(IRInst* inst) { emitPostKeywordTypeAttributesImpl(inst); }
 
-    virtual void emitMemoryQualifiers(IRInst* /*varInst*/){};
+    virtual void emitMemoryQualifiers(IRInst* /*varInst*/) {};
     virtual void emitStructFieldAttributes(
         IRStructType* /* structType */,
         IRStructField* /* field */
-    ){};
+    ) {};
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
     void emitMeshShaderModifiers(IRInst* varInst);
     virtual void emitPackOffsetModifier(
         IRInst* /*varInst*/,
         IRType* /*valueType*/,
         IRPackOffsetDecoration* /*decoration*/
-    ){};
+    ) {};
 
 
     /// Emit modifiers that should apply even for a declaration of an SSA temporary.
@@ -470,7 +470,6 @@ public:
     void emitFrontMatter(TargetRequest* targetReq) { emitFrontMatterImpl(targetReq); }
 
     void emitPreModule() { emitPreModuleImpl(); }
-    void emitPostModule() { emitPostModuleImpl(); }
     void emitModule(IRModule* module, DiagnosticSink* sink)
     {
         m_irModule = module;
@@ -541,7 +540,6 @@ protected:
     /// For example on targets that don't have built in vector/matrix support, this is where
     /// the appropriate generated declarations occur.
     virtual void emitPreModuleImpl();
-    virtual void emitPostModuleImpl();
 
     virtual void emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator);
     void emitSimpleTypeAndDeclarator(IRType* type, DeclaratorInfo* declarator)
@@ -722,10 +720,6 @@ protected:
     Dictionary<IRInst*, String> m_mapInstToName;
 
     OrderedHashSet<IRStringLit*> m_requiredPreludes;
-    struct RequiredAfter
-    {
-        String requireComputeDerivatives;
-    } m_requiredAfter;
 
     Dictionary<const char*, IRStringLit*> m_builtinPreludes;
 };

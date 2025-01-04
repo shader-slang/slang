@@ -363,6 +363,12 @@ Extensions
 `SPV_EXT_demote_to_helper_invocation`
 > Represents the SPIR-V extension for demoting to helper invocation.
 
+`SPV_KHR_maximal_reconvergence`
+> Represents the SPIR-V extension for maximal reconvergence.
+
+`SPV_KHR_quad_control`
+> Represents the SPIR-V extension for quad group control.
+
 `SPV_KHR_fragment_shader_barycentric`
 > Represents the SPIR-V extension for fragment shader barycentric.
 
@@ -503,6 +509,12 @@ Extensions
 `spvDemoteToHelperInvocation`
 > Represents the SPIR-V capability for demoting to helper invocation.
 
+`spvMaximalReconvergenceKHR`
+> Represents the SPIR-V capability for maximal reconvergence.
+
+`spvQuadControlKHR`
+> Represents the SPIR-V capability for quad group control.
+
 `GL_EXT_buffer_reference`
 > Represents the GL_EXT_buffer_reference extension.
 
@@ -514,6 +526,12 @@ Extensions
 
 `GL_EXT_demote_to_helper_invocation`
 > Represents the GL_EXT_demote_to_helper_invocation extension.
+
+`GL_EXT_maximal_reconvergence`
+> Represents the GL_EXT_maximal_reconvergence extension.
+
+`GL_EXT_shader_quad_control`
+> Represents the GL_EXT_shader_quad_control extension.
 
 `GL_EXT_fragment_shader_barycentric`
 > Represents the GL_EXT_fragment_shader_barycentric extension.
@@ -1077,6 +1095,9 @@ Compound Capabilities
 
 `helper_lane`
 > Capabilities required to enable helper-lane demotion
+
+`quad_control`
+> Capabilities required to enable quad group control
 
 `breakpoint`
 > Capabilities required to enable shader breakpoints
