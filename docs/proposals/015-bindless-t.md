@@ -84,6 +84,8 @@ This means that you can use a `Bindless<T>` type in any context where an ordinar
 is allowed, such as in buffer elements.
 
 On targets where resource handles are already concrete and sized types, `Bindless<T>` simply translates to just `T`.
+If `T` has native size or alignment that is less than 8 bytes, it will be rounded up to 8 bytes. If the native size for
+`T` is greater than 8 bytes, it will be treated as an opaque type instead of translating to `T`.
 
 ### Obtaining Actual Resource Handle from `Bindless<T>`
 
