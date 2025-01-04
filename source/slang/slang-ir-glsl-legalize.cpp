@@ -4154,41 +4154,4 @@ void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
     }
 }
 
-void legalizeFunctionForEntryPointAttributesForGLSL(IRModule* module, IRFunc* entryPointFunc)
-{
-    // Dummy builder required to create decorations.
-    IRBuilder builder(module);
-    builder.setInsertInto(entryPointFunc);
-
-    for (auto globalInst : module->getGlobalInsts())
-    {
-        if (auto func = as<IRGlobalValueWithCode>(globalInst))
-        {
-            for (auto block : func->getBlocks())
-            {
-
-                for (auto inst = block->getFirstInst(); inst; inst = inst->next)
-                {
-                    if (as<IRRequireMaximallyReconverges>(inst))
-                    {
-                        builder.addDecoration(entryPointFunc, kIROp_MaximallyReconvergesDecoration);
-                    }
-                    else if (as<IRRequireQuadDerivatives>(inst))
-                    {
-                        builder.addDecoration(entryPointFunc, kIROp_QuadDerivativesDecoration);
-                    }
-                }
-            }
-        }
-    }
-}
-
-void legalizeFunctionsForEntryPointAttributesForGLSL(IRModule* module, const List<IRFunc*>& funcs)
-{
-    for (auto func : funcs)
-    {
-        legalizeFunctionForEntryPointAttributesForGLSL(module, func);
-    }
-}
-
 } // namespace Slang

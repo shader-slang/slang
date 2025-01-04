@@ -15620,7 +15620,7 @@ bool IsHelperLane()
 //
 
 //@public:
-/// Returns true if <expr> is true in any lane of the current quad.
+/// Returns true if `expr` is true in any lane of the current quad.
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
@@ -15644,7 +15644,7 @@ bool QuadAny(bool expr)
 }
 
 //@public:
-/// Returns true if <expr> is true in all lanes of the current quad.
+/// Returns true if `expr` is true in all lanes of the current quad.
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
