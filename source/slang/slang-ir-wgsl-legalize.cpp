@@ -1,5 +1,6 @@
 #include "slang-ir-wgsl-legalize.h"
 
+#include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-varying-params.h"
@@ -969,7 +970,8 @@ struct LegalizeWGSLEntryPointContext
                 auto newDecoration = builder.addSemanticDecoration(
                     key,
                     loweredNameSlice,
-                    hasStringIndex ? stringToInt(outIndex) : 0);
+                    hasStringIndex ? stringToInt(outIndex)
+                                   : semanticDecoration->getSemanticIndex());
                 semanticDecoration->replaceUsesWith(newDecoration);
                 semanticDecoration->removeAndDeallocate();
                 semanticDecoration = newDecoration;
@@ -988,23 +990,29 @@ struct LegalizeWGSLEntryPointContext
                 layoutDecor = _simplifyUserSemanticNames(builder, layoutDecor);
                 oldLayoutDecorToNew[layoutDecor] = layoutDecor;
                 auto layout = layoutDecor->getLayout();
-                for (auto attr : layout->getAllAttrs())
+
+                if (layout)
                 {
-                    if (auto offset = as<IRVarOffsetAttr>(attr))
+                    for (auto attr : layout->getAllAttrs())
                     {
-                        auto& semanticUse = usedSemanticIndexVarOffset[offset->getResourceKind()];
-                        if (semanticUse.find(offset->getOffset()) != semanticUse.end())
-                            overlappingVarOffset.add({layoutDecor, offset});
-                        else
-                            semanticUse.insert(offset->getOffset());
-                    }
-                    else if (auto userSemantic = as<IRUserSemanticAttr>(attr))
-                    {
-                        auto& semanticUse = usedSemanticIndexUserSemantic[userSemantic->getName()];
-                        if (semanticUse.find(userSemantic->getIndex()) != semanticUse.end())
-                            overlappingUserSemantic.add({layoutDecor, userSemantic});
-                        else
-                            semanticUse.insert(userSemantic->getIndex());
+                        if (auto offset = as<IRVarOffsetAttr>(attr))
+                        {
+                            auto& semanticUse =
+                                usedSemanticIndexVarOffset[offset->getResourceKind()];
+                            if (semanticUse.find(offset->getOffset()) != semanticUse.end())
+                                overlappingVarOffset.add({layoutDecor, offset});
+                            else
+                                semanticUse.insert(offset->getOffset());
+                        }
+                        else if (auto userSemantic = as<IRUserSemanticAttr>(attr))
+                        {
+                            auto& semanticUse =
+                                usedSemanticIndexUserSemantic[userSemantic->getName()];
+                            if (semanticUse.find(userSemantic->getIndex()) != semanticUse.end())
+                                overlappingUserSemantic.add({layoutDecor, userSemantic});
+                            else
+                                semanticUse.insert(userSemantic->getIndex());
+                        }
                     }
                 }
             }
@@ -1348,6 +1356,195 @@ struct LegalizeWGSLEntryPointContext
         }
     }
 
+    void hoistEntryPointParameterFromStruct(EntryPointInfo entryPoint)
+    {
+        // If an entry point has a input parameter with a struct type, we want to hoist out
+        // all the fields of the struct type to be individual parameters of the entry point.
+        // This will canonicalize the entry point signature, so we can handle all cases uniformly.
+
+        // For example, given an entry point:
+        // ```
+        // struct VertexInput { float3 pos; float 2 uv; int vertexId : SV_VertexID};
+        // void main(VertexInput vin) { ... }
+        // ```
+        // We will transform it to:
+        // ```
+        // void main(float3 pos, float2 uv, int vertexId : SV_VertexID) {
+        //     VertexInput vin = {pos,uv,vertexId};
+        //     ...
+        // }
+        // ```
+
+        auto func = entryPoint.entryPointFunc;
+        List<IRParam*> paramsToProcess;
+        for (auto param : func->getParams())
+        {
+            if (as<IRStructType>(param->getDataType()))
+            {
+                paramsToProcess.add(param);
+            }
+        }
+
+        IRBuilder builder(func);
+        builder.setInsertBefore(func);
+        for (auto param : paramsToProcess)
+        {
+            auto structType = as<IRStructType>(param->getDataType());
+            builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+            auto varLayout = findVarLayout(param);
+
+            // If `param` already has a semantic, we don't want to hoist its fields out.
+            if (varLayout->findSystemValueSemanticAttr() != nullptr ||
+                param->findDecoration<IRSemanticDecoration>())
+                continue;
+
+            IRStructTypeLayout* structTypeLayout = nullptr;
+            if (varLayout)
+                structTypeLayout = as<IRStructTypeLayout>(varLayout->getTypeLayout());
+            Index fieldIndex = 0;
+            List<IRInst*> fieldParams;
+            for (auto field : structType->getFields())
+            {
+                auto fieldParam = builder.emitParam(field->getFieldType());
+                IRCloneEnv cloneEnv;
+                cloneInstDecorationsAndChildren(
+                    &cloneEnv,
+                    builder.getModule(),
+                    field->getKey(),
+                    fieldParam);
+
+                IRVarLayout* fieldLayout =
+                    structTypeLayout ? structTypeLayout->getFieldLayout(fieldIndex) : nullptr;
+                if (varLayout)
+                {
+                    IRVarLayout::Builder varLayoutBuilder(&builder, fieldLayout->getTypeLayout());
+                    varLayoutBuilder.cloneEverythingButOffsetsFrom(fieldLayout);
+                    for (auto offsetAttr : fieldLayout->getOffsetAttrs())
+                    {
+                        auto parentOffsetAttr =
+                            varLayout->findOffsetAttr(offsetAttr->getResourceKind());
+                        UInt parentOffset = parentOffsetAttr ? parentOffsetAttr->getOffset() : 0;
+                        UInt parentSpace = parentOffsetAttr ? parentOffsetAttr->getSpace() : 0;
+                        auto resInfo =
+                            varLayoutBuilder.findOrAddResourceInfo(offsetAttr->getResourceKind());
+                        resInfo->offset = parentOffset + offsetAttr->getOffset();
+                        resInfo->space = parentSpace + offsetAttr->getSpace();
+                    }
+                    builder.addLayoutDecoration(fieldParam, varLayoutBuilder.build());
+                }
+                param->insertBefore(fieldParam);
+                fieldParams.add(fieldParam);
+                fieldIndex++;
+            }
+            builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+            auto reconstructedParam =
+                builder.emitMakeStruct(structType, fieldParams.getCount(), fieldParams.getBuffer());
+            param->replaceUsesWith(reconstructedParam);
+            param->removeFromParent();
+        }
+        fixUpFuncType(func);
+    }
+
+    void packStageInParameters(EntryPointInfo entryPoint)
+    {
+        // If the entry point has any parameters whose layout contains VaryingInput,
+        // we need to pack those parameters into a single `struct` type, and decorate
+        // the fields with the appropriate `@location` decorations.
+        // For other parameters that are not `VaryingInput`, we need to leave them as is.
+        //
+        // For example,
+        // ```
+        // void main(float3 pos, float2 uv, int vertexId : SV_VertexID) {
+        //     VertexInput vin = {pos,uv,vertexId};
+        //     ...
+        // }
+        // ```
+        // We are going to transform it into:
+        // ```
+        // struct VertexInput {
+        //     @location(0) float3 pos;
+        //     @location(1) float2 uv;
+        // };
+        //
+        // void main(vin: VertexInput, @builtin(vertex_index) vertexId : u32) {
+        //     let pos = vin.pos;
+        //     let uv = vin.uv;
+        //     ...
+        // }
+
+        auto func = entryPoint.entryPointFunc;
+
+        List<IRParam*> paramsToPack;
+        for (auto param : func->getParams())
+        {
+            auto layout = findVarLayout(param);
+            if (!layout)
+                continue;
+            if (!layout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+                continue;
+            paramsToPack.add(param);
+        }
+
+        if (paramsToPack.getCount() == 0)
+            return;
+
+        IRBuilder builder(func);
+        builder.setInsertBefore(func);
+        IRStructType* structType = builder.createStructType();
+        auto stageText = getStageText(entryPoint.entryPointDecor->getProfile().getStage());
+        builder.addNameHintDecoration(
+            structType,
+            (String(stageText) + toSlice("Input")).getUnownedSlice());
+        List<IRStructKey*> keys;
+        IRStructTypeLayout::Builder layoutBuilder(&builder);
+        for (auto param : paramsToPack)
+        {
+            auto paramVarLayout = findVarLayout(param);
+            auto key = builder.createStructKey();
+            param->transferDecorationsTo(key);
+            builder.createStructField(structType, key, param->getDataType());
+            if (auto varyingInOffsetAttr =
+                    paramVarLayout->findOffsetAttr(LayoutResourceKind::VaryingInput))
+            {
+                if (!key->findDecoration<IRSemanticDecoration>() &&
+                    !paramVarLayout->findAttr<IRSemanticAttr>())
+                {
+                    // If the parameter doesn't have a semantic, we need to add one for semantic
+                    // matching.
+                    builder.addSemanticDecoration(
+                        key,
+                        toSlice("_slang_attr"),
+                        (int)varyingInOffsetAttr->getOffset());
+                }
+            }
+            layoutBuilder.addField(key, paramVarLayout);
+            builder.addLayoutDecoration(key, paramVarLayout);
+            keys.add(key);
+        }
+        builder.setInsertInto(func->getFirstBlock());
+        auto packedParam = builder.emitParamAtHead(structType);
+        auto typeLayout = layoutBuilder.build();
+        IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
+
+        // Add a VaryingInput resource info to the packed parameter layout, so that we can emit
+        // the individual varying input alongside other nested/struct varying inputs.
+        varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingInput);
+        auto paramVarLayout = varLayoutBuilder.build();
+        builder.addLayoutDecoration(packedParam, paramVarLayout);
+
+        // Replace the original parameters with the packed parameter
+        builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
+        for (Index paramIndex = 0; paramIndex < paramsToPack.getCount(); paramIndex++)
+        {
+            auto param = paramsToPack[paramIndex];
+            auto key = keys[paramIndex];
+            auto paramField = builder.emitFieldExtract(param->getDataType(), packedParam, key);
+            param->replaceUsesWith(paramField);
+            param->removeFromParent();
+        }
+        fixUpFuncType(func);
+    }
+
     void legalizeSystemValueParameters(EntryPointInfo entryPoint)
     {
         List<SystemValLegalizationWorkItem> systemValWorkItems =
@@ -1363,6 +1560,8 @@ struct LegalizeWGSLEntryPointContext
     void legalizeEntryPointForWGSL(EntryPointInfo entryPoint)
     {
         // Input Parameter Legalize
+        hoistEntryPointParameterFromStruct(entryPoint);
+        packStageInParameters(entryPoint);
         flattenInputParameters(entryPoint);
 
         // System Value Legalize
