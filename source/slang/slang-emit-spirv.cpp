@@ -7967,10 +7967,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         if (m_executionModes[entryPoint].add(executionMode))
         {
+            SpvOp execModeOp = SpvOpExecutionMode;
+            if (executionMode == SpvExecutionModeLocalSizeId ||
+                executionMode == SpvExecutionModeLocalSizeHintId ||
+                executionMode == SpvExecutionModeSubgroupsPerWorkgroupId)
+            {
+                execModeOp = SpvOpExecutionModeId;
+            }
+
             emitInst(
                 getSection(SpvLogicalSectionID::ExecutionModes),
                 parentInst,
-                SpvOpExecutionMode,
+                execModeOp,
                 entryPoint,
                 executionMode,
                 ops...);

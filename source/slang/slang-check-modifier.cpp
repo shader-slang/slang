@@ -1909,8 +1909,7 @@ Modifier* SemanticsVisitor::checkModifier(
 
                         for (auto member : decl->parentDecl->members)
                         {
-                            auto constantId =
-                                member->findModifier<VkConstantIdAttribute>();
+                            auto constantId = member->findModifier<VkConstantIdAttribute>();
                             if (constantId)
                             {
                                 SLANG_ASSERT(constantId->args.getCount() == 1);
