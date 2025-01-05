@@ -567,6 +567,32 @@ bool TEST_texture(
         // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
         && float(0) == d2D.SampleCmpLevelZero(shadowSampler, float2(u2, u), 0, int2(0, 0))
 
+        // ===================================
+        //  float SampleCmpLevel()
+        // ===================================
+
+        // METAL: d2D{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
+        && float(0) == d2D.SampleCmpLevel(shadowSampler, float2(u, u), 0, 0.0)
+
+        // METAL: d2DArray{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_2d_array.f32(
+        && float(0) == d2DArray.SampleCmpLevel(shadowSampler, float3(u, u, 0), 0, 0.0)
+
+        // METAL: dCube{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_cube.f32(
+        && float(0) == dCube.SampleCmpLevel(shadowSampler, normalize(float3(u, 1 - u, u)), 0, 0.0)
+
+        // METAL: dCubeArray{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_cube_array.f32(
+        && float(0) == dCubeArray.SampleCmpLevel(shadowSampler, float4(normalize(float3(u, 1-u, u)), 0), 0, 0.0)
+
+        // Offset variant
+
+        // METAL: d2D{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
+        && float(0) == d2D.SampleCmpLevel(shadowSampler, float2(u2, u), 0, 0.0, int2(0, 0))
+
         // ==================================
         //  vector<T,4> Gather()
         // ==================================
