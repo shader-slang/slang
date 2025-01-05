@@ -493,7 +493,7 @@ public T mix(T x, T y, bool a)
     {
     case glsl: __intrinsic_asm "mix";
     case spirv: return spirv_asm {
-        result:$$T = OpSelect $a $x $y
+        result:$$T = OpSelect $a $y $x
     };
     default:
         return (a ? y : x);
@@ -510,7 +510,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<bool, N> a)
     {
     case glsl: __intrinsic_asm "mix";
     case spirv: return spirv_asm {
-        result:$$vector<T,N> = OpSelect $a $x $y
+        result:$$vector<T,N> = OpSelect $a $y $x
     };
     default:
         vector<T, N> result;
