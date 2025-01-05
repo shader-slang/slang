@@ -2328,7 +2328,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
                 , "HLSL supports only float and half type textures");
-            __intrinsic_asm ".SampleCmpLevelZero";
+            __intrinsic_asm ".SampleCmpLevel";
         case metal:
             if (isShadow == 1)
             {
