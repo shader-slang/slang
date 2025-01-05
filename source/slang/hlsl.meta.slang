@@ -1118,30 +1118,15 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     {
         __target_switch
         {
-        case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
-            {
-                return __glsl_texture_level_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue), 0.0);
-            }
-            else
-            {
-                return __glsl_texture_level(this, __makeVector(location, compareValue), 0.0);
-            }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue);
-        case metal:
-            return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue);
-        case spirv:
-            const float zeroFloat = 0.0f;
-            return spirv_asm
-            {
-                result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Lod $zeroFloat;
-            };
         case wgsl:
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue);
+        default:
+            return SampleCmpLevel(location, compareValue, 0.0);
         }
     }
 
@@ -1203,30 +1188,15 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     {
         __target_switch
         {
-        case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
-            {
-                return __glsl_texture_level_offset_1d_shadow(this, __makeVector(__makeVector(location,0.0), compareValue), 0.0, offset);
-            }
-            else
-            {
-                return __glsl_texture_level_offset(this, __makeVector(location, compareValue), 0.0, offset);
-            }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset);
-        case metal:
-            return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset);
-        case spirv:
-            const float zeroFloat = 0.0f;
-            return spirv_asm
-            {
-                result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Lod|ConstOffset $zeroFloat $offset;
-            };
         case wgsl:
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset);
+        default:
+            return SampleCmpLevel(location, compareValue, 0.0, offset);
         }
     }
 
@@ -2033,48 +2003,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     {
         __target_switch
         {
-        case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
-            {
-                return __glsl_texture_level_1d_shadow(this, s, __makeVector(__makeVector(location, 0.0), compareValue), 0.0);
-            }
-            else
-            {
-                return __glsl_texture_level(this, s, __makeVector(location,compareValue), 0.0);
-            }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpLevelZero";
-        case metal:
-            if (isArray == 1)
-            {
-                switch (Shape.flavor)
-                {
-                case $(SLANG_TEXTURE_2D):
-                    __intrinsic_asm "$0.sample_compare($1, ($2).xy, uint(($2).z), $3, level(0))";
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "$0.sample_compare($1, ($2).xyz, uint(($2).w), $3, level(0))";
-                }
-            }
-            else
-            {
-                switch (Shape.flavor)
-                {
-                case $(SLANG_TEXTURE_2D):
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "$0.sample_compare($1, $2, $3, level(0))";
-                }
-            }
-            __intrinsic_asm "<invalid intrinsic>";
-        case spirv:
-            const float zeroFloat = 0.0f;
-            return spirv_asm
-            {
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Lod $zeroFloat;
-            };
         case wgsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 , "WGSL supports only f32 type textures");
@@ -2091,6 +2024,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 }
             }
             __intrinsic_asm "textureSampleCompareLevel($0, $1, $2, $3)";
+        default:
+            return SampleCmpLevel(s, location, compareValue, 0.0);
         }
     }
 
@@ -2182,47 +2117,11 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     {
         __target_switch
         {
-        case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
-            {
-                return __glsl_texture_level_offset_1d_shadow(this, s, __makeVector(__makeVector(location,0.0),compareValue), 0.0, offset);
-            }
-            else
-            {
-                return __glsl_texture_level_offset(this, s, __makeVector(location,compareValue), 0.0, offset);
-            }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpLevelZero";
-        case metal:
-            if (isShadow == 1)
-            {
-                switch (Shape.flavor)
-                {
-                case $(SLANG_TEXTURE_2D):
-                    if (isArray == 1)
-                    {
-                        // T sample_compare(sampler s, float2 coord, uint array, float compare_value, lod_options options, int2 offset = int2(0)) const
-                        __intrinsic_asm "$0.sample_compare($1, ($2).xy, uint(($2).z), $3, level(0), $4)";
-                    }
-                    else
-                    {
-                        // T sample_compare(sampler s, float2 coord, float compare_value, lod_options options, int2 offset = int2(0)) const
-                        __intrinsic_asm "$0.sample_compare($1, $2, $3, level(0), $4)";
-                    }
-                    break;
-                }
-            }
-            __intrinsic_asm "<invalid intrinsic>";
-        case spirv:
-            const float zeroFloat = 0.0f;
-            return spirv_asm
-            {
-                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
-                result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Lod|ConstOffset $zeroFloat $offset;
-            };
         case wgsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
                 , "WGSL supports only f32 type textures");
@@ -2239,6 +2138,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 }
             }
             __intrinsic_asm "textureSampleCompareLevel($0, $1, $2, $3, $4)";
+        default:
+            return SampleCmpLevel(s, location, compareValue, 0.0, offset);
         }
     }
 
