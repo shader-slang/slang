@@ -53,6 +53,11 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
     if (!varLayout)
         return;
 
+    UInt spaceOffset = 0;
+    if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+    {
+        spaceOffset = spaceAttr->getOffset();
+    }
     for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
     {
         auto kind = sizeAttr->getResourceKind();
@@ -65,11 +70,39 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
         if (auto offsetAttr = varLayout->findOffsetAttr(kind))
         {
             // Get the binding information from this attribute and insert it into the list
-            auto spaceIndex = offsetAttr->getSpace();
-            if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
-            {
-                spaceIndex += spaceAttr->getOffset();
-            }
+            auto spaceIndex = spaceOffset + offsetAttr->getSpace();
+            auto registerIndex = offsetAttr->getOffset();
+            auto size = sizeAttr->getSize();
+            auto count = size.isFinite() ? size.getFiniteValue() : 0;
+            _insertBinding(outMetadata.m_usedBindings, kind, spaceIndex, registerIndex, count);
+        }
+    }
+
+    // If the global parameter is a parameter block, make sure to collect bindings for its
+    // default constant buffer, if there is one.
+    // The default constant buffer binding will be represented in the container var layout.
+    //
+    auto paramGroupTypeLayout = as<IRParameterGroupTypeLayout>(varLayout->getTypeLayout());
+    if (!paramGroupTypeLayout)
+        return;
+    auto containerVarLayout = paramGroupTypeLayout->getContainerVarLayout();
+    if (!containerVarLayout)
+        return;
+    auto containerSpaceOffset =
+        varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace);
+    if (!containerSpaceOffset)
+        return;
+    spaceOffset += containerSpaceOffset->getOffset();
+    for (auto sizeAttr : containerVarLayout->getTypeLayout()->getSizeAttrs())
+    {
+        auto kind = sizeAttr->getResourceKind();
+
+        if (!ShaderBindingRange::isUsageTracked(kind))
+            continue;
+
+        if (auto offsetAttr = containerVarLayout->findOffsetAttr(kind))
+        {
+            auto spaceIndex = spaceOffset + offsetAttr->getSpace();
             auto registerIndex = offsetAttr->getOffset();
             auto size = sizeAttr->getSize();
             auto count = size.isFinite() ? size.getFiniteValue() : 0;
