@@ -236,6 +236,24 @@ bool TEST_texture_float()
         // METALLIB: call {{.*}}.calculate_clamped_lod_texture_cube_array(
         && float(0) == tCubeArray.CalculateLevelOfDetail(normalize(float3(u, 1 - u, u)))
 
+        // Shadow variant
+
+        // METAL: d2D{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_texture_2d(
+        && float(0) == d2D.CalculateLevelOfDetail(float2(u, u))
+
+        // METAL: dCube{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_texture_cube(
+        && float(0) == dCube.CalculateLevelOfDetail(normalize(float3(u, 1 - u, u)))
+
+        // METAL: d2DArray{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_texture_2d_array(
+        && float(0) == d2DArray.CalculateLevelOfDetail(float2(u, u))
+
+        // METAL: dCubeArray{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_texture_cube_array(
+        && float(0) == dCubeArray.CalculateLevelOfDetail(normalize(float3(u, 1 - u, u)))
+
         // ========================================
         // float CalculateLevelOfDetailUnclamped()
         // ========================================
@@ -259,6 +277,24 @@ bool TEST_texture_float()
         // METAL: tCubeArray{{.*}}.calculate_unclamped_lod({{.*}}
         // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_cube_array(
         && float(0) >= tCubeArray.CalculateLevelOfDetailUnclamped(normalize(float3(u, 1 - u, u)))
+
+        // Shadow variant
+
+        // METAL: d2D{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_2d(
+        && float(0) >= d2D.CalculateLevelOfDetailUnclamped(float2(u, u))
+
+        // METAL: dCube{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_cube(
+        && float(0) >= dCube.CalculateLevelOfDetailUnclamped(normalize(float3(u, 1 - u, u)))
+
+        // METAL: d2DArray{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_2d_array(
+        && float(0) >= d2DArray.CalculateLevelOfDetailUnclamped(float2(u, u))
+
+        // METAL: dCubeArray{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_cube_array(
+        && float(0) >= dCubeArray.CalculateLevelOfDetailUnclamped(normalize(float3(u, 1 - u, u)))
 
         // ===========
         // T Sample()
