@@ -2442,6 +2442,25 @@ public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
 
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_shadowlod)]
+public float textureLod(sampler2DArrayShadow sampler, vec4 p, float lod)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod";
+    case spirv:
+    {
+        float compareValue = p.w;
+        return spirv_asm {
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Lod $lod
+        };
+    }
+    default:
+        return sampler.SampleCmp(p.xyz, p.w);
+    }
+}
+
+[ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
 {
     __target_switch
