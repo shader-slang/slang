@@ -380,9 +380,6 @@ Modifier* SemanticsVisitor::validateAttribute(
     {
         SLANG_ASSERT(attr->args.getCount() == 3);
 
-        IntVal* values[3] = {};
-        DeclRef<VarDeclBase> specIds[3] = {};
-
         for (int i = 0; i < 3; ++i)
         {
             IntVal* value = nullptr;
@@ -393,7 +390,8 @@ Modifier* SemanticsVisitor::validateAttribute(
                 auto specConstDecl = tryGetIntSpecializationConstant(arg);
                 if (specConstDecl)
                 {
-                    specIds[i] = specConstDecl;
+                    numThreadsAttr->extents[i] = nullptr;
+                    numThreadsAttr->specConstExtents[i] = specConstDecl;
                     continue;
                 }
 
@@ -428,16 +426,8 @@ Modifier* SemanticsVisitor::validateAttribute(
             {
                 value = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1);
             }
-            values[i] = value;
+            numThreadsAttr->extents[i] = value;
         }
-
-        numThreadsAttr->x = values[0];
-        numThreadsAttr->y = values[1];
-        numThreadsAttr->z = values[2];
-
-        numThreadsAttr->xSpecConst = specIds[0];
-        numThreadsAttr->ySpecConst = specIds[1];
-        numThreadsAttr->zSpecConst = specIds[2];
     }
     else if (auto waveSizeAttr = as<WaveSizeAttribute>(attr))
     {
@@ -1873,16 +1863,13 @@ Modifier* SemanticsVisitor::checkModifier(
     {
         SLANG_ASSERT(attr->args.getCount() == 3);
 
-        IntVal* values[3] = {};
-        DeclRef<VarDeclBase> specIds[3] = {};
-
         // GLSLLayoutLocalSizeAttribute is always attached to an EmptyDecl.
-        auto decl = as<Decl>(syntaxNode);
+        auto decl = as<EmptyDecl>(syntaxNode);
         SLANG_ASSERT(decl);
 
         for (int i = 0; i < 3; ++i)
         {
-            IntVal* value = nullptr;
+            attr->extents[i] = nullptr;
 
             auto arg = attr->args[i];
             if (arg)
@@ -1890,7 +1877,7 @@ Modifier* SemanticsVisitor::checkModifier(
                 auto specConstDecl = tryGetIntSpecializationConstant(arg);
                 if (specConstDecl)
                 {
-                    specIds[i] = specConstDecl;
+                    attr->specConstExtents[i] = specConstDecl;
                     continue;
                 }
 
@@ -1916,7 +1903,8 @@ Modifier* SemanticsVisitor::checkModifier(
                                 auto id = checkConstantIntVal(constantId->args[0]);
                                 if (id->getValue() == specConstId)
                                 {
-                                    specIds[i] = DeclRef<VarDeclBase>(member->getDefaultDeclRef());
+                                    attr->specConstExtents[i] =
+                                        DeclRef<VarDeclBase>(member->getDefaultDeclRef());
                                     break;
                                 }
                             }
@@ -1924,7 +1912,7 @@ Modifier* SemanticsVisitor::checkModifier(
 
                         // If not found, we need to create a new specialization
                         // constant with this ID.
-                        if (!specIds[i])
+                        if (!attr->specConstExtents[i])
                         {
                             auto specConstVarDecl = getASTBuilder()->create<VarDecl>();
                             auto constantIdModifier =
@@ -1933,7 +1921,7 @@ Modifier* SemanticsVisitor::checkModifier(
                             specConstVarDecl->type.type = getASTBuilder()->getIntType();
                             addModifier(specConstVarDecl, constantIdModifier);
                             decl->parentDecl->addMember(specConstVarDecl);
-                            specIds[i] =
+                            attr->specConstExtents[i] =
                                 DeclRef<VarDeclBase>(specConstVarDecl->getDefaultDeclRef());
                         }
                         continue;
@@ -1947,22 +1935,13 @@ Modifier* SemanticsVisitor::checkModifier(
                         return nullptr;
                     }
                 }
-                value = intValue;
+                attr->extents[i] = intValue;
             }
             else
             {
-                value = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1);
+                attr->extents[i] = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1);
             }
-            values[i] = value;
         }
-
-        attr->x = values[0];
-        attr->y = values[1];
-        attr->z = values[2];
-
-        attr->xSpecConst = specIds[0];
-        attr->ySpecConst = specIds[1];
-        attr->zSpecConst = specIds[2];
     }
 
     // Default behavior is to leave things as they are,

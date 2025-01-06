@@ -188,7 +188,7 @@ IRInst* emitCalcGroupExtents(IRBuilder& builder, IRFunc* entryPoint, IRVectorTyp
 
         for (int axis = 0; axis < kAxisCount; axis++)
         {
-            auto litValue = as<IRIntLit>(numThreadsDecor->getExtentAlongAxis(axis));
+            auto litValue = as<IRIntLit>(numThreadsDecor->getOperand(axis));
             if (!litValue)
                 return nullptr;
 

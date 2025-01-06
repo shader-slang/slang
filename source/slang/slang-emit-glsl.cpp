@@ -1344,9 +1344,9 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
         {
             if (ii != 0)
                 m_writer->emit(", ");
-
             m_writer->emit("local_size_");
             m_writer->emit(axes[ii]);
+
             if (specializationConstantIds[ii] >= 0)
             {
                 m_writer->emit("_id = ");

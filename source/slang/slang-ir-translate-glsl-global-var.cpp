@@ -280,13 +280,10 @@ struct GlobalVarTranslationContext
                         if (!numthreadsDecor)
                             return;
                         builder.setInsertBefore(use->getUser());
-                        IRInst* values[3] = {};
-                        for (int i = 0; i < 3; ++i)
-                        {
-                            values[i] = numthreadsDecor->getExtentAlongAxis(i);
-                            if (!values[i])
-                                values[i] = numthreadsDecor->getSpecConstAlongAxis(i);
-                        }
+                        IRInst* values[3] = {
+                            numthreadsDecor->getOperand(0),
+                            numthreadsDecor->getOperand(1),
+                            numthreadsDecor->getOperand(2)};
 
                         auto workgroupSize = builder.emitMakeVector(
                             builder.getVectorType(builder.getIntType(), 3),
@@ -330,13 +327,10 @@ struct GlobalVarTranslationContext
                 if (!firstBlock)
                     continue;
                 builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
-                IRInst* args[3] = {};
-                for (int i = 0; i < 3; ++i)
-                {
-                    args[i] = numthreadsDecor->getExtentAlongAxis(i);
-                    if (!args[i])
-                        args[i] = numthreadsDecor->getSpecConstAlongAxis(i);
-                }
+                IRInst* args[3] = {
+                    numthreadsDecor->getOperand(0),
+                    numthreadsDecor->getOperand(1),
+                    numthreadsDecor->getOperand(2)};
                 auto workgroupSize =
                     builder.emitMakeVector(workgroupSizeInst->getFullType(), 3, args);
                 builder.emitStore(globalVar, workgroupSize);

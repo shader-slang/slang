@@ -973,18 +973,14 @@ class GLSLLayoutLocalSizeAttribute : public Attribute
     //
     // TODO: These should be accessors that use the
     // ordinary `args` list, rather than side data.
-    IntVal* x;
-    IntVal* y;
-    IntVal* z;
+    IntVal* extents[3];
 
     bool axisIsSpecConstId[3];
 
     // References to specialization constants, for defining the number of
     // threads with them. If set, the corresponding axis is set to nullptr
     // above.
-    DeclRef<VarDeclBase> xSpecConst;
-    DeclRef<VarDeclBase> ySpecConst;
-    DeclRef<VarDeclBase> zSpecConst;
+    DeclRef<VarDeclBase> specConstExtents[3];
 };
 
 class GLSLLayoutDerivativeGroupQuadAttribute : public Attribute
@@ -1047,16 +1043,12 @@ class NumThreadsAttribute : public Attribute
     //
     // TODO: These should be accessors that use the
     // ordinary `args` list, rather than side data.
-    IntVal* x;
-    IntVal* y;
-    IntVal* z;
+    IntVal* extents[3];
 
     // References to specialization constants, for defining the number of
     // threads with them. If set, the corresponding axis is set to nullptr
     // above.
-    DeclRef<VarDeclBase> xSpecConst;
-    DeclRef<VarDeclBase> ySpecConst;
-    DeclRef<VarDeclBase> zSpecConst;
+    DeclRef<VarDeclBase> specConstExtents[3];
 };
 
 class WaveSizeAttribute : public Attribute

@@ -299,9 +299,6 @@ IRNumThreadsDecoration* CLikeSourceEmitter::getComputeThreadGroupSize(
     IRFunc* func,
     Int outNumThreads[kThreadGroupAxisCount])
 {
-    // TODO: Warn user that the selected emitter doesn't support setting work
-    // group sizes with specialization constants (yet). They're currently just
-    // ignored and '1' is returned in their place.
     Int specializationConstantIds[kThreadGroupAxisCount];
     IRNumThreadsDecoration* decor =
         getComputeThreadGroupSize(func, outNumThreads, specializationConstantIds);

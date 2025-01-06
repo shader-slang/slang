@@ -586,9 +586,6 @@ struct IRNumThreadsDecoration : IRDecoration
     IRGlobalParam* getXSpecConst() { return as<IRGlobalParam>(getOperand(0)); }
     IRGlobalParam* getYSpecConst() { return as<IRGlobalParam>(getOperand(1)); }
     IRGlobalParam* getZSpecConst() { return as<IRGlobalParam>(getOperand(2)); }
-
-    IRIntLit* getExtentAlongAxis(int axis) { return as<IRIntLit>(getOperand(axis)); }
-    IRGlobalParam* getSpecConstAlongAxis(int axis) { return as<IRGlobalParam>(getOperand(axis)); }
 };
 
 struct IRWaveSizeDecoration : IRDecoration
