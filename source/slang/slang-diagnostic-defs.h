@@ -2566,7 +2566,7 @@ DIAGNOSTIC(
     99999,
     Internal,
     spirvValidationFailed,
-    "Validation of generated SPIR-V failed. SPIRV generated: \n$0")
+    "Validation of generated SPIR-V failed.")
 
 DIAGNOSTIC(
     99999,

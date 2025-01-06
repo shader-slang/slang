@@ -1964,6 +1964,9 @@ SlangResult emitSPIRVForEntryPointsDirectly(
                         int(spirv.getCount() / 4))))
                 {
                     compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
+                    codeGenContext->getSink()->diagnoseWithoutSourceView(
+                        SourceLoc{},
+                        Diagnostics::spirvValidationFailed);
                 }
             }
         }
