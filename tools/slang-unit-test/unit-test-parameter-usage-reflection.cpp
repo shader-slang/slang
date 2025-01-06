@@ -22,11 +22,18 @@ SLANG_UNIT_TEST(isParameterLocationUsedReflection)
             Texture2D tex2;
             Texture2D tex3;
         };
+        struct Material
+        {
+            float2 uvScale;
+            float2 uvBias;
+        }
         ParameterBlock<Params> gParams;
+        ConstantBuffer<Material> gcMaterial;
+        ParameterBlock<Material> gMaterial;
         [shader("fragment")]
         float4 fragMain(float4 pos:SV_Position, float unused:COLOR0, float4 used:COLOR1) : SV_Target
         {
-            return g_tex.Load(int3(0, 0, 0)) + gParams.tex3.Load(int3(0)) + used;
+            return g_tex.Load(int3(0, 0, 0)) + gParams.tex3.Load(int3(0)) + used + gMaterial.uvScale.x + gcMaterial.uvBias.x;
         }
         )";
 
@@ -79,12 +86,18 @@ SLANG_UNIT_TEST(isParameterLocationUsedReflection)
     SLANG_CHECK(isUsed);
 
     metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 1, isUsed);
+    SLANG_CHECK(isUsed);
+
+    metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 2, isUsed);
     SLANG_CHECK(!isUsed);
 
     metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 1, 0, isUsed);
     SLANG_CHECK(!isUsed);
 
     metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 1, 1, isUsed);
+    SLANG_CHECK(isUsed);
+
+    metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 2, 0, isUsed);
     SLANG_CHECK(isUsed);
 
     metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_VARYING_INPUT, 0, 0, isUsed);
