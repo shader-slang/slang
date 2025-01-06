@@ -814,6 +814,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         case spirv:
             return (spirv_asm
             {
+                OpCapability ImageQuery;
                 result:$$float2 = OpImageQueryLod $this $location
             }).x;
         }
@@ -839,6 +840,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         case spirv:
             return (spirv_asm
             {
+                OpCapability ImageQuery;
                 result:$$float2 = OpImageQueryLod $this $location
             }).y;
         }
@@ -1470,6 +1472,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
             __intrinsic_asm "textureQueryLod($p, $2).x";
         case spirv:
             return (spirv_asm {
+                OpCapability ImageQuery;
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 result:$$float2 = OpImageQueryLod %sampledImage $location;
             }).x;
@@ -1492,6 +1495,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
             __intrinsic_asm "textureQueryLod($p, $2).y";
         case spirv:
             return (spirv_asm {
+                OpCapability ImageQuery;
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 result:$$float2 = OpImageQueryLod %sampledImage $location;
             }).y;
