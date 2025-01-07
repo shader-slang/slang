@@ -418,14 +418,14 @@ public:
     virtual void emitStructFieldAttributes(
         IRStructType* /* structType */,
         IRStructField* /* field */
-    ) {};
+    ){};
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
     void emitMeshShaderModifiers(IRInst* varInst);
     virtual void emitPackOffsetModifier(
         IRInst* /*varInst*/,
         IRType* /*valueType*/,
         IRPackOffsetDecoration* /*decoration*/
-    ) {};
+    ){};
 
 
     /// Emit modifiers that should apply even for a declaration of an SSA temporary.
