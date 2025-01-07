@@ -3,7 +3,7 @@
 //TEST:SIMPLE(filecheck=HLSL): -stage compute -entry computeMain -target hlsl -DEXCLUDE_INTEGER_TYPE
 //TEST:SIMPLE(filecheck=SPIR): -stage compute -entry computeMain -target spirv -emit-spirv-directly -DEXCLUDE_HALF_TYPE -DEXCLUDE_SHORT_TYPE
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-slang -compute -dx12 -profile cs_6_6 -use-dxil -shaderobj -output-using-type -xslang -DEXCLUDE_INTEGER_TYPE
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-slang -compute -dx12 -profile cs_6_6 -use-dxil -shaderobj -output-using-type -xslang -DEXCLUDE_INTEGER_TYPE -xslang -DEXCLUDE_SM_6_7
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DEXCLUDE_HALF_TYPE -xslang -DEXCLUDE_SHORT_TYPE
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
@@ -571,6 +571,8 @@ bool TEST_texture(
         //  float SampleCmpLevel()
         // ===================================
 
+        // These require SM 6.7 for dx12 but functional compute tests currently do not run with the cs_6_7.
+#if !defined(EXCLUDE_SM_6_7)
         // METAL: d2D{{.*}}.sample_compare(
         // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
         && float(0) == d2D.SampleCmpLevel(shadowSampler, float2(u, u), 0, 0.0)
@@ -592,6 +594,7 @@ bool TEST_texture(
         // METAL: d2D{{.*}}.sample_compare(
         // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
         && float(0) == d2D.SampleCmpLevel(shadowSampler, float2(u2, u), 0, 0.0, int2(0, 0))
+#endif
 
         // ==================================
         //  vector<T,4> Gather()
