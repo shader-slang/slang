@@ -123,12 +123,20 @@ struct SpecializationContext
                 }
                 return false;
             }
+        // For all the wrapper type, we need to make sure the operands are fully specialized.
         case kIROp_ArrayType:
-            {
-                auto array = as<IRArrayType>(inst);
-                auto elementType = array->getElementType();
-                return isInstFullySpecialized(elementType);
-            }
+        case kIROp_TextureType:
+        case kIROp_VectorType:
+        case kIROp_MatrixType:
+        case kIROp_PtrType:
+        case kIROp_RefType:
+        case kIROp_ConstRefType:
+        case kIROp_HLSLStructuredBufferType:
+        case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+        case kIROp_HLSLAppendStructuredBufferType:
+        case kIROp_HLSLConsumeStructuredBufferType:
+            return areAllOperandsFullySpecialized(inst);
         }
 
         // The default case is that a global value is always specialized.
