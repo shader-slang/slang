@@ -2562,11 +2562,7 @@ DIAGNOSTIC(
     Internal,
     serialDebugVerificationFailed,
     "Verification of serial debug information failed.")
-DIAGNOSTIC(
-    99999,
-    Internal,
-    spirvValidationFailed,
-    "Validation of generated SPIR-V failed.")
+DIAGNOSTIC(99999, Internal, spirvValidationFailed, "Validation of generated SPIR-V failed.")
 
 DIAGNOSTIC(
     99999,
