@@ -1489,6 +1489,44 @@ struct LegalizeWGSLEntryPointContext
 
     void legalizeBinaryOp(IRInst* inst)
     {
+        // For shifts, ensure that the shift amount is unsigned, as required by
+        // https://www.w3.org/TR/WGSL/#bit-expr.
+        if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
+        {
+            IRInst* shiftAmount = inst->getOperand(1);
+            IRType* shiftAmountType = shiftAmount->getDataType();
+            if (auto shiftAmountVectorType = as<IRVectorType>(shiftAmountType))
+            {
+                IRType* shiftAmountElementType = shiftAmountVectorType->getElementType();
+                IntInfo opIntInfo = getIntTypeInfo(shiftAmountElementType);
+                if (opIntInfo.isSigned)
+                {
+                    IRBuilder builder(inst);
+                    builder.setInsertBefore(inst);
+                    opIntInfo.isSigned = false;
+                    shiftAmountElementType = builder.getType(getIntTypeOpFromInfo(opIntInfo));
+                    shiftAmountVectorType = builder.getVectorType(
+                        shiftAmountElementType,
+                        shiftAmountVectorType->getElementCount());
+                    IRInst* newShiftAmount = builder.emitCast(shiftAmountVectorType, shiftAmount);
+                    builder.replaceOperand(inst->getOperands() + 1, newShiftAmount);
+                }
+            }
+            else if (isIntegralType(shiftAmountType))
+            {
+                IntInfo opIntInfo = getIntTypeInfo(shiftAmountType);
+                if (opIntInfo.isSigned)
+                {
+                    IRBuilder builder(inst);
+                    builder.setInsertBefore(inst);
+                    opIntInfo.isSigned = false;
+                    shiftAmountType = builder.getType(getIntTypeOpFromInfo(opIntInfo));
+                    IRInst* newShiftAmount = builder.emitCast(shiftAmountType, shiftAmount);
+                    builder.replaceOperand(inst->getOperands() + 1, newShiftAmount);
+                }
+            }
+        }
+
         auto isVectorOrMatrix = [](IRType* type)
         {
             switch (type->getOp())
@@ -1505,9 +1543,17 @@ struct LegalizeWGSLEntryPointContext
         {
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
-            auto newRhs = builder.emitMakeCompositeFromScalar(
-                inst->getOperand(0)->getDataType(),
-                inst->getOperand(1));
+            IRType* compositeType = inst->getOperand(0)->getDataType();
+            IRInst* scalarValue = inst->getOperand(1);
+            // Retain the scalar type for shifts
+            if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
+            {
+                auto vectorType = as<IRVectorType>(compositeType);
+                compositeType = builder.getVectorType(
+                    scalarValue->getDataType(),
+                    vectorType->getElementCount());
+            }
+            auto newRhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
             builder.replaceOperand(inst->getOperands() + 1, newRhs);
         }
         else if (
@@ -1516,22 +1562,33 @@ struct LegalizeWGSLEntryPointContext
         {
             IRBuilder builder(inst);
             builder.setInsertBefore(inst);
-            auto newLhs = builder.emitMakeCompositeFromScalar(
-                inst->getOperand(1)->getDataType(),
-                inst->getOperand(0));
+            IRType* compositeType = inst->getOperand(1)->getDataType();
+            IRInst* scalarValue = inst->getOperand(0);
+            // Retain the scalar type for shifts
+            if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
+            {
+                auto vectorType = as<IRVectorType>(compositeType);
+                compositeType = builder.getVectorType(
+                    scalarValue->getDataType(),
+                    vectorType->getElementCount());
+            }
+            auto newLhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
             builder.replaceOperand(inst->getOperands(), newLhs);
         }
         else if (
             isIntegralType(inst->getOperand(0)->getDataType()) &&
             isIntegralType(inst->getOperand(1)->getDataType()))
         {
-            // If integer operands differ in signedness, convert the signed one to unsigned.
+            // Unless the operator is a shift, and if the integer operands differ in signedness,
+            // then convert the signed one to unsigned.
             // We're assuming that the cases where this is bad have already been caught by
             // common validation checks.
             IntInfo opIntInfo[2] = {
                 getIntTypeInfo(inst->getOperand(0)->getDataType()),
                 getIntTypeInfo(inst->getOperand(1)->getDataType())};
-            if (opIntInfo[0].isSigned != opIntInfo[1].isSigned)
+            bool isShift = inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh;
+            bool signednessDiffers = opIntInfo[0].isSigned != opIntInfo[1].isSigned;
+            if (!isShift && signednessDiffers)
             {
                 int signedOpIndex = (int)opIntInfo[1].isSigned;
                 opIntInfo[signedOpIndex].isSigned = false;
