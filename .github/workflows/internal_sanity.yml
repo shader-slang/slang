@@ -1,0 +1,40 @@
+name: Internal-CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  PR_NUMBER: ${{ github.event.number }}
+  PIPELINE_TRIGGER_TOKEN: ${{ secrets.INTERNAL_PIPELINE_TRIGGER_TOKEN }}
+  ACCESS_TOKEN: ${{ secrets.INTERNAL_PIPELINE_ACCESS_TOKEN }}
+  INTERNAL_PIPELINE_API_ENDPOINT: ${{ secrets.INTERNAL_PIPELINE_ENDPOINT }}
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          # Self-hosted falcor tests
+          - os: windows
+            runs-on: [Windows, self-hosted]
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Setup jd tools to git-bash
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+          Invoke-WebRequest https://github.com/jqlang/jq/releases/latest/download/jq-win64.exe -OutFile "C:\\Program Files\\Git\\usr\\bin\\jq.exe"
+
+      - name: Run Internal CI Pipeline
+        shell: bash
+        run: .github/workflows/internal_test.sh $PR_NUMBER
