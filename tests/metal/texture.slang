@@ -3,7 +3,7 @@
 //TEST:SIMPLE(filecheck=HLSL): -stage compute -entry computeMain -target hlsl -DEXCLUDE_INTEGER_TYPE
 //TEST:SIMPLE(filecheck=SPIR): -stage compute -entry computeMain -target spirv -emit-spirv-directly -DEXCLUDE_HALF_TYPE -DEXCLUDE_SHORT_TYPE
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-slang -compute -dx12 -profile cs_6_6 -use-dxil -shaderobj -output-using-type -xslang -DEXCLUDE_INTEGER_TYPE
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-slang -compute -dx12 -profile cs_6_6 -use-dxil -shaderobj -output-using-type -xslang -DEXCLUDE_INTEGER_TYPE -xslang -DEXCLUDE_SM_6_7
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DEXCLUDE_HALF_TYPE -xslang -DEXCLUDE_SHORT_TYPE
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
@@ -343,6 +343,8 @@ bool TEST_texture(
 
         // SamplerComparisonState variant
 
+        // Functional tests that require SM higher than 6.6 (as of writing) cannot run.
+#if !defined(EXCLUDE_SM_6_7)
         // METAL: t2D{{.*}}.calculate_clamped_lod({{.*}}
         // METALLIB: call {{.*}}.calculate_clamped_lod_texture_2d(
         && float(0) == t2D.CalculateLevelOfDetail(shadowSampler, float2(u, u))
@@ -362,6 +364,7 @@ bool TEST_texture(
         // METAL: tCubeArray{{.*}}.calculate_clamped_lod({{.*}}
         // METALLIB: call {{.*}}.calculate_clamped_lod_texture_cube_array(
         && float(0) == tCubeArray.CalculateLevelOfDetail(shadowSampler, normalize(float3(u, 1 - u, u)))
+#endif
 
         // ========================================
         // float CalculateLevelOfDetailUnclamped()
@@ -390,7 +393,7 @@ bool TEST_texture(
         && float(0) >= tCubeArray.CalculateLevelOfDetailUnclamped(samplerState, normalize(float3(u, 1 - u, u)))
 
         // SamplerComparisonState variant
-
+#if !defined(EXCLUDE_SM_6_7)
         // METAL: t2D{{.*}}.calculate_unclamped_lod({{.*}}
         // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_2d(
         && float(0) >= t2D.CalculateLevelOfDetailUnclamped(shadowSampler, float2(u, u))
@@ -410,6 +413,7 @@ bool TEST_texture(
         // METAL: tCubeArray{{.*}}.calculate_unclamped_lod({{.*}}
         // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_cube_array(
         && float(0) >= tCubeArray.CalculateLevelOfDetailUnclamped(shadowSampler, normalize(float3(u, 1 - u, u)))
+#endif
 
         // ===========
         // T Sample()
