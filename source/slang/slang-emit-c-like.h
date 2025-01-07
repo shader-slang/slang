@@ -414,7 +414,7 @@ public:
     /// Emit type attributes that should appear after, e.g., a `struct` keyword
     void emitPostKeywordTypeAttributes(IRInst* inst) { emitPostKeywordTypeAttributesImpl(inst); }
 
-    virtual void emitMemoryQualifiers(IRInst* /*varInst*/) {};
+    virtual void emitMemoryQualifiers(IRInst* /*varInst*/){};
     virtual void emitStructFieldAttributes(
         IRStructType* /* structType */,
         IRStructField* /* field */
