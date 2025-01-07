@@ -727,6 +727,18 @@ __generic<T, let N : int> __intrinsic_op(select) vector<T,N> operator?:(vector<b
 __generic<T> __intrinsic_op(select) T select(bool condition, T ifTrue, T ifFalse);
 __generic<T, let N : int> __intrinsic_op(select) vector<T,N> select(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
 
+[ForceInline]
+__generic<T> Optional<T> select(bool condition, __none_t ifTrue, T ifFalse)
+{
+    return select(condition, Optional<T>(none), Optional<T>(ifFalse));
+}
+
+[ForceInline]
+__generic<T> Optional<T> select(bool condition, T ifTrue, __none_t ifFalse)
+{
+    return select(condition, Optional<T>(ifTrue), Optional<T>(none));
+}
+
 // Allow real-number types to be cast into each other
 //@hidden:
 __intrinsic_op($(kIROp_FloatCast))
