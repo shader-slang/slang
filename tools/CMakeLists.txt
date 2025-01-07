@@ -235,6 +235,8 @@ if(SLANG_ENABLE_TESTS)
             slang-llvm
             copy-webgpu_dawn
             copy-slang-tint
+            # See issue 5305.
+            copy-prebuilt-binaries
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
