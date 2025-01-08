@@ -33,7 +33,8 @@ jobs:
         run: |
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
-          Invoke-WebRequest https://github.com/jqlang/jq/releases/latest/download/jq-win64.exe -OutFile "C:\\Program Files\\Git\\usr\\bin\\jq.exe"
+          Invoke-WebRequest https://github.com/jqlang/jq/releases/latest/download/jq-win64.exe -OutFile ".\\jq.exe"
+          echo $PWD
 
       - name: Run Internal CI Pipeline
         shell: bash
