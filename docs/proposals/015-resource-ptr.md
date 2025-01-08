@@ -28,7 +28,8 @@ We introduce a `ResourcePtr<T>` type that is defined as:
 struct ResourcePtr<T> : IComparable
     where T : IOpaqueHandle
 {
-    __init(uint2 value);
+    [requires(hlsl_glsl_spirv)]
+    __init(uint2 value); // For HLSL, GLSL and SPIRV targets only.
 }
 ```
 Where `IOpaqueHandle` is an interface that is implemented by all texture, buffer and sampler state types:
@@ -88,10 +89,11 @@ void test()
 }
 ```
 
-A `ResourcePtr<T>` type is a concrete type whose size is target dependent. For most targets, it is represented as a two-component vector of 32-bit unsigned integer (`uint2`).
+A `ResourcePtr<T>` type has target-dependent size, but it is always a concrete/physical data type and valid in all memory locations. For HLSL and SPIRV targets, it is represented as a two-component vector of 32-bit unsigned integer (`uint2`), and builtin conversion functions are provided to construct
+a `ResourcePtr<T>` from a `uint2` value.
 This means that you can use a `ResourcePtr<T>` type in any context where an ordinary data type, e.g. `int` type is allowed, such as in buffer elements.
 
-On targets where resource handles are already concrete and sized types, `ResourcePtr<T>` simply translates to just `T`, and has size and alignment that matches the corresponding native type, which is queryable with Slang's reflection API.
+On targets where resource handles are already concrete and sized types, `ResourcePtr<T>` simply translates to `T`, and has size and alignment that matches the corresponding native type, which is queryable with Slang's reflection API.
 
 ### Obtaining Actual Resource Handle from `ResourcePtr<T>`
 
@@ -227,6 +229,14 @@ allowing the compiler to treat `ResourcePtr<T>` as `T` in a special mode if this
 For now we think that restricting `T` to be an `IOpaqueHandle` type will result in a much simpler implementation, and is likely sufficient for current needs. Given that the trend of modern GPU architecture is moving towards bindless idioms and the whole idea of opaque handles may disappear in the future, we should be cautious at inventing too many heavy weight mechanisms around opaque handles. Nevertheless, this proposal still allows us to relax this requirement in the future if it becomes clear that such feature is valuable to our users.
 
 In the initial version of this propsoal, `ResourcePtr<T>` is named `Bindless<T>`. During discussion, we determined that this naming can be confusing to users who are coming from general GPU compute community and haven't heard of the term "bindless resources". We believe `ResourcePtr<T>` is a better name because it reflects the essense of the type more accurately.
+
+The initial version of the proposal defines `ResourcePtr<T>` to be backed by an 8-byte integer value independent of the target. This is changed
+so that Slang only guarantees `ResourcePtr<T>` to be a phyiscal data type, and will have target-dependent size. Slang guarantees that `ResourcePtr<T>`
+will be lowered to a `uint2` value when targeting HLSL, GLSL and SPIRV, but not on other targets. This is because on targets where `T` is already a
+phyisical type, their size can vary and may not fit in an 8-byte structure. For example, `StructuredBuffer<T>` maps to a `{T*, size_t}` structure when
+targeting CUDA, which takes 16 bytes. In the meanwhile, forcing `ResourcePtr<T>` to be `uint64_t` makes the feature unusable for lower-tier hardware
+where 64-bit integers are not supported. Representing the handle with `uint2` allows the feature to be used without requiring this additional
+capability.
 
 ## Conclusion
 
