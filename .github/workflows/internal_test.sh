@@ -12,7 +12,7 @@ PR=$1
 # # Trigger the pipeline
 trigger_response=$(curl -s --request POST \
   --form token=${PIPELINE_TRIGGER_TOKEN} \
-  --form ref=ov-sanity-ci \
+  --form ref=nv-master \
   --form "variables[PR]=$PR" \
   "$INTERNAL_PIPELINE_API_ENDPOINT/trigger/pipeline")
 
