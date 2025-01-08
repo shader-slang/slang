@@ -62,6 +62,7 @@
 #include "slang-ir-lower-binding-query.h"
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-buffer-element-type.h"
+#include "slang-ir-lower-dynamic-resource-heap.h"
 #include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-glsl-ssbo-types.h"
@@ -315,6 +316,7 @@ struct RequiredLoweringPassSet
     bool glslSSBO;
     bool byteAddressBuffer;
     bool dynamicResource;
+    bool dynamicResourceHeap;
 };
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
@@ -423,6 +425,9 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_DynamicResourceType:
         result.dynamicResource = true;
+        break;
+    case kIROp_GetDynamicResourceHeap:
+        result.dynamicResourceHeap = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -1087,6 +1092,9 @@ Result linkAndOptimizeIR(
         eliminateDeadCode(irModule, deadCodeEliminationOptions);
     else
         simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
+
+    if (requiredLoweringPassSet.dynamicResourceHeap)
+        lowerDynamicResourceHeap(targetProgram, irModule, sink);
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER SSA");

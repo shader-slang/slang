@@ -1669,6 +1669,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 registerInst(inst, result);
                 return result;
             }
+        case kIROp_ResourcePtrType:
+            {
+                IRBuilder builder(inst);
+                builder.setInsertBefore(inst);
+                return emitOpTypeVector(inst, builder.getUIntType(), SpvLiteralInteger::from32(2));
+            }
         case kIROp_SubpassInputType:
             return ensureSubpassInputType(inst, cast<IRSubpassInputType>(inst));
         case kIROp_TextureType:
@@ -3444,6 +3450,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Lsh:
             result = emitArithmetic(parent, inst);
             break;
+        case kIROp_CastBindlessToInt:
+        case kIROp_CastIntToBindless:
         case kIROp_GlobalValueRef:
             {
                 auto inner = ensureInst(inst->getOperand(0));

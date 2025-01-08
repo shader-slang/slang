@@ -133,6 +133,10 @@ INST(Nop, nop, 0, 0)
     INST(ComPtrType, ComPtr, 1, HOISTABLE)
     // A NativePtr<T> type represents a native pointer to a managed resource.
     INST(NativePtrType, NativePtr, 1, HOISTABLE)
+
+    // A ResourcePtr<T> type represents a bindless handle to an opaue resource type.
+    INST(ResourcePtrType, ResourcePtr, 1, HOISTABLE)
+
     // An AtomicUint is a placeholder type for a storage buffer, and will be mangled during compiling.
     INST(GLSLAtomicUintType, GLSLAtomicUint, 0, HOISTABLE)
 
@@ -365,6 +369,9 @@ INST(MakeTargetTuple, makeTuple, 0, 0)
 INST(MakeValuePack, makeValuePack, 0, 0)
 INST(GetTargetTupleElement, getTargetTupleElement, 0, 0)
 INST(GetTupleElement, getTupleElement, 2, 0)
+INST(LoadResourceDescriptorFromHeap, LoadResourceDescriptorFromHeap, 1, 0)
+INST(LoadSamplerDescriptorFromHeap, LoadSamplerDescriptorFromHeap, 1, 0)
+INST(MakeCombinedTextureSamplerFromHandle, MakeCombinedTextureSamplerFromHandle, 1, 0)
 INST(MakeWitnessPack, MakeWitnessPack, 0, HOISTABLE)
 INST(Expand, Expand, 1, 0)
 INST(Each, Each, 1, HOISTABLE)
@@ -1184,6 +1191,8 @@ INST(CastPtrToInt, CastPtrToInt, 1, 0)
 INST(CastIntToPtr, CastIntToPtr, 1, 0)
 INST(CastToVoid, castToVoid, 1, 0)
 INST(PtrCast, PtrCast, 1, 0)
+INST(CastIntToBindless, CastIntToBindless, 1, 0)
+INST(CastBindlessToInt, CastBindlessToInt, 1, 0)
 INST(TreatAsDynamicUniform, TreatAsDynamicUniform, 1, 0)
 
 INST(SizeOf,                            sizeOf,                     1, 0)
@@ -1200,6 +1209,7 @@ INST(IsHalf, IsHalf, 1, 0)
 INST(IsUnsignedInt, IsUnsignedInt, 1, 0)
 INST(IsSignedInt, IsSignedInt, 1, 0)
 INST(IsVector, IsVector, 1, 0)
+INST(GetDynamicResourceHeap, GetDynamicResourceHeap, 0, HOISTABLE)
 
 INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
 

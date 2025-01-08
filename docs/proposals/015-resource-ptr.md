@@ -1,13 +1,13 @@
-SP #015 - `Bindless<T>` type
+SP #015 - `ResourcePtr<T>` type
 ==============
 
 ## Status
 
 Author: Yong He
 
-Status: Design review.
+Status: In Experiment.
 
-Implementation:
+Implementation: 
 
 Reviewed by: Theresa Foley
 
@@ -23,12 +23,12 @@ We believe that graphics developers will greatly benefit from a system defined p
 
 ## Proposed Approach
 
-We introduce a `Bindless<T>` type that is defined as:
+We introduce a `ResourcePtr<T>` type that is defined as:
 ```
-struct Bindless<T> : IComparable<Bindless<T>>
+struct ResourcePtr<T> : IComparable
     where T : IOpaqueHandle
 {
-    __init(uint64_t value);
+    __init(uint2 value);
 }
 ```
 Where `IOpaqueHandle` is an interface that is implemented by all texture, buffer and sampler state types:
@@ -36,7 +36,12 @@ Where `IOpaqueHandle` is an interface that is implemented by all texture, buffer
 ```slang
 enum ResourceKind
 {
-    Unknown, Texture, ConstantBuffer, StorageBuffer, Sampler
+    Unknown,
+    Texture,
+    CombinedTextureSampler,
+    Buffer,
+    Sampler,
+    AccelerationStructure,
 }
 interface IOpaqueHandle
 {
@@ -46,19 +51,19 @@ interface IOpaqueHandle
 
 ### Basic Usage
 
-`Bindless<T>` should provide the following features:
+`ResourcePtr<T>` should provide the following features:
 
-- Construction/explicit cast from a 64-bit integer.
-- Explicit cast to a 64-bit integer.
+- Construction/explicit cast from a `uint2` value.
+- Explicit cast to a `uint2` value.
 - Equality comparison.
-- Implicit dereference to `T`.
-- Implicit conversion to `T`.
+- `operator *` to deference the pointer and obatin the actual resource handle `T`.
+- Implicit conversion to `T` when used in a location that expects `T`.
 
 For example:
 
 ```slang
-uniform Bindless<Texture2D> texture;
-uniform Bindless<SamplerState> sampler;
+uniform ResourcePtr<Texture2D> texture;
+uniform ResourcePtr<SamplerState> sampler;
 
 void test()
 {
@@ -66,40 +71,41 @@ void test()
     let idx = (uint64_t)texture;
 
     // Constructing bindless handle from uint64_t value.
-    let t = Bindless<Texture2D>(idx);
+    let t = ResourcePtr<Texture2D>(idx);
 
     // Comparison.
     ASSERT(t == texture);
 
     // OK, `t` is first implicitly dereferenced to producee `Texture2D`, and
     // then `Texture2D::Sample` is called.
-    // The `sampler` argument is implicitly converted from `Bindless<SamplerState>`
+    // The `sampler` argument is implicitly converted from `ResourcePtr<SamplerState>`
     // to `SamplerState`.
     t.Sample(sampler, float2(0,0));
+
+    // Alternatively, the following syntax is also allowed, to
+    // make `ResourcePtr` appear more like a pointer:
+    t->Sample(*sampler, float2(0, 0));
 }
 ```
 
-A `Bindless<T>` type is a concrete type whose size is always 8 bytes and is internally a 64-bit integer.
-This means that you can use a `Bindless<T>` type in any context where an ordinary data type, e.g. `int` type
-is allowed, such as in buffer elements.
+A `ResourcePtr<T>` type is a concrete type whose size is target dependent. For most targets, it is represented as a two-component vector of 32-bit unsigned integer (`uint2`).
+This means that you can use a `ResourcePtr<T>` type in any context where an ordinary data type, e.g. `int` type is allowed, such as in buffer elements.
 
-On targets where resource handles are already concrete and sized types, `Bindless<T>` simply translates to just `T`.
-If `T` has native size or alignment that is less than 8 bytes, it will be rounded up to 8 bytes. If the native size for
-`T` is greater than 8 bytes, it will be treated as an opaque type instead of translating to `T`.
+On targets where resource handles are already concrete and sized types, `ResourcePtr<T>` simply translates to just `T`, and has size and alignment that matches the corresponding native type, which is queryable with Slang's reflection API.
 
-### Obtaining Actual Resource Handle from `Bindless<T>`
+### Obtaining Actual Resource Handle from `ResourcePtr<T>`
 
 Depending on the target platform and the design choices of the user's application, the way to obtain the actual
-resource handle from a `Bindless<T>` integer handle can vary. Slang does not dictate how this conversion is done,
+resource handle from a `ResourcePtr<T>` integer handle can vary. Slang does not dictate how this conversion is done,
 and instead, this is left to the user via Slang's link-time specialization ability.
 
 Slang defines the following core module declarations:
 
 ```slang
-extern T getResourceFromBindlessHandle(uint64_t handle) where T : IOpaqueHandle
+extern T getResourceFromBindlessHandle(ResourcePtr<T> handle) where T : IOpaqueHandle
 {
     // Default Implementation
-    // ...
+    return defaultGetResourceFromBindlessHandle(handle);
 }
 ```
 
@@ -128,32 +134,64 @@ __DynamicResource<__DynamicResourceKind.General> resourceHandles[];
 [vk::binding(0, 101)]
 __DynamicResource<__DynamicResourceKind.Sampler> samplerHandles[];
 
-export getResourceFromBindlessHandle<T>(uint64_t handle) where T : IOpaqueHandle
+export getResourceFromBindlessHandle<T>(ResourcePtr<T> handle) where T : IOpaqueHandle
 {
     if (T.kind == ResourceKind.Sampler)
-        return (T)samplerHandles[handle];
+        return (T)samplerHandles[((uint2)handle).x];
     else
-        return (T)resourceHandles[handle];
+        return (T)resourceHandles[((uint2)handle).x];
 }
 ```
 
+The user can call `defaultGetResourceFromBindlessHandle` function from their implementation of `getResourceFromBindlessHandle` to dispatch to the default behavior.
+
 ### Invalid Handle
 
-We reserve `uint64_t.maxValue` as a special handle value of `Bindless<T>` types to mean an invalid/null resource.
-This will allow us to optimize `Optional<Bindless<Texture2D>>` to use the reserved value to mean no-value.
+We reserve `uint2(0xFFFFFFFF, 0xFFFFFFFF)` as a special handle value of `ResourcePtr<T>` types to mean an invalid/null resource.
+This will allow us to optimize `Optional<ResourcePtr<Texture2D>>` to use the reserved value to mean no-value.
 
-The user should also be able to use `Bindless<T>.invalid` to refer to such an invalid value:
+The user should also be able to use `ResourcePtr<T>.invalid` to refer to such an invalid value:
 
 ```slang
-struct Bindless<T> where T:IOpaqueHandle
+struct ResourcePtr<T> where T:IOpaqueHandle
 {
-    static const Bindless<T> invalid = Bindless<T>(uint64_t.maxValue);
+    static const ResourcePtr<T> invalid = ResourcePtr<T>(uint2(uint.maxValue));
+}
+```
+
+### Combind Texture Samplers
+
+On platforms without native support for combined texture samplers, we will use both components of the
+underlying `uint2` value: the `x` component stores the bindless handle for the texture, and the `y` component stores the bindless handle for the sampler.
+
+For example, given:
+
+```slang
+uniform ResourcePtr<Sampler2D> s;
+void main()
+{
+    float2 uv = ...;
+    s.SampleLevel(uv, 0.0);
+}
+```
+
+The Slang compiler should emit HLSL as follows:
+
+```hlsl
+uniform uint2 s;
+void main()
+{
+    float2 uv = ...;
+    Texture2D(ResourceDescriptorHeap[s.x]).SampleLevel(
+        SamplerState(SamplerDescriptorHeap[s.y]),
+        uv,
+        0.0);
 }
 ```
 
 ## Alternatives Considered
 
-We initially considered to support a more general `Bindless<T>` where `T` can be any composite type, for example, allowing the following:
+We initially considered to support a more general `ResourcePtr<T>` where `T` can be any composite type, for example, allowing the following:
 
 ```slang
 struct Foo
@@ -163,7 +201,7 @@ struct Foo
     float ordinaryData;
 }
 
-uniform Bindless<Foo> foo;
+uniform ResourcePtr<Foo> foo;
 ```
 
 which is equivalent to:
@@ -171,8 +209,8 @@ which is equivalent to:
 ```slang
 struct Bindless_Foo
 {
-    Bindless<Texture2D> t;
-    Bindless<SamplerState> s;
+    ResourcePtr<Texture2D> t;
+    ResourcePtr<SamplerState> s;
     float s;
 }
 uniform Bindless_Foo foo;
@@ -184,15 +222,17 @@ cases that are hard to get right.
 
 An argument for allowing `T` to be general composite types is that it enables sharing the same
 code for both bindless systems and bindful systems. But this argument can also be countered by
-allowing the compiler to treat `Bindless<T>` as `T` in a special mode if this feature is found to be useful.
+allowing the compiler to treat `ResourcePtr<T>` as `T` in a special mode if this feature is found to be useful.
 
 For now we think that restricting `T` to be an `IOpaqueHandle` type will result in a much simpler implementation, and is likely sufficient for current needs. Given that the trend of modern GPU architecture is moving towards bindless idioms and the whole idea of opaque handles may disappear in the future, we should be cautious at inventing too many heavy weight mechanisms around opaque handles. Nevertheless, this proposal still allows us to relax this requirement in the future if it becomes clear that such feature is valuable to our users.
+
+In the initial version of this propsoal, `ResourcePtr<T>` is named `Bindless<T>`. During discussion, we determined that this naming can be confusing to users who are coming from general GPU compute community and haven't heard of the term "bindless resources". We believe `ResourcePtr<T>` is a better name because it reflects the essense of the type more accurately.
 
 ## Conclusion
 
 This proposal introduces a standard way to achieve bindless parameter passing idom on current graphics platforms.
 Standardizing the way of writing bindless parameter binding code is essential for creating reusable shader code
-libraries. The convenience language features around `Bindless<T>` type should also make shader code easier to write
+libraries. The convenience language features around `ResourcePtr<T>` type should also make shader code easier to write
 and to maintain. Finally, by using Slang's link time specialization feature,
 this proposal allows Slang to not get into the way of dicatating one specific way of passing
 the actual resource handles to the shader code, and allows the user to customize how the conversion from integer handle

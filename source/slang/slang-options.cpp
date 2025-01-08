@@ -527,9 +527,7 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::EmitReflectionJSON,
          "-reflection-json",
          "reflection-json <path>",
-         "Emit reflection data in JSON format to a file."},
-    };
-
+         "Emit reflection data in JSON format to a file."}};
 
     _addOptions(makeConstArrayView(generalOpts), options);
 
@@ -672,7 +670,10 @@ void initCommandOptions(CommandOptions& options)
          "-incomplete-library",
          nullptr,
          "Allow generating code from incomplete libraries with unresolved external functions"},
-    };
+        {OptionKind::BindlessSpaceIndex,
+         "-bindless-space-index",
+         "-bindless-space-index <index>",
+         "Specify the space index for the system defined global bindless resource array."}};
 
     _addOptions(makeConstArrayView(targetOpts), options);
 
@@ -2475,6 +2476,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // value in only allowing a single `-profile` option per target while still allowing
                 // zero or more `-capability` options.
 
+                // Don't treat zero args as an error.
+                if (!m_reader.hasArg())
+                    break;
+
                 CommandLineArg operand;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(operand));
 
@@ -2897,6 +2902,15 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::DisableShortCircuit:
             {
                 linkage->m_optionSet.add(OptionKind::DisableShortCircuit, true);
+                break;
+            }
+        case OptionKind::BindlessSpaceIndex:
+            {
+                CommandLineArg indexArg;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(indexArg));
+                Int index = 0;
+                SLANG_RETURN_ON_FAIL(_expectInt(indexArg, index));
+                linkage->m_optionSet.add(OptionKind::BindlessSpaceIndex, (int)index);
                 break;
             }
         default:

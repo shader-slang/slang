@@ -344,6 +344,7 @@ static Result _calcSizeAndAlignment(
     case kIROp_ComPtrType:
     case kIROp_NativeStringType:
     case kIROp_HLSLConstBufferPointerType:
+    case kIROp_ResourcePtrType:
         {
             *outSizeAndAlignment = IRSizeAndAlignment(kPointerSize, kPointerSize);
             return SLANG_OK;

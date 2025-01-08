@@ -4802,6 +4802,10 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             type,
             rules);
     }
+    else if (as<ResourcePtrType>(type))
+    {
+        return createSimpleTypeLayout(rules->GetScalarLayout(BaseType::UInt64), type, rules);
+    }
     else if (auto optionalType = as<OptionalType>(type))
     {
         // OptionalType should be laid out the same way as Tuple<T, bool>.

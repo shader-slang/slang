@@ -182,10 +182,8 @@ void lowerCombinedTextureSamplers(
             continue;
         for (auto block : func->getBlocks())
         {
-            IRInst* nextInst = nullptr;
-            for (auto inst = block->getFirstInst(); inst; inst = nextInst)
+            for (auto inst : block->getModifiableChildren())
             {
-                nextInst = inst->getNextInst();
                 switch (inst->getOp())
                 {
                 case kIROp_CombinedTextureSamplerGetTexture:
@@ -204,6 +202,34 @@ void lowerCombinedTextureSamplers(
                                 ? loweredInfo->sampler
                                 : loweredInfo->texture);
                         inst->replaceUsesWith(fieldExtract);
+                        inst->removeAndDeallocate();
+                    }
+                    break;
+                case kIROp_MakeCombinedTextureSamplerFromHandle:
+                    {
+                        auto combinedSamplerType = inst->getDataType();
+                        auto loweredInfo =
+                            context.mapTypeToLoweredInfo.tryGetValue(combinedSamplerType);
+                        if (!loweredInfo)
+                            continue;
+                        builder.setInsertBefore(inst);
+                        auto textureIndex =
+                            builder.emitElementExtract(inst->getOperand(0), IRIntegerValue(0));
+                        auto texture = builder.emitIntrinsicInst(
+                            loweredInfo->textureType,
+                            kIROp_LoadResourceDescriptorFromHeap,
+                            1,
+                            &textureIndex);
+                        auto samplerIndex =
+                            builder.emitElementExtract(inst->getOperand(0), IRIntegerValue(1));
+                        auto sampler = builder.emitIntrinsicInst(
+                            loweredInfo->samplerType,
+                            kIROp_LoadSamplerDescriptorFromHeap,
+                            1,
+                            &samplerIndex);
+                        IRInst* args[] = {texture, sampler};
+                        auto combinedSampler = builder.emitMakeStruct(loweredInfo->type, 2, args);
+                        inst->replaceUsesWith(combinedSampler);
                         inst->removeAndDeallocate();
                     }
                     break;

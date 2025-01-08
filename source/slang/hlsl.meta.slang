@@ -20693,6 +20693,23 @@ struct ConstBufferPointer
 // new aliased bindings for each distinct cast type.
 //
 
+enum ResourceKind
+{
+    Unknown,
+    Texture,
+    CombinedTextureSampler,
+    Buffer,
+    Sampler,
+    AccelerationStructure,
+}
+
+[sealed]
+[builtin]
+interface IOpaqueHandle
+{
+    static const ResourceKind kind;
+}
+
 __magic_type(DynamicResourceType)
 __intrinsic_type($(kIROp_DynamicResourceType))
 struct __DynamicResource<let kind = __DynamicResourceKind.General>
@@ -20700,7 +20717,7 @@ struct __DynamicResource<let kind = __DynamicResourceKind.General>
     __intrinsic_op($(kIROp_CastDynamicResource))
     T as<T : __IDynamicResourceCastable<kind>>();
 }
-interface __IDynamicResourceCastable<let kind = __DynamicResourceKind.General>
+interface __IDynamicResourceCastable<let kind = __DynamicResourceKind.General> : IOpaqueHandle
 {
 }
 
@@ -20716,41 +20733,142 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     __intrinsic_op($(kIROp_CastDynamicResource))
     __implicit_conversion($(kConversionCost_GenericParamUpcast))
     __init(__DynamicResource res);
+
+    static const ResourceKind kind = isCombined!=0 ? ResourceKind.CombinedTextureSampler : ResourceKind.Texture;
+
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    __init(ResourcePtr<This> bindless)
+    {
+        return getResourceFromBindlessHandle(bindless);
+    }
 }
 
 ${{{{
-const char* kDynamicResourceCastableTypes[] = {
-    "StructuredBuffer<T, L>", "RWStructuredBuffer<T, L>",
-    "AppendStructuredBuffer<T, L>", "ConsumeStructuredBuffer<T, L>", "RasterizerOrderedStructuredBuffer<T, L>",
-    "ByteAddressBuffer", "RWByteAddressBuffer", "RasterizerOrderedByteAddressBuffer",
-
-    "SamplerState", "SamplerComparisonState",
-
-    "ConstantBuffer<T, L>", "TextureBuffer<T>",
+struct DynamicResourceTypeInfo
+{
+    const char* name;
+    const char* kind;
+    const char* dynamicKind;
 };
 
-for (auto typeName : kDynamicResourceCastableTypes) {
-    auto kind = strstr(typeName, "Sampler") ? "Sampler" : "General";
+const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
+    {"StructuredBuffer<T, L>", "Buffer", "General"},
+    {"RWStructuredBuffer<T, L>", "Buffer", "General"},
+    {"AppendStructuredBuffer<T, L>", "Buffer", "General"},
+    {"ConsumeStructuredBuffer<T, L>", "Buffer", "General"},
+    {"RasterizerOrderedStructuredBuffer<T, L>", "Buffer", "General"},
+    {"ByteAddressBuffer", "Buffer", "General"},
+    {"RWByteAddressBuffer", "Buffer", "General"},
+    {"RasterizerOrderedByteAddressBuffer", "Buffer", "General"},
+    {"SamplerState", "Sampler", "Sampler"},
+    {"SamplerComparisonState", "Sampler", "Sampler"},
+    {"ConstantBuffer<T, L>", "Buffer", "General"},
+    {"TextureBuffer<T>", "Buffer", "General"},
+    {"RaytracingAccelerationStructure", "AccelerationStructure", "General"},
+};
 
-    if (strstr(typeName, "StructuredBuffer<T, L>"))
-        sb << "__generic<T, L : IBufferDataLayout = DefaultDataLayout>\n";
-    else if (strstr(typeName, "ConstantBuffer<T, L>"))
-        sb << "__generic<T, L : IBufferDataLayout = DefaultDataLayout>\n";
-    else if (strstr(typeName, "Buffer<T>"))
+for (auto type : kDynamicResourceCastableTypes) {
+    auto dynamicKind = type.dynamicKind;
+    auto kind = type.kind;
+    auto typeName = type.name;
+    if (strstr(typeName, "<T, L>"))
+        sb << "__generic<T, L : IBufferDataLayout>\n";
+    else if (strstr(typeName, "<T>"))
         sb << "__generic<T>\n";
 }}}}
 
-extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(kind)>
+extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynamicKind)>
 {
     __intrinsic_op($(kIROp_CastDynamicResource))
     __implicit_conversion($(kConversionCost_GenericParamUpcast))
     __init(__DynamicResource res);
+
+    static const ResourceKind kind = ResourceKind.$(kind);
+
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    __init(ResourcePtr<$(typeName)> bindless)
+    {
+        return getResourceFromBindlessHandle(bindless);
+    }
 }
 
 ${{{{
 }
 }}}}
 
+__magic_type(ResourcePtrType)
+__intrinsic_type($(kIROp_ResourcePtrType))
+struct ResourcePtr<T:IOpaqueHandle> : IComparable
+{
+    __intrinsic_op($(kIROp_CastIntToBindless))
+    __init(uint2 handleValue);
+
+    static const ResourcePtr<T> invalid = ResourcePtr<T>(uint2(uint32_t.maxValue, uint32_t.maxValue));
+
+    [ForceInline]
+    bool equals(ResourcePtr<T> other) { return all(__vectorEql((uint2)this, (uint2)other)); }
+
+    [ForceInline]
+    bool lessThan(ResourcePtr<T> other) { let vthis = ((uint2)this); let vother = (uint2)other; return vthis.x < vother.x || (vthis.x == vother.x && vthis.y < vother.y); }
+
+    [ForceInline]
+    bool lessThanOrEquals(ResourcePtr<T> other) { let vthis = ((uint2)this); let vother = (uint2)other; return vthis.x < vother.x || (vthis.x == vother.x && vthis.y <= vother.y); }
+}
+
+extension uint2
+{
+    __intrinsic_op($(kIROp_CastBindlessToInt))
+    __init<T:IOpaqueHandle>(ResourcePtr<T> bindless);
+}
+
+__generic<T:IOpaqueHandle>
+[ForceInline]
+__prefix T operator*(ResourcePtr<T> value)
+{
+    return getResourceFromBindlessHandle(value);
+}
+
+__intrinsic_op($(kIROp_GetDynamicResourceHeap))
+T[] __getDynamicResourceHeap<T:IOpaqueHandle>();
+
+
+// Used by the HLSL backend only, load a sampler state handle from SamplerDescriptorHeap.
+__intrinsic_op($(kIROp_LoadSamplerDescriptorFromHeap))
+T __loadSamplerDescriptorFromHeap<T>(uint index);
+
+// Used by the HLSL backend only, load a resource handle from ResourceDescriptorHeap.
+__intrinsic_op($(kIROp_LoadResourceDescriptorFromHeap))
+T __loadResourceDescriptorFromHeap<T>(uint index);
+
+// Used by the HLSL backend only, create a combined texture sampler object from a bindless handle.
+__intrinsic_op($(kIROp_MakeCombinedTextureSamplerFromHandle))
+T __makeCombinedTextureSamplerFromHandle<T>(uint2 handle);
+
+T defaultGetResourceFromBindlessHandle<T:IOpaqueHandle>(ResourcePtr<T> handleValue)
+{
+    __target_switch
+    {
+    case hlsl:
+        if (T.kind == ResourceKind.Sampler)
+            return __loadSamplerDescriptorFromHeap<T>(((uint2)handleValue).x);
+        else if (T.kind == ResourceKind.CombinedTextureSampler)
+            return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
+        else
+            return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
+    case spirv:
+    case glsl:
+    case wgsl:
+        return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
+    default:
+        __intrinsic_asm "($0)";
+    }
+}
+
+[ForceInline]
+extern T getResourceFromBindlessHandle<T:IOpaqueHandle>(ResourcePtr<T> handleValue)
+{
+    return defaultGetResourceFromBindlessHandle(handleValue);
+}
 
 __glsl_version(450)
 __glsl_extension(GL_ARB_shader_clock)
