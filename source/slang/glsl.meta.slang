@@ -493,7 +493,7 @@ public T mix(T x, T y, bool a)
     {
     case glsl: __intrinsic_asm "mix";
     case spirv: return spirv_asm {
-        result:$$T = OpSelect $a $x $y
+        result:$$T = OpSelect $a $y $x
     };
     default:
         return (a ? y : x);
@@ -510,7 +510,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<bool, N> a)
     {
     case glsl: __intrinsic_asm "mix";
     case spirv: return spirv_asm {
-        result:$$vector<T,N> = OpSelect $a $x $y
+        result:$$vector<T,N> = OpSelect $a $y $x
     };
     default:
         vector<T, N> result;
@@ -2437,6 +2437,25 @@ public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
     }
     default:
         return sampler.SampleCmp(p.xy, p.z);
+    }
+}
+
+[ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
+public float textureLod(sampler2DArrayShadow sampler, vec4 p, float lod)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod";
+    case spirv:
+    {
+        float compareValue = p.w;
+        return spirv_asm {
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Lod $lod
+        };
+    }
+    default:
+        return sampler.SampleCmp(p.xyz, p.w);
     }
 }
 

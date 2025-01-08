@@ -8330,6 +8330,26 @@ static NodeBase* parseCUDASMVersionModifier(Parser* parser, void* /*userData*/)
     parser->sink->diagnose(token, Diagnostics::invalidCUDASMVersion);
     return nullptr;
 }
+
+static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
+{
+    Modifier* modifier = nullptr;
+
+    // While in GLSL compatibility mode, 'shared' = 'groupshared' and not the
+    // D3D11 effect syntax.
+    if (parser->options.allowGLSLInput)
+    {
+        modifier = parser->astBuilder->create<HLSLGroupSharedModifier>();
+    }
+    else
+    {
+        modifier = parser->astBuilder->create<HLSLEffectSharedModifier>();
+    }
+    modifier->keywordName = getName(parser, "shared");
+    modifier->loc = parser->tokenReader.peekLoc();
+    return modifier;
+}
+
 static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
 {
     ModifierListBuilder listBuilder;
@@ -8757,7 +8777,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("sample", HLSLSampleModifier::kReflectClassInfo),
     _makeParseModifier("centroid", HLSLCentroidModifier::kReflectClassInfo),
     _makeParseModifier("precise", PreciseModifier::kReflectClassInfo),
-    _makeParseModifier("shared", HLSLEffectSharedModifier::kReflectClassInfo),
+    _makeParseModifier("shared", parseSharedModifier),
     _makeParseModifier("groupshared", HLSLGroupSharedModifier::kReflectClassInfo),
     _makeParseModifier("static", HLSLStaticModifier::kReflectClassInfo),
     _makeParseModifier("uniform", HLSLUniformModifier::kReflectClassInfo),

@@ -104,6 +104,8 @@ bool isSimpleDataType(IRType* type);
 
 bool isSimpleHLSLDataType(IRInst* inst);
 
+bool isWrapperType(IRInst* inst);
+
 SourceLoc findFirstUseLoc(IRInst* inst);
 
 inline bool isChildInstOf(IRInst* inst, IRInst* parent)

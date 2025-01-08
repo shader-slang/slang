@@ -106,7 +106,6 @@
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
-#include "slang-spirv-val.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -1953,18 +1952,16 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
     artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
 
-#if 0
-    // Dump the unoptimized SPIRV after lowering from slang IR -> SPIRV
-    String err; String dis;
-    disassembleSPIRV(spirv, err, dis);
-    printf("%s", dis.begin());
-#endif
-
     IDownstreamCompiler* compiler = codeGenContext->getSession()->getOrLoadDownstreamCompiler(
         PassThroughMode::SpirvOpt,
         codeGenContext->getSink());
     if (compiler)
     {
+#if 0
+        // Dump the unoptimized SPIRV after lowering from slang IR -> SPIRV
+        compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
+#endif
+
         if (!codeGenContext->shouldSkipSPIRVValidation())
         {
             StringBuilder runSpirvValEnvVar;
@@ -1977,13 +1974,10 @@ SlangResult emitSPIRVForEntryPointsDirectly(
                         (uint32_t*)spirv.getBuffer(),
                         int(spirv.getCount() / 4))))
                 {
-                    String err;
-                    String dis;
-                    disassembleSPIRV(spirv, err, dis);
+                    compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
                     codeGenContext->getSink()->diagnoseWithoutSourceView(
                         SourceLoc{},
-                        Diagnostics::spirvValidationFailed,
-                        dis);
+                        Diagnostics::spirvValidationFailed);
                 }
             }
         }
