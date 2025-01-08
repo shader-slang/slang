@@ -706,7 +706,8 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo
         needParens = true;
     }
     // a ^ b + c => a ^ (b + c)
-    else if (prec.leftPrecedence == EPrecedence::kEPrecedence_Additive_Left &&
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Additive_Left &&
         outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitXor_Right)
     {
         needParens = true;
@@ -719,7 +720,8 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo
         needParens = true;
     }
     // a | b + c => a | (b + c)
-    else if (prec.leftPrecedence == EPrecedence::kEPrecedence_Additive_Left &&
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Additive_Left &&
         outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitOr_Right)
     {
         needParens = true;
