@@ -693,7 +693,10 @@ protected:
             auto val = (Val*)(node);
             val->m_resolvedValEpoch = getEpoch();
         }
-
+        else if (node->getClassInfo().isSubClassOf(*ASTClassInfo::getInfo(Decl::kType)))
+        {
+            ((Decl*)node)->m_defaultDeclRef = getOrCreate<DirectDeclRef>((Decl*)node);
+        }
         return node;
     }
 
