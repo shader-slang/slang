@@ -37,7 +37,7 @@ while true; do
   elapsed_time=$((current_time - start_time))
 
   # Check if the pipeline hasn't started running after 10 minutes
-  if [[ $elapsed_time -ge $running_timeout && "$pipeline_status" != "running" ]]; then
+  if [[ $elapsed_time -ge $running_timeout && "$pipeline_status" != "running" && "$pipeline_status" == "success" ]]; then
     echo "Error: Pipeline did not start running within 10 minutes."
     exit 1
   fi
