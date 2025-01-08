@@ -2906,10 +2906,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         case OptionKind::BindlessSpaceIndex:
             {
-                CommandLineArg indexArg;
-                SLANG_RETURN_ON_FAIL(m_reader.expectArg(indexArg));
                 Int index = 0;
-                SLANG_RETURN_ON_FAIL(_expectInt(indexArg, index));
+                SLANG_RETURN_ON_FAIL(_expectInt(arg, index));
                 linkage->m_optionSet.add(OptionKind::BindlessSpaceIndex, (int)index);
                 break;
             }

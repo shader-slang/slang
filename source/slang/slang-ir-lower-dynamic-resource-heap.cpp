@@ -96,7 +96,7 @@ void lowerDynamicResourceHeap(TargetProgram* targetProgram, IRModule* module, Di
         auto param = builder.createGlobalParam(arrayType);
         auto varLayout = createResourceHeapVarLayoutWithSpace(builder, param, unusedSpaceIndex);
         builder.addLayoutDecoration(param, varLayout);
-
+        builder.addNameHintDecoration(param, toSlice("__slang_resource_heap"));
         inst->replaceUsesWith(param);
     }
 }
