@@ -785,16 +785,6 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
-    // If both are string types we assume they are convertable in both directions
-    if (as<StringTypeBase>(fromType) && as<StringTypeBase>(toType))
-    {
-        if (outToExpr)
-            *outToExpr = fromExpr;
-        if (outCost)
-            *outCost = kConversionCost_None;
-        return true;
-    }
-
     // Allow implicit conversion from sized array to unsized array when
     // calling a function.
     // Note: we implement the logic here instead of an implicit_conversion
