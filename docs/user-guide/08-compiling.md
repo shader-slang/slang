@@ -179,6 +179,13 @@ we can compile the `computeMain()` entry point to SPIR-V using the following com
 slangc hello-world.slang -target spirv -o hello-world.spv
 ```
 
+> #### Note ####
+> The `slangc` CLI [does not currently support](https://github.com/shader-slang/slang/issues/5541) `[shader(...)]` attributes. Complile the above example with the following command instead:
+> 
+> ```bat
+> slangc hello-world.slang -target spirv -entry computeMain -o hello-world.spv
+> ```
+
 ### Source Files and Translation Units
 
 The `hello-world.slang` argument here is specifying an input file.
@@ -194,6 +201,9 @@ If multiple source files are passed to `slangc`, they will be grouped into trans
 * Each `.slang-module` file forms its own translation unit.
 
 ### Entry Points
+
+> #### Note ####
+> This feature of `slangc` [is planned but not implemented](https://github.com/shader-slang/slang/issues/5541).
 
 When using `slangc`, you will typically want to identify which entry point(s) you intend to compile.
 The `-entry computeMain` option selects an entry point to be compiled to output code in this invocation of `slangc`.
