@@ -544,7 +544,8 @@ Pointer types can also be specified using the generic syntax: `Ptr<MyType>` is e
 Slang supports the `ResourcePtr<T>` type that represents a bindless handle to a resource. This feature provides a portable way of implementing
 the bindless resource idiom. When targeting HLSL, GLSL and SPIRV where resources types (e.g. textures, samplers and buffers) are opaque handles,
 `ResourcePtr<T>` will translate into a `uint2` so it can be defined in any memory location. The underlying `uint2` value is treated as an index
-to access the global descriptor heap or resource array in order to obtain the actual resource handle.
+to access the global descriptor heap or resource array in order to obtain the actual resource handle. On targets with where resource handles
+are not opaque handles, `ResourcePtr<T>` maps to `T` and will have the same size and alignment defined by the target.
 
 `ResourcePtr<T>` is declared as:
 ```slang
@@ -598,6 +599,10 @@ void test()
 When targeting SPIRV, Slang will introduce a global array of descriptors and fetch from the global array.
 The descriptor set ID of the global descriptor array can be configured with the `-bindless-space-index`
 (or `CompilerOptionName::BindlessSpaceIndex` when using the API) option.
+
+> #### Note
+> The default implementation for SPIRV may change in the future if SPIRV is extended to provide what is
+> equivalent to D3D's `ResourceDescriptorHeap` construct.
 
 Users can override the default behavior of convering from bindless handle to resource handle, by providing a
 `getResourceFromBindlessHandle` in user code. For example:
