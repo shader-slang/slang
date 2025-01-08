@@ -20803,7 +20803,8 @@ __intrinsic_type($(kIROp_ResourcePtrType))
 struct ResourcePtr<T:IOpaqueHandle> : IComparable
 {
     [require(glsl_spirv)]
-    [require(_sm_6_6)]
+    [require(hlsl, sm_6_6)]
+    [require(wgsl)]
     __intrinsic_op($(kIROp_CastIntToBindless))
     __init(uint2 handleValue);
 
@@ -20821,7 +20822,8 @@ extension uint2
 {
     __intrinsic_op($(kIROp_CastBindlessToInt))
     [require(glsl_spirv)]
-    [require(_sm_6_6)]
+    [require(hlsl, sm_6_6)]
+    [require(wgsl)]
     __init<T:IOpaqueHandle>(ResourcePtr<T> bindless);
 }
 
