@@ -20796,6 +20796,8 @@ ${{{{
 }
 }}}}
 
+/// Represents a bindless resource handle. A bindless resource handle is always a concrete type and can be
+/// declared in any memory location.
 __magic_type(ResourcePtrType)
 __intrinsic_type($(kIROp_ResourcePtrType))
 struct ResourcePtr<T:IOpaqueHandle> : IComparable
@@ -20844,6 +20846,8 @@ T __loadResourceDescriptorFromHeap<T>(uint index);
 __intrinsic_op($(kIROp_MakeCombinedTextureSamplerFromHandle))
 T __makeCombinedTextureSamplerFromHandle<T>(uint2 handle);
 
+/// The default implementation of `getResourceFromBindlessHandle`, which converts from a bindless resource handle
+/// to a typed resource object.
 T defaultGetResourceFromBindlessHandle<T:IOpaqueHandle>(ResourcePtr<T> handleValue)
 {
     __target_switch
