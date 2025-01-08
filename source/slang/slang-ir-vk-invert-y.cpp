@@ -104,10 +104,15 @@ void rcpWOfPositionInput(IRModule* module)
                 [&](IRUse* use)
                 {
                     // Get the inverted vector.
-                    builder.setInsertBefore(use->getUser());
-                    auto invertedVal = _invertWOfVector(builder, globalInst);
-                    // Replace original uses with the invertex vector.
-                    builder.replaceOperand(use, invertedVal);
+                    auto user = use->getUser();
+                    if (user->getOp() == kIROp_Load)
+                    {
+                        builder.setInsertBefore(user);
+                        auto val = builder.emitLoad(globalInst);
+                        auto invertedVal = _invertWOfVector(builder, val);
+                        user->replaceUsesWith(invertedVal);
+                        user->removeAndDeallocate();
+                    }
                 });
         }
     }
