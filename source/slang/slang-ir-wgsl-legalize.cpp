@@ -1362,6 +1362,9 @@ struct LegalizeWGSLEntryPointContext
 
     void legalizeEntryPointForWGSL(EntryPointInfo entryPoint)
     {
+        // If the entrypoint is receiving varying inputs as a pointer, turn it into a value.
+        depointerizeInputParams(entryPoint.entryPointFunc);
+
         // Input Parameter Legalize
         flattenInputParameters(entryPoint);
 
