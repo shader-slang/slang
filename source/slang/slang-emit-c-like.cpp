@@ -2458,6 +2458,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         }
     case kIROp_CastBindlessToInt:
     case kIROp_CastIntToBindless:
+    case kIROp_CastResourcePtrToResource:
         emitOperand(inst->getOperand(0), outerPrec);
         break;
     // Binary ops

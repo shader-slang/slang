@@ -20849,12 +20849,17 @@ T __loadSamplerDescriptorFromHeap<T>(uint index);
 __intrinsic_op($(kIROp_LoadResourceDescriptorFromHeap))
 T __loadResourceDescriptorFromHeap<T>(uint index);
 
-// Used by the HLSL backend only, create a combined texture sampler object from a bindless handle.
+// Used by the HLSL and Metal backends only,
+// create a combined texture sampler object from a bindless handle.
 __intrinsic_op($(kIROp_MakeCombinedTextureSamplerFromHandle))
-T __makeCombinedTextureSamplerFromHandle<T>(uint2 handle);
+T __makeCombinedTextureSamplerFromHandle<T, U>(U handle);
+
+__intrinsic_op($(kIROp_CastResourcePtrToResource))
+T __castResourcePtrToResource<T:IOpaqueHandle>(ResourcePtr<T> ptr);
 
 /// The default implementation of `getResourceFromBindlessHandle`, which converts from a bindless resource handle
 /// to a typed resource object.
+[ForceInline]
 T defaultGetResourceFromBindlessHandle<T:IOpaqueHandle>(ResourcePtr<T> handleValue)
 {
     __target_switch
@@ -20871,7 +20876,7 @@ T defaultGetResourceFromBindlessHandle<T:IOpaqueHandle>(ResourcePtr<T> handleVal
     case wgsl:
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
     default:
-        __intrinsic_asm "($0)";
+        return __castResourcePtrToResource<T>(handleValue);
     }
 }
 
@@ -20880,6 +20885,9 @@ extern T getResourceFromBindlessHandle<T:IOpaqueHandle>(ResourcePtr<T> handleVal
 {
     return defaultGetResourceFromBindlessHandle(handleValue);
 }
+
+__intrinsic_op($(kIROp_NonUniformResourceIndex))
+ResourcePtr<T> nonuniform<T:IOpaqueHandle>(ResourcePtr<T> ptr);
 
 __glsl_version(450)
 __glsl_extension(GL_ARB_shader_clock)

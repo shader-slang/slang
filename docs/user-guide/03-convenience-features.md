@@ -634,6 +634,19 @@ export getResourceFromBindlessHandle<T>(ResourcePtr<T> handle) where T : IOpaque
 The user can call `defaultGetResourceFromBindlessHandle` function from their implementation of
 `getResourceFromBindlessHandle` to dispatch to the default behavior.
 
+By default, the value of a `ResourcePtr<T>` object is assumed to be dynamically uniform across all
+execution threads. If this is not the case, the user is required to mark the `ResourcePtr` as `nonuniform`
+*immediately* before dereferencing it:
+```slang
+void test(ResourcePtr<Texture2D> t)
+{
+    nonuniform(t)->Sample(...);
+}
+```
+
+If the resource pointer value is not uniform and `nonuniform` is not called, the result may be
+undefined.
+
 Extensions
 --------------------
 Slang allows defining additional methods for a type outside its initial definition. For example, suppose we already have a type defined:

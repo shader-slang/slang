@@ -1193,6 +1193,10 @@ INST(CastToVoid, castToVoid, 1, 0)
 INST(PtrCast, PtrCast, 1, 0)
 INST(CastIntToBindless, CastIntToBindless, 1, 0)
 INST(CastBindlessToInt, CastBindlessToInt, 1, 0)
+
+// Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are already concrete types.
+INST(CastResourcePtrToResource, CastResourcePtrToResource, 1, 0)
+
 INST(TreatAsDynamicUniform, TreatAsDynamicUniform, 1, 0)
 
 INST(SizeOf,                            sizeOf,                     1, 0)

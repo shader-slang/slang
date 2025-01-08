@@ -42,6 +42,7 @@
 #include "slang-ir-entry-point-uniforms.h"
 #include "slang-ir-explicit-global-context.h"
 #include "slang-ir-explicit-global-init.h"
+#include "slang-ir-float-non-uniform-resource-index.h"
 #include "slang-ir-fuse-satcoop.h"
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-glsl-liveness.h"
@@ -1363,6 +1364,11 @@ Result linkAndOptimizeIR(
 
     default:
         break;
+    }
+
+    if (!isSPIRV(targetRequest->getTarget()))
+    {
+        floatNonUniformResourceIndex(irModule, NonUniformResourceIndexFloatMode::Textual);
     }
 
     // Legalize non struct parameters that are expected to be structs for HLSL.

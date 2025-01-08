@@ -149,6 +149,21 @@ export getResourceFromBindlessHandle<T>(ResourcePtr<T> handle) where T : IOpaque
 
 The user can call `defaultGetResourceFromBindlessHandle` function from their implementation of `getResourceFromBindlessHandle` to dispatch to the default behavior.
 
+### Uniformity
+
+By default, the value of a `ResourcePtr<T>` object is assumed to be dynamically uniform across all
+execution threads. If this is not the case, the user is required to mark the `ResourcePtr` as `nonuniform`
+*immediately* before dereferencing it:
+```slang
+void test(ResourcePtr<Texture2D> t)
+{
+    nonuniform(t)->Sample(...);
+}
+```
+
+If the resource pointer value is not uniform and `nonuniform` is not called, the result may be
+undefined.
+
 ### Combind Texture Samplers
 
 On platforms without native support for combined texture samplers, we will use both components of the

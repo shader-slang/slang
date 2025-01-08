@@ -2088,7 +2088,9 @@ static LegalVal legalizeInst(
     case kIROp_Return:
         result = legalizeRetVal(context, args[0], (IRReturn*)inst);
         break;
-
+    case kIROp_CastResourcePtrToResource:
+        result = LegalVal::simple(inst);
+        break;
     case kIROp_DebugVar:
         result = legalizeDebugVar(context, type, (IRDebugVar*)inst);
         break;
