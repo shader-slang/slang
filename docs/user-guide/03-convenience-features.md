@@ -622,9 +622,9 @@ export getResourceFromBindlessHandle<T>(ResourcePtr<T> handle) where T : IOpaque
     {
     case spirv:
         if (T.kind == ResourceKind.Sampler)
-            return (T)samplerHandles[((uint2)handle).x];
+            return samplerHandles[((uint2)handle).x].asOpaqueHandle<T>();
         else
-            return (T)resourceHandles[((uint2)handle).x];
+            return resourceHandles[((uint2)handle).x].asOpaqueHandle<T>();
     default:
         return defaultGetResourceFromBindlessHandle(handle);
     }

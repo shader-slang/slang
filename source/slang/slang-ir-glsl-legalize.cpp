@@ -3837,7 +3837,24 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
 
 void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
 {
-    List<IRGlobalParam*> toRemove;
+    List<IRInst*> toRemove;
+
+    // At this stage, we can safely remove the generic `getResourceFromBindlessHandle` function
+    // despite it being marked `export`.
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto genFunc = as<IRGeneric>(inst))
+        {
+            if (!genFunc->hasUses())
+            {
+                toRemove.add(genFunc);
+            }
+        }
+    }
+    for (auto inst : toRemove)
+    {
+        inst->removeAndDeallocate();
+    }
 
     for (auto inst : module->getGlobalInsts())
     {

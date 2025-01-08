@@ -90,11 +90,12 @@ void test()
 }
 ```
 
-A `ResourcePtr<T>` type has target-dependent size, but it is always a concrete/physical data type and valid in all memory locations. For HLSL and SPIRV targets, it is represented as a two-component vector of 32-bit unsigned integer (`uint2`), and builtin conversion functions are provided to construct
+A `ResourcePtr<T>` type has target-dependent size, but it is always a concrete/physical data type and valid in all memory locations. For HLSL and SPIRV targets, it is represented by a two-component vector of 32-bit unsigned integer (`uint2`), and laid out as such. On these targets, builtin conversion functions are provided to construct
 a `ResourcePtr<T>` from a `uint2` value.
-This means that you can use a `ResourcePtr<T>` type in any context where an ordinary data type, e.g. `int` type is allowed, such as in buffer elements.
 
 On targets where resource handles are already concrete and sized types, `ResourcePtr<T>` simply translates to `T`, and has size and alignment that matches the corresponding native type, which is queryable with Slang's reflection API.
+
+This means that on all targets where `ResourcePtr<T>` is supported, you can use a `ResourcePtr<T>` type in any context where an ordinary data type, e.g. `int` type is allowed, such as in buffer elements.
 
 ### Obtaining Actual Resource Handle from `ResourcePtr<T>`
 
@@ -140,9 +141,9 @@ __DynamicResource<__DynamicResourceKind.Sampler> samplerHandles[];
 export getResourceFromBindlessHandle<T>(ResourcePtr<T> handle) where T : IOpaqueHandle
 {
     if (T.kind == ResourceKind.Sampler)
-        return (T)samplerHandles[((uint2)handle).x];
+        return samplerHandles[((uint2)handle).x].asOpaqueHandle<T>();
     else
-        return (T)resourceHandles[((uint2)handle).x];
+        return resourceHandles[((uint2)handle).x].asOpaqueHandle<T>();
 }
 ```
 

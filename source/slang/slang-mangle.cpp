@@ -416,6 +416,19 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
         return;
     }
 
+    if (auto genTypeParamDecl = as<GenericTypeParamDeclBase>(declRef.getDecl()))
+    {
+        emit(context, "GP");
+        emit(context, genTypeParamDecl->parameterIndex);
+        return;
+    }
+    if (auto genValParamDecl = as<GenericValueParamDecl>(declRef.getDecl()))
+    {
+        emit(context, "GP");
+        emit(context, genValParamDecl->parameterIndex);
+        return;
+    }
+
     auto parentDeclRef = declRef.getParent();
     if (as<FileDecl>(parentDeclRef))
         parentDeclRef = parentDeclRef.getParent();

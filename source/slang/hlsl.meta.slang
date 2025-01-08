@@ -20716,6 +20716,9 @@ struct __DynamicResource<let kind = __DynamicResourceKind.General>
 {
     __intrinsic_op($(kIROp_CastDynamicResource))
     T as<T : __IDynamicResourceCastable<kind>>();
+
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    T asOpaqueHandle<T : IOpaqueHandle>();
 }
 interface __IDynamicResourceCastable<let kind = __DynamicResourceKind.General> : IOpaqueHandle
 {
