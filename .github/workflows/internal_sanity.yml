@@ -10,9 +10,6 @@ concurrency:
   cancel-in-progress: true
 env:
   PR_NUMBER: ${{ github.event.number }}
-  PIPELINE_TRIGGER_TOKEN: ${{ secrets.INTERNAL_PIPELINE_TRIGGER_TOKEN }}
-  ACCESS_TOKEN: ${{ secrets.INTERNAL_PIPELINE_ACCESS_TOKEN }}
-  INTERNAL_PIPELINE_API_ENDPOINT: ${{ secrets.INTERNAL_PIPELINE_ENDPOINT }}
 
 jobs:
   build:
@@ -42,4 +39,6 @@ jobs:
 
       - name: Run Internal CI Pipeline
         shell: bash
-        run: .github/workflows/internal_test.sh $PR_NUMBER
+        env:
+          MY_TEST_SECRET: ${{ secrets.MY_TEST_SECRET }}
+        run: .github/workflows/internal_test.sh $PR_NUMBER $MY_TEST_SECRET
