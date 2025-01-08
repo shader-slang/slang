@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -stage vertex -entry main -allow-glsl -emit-spirv-directly
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -stage vertex -entry main -allow-glsl
-//TEST:SIMPLE(filecheck=METAL): -target metal -stage vertex -entry main -allow-glsl
+//TEST:SIMPLE(filecheck=METAL): -target metal -stage vertex -entry main -allow-glsl -matrix-layout-row-major
 #version 310 es
 layout(location = 0) in highp vec4 a_position;
 
