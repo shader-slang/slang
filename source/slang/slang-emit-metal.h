@@ -30,7 +30,7 @@ protected:
         SLANG_UNUSED(type);
         return true;
     }
-    
+
     void emitMemoryOrderOperand(IRInst* inst);
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
         SLANG_OVERRIDE;
