@@ -513,7 +513,7 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
 
 Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, SourceLoc loc)
 {
-    if (auto resPtrType = as<ResourcePtrType>(base->type))
+    if (auto resPtrType = as<DescriptorHandleType>(base->type))
     {
         return coerce(CoercionSite::ExplicitCoercion, resPtrType->getElementType(), base);
     }
@@ -4730,7 +4730,11 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
         else if (auto aggType = as<DeclRefType>(e->type))
             handleLeafCase(aggType->getDeclRef(), aggType);
         else if (auto typetype = as<TypeType>(e->type))
-            handleLeafCase(DeclRef<Decl>(), typetype->getType());
+        {
+            auto properType = CoerceToProperType(TypeExp(e));
+            if (properType.type)
+                handleLeafCase(DeclRef<Decl>(), properType.type);
+        }
     };
 
     auto& baseType = baseExpression->type;

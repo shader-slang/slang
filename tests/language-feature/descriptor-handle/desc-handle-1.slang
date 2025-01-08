@@ -4,24 +4,24 @@
 // SPV: OpAccessChain {{.*}} %resourceHeap
 // SPV: OpImageSample
 
-uniform StructuredBuffer<ResourcePtr<Sampler2D>> t;
-uniform ResourcePtr<RWStructuredBuffer<float4>> buffer;
+uniform StructuredBuffer<DescriptorHandle<Sampler2D>> t;
+uniform DescriptorHandle<RWStructuredBuffer<float4>> buffer;
 
 [vk::binding(0, 10)]
 __DynamicResource<__DynamicResourceKind.General> resourceHeap[]; 
 
 // A customized function that overrides the default behavior of fetch texture resources.
-export T getResourceFromBindlessHandle<T:IOpaqueHandle>(ResourcePtr<T> handleValue)
+export T getDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
 {
     __target_switch
     {
     case spirv:
-        if (T.kind != ResourceKind.Buffer)
+        if (T.kind != DescriptorKind.Buffer)
             return resourceHeap[((uint2)handleValue).x].asOpaqueHandle<T>();
         else
-            return defaultGetResourceFromBindlessHandle(handleValue);
+            return defaultGetDescriptorFromHandle(handleValue);
     default:
-        return defaultGetResourceFromBindlessHandle(handleValue);
+        return defaultGetDescriptorFromHandle(handleValue);
     }
 }
 

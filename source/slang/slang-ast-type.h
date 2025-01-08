@@ -394,9 +394,9 @@ class GLSLInputAttachmentType : public BuiltinType
 };
 
 
-class ResourcePtrType : public PointerLikeType
+class DescriptorHandleType : public PointerLikeType
 {
-    SLANG_AST_CLASS(ResourcePtrType)
+    SLANG_AST_CLASS(DescriptorHandleType)
 };
 
 // Base class for types used when desugaring parameter block

@@ -25,8 +25,8 @@
 // CUDA: tex2DLod
 // PTX: computeMain
 
-uniform StructuredBuffer<ResourcePtr<Sampler2D>> t;
-uniform ResourcePtr<RWStructuredBuffer<float4>> buffer;
+uniform StructuredBuffer<Sampler2D.Handle> t;
+uniform RWStructuredBuffer<float4>.Handle buffer;
 
 [numthreads(4,1,1)]
 void computeMain(int3 id : SV_DispatchThreadID)

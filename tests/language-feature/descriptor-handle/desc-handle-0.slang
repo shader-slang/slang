@@ -12,8 +12,8 @@
 // CUDA: computeMain
 // MTL: define void @computeMain
 
-uniform StructuredBuffer<ResourcePtr<Sampler2D>> t;
-uniform ResourcePtr<RWStructuredBuffer<float4>> buffer;
+uniform StructuredBuffer<DescriptorHandle<Sampler2D>> t;
+uniform DescriptorHandle<RWStructuredBuffer<float4>> buffer;
 
 [numthreads(1,1,1)]
 void computeMain()

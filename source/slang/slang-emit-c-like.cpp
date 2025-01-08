@@ -391,15 +391,15 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             _emitType(rateQualifiedType->getValueType(), declarator);
         }
         break;
-    case kIROp_ResourcePtrType:
+    case kIROp_DescriptorHandleType:
         {
             // If the T is already bindless for target, emit it directly.
-            auto resPtrType = cast<IRResourcePtrType>(type);
+            auto resPtrType = cast<IRDescriptorHandleType>(type);
             if (isResourceTypeBindless(resPtrType->getResourceType()))
                 _emitType(resPtrType->getResourceType(), declarator);
             else
             {
-                // Otherwise, emit the ResourcePtr<T> as uint2.
+                // Otherwise, emit the DescriptorHandle<T> as uint2.
                 IRBuilder builder(resPtrType);
                 builder.setInsertBefore(resPtrType);
                 emitSimpleTypeAndDeclarator(
@@ -2480,9 +2480,9 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             emitOperand(inst->getOperand(1), rightSide(outerPrec, prec));
             break;
         }
-    case kIROp_CastBindlessToInt:
-    case kIROp_CastIntToBindless:
-    case kIROp_CastResourcePtrToResource:
+    case kIROp_CastDescriptorHandleToUInt2:
+    case kIROp_CastUInt2ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToResource:
         emitOperand(inst->getOperand(0), outerPrec);
         break;
     // Binary ops

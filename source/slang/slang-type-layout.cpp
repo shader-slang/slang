@@ -4802,7 +4802,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             type,
             rules);
     }
-    else if (auto resPtrType = as<ResourcePtrType>(type))
+    else if (auto resPtrType = as<DescriptorHandleType>(type))
     {
         if (areResourceTypesBindlessOnTarget(context.targetReq))
             return _createTypeLayout(context, resPtrType->getElementType());

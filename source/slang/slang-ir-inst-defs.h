@@ -134,8 +134,8 @@ INST(Nop, nop, 0, 0)
     // A NativePtr<T> type represents a native pointer to a managed resource.
     INST(NativePtrType, NativePtr, 1, HOISTABLE)
 
-    // A ResourcePtr<T> type represents a bindless handle to an opaue resource type.
-    INST(ResourcePtrType, ResourcePtr, 1, HOISTABLE)
+    // A DescriptorHandle<T> type represents a bindless handle to an opaue resource type.
+    INST(DescriptorHandleType, DescriptorHandle, 1, HOISTABLE)
 
     // An AtomicUint is a placeholder type for a storage buffer, and will be mangled during compiling.
     INST(GLSLAtomicUintType, GLSLAtomicUint, 0, HOISTABLE)
@@ -1192,11 +1192,11 @@ INST(CastPtrToInt, CastPtrToInt, 1, 0)
 INST(CastIntToPtr, CastIntToPtr, 1, 0)
 INST(CastToVoid, castToVoid, 1, 0)
 INST(PtrCast, PtrCast, 1, 0)
-INST(CastIntToBindless, CastIntToBindless, 1, 0)
-INST(CastBindlessToInt, CastBindlessToInt, 1, 0)
+INST(CastUInt2ToDescriptorHandle, CastUInt2ToDescriptorHandle, 1, 0)
+INST(CastDescriptorHandleToUInt2, CastDescriptorHandleToUInt2, 1, 0)
 
 // Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are already concrete types.
-INST(CastResourcePtrToResource, CastResourcePtrToResource, 1, 0)
+INST(CastDescriptorHandleToResource, CastDescriptorHandleToResource, 1, 0)
 
 INST(TreatAsDynamicUniform, TreatAsDynamicUniform, 1, 0)
 

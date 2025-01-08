@@ -53,14 +53,14 @@ void processNonUniformResourceIndex(
                     // Replace intCast(nonUniformRes(x)), into nonUniformRes(intCast(x))
                     newUser = builder.emitCast(user->getFullType(), inst->getOperand(0));
                     break;
-                case kIROp_CastBindlessToInt:
+                case kIROp_CastDescriptorHandleToUInt2:
                     {
                         // Replace castBindlessToInt(nonUniformRes(x)), into
                         // nonUniformRes(castBindlessToInt(x))
                         auto operand = inst->getOperand(0);
                         newUser = builder.emitIntrinsicInst(
                             user->getFullType(),
-                            kIROp_CastBindlessToInt,
+                            kIROp_CastDescriptorHandleToUInt2,
                             1,
                             &operand);
                     }
@@ -139,7 +139,7 @@ void processNonUniformResourceIndex(
                 case kIROp_GetElementPtr:
                 case kIROp_Load:
                 case kIROp_NonUniformResourceIndex:
-                case kIROp_CastBindlessToInt:
+                case kIROp_CastDescriptorHandleToUInt2:
                 case kIROp_GetElement:
                 case kIROp_swizzle:
                     resWorkList.add(nonuniformUser);

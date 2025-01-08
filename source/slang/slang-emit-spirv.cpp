@@ -1668,7 +1668,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 registerInst(inst, result);
                 return result;
             }
-        case kIROp_ResourcePtrType:
+        case kIROp_DescriptorHandleType:
             {
                 IRBuilder builder(inst);
                 builder.setInsertBefore(inst);
@@ -3449,8 +3449,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Lsh:
             result = emitArithmetic(parent, inst);
             break;
-        case kIROp_CastBindlessToInt:
-        case kIROp_CastIntToBindless:
+        case kIROp_CastDescriptorHandleToUInt2:
+        case kIROp_CastUInt2ToDescriptorHandle:
         case kIROp_GlobalValueRef:
             {
                 auto inner = ensureInst(inst->getOperand(0));

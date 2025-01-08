@@ -210,12 +210,12 @@ void lowerCombinedTextureSamplers(
                         inst->removeAndDeallocate();
                     }
                     break;
-                case kIROp_CastResourcePtrToResource:
+                case kIROp_CastDescriptorHandleToResource:
                     {
                         auto handle = inst->getOperand(0);
-                        if (auto resPtrType = as<IRResourcePtrType>(handle->getDataType()))
+                        if (auto resPtrType = as<IRDescriptorHandleType>(handle->getDataType()))
                         {
-                            // If handle is still a ResourcePtr, we are on a target that
+                            // If handle is still a DescriptorHandle, we are on a target that
                             // where native resource handles are already bindless, e.g. metal.
                             // On these platforms, the handle is a struct containing texture
                             // and sampler fields, so we just need to insert the extract operations.

@@ -1654,10 +1654,10 @@ struct IRRateQualifiedType : IRType
     IR_LEAF_ISA(RateQualifiedType)
 };
 
-struct IRResourcePtrType : IRType
+struct IRDescriptorHandleType : IRType
 {
     IRType* getResourceType() { return (IRType*)getOperand(0); }
-    IR_LEAF_ISA(ResourcePtrType)
+    IR_LEAF_ISA(DescriptorHandleType)
 };
 
 // Unlike the AST-level type system where `TypeType` tracks the

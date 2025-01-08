@@ -4040,7 +4040,7 @@ void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
 {
     List<IRInst*> toRemove;
 
-    // At this stage, we can safely remove the generic `getResourceFromBindlessHandle` function
+    // At this stage, we can safely remove the generic `getDescriptorFromHandle` function
     // despite it being marked `export`.
     for (auto inst : module->getGlobalInsts())
     {

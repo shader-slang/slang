@@ -355,7 +355,7 @@ static Result _calcSizeAndAlignment(
     case kIROp_DefaultBufferLayoutType:
         *outSizeAndAlignment = IRSizeAndAlignment(0, 4);
         return SLANG_OK;
-    case kIROp_ResourcePtrType:
+    case kIROp_DescriptorHandleType:
         {
             IRBuilder builder(type);
             builder.setInsertBefore(type);

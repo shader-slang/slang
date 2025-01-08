@@ -531,7 +531,7 @@ Pointer types can also be specified using the generic syntax: `Ptr<MyType>` is e
 
 - Slang can produce pointers using the & operator from data in global memory.
 
-- Slang doesn't support forming pointers to opaque handle types, e.g. `Texture2D`. For handle pointers, use `ResourcePtr<T>` instead.
+- Slang doesn't support forming pointers to opaque handle types, e.g. `Texture2D`. For handle pointers, use `DescriptorHandle<T>` instead.
 
 - Slang doesn't support coherent load/stores.
 
@@ -539,27 +539,31 @@ Pointer types can also be specified using the generic syntax: `Ptr<MyType>` is e
 
 - Slang currently does not support pointers to immutable values, i.e. `const T*`.
 
-## ResourcePtr for Bindless Resources
+## `DescriptorHandle` for Bindless Descriptor Access
 
-Slang supports the `ResourcePtr<T>` type that represents a bindless handle to a resource. This feature provides a portable way of implementing
-the bindless resource idiom. When targeting HLSL, GLSL and SPIRV where resources types (e.g. textures, samplers and buffers) are opaque handles,
-`ResourcePtr<T>` will translate into a `uint2` so it can be defined in any memory location. The underlying `uint2` value is treated as an index
+Slang supports the `DescriptorHandle<T>` type that represents a bindless handle to a resource. This feature provides a portable way of implementing
+the bindless resource idiom. When targeting HLSL, GLSL and SPIRV where descriptor types (e.g. textures, samplers and buffers) are opaque handles,
+`DescriptorHandle<T>` will translate into a `uint2` so it can be defined in any memory location. The underlying `uint2` value is treated as an index
 to access the global descriptor heap or resource array in order to obtain the actual resource handle. On targets with where resource handles
-are not opaque handles, `ResourcePtr<T>` maps to `T` and will have the same size and alignment defined by the target.
+are not opaque handles, `DescriptorHandle<T>` maps to `T` and will have the same size and alignment defined by the target.
 
-`ResourcePtr<T>` is declared as:
+`DescriptorHandle<T>` is declared as:
 ```slang
-struct ResourcePtr<T> where T:IOpaqueHandle {}
+struct DescriptorHandle<T> where T:IOpaqueDescriptor {}
 ```
-where `IOpaqueHandle` is an interface implemented by all resource types, including textures,
+where `IOpaqueDescriptor` is an interface implemented by all resource types, including textures,
 `ConstantBuffer`, `RaytracingAccelerationStructure`, `SamplerState`, `SamplerComparisonState` and all types of `StructuredBuffer`.
 
-`ResourcePtr<T>` supports `operator *`, `operator ->`, and can implicitly convert to `T`, for example:
+You may also write `Texture2D.Handle` as a short-hand of `DescriptorHandle<Texture2D>`.
+
+`DescriptorHandle<T>` supports `operator *`, `operator ->`, and can implicitly convert to `T`, for example:
 
 ```slang
-uniform StructuredBuffer<ResourcePtr<Texture2D>> textures;
+uniform StructuredBuffer<DescriptorHandle<Texture2D>> textures;
 uniform int textureIndex;
-uniform ResourcePtr<StructuredBuffer<float4>> output;
+
+// define a descriptor handle using builtin convenience typealias:
+uniform StructuredBuffer<float4>.Handle output;
 
 [numthreads(1,1,1)]
 void main()
@@ -571,12 +575,12 @@ void main()
 }
 ```
 
-By default, when targeting HLSL, `ResourcePtr<T>` translates to uses of `ResourceDescriptorHeap[index]` and `SamplerDescriptorHeap[index]`.
+By default, when targeting HLSL, `DescriptorHandle<T>` translates to uses of `ResourceDescriptorHeap[index]` and `SamplerDescriptorHeap[index]`.
 In particular, when combined with combined texture sampler types (e.g. `Sampler2D`), Slang will fetch the texture using the first
 component of the handle, and the sampler state from the second component of the handle. For example:
 
 ```
-uniform ResourcePtr<Sampler2D> s;
+uniform DescriptorHandle<Sampler2D> s;
 void test()
 {
     s.Sample(uv);
@@ -605,7 +609,7 @@ The descriptor set ID of the global descriptor array can be configured with the 
 > equivalent to D3D's `ResourceDescriptorHeap` construct.
 
 Users can override the default behavior of convering from bindless handle to resource handle, by providing a
-`getResourceFromBindlessHandle` in user code. For example:
+`getDescriptorFromHandle` in user code. For example:
 
 ```slang
 // All texture and buffer handles are defined in descriptor set 100.
@@ -616,7 +620,7 @@ __DynamicResource<__DynamicResourceKind.General> resourceHandles[];
 [vk::binding(0, 101)]
 __DynamicResource<__DynamicResourceKind.Sampler> samplerHandles[];
 
-export getResourceFromBindlessHandle<T>(ResourcePtr<T> handle) where T : IOpaqueHandle
+export getDescriptorFromHandle<T>(DescriptorHandle<T> handle) where T : IOpaqueDescriptor
 {
     __target_switch
     {
@@ -626,19 +630,19 @@ export getResourceFromBindlessHandle<T>(ResourcePtr<T> handle) where T : IOpaque
         else
             return resourceHandles[((uint2)handle).x].asOpaqueHandle<T>();
     default:
-        return defaultGetResourceFromBindlessHandle(handle);
+        return defaultGetDescriptorFromHandle(handle);
     }
 }
 ```
 
-The user can call `defaultGetResourceFromBindlessHandle` function from their implementation of
-`getResourceFromBindlessHandle` to dispatch to the default behavior.
+The user can call `defaultGetDescriptorFromHandle` function from their implementation of
+`getDescriptorFromHandle` to dispatch to the default behavior.
 
-By default, the value of a `ResourcePtr<T>` object is assumed to be dynamically uniform across all
-execution threads. If this is not the case, the user is required to mark the `ResourcePtr` as `nonuniform`
+By default, the value of a `DescriptorHandle<T>` object is assumed to be dynamically uniform across all
+execution threads. If this is not the case, the user is required to mark the `DescriptorHandle` as `nonuniform`
 *immediately* before dereferencing it:
 ```slang
-void test(ResourcePtr<Texture2D> t)
+void test(DescriptorHandle<Texture2D> t)
 {
     nonuniform(t)->Sample(...);
 }

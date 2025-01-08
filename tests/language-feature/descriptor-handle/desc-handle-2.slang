@@ -4,8 +4,8 @@
 // SPV: OpDecorate %__slang_resource_heap{{.*}} DescriptorSet 101
 // SPV: OpImageSample
 
-uniform StructuredBuffer<ResourcePtr<Sampler2D>> t;
-uniform ResourcePtr<RWStructuredBuffer<float4>> buffer;
+uniform StructuredBuffer<DescriptorHandle<Sampler2D>> t;
+uniform DescriptorHandle<RWStructuredBuffer<float4>> buffer;
 
 [numthreads(1,1,1)]
 void computeMain()
