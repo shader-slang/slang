@@ -42,6 +42,7 @@
 #include "slang-ir-entry-point-uniforms.h"
 #include "slang-ir-explicit-global-context.h"
 #include "slang-ir-explicit-global-init.h"
+#include "slang-ir-fix-entrypoint-callsite.h"
 #include "slang-ir-float-non-uniform-resource-index.h"
 #include "slang-ir-fuse-satcoop.h"
 #include "slang-ir-glsl-legalize.h"
@@ -78,6 +79,7 @@
 #include "slang-ir-pytorch-cpp-binding.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-resolve-texture-format.h"
+#include "slang-ir-resolve-varying-input-ref.h"
 #include "slang-ir-restructure-scoping.h"
 #include "slang-ir-restructure.h"
 #include "slang-ir-sccp.h"
@@ -106,7 +108,6 @@
 #include "slang-legalize-types.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
-#include "slang-spirv-val.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -318,6 +319,7 @@ struct RequiredLoweringPassSet
     bool byteAddressBuffer;
     bool dynamicResource;
     bool dynamicResourceHeap;
+    bool resolveVaryingInputRef;
 };
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
@@ -429,6 +431,9 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_GetDynamicResourceHeap:
         result.dynamicResourceHeap = true;
+        break;
+    case kIROp_ResolveVaryingInputRef:
+        result.resolveVaryingInputRef = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -597,6 +602,11 @@ Result linkAndOptimizeIR(
 
     if (requiredLoweringPassSet.glslGlobalVar)
         translateGLSLGlobalVar(codeGenContext, irModule);
+
+    if (requiredLoweringPassSet.resolveVaryingInputRef)
+        resolveVaryingInputRef(irModule);
+
+    fixEntryPointCallsites(irModule);
 
     // Replace any global constants with their values.
     //
@@ -1956,18 +1966,16 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
     artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
 
-#if 0
-    // Dump the unoptimized SPIRV after lowering from slang IR -> SPIRV
-    String err; String dis;
-    disassembleSPIRV(spirv, err, dis);
-    printf("%s", dis.begin());
-#endif
-
     IDownstreamCompiler* compiler = codeGenContext->getSession()->getOrLoadDownstreamCompiler(
         PassThroughMode::SpirvOpt,
         codeGenContext->getSink());
     if (compiler)
     {
+#if 0
+        // Dump the unoptimized SPIRV after lowering from slang IR -> SPIRV
+        compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
+#endif
+
         if (!codeGenContext->shouldSkipSPIRVValidation())
         {
             StringBuilder runSpirvValEnvVar;
@@ -1980,13 +1988,10 @@ SlangResult emitSPIRVForEntryPointsDirectly(
                         (uint32_t*)spirv.getBuffer(),
                         int(spirv.getCount() / 4))))
                 {
-                    String err;
-                    String dis;
-                    disassembleSPIRV(spirv, err, dis);
+                    compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
                     codeGenContext->getSink()->diagnoseWithoutSourceView(
                         SourceLoc{},
-                        Diagnostics::spirvValidationFailed,
-                        dis);
+                        Diagnostics::spirvValidationFailed);
                 }
             }
         }

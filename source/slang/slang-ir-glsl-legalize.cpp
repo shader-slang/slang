@@ -67,11 +67,7 @@ struct ScalarizedValImpl : RefObject
 };
 struct ScalarizedTupleValImpl;
 struct ScalarizedTypeAdapterValImpl;
-
-struct ScalarizedArrayIndexValImpl : ScalarizedValImpl
-{
-    Index index;
-};
+struct ScalarizedArrayIndexValImpl;
 
 struct ScalarizedVal
 {
@@ -132,15 +128,12 @@ struct ScalarizedVal
         result.impl = (ScalarizedValImpl*)impl;
         return result;
     }
-    static ScalarizedVal scalarizedArrayIndex(IRInst* irValue, Index index)
+    static ScalarizedVal scalarizedArrayIndex(ScalarizedArrayIndexValImpl* impl)
     {
         ScalarizedVal result;
         result.flavor = Flavor::arrayIndex;
-        auto impl = new ScalarizedArrayIndexValImpl;
-        impl->index = index;
-
-        result.irValue = irValue;
-        result.impl = impl;
+        result.irValue = nullptr;
+        result.impl = (ScalarizedValImpl*)impl;
         return result;
     }
 
@@ -150,8 +143,6 @@ struct ScalarizedVal
     IRInst* irValue = nullptr;
     RefPtr<ScalarizedValImpl> impl;
 };
-
-IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val);
 
 // This is the case for a value that is a "tuple" of other values
 struct ScalarizedTupleValImpl : ScalarizedValImpl
@@ -174,6 +165,36 @@ struct ScalarizedTypeAdapterValImpl : ScalarizedValImpl
     IRType* actualType;  // the actual type of `val`
     IRType* pretendType; // the type this value pretends to have
 };
+
+struct ScalarizedArrayIndexValImpl : ScalarizedValImpl
+{
+    ScalarizedVal arrayVal;
+    Index index;
+    IRType* elementType;
+};
+
+ScalarizedVal extractField(
+    IRBuilder* builder,
+    ScalarizedVal const& val,
+    UInt fieldIndex, // Pass ~0 in to search for the index via the key
+    IRStructKey* fieldKey);
+ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType* fromType);
+ScalarizedVal adaptType(
+    IRBuilder* builder,
+    ScalarizedVal const& val,
+    IRType* toType,
+    IRType* fromType);
+IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val);
+ScalarizedVal getSubscriptVal(
+    IRBuilder* builder,
+    IRType* elementType,
+    ScalarizedVal val,
+    IRInst* indexVal);
+ScalarizedVal getSubscriptVal(
+    IRBuilder* builder,
+    IRType* elementType,
+    ScalarizedVal val,
+    UInt index);
 
 struct GlobalVaryingDeclarator
 {
@@ -1303,6 +1324,22 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         }
     }
 
+    AddressSpace addrSpace = AddressSpace::Uniform;
+    IROp ptrOpCode = kIROp_PtrType;
+    switch (kind)
+    {
+    case LayoutResourceKind::VaryingInput:
+        addrSpace = systemValueInfo ? AddressSpace::BuiltinInput : AddressSpace::Input;
+        break;
+    case LayoutResourceKind::VaryingOutput:
+        addrSpace = systemValueInfo ? AddressSpace::BuiltinOutput : AddressSpace::Output;
+        ptrOpCode = kIROp_OutType;
+        break;
+    default:
+        break;
+    }
+
+
     // If we have a declarator, we just use the normal logic, as that seems to work correctly
     //
     if (systemValueInfo && systemValueInfo->arrayIndex >= 0 && declarator == nullptr)
@@ -1339,9 +1376,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             // Set the array size to 0, to mean it is unsized
             auto arrayType = builder->getArrayType(type, 0);
 
-            IRType* paramType = kind == LayoutResourceKind::VaryingOutput
-                                    ? (IRType*)builder->getOutType(arrayType)
-                                    : arrayType;
+            IRType* paramType = builder->getPtrType(ptrOpCode, arrayType, addrSpace);
 
             auto globalParam = addGlobalParam(builder->getModule(), paramType);
             moveValueBefore(globalParam, builder->getFunc());
@@ -1371,9 +1406,12 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         semanticGlobal->addIndex(systemValueInfo->arrayIndex);
 
         // Make it an array index
-        ScalarizedVal val = ScalarizedVal::scalarizedArrayIndex(
-            semanticGlobal->globalParam,
-            systemValueInfo->arrayIndex);
+        ScalarizedVal val = ScalarizedVal::address(semanticGlobal->globalParam);
+        RefPtr<ScalarizedArrayIndexValImpl> arrayImpl = new ScalarizedArrayIndexValImpl();
+        arrayImpl->arrayVal = val;
+        arrayImpl->index = systemValueInfo->arrayIndex;
+        arrayImpl->elementType = type;
+        val = ScalarizedVal::scalarizedArrayIndex(arrayImpl);
 
         // We need to make this access, an array access to the global
         if (auto fromType = systemValueInfo->requiredType)
@@ -1466,14 +1504,14 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
     // like our IR function parameters, and need a wrapper
     // `Out<...>` type to represent outputs.
     //
-    bool isOutput = (kind == LayoutResourceKind::VaryingOutput);
-    IRType* paramType = isOutput ? builder->getOutType(type) : type;
+
+    // Non system value varying inputs shall be passed as pointers.
+    IRType* paramType = builder->getPtrType(ptrOpCode, type, addrSpace);
 
     auto globalParam = addGlobalParam(builder->getModule(), paramType);
     moveValueBefore(globalParam, builder->getFunc());
 
-    ScalarizedVal val =
-        isOutput ? ScalarizedVal::address(globalParam) : ScalarizedVal::value(globalParam);
+    ScalarizedVal val = ScalarizedVal::address(globalParam);
 
     if (systemValueInfo)
     {
@@ -1958,10 +1996,10 @@ ScalarizedVal adaptType(
         break;
     case ScalarizedVal::Flavor::arrayIndex:
         {
-            auto element = builder->emitElementExtract(
-                val.irValue,
-                as<ScalarizedArrayIndexValImpl>(val.impl)->index);
-            return adaptType(builder, element, toType, fromType);
+            auto arrayImpl = as<ScalarizedArrayIndexValImpl>(val.impl);
+            auto elementVal =
+                getSubscriptVal(builder, fromType, arrayImpl->arrayVal, arrayImpl->index);
+            return adaptType(builder, elementVal, toType, fromType);
         }
         break;
     default:
@@ -1969,8 +2007,6 @@ ScalarizedVal adaptType(
         UNREACHABLE_RETURN(ScalarizedVal());
     }
 }
-
-IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val);
 
 void assign(
     IRBuilder* builder,
@@ -1988,16 +2024,12 @@ void assign(
 
             // Determine the index
             auto leftArrayIndexVal = as<ScalarizedArrayIndexValImpl>(left.impl);
-            const auto arrayIndex = leftArrayIndexVal->index;
-
-            auto arrayIndexInst = builder->getIntValue(builder->getIntType(), arrayIndex);
-
-            // Store to the index
-            auto address = builder->emitElementAddress(
-                builder->getPtrType(right.irValue->getFullType()),
-                left.irValue,
-                arrayIndexInst);
-            builder->emitStore(address, rhs);
+            auto leftVal = getSubscriptVal(
+                builder,
+                leftArrayIndexVal->elementType,
+                leftArrayIndexVal->arrayVal,
+                leftArrayIndexVal->index);
+            builder->emitStore(leftVal.irValue, rhs);
 
             break;
         }
@@ -2236,10 +2268,10 @@ IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val)
 
     case ScalarizedVal::Flavor::arrayIndex:
         {
-            auto element = builder->emitElementExtract(
-                val.irValue,
-                as<ScalarizedArrayIndexValImpl>(val.impl)->index);
-            return element;
+            auto impl = as<ScalarizedArrayIndexValImpl>(val.impl);
+            auto elementVal =
+                getSubscriptVal(builder, impl->elementType, impl->arrayVal, impl->index);
+            return materializeValue(builder, elementVal);
         }
     case ScalarizedVal::Flavor::tuple:
         {
@@ -2735,9 +2767,9 @@ IRInst* getOrCreatePerVertexInputArray(GLSLLegalizationContext* context, IRInst*
     IRBuilder builder(inputVertexAttr);
     builder.setInsertBefore(inputVertexAttr);
     auto arrayType = builder.getArrayType(
-        inputVertexAttr->getDataType(),
+        tryGetPointedToType(&builder, inputVertexAttr->getDataType()),
         builder.getIntValue(builder.getIntType(), 3));
-    arrayInst = builder.createGlobalParam(arrayType);
+    arrayInst = builder.createGlobalParam(builder.getPtrType(arrayType, AddressSpace::Input));
     context->mapVertexInputToPerVertexArray[inputVertexAttr] = arrayInst;
     builder.addDecoration(arrayInst, kIROp_PerVertexDecoration);
 
@@ -2770,21 +2802,105 @@ void tryReplaceUsesOfStageInput(
                 [&](IRUse* use)
                 {
                     auto user = use->getUser();
+                    IRBuilder builder(user);
+                    builder.setInsertBefore(user);
+                    builder.replaceOperand(use, val.irValue);
+                });
+        }
+        break;
+    case ScalarizedVal::Flavor::address:
+        {
+            bool needMaterialize = false;
+            if (as<IRPtrTypeBase>(val.irValue->getDataType()))
+            {
+                if (!as<IRPtrTypeBase>(originalVal->getDataType()))
+                {
+                    needMaterialize = true;
+                }
+            }
+            traverseUses(
+                originalVal,
+                [&](IRUse* use)
+                {
+                    auto user = use->getUser();
                     if (user->getOp() == kIROp_GetPerVertexInputArray)
                     {
                         auto arrayInst = getOrCreatePerVertexInputArray(context, val.irValue);
                         user->replaceUsesWith(arrayInst);
                         user->removeAndDeallocate();
+                        return;
+                    }
+                    IRBuilder builder(user);
+                    builder.setInsertBefore(user);
+                    if (needMaterialize)
+                    {
+                        auto materializedVal = materializeValue(&builder, val);
+                        builder.replaceOperand(use, materializedVal);
                     }
                     else
                     {
-                        IRBuilder builder(user);
-                        builder.setInsertBefore(user);
                         builder.replaceOperand(use, val.irValue);
                     }
                 });
         }
         break;
+    case ScalarizedVal::Flavor::typeAdapter:
+        {
+            traverseUses(
+                originalVal,
+                [&](IRUse* use)
+                {
+                    auto user = use->getUser();
+                    IRBuilder builder(user);
+                    builder.setInsertBefore(user);
+                    auto typeAdapter = as<ScalarizedTypeAdapterValImpl>(val.impl);
+                    auto materializedInner = materializeValue(&builder, typeAdapter->val);
+                    auto adapted = adaptType(
+                        &builder,
+                        materializedInner,
+                        typeAdapter->pretendType,
+                        typeAdapter->actualType);
+                    if (user->getOp() == kIROp_Load)
+                    {
+                        user->replaceUsesWith(adapted.irValue);
+                        user->removeAndDeallocate();
+                    }
+                    else
+                    {
+                        use->set(adapted.irValue);
+                    }
+                });
+        }
+        break;
+    case ScalarizedVal::Flavor::arrayIndex:
+        {
+            traverseUses(
+                originalVal,
+                [&](IRUse* use)
+                {
+                    auto arrayIndexImpl = as<ScalarizedArrayIndexValImpl>(val.impl);
+                    auto user = use->getUser();
+                    IRBuilder builder(user);
+                    builder.setInsertBefore(user);
+                    auto subscriptVal = getSubscriptVal(
+                        &builder,
+                        arrayIndexImpl->elementType,
+                        arrayIndexImpl->arrayVal,
+                        arrayIndexImpl->index);
+                    builder.setInsertBefore(user);
+                    auto materializedInner = materializeValue(&builder, subscriptVal);
+                    if (user->getOp() == kIROp_Load)
+                    {
+                        user->replaceUsesWith(materializedInner);
+                        user->removeAndDeallocate();
+                    }
+                    else
+                    {
+                        use->set(materializedInner);
+                    }
+                });
+            break;
+        }
     case ScalarizedVal::Flavor::tuple:
         {
             auto tupleVal = as<ScalarizedTupleValImpl>(val.impl);
@@ -2793,22 +2909,36 @@ void tryReplaceUsesOfStageInput(
                 [&](IRUse* use)
                 {
                     auto user = use->getUser();
-                    if (auto fieldExtract = as<IRFieldExtract>(user))
+                    switch (user->getOp())
                     {
-                        auto fieldKey = fieldExtract->getField();
-                        ScalarizedVal fieldVal;
-                        for (auto element : tupleVal->elements)
+                    case kIROp_FieldExtract:
+                    case kIROp_FieldAddress:
                         {
-                            if (element.key == fieldKey)
+                            auto fieldKey = user->getOperand(1);
+                            ScalarizedVal fieldVal;
+                            for (auto element : tupleVal->elements)
                             {
-                                fieldVal = element.val;
-                                break;
+                                if (element.key == fieldKey)
+                                {
+                                    fieldVal = element.val;
+                                    break;
+                                }
+                            }
+                            if (fieldVal.flavor != ScalarizedVal::Flavor::none)
+                            {
+                                tryReplaceUsesOfStageInput(context, fieldVal, user);
                             }
                         }
-                        if (fieldVal.flavor != ScalarizedVal::Flavor::none)
+                        break;
+                    case kIROp_Load:
                         {
-                            tryReplaceUsesOfStageInput(context, fieldVal, user);
+                            IRBuilder builder(user);
+                            builder.setInsertBefore(user);
+                            auto materializedVal = materializeTupleValue(&builder, val);
+                            user->replaceUsesWith(materializedVal);
+                            user->removeAndDeallocate();
                         }
+                        break;
                     }
                 });
         }
@@ -3066,7 +3196,7 @@ void legalizeEntryPointParameterForGLSL(
         // We are going to create a local variable of the appropriate
         // type, which will replace the parameter, along with
         // one or more global variables for the actual input/output.
-
+        setInsertAfterOrdinaryInst(builder, pp);
         auto localVariable = builder->emitVar(valueType);
         auto localVal = ScalarizedVal::address(localVariable);
 
@@ -3133,6 +3263,73 @@ void legalizeEntryPointParameterForGLSL(
             // Assign from the local variabel to the global output
             // variable before the actual `return` takes place.
             assign(&terminatorBuilder, globalOutputVal, localVal);
+        }
+    }
+    else if (auto ptrType = as<IRPtrTypeBase>(paramType))
+    {
+        // This is the case where the parameter is passed by const
+        // reference. We simply replace existing uses of the parameter
+        // with the real global variable.
+        SLANG_ASSERT(
+            ptrType->getOp() == kIROp_ConstRefType ||
+            ptrType->getAddressSpace() == AddressSpace::Input ||
+            ptrType->getAddressSpace() == AddressSpace::BuiltinInput);
+
+        auto globalValue = createGLSLGlobalVaryings(
+            context,
+            codeGenContext,
+            builder,
+            valueType,
+            paramLayout,
+            LayoutResourceKind::VaryingInput,
+            stage,
+            pp);
+        tryReplaceUsesOfStageInput(context, globalValue, pp);
+        for (auto dec : pp->getDecorations())
+        {
+            if (dec->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
+                continue;
+            auto globalVar = dec->getOperand(0);
+            auto key = dec->getOperand(1);
+            IRInst* realGlobalVar = nullptr;
+            if (globalValue.flavor != ScalarizedVal::Flavor::tuple)
+                continue;
+            if (auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl))
+            {
+                for (auto elem : tupleVal->elements)
+                {
+                    if (elem.key == key)
+                    {
+                        realGlobalVar = elem.val.irValue;
+                        break;
+                    }
+                }
+            }
+            SLANG_ASSERT(realGlobalVar);
+
+            // Remove all stores into the global var introduced during
+            // the initial glsl global var translation pass since we are
+            // going to replace the global var with a pointer to the real
+            // input, and it makes no sense to store values into such real
+            // input locations.
+            traverseUses(
+                globalVar,
+                [&](IRUse* use)
+                {
+                    auto user = use->getUser();
+                    if (auto store = as<IRStore>(user))
+                    {
+                        if (store->getPtrUse() == use)
+                        {
+                            store->removeAndDeallocate();
+                        }
+                    }
+                });
+            // we will be replacing uses of `globalVarToReplace`. We need
+            // globalVarToReplaceNextUse to catch the next use before it is removed from the
+            // list of uses.
+            globalVar->replaceUsesWith(realGlobalVar);
+            globalVar->removeAndDeallocate();
         }
     }
     else
@@ -3451,6 +3648,7 @@ ScalarizedVal legalizeEntryPointReturnValueForGLSL(
     return result;
 }
 
+
 void legalizeEntryPointForGLSL(
     Session* session,
     IRModule* module,
@@ -3554,12 +3752,12 @@ void legalizeEntryPointForGLSL(
     // and turn them into global variables.
     if (auto firstBlock = func->getFirstBlock())
     {
-        // Any initialization code we insert for parameters needs
-        // to be at the start of the "ordinary" instructions in the block:
-        builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
-
         for (auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam())
         {
+            // Any initialization code we insert for parameters needs
+            // to be at the start of the "ordinary" instructions in the block:
+            builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
+
             // We assume that the entry-point parameters will all have
             // layout information attached to them, which is kept up-to-date
             // by any transformations affecting the parameter list.
@@ -3606,11 +3804,11 @@ void legalizeEntryPointForGLSL(
         {
             auto type = value.globalParam->getDataType();
 
-            // Strip out if there is one
-            auto outType = as<IROutType>(type);
-            if (outType)
+            // Strip ptr if there is one.
+            auto ptrType = as<IRPtrTypeBase>(type);
+            if (ptrType)
             {
-                type = outType->getValueType();
+                type = ptrType->getValueType();
             }
 
             // Get the array type
@@ -3627,10 +3825,13 @@ void legalizeEntryPointForGLSL(
             auto elementCountInst = builder.getIntValue(builder.getIntType(), value.maxIndex + 1);
             IRType* sizedArrayType = builder.getArrayType(elementType, elementCountInst);
 
-            // Re-add out if there was one on the input
-            if (outType)
+            // Re-add ptr if there was one on the input
+            if (ptrType)
             {
-                sizedArrayType = builder.getOutType(sizedArrayType);
+                sizedArrayType = builder.getPtrType(
+                    ptrType->getOp(),
+                    sizedArrayType,
+                    ptrType->getAddressSpace());
             }
 
             // Change the globals type
