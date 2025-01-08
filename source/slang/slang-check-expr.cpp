@@ -4100,7 +4100,7 @@ Expr* SemanticsVisitor::maybeDereference(Expr* inExpr, CheckBaseContext checkBas
     for (;;)
     {
         auto baseType = expr->type;
-        if (auto ptrType = as<PtrType>(baseType))
+        if (as<PtrType>(baseType))
         {
             if (checkBaseContext == CheckBaseContext::Subscript)
                 return expr;
