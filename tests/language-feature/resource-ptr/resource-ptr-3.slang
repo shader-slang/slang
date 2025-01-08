@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=MTL): -target metal
 //TEST:SIMPLE(filecheck=MTLLIB): -target metallib
+//TEST:SIMPLE(filecheck=CUDA): -target cuda -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=PTX): -target ptx -entry computeMain -stage compute 
 //TEST:SIMPLE(filecheck=SPV): -target spirv -entry computeMain -stage compute -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -entry computeMain -profile cs_6_6
@@ -20,11 +22,14 @@
 // MTL: void computeMain
 // MTLLIB: @computeMain
 
+// CUDA: tex2DLod
+// PTX: computeMain
+
 uniform StructuredBuffer<ResourcePtr<Sampler2D>> t;
 uniform ResourcePtr<RWStructuredBuffer<float4>> buffer;
 
 [numthreads(4,1,1)]
-void computeMain(int id : SV_DispatchThreadID)
+void computeMain(int3 id : SV_DispatchThreadID)
 {
-    (*buffer)[0] = nonuniform(t[id]).SampleLevel(float2(0.0), 0.0);
+    (*buffer)[0] = nonuniform(t[id.x]).SampleLevel(float2(0.0), 0.0);
 }

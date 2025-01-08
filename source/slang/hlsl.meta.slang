@@ -20740,6 +20740,7 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     static const ResourceKind kind = isCombined!=0 ? ResourceKind.CombinedTextureSampler : ResourceKind.Texture;
 
     __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
     __init(ResourcePtr<This> bindless)
     {
         return getResourceFromBindlessHandle(bindless);
@@ -20789,6 +20790,7 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
     static const ResourceKind kind = ResourceKind.$(kind);
 
     __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
     __init(ResourcePtr<$(typeName)> bindless)
     {
         return getResourceFromBindlessHandle(bindless);

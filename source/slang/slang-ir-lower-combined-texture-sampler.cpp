@@ -19,6 +19,7 @@ struct LoweredCombinedSamplerStructInfo
 struct LowerCombinedSamplerContext
 {
     Dictionary<IRType*, LoweredCombinedSamplerStructInfo> mapTypeToLoweredInfo;
+    Dictionary<IRType*, LoweredCombinedSamplerStructInfo> mapLoweredTypeToLoweredInfo;
     CodeGenTarget codeGenTarget;
 
     LoweredCombinedSamplerStructInfo lowerCombinedTextureSamplerType(IRTextureTypeBase* textureType)
@@ -96,6 +97,7 @@ struct LowerCombinedSamplerContext
         builder.addLayoutDecoration(structType, info.typeLayout);
 
         mapTypeToLoweredInfo.add(textureType, info);
+        mapLoweredTypeToLoweredInfo.add(info.type, info);
         return info;
     }
 };
@@ -192,6 +194,9 @@ void lowerCombinedTextureSamplers(
                         auto combinedSamplerType = inst->getOperand(0)->getDataType();
                         auto loweredInfo =
                             context.mapTypeToLoweredInfo.tryGetValue(combinedSamplerType);
+                        if (!loweredInfo)
+                            loweredInfo = context.mapLoweredTypeToLoweredInfo.tryGetValue(
+                                combinedSamplerType);
                         if (!loweredInfo)
                             continue;
                         builder.setInsertBefore(inst);
