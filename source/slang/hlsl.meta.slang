@@ -20802,10 +20802,10 @@ __magic_type(ResourcePtrType)
 __intrinsic_type($(kIROp_ResourcePtrType))
 struct ResourcePtr<T:IOpaqueHandle> : IComparable
 {
+    [require(glsl_spirv)]
+    [require(_sm_6_6)]
     __intrinsic_op($(kIROp_CastIntToBindless))
     __init(uint2 handleValue);
-
-    static const ResourcePtr<T> invalid = ResourcePtr<T>(uint2(uint32_t.maxValue, uint32_t.maxValue));
 
     [ForceInline]
     bool equals(ResourcePtr<T> other) { return all(__vectorEql((uint2)this, (uint2)other)); }
@@ -20820,6 +20820,8 @@ struct ResourcePtr<T:IOpaqueHandle> : IComparable
 extension uint2
 {
     __intrinsic_op($(kIROp_CastBindlessToInt))
+    [require(glsl_spirv)]
+    [require(_sm_6_6)]
     __init<T:IOpaqueHandle>(ResourcePtr<T> bindless);
 }
 

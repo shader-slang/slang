@@ -28,7 +28,7 @@ We introduce a `ResourcePtr<T>` type that is defined as:
 struct ResourcePtr<T> : IComparable
     where T : IOpaqueHandle
 {
-    [requires(hlsl_glsl_spirv)]
+    [require(hlsl_glsl_spirv)]
     __init(uint2 value); // For HLSL, GLSL and SPIRV targets only.
 }
 ```
@@ -54,11 +54,10 @@ interface IOpaqueHandle
 
 `ResourcePtr<T>` should provide the following features:
 
-- Construction/explicit cast from a `uint2` value.
-- Explicit cast to a `uint2` value.
-- Equality comparison.
 - `operator *` to deference the pointer and obatin the actual resource handle `T`.
 - Implicit conversion to `T` when used in a location that expects `T`.
+- When targeting HLSL, GLSL and SPIRV, `ResourcePtr<T>` can be casted to and from a `uint2` value.
+- Equality comparison.
 
 For example:
 
@@ -68,10 +67,12 @@ uniform ResourcePtr<SamplerState> sampler;
 
 void test()
 {
-    // Explicit cast from bindless handle to uint64_t value.
-    let idx = (uint64_t)texture;
+    // Explicit cast from bindless handle to an uint2 value.
+    // (Available on HLSL, GLSL and SPIRV targets only)
+    let idx = (uint2)texture;
 
-    // Constructing bindless handle from uint64_t value.
+    // Constructing bindless handle from uint2 value.
+    // (Available on HLSL, GLSL and SPIRV targets only)
     let t = ResourcePtr<Texture2D>(idx);
 
     // Comparison.
@@ -146,20 +147,6 @@ export getResourceFromBindlessHandle<T>(ResourcePtr<T> handle) where T : IOpaque
 ```
 
 The user can call `defaultGetResourceFromBindlessHandle` function from their implementation of `getResourceFromBindlessHandle` to dispatch to the default behavior.
-
-### Invalid Handle
-
-We reserve `uint2(0xFFFFFFFF, 0xFFFFFFFF)` as a special handle value of `ResourcePtr<T>` types to mean an invalid/null resource.
-This will allow us to optimize `Optional<ResourcePtr<Texture2D>>` to use the reserved value to mean no-value.
-
-The user should also be able to use `ResourcePtr<T>.invalid` to refer to such an invalid value:
-
-```slang
-struct ResourcePtr<T> where T:IOpaqueHandle
-{
-    static const ResourcePtr<T> invalid = ResourcePtr<T>(uint2(uint.maxValue));
-}
-```
 
 ### Combind Texture Samplers
 
@@ -237,6 +224,10 @@ phyisical type, their size can vary and may not fit in an 8-byte structure. For 
 targeting CUDA, which takes 16 bytes. In the meanwhile, forcing `ResourcePtr<T>` to be `uint64_t` makes the feature unusable for lower-tier hardware
 where 64-bit integers are not supported. Representing the handle with `uint2` allows the feature to be used without requiring this additional
 capability.
+
+The initial proposal also reserves a value for invalid/null handle. This is removed because we cannot find
+a safe value that won't be used across all targets we support. In particular, this is not possible on CUDA
+and Metal because it is not possible to interpret these handles as plain integers. 
 
 ## Conclusion
 

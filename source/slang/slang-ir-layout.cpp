@@ -344,7 +344,6 @@ static Result _calcSizeAndAlignment(
     case kIROp_ComPtrType:
     case kIROp_NativeStringType:
     case kIROp_HLSLConstBufferPointerType:
-    case kIROp_ResourcePtrType:
         {
             *outSizeAndAlignment = IRSizeAndAlignment(kPointerSize, kPointerSize);
             return SLANG_OK;
@@ -356,6 +355,14 @@ static Result _calcSizeAndAlignment(
     case kIROp_DefaultBufferLayoutType:
         *outSizeAndAlignment = IRSizeAndAlignment(0, 4);
         return SLANG_OK;
+    case kIROp_ResourcePtrType:
+        {
+            IRBuilder builder(type);
+            builder.setInsertBefore(type);
+            auto uintType = builder.getUIntType();
+            auto uint2Type = builder.getVectorType(uintType, 2);
+            return getSizeAndAlignment(optionSet, rules, uint2Type, outSizeAndAlignment);
+        }
     case kIROp_AttributedType:
         {
             auto attributedType = cast<IRAttributedType>(type);

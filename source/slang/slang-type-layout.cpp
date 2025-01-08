@@ -2523,7 +2523,7 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
 
 bool areResourceTypesBindlessOnTarget(TargetRequest* targetReq)
 {
-    return isCPUTarget(targetReq) || isCUDATarget(targetReq);
+    return isCPUTarget(targetReq) || isCUDATarget(targetReq) || isMetalTarget(targetReq);
 }
 
 static bool isD3D11Target(TargetRequest*)
@@ -4802,9 +4802,14 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             type,
             rules);
     }
-    else if (as<ResourcePtrType>(type))
+    else if (auto resPtrType = as<ResourcePtrType>(type))
     {
-        return createSimpleTypeLayout(rules->GetScalarLayout(BaseType::UInt64), type, rules);
+        if (areResourceTypesBindlessOnTarget(context.targetReq))
+            return _createTypeLayout(context, resPtrType->getElementType());
+        auto uint2Type = context.astBuilder->getVectorType(
+            context.astBuilder->getUIntType(),
+            context.astBuilder->getIntVal(context.astBuilder->getIntType(), 2));
+        return _createTypeLayout(context, uint2Type);
     }
     else if (auto optionalType = as<OptionalType>(type))
     {
