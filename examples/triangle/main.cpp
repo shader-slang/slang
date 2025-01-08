@@ -405,4 +405,4 @@ struct HelloWorld : public WindowedAppBase
 
 // This macro instantiates an appropriate main function to
 // run the application defined above.
-PLATFORM_UI_MAIN(innerMain<HelloWorld>)
+EXAMPLE_MAIN(innerMain<HelloWorld>);
