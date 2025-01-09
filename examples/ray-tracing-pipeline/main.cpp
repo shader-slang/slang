@@ -382,6 +382,8 @@ struct RayTracing : public WindowedAppBase
             asDraftBufferDesc.sizeInBytes =
                 (size_t)accelerationStructurePrebuildInfo.resultDataMaxSize;
             ComPtr<IBufferResource> draftBuffer = gDevice->createBufferResource(asDraftBufferDesc);
+            if (!draftBuffer)
+                return SLANG_FAIL;
             IBufferResource::Desc scratchBufferDesc;
             scratchBufferDesc.type = IResource::Type::Buffer;
             scratchBufferDesc.defaultState = ResourceState::UnorderedAccess;
@@ -389,6 +391,8 @@ struct RayTracing : public WindowedAppBase
                 (size_t)accelerationStructurePrebuildInfo.scratchDataSize;
             ComPtr<IBufferResource> scratchBuffer =
                 gDevice->createBufferResource(scratchBufferDesc);
+            if (!scratchBuffer)
+                return SLANG_FAIL;
 
             // Build acceleration structure.
             ComPtr<IQueryPool> compactedSizeQuery;
@@ -708,4 +712,4 @@ struct RayTracing : public WindowedAppBase
 
 // This macro instantiates an appropriate main function to
 // run the application defined above.
-PLATFORM_UI_MAIN(innerMain<RayTracing>)
+EXAMPLE_MAIN(innerMain<RayTracing>);

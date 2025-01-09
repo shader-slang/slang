@@ -736,7 +736,8 @@ INST(GetVulkanRayTracingPayloadLocation, GetVulkanRayTracingPayloadLocation, 1, 
 
 INST(GetLegalizedSPIRVGlobalParamAddr, GetLegalizedSPIRVGlobalParamAddr, 1, 0)
 
-INST(GetPerVertexInputArray, GetPerVertexInputArray, 1, 0)
+INST(GetPerVertexInputArray, GetPerVertexInputArray, 1, HOISTABLE)
+INST(ResolveVaryingInputRef, ResolveVaryingInputRef, 1, HOISTABLE)
 
 INST(ForceVarIntoStructTemporarily, ForceVarIntoStructTemporarily, 1, 0)
 INST(MetalAtomicCast, MetalAtomicCast, 1, 0)
