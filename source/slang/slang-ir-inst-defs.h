@@ -1296,6 +1296,9 @@ INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDicti
 /* Differentiable Type Dictionary */
 INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
 
+/* Differentiable Type Annotation (for run-time types)*/
+INST(DifferentiableTypeAnnotation, DifferentiableTypeAnnotation, 2, HOISTABLE)
+
 INST(BeginFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)
 INST(EndFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)
 

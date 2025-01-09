@@ -1334,6 +1334,18 @@ struct IRPrimalSubstitute : IRInst
     IR_LEAF_ISA(PrimalSubstitute)
 };
 
+struct IRDifferentiableTypeAnnotation : IRInst
+{
+    enum
+    {
+        kOp = kIROp_DifferentiableTypeAnnotation
+    };
+    IRInst* getBaseType() { return getOperand(0); }
+    IRInst* getWitness() { return getOperand(1); }
+
+    IR_LEAF_ISA(DifferentiableTypeAnnotation)
+};
+
 struct IRDispatchKernel : IRInst
 {
     enum
