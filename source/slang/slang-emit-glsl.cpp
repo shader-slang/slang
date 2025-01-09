@@ -3257,6 +3257,11 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             emitSimpleTypeImpl(cast<IRAtomicType>(type)->getElementType());
             return;
         }
+    case kIROp_ConstRefType:
+        {
+            emitSimpleTypeImpl(as<IRConstRefType>(type)->getValueType());
+            return;
+        }
     default:
         break;
     }
@@ -3562,15 +3567,18 @@ void GLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRType* varType)
     //
 
     auto matrixType = as<IRMatrixType>(unwrapArray(varType));
-
     if (matrixType)
     {
+        auto layout = getIntVal(matrixType->getLayout());
+        if (layout == getTargetProgram()->getOptionSet().getMatrixLayoutMode())
+            return;
+
         // Reminder: the meaning of row/column major layout
         // in our semantics is the *opposite* of what GLSL
         // calls them, because what they call "columns"
         // are what we call "rows."
         //
-        switch (getIntVal(matrixType->getLayout()))
+        switch (layout)
         {
         case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
             m_writer->emit("layout(row_major)\n");
