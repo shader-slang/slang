@@ -28,6 +28,7 @@ static List<ConstructorDecl*> _getCtorList(
     SemanticsVisitor* visitor,
     StructDecl* structDecl,
     ConstructorDecl** defaultCtorOut);
+static Expr* constructDefaultInitExprForVar(SemanticsVisitor* visitor, VarDeclBase* varDecl);
 
 /// Visitor to transition declarations to `DeclCheckState::CheckedModifiers`
 struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
@@ -236,6 +237,18 @@ struct SemanticsDeclBasesVisitor : public SemanticsDeclVisitorBase,
     void _validateExtensionDeclMembers(ExtensionDecl* decl);
 
     void visitExtensionDecl(ExtensionDecl* decl);
+
+    // Synthesize the constructor declaration for a struct during header visit, as we
+    // need to have such declaration first such that the overloading resolution can lookup
+    // such constructor and complete the initialize list to constructor translation.
+    //
+    // We will defer the actual implementation of the constructor to the body visit, because
+    // we will have full information about each field in the struct during that stage.
+    void _synthesizeEmptyConstructor(StructDecl* structDecl);
+    void _searchMembersWithHigherVisibility(
+        StructDecl* structDecl,
+        const DeclVisibility& ctorVisibility,
+        List<VarDeclBase*>& resultMembers);
 };
 
 struct SemanticsDeclTypeResolutionVisitor : public SemanticsDeclVisitorBase,
@@ -2057,13 +2070,33 @@ static ConstructorDecl* _createCtor(
     return ctor;
 }
 
+static inline bool _isDefaultCtor(ConstructorDecl* ctor)
+{
+    auto allParamHaveInitExpr = [](ConstructorDecl* ctor)
+    {
+        for (auto i : ctor->getParameters())
+            if (!i->initExpr)
+                return false;
+        return true;
+    };
+
+    // 1. default ctor must have definition
+    // 2. either 2.1 or 2.2 is safisfied
+    // 2.1. default ctor must have no parameters
+    // 2.2. default ctor can have parameters, but all parameters have init expr (Because we won't
+    // differentiate this case from 2.)
+    if (ctor->body && (ctor->members.getCount() == 0 || allParamHaveInitExpr(ctor)))
+        return true;
+
+    return false;
+}
+
 static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl)
 {
     for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
     {
-        if (!ctor->body || ctor->members.getCount() != 0)
-            continue;
-        return ctor;
+        if (_isDefaultCtor(ctor))
+            return ctor;
     }
     return nullptr;
 }
@@ -2095,9 +2128,8 @@ static List<ConstructorDecl*> _getCtorList(
         if (!ctor || !ctor->body)
             return;
         ctorList.add(ctor);
-        if (ctor->members.getCount() != 0)
-            return;
-        *defaultCtorOut = ctor;
+        if (_isDefaultCtor(ctor))
+            *defaultCtorOut = ctor;
     };
     if (ctorLookupResult.items.getCount() == 0)
     {
@@ -7395,6 +7427,117 @@ void SemanticsDeclBasesVisitor::visitInterfaceDecl(InterfaceDecl* decl)
     }
 }
 
+void SemanticsDeclBasesVisitor::_searchMembersWithHigherVisibility(
+    StructDecl* structDecl,
+    const DeclVisibility& ctorVisibility,
+    List<VarDeclBase*>& resultMembers)
+{
+    auto findMembers = [&](StructDecl* structDecl)
+    {
+        for (auto varDeclRef : getMembersOfType<VarDeclBase>(
+                 getASTBuilder(),
+                 structDecl,
+                 MemberFilterStyle::Instance))
+        {
+            auto varDecl = varDeclRef.getDecl();
+            if (getDeclVisibility(varDecl) >= ctorVisibility)
+            {
+                resultMembers.add(varDecl);
+            }
+        }
+    };
+
+    for (auto inheritanceMember : structDecl->getMembersOfType<InheritanceDecl>())
+    {
+        auto declRefType = as<DeclRefType>(inheritanceMember->base.type);
+        if (!declRefType)
+            continue;
+
+        auto structOfInheritance = as<StructDecl>(declRefType->getDeclRef().getDecl());
+        if (!structOfInheritance)
+            continue;
+
+        findMembers(structOfInheritance);
+    }
+
+    findMembers(structDecl);
+}
+
+// If a struct's member has:
+// 1. an initialize expersion: Struct S {int a = 1;}; or
+// 2. a default value: Struct T{}; Struct S {T t;}
+//    Note, If a type is not default initializable, it doesn't have default value.
+// it can be associated with default value expression in the constructor signature.
+// This function helps to check whether either of those 2 conditions are met and create
+// a default value for the parameter.
+// It's totally fine that there is no default value for the parameter, in this case, user
+// code has to provide the argument for this parameter.
+static Expr* _getParamDefaultValue(SemanticsVisitor* visitor, VarDeclBase* varDecl)
+{
+    // 1st condition is easy, we can just use the init expression as the default value.
+    if (varDecl->initExpr)
+    {
+        return varDecl->initExpr;
+    }
+
+    // For the 2nd condition, we need to check if the type is default initializable, if so,
+    // we can use the default constructor.
+    return constructDefaultInitExprForVar(visitor, varDecl);
+}
+
+void SemanticsDeclBasesVisitor::_synthesizeEmptyConstructor(StructDecl* structDecl)
+{
+    // If a type already defines any explicit constructors, do not synthesize any constructors.
+    if (_hasExplicitConstructor(structDecl))
+        return;
+
+    // synthesize the signature first.
+    // The constructor's visibility level is the same as the struct itself.
+    // See:
+    // https://github.com/shader-slang/slang/blob/master/docs/proposals/004-initialization.md#synthesis-of-constructors-for-member-initialization
+    DeclVisibility ctorVisibility = getDeclVisibility(structDecl);
+
+    // Only the members whose visibility level is higher or equal than the
+    // constructor's visibility level will appear in the constructor's parameter list.
+    List<VarDeclBase*> resultMembers;
+    _searchMembersWithHigherVisibility(structDecl, ctorVisibility, resultMembers);
+
+    // synthesize the constructor signature:
+    // 1. The constructor's name is always `$init`, we create one without parameters now.
+    ConstructorDecl* ctor = _createCtor(this, getASTBuilder(), structDecl);
+    ctor->members.reserve(resultMembers.getCount());
+
+    // 2. Add the parameter list
+    uint32_t paramIndex = 0;
+    bool stopProcessingDefaultValues = false;
+    for (SlangInt i = resultMembers.getCount() - 1; i >= 0; i--)
+    {
+        auto member = resultMembers[i];
+        auto ctorParam = m_astBuilder->create<ParamDecl>();
+        ctorParam->type = (TypeExp)member->type;
+
+        if (!stopProcessingDefaultValues)
+            ctorParam->initExpr = _getParamDefaultValue(this, member);
+
+        if (!ctorParam->initExpr)
+            stopProcessingDefaultValues = true;
+
+        ctorParam->parentDecl = ctor;
+        StringBuilder prefix;
+        prefix << "param_" << paramIndex++ << "_";
+
+        Name* paramName =
+            member->getName() ? getName(prefix + member->getName()->text) : getName(prefix);
+
+        ctorParam->nameAndLoc = NameLoc(paramName, ctor->loc);
+        ctor->members.add(ctorParam);
+    }
+    ctor->members.reverse();
+
+    // 3. Add the modifiers, there is some special handling for the synthesized constructor that
+    // requires us to add some modifiers.
+}
+
 void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
 {
     // A `struct` type can only inherit from `struct` or `interface` types.
@@ -7496,6 +7639,9 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
 
         _validateCrossModuleInheritance(decl, inheritanceDecl);
     }
+
+    if (!isFromCoreModule(decl))
+        _synthesizeEmptyConstructor(decl);
 }
 
 void SemanticsDeclBasesVisitor::visitClassDecl(ClassDecl* decl)
