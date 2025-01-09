@@ -213,7 +213,7 @@ void lowerCombinedTextureSamplers(
                 case kIROp_CastDescriptorHandleToResource:
                     {
                         auto handle = inst->getOperand(0);
-                        if (auto resPtrType = as<IRDescriptorHandleType>(handle->getDataType()))
+                        if (as<IRDescriptorHandleType>(handle->getDataType()))
                         {
                             // If handle is still a DescriptorHandle, we are on a target that
                             // where native resource handles are already bindless, e.g. metal.
