@@ -620,7 +620,7 @@ __DynamicResource<__DynamicResourceKind.General> resourceHandles[];
 [vk::binding(0, 101)]
 __DynamicResource<__DynamicResourceKind.Sampler> samplerHandles[];
 
-export getDescriptorFromHandle<T>(DescriptorHandle<T> handle) where T : IOpaqueDescriptor
+export T getDescriptorFromHandle<T>(DescriptorHandle<T> handle) where T : IOpaqueDescriptor
 {
     __target_switch
     {
