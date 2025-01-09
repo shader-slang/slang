@@ -2909,46 +2909,46 @@ Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
 
     if (auto varExpr = as<VarExpr>(expr->functionExpr))
     {
-        if ((varExpr->name->text == "&&") || (varExpr->name->text == "||"))
-        {
-            // We only use short-circuiting in scalar input, will fall back
-            // to non-short-circuiting in vector input.
-            bool shortCircuitSupport = true;
-            for (auto& arg : expr->arguments)
+        if (varExpr->name && ((varExpr->name->text == "&&") || (varExpr->name->text == "||")))
             {
-                if (!as<BasicExpressionType>(arg->type.type))
+                // We only use short-circuiting in scalar input, will fall back
+                // to non-short-circuiting in vector input.
+                bool shortCircuitSupport = true;
+                for (auto& arg : expr->arguments)
                 {
-                    shortCircuitSupport = false;
+                    if (!as<BasicExpressionType>(arg->type.type))
+                    {
+                        shortCircuitSupport = false;
+                    }
                 }
-            }
 
-            if (!shortCircuitSupport)
-            {
-                return nullptr;
-            }
+                if (!shortCircuitSupport)
+                {
+                    return nullptr;
+                }
 
-            // We do the cast in the 2nd pass because we want to leave it for 'visitInvokeExpr'
-            // to handle if this expression doesn't support short-circuiting.
-            for (auto& arg : expr->arguments)
-            {
-                arg = coerce(CoercionSite::Argument, m_astBuilder->getBoolType(), arg);
-            }
+                // We do the cast in the 2nd pass because we want to leave it for 'visitInvokeExpr'
+                // to handle if this expression doesn't support short-circuiting.
+                for (auto& arg : expr->arguments)
+                {
+                    arg = coerce(CoercionSite::Argument, m_astBuilder->getBoolType(), arg);
+                }
 
-            expr->functionExpr = CheckTerm(expr->functionExpr);
-            newExpr = m_astBuilder->create<LogicOperatorShortCircuitExpr>();
-            if (varExpr->name->text == "&&")
-            {
-                newExpr->flavor = LogicOperatorShortCircuitExpr::Flavor::And;
+                expr->functionExpr = CheckTerm(expr->functionExpr);
+                newExpr = m_astBuilder->create<LogicOperatorShortCircuitExpr>();
+                if (varExpr->name->text == "&&")
+                {
+                    newExpr->flavor = LogicOperatorShortCircuitExpr::Flavor::And;
+                }
+                else
+                {
+                    newExpr->flavor = LogicOperatorShortCircuitExpr::Flavor::Or;
+                }
+                newExpr->loc = expr->loc;
+                newExpr->functionExpr = expr->functionExpr;
+                newExpr->type = m_astBuilder->getBoolType();
+                newExpr->arguments = expr->arguments;
             }
-            else
-            {
-                newExpr->flavor = LogicOperatorShortCircuitExpr::Flavor::Or;
-            }
-            newExpr->loc = expr->loc;
-            newExpr->functionExpr = expr->functionExpr;
-            newExpr->type = m_astBuilder->getBoolType();
-            newExpr->arguments = expr->arguments;
-        }
     }
 
     return newExpr;
