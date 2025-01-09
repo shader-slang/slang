@@ -1917,7 +1917,7 @@ Modifier* SemanticsVisitor::checkModifier(
                             auto specConstVarDecl = getASTBuilder()->create<VarDecl>();
                             auto constantIdModifier =
                                 getASTBuilder()->create<VkConstantIdAttribute>();
-                            constantIdModifier->location = specConstId;
+                            constantIdModifier->location = (int32_t)specConstId;
                             specConstVarDecl->type.type = getASTBuilder()->getIntType();
                             addModifier(specConstVarDecl, constantIdModifier);
                             decl->parentDecl->addMember(specConstVarDecl);
