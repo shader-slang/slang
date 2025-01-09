@@ -1542,7 +1542,8 @@ public:
         Type* toType,
         Expr** outToExpr,
         InitializerListExpr* fromInitializerListExpr,
-        UInt& ioInitArgIndex);
+        UInt& ioInitArgIndex,
+        bool useLegacyMode = false);
 
     /// Read an aggregate value from an initializer list expression.
     ///
@@ -1567,7 +1568,8 @@ public:
         Type* inToType,
         Expr** outToExpr,
         InitializerListExpr* fromInitializerListExpr,
-        UInt& ioArgIndex);
+        UInt& ioArgIndex,
+        bool useLegacyMode = false);
 
     /// Coerce an initializer-list expression to a specific type.
     ///
@@ -2780,6 +2782,25 @@ public:
     void suggestCompletionItems(
         CompletionSuggestions::ScopeKind scopeKind,
         LookupResult const& lookupResult);
+
+    bool _invokeExprForExplicitCtor(
+        Type* toType,
+        InitializerListExpr* fromInitializerListExpr,
+        Expr** outExpr);
+    bool _invokeExprForSynthesizedCtor(
+        Type* toType,
+        StructDecl* structDecl,
+        InitializerListExpr* fromInitializerListExpr,
+        UInt& ioArgIndex,
+        Expr** outExpr);
+
+    Expr* _prepareCtorInvokeExpr(
+        Type* toType,
+        const SourceLoc& loc,
+        const List<Expr*>& coercedArgs);
+
+    bool _hasExplicitConstructor(StructDecl* structDecl);
+    ConstructorDecl* _getSynthesizedConstructor(StructDecl* structDecl);
 };
 
 
