@@ -146,6 +146,8 @@ public in int gl_SampleID : SV_SampleIndex;
 public in int gl_VertexIndex : SV_VertexID;
 public in int gl_ViewIndex : SV_ViewID;
 public in int gl_ViewportIndex : SV_ViewportArrayIndex;
+public in int gl_BaseVertex : SV_StartVertexLocation;
+public in int gl_BaseInstance : SV_StartInstanceLocation;
 
 
 // Override operator* behavior to compute algebric product of matrices and vectors.
@@ -491,7 +493,7 @@ public T mix(T x, T y, bool a)
     {
     case glsl: __intrinsic_asm "mix";
     case spirv: return spirv_asm {
-        result:$$T = OpSelect $a $x $y
+        result:$$T = OpSelect $a $y $x
     };
     default:
         return (a ? y : x);
@@ -508,7 +510,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<bool, N> a)
     {
     case glsl: __intrinsic_asm "mix";
     case spirv: return spirv_asm {
-        result:$$vector<T,N> = OpSelect $a $x $y
+        result:$$vector<T,N> = OpSelect $a $y $x
     };
     default:
         vector<T, N> result;
@@ -2435,6 +2437,25 @@ public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
     }
     default:
         return sampler.SampleCmp(p.xy, p.z);
+    }
+}
+
+[ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
+public float textureLod(sampler2DArrayShadow sampler, vec4 p, float lod)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod";
+    case spirv:
+    {
+        float compareValue = p.w;
+        return spirv_asm {
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Lod $lod
+        };
+    }
+    default:
+        return sampler.SampleCmp(p.xyz, p.w);
     }
 }
 
@@ -5099,6 +5120,30 @@ __glsl_extension(GL_EXT_ray_tracing)
 public bool reportIntersectionEXT(float hitT, uint hitKind)
 {
     return __reportIntersection(hitT, hitKind);
+}
+
+public property int terminateRayEXT
+{
+    [require(glsl_spirv, raytracing_anyhit)]
+    [ForceInline]
+    get
+    {
+        setupExtForRayTracingBuiltIn();
+        AcceptHitAndEndSearch();
+        return 0;
+    }
+}
+
+public property int ignoreIntersectionEXT
+{
+    [require(glsl_spirv, raytracing_anyhit)]
+    [ForceInline]
+    get
+    {
+        setupExtForRayTracingBuiltIn();
+        IgnoreHit();
+        return 0;
+    }
 }
 
 __glsl_extension(GL_EXT_ray_tracing)
@@ -9035,7 +9080,7 @@ public vector<float, N> fwidthCoarse(vector<float, N> p)
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
 [require(glsl_spirv, fragmentprocessing)]
-public float interpolateAtCentroid(__ref float interpolant)
+public float interpolateAtCentroid(__constref float interpolant)
 {
     __target_switch
     {
@@ -9054,7 +9099,7 @@ __generic<let N : int>
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
 [require(glsl_spirv, fragmentprocessing)]
-public vector<float, N> interpolateAtCentroid(__ref vector<float, N> interpolant)
+public vector<float, N> interpolateAtCentroid(__constref vector<float, N> interpolant)
 {
     __target_switch
     {
@@ -9073,7 +9118,7 @@ public vector<float, N> interpolateAtCentroid(__ref vector<float, N> interpolant
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
 [require(glsl_spirv, fragmentprocessing)]
-public float interpolateAtSample(__ref float interpolant, int sample)
+public float interpolateAtSample(__constref float interpolant, int sample)
 {
     __target_switch
     {
@@ -9092,7 +9137,7 @@ __generic<let N : int>
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
 [require(glsl_spirv, fragmentprocessing)]
-public vector<float, N> interpolateAtSample(__ref vector<float, N> interpolant, int sample)
+public vector<float, N> interpolateAtSample(__constref vector<float, N> interpolant, int sample)
 {
     __target_switch
     {
@@ -9111,7 +9156,7 @@ public vector<float, N> interpolateAtSample(__ref vector<float, N> interpolant, 
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
 [require(glsl_spirv, fragmentprocessing)]
-public float interpolateAtOffset(__ref float interpolant, vec2 offset)
+public float interpolateAtOffset(__constref float interpolant, vec2 offset)
 {
     __target_switch
     {
@@ -9130,7 +9175,7 @@ __generic<let N : int>
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
 [require(glsl_spirv, fragmentprocessing)]
-public vector<float, N> interpolateAtOffset(__ref vector<float, N> interpolant, vec2 offset)
+public vector<float, N> interpolateAtOffset(__constref vector<float, N> interpolant, vec2 offset)
 {
     __target_switch
     {

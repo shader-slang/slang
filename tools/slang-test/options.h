@@ -51,6 +51,9 @@ struct Options
     // Directory to use when looking for binaries to run. If empty it's not set.
     Slang::String binDir;
 
+    // Root directory to use when looking for test cases
+    Slang::String testDir;
+
     // only run test cases with names have one of these prefixes.
     Slang::List<Slang::String> testPrefixes;
 

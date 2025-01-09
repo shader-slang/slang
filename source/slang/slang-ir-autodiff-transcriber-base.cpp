@@ -553,6 +553,9 @@ IRType* AutoDiffTranscriberBase::tryGetDiffPairType(IRBuilder* builder, IRType* 
     // If this is a PtrType (out, inout, etc..), then create diff pair from
     // value type and re-apply the appropropriate PtrType wrapper.
     //
+    if (isNoDiffType(originalType))
+        return nullptr;
+
     if (auto origPtrType = as<IRPtrTypeBase>(originalType))
     {
         if (auto diffPairValueType = tryGetDiffPairType(builder, origPtrType->getValueType()))

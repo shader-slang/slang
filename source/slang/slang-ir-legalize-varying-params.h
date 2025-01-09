@@ -18,6 +18,7 @@ void legalizeEntryPointVaryingParamsForCPU(IRModule* module, DiagnosticSink* sin
 
 void legalizeEntryPointVaryingParamsForCUDA(IRModule* module, DiagnosticSink* sink);
 
+void depointerizeInputParams(IRFunc* entryPoint);
 
 // (#4375) Once `slang-ir-metal-legalize.cpp` is merged with
 // `slang-ir-legalize-varying-params.cpp`, move the following
@@ -57,6 +58,8 @@ IRInst* emitCalcGroupIndex(IRBuilder& builder, IRInst* groupThreadID, IRInst* gr
     M(ViewID, SV_ViewID)                                 \
     M(ViewportArrayIndex, SV_ViewportArrayIndex)         \
     M(Target, SV_Target)                                 \
+    M(StartVertexLocation, SV_StartVertexLocation)       \
+    M(StartInstanceLocation, SV_StartInstanceLocation)   \
     /* end */
 
 /// A known system-value semantic name that can be applied to a parameter

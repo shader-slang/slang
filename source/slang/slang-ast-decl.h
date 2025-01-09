@@ -461,6 +461,8 @@ class ModuleDecl : public NamespaceDeclBase
     /// `__implementing` etc.
     bool isInLegacyLanguage = true;
 
+    DeclVisibility defaultVisibility = DeclVisibility::Internal;
+
     SLANG_UNREFLECTED
 
     /// Map a type to the list of extensions of that type (if any) declared in this module

@@ -40,6 +40,8 @@ The system-value semantics are translated to the following Metal attributes:
 | `SV_Target<N>`              | `[[color(N)]]`                                       |
 | `SV_VertexID`               | `[[vertex_id]]`                                      |
 | `SV_ViewportArrayIndex`     | `[[viewport_array_index]]`                           |
+| `SV_StartVertexLocation`    | `[[base_vertex]]`                                    |
+| `SV_StartInstanceLocation`  | `[[base_instance]]`                                  |
 
 Custom semantics are mapped to user attributes:
 
@@ -275,6 +277,8 @@ The HLSL `:register()` semantic is respected when emitting Metal code.
 Since metal does not differentiate a constant buffer, a shader resource (read-only) buffer and an unordered access buffer, Slang will map `register(tN)`, `register(uN)` and `register(bN)` to `[[buffer(N)]]` when such `register` semantic is declared on a buffer typed parameter.
 
 `spaceN` specifiers inside `register` semantics are ignored.
+
+The `[vk::location(N)]` attributes on stage input/output parameters are respected.
 
 ## Specialization Constants
 

@@ -11,6 +11,23 @@
 namespace Slang
 {
 
+static const char* kHLSLBuiltInPrelude64BitCast = R"(
+uint64_t _slang_asuint64(double x)
+{
+    uint32_t low;
+    uint32_t high;
+    asuint(x, low, high);
+    return ((uint64_t)high << 32) | low;
+}
+
+double _slang_asdouble(uint64_t x)
+{
+    uint32_t low = x & 0xFFFFFFFF;
+    uint32_t high = x >> 32;
+    return asdouble(low, high);
+}
+)";
+
 void HLSLSourceEmitter::_emitHLSLDecorationSingleString(
     const char* name,
     IRFunc* entryPoint,
@@ -805,6 +822,8 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             case BaseType::UInt64:
             case BaseType::UIntPtr:
             case BaseType::Bool:
+            case BaseType::Int8x4Packed:
+            case BaseType::UInt8x4Packed:
                 // Because the intermediate type will always
                 // be an integer type, we can convert to
                 // another integer type of the same size
@@ -822,16 +841,11 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 //
                 // There is no current function (it seems)
                 // for bit-casting an `int16_t` to a `half`.
-                //
-                // TODO: There is an `asdouble` function
-                // for converting two 32-bit integer values into
-                // one `double`. We could use that for
-                // bit casts of 64-bit values with a bit of
-                // extra work, but doing so might be best
-                // handled in an IR pass that legalizes
-                // bit-casts.
-                //
                 m_writer->emit("asfloat");
+                break;
+            case BaseType::Double:
+                ensurePrelude(kHLSLBuiltInPrelude64BitCast);
+                m_writer->emit("_slang_asdouble");
                 break;
             }
             m_writer->emit("(");
@@ -844,9 +858,13 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 diagnoseUnhandledInst(inst);
                 break;
 
+            case BaseType::Int64:
+            case BaseType::UInt64:
             case BaseType::UInt:
             case BaseType::Int:
             case BaseType::Bool:
+            case BaseType::Int8x4Packed:
+            case BaseType::UInt8x4Packed:
                 break;
             case BaseType::UInt16:
             case BaseType::Int16:
@@ -858,6 +876,11 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             case BaseType::Half:
                 m_writer->emit("asuint16(");
+                closeCount++;
+                break;
+            case BaseType::Double:
+                ensurePrelude(kHLSLBuiltInPrelude64BitCast);
+                m_writer->emit("_slang_asuint64(");
                 closeCount++;
                 break;
             }
@@ -1157,6 +1180,34 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     Super::emitSimpleValueImpl(inst);
 }
 
+void HLSLSourceEmitter::emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator)
+{
+    if (declarator)
+    {
+        // HLSL only allow matrix layout modifier when declaring a variable or struct field.
+        if (auto matType = as<IRMatrixType>(type))
+        {
+            auto matrixLayout = getIntVal(matType->getLayout());
+            if (getTargetProgram()->getOptionSet().getMatrixLayoutMode() !=
+                (MatrixLayoutMode)matrixLayout)
+            {
+                switch (matrixLayout)
+                {
+                case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
+                    m_writer->emit("column_major ");
+                    break;
+                case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
+                    m_writer->emit("row_major ");
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+    Super::emitSimpleTypeAndDeclaratorImpl(type, declarator);
+}
+
 void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
     switch (type->getOp())
@@ -1174,6 +1225,8 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_Int16Type:
     case kIROp_UInt16Type:
     case kIROp_HalfType:
+    case kIROp_Int8x4PackedType:
+    case kIROp_UInt8x4PackedType:
         {
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
@@ -1286,6 +1339,11 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_AtomicType:
         {
             emitSimpleTypeImpl(cast<IRAtomicType>(type)->getElementType());
+            return;
+        }
+    case kIROp_ConstRefType:
+        {
+            emitSimpleTypeImpl(as<IRConstRefType>(type)->getValueType());
             return;
         }
     default:
@@ -1642,28 +1700,6 @@ void HLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
             if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
                 m_writer->emit("globallycoherent\n");
             continue;
-        }
-    }
-}
-
-void HLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRType* type)
-{
-    auto matType = as<IRMatrixType>(type);
-    if (!matType)
-        return;
-    auto matrixLayout = getIntVal(matType->getLayout());
-    if (getTargetProgram()->getOptionSet().getMatrixLayoutMode() != (MatrixLayoutMode)matrixLayout)
-    {
-        switch (matrixLayout)
-        {
-        case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
-            m_writer->emit("column_major ");
-            break;
-        case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
-            m_writer->emit("row_major ");
-            break;
-        default:
-            break;
         }
     }
 }

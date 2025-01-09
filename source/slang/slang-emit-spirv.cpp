@@ -12,7 +12,6 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-lookup-spirv.h"
-#include "slang-spirv-val.h"
 #include "spirv/unified1/spirv.h"
 
 #include <type_traits>
@@ -1279,8 +1278,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case AddressSpace::Uniform:
             return SpvStorageClassUniform;
         case AddressSpace::Input:
+        case AddressSpace::BuiltinInput:
             return SpvStorageClassInput;
         case AddressSpace::Output:
+        case AddressSpace::BuiltinOutput:
             return SpvStorageClassOutput;
         case AddressSpace::TaskPayloadWorkgroup:
             return SpvStorageClassTaskPayloadWorkgroupEXT;
@@ -1463,6 +1464,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Int8Type:
         case kIROp_IntType:
         case kIROp_Int64Type:
+        case kIROp_Int8x4PackedType:
+        case kIROp_UInt8x4PackedType:
             {
                 const IntInfo i = getIntTypeInfo(as<IRType>(inst));
                 if (i.width == 16)
@@ -2688,7 +2691,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRBuilder builder(spvAsmBuiltinVar);
         builder.setInsertBefore(spvAsmBuiltinVar);
         auto varInst = getBuiltinGlobalVar(
-            builder.getPtrType(kIROp_PtrType, spvAsmBuiltinVar->getDataType(), AddressSpace::Input),
+            builder.getPtrType(
+                kIROp_PtrType,
+                spvAsmBuiltinVar->getDataType(),
+                AddressSpace::BuiltinInput),
             kind,
             spvAsmBuiltinVar);
         registerInst(spvAsmBuiltinVar, varInst);
@@ -4214,7 +4220,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                         {
                                             auto addrSpace = ptrType->getAddressSpace();
                                             if (addrSpace != AddressSpace::Input &&
-                                                addrSpace != AddressSpace::Output)
+                                                addrSpace != AddressSpace::Output &&
+                                                addrSpace != AddressSpace::BuiltinInput &&
+                                                addrSpace != AddressSpace::BuiltinOutput)
                                                 continue;
                                         }
                                     }
@@ -4995,7 +5003,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (!ptrType)
             return;
         auto addrSpace = ptrType->getAddressSpace();
-        if (addrSpace == AddressSpace::Input)
+        if (addrSpace == AddressSpace::Input || addrSpace == AddressSpace::BuiltinInput)
         {
             if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
             {
@@ -5295,6 +5303,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             inst->getFullType(),
                             SpvBuiltInShadingRateKHR,
                             inst);
+                }
+                else if (semanticName == "sv_startvertexlocation")
+                {
+                    requireSPIRVCapability(SpvCapabilityDrawParameters);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaseVertex, inst);
+                }
+                else if (semanticName == "sv_startinstancelocation")
+                {
+                    requireSPIRVCapability(SpvCapabilityDrawParameters);
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaseInstance, inst);
                 }
                 SLANG_UNREACHABLE("Unimplemented system value in spirv emit.");
             }
@@ -7349,6 +7367,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             case kIROp_UInt64Type:
             case kIROp_UInt8Type:
             case kIROp_UIntPtrType:
+            case kIROp_Int8x4PackedType:
+            case kIROp_UInt8x4PackedType:
                 spvEncoding = 6; // Unsigned
                 break;
             case kIROp_FloatType:
@@ -7957,6 +7977,8 @@ SlangResult emitSPIRVFromIR(
 {
     spirvOut.clear();
 
+    bool symbolsEmitted = false;
+
     auto sink = codeGenContext->getSink();
 
 #if 0
@@ -8001,6 +8023,7 @@ SlangResult emitSPIRVFromIR(
         if (shouldPreserveParams && as<IRGlobalParam>(inst))
         {
             context.ensureInst(inst);
+            symbolsEmitted = true;
         }
         if (generateWholeProgram)
         {
@@ -8009,6 +8032,7 @@ SlangResult emitSPIRVFromIR(
                 if (func->findDecoration<IRDownstreamModuleExportDecoration>())
                 {
                     context.ensureInst(inst);
+                    symbolsEmitted = true;
                 }
             }
         }
@@ -8039,8 +8063,14 @@ SlangResult emitSPIRVFromIR(
     for (auto irEntryPoint : irEntryPoints)
     {
         context.ensureInst(irEntryPoint);
+        symbolsEmitted = true;
     }
 
+    if (!symbolsEmitted)
+    {
+        sink->diagnose(irModule->getModuleInst(), Diagnostics::outputSpvIsEmpty);
+        return SLANG_FAIL;
+    }
 
     // Move forward delcared pointers to the end.
     do

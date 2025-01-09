@@ -127,6 +127,12 @@ struct SpecializationContext
             }
         }
 
+        if (isWrapperType(inst))
+        {
+            // For all the wrapper type, we need to make sure the operands are fully specialized.
+            return areAllOperandsFullySpecialized(inst);
+        }
+
         // The default case is that a global value is always specialized.
         if (inst->getParent() == module->getModuleInst())
         {

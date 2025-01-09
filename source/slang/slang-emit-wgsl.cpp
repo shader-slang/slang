@@ -49,18 +49,6 @@ fn _slang_getNan() -> f32
 }
 )";
 
-void WGSLSourceEmitter::ensurePrelude(const char* preludeText)
-{
-    IRStringLit* stringLit;
-    if (!m_builtinPreludes.tryGetValue(preludeText, stringLit))
-    {
-        IRBuilder builder(m_irModule);
-        stringLit = builder.getStringValue(UnownedStringSlice(preludeText));
-        m_builtinPreludes[preludeText] = stringLit;
-    }
-    m_requiredPreludes.add(stringLit);
-}
-
 void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
     const SwitchRegion::Case* const currentCase,
     const bool isDefault)
@@ -507,6 +495,10 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_UIntPtrType:
         m_writer->emit("u64");
         return;
+    case kIROp_Int8x4PackedType:
+    case kIROp_UInt8x4PackedType:
+        m_writer->emit("u32");
+        return;
     case kIROp_StructType:
         m_writer->emit(getName(type));
         return;
@@ -952,6 +944,8 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         return;
                     }
                 case BaseType::UInt:
+                case BaseType::Int8x4Packed:
+                case BaseType::UInt8x4Packed:
                     {
                         m_writer->emit("u32(");
                         m_writer->emit(UInt(uint32_t(litInst->value.intVal)));

@@ -745,7 +745,7 @@ struct ModelViewer : WindowedAppBase
     //
     Result initialize()
     {
-        initializeBase("Model Viewer", 1024, 768);
+        SLANG_RETURN_ON_FAIL(initializeBase("Model Viewer", 1024, 768));
         if (!isTestMode())
         {
             gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e)
@@ -969,4 +969,4 @@ struct ModelViewer : WindowedAppBase
 
 // This macro instantiates an appropriate main function to
 // run the application defined above.
-PLATFORM_UI_MAIN(innerMain<ModelViewer>)
+EXAMPLE_MAIN(innerMain<ModelViewer>);

@@ -1,6 +1,7 @@
 // slang-reflection-api.cpp
 
 #include "../core/slang-basic.h"
+#include "slang-check-impl.h"
 #include "slang-check.h"
 #include "slang-compiler.h"
 #include "slang-syntax.h"
@@ -352,6 +353,15 @@ SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueFloat(
     {
         *rs = (float)cexpr->value;
         return 0;
+    }
+    else if (auto implicitCastExpr = as<ImplicitCastExpr>(userAttr->args[index]))
+    {
+        auto base = implicitCastExpr->arguments[0];
+        if (auto intLit = as<IntegerLiteralExpr>(base))
+        {
+            *rs = (float)intLit->value;
+            return 0;
+        }
     }
     return SLANG_E_INVALID_ARG;
 }

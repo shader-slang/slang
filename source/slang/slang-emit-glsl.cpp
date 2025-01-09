@@ -1236,6 +1236,8 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         return;
                     }
                 case BaseType::UInt:
+                case BaseType::Int8x4Packed:
+                case BaseType::UInt8x4Packed:
                     {
                         m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
                         m_writer->emit("U");
@@ -1984,6 +1986,8 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 break;
 
             case BaseType::UInt:
+            case BaseType::Int8x4Packed:
+            case BaseType::UInt8x4Packed:
                 if (fromType == BaseType::Float)
                 {
                     m_writer->emit("floatBitsToUint");
@@ -2023,6 +2027,32 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                     m_writer->emit("int16_t(packHalf2x16(vec2(");
                     emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
                     m_writer->emit(", 0.0)))");
+                    return true;
+                }
+                else
+                {
+                    emitType(inst->getDataType());
+                }
+                break;
+            case BaseType::Int64:
+                if (fromType == BaseType::Double)
+                {
+                    m_writer->emit("int64_t(doubleBitsToInt64(");
+                    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                    m_writer->emit("))");
+                    return true;
+                }
+                else
+                {
+                    emitType(inst->getDataType());
+                }
+                break;
+            case BaseType::UInt64:
+                if (fromType == BaseType::Double)
+                {
+                    m_writer->emit("uint64_t(doubleBitsToUint64(");
+                    emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                    m_writer->emit("))");
                     return true;
                 }
                 else
@@ -3024,6 +3054,18 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 #endif
             return;
         }
+    case kIROp_Int8x4PackedType:
+        {
+            _requireBaseType(BaseType::Int8x4Packed);
+            m_writer->emit("uint");
+            return;
+        }
+    case kIROp_UInt8x4PackedType:
+        {
+            _requireBaseType(BaseType::UInt8x4Packed);
+            m_writer->emit("uint");
+            return;
+        }
     case kIROp_VoidType:
     case kIROp_BoolType:
     case kIROp_Int8Type:
@@ -3097,6 +3139,7 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_RayQueryType:
         {
+            _requireRayQuery();
             m_writer->emit("rayQueryEXT");
             return;
         }
@@ -3121,6 +3164,11 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_AtomicType:
         {
             emitSimpleTypeImpl(cast<IRAtomicType>(type)->getElementType());
+            return;
+        }
+    case kIROp_ConstRefType:
+        {
+            emitSimpleTypeImpl(as<IRConstRefType>(type)->getValueType());
             return;
         }
     default:
@@ -3428,15 +3476,18 @@ void GLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRType* varType)
     //
 
     auto matrixType = as<IRMatrixType>(unwrapArray(varType));
-
     if (matrixType)
     {
+        auto layout = getIntVal(matrixType->getLayout());
+        if (layout == getTargetProgram()->getOptionSet().getMatrixLayoutMode())
+            return;
+
         // Reminder: the meaning of row/column major layout
         // in our semantics is the *opposite* of what GLSL
         // calls them, because what they call "columns"
         // are what we call "rows."
         //
-        switch (getIntVal(matrixType->getLayout()))
+        switch (layout)
         {
         case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
             m_writer->emit("layout(row_major)\n");

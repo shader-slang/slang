@@ -43,6 +43,74 @@ static void _insertBinding(
     ranges.add(newRange);
 }
 
+void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadata)
+{
+    auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecoration)
+        return;
+
+    auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
+    if (!varLayout)
+        return;
+
+    UInt spaceOffset = 0;
+    if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+    {
+        spaceOffset = spaceAttr->getOffset();
+    }
+    for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
+    {
+        auto kind = sizeAttr->getResourceKind();
+
+        // Only track resource types that we can reliably track, such as textures.
+        // Do not track individual uniforms, for example.
+        if (!ShaderBindingRange::isUsageTracked(kind))
+            continue;
+
+        if (auto offsetAttr = varLayout->findOffsetAttr(kind))
+        {
+            // Get the binding information from this attribute and insert it into the list
+            auto spaceIndex = spaceOffset + offsetAttr->getSpace();
+            auto registerIndex = offsetAttr->getOffset();
+            auto size = sizeAttr->getSize();
+            auto count = size.isFinite() ? size.getFiniteValue() : 0;
+            _insertBinding(outMetadata.m_usedBindings, kind, spaceIndex, registerIndex, count);
+        }
+    }
+
+    // If the global parameter is a parameter block, make sure to collect bindings for its
+    // default constant buffer, if there is one.
+    // The default constant buffer binding will be represented in the container var layout.
+    //
+    auto paramGroupTypeLayout = as<IRParameterGroupTypeLayout>(varLayout->getTypeLayout());
+    if (!paramGroupTypeLayout)
+        return;
+    auto containerVarLayout = paramGroupTypeLayout->getContainerVarLayout();
+    if (!containerVarLayout)
+        return;
+    auto containerSpaceOffset =
+        varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace);
+    if (!containerSpaceOffset)
+        return;
+    spaceOffset += containerSpaceOffset->getOffset();
+    for (auto sizeAttr : containerVarLayout->getTypeLayout()->getSizeAttrs())
+    {
+        auto kind = sizeAttr->getResourceKind();
+
+        if (!ShaderBindingRange::isUsageTracked(kind))
+            continue;
+
+        if (auto offsetAttr = containerVarLayout->findOffsetAttr(kind))
+        {
+            auto spaceIndex = spaceOffset + offsetAttr->getSpace();
+            auto registerIndex = offsetAttr->getOffset();
+            auto size = sizeAttr->getSize();
+            auto count = size.isFinite() ? size.getFiniteValue() : 0;
+            _insertBinding(outMetadata.m_usedBindings, kind, spaceIndex, registerIndex, count);
+        }
+    }
+}
+
 // Collects the metadata from the provided IR module, saves it in outMetadata.
 void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMetadata)
 {
@@ -57,39 +125,18 @@ void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMeta
                 auto name = func->findDecoration<IRExportDecoration>()->getMangledName();
                 outMetadata.m_exportedFunctionMangledNames.add(name);
             }
+
+            // Collect metadata from entrypoint params.
+            for (auto param : func->getParams())
+            {
+                collectMetadataFromInst(param, outMetadata);
+            }
         }
 
         auto param = as<IRGlobalParam>(inst);
         if (!param)
             continue;
-
-        auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
-        if (!layoutDecoration)
-            continue;
-
-        auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
-        if (!varLayout)
-            continue;
-
-        for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
-        {
-            auto kind = sizeAttr->getResourceKind();
-
-            // Only track resource types that we can reliably track, such as textures.
-            // Do not track individual uniforms, for example.
-            if (!ShaderBindingRange::isUsageTracked(kind))
-                continue;
-
-            if (auto offsetAttr = varLayout->findOffsetAttr(kind))
-            {
-                // Get the binding information from this attribute and insert it into the list
-                auto spaceIndex = offsetAttr->getSpace();
-                auto registerIndex = offsetAttr->getOffset();
-                auto size = sizeAttr->getSize();
-                auto count = size.isFinite() ? size.getFiniteValue() : 0;
-                _insertBinding(outMetadata.m_usedBindings, kind, spaceIndex, registerIndex, count);
-            }
-        }
+        collectMetadataFromInst(param, outMetadata);
     }
 }
 

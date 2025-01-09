@@ -26,12 +26,13 @@ SLANG_UNIT_TEST(attributeReflection)
         public struct NormalTextureAttribute
         {
             public E Type;
+            public float x;
         };
 
         [COM("042BE50B-CB01-4DBB-8367-3A9CDCBE2F49")]
         interface IInterface { void f(); }
 
-        [NormalTexture(E.V1)]
+        [NormalTexture(E.V1, 6)]
         struct TS {};
         )";
     String userSource = userSourceBody;
@@ -76,4 +77,8 @@ SLANG_UNIT_TEST(attributeReflection)
     int value = 0;
     normalTextureAttribute->getArgumentValueInt(0, &value);
     SLANG_CHECK(value == 1);
+
+    float fvalue = 0;
+    normalTextureAttribute->getArgumentValueFloat(1, &fvalue);
+    SLANG_CHECK(fvalue == 6.0);
 }

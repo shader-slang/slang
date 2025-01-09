@@ -2335,6 +2335,7 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
         case TokenType::Dot:
         case TokenType::LParent:
         case TokenType::RParent:
+        case TokenType::LBracket:
         case TokenType::RBracket:
         case TokenType::Colon:
         case TokenType::Comma:
@@ -3356,6 +3357,16 @@ static Decl* ParseBufferBlockDecl(
     {
         // If the user specified an explicit name of the buffer var, use it.
         bufferVarDecl->nameAndLoc = ParseDeclName(parser);
+        reflectionNameModifier->nameAndLoc = bufferVarDecl->nameAndLoc;
+        parser->ReadToken(TokenType::Semicolon);
+    }
+    else if (
+        parser->options.allowGLSLInput && parser->LookAheadToken(TokenType::Identifier) &&
+        parser->LookAheadToken(TokenType::LBracket, 1))
+    {
+        // GLSL bindless buffers are denoted with [] after the name.
+        bufferVarDecl->nameAndLoc = ParseDeclName(parser);
+        bufferVarDecl->type.exp = parseBracketTypeSuffix(parser, bufferVarDecl->type.exp);
         reflectionNameModifier->nameAndLoc = bufferVarDecl->nameAndLoc;
         parser->ReadToken(TokenType::Semicolon);
     }
@@ -4634,14 +4645,6 @@ static void CompleteDecl(
     ContainerDecl* containerDecl,
     Modifiers modifiers)
 {
-
-    // If this is a namespace and already added, we don't want to add to the parent
-    // Or add any modifiers
-    if (as<NamespaceDecl>(decl) && decl->parentDecl)
-    {
-        return;
-    }
-
     // Add any modifiers we parsed before the declaration to the list
     // of modifiers on the declaration itself.
     //
@@ -4697,6 +4700,13 @@ static void CompleteDecl(
                         declToModify->astNodeType);
                 }
             }
+        }
+
+        // If this is a namespace and already added, we don't want to add to the parent
+        // Or add any modifiers
+        if (as<NamespaceDecl>(decl) && decl->parentDecl)
+        {
+            return;
         }
 
         if (!as<GenericDecl>(containerDecl))
@@ -7521,12 +7531,6 @@ static IRFloatingPointValue _foldFloatPrefixOp(TokenType tokenType, IRFloatingPo
 
 static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
 {
-    const auto slangIdentOperand = [&](auto flavor)
-    {
-        auto token = parser->tokenReader.peekToken();
-        return SPIRVAsmOperand{flavor, token, parseAtomicExpr(parser)};
-    };
-
     const auto slangTypeExprOperand = [&](auto flavor)
     {
         auto tok = parser->tokenReader.peekToken();
@@ -7663,12 +7667,13 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
     // A &foo variable reference (for the address of foo)
     else if (AdvanceIf(parser, TokenType::OpBitAnd))
     {
-        return slangIdentOperand(SPIRVAsmOperand::SlangValueAddr);
+        Expr* expr = parsePostfixExpr(parser);
+        return SPIRVAsmOperand{SPIRVAsmOperand::SlangValueAddr, Token{}, expr};
     }
     // A $foo variable
     else if (AdvanceIf(parser, TokenType::Dollar))
     {
-        Expr* expr = parseAtomicExpr(parser);
+        Expr* expr = parsePostfixExpr(parser);
         return SPIRVAsmOperand{SPIRVAsmOperand::SlangValue, Token{}, expr};
     }
     // A $$foo type
@@ -8325,6 +8330,26 @@ static NodeBase* parseCUDASMVersionModifier(Parser* parser, void* /*userData*/)
     parser->sink->diagnose(token, Diagnostics::invalidCUDASMVersion);
     return nullptr;
 }
+
+static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
+{
+    Modifier* modifier = nullptr;
+
+    // While in GLSL compatibility mode, 'shared' = 'groupshared' and not the
+    // D3D11 effect syntax.
+    if (parser->options.allowGLSLInput)
+    {
+        modifier = parser->astBuilder->create<HLSLGroupSharedModifier>();
+    }
+    else
+    {
+        modifier = parser->astBuilder->create<HLSLEffectSharedModifier>();
+    }
+    modifier->keywordName = getName(parser, "shared");
+    modifier->loc = parser->tokenReader.peekLoc();
+    return modifier;
+}
+
 static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
 {
     ModifierListBuilder listBuilder;
@@ -8752,7 +8777,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("sample", HLSLSampleModifier::kReflectClassInfo),
     _makeParseModifier("centroid", HLSLCentroidModifier::kReflectClassInfo),
     _makeParseModifier("precise", PreciseModifier::kReflectClassInfo),
-    _makeParseModifier("shared", HLSLEffectSharedModifier::kReflectClassInfo),
+    _makeParseModifier("shared", parseSharedModifier),
     _makeParseModifier("groupshared", HLSLGroupSharedModifier::kReflectClassInfo),
     _makeParseModifier("static", HLSLStaticModifier::kReflectClassInfo),
     _makeParseModifier("uniform", HLSLUniformModifier::kReflectClassInfo),

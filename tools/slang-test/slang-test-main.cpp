@@ -47,6 +47,20 @@
 
 using namespace Slang;
 
+#if defined(_WIN32)
+// https://devblogs.microsoft.com/directx/gettingstarted-dx12agility/#2.-set-agility-sdk-parameters
+
+extern "C"
+{
+    __declspec(dllexport) extern const uint32_t D3D12SDKVersion = 711;
+}
+
+extern "C"
+{
+    __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\";
+}
+#endif
+
 // Options for a particular test
 struct TestOptions
 {
@@ -4427,10 +4441,10 @@ void runTestsInParallel(TestContext* context, int count, const F& f)
     context->setTestReporter(originalReporter);
 }
 
-void runTestsInDirectory(TestContext* context, String directoryPath)
+void runTestsInDirectory(TestContext* context)
 {
     List<String> files;
-    getFilesInDirectory(directoryPath, files);
+    getFilesInDirectory(context->options.testDir, files);
     auto processFile = [&](String file)
     {
         if (shouldRunTest(context, file))
@@ -4865,9 +4879,7 @@ SlangResult innerMain(int argc, char** argv)
         {
             TestReporter::SuiteScope suiteScope(&reporter, "tests");
             // Enumerate test files according to policy
-            // TODO: add more directories to this list
-            // TODO: allow for a command-line argument to select a particular directory
-            runTestsInDirectory(&context, "tests/");
+            runTestsInDirectory(&context);
         }
 
         // Run the unit tests (these are internal C++ tests - not specified via files in a

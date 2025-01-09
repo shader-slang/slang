@@ -660,6 +660,18 @@ struct LegalizeMetalEntryPointContext
 
                 break;
             }
+        case SystemValueSemanticName::StartVertexLocation:
+            {
+                result.metalSystemValueName = toSlice("base_vertex");
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
+                break;
+            }
+        case SystemValueSemanticName::StartInstanceLocation:
+            {
+                result.metalSystemValueName = toSlice("base_instance");
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
+                break;
+            }
         default:
             m_sink->diagnose(
                 parentVar,
@@ -1912,6 +1924,7 @@ struct LegalizeMetalEntryPointContext
     void legalizeEntryPointForMetal(EntryPointInfo entryPoint)
     {
         // Input Parameter Legalize
+        depointerizeInputParams(entryPoint.entryPointFunc);
         hoistEntryPointParameterFromStruct(entryPoint);
         packStageInParameters(entryPoint);
         flattenInputParameters(entryPoint);

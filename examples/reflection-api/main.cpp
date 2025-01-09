@@ -7,9 +7,8 @@
 // This example uses the Slang reflection API to travserse the structure
 // of the parameters of a Slang program and their types.
 //
-// This program is a companion to a document on the Slang reflection API.
-// Once that document is published, this paragraph will be updated to
-// properly link to that document.
+// This program is a companion Slang reflection API documentation:
+// https://shader-slang.org/slang/user-guide/compiling.html
 //
 // Boilerplate
 // -----------
@@ -1470,7 +1469,7 @@ struct ExampleProgram : public TestBase
     }
 };
 
-int main(int argc, char* argv[])
+int exampleMain(int argc, char** argv)
 {
     ExampleProgram app;
     if (SLANG_FAILED(app.execute(argc, argv)))

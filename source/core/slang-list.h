@@ -537,7 +537,7 @@ public:
         }
     }
 
-    inline void swapElements(T* vals, Index index1, Index index2)
+    inline static void swapElements(T* vals, Index index1, Index index2)
     {
         if (index1 != index2)
         {
@@ -546,6 +546,8 @@ public:
             vals[index2] = static_cast<T&&>(tmp);
         }
     }
+
+    inline void swapElements(Index index1, Index index2) { swapElements(m_buffer, index1, index2); }
 
     template<typename T2, typename Comparer>
     Index binarySearch(const T2& obj, Comparer comparer) const

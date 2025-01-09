@@ -274,6 +274,11 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
     case kIROp_UIntPtrType:
         return UnownedStringSlice("uintptr_t");
 
+    case kIROp_Int8x4PackedType:
+        return UnownedStringSlice("int8_t4_packed");
+    case kIROp_UInt8x4PackedType:
+        return UnownedStringSlice("uint8_t4_packed");
+
     case kIROp_HalfType:
         return UnownedStringSlice("half");
 
@@ -697,6 +702,34 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo
     else if (
         prec.rightPrecedence == EPrecedence::kEPrecedence_BitXor_Right &&
         outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left)
+    {
+        needParens = true;
+    }
+    // a ^ b + c => a ^ (b + c)
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Additive_Left &&
+        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitXor_Right)
+    {
+        needParens = true;
+    }
+    // a + b ^ c => (a + b) ^ c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitXor_Left)
+    {
+        needParens = true;
+    }
+    // a | b + c => a | (b + c)
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Additive_Left &&
+        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitOr_Right)
+    {
+        needParens = true;
+    }
+    // a + b | c => (a + b) | c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitOr_Left)
     {
         needParens = true;
     }
@@ -1272,6 +1305,8 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         return;
                     }
                 case BaseType::UInt:
+                case BaseType::Int8x4Packed:
+                case BaseType::UInt8x4Packed:
                     {
                         m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
                         m_writer->emit("U");
@@ -1528,6 +1563,30 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     {
         if (!inst->mightHaveSideEffects())
             return true;
+    }
+
+    if (auto load = as<IRLoad>(inst))
+    {
+        // Loads from a constref global param should always be folded.
+        auto ptrType = load->getPtr()->getDataType();
+        if (load->getPtr()->getOp() == kIROp_GlobalParam)
+        {
+            if (ptrType->getOp() == kIROp_ConstRefType)
+                return true;
+            if (auto ptrTypeBase = as<IRPtrTypeBase>(ptrType))
+            {
+                auto addrSpace = ptrTypeBase->getAddressSpace();
+                switch (addrSpace)
+                {
+                case Slang::AddressSpace::Uniform:
+                case Slang::AddressSpace::Input:
+                case Slang::AddressSpace::BuiltinInput:
+                    return true;
+                default:
+                    break;
+                }
+            }
+        }
     }
 
     // Always hold if inst is a call into an [__alwaysFoldIntoUseSite] function.
@@ -3896,6 +3955,8 @@ void CLikeSourceEmitter::emitVecNOrScalar(
                 m_writer->emit("ushort");
                 break;
             case kIROp_UIntType:
+            case kIROp_Int8x4PackedType:
+            case kIROp_UInt8x4PackedType:
                 m_writer->emit("uint");
                 break;
             case kIROp_UInt64Type:
@@ -4700,9 +4761,21 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
     auto rawType = varDecl->getDataType();
 
     auto varType = rawType;
-    if (auto outType = as<IROutTypeBase>(varType))
+    if (auto ptrType = as<IRPtrTypeBase>(varType))
     {
-        varType = outType->getValueType();
+        switch (ptrType->getAddressSpace())
+        {
+        case AddressSpace::Input:
+        case AddressSpace::Output:
+        case AddressSpace::BuiltinInput:
+        case AddressSpace::BuiltinOutput:
+            varType = ptrType->getValueType();
+            break;
+        default:
+            if (as<IROutTypeBase>(ptrType))
+                varType = ptrType->getValueType();
+            break;
+        }
     }
     if (as<IRVoidType>(varType))
         return;
@@ -5137,4 +5210,15 @@ void CLikeSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
     executeEmitActions(actions);
 }
 
+void CLikeSourceEmitter::ensurePrelude(const char* preludeText)
+{
+    IRStringLit* stringLit;
+    if (!m_builtinPreludes.tryGetValue(preludeText, stringLit))
+    {
+        IRBuilder builder(m_irModule);
+        stringLit = builder.getStringValue(UnownedStringSlice(preludeText));
+        m_builtinPreludes[preludeText] = stringLit;
+    }
+    m_requiredPreludes.add(stringLit);
+}
 } // namespace Slang

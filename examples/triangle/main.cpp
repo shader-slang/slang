@@ -223,7 +223,7 @@ struct HelloWorld : public WindowedAppBase
     {
         // Create a window for our application to render into.
         //
-        initializeBase("hello-world", 1024, 768);
+        SLANG_RETURN_ON_FAIL(initializeBase("hello-world", 1024, 768));
 
         // We will create objects needed to configur the "input assembler"
         // (IA) stage of the D3D pipeline.
@@ -405,4 +405,4 @@ struct HelloWorld : public WindowedAppBase
 
 // This macro instantiates an appropriate main function to
 // run the application defined above.
-PLATFORM_UI_MAIN(innerMain<HelloWorld>)
+EXAMPLE_MAIN(innerMain<HelloWorld>);

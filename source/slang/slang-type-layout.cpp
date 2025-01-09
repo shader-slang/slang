@@ -110,6 +110,10 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
                 sizeof(intptr_t),
                 sizeof(intptr_t));
 
+        case BaseType::Int8x4Packed:
+        case BaseType::UInt8x4Packed:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
+
         case BaseType::Half:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
         case BaseType::Float:
@@ -1891,6 +1895,19 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
         SLANG_UNUSED(baseType);
         // Everything in a metal argument buffer, including basic scalar values, occupy one `[[id]]`
         // slot.
+        return SimpleLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 1);
+    }
+
+    SimpleLayoutInfo GetVectorLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t elementCount) override
+    {
+        SLANG_UNUSED(elementType);
+        SLANG_UNUSED(elementInfo);
+        SLANG_UNUSED(elementCount);
+
+        // A vector occupies one [[id]] slot in a metal argument buffer.
         return SimpleLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 1);
     }
 
@@ -4785,10 +4802,18 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             type,
             rules);
     }
+    else if (auto optionalType = as<OptionalType>(type))
+    {
+        // OptionalType should be laid out the same way as Tuple<T, bool>.
+        Array<Type*, 2> types =
+            makeArray(optionalType->getValueType(), context.astBuilder->getBoolType());
+        auto tupleType = context.astBuilder->getTupleType(types.getView());
+        return _createTypeLayout(context, tupleType);
+    }
     else if (auto tupleType = as<TupleType>(type))
     {
         // A `Tuple` type is laid out exactly the same way as a `struct` type,
-        // except that we want have a declref to the field.
+        // except that we won't have a declref to the field.
 
         StructTypeLayoutBuilder typeLayoutBuilder;
         StructTypeLayoutBuilder pendingDataTypeLayoutBuilder;

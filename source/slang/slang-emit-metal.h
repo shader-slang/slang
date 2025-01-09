@@ -22,12 +22,8 @@ public:
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }
 
-    Dictionary<const char*, IRStringLit*> m_builtinPreludes;
-
 protected:
     RefPtr<MetalExtensionTracker> m_extensionTracker;
-
-    void ensurePrelude(const char* preludeText);
 
     void emitMemoryOrderOperand(IRInst* inst);
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)

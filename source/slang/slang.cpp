@@ -81,6 +81,8 @@ namespace Slang
      BaseTypeInfo::Flag::Signed | BaseTypeInfo::Flag::Integer,
      uint8_t(BaseType::IntPtr)},
     {uint8_t(sizeof(uintptr_t)), BaseTypeInfo::Flag::Integer, uint8_t(BaseType::UIntPtr)},
+    {uint8_t(sizeof(uint32_t)), BaseTypeInfo::Flag::Integer, uint8_t(BaseType::Int8x4Packed)},
+    {uint8_t(sizeof(uint32_t)), BaseTypeInfo::Flag::Integer, uint8_t(BaseType::UInt8x4Packed)},
 };
 
 /* static */ bool BaseTypeInfo::check()
@@ -132,6 +134,10 @@ namespace Slang
         return UnownedStringSlice::fromLiteral("intptr_t");
     case BaseType::UIntPtr:
         return UnownedStringSlice::fromLiteral("uintptr_t");
+    case BaseType::Int8x4Packed:
+        return UnownedStringSlice::fromLiteral("int8_t4_packed");
+    case BaseType::UInt8x4Packed:
+        return UnownedStringSlice::fromLiteral("uint8_t4_packed");
     default:
         {
             SLANG_ASSERT(!"Unknown basic type");
@@ -602,7 +608,7 @@ Session::queryInterface(SlangUUID const& uuid, void** outObject)
         return SLANG_OK;
     }
 
-    if (uuid == ISlangUnknown::getTypeGuid() && uuid == IGlobalSession::getTypeGuid())
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == IGlobalSession::getTypeGuid())
     {
         addReference();
         *outObject = static_cast<slang::IGlobalSession*>(this);
@@ -4592,7 +4598,7 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
     if (_canExportDeclSymbol(decl->astNodeType))
     {
         // It's a reference to a declaration in another module, so first get the symbol name.
-        String mangledName = getMangledName(getASTBuilder(), decl);
+        String mangledName = getMangledName(getCurrentASTBuilder(), decl);
 
         Index index = Index(m_mangledExportPool.add(mangledName));
 
@@ -5171,22 +5177,24 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
                 entryPointsDiscovered = true;
             }
         }
-        // If no entry points were discovered, then we should return nullptr.
-        if (!entryPointsDiscovered)
-        {
-            return nullptr;
-        }
 
-        RefPtr<CompositeComponentType> composite = new CompositeComponentType(linkage, components);
-        ComPtr<IComponentType> linkedComponentType;
-        SLANG_RETURN_NULL_ON_FAIL(composite->link(linkedComponentType.writeRef(), outDiagnostics));
-        auto targetArtifact = static_cast<ComponentType*>(linkedComponentType.get())
-                                  ->getTargetArtifact(targetIndex, outDiagnostics);
-        if (targetArtifact)
+        // If any entry points were discovered, then we should emit the program with entrypoints
+        // linked.
+        if (entryPointsDiscovered)
         {
-            m_targetArtifacts[targetIndex] = targetArtifact;
+            RefPtr<CompositeComponentType> composite =
+                new CompositeComponentType(linkage, components);
+            ComPtr<IComponentType> linkedComponentType;
+            SLANG_RETURN_NULL_ON_FAIL(
+                composite->link(linkedComponentType.writeRef(), outDiagnostics));
+            auto targetArtifact = static_cast<ComponentType*>(linkedComponentType.get())
+                                      ->getTargetArtifact(targetIndex, outDiagnostics);
+            if (targetArtifact)
+            {
+                m_targetArtifacts[targetIndex] = targetArtifact;
+            }
+            return targetArtifact;
         }
-        return targetArtifact;
     }
 
     auto target = linkage->targets[targetIndex];
