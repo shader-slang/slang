@@ -105,6 +105,25 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 #endif
 
     /*
+        float Object.SampleCmpLevel().
+        These require SM 6.7 for dx12 but functional compute tests currently do not run with the cs_6_7,
+        hence only enable these for vk.
+    */
+#if defined(VK)
+    float level = 1.0;
+    val += t1D.SampleCmpLevel(shadowSampler, u, 0, level);
+    val += t2D.SampleCmpLevel(shadowSampler, float2(u, u), 0, level);
+    val += t1DArray.SampleCmpLevel(shadowSampler, float2(u, u), 0, level);
+    val += tCube.SampleCmpLevel(shadowSampler, normalize(float3(u, 1 - u, u)), 0, level);
+    val += t2DArray.SampleCmpLevel(shadowSampler, normalize(float3(u, 1 - u, u)), 0, level);
+    val += tCubeArray.SampleCmpLevel(shadowSampler, normalize(float4(u, 1-u, u, u)), 0, level);
+
+    // Offset variant
+    val += t1D.SampleCmpLevel(shadowSampler, u, 0, level, 0);
+    val += t2D.SampleCmpLevel(shadowSampler, float2(u, u), 0, level, int2(0, 0));
+#endif
+
+    /*
         void Object.GetDimensions()
     */
     t1D.GetDimensions(width);
@@ -353,7 +372,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 // DX12CS6: 377
 // DX12CS6: 377
 // DX12CS6: 377
-// VK: 351
-// VK: 351
-// VK: 351
-// VK: 351
+// VK: 359
+// VK: 359
+// VK: 359
+// VK: 359

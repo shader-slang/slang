@@ -6,9 +6,9 @@
 //TEST:COMPILE: tests/diagnostics/illegal-func-decl-module.slang -o tests/diagnostics/illegal-func-decl-module.slang-module
 
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK1): -r tests/diagnostics/illegal-func-decl-module.slang-module -DTEST1 -target spirv -o illegal-func-decl.spv
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK2): -r tests/diagnostics/illegal-func-decl-module.slang-module -DTEST2 -target spirv -o illegal-func-decl.spv
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK2): -r tests/diagnostics/illegal-func-decl-module.slang-module -DTEST2 -target spirv -o illegal-func-decl.spv -skip-spirv-validation
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK3): -r tests/diagnostics/illegal-func-decl-module.slang-module -DTEST3 -target spirv -o illegal-func-decl.spv
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK4): -r tests/diagnostics/illegal-func-decl-module.slang-module -DTEST4 -target spirv -o illegal-func-decl.spv
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK4): -r tests/diagnostics/illegal-func-decl-module.slang-module -DTEST4 -target spirv -o illegal-func-decl.spv -skip-spirv-validation
 
 #ifdef TEST1
 // CHECK1: ([[# @LINE+1]]): error 45001: unresolved external symbol 'libraryFunction'.

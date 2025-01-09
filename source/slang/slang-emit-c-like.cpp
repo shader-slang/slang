@@ -705,6 +705,34 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo
     {
         needParens = true;
     }
+    // a ^ b + c => a ^ (b + c)
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Additive_Left &&
+        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitXor_Right)
+    {
+        needParens = true;
+    }
+    // a + b ^ c => (a + b) ^ c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitXor_Left)
+    {
+        needParens = true;
+    }
+    // a | b + c => a | (b + c)
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Additive_Left &&
+        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitOr_Right)
+    {
+        needParens = true;
+    }
+    // a + b | c => (a + b) | c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitOr_Left)
+    {
+        needParens = true;
+    }
 
     if (needParens)
     {
@@ -1535,6 +1563,30 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     {
         if (!inst->mightHaveSideEffects())
             return true;
+    }
+
+    if (auto load = as<IRLoad>(inst))
+    {
+        // Loads from a constref global param should always be folded.
+        auto ptrType = load->getPtr()->getDataType();
+        if (load->getPtr()->getOp() == kIROp_GlobalParam)
+        {
+            if (ptrType->getOp() == kIROp_ConstRefType)
+                return true;
+            if (auto ptrTypeBase = as<IRPtrTypeBase>(ptrType))
+            {
+                auto addrSpace = ptrTypeBase->getAddressSpace();
+                switch (addrSpace)
+                {
+                case Slang::AddressSpace::Uniform:
+                case Slang::AddressSpace::Input:
+                case Slang::AddressSpace::BuiltinInput:
+                    return true;
+                default:
+                    break;
+                }
+            }
+        }
     }
 
     // Always hold if inst is a call into an [__alwaysFoldIntoUseSite] function.
@@ -4709,9 +4761,21 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
     auto rawType = varDecl->getDataType();
 
     auto varType = rawType;
-    if (auto outType = as<IROutTypeBase>(varType))
+    if (auto ptrType = as<IRPtrTypeBase>(varType))
     {
-        varType = outType->getValueType();
+        switch (ptrType->getAddressSpace())
+        {
+        case AddressSpace::Input:
+        case AddressSpace::Output:
+        case AddressSpace::BuiltinInput:
+        case AddressSpace::BuiltinOutput:
+            varType = ptrType->getValueType();
+            break;
+        default:
+            if (as<IROutTypeBase>(ptrType))
+                varType = ptrType->getValueType();
+            break;
+        }
     }
     if (as<IRVoidType>(varType))
         return;

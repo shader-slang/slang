@@ -35,6 +35,11 @@ public struct GlossyMaterial : IMaterial
         float3 albedo = getAlbedo(baseColor);
         GlossyMaterialInstance mi = { baseColor };
         for (uint i = 0; i < 3; i++) miData.data[i] = albedo[i];
+
+        // unused
+        miData.data[3] = 0.f;
+        miData.data[4] = 0.f;
+        
         return mi;
     }
 };
