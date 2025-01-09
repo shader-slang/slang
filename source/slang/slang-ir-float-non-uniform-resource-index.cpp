@@ -179,7 +179,9 @@ void processNonUniformResourceIndex(
             {
                 // If the inst is a load, then the addr inst itself should also be decorated
                 // with the [NonUniformResource] decoration.
-                builder.addSPIRVNonUniformResourceDecoration(operand->getOperand(0));
+                auto addr = operand->getOperand(0);
+                if (!addr->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+                    builder.addSPIRVNonUniformResourceDecoration(addr);
             }
         }
         inst->replaceUsesWith(operand);
@@ -209,7 +211,8 @@ void floatNonUniformResourceIndex(IRModule* module, NonUniformResourceIndexFloat
         }
         for (auto inst : workList)
         {
-            processNonUniformResourceIndex(inst, floatMode);
+            if (inst->getParent() != nullptr)
+                processNonUniformResourceIndex(inst, floatMode);
         }
     }
 }
