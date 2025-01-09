@@ -228,8 +228,6 @@ void lowerGenerics(TargetProgram* targetProgram, IRModule* module, DiagnosticSin
 
     checkTypeConformanceExists(&sharedContext);
 
-    inferAnyValueSizeWhereNecessary(targetProgram, module);
-
     // Replace all `makeExistential` insts with `makeExistentialWithRTTI`
     // before making any other changes. This is necessary because a parameter of
     // generic type will be lowered into `AnyValueType`, and after that we can no longer
