@@ -785,6 +785,16 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
+    // Assume string literals are convertible to any string type.
+    if (as<StringLiteralExpr>(fromExpr) && as<StringTypeBase>(toType))
+    {
+        if (outToExpr)
+            *outToExpr = fromExpr;
+        if (outCost)
+            *outCost = kConversionCost_None;
+        return true;
+    }
+
     // Allow implicit conversion from sized array to unsized array when
     // calling a function.
     // Note: we implement the logic here instead of an implicit_conversion
