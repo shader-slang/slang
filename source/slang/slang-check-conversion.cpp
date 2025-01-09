@@ -103,8 +103,7 @@ bool SemanticsVisitor::_readValueFromInitializerList(
     Type* toType,
     Expr** outToExpr,
     InitializerListExpr* fromInitializerListExpr,
-    UInt& ioInitArgIndex,
-    bool useLegacyMode)
+    UInt& ioInitArgIndex)
 {
     // First, we will check if we have run out of arguments
     // on the initializer list.
@@ -161,8 +160,7 @@ bool SemanticsVisitor::_readValueFromInitializerList(
         toType,
         outToExpr,
         fromInitializerListExpr,
-        ioInitArgIndex,
-        useLegacyMode);
+        ioInitArgIndex);
 }
 
 DeclRefType* findBaseStructType(ASTBuilder* astBuilder, DeclRef<StructDecl> structTypeDeclRef)
@@ -293,36 +291,28 @@ bool SemanticsVisitor::_invokeExprForExplicitCtor(
 
 bool SemanticsVisitor::_invokeExprForSynthesizedCtor(
     Type* toType,
-    StructDecl* structDecl,
     InitializerListExpr* fromInitializerListExpr,
-    UInt& ioArgIndex,
     Expr** outExpr)
 {
+    StructDecl* structDecl = nullptr;
+    if (auto toDeclRefType = as<DeclRefType>(toType))
+    {
+        auto toTypeDeclRef = toDeclRefType->getDeclRef();
+        if (auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
+        {
+            structDecl = toStructDeclRef.getDecl();
+        }
+    }
+
+    if (!structDecl || isFromCoreModule(structDecl))
+        return true;
+
     auto synthesizedConstructor = _getSynthesizedConstructor(structDecl);
     SLANG_ASSERT(synthesizedConstructor);
 
     List<Expr*> coercedArgs;
-
-    for (auto param : getParameters(getASTBuilder(), synthesizedConstructor))
-    {
-        Expr* coercedArg = nullptr;
-        bool argResult = _readValueFromInitializerList(
-            getType(m_astBuilder, param),
-            &coercedArg,
-            fromInitializerListExpr,
-            ioArgIndex);
-
-        // No point in trying further if any argument fails
-        if (!argResult)
-            return false;
-
-        if (coercedArg)
-        {
-            coercedArgs.add(coercedArg);
-        }
-    }
-
-    auto ctorInvokeExpr = _prepareCtorInvokeExpr(toType, fromInitializerListExpr->loc, coercedArgs);
+    auto ctorInvokeExpr =
+        _prepareCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);
     if (ctorInvokeExpr)
     {
         // The reason we need to check the coercion again is that the ResolveInvoke() could still
@@ -343,11 +333,6 @@ bool SemanticsVisitor::_invokeExprForSynthesizedCtor(
             // TODO:
             // 1. Create a more explainable error message.
             // 2. We should not diagnose here, because we will need a fall back mechanism.
-            getSink()->diagnose(
-                fromInitializerListExpr->loc,
-                Diagnostics::typeMismatch,
-                toType,
-                ctorInvokeExpr->type);
             return false;
         }
         else
@@ -364,8 +349,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
     Type* inToType,
     Expr** outToExpr,
     InitializerListExpr* fromInitializerListExpr,
-    UInt& ioArgIndex,
-    bool useLegacyMode)
+    UInt& ioArgIndex)
 {
     auto toType = inToType;
     UInt argCount = fromInitializerListExpr->args.getCount();
@@ -633,72 +617,53 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         auto toTypeDeclRef = toDeclRefType->getDeclRef();
         if (auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
         {
-            // TODO: create a function '_createCtorInvokeExpr()'
-            // We must have a synthesized constructor here there are only two cases that we don't
-            // synthesized constructor:
-            // 1. It is a stdlib struct.
-            // 2. It is a struct that has user defined constructor. (In this case, we should have
-            // already handled it in _coerceInitializerList)
-            if (!isFromCoreModule(toStructDeclRef.getDecl()) && !useLegacyMode)
+            // Trying to initialize a `struct` type given an initializer list.
+            //
+            // Before we iterate over the fields, we want to check if this struct
+            // inherits from another `struct` type. If so, we want to read
+            // an initializer for that base type first.
+            //
+            if (auto baseStructType = findBaseStructType(m_astBuilder, toStructDeclRef))
             {
-                return _invokeExprForSynthesizedCtor(
-                    inToType,
-                    toStructDeclRef.getDecl(),
+                Expr* coercedArg = nullptr;
+                bool argResult = _readValueFromInitializerList(
+                    baseStructType,
+                    outToExpr ? &coercedArg : nullptr,
                     fromInitializerListExpr,
-                    ioArgIndex,
-                    outToExpr);
-            }
-            else
-            {
-                // Trying to initialize a `struct` type given an initializer list.
-                //
-                // Before we iterate over the fields, we want to check if this struct
-                // inherits from another `struct` type. If so, we want to read
-                // an initializer for that base type first.
-                //
-                if (auto baseStructType = findBaseStructType(m_astBuilder, toStructDeclRef))
+                    ioArgIndex);
+
+                // No point in trying further if any argument fails
+                if (!argResult)
+                    return false;
+
+                if (coercedArg)
                 {
-                    Expr* coercedArg = nullptr;
-                    bool argResult = _readValueFromInitializerList(
-                        baseStructType,
-                        outToExpr ? &coercedArg : nullptr,
-                        fromInitializerListExpr,
-                        ioArgIndex);
-
-                    // No point in trying further if any argument fails
-                    if (!argResult)
-                        return false;
-
-                    if (coercedArg)
-                    {
-                        coercedArgs.add(coercedArg);
-                    }
+                    coercedArgs.add(coercedArg);
                 }
+            }
 
-                // We will go through the fields in order and try to match them
-                // up with initializer arguments.
-                //
-                for (auto fieldDeclRef : getMembersOfType<VarDecl>(
-                         m_astBuilder,
-                         toStructDeclRef,
-                         MemberFilterStyle::Instance))
+            // We will go through the fields in order and try to match them
+            // up with initializer arguments.
+            //
+            for (auto fieldDeclRef : getMembersOfType<VarDecl>(
+                     m_astBuilder,
+                     toStructDeclRef,
+                     MemberFilterStyle::Instance))
+            {
+                Expr* coercedArg = nullptr;
+                bool argResult = _readValueFromInitializerList(
+                    getType(m_astBuilder, fieldDeclRef),
+                    outToExpr ? &coercedArg : nullptr,
+                    fromInitializerListExpr,
+                    ioArgIndex);
+
+                // No point in trying further if any argument fails
+                if (!argResult)
+                    return false;
+
+                if (coercedArg)
                 {
-                    Expr* coercedArg = nullptr;
-                    bool argResult = _readValueFromInitializerList(
-                        getType(m_astBuilder, fieldDeclRef),
-                        outToExpr ? &coercedArg : nullptr,
-                        fromInitializerListExpr,
-                        ioArgIndex,
-                        true);
-
-                    // No point in trying further if any argument fails
-                    if (!argResult)
-                        return false;
-
-                    if (coercedArg)
-                    {
-                        coercedArgs.add(coercedArg);
-                    }
+                    coercedArgs.add(coercedArg);
                 }
             }
         }
@@ -783,6 +748,16 @@ bool SemanticsVisitor::_coerceInitializerList(
         return true;
     }
 
+    // try to invoke the synthesized constructor if it exists
+    if (!_invokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
+    {
+        // TODO: check if it's C-style initializer list
+        // if it's not, return error.
+        // if it is, return, fall-back to legacy logic
+        getSink()->diagnoseRaw(Severity::Error, "Synthesized Constructor is not found\n");
+        return false;
+    }
+
     // We will fall back to the legacy logic of initialize list.
     if (!_readAggregateValueFromInitializerList(
             toType,
@@ -790,14 +765,7 @@ bool SemanticsVisitor::_coerceInitializerList(
             fromInitializerListExpr,
             argIndex))
     {
-        bool useLegacyMode = true;
-        if (!_readAggregateValueFromInitializerList(
-                toType,
-                outToExpr,
-                fromInitializerListExpr,
-                argIndex,
-                useLegacyMode))
-            return false;
+        return false;
     }
 
     if (argIndex != argCount)
