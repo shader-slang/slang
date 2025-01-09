@@ -626,9 +626,9 @@ export getDescriptorFromHandle<T>(DescriptorHandle<T> handle) where T : IOpaqueD
     {
     case spirv:
         if (T.kind == ResourceKind.Sampler)
-            return samplerHandles[((uint2)handle).x].asOpaqueHandle<T>();
+            return samplerHandles[((uint2)handle).x].asOpaqueDescriptor<T>();
         else
-            return resourceHandles[((uint2)handle).x].asOpaqueHandle<T>();
+            return resourceHandles[((uint2)handle).x].asOpaqueDescriptor<T>();
     default:
         return defaultGetDescriptorFromHandle(handle);
     }

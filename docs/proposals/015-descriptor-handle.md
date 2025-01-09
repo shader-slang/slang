@@ -7,9 +7,9 @@ Author: Yong He
 
 Status: In Experiment.
 
-Implementation: 
+Implementation: [PR 6028](https://github.com/shader-slang/slang/pull/6028)
 
-Reviewed by: Theresa Foley
+Reviewed by: Theresa Foley, Jay Kwak
 
 ## Background
 
@@ -101,7 +101,7 @@ On targets where descriptor handles are already concrete and sized types, `Descr
 
 This means that on all targets where `DescriptorHandle<T>` is supported, you can use a `DescriptorHandle<T>` type in any context where an ordinary data type, e.g. `int` type is allowed, such as in buffer elements.
 
-### Obtaining Actual Descriptor Handle from `DescriptorHandle<T>`
+### Obtaining Descriptor from `DescriptorHandle<T>`
 
 Depending on the target platform and the design choices of the user's application, the way to obtain the actual
 descriptor handle from a `DescriptorHandle<T>` integer handle can vary. Slang does not dictate how this conversion is done,
@@ -142,12 +142,12 @@ __DynamicResource<__DynamicResourceKind.General> resourceHandles[];
 [vk::binding(0, 101)]
 __DynamicResource<__DynamicResourceKind.Sampler> samplerHandles[];
 
-export getDescriptorFromHandle<T>(DescriptorHandle<T> handle) where T : IOpaqueDescriptor
+export T getDescriptorFromHandle<T>(DescriptorHandle<T> handle) where T : IOpaqueDescriptor
 {
     if (T.kind == ResourceKind.Sampler)
-        return samplerHandles[((uint2)handle).x].asOpaqueHandle<T>();
+        return samplerHandles[((uint2)handle).x].asOpaqueDescriptor<T>();
     else
-        return resourceHandles[((uint2)handle).x].asOpaqueHandle<T>();
+        return resourceHandles[((uint2)handle).x].asOpaqueDescriptor<T>();
 }
 ```
 

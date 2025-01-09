@@ -17,7 +17,7 @@ export T getDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
     {
     case spirv:
         if (T.kind != DescriptorKind.Buffer)
-            return resourceHeap[((uint2)handleValue).x].asOpaqueHandle<T>();
+            return resourceHeap[((uint2)handleValue).x].asOpaqueDescriptor<T>();
         else
             return defaultGetDescriptorFromHandle(handleValue);
     default:
