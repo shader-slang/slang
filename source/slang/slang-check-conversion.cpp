@@ -205,22 +205,6 @@ DeclRef<StructDecl> findBaseStructDeclRef(
     return baseStructDeclRef;
 }
 
-bool SemanticsVisitor::_hasExplicitConstructor(StructDecl* structDecl)
-{
-    bool result = false;
-    for (auto ctor :
-         getMembersOfType<ConstructorDecl>(getASTBuilder(), structDecl, MemberFilterStyle::All))
-    {
-        // constructor that is not synthesized must be user defined.
-        if (ctor.getDecl()->findModifier<SynthesizedModifier>() == nullptr)
-        {
-            result = true;
-            break;
-        }
-    }
-    return result;
-}
-
 // TODO: We might need to find a good way to get the synthesized constructor instead of traversing
 // all of constructors.
 ConstructorDecl* SemanticsVisitor::_getSynthesizedConstructor(StructDecl* structDecl)
@@ -237,6 +221,112 @@ ConstructorDecl* SemanticsVisitor::_getSynthesizedConstructor(StructDecl* struct
     return nullptr;
 }
 
+static StructDecl* _getStructDecl(Type* type)
+{
+    if (as<VectorExpressionType>(type) || as<MatrixExpressionType>(type) ||
+        as<ArithmeticExpressionType>(type) || as<BuiltinType>(type))
+    {
+        return nullptr;
+    }
+
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        auto structDecl = as<StructDecl>(declRefType->getDeclRef());
+        return structDecl.getDecl();
+    }
+
+    return nullptr;
+}
+
+bool SemanticsVisitor::_cStyleStructBasicCheck(Decl* decl)
+{
+    // 1. It has to be a user-defined struct type, or a basic scalar, vector or matrix type
+    if (isFromCoreModule(decl))
+        return false;
+
+    if (auto varDecl = as<VarDecl>(decl))
+    {
+        auto type = varDecl->getType();
+        if (as<VectorExpressionType>(type) || as<MatrixExpressionType>(type) ||
+            as<BasicExpressionType>(type))
+            return true;
+        else
+            return false;
+    }
+
+    auto structDecl = as<StructDecl>(decl);
+    if (!structDecl)
+        return false;
+
+    // 2. It cannot have inheritance
+    if (structDecl->getMembersOfType<InheritanceDecl>().getCount() > 0)
+        return false;
+
+    // 3. It cannot have explicit constructor
+    if (_hasExplicitConstructor(structDecl))
+        return false;
+
+    // 4. All of its members have to have the same visibility as the struct itself.
+    DeclVisibility structVisibility = getDeclVisibility(structDecl);
+    for (auto varDeclRef :
+         getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance))
+    {
+        auto varDecl = varDeclRef.getDecl();
+        if (getDeclVisibility(varDecl) != structVisibility)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+// TODO: We need to cache the result of this check, though it's not a heavy call.
+bool SemanticsVisitor::isCStyleStruct(StructDecl* structDecl)
+{
+    // rules 1-4 are checked in _cStyleStructBasicCheck for all the non-array members
+    if (!_cStyleStructBasicCheck(structDecl))
+        return false;
+
+    // 5. All its members are legacy C-Style structs or arrays of legacy C-style structs
+    for (auto varDeclRef :
+         getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance))
+    {
+        auto varDecl = varDeclRef.getDecl();
+
+        // if the member is an array, check if the element is legacy C-style rule.
+        if (auto arrayType = as<ArrayExpressionType>(varDecl->getType()))
+        {
+            auto* elementType = arrayType->getElementType();
+            ArrayExpressionType* nextType = nullptr;
+            while (nextType = as<ArrayExpressionType>(elementType))
+            {
+                elementType = nextType->getElementType();
+            }
+            if (auto structDecl = _getStructDecl(elementType))
+            {
+                if (!_cStyleStructBasicCheck(structDecl))
+                    return false;
+            }
+            else
+            {
+                // if the element is not a struct, it has to be a scalar, vector or matrix.
+                if (!as<VectorExpressionType>(elementType) &&
+                    !as<MatrixExpressionType>(elementType) && !as<BasicExpressionType>(elementType))
+                {
+                    return false;
+                }
+            }
+        }
+        else
+        {
+            // all the other members still go through the basic check.
+            if (!_cStyleStructBasicCheck(varDecl))
+                return false;
+        }
+    }
+    return true;
+}
+
 Expr* SemanticsVisitor::_prepareCtorInvokeExpr(
     Type* toType,
     const SourceLoc& loc,
@@ -250,9 +340,8 @@ Expr* SemanticsVisitor::_prepareCtorInvokeExpr(
     constructorExpr->functionExpr = varExpr;
     constructorExpr->arguments.addRange(coercedArgs);
     constructorExpr->loc = loc;
-    auto resolvedConstructorExpr = CheckExpr(constructorExpr);
 
-    return resolvedConstructorExpr;
+    return constructorExpr;
 }
 
 // translation from initializer list to constructor invocation if the struct has constructor.
@@ -278,6 +367,8 @@ bool SemanticsVisitor::_invokeExprForExplicitCtor(
                     toType,
                     fromInitializerListExpr->loc,
                     fromInitializerListExpr->args);
+
+                ctorInvokeExpr = CheckTerm(ctorInvokeExpr);
                 if (outExpr && ctorInvokeExpr)
                 {
                     *outExpr = ctorInvokeExpr;
@@ -305,21 +396,28 @@ bool SemanticsVisitor::_invokeExprForSynthesizedCtor(
     }
 
     if (!structDecl || isFromCoreModule(structDecl))
-        return true;
+        return false;
 
+    bool isCStyle = isCStyleStruct(structDecl);
     auto synthesizedConstructor = _getSynthesizedConstructor(structDecl);
     SLANG_ASSERT(synthesizedConstructor);
 
     List<Expr*> coercedArgs;
     auto ctorInvokeExpr =
         _prepareCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);
+
+    DiagnosticSink tempSink(getSourceManager(), nullptr);
+    SemanticsVisitor subVisitor(withSink(&tempSink));
+    ctorInvokeExpr = subVisitor.CheckExpr(ctorInvokeExpr);
+
     if (ctorInvokeExpr)
     {
         // The reason we need to check the coercion again is that the ResolveInvoke() could still
-        // find us the wrong constructor when there is inheritance. e.g.: struct A { int a; };//
-        // __init(int a) will be synthesized. struct B : A { int b; };// __init(int a, int b) will
-        // be synthesized. B b = {1};   // This should report an error, but the ResolveInvoke() will
-        // find the A.__init(int a).
+        // find us the wrong constructor when there is inheritance.
+        // e.g.: struct A { int a; };     // __init(int a) will be synthesized.
+        // struct B : A { int b; };       // __init(int a, int b) will be synthesized.
+        // B b = {1};
+        // This should report an error, but the ResolveInvoke() will find A.__init(int a).
         //
         // This will not happen when both A and B have explicit constructors, because 'coerce()'
         // will be called after 'ResolveInvoke()'. However, in this initialize list to synthesized
@@ -328,18 +426,38 @@ bool SemanticsVisitor::_invokeExprForSynthesizedCtor(
         //
         // TODO: should we improve the ResolveInvoke() to handle this case? Because A.__init(int a)
         // should not be found at first place, Base class cannot construct a Derived class.
-        if (!canCoerce(toType, ctorInvokeExpr->type, ctorInvokeExpr, nullptr))
+        if (!tempSink.getErrorCount())
         {
-            // TODO:
-            // 1. Create a more explainable error message.
-            // 2. We should not diagnose here, because we will need a fall back mechanism.
-            return false;
+            if (!canCoerce(toType, ctorInvokeExpr->type, ctorInvokeExpr, nullptr))
+            {
+                // TODO:
+                // 1. Create a more explainable error message.
+                // 2. We should not diagnose here, because we will need a fall back mechanism.
+                tempSink.diagnose(
+                    fromInitializerListExpr->loc,
+                    Diagnostics::typeMismatch,
+                    toType,
+                    ctorInvokeExpr->type);
+                return false;
+            }
+            else
+            {
+                if (outExpr)
+                    *outExpr = ctorInvokeExpr;
+                return true;
+            }
         }
         else
         {
-            if (outExpr)
-                *outExpr = ctorInvokeExpr;
-            return true;
+            if (isCStyle)
+            {
+                return false;
+            }
+            Slang::ComPtr<ISlangBlob> blob;
+            tempSink.getBlobIfNeeded(blob.writeRef());
+            getSink()->diagnoseRaw(
+                Severity::Error,
+                static_cast<char const*>(blob->getBufferPointer()));
         }
     }
     return false;
@@ -749,13 +867,9 @@ bool SemanticsVisitor::_coerceInitializerList(
     }
 
     // try to invoke the synthesized constructor if it exists
-    if (!_invokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
+    if (_invokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
     {
-        // TODO: check if it's C-style initializer list
-        // if it's not, return error.
-        // if it is, return, fall-back to legacy logic
-        getSink()->diagnoseRaw(Severity::Error, "Synthesized Constructor is not found\n");
-        return false;
+        return true;
     }
 
     // We will fall back to the legacy logic of initialize list.
