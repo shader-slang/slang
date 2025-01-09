@@ -2787,6 +2787,8 @@ public:
 
     bool _hasExplicitConstructor(StructDecl* structDecl);
     ConstructorDecl* _getSynthesizedConstructor(StructDecl* structDecl);
+    bool isCStyleStruct(StructDecl* structDecl);
+    bool _cStyleStructBasicCheck(Decl* decl);
 };
 
 
