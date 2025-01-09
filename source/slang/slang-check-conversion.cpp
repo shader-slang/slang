@@ -325,7 +325,7 @@ bool SemanticsVisitor::isCStyleStruct(StructDecl* structDecl)
     return true;
 }
 
-Expr* SemanticsVisitor::_prepareCtorInvokeExpr(
+Expr* SemanticsVisitor::_createCtorInvokeExpr(
     Type* toType,
     const SourceLoc& loc,
     const List<Expr*>& coercedArgs)
@@ -361,7 +361,7 @@ bool SemanticsVisitor::_invokeExprForExplicitCtor(
 
             if (_hasExplicitConstructor(toStructDeclRef.getDecl()))
             {
-                auto ctorInvokeExpr = _prepareCtorInvokeExpr(
+                auto ctorInvokeExpr = _createCtorInvokeExpr(
                     toType,
                     fromInitializerListExpr->loc,
                     fromInitializerListExpr->args);
@@ -402,7 +402,7 @@ bool SemanticsVisitor::_invokeExprForSynthesizedCtor(
 
     List<Expr*> coercedArgs;
     auto ctorInvokeExpr =
-        _prepareCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);
+        _createCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);
 
     DiagnosticSink tempSink(getSourceManager(), nullptr);
     SemanticsVisitor subVisitor(withSink(&tempSink));
