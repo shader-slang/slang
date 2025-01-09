@@ -2780,10 +2780,7 @@ public:
         InitializerListExpr* fromInitializerListExpr,
         Expr** outExpr);
 
-    Expr* _prepareCtorInvokeExpr(
-        Type* toType,
-        const SourceLoc& loc,
-        const List<Expr*>& coercedArgs);
+    Expr* _createCtorInvokeExpr(Type* toType, const SourceLoc& loc, const List<Expr*>& coercedArgs);
 
     bool _hasExplicitConstructor(StructDecl* structDecl);
     ConstructorDecl* _getSynthesizedConstructor(StructDecl* structDecl);
