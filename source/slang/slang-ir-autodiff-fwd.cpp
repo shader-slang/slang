@@ -779,7 +779,6 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
                 while (auto attrType = as<IRAttributedType>(origType))
                     origType = attrType->getBaseType();
             }
-
             if (auto pairType = tryGetDiffPairType(&argBuilder, primalType))
             {
                 auto pairPtrType = as<IRPtrTypeBase>(pairType);
@@ -1661,11 +1660,11 @@ InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFu
     IRFunc* diffFunc = nullptr;
 
     // If we're transcribing a function as a 'value' (i.e. maybe embedded in a generic, keep the
-    // insert location unchanges). If we're transcribing it as a declaration, we should
+    // insert location unchanged). If we're transcribing it as a declaration, we should
     // insert into the module.
     //
     auto origOuterGen = as<IRGeneric>(findOuterGeneric(origFunc));
-    if (!origOuterGen || !(findInnerMostGenericReturnVal(origOuterGen) == origFunc))
+    if (!origOuterGen || findInnerMostGenericReturnVal(origOuterGen) != origFunc)
     {
         // Dealing with a declaration.. insert into module scope.
         IRBuilder subBuilder = *inBuilder;

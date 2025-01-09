@@ -9247,8 +9247,6 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
             if (!decl->hasModifier<NoDiffThisAttribute>())
             {
                 // Build decl-ref-type from interface.
-                // auto interfaceType =
-                //    DeclRefType::create(getASTBuilder(), makeDeclRef(interfaceDecl));
                 auto thisType = DeclRefType::create(
                     m_astBuilder,
                     createDefaultSubstitutionsIfNeeded(
