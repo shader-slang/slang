@@ -374,9 +374,20 @@ class ConstructorDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(ConstructorDecl)
 
-    // Indicates whether the declaration was synthesized by
-    // slang and not actually provided by the user
-    bool isSynthesized = false;
+    enum class ConstructorTags : int
+    {
+        None = 0x00,
+        // Indicates whether the declaration was synthesized by
+        // Slang and not explicitly provided by the user
+        Synthesized = 0x01,
+        // Member initialize constructor is a synthesized ctor,
+        // but it takes parameters.
+        MemberInitCtor = 0x03
+    };
+
+    int m_tags = (int)ConstructorTags::None;
+    void addTag(ConstructorTags tag) { m_tags = (int)tag; }
+    bool containsTag(ConstructorTags tag) { return m_tags & (int)tag; }
 };
 
 // A subscript operation used to index instances of a type

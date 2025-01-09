@@ -207,14 +207,15 @@ DeclRef<StructDecl> findBaseStructDeclRef(
 
 // TODO: We might need to find a good way to get the synthesized constructor instead of traversing
 // all of constructors.
-ConstructorDecl* SemanticsVisitor::_getSynthesizedConstructor(StructDecl* structDecl)
+ConstructorDecl* SemanticsVisitor::_getSynthesizedConstructor(
+    StructDecl* structDecl,
+    ConstructorDecl::ConstructorTags tags)
 {
-    for (auto ctor :
-         getMembersOfType<ConstructorDecl>(getASTBuilder(), structDecl, MemberFilterStyle::All))
+    for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
     {
-        if (ctor.getDecl()->findModifier<SynthesizedModifier>() != nullptr)
+        if (ctor->containsTag(tags))
         {
-            return ctor.getDecl();
+            return ctor;
         }
     }
 
@@ -263,7 +264,7 @@ bool SemanticsVisitor::_cStyleStructBasicCheck(Decl* decl)
         return false;
 
     // 3. It cannot have explicit constructor
-    if (_hasExplicitConstructor(structDecl))
+    if (_hasExplicitConstructor(structDecl, true))
         return false;
 
     // 4. All of its members have to have the same visibility as the struct itself.
@@ -350,30 +351,26 @@ bool SemanticsVisitor::_invokeExprForExplicitCtor(
     InitializerListExpr* fromInitializerListExpr,
     Expr** outExpr)
 {
-    if (auto toDeclRefType = as<DeclRefType>(toType))
+    if (auto toStructDeclRef = isDeclRefTypeOf<StructDecl>(toType))
     {
-        auto toTypeDeclRef = toDeclRefType->getDeclRef();
-        if (auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
+        if (isFromCoreModule(toStructDeclRef.getDecl()))
         {
-            if (isFromCoreModule(toStructDeclRef.getDecl()))
-            {
-                // If the struct is from stdlib, we will not try to create a constructor.
-                return false;
-            }
+            // If the struct is from stdlib, we will not try to create a constructor.
+            return false;
+        }
 
-            if (_hasExplicitConstructor(toStructDeclRef.getDecl()))
-            {
-                auto ctorInvokeExpr = _createCtorInvokeExpr(
-                    toType,
-                    fromInitializerListExpr->loc,
-                    fromInitializerListExpr->args);
+        if (_hasExplicitConstructor(toStructDeclRef.getDecl(), false))
+        {
+            auto ctorInvokeExpr = _createCtorInvokeExpr(
+                toType,
+                fromInitializerListExpr->loc,
+                fromInitializerListExpr->args);
 
-                ctorInvokeExpr = CheckTerm(ctorInvokeExpr);
-                if (outExpr && ctorInvokeExpr)
-                {
-                    *outExpr = ctorInvokeExpr;
-                    return true;
-                }
+            ctorInvokeExpr = CheckTerm(ctorInvokeExpr);
+            if (outExpr && ctorInvokeExpr)
+            {
+                *outExpr = ctorInvokeExpr;
+                return true;
             }
         }
     }
@@ -385,22 +382,12 @@ bool SemanticsVisitor::_invokeExprForSynthesizedCtor(
     InitializerListExpr* fromInitializerListExpr,
     Expr** outExpr)
 {
-    StructDecl* structDecl = nullptr;
-    if (auto toDeclRefType = as<DeclRefType>(toType))
-    {
-        auto toTypeDeclRef = toDeclRefType->getDeclRef();
-        if (auto toStructDeclRef = toTypeDeclRef.as<StructDecl>())
-        {
-            structDecl = toStructDeclRef.getDecl();
-        }
-    }
+    StructDecl* structDecl = isDeclRefTypeOf<StructDecl>(toType).getDecl();
 
     if (!structDecl || isFromCoreModule(structDecl))
         return false;
 
     bool isCStyle = isCStyleStruct(structDecl);
-    auto synthesizedConstructor = _getSynthesizedConstructor(structDecl);
-    SLANG_ASSERT(synthesizedConstructor);
 
     List<Expr*> coercedArgs;
     auto ctorInvokeExpr =

@@ -2792,9 +2792,10 @@ public:
         Expr** outExpr);
 
     Expr* _createCtorInvokeExpr(Type* toType, const SourceLoc& loc, const List<Expr*>& coercedArgs);
-
-    bool _hasExplicitConstructor(StructDecl* structDecl);
-    ConstructorDecl* _getSynthesizedConstructor(StructDecl* structDecl);
+    bool _hasExplicitConstructor(StructDecl* structDecl, bool checkBaseType);
+    ConstructorDecl* _getSynthesizedConstructor(
+        StructDecl* structDecl,
+        ConstructorDecl::ConstructorTags tags);
     bool isCStyleStruct(StructDecl* structDecl);
     bool _cStyleStructBasicCheck(Decl* decl);
 };

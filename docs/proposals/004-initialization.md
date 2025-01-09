@@ -129,6 +129,39 @@ MyType x = MyType(y); // equivalent to `x = y`.
 
 The compiler will attempt to resolve all type casts using type coercion rules, if that failed, will fall back to resolve it as a constructor call.
 
+### Inheritance Initialization
+For derived struct, slang will synthesized the constructor by bring the parameters from the base struct's constructor if the base struct also has a synthesized constructor. For example:
+```csharp
+struct Base
+{
+  int x;
+  // compiler synthesizes:
+  // __init(int x) { ... }
+}
+struct Derived : Base
+{
+  int y;
+  // compiler synthesizes:
+  // __init(int x, int y) { ... }
+}
+```
+
+However, if the base struct has explicit ctors, the compiler will not synthesize a constructor for the derived struct.
+For example, given
+```csharp
+struct Base { int x; __init(int x) { this.x = x; } }
+struct Derived : Base { int y;}
+```
+The compiler will not synthesize a constructor for `Derived`, and the following code will fail to compile:
+```csharp
+
+Derived d = {1};            // error, no matching ctor.
+Derived d = {1, 2};         // error, no matching ctor.
+Derived d = Derived(1);     // error, no matching ctor.
+Derived d = Derived(1, 2);  // error, no matching ctor.
+```
+
+
 ### Initialization List
 
 Slang allows initialization of a variable by assigning it with an initialization list. 
