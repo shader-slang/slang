@@ -4729,7 +4729,7 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
             handleLeafCase(nsType->getDeclRef(), nsType);
         else if (auto aggType = as<DeclRefType>(e->type))
             handleLeafCase(aggType->getDeclRef(), aggType);
-        else if (auto typetype = as<TypeType>(e->type))
+        else if (as<TypeType>(e->type))
         {
             auto properType = CoerceToProperType(TypeExp(e));
             if (properType.type)
