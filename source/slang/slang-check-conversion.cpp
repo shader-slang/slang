@@ -413,6 +413,7 @@ bool SemanticsVisitor::_invokeExprForSynthesizedCtor(
 
     DiagnosticSink tempSink(getSourceManager(), nullptr);
     SemanticsVisitor subVisitor(withSink(&tempSink));
+    subVisitor.setCheckForSynthesizedCtor(true);
 
     // First make sure the struct is fully checked, otherwise the synthesized constructor may not be
     // created yet.
