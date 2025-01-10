@@ -205,18 +205,14 @@ DeclRef<StructDecl> findBaseStructDeclRef(
     return baseStructDeclRef;
 }
 
-// TODO: We might need to find a good way to get the synthesized constructor instead of traversing
-// all of constructors.
 ConstructorDecl* SemanticsVisitor::_getSynthesizedConstructor(
     StructDecl* structDecl,
     ConstructorDecl::ConstructorTags tags)
 {
-    for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
+    ConstructorDecl* synthesizedCtor = nullptr;
+    if(structDecl->m_synthesizedCtorMap.tryGetValue((int)tags, synthesizedCtor))
     {
-        if (ctor->containsTag(tags))
-        {
-            return ctor;
-        }
+        return synthesizedCtor;
     }
 
     return nullptr;
@@ -281,12 +277,20 @@ bool SemanticsVisitor::_cStyleStructBasicCheck(Decl* decl)
     return true;
 }
 
-// TODO: We need to cache the result of this check, though it's not a heavy call.
 bool SemanticsVisitor::isCStyleStruct(StructDecl* structDecl)
 {
+    // Get the result from the cache first
+    if (bool *isCStyle = getShared()->isCStyleStruct(structDecl))
+    {
+        return *isCStyle;
+    }
+
     // rules 1-4 are checked in _cStyleStructBasicCheck for all the non-array members
     if (!_cStyleStructBasicCheck(structDecl))
+    {
+        getShared()->cacheCStyleStruct(structDecl, false);
         return false;
+    }
 
     // 5. All its members are legacy C-Style structs or arrays of legacy C-style structs
     for (auto varDeclRef :
@@ -306,7 +310,10 @@ bool SemanticsVisitor::isCStyleStruct(StructDecl* structDecl)
             if (auto structDecl = _getStructDecl(elementType))
             {
                 if (!_cStyleStructBasicCheck(structDecl))
+                {
+                    getShared()->cacheCStyleStruct(structDecl, false);
                     return false;
+                }
             }
             else
             {
@@ -314,6 +321,7 @@ bool SemanticsVisitor::isCStyleStruct(StructDecl* structDecl)
                 if (!as<VectorExpressionType>(elementType) &&
                     !as<MatrixExpressionType>(elementType) && !as<BasicExpressionType>(elementType))
                 {
+                    getShared()->cacheCStyleStruct(structDecl, false);
                     return false;
                 }
             }
@@ -322,9 +330,14 @@ bool SemanticsVisitor::isCStyleStruct(StructDecl* structDecl)
         {
             // all the other members still go through the basic check.
             if (!_cStyleStructBasicCheck(varDecl))
+            {
+                getShared()->cacheCStyleStruct(structDecl, false);
                 return false;
+            }
         }
     }
+
+    getShared()->cacheCStyleStruct(structDecl, true);
     return true;
 }
 
@@ -848,12 +861,15 @@ bool SemanticsVisitor::_coerceInitializerList(
         !canCoerce(toType, fromInitializerListExpr->type, nullptr))
         return _failedCoercion(toType, outToExpr, fromInitializerListExpr);
 
+    // Try to invoke the user-defined constructor if it exists. This call will
+    // report error diagnostics if the used-defined constructor exists but does not
+    // match the initialize list.
     if (_invokeExprForExplicitCtor(toType, fromInitializerListExpr, outToExpr))
     {
         return true;
     }
 
-    // try to invoke the synthesized constructor if it exists
+    // Try to invoke the synthesized constructor if it exists
     if (_invokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
     {
         return true;

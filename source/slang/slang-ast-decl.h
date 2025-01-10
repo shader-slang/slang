@@ -165,6 +165,11 @@ class AggTypeDecl : public AggTypeDeclBase
 class StructDecl : public AggTypeDecl
 {
     SLANG_AST_CLASS(StructDecl);
+
+SLANG_UNREFLECTED
+    // We will use these auxiliary to help in synthesizing the member initialize constructor.
+    Slang::HashSet<VarDeclBase*>            m_membersVisibleInCtor;
+    Dictionary<int, ConstructorDecl*>       m_synthesizedCtorMap;
 };
 
 class ClassDecl : public AggTypeDecl
@@ -382,11 +387,11 @@ class ConstructorDecl : public FunctionDeclBase
         Synthesized = 0x01,
         // Member initialize constructor is a synthesized ctor,
         // but it takes parameters.
-        MemberInitCtor = 0x03
+        MemberInitCtor = 0x02
     };
 
     int m_tags = (int)ConstructorTags::None;
-    void addTag(ConstructorTags tag) { m_tags = (int)tag; }
+    void addTag(ConstructorTags tag) { m_tags |= (int)tag; }
     bool containsTag(ConstructorTags tag) { return m_tags & (int)tag; }
 };
 
