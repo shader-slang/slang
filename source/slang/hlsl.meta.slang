@@ -814,6 +814,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         case spirv:
             return (spirv_asm
             {
+                OpCapability ImageQuery;
                 result:$$float2 = OpImageQueryLod $this $location
             }).x;
         }
@@ -839,6 +840,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         case spirv:
             return (spirv_asm
             {
+                OpCapability ImageQuery;
                 result:$$float2 = OpImageQueryLod $this $location
             }).y;
         }
@@ -1517,6 +1519,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
             __intrinsic_asm "textureQueryLod($p, $2).x";
         case spirv:
             return (spirv_asm {
+                OpCapability ImageQuery;
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 result:$$float2 = OpImageQueryLod %sampledImage $location;
             }).x;
@@ -1539,6 +1542,53 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
             __intrinsic_asm "textureQueryLod($p, $2).y";
         case spirv:
             return (spirv_asm {
+                OpCapability ImageQuery;
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float2 = OpImageQueryLod %sampledImage $location;
+            }).y;
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(glsl_hlsl_metal_spirv, texture_querylod)]
+    float CalculateLevelOfDetail(SamplerComparisonState s, TextureCoord location)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".CalculateLevelOfDetail";
+        case metal:
+            __intrinsic_asm ".calculate_clamped_lod";
+        case glsl:
+            __intrinsic_asm "textureQueryLod($p, $2).x";
+        case spirv:
+            return (spirv_asm {
+                OpCapability ImageQuery;
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float2 = OpImageQueryLod %sampledImage $location;
+            }).x;
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(glsl_hlsl_metal_spirv, texture_querylod)]
+    float CalculateLevelOfDetailUnclamped(SamplerComparisonState s, TextureCoord location)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm ".CalculateLevelOfDetailUnclamped";
+        case metal:
+            __intrinsic_asm ".calculate_unclamped_lod";
+        case glsl:
+            __intrinsic_asm "textureQueryLod($p, $2).y";
+        case spirv:
+            return (spirv_asm {
+                OpCapability ImageQuery;
                 %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
                 result:$$float2 = OpImageQueryLod %sampledImage $location;
             }).y;
