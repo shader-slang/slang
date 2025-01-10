@@ -238,6 +238,7 @@ static StructDecl* _getStructDecl(Type* type)
 bool SemanticsVisitor::_cStyleStructBasicCheck(Decl* decl)
 {
     // 1. It has to be a user-defined struct type, or a basic scalar, vector or matrix type
+    StructDecl* structDecl = nullptr;
     if (isFromCoreModule(decl))
         return false;
 
@@ -247,17 +248,23 @@ bool SemanticsVisitor::_cStyleStructBasicCheck(Decl* decl)
         if (as<VectorExpressionType>(type) || as<MatrixExpressionType>(type) ||
             as<BasicExpressionType>(type))
             return true;
-        else
+        // check for user-defined struct type
+        structDecl = _getStructDecl(type);
+        if (!structDecl)
             return false;
     }
 
-    auto structDecl = as<StructDecl>(decl);
     if (!structDecl)
-        return false;
+        structDecl = as<StructDecl>(decl);
 
-    // 2. It cannot have inheritance
-    if (structDecl->getMembersOfType<InheritanceDecl>().getCount() > 0)
-        return false;
+    // 2. It cannot have inheritance, but inherit from interface is fine.
+    for (auto inheritanceDecl : structDecl->getMembersOfType<InheritanceDecl>())
+    {
+        if (!isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type))
+        {
+            return false;
+        }
+    }
 
     // 3. It cannot have explicit constructor
     if (_hasExplicitConstructor(structDecl, true))

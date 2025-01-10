@@ -14,11 +14,11 @@ RWStructuredBuffer<float> outputBuffer;
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
-        var dp = diffPair(MyStruct(), MyStruct.Differential());
+        var dp = diffPair(MyStruct(0.0, 0), MyStruct.Differential(0.0));
 
         outputBuffer[0] = dp.d.a;
 
-        var dp2 = diffPair<MyStruct>(MyStruct(), MyStruct.Differential(1.f));
+        var dp2 = diffPair<MyStruct>(MyStruct(0.0, 0), MyStruct.Differential(1.f));;
 
         outputBuffer[1] = dp2.d.a;
     }

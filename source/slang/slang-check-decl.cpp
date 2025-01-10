@@ -9401,9 +9401,6 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMember(
         cachedDeclToCheckedVar.add({member, checkedMemberVarExpr});
     }
 
-    if (!checkedMemberVarExpr->type.isLeftValue)
-        return;
-
     seqStmtChild->stmts.add(stmt);
 }
 
@@ -12405,6 +12402,7 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
     // 1. The constructor's name is always `$init`, we create one without parameters now.
     ConstructorDecl* ctor = _createCtor(this, getASTBuilder(), structDecl);
     ctor->addTag(ConstructorDecl::ConstructorTags::MemberInitCtor);
+    addVisibilityModifier(getASTBuilder(), ctor, ctorVisibility);
     structDecl->m_synthesizedCtorMap.addIfNotExists(
         (int)ConstructorDecl::ConstructorTags::MemberInitCtor,
         ctor);

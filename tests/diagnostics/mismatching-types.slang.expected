@@ -17,21 +17,20 @@ tests/diagnostics/mismatching-types.slang(61): error 30019: expected an expressi
 tests/diagnostics/mismatching-types.slang(63): error 30019: expected an expression of type 'GenericOuter<int>.NonGenericInner', got 'GenericOuter<float>.NonGenericInner'
     a.ng = b.ng;
              ^~
-tests/diagnostics/mismatching-types.slang(65): error 30019: expected an expression of type 'GenericInner<int>', got 'int'
+tests/diagnostics/mismatching-types.slang(66): error 30019: expected an expression of type 'GenericInner<int>', got 'int'
     c.i = 0;
           ^
-tests/diagnostics/mismatching-types.slang(65): note: explicit conversion from 'int' to 'GenericInner<int>' is possible
-tests/diagnostics/mismatching-types.slang(67): error 30019: expected an expression of type 'GenericInner<int>', got 'GenericInner<float>'
+tests/diagnostics/mismatching-types.slang(68): note: explicit conversion from 'int' to 'GenericInner<int>' is possible
     c.i = c.f;
             ^
-tests/diagnostics/mismatching-types.slang(71): error 30019: expected an expression of type 'GenericInner<int>.ReallyNested', got 'int'
+tests/diagnostics/mismatching-types.slang(72): error 30019: expected an expression of type 'GenericInner<int>.ReallyNested', got 'int'
     c.i.n = 0;
             ^
-tests/diagnostics/mismatching-types.slang(71): note: explicit conversion from 'int' to 'GenericInner<int>.ReallyNested' is possible
-tests/diagnostics/mismatching-types.slang(80): error 30019: expected an expression of type 'Texture1D<int>', got 'Texture1D<float>'
+tests/diagnostics/mismatching-types.slang(72): note: explicit conversion from 'int' to 'GenericInner<int>.ReallyNested' is possible
+tests/diagnostics/mismatching-types.slang(81): error 30019: expected an expression of type 'Texture1D<int>', got 'Texture1D<float>'
     Texture1D<int> t1 = tex;
                         ^~~
-tests/diagnostics/mismatching-types.slang(82): error 30019: expected an expression of type 'Texture2D<float>', got 'Texture1D<float>'
+tests/diagnostics/mismatching-types.slang(83): error 30019: expected an expression of type 'Texture2D<float>', got 'Texture1D<float>'
     Texture2D<float> t2 = tex;
                           ^~~
 }
