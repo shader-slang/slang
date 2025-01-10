@@ -180,10 +180,10 @@ slangc hello-world.slang -target spirv -o hello-world.spv
 ```
 
 > #### Note ####
-> The `slangc` CLI [does not currently support](https://github.com/shader-slang/slang/issues/5541) `[shader(...)]` attributes. Complile the above example with the following command instead:
+> The `slangc` CLI [does not currently support](https://github.com/shader-slang/slang/issues/5541) `[shader(...)]` attributes for targets other than SPIRV. For other targets, the `-entry` argument is mandatory. Example:
 > 
 > ```bat
-> slangc hello-world.slang -target spirv -entry computeMain -o hello-world.spv
+> slangc hello-world.slang -target hlsl -entry computeMain -o hello-world.spv
 > ```
 
 ### Source Files and Translation Units
@@ -202,13 +202,13 @@ If multiple source files are passed to `slangc`, they will be grouped into trans
 
 ### Entry Points
 
-> #### Note ####
-> This feature of `slangc` [is planned but not implemented](https://github.com/shader-slang/slang/issues/5541).
-
 When using `slangc`, you will typically want to identify which entry point(s) you intend to compile.
 The `-entry computeMain` option selects an entry point to be compiled to output code in this invocation of `slangc`.
 
 Because the `computeMain()` entry point in this example has a `[shader(...)]` attribute, the compiler is able to deduce that it should be compiled for the `compute` stage.
+
+> #### Note ####
+> This feature of `slangc` [is planned but not implemented](https://github.com/shader-slang/slang/issues/5541) for all targets. Only SPIRV output currently supports inline entry points via `[shader(...)]` attributes.
 
 ```bat
 slangc hello-world.slang -target spirv -o hello-world.spv
