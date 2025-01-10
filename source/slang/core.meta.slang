@@ -3965,3 +3965,7 @@ attribute_syntax [DerivativeGroupQuad] : DerivativeGroupQuadAttribute;
 /// effect on other targets.
 __attributeTarget(FuncDecl)
 attribute_syntax [DerivativeGroupLinear] : DerivativeGroupLinearAttribute;
+
+__generic<T>
+typealias NodePayloadPtr = Ptr<T, $( (uint64_t)AddressSpace::NodePayloadAMDX)>;
+
