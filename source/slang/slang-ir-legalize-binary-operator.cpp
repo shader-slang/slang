@@ -67,9 +67,8 @@ void legalizeBinaryOp(IRInst* inst)
         if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
         {
             auto vectorType = as<IRVectorType>(compositeType);
-            compositeType = builder.getVectorType(
-                scalarValue->getDataType(),
-                vectorType->getElementCount());
+            compositeType =
+                builder.getVectorType(scalarValue->getDataType(), vectorType->getElementCount());
         }
         auto newRhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
         builder.replaceOperand(inst->getOperands() + 1, newRhs);
@@ -86,9 +85,8 @@ void legalizeBinaryOp(IRInst* inst)
         if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
         {
             auto vectorType = as<IRVectorType>(compositeType);
-            compositeType = builder.getVectorType(
-                scalarValue->getDataType(),
-                vectorType->getElementCount());
+            compositeType =
+                builder.getVectorType(scalarValue->getDataType(), vectorType->getElementCount());
         }
         auto newLhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
         builder.replaceOperand(inst->getOperands(), newLhs);
