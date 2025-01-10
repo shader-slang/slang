@@ -2552,4 +2552,18 @@ SpvInst* emitOpAtomicIDecrement(
         memory,
         semantics);
 }
+
+// https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/AMD/SPV_AMDX_shader_enqueue.html#OpTypeNodePayloadArrayAMDX
+template<typename T>
+SpvInst* emitOpTypeNodePayloadArray(IRInst* inst, const T& type)
+{
+    static_assert(isSingular<T>);
+    return emitInstMemoized(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeNodePayloadArrayAMDX,
+        kResultID,
+        type);
+}
+
 #endif // SLANG_IN_SPIRV_EMIT_CONTEXT

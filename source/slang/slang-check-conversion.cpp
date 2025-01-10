@@ -785,8 +785,8 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
-    // If both are string types we assume they are convertable in both directions
-    if (as<StringTypeBase>(fromType) && as<StringTypeBase>(toType))
+    // Assume string literals are convertible to any string type.
+    if (as<StringLiteralExpr>(fromExpr) && as<StringTypeBase>(toType))
     {
         if (outToExpr)
             *outToExpr = fromExpr;
