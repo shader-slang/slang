@@ -391,6 +391,23 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             _emitType(rateQualifiedType->getValueType(), declarator);
         }
         break;
+    case kIROp_DescriptorHandleType:
+        {
+            // If the T is already bindless for target, emit it directly.
+            auto resPtrType = cast<IRDescriptorHandleType>(type);
+            if (isResourceTypeBindless(resPtrType->getResourceType()))
+                _emitType(resPtrType->getResourceType(), declarator);
+            else
+            {
+                // Otherwise, emit the DescriptorHandle<T> as uint2.
+                IRBuilder builder(resPtrType);
+                builder.setInsertBefore(resPtrType);
+                emitSimpleTypeAndDeclarator(
+                    builder.getVectorType(builder.getUIntType(), 2),
+                    declarator);
+            }
+        }
+        break;
 
     case kIROp_ArrayType:
         {
@@ -730,6 +747,83 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo
     else if (
         prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right &&
         outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitOr_Left)
+    {
+        needParens = true;
+    }
+    // a ^ b * c => a ^ (b * c)
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left &&
+        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitXor_Right)
+    {
+        needParens = true;
+    }
+    // a * b ^ c => (a * b) ^ c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitXor_Left)
+    {
+        needParens = true;
+    }
+    // a | b * c => a | (b * c)
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left &&
+        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitOr_Right)
+    {
+        needParens = true;
+    }
+    // a * b | c => (a * b) | c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitOr_Left)
+    {
+        needParens = true;
+    }
+    // a & b * c => a & (b * c)
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left &&
+        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitAnd_Right)
+    {
+        needParens = true;
+    }
+    // a * b & c => (a * b) & c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitAnd_Left)
+    {
+        needParens = true;
+    }
+    // a << b * c => a << (b * c)
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left &&
+        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_Shift_Right)
+    {
+        needParens = true;
+    }
+    // a * b << c => (a * b) << c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Shift_Left)
+    {
+        needParens = true;
+    }
+    // a != b == c => (a != b) == c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Equality_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Equality_Left)
+    {
+        needParens = true;
+    }
+    // a == b < c => a == (b < c)
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Relational_Left &&
+        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_Equality_Right)
+    {
+        needParens = true;
+    }
+    // a < b == c => (a < b) == c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Relational_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Equality_Left)
     {
         needParens = true;
     }
@@ -2491,7 +2585,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             emitOperand(inst->getOperand(1), rightSide(outerPrec, prec));
             break;
         }
-
+    case kIROp_CastDescriptorHandleToUInt2:
+    case kIROp_CastUInt2ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToResource:
+        emitOperand(inst->getOperand(0), outerPrec);
+        break;
     // Binary ops
     case kIROp_Add:
     case kIROp_Sub:
