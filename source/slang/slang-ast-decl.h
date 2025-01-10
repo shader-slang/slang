@@ -166,10 +166,10 @@ class StructDecl : public AggTypeDecl
 {
     SLANG_AST_CLASS(StructDecl);
 
-SLANG_UNREFLECTED
+    SLANG_UNREFLECTED
     // We will use these auxiliary to help in synthesizing the member initialize constructor.
-    Slang::HashSet<VarDeclBase*>            m_membersVisibleInCtor;
-    Dictionary<int, ConstructorDecl*>       m_synthesizedCtorMap;
+    Slang::HashSet<VarDeclBase*> m_membersVisibleInCtor;
+    Dictionary<int, ConstructorDecl*> m_synthesizedCtorMap;
 };
 
 class ClassDecl : public AggTypeDecl
