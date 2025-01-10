@@ -903,6 +903,24 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             return true;
         }
+    case kIROp_LoadSamplerDescriptorFromHeap:
+        {
+            emitType(inst->getDataType());
+            m_writer->emit("(");
+            m_writer->emit("SamplerDescriptorHeap[");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit("])");
+            return true;
+        }
+    case kIROp_LoadResourceDescriptorFromHeap:
+        {
+            emitType(inst->getDataType());
+            m_writer->emit("(");
+            m_writer->emit("ResourceDescriptorHeap[");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit("])");
+            return true;
+        }
     case kIROp_ByteAddressBufferLoad:
         {
             // HLSL byte-address buffers have two kinds of `Load` operations.

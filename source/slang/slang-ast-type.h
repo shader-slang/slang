@@ -394,6 +394,11 @@ class GLSLInputAttachmentType : public BuiltinType
 };
 
 
+class DescriptorHandleType : public PointerLikeType
+{
+    SLANG_AST_CLASS(DescriptorHandleType)
+};
+
 // Base class for types used when desugaring parameter block
 // declarations, includeing HLSL `cbuffer` or GLSL `uniform` blocks.
 class ParameterGroupType : public PointerLikeType

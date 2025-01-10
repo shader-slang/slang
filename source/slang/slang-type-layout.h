@@ -975,6 +975,8 @@ enum class ShaderParameterKind
     AtomicUint,
 
     SubpassInput,
+
+    ParameterBlock,
 };
 
 struct SimpleLayoutRulesImpl

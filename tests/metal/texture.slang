@@ -341,6 +341,31 @@ bool TEST_texture(
         // METALLIB: call {{.*}}.calculate_clamped_lod_texture_cube_array(
         && float(0) == tCubeArray.CalculateLevelOfDetail(samplerState, normalize(float3(u, 1 - u, u)))
 
+        // SamplerComparisonState variant
+
+        // Functional tests that require SM higher than 6.6 (as of writing) cannot run.
+#if !defined(EXCLUDE_SM_6_7)
+        // METAL: t2D{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_texture_2d(
+        && float(0) == t2D.CalculateLevelOfDetail(shadowSampler, float2(u, u))
+
+        // METAL: t3D{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_texture_3d(
+        && float(0) == t3D.CalculateLevelOfDetail(shadowSampler, float3(u, u, u))
+
+        // METAL: tCube{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_texture_cube(
+        && float(0) == tCube.CalculateLevelOfDetail(shadowSampler, normalize(float3(u, 1 - u, u)))
+
+        // METAL: t2DArray{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_texture_2d_array(
+        && float(0) == t2DArray.CalculateLevelOfDetail(shadowSampler, float2(u, u))
+
+        // METAL: tCubeArray{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_texture_cube_array(
+        && float(0) == tCubeArray.CalculateLevelOfDetail(shadowSampler, normalize(float3(u, 1 - u, u)))
+#endif
+
         // ========================================
         // float CalculateLevelOfDetailUnclamped()
         // ========================================
@@ -366,6 +391,29 @@ bool TEST_texture(
         // METAL: tCubeArray{{.*}}.calculate_unclamped_lod({{.*}}
         // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_cube_array(
         && float(0) >= tCubeArray.CalculateLevelOfDetailUnclamped(samplerState, normalize(float3(u, 1 - u, u)))
+
+        // SamplerComparisonState variant
+#if !defined(EXCLUDE_SM_6_7)
+        // METAL: t2D{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_2d(
+        && float(0) >= t2D.CalculateLevelOfDetailUnclamped(shadowSampler, float2(u, u))
+
+        // METAL: t3D{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_3d(
+        && float(0) >= t3D.CalculateLevelOfDetailUnclamped(shadowSampler, float3(u, u, u))
+
+        // METAL: tCube{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_cube(
+        && float(0) >= tCube.CalculateLevelOfDetailUnclamped(shadowSampler, normalize(float3(u, 1 - u, u)))
+
+        // METAL: t2DArray{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_2d_array(
+        && float(0) >= t2DArray.CalculateLevelOfDetailUnclamped(shadowSampler, float2(u, u))
+
+        // METAL: tCubeArray{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_cube_array(
+        && float(0) >= tCubeArray.CalculateLevelOfDetailUnclamped(shadowSampler, normalize(float3(u, 1 - u, u)))
+#endif
 
         // ===========
         // T Sample()
