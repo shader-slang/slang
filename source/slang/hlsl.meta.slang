@@ -21050,7 +21050,7 @@ ${{{{
 }
 }}}}
 
-/// Represents a bindless handle to a descriptor. A descriptor handle is always a ordinary data type and can be
+/// Represents a bindless handle to a descriptor. A descriptor handle is always an ordinary data type and can be
 /// declared in any memory location.
 /// @remarks Opaque descriptor types such as textures(`Texture2D` etc.), `SamplerState` and buffers (e.g. `StructuredBuffer`)
 /// can have undefined size and data representation on many targets. On platforms such as Vulkan and D3D12, descriptors are
