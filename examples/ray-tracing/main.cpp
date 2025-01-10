@@ -676,4 +676,4 @@ struct RayTracing : public WindowedAppBase
 
 // This macro instantiates an appropriate main function to
 // run the application defined above.
-PLATFORM_UI_MAIN(innerMain<RayTracing>)
+EXAMPLE_MAIN(innerMain<RayTracing>);

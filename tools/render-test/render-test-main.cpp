@@ -45,12 +45,16 @@ struct Vertex
     float position[3];
     float color[3];
     float uv[2];
+    float customData0[4];
+    float customData1[4];
+    float customData2[4];
+    float customData3[4];
 };
 
 static const Vertex kVertexData[] = {
-    {{0, 0, 0.5}, {1, 0, 0}, {0, 0}},
-    {{0, 1, 0.5}, {0, 0, 1}, {1, 0}},
-    {{1, 0, 0.5}, {0, 1, 0}, {1, 1}},
+    {{0, 0, 0.5}, {1, 0, 0}, {0, 0}, {1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}, {13, 14, 15, 16}},
+    {{0, 1, 0.5}, {0, 0, 1}, {1, 0}, {1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}, {13, 14, 15, 16}},
+    {{1, 0, 0.5}, {0, 1, 0}, {1, 1}, {1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}, {13, 14, 15, 16}},
 };
 static const int kVertexCount = SLANG_COUNT_OF(kVertexData);
 
@@ -614,6 +618,10 @@ SlangResult RenderTestApp::initialize(
                     {"A", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position)},
                     {"A", 1, Format::R32G32B32_FLOAT, offsetof(Vertex, color)},
                     {"A", 2, Format::R32G32_FLOAT, offsetof(Vertex, uv)},
+                    {"A", 3, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData0)},
+                    {"A", 4, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData1)},
+                    {"A", 5, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData2)},
+                    {"A", 6, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData3)},
                 };
 
                 ComPtr<IInputLayout> inputLayout;

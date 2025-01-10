@@ -133,6 +133,10 @@ INST(Nop, nop, 0, 0)
     INST(ComPtrType, ComPtr, 1, HOISTABLE)
     // A NativePtr<T> type represents a native pointer to a managed resource.
     INST(NativePtrType, NativePtr, 1, HOISTABLE)
+
+    // A DescriptorHandle<T> type represents a bindless handle to an opaue resource type.
+    INST(DescriptorHandleType, DescriptorHandle, 1, HOISTABLE)
+
     // An AtomicUint is a placeholder type for a storage buffer, and will be mangled during compiling.
     INST(GLSLAtomicUintType, GLSLAtomicUint, 0, HOISTABLE)
 
@@ -365,6 +369,9 @@ INST(MakeTargetTuple, makeTuple, 0, 0)
 INST(MakeValuePack, makeValuePack, 0, 0)
 INST(GetTargetTupleElement, getTargetTupleElement, 0, 0)
 INST(GetTupleElement, getTupleElement, 2, 0)
+INST(LoadResourceDescriptorFromHeap, LoadResourceDescriptorFromHeap, 1, 0)
+INST(LoadSamplerDescriptorFromHeap, LoadSamplerDescriptorFromHeap, 1, 0)
+INST(MakeCombinedTextureSamplerFromHandle, MakeCombinedTextureSamplerFromHandle, 1, 0)
 INST(MakeWitnessPack, MakeWitnessPack, 0, HOISTABLE)
 INST(Expand, Expand, 1, 0)
 INST(Each, Each, 1, HOISTABLE)
@@ -736,7 +743,8 @@ INST(GetVulkanRayTracingPayloadLocation, GetVulkanRayTracingPayloadLocation, 1, 
 
 INST(GetLegalizedSPIRVGlobalParamAddr, GetLegalizedSPIRVGlobalParamAddr, 1, 0)
 
-INST(GetPerVertexInputArray, GetPerVertexInputArray, 1, 0)
+INST(GetPerVertexInputArray, GetPerVertexInputArray, 1, HOISTABLE)
+INST(ResolveVaryingInputRef, ResolveVaryingInputRef, 1, HOISTABLE)
 
 INST(ForceVarIntoStructTemporarily, ForceVarIntoStructTemporarily, 1, 0)
 INST(MetalAtomicCast, MetalAtomicCast, 1, 0)
@@ -1184,6 +1192,12 @@ INST(CastPtrToInt, CastPtrToInt, 1, 0)
 INST(CastIntToPtr, CastIntToPtr, 1, 0)
 INST(CastToVoid, castToVoid, 1, 0)
 INST(PtrCast, PtrCast, 1, 0)
+INST(CastUInt2ToDescriptorHandle, CastUInt2ToDescriptorHandle, 1, 0)
+INST(CastDescriptorHandleToUInt2, CastDescriptorHandleToUInt2, 1, 0)
+
+// Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are already concrete types.
+INST(CastDescriptorHandleToResource, CastDescriptorHandleToResource, 1, 0)
+
 INST(TreatAsDynamicUniform, TreatAsDynamicUniform, 1, 0)
 
 INST(SizeOf,                            sizeOf,                     1, 0)
@@ -1200,6 +1214,7 @@ INST(IsHalf, IsHalf, 1, 0)
 INST(IsUnsignedInt, IsUnsignedInt, 1, 0)
 INST(IsSignedInt, IsSignedInt, 1, 0)
 INST(IsVector, IsVector, 1, 0)
+INST(GetDynamicResourceHeap, GetDynamicResourceHeap, 0, HOISTABLE)
 
 INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
 
@@ -1280,6 +1295,9 @@ INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDicti
 
 /* Differentiable Type Dictionary */
 INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
+
+/* Differentiable Type Annotation (for run-time types)*/
+INST(DifferentiableTypeAnnotation, DifferentiableTypeAnnotation, 2, HOISTABLE)
 
 INST(BeginFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)
 INST(EndFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)
