@@ -1033,6 +1033,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(BackwardDerivativePrimalContextDecoration, BackwardDerivativePrimalContextDecoration, 1, 0)
     INST(BackwardDerivativePrimalReturnDecoration, BackwardDerivativePrimalReturnDecoration, 1, 0)
 
+        // Mark a parameter as autodiff primal context.
+    INST(PrimalContextDecoration, PrimalContextDecoration, 0, 0)
     INST(LoopCounterDecoration, loopCounterDecoration, 0, 0)
     INST(LoopCounterUpdateDecoration, loopCounterUpdateDecoration, 0, 0)
 
