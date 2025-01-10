@@ -93,6 +93,22 @@ struct ExtractPrimalFuncContext
             as<IRGeneric>(findOuterGeneric(destFunc)),
             destFunc);
 
+        if (auto origGeneric = as<IRGeneric>(findOuterGeneric(originalFunc)))
+        {
+            // Clone in everything else except the return value.
+            IRBuilder subBuilder(destFunc);
+            builder.setInsertAfter(findOuterGeneric(destFunc)->getFirstBlock()->getLastParam());
+
+            // Clone in any hoistable insts.
+            for (auto child = origGeneric->getFirstBlock()->getFirstOrdinaryInst(); child;
+                 child = child->getNextInst())
+            {
+                if ((child != originalFunc) && !as<IRReturn>(child) &&
+                    !as<IRGlobalValueWithCode>(child))
+                    migrationContext.cloneInst(&subBuilder, child);
+            }
+        }
+
         originalFuncType = as<IRFuncType>(originalFunc->getDataType());
 
         SLANG_RELEASE_ASSERT(originalFuncType);
