@@ -1463,6 +1463,11 @@ struct String
     __intrinsic_op($(kIROp_MakeString))
     __init(double val);
 
+    [require(cpp)]
+    __implicit_conversion($(kConversionCost_None))
+    __intrinsic_op($(kIROp_MakeString))
+    __init(NativeString value);
+
     /// Returns the length of the string.
     [require(cpp)]
     int64_t getLength();
@@ -1502,6 +1507,7 @@ struct NativeString
 
     property int length { [__unsafeForceInlineEarly] get{return getLength();} }
 
+    __implicit_conversion($(kConversionCost_None))
     __intrinsic_op($(kIROp_getNativeStr))
     __init(String value);
 };
@@ -3959,3 +3965,7 @@ attribute_syntax [DerivativeGroupQuad] : DerivativeGroupQuadAttribute;
 /// effect on other targets.
 __attributeTarget(FuncDecl)
 attribute_syntax [DerivativeGroupLinear] : DerivativeGroupLinearAttribute;
+
+__generic<T>
+typealias NodePayloadPtr = Ptr<T, $( (uint64_t)AddressSpace::NodePayloadAMDX)>;
+

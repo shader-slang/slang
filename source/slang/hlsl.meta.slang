@@ -21415,3 +21415,31 @@ int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
     }
 }
 
+// Work-graphs
+
+//@public:
+/// read-only input to Broadcasting launch node.
+__generic<T>
+//TODO: DispatchNodeInputRecord should be available only for broadcasting node shader.
+//[require(broadcasting_node)]
+[require(spirv)]
+struct DispatchNodeInputRecord
+{
+    /// Provide an access to a record object that only holds a single record.
+    NodePayloadPtr<T> Get()
+    {
+        int index = 0;
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                %in_payload_t = OpTypeNodePayloadArrayAMDX $$T;
+                %in_payload_ptr_t = OpTypePointer NodePayloadAMDX %in_payload_t;
+                %var = OpVariable %in_payload_ptr_t NodePayloadAMDX;
+                result : $$NodePayloadPtr<T> = OpAccessChain %var $index;
+            };
+        }
+    }
+};
+
