@@ -29,6 +29,7 @@ static List<ConstructorDecl*> _getCtorList(
     StructDecl* structDecl,
     ConstructorDecl** defaultCtorOut);
 static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
+void addVisibilityModifier(ASTBuilder* builder, Decl* decl, DeclVisibility vis);
 
 /// Visitor to transition declarations to `DeclCheckState::CheckedModifiers`
 struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
@@ -2066,7 +2067,8 @@ static void addAutoDiffModifiersToFunc(
 static ConstructorDecl* _createCtor(
     SemanticsDeclVisitorBase* visitor,
     ASTBuilder* m_astBuilder,
-    AggTypeDecl* decl)
+    AggTypeDecl* decl,
+    DeclVisibility ctorVisibility)
 {
     auto ctor = m_astBuilder->create<ConstructorDecl>();
     addModifier(ctor, m_astBuilder->create<SynthesizedModifier>());
@@ -2093,6 +2095,7 @@ static ConstructorDecl* _createCtor(
     ctor->addTag(ConstructorDecl::ConstructorTags::Synthesized);
     decl->addMember(ctor);
     addAutoDiffModifiersToFunc(visitor, m_astBuilder, ctor);
+    addVisibilityModifier(m_astBuilder, ctor, ctorVisibility);
     return ctor;
 }
 
@@ -2182,7 +2185,8 @@ static void checkSynthesizedConstructorWithoutDiagnostic(VisitorType& subVisitor
         structDecl->members.remove(decl);
         structDecl->invalidateMemberDictionary();
         structDecl->buildMemberDictionary();
-        structDecl->m_synthesizedCtorMap.remove((int)ConstructorDecl::ConstructorTags::MemberInitCtor);
+        structDecl->m_synthesizedCtorMap.remove(
+            (int)ConstructorDecl::ConstructorTags::MemberInitCtor);
     }
     return;
 }
@@ -8175,10 +8179,11 @@ void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
 {
     if (auto constructorDecl = as<ConstructorDecl>(decl))
     {
-        // When checking the synthesized constructor, it's possible to hit error, but we don't want to
-        // report this error, because this function is not created by user. Instead, when we detect this
-        // error, we will remove this synthesized constructor from the struct.
-        if (constructorDecl->containsTag(ConstructorDecl::ConstructorTags::MemberInitCtor) && !m_checkForSynthesizedCtor)
+        // When checking the synthesized constructor, it's possible to hit error, but we don't want
+        // to report this error, because this function is not created by user. Instead, when we
+        // detect this error, we will remove this synthesized constructor from the struct.
+        if (constructorDecl->containsTag(ConstructorDecl::ConstructorTags::MemberInitCtor) &&
+            !m_checkForSynthesizedCtor)
         {
             DiagnosticSink tempSink;
             SemanticsContext subContext = withSink(&tempSink);
@@ -12414,12 +12419,12 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
     // Only the members whose visibility level is higher or equal than the
     // constructor's visibility level will appear in the constructor's parameter list.
     List<VarDeclBase*> resultMembers;
-    if(!_searchMembersWithHigherVisibility(structDecl, ctorVisibility, resultMembers))
+    if (!_searchMembersWithHigherVisibility(structDecl, ctorVisibility, resultMembers))
         return;
 
     // synthesize the constructor signature:
     // 1. The constructor's name is always `$init`, we create one without parameters now.
-    ConstructorDecl* ctor = _createCtor(this, getASTBuilder(), structDecl);
+    ConstructorDecl* ctor = _createCtor(this, getASTBuilder(), structDecl, ctorVisibility);
     ctor->addTag(ConstructorDecl::ConstructorTags::MemberInitCtor);
     structDecl->m_synthesizedCtorMap.addIfNotExists(
         (int)ConstructorDecl::ConstructorTags::MemberInitCtor,
@@ -12446,8 +12451,9 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
         ctorParam->loc = ctor->loc;
         ctor->members.add(ctorParam);
 
-        // We need to ensure member is `no_diff` if it cannot be differentiated, `ctor` modifiers do not matter
-        // in this case since member-wise ctor is always differentiable or "treat as differentiable".
+        // We need to ensure member is `no_diff` if it cannot be differentiated, `ctor` modifiers do
+        // not matter in this case since member-wise ctor is always differentiable or "treat as
+        // differentiable".
         if (!isTypeDifferentiable(member->getType()) || member->hasModifier<NoDiffModifier>())
         {
             auto noDiffMod = m_astBuilder->create<NoDiffModifier>();
@@ -12456,9 +12462,6 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
         }
     }
     ctor->members.reverse();
-
-    // 3. Add the necessary modifiers
-    addVisibilityModifier(getASTBuilder(), ctor, ctorVisibility);
 }
 
 void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
@@ -12472,7 +12475,8 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
     auto defaultCtor = _getDefaultCtor(structDecl);
     if (!defaultCtor)
     {
-        auto ctor = _createCtor(this, m_astBuilder, structDecl);
+        DeclVisibility ctorVisibility = getDeclVisibility(structDecl);
+        auto ctor = _createCtor(this, m_astBuilder, structDecl, ctorVisibility);
         structDecl->m_synthesizedCtorMap.addIfNotExists(
             (int)ConstructorDecl::ConstructorTags::Synthesized,
             ctor);

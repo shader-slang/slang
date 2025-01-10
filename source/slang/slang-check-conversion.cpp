@@ -411,12 +411,17 @@ bool SemanticsVisitor::_invokeExprForSynthesizedCtor(
 
     bool isCStyle = isCStyleStruct(structDecl);
 
+    DiagnosticSink tempSink(getSourceManager(), nullptr);
+    SemanticsVisitor subVisitor(withSink(&tempSink));
+
+    // First make sure the struct is fully checked, otherwise the synthesized constructor may not be
+    // created yet.
+    subVisitor.ensureDecl(structDecl, DeclCheckState::DefinitionChecked);
+
     List<Expr*> coercedArgs;
     auto ctorInvokeExpr =
         _createCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);
 
-    DiagnosticSink tempSink(getSourceManager(), nullptr);
-    SemanticsVisitor subVisitor(withSink(&tempSink));
     ctorInvokeExpr = subVisitor.CheckExpr(ctorInvokeExpr);
 
     if (ctorInvokeExpr)
