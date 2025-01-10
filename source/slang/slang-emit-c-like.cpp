@@ -733,6 +733,83 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo
     {
         needParens = true;
     }
+    // a ^ b * c => a ^ (b * c)
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left &&
+        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitXor_Right)
+    {
+        needParens = true;
+    }
+    // a * b ^ c => (a * b) ^ c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitXor_Left)
+    {
+        needParens = true;
+    }
+    // a | b * c => a | (b * c)
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left &&
+        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitOr_Right)
+    {
+        needParens = true;
+    }
+    // a * b | c => (a * b) | c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitOr_Left)
+    {
+        needParens = true;
+    }
+    // a & b * c => a & (b * c)
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left &&
+        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitAnd_Right)
+    {
+        needParens = true;
+    }
+    // a * b & c => (a * b) & c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitAnd_Left)
+    {
+        needParens = true;
+    }
+    // a << b * c => a << (b * c)
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left &&
+        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_Shift_Right)
+    {
+        needParens = true;
+    }
+    // a * b << c => (a * b) << c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Shift_Left)
+    {
+        needParens = true;
+    }
+    // a != b == c => (a != b) == c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Equality_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Equality_Left)
+    {
+        needParens = true;
+    }
+    // a == b < c => a == (b < c)
+    else if (
+        prec.leftPrecedence == EPrecedence::kEPrecedence_Relational_Left &&
+        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_Equality_Right)
+    {
+        needParens = true;
+    }
+    // a < b == c => (a < b) == c
+    else if (
+        prec.rightPrecedence == EPrecedence::kEPrecedence_Relational_Right &&
+        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Equality_Left)
+    {
+        needParens = true;
+    }
 
     if (needParens)
     {
