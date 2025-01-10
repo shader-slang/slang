@@ -791,6 +791,7 @@ static LayoutResourceKind _getHLSLLayoutResourceKind(ShaderParameterKind kind)
     case ShaderParameterKind::RawBuffer:
     case ShaderParameterKind::Buffer:
     case ShaderParameterKind::Texture:
+    case ShaderParameterKind::AccelerationStructure:
         return LayoutResourceKind::ShaderResource;
 
     case ShaderParameterKind::MutableStructuredBuffer:
@@ -798,6 +799,7 @@ static LayoutResourceKind _getHLSLLayoutResourceKind(ShaderParameterKind kind)
     case ShaderParameterKind::MutableBuffer:
     case ShaderParameterKind::MutableTexture:
     case ShaderParameterKind::AppendConsumeStructuredBuffer:
+    case ShaderParameterKind::ShaderStorageBuffer:
         return LayoutResourceKind::UnorderedAccess;
 
     case ShaderParameterKind::SamplerState:
@@ -897,8 +899,10 @@ struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::RawBuffer:
         case ShaderParameterKind::Buffer:
         case ShaderParameterKind::Texture:
+        case ShaderParameterKind::AccelerationStructure:
             return SimpleLayoutInfo(LayoutResourceKind::ShaderResource, 1);
 
+        case ShaderParameterKind::ShaderStorageBuffer:
         case ShaderParameterKind::MutableStructuredBuffer:
         case ShaderParameterKind::MutableRawBuffer:
         case ShaderParameterKind::MutableBuffer:
@@ -1214,6 +1218,8 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
                 sizeof(void*) * 2,
                 SLANG_ALIGN_OF(void*));
 
+        case ShaderParameterKind::ShaderStorageBuffer:
+        case ShaderParameterKind::AccelerationStructure:
         case ShaderParameterKind::SamplerState:
             // It's a pointer
             return SimpleLayoutInfo(
@@ -1302,6 +1308,15 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
                 const size_t size =
                     _roundToAlignment(sizeof(CUDAPtr) + sizeof(CUDACount), sizeof(CUDAPtr));
                 return SimpleLayoutInfo(LayoutResourceKind::Uniform, size, sizeof(CUDAPtr));
+            }
+        case ShaderParameterKind::ShaderStorageBuffer:
+        case ShaderParameterKind::AccelerationStructure:
+            {
+                // It's a pointer.
+                return SimpleLayoutInfo(
+                    LayoutResourceKind::Uniform,
+                    sizeof(CUDAPtr),
+                    sizeof(CUDAPtr));
             }
         case ShaderParameterKind::SamplerState:
             {
@@ -1862,6 +1877,8 @@ struct MetalObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         case ShaderParameterKind::Buffer:
         case ShaderParameterKind::MutableRawBuffer:
         case ShaderParameterKind::MutableBuffer:
+        case ShaderParameterKind::ShaderStorageBuffer:
+        case ShaderParameterKind::AccelerationStructure:
             return SimpleLayoutInfo(LayoutResourceKind::MetalBuffer, 1);
         case ShaderParameterKind::AppendConsumeStructuredBuffer:
             return SimpleLayoutInfo(LayoutResourceKind::MetalBuffer, 2);
@@ -1927,6 +1944,8 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
         case ShaderParameterKind::TextureUniformBuffer:
         case ShaderParameterKind::Texture:
         case ShaderParameterKind::SamplerState:
+        case ShaderParameterKind::ShaderStorageBuffer:
+        case ShaderParameterKind::AccelerationStructure:
             {
                 return SimpleLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 1);
             }
@@ -4629,6 +4648,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     CASE(GLSLInputAttachmentType, InputRenderTarget);
 
     // This case is mostly to allow users to add new resource types...
+    CASE(RaytracingAccelerationStructureType, AccelerationStructure);
     CASE(UntypedBufferResourceType, RawBuffer);
 
     CASE(GLSLShaderStorageBufferType, MutableRawBuffer);

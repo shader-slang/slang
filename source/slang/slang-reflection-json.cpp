@@ -416,6 +416,7 @@ static void emitReflectionResourceTypeBaseInfoJSON(
         CASE(TEXTURE_BUFFER, textureBuffer);
         CASE(STRUCTURED_BUFFER, structuredBuffer);
         CASE(BYTE_ADDRESS_BUFFER, byteAddressBuffer);
+        CASE(ACCELERATION_STRUCTURE, accelerationStructure);
 #undef CASE
     }
     writer << "\"";
