@@ -190,8 +190,6 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void cloneModifiers(Decl* dest, Decl* src);
     void setFuncTypeIntoRequirementDecl(CallableDecl* decl, FuncType* funcType);
-
-    bool m_checkForSynthesizedCtor = false;
 };
 
 struct SemanticsDeclRedeclarationVisitor : public SemanticsDeclVisitorBase,
