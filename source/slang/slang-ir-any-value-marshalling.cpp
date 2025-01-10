@@ -875,7 +875,7 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
         return alignUp(offset, 2) + 2;
     case kIROp_UInt8Type:
     case kIROp_Int8Type:
-        return 1;
+        return offset + 1;
     case kIROp_VectorType:
         {
             auto vectorType = static_cast<IRVectorType*>(type);
