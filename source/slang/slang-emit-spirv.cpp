@@ -1311,6 +1311,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return SpvStorageClassImage;
         case AddressSpace::UserPointer:
             return SpvStorageClassPhysicalStorageBuffer;
+        case AddressSpace::NodePayloadAMDX:
+            return SpvStorageClassNodePayloadAMDX;
         case AddressSpace::Global:
         case AddressSpace::MetalObjectData:
         case AddressSpace::SpecializationConstant:
@@ -1504,13 +1506,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 SLANG_ASSERT(ptrType);
                 if (ptrType->hasAddressSpace())
                     storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
-                if (storageClass == SpvStorageClassStorageBuffer)
+
+                switch (storageClass)
+                {
+                case SpvStorageClassStorageBuffer:
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_KHR_storage_buffer_storage_class"));
-                if (storageClass == SpvStorageClassPhysicalStorageBuffer)
-                {
+                    break;
+                case SpvStorageClassPhysicalStorageBuffer:
                     requirePhysicalStorageAddressing();
+                    break;
+                case SpvStorageClassNodePayloadAMDX:
+                    requireSPIRVCapability(SpvCapabilityShaderEnqueueAMDX);
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_AMDX_shader_enqueue"));
+                    break;
                 }
+
                 auto valueType = ptrType->getValueType();
                 // If we haven't emitted the inner type yet, we need to emit a forward declaration.
                 bool useForwardDeclaration =
@@ -1524,17 +1535,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     builder.setInsertBefore(valueType);
                     valueTypeId = getID(ensureInst(builder.getUIntType()));
                 }
+                else if (useForwardDeclaration)
+                {
+                    valueTypeId = getIRInstSpvID(valueType);
+                }
+                else if (storageClass == SpvStorageClassNodePayloadAMDX)
+                {
+                    auto spvValueType = ensureInst(valueType);
+                    auto spvNodePayloadType = emitOpTypeNodePayloadArray(inst, spvValueType);
+                    valueTypeId = getID(spvNodePayloadType);
+                }
                 else
                 {
-                    if (useForwardDeclaration)
-                    {
-                        valueTypeId = getIRInstSpvID(valueType);
-                    }
-                    else
-                    {
-                        auto spvValueType = ensureInst(valueType);
-                        valueTypeId = getID(spvValueType);
-                    }
+                    auto spvValueType = ensureInst(valueType);
+                    valueTypeId = getID(spvValueType);
                 }
 
                 auto resultSpvType = emitOpTypePointer(inst, storageClass, valueTypeId);
@@ -1667,6 +1681,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto result = ensureInst(as<IRAtomicType>(inst)->getElementType());
                 registerInst(inst, result);
                 return result;
+            }
+        case kIROp_DescriptorHandleType:
+            {
+                IRBuilder builder(inst);
+                builder.setInsertBefore(inst);
+                return emitOpTypeVector(inst, builder.getUIntType(), SpvLiteralInteger::from32(2));
             }
         case kIROp_SubpassInputType:
             return ensureSubpassInputType(inst, cast<IRSubpassInputType>(inst));
@@ -3443,6 +3463,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Lsh:
             result = emitArithmetic(parent, inst);
             break;
+        case kIROp_CastDescriptorHandleToUInt2:
+        case kIROp_CastUInt2ToDescriptorHandle:
         case kIROp_GlobalValueRef:
             {
                 auto inner = ensureInst(inst->getOperand(0));
@@ -7564,6 +7586,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     case SpvOpMemberDecorate:
                     case SpvOpMemberDecorateString:
                         return getSection(SpvLogicalSectionID::Annotations);
+                    case SpvOpTypeNodePayloadArrayAMDX:
+                        return getSection(SpvLogicalSectionID::ConstantsAndTypes);
                     default:
                         return defaultParent;
                     }

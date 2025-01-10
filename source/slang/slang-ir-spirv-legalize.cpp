@@ -8,6 +8,7 @@
 #include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
+#include "slang-ir-float-non-uniform-resource-index.h"
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
@@ -1098,130 +1099,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         addUsersToWorkList(newStore);
     }
 
-    void processNonUniformResourceIndex(IRInst* nonUniformResourceIndexInst)
-    {
-        // implement the translation to spirv by walking up the use-def chain
-        // from nonUniformResource inst of an index to an array of buffer or
-        // texture def all the way to the leaf operations. To be precise:
-        // - go through GEP and see if it calls an intrinsic function,
-        //   then decorate the address itself (GetElementPtr)
-        // - go through GEP to identify the pointer access and the Loads that it
-        //   accesses (GetElementPtr -> Load), then decorate the load instruction.
-        // - go through IntCasts to deal with u32 -> i32 / vice-versa (IntCast)
-        List<IRInst*> resWorkList;
-
-        // Handle cases when `nonUniformResourceIndexInst` inst is wrapped around
-        // an index in a nested fashion, i.e. nonUniform(nonUniform(index)) by
-        // only adding the inner-most inst in the worklist, and work our way out.
-        auto insti = nonUniformResourceIndexInst;
-        while (insti->getOp() == kIROp_NonUniformResourceIndex)
-        {
-            if (resWorkList.getCount() != 0)
-                resWorkList.removeLast();
-            resWorkList.add(insti);
-            insti = insti->getOperand(0);
-        }
-
-        // For all the users of a `nonUniformResourceIndexInst`, make them directly
-        // use the underlying base inst that is wrapped by `nonUniformResourceIndex`
-        // and finally wrap them with a `nonUniformResourceIndex`, and add back to the
-        // worklist, and keep bubbling them up until it can.
-        for (Index i = 0; i < resWorkList.getCount(); i++)
-        {
-            auto inst = resWorkList[i];
-            traverseUses(
-                inst,
-                [&](IRUse* use)
-                {
-                    auto user = use->getUser();
-                    IRBuilder builder(user);
-                    builder.setInsertBefore(user);
-
-                    IRInst* newUser = nullptr;
-                    switch (user->getOp())
-                    {
-                    case kIROp_IntCast:
-                        // Replace intCast(nonUniformRes(x)), into nonUniformRes(intCast(x))
-                        newUser = builder.emitCast(user->getFullType(), inst->getOperand(0));
-                        break;
-                    case kIROp_GetElementPtr:
-                        // Ignore when `NonUniformResourceIndex` is not on the index
-                        if (user->getOperand(1) == inst)
-                        {
-                            // Replace gep(pArray, nonUniformRes(x)), into
-                            // nonUniformRes(gep(pArray, x))
-                            newUser = builder.emitElementAddress(
-                                user->getFullType(),
-                                user->getOperand(0),
-                                inst->getOperand(0));
-                        }
-                        break;
-                    case kIROp_NonUniformResourceIndex:
-                        // Replace nonUniformRes(nonUniformRes(x)), into nonUniformRes(x)
-                        newUser = inst->getOperand(0);
-                        break;
-                    case kIROp_Load:
-                        // Replace load(nonUniformRes(x)), into nonUniformRes(load(x))
-                        newUser = builder.emitLoad(user->getFullType(), inst->getOperand(0));
-                        break;
-                    default:
-                        // Ignore for all other unknown insts.
-                        break;
-                    };
-
-                    // Early exit when we could not process the `NonUniformResourceIndex` inst.
-                    if (!newUser)
-                        return;
-
-                    auto nonuniformUser = builder.emitNonUniformResourceIndexInst(newUser);
-                    user->replaceUsesWith(nonuniformUser);
-
-                    // Update the worklist with the newly added `NonUniformResourceIndex` inst,
-                    // based on the base inst it was constructed around, in case we need to further
-                    // bubble up the `NonUniformResourceIndex` inst.
-                    switch (user->getOp())
-                    {
-                    case kIROp_IntCast:
-                    case kIROp_GetElementPtr:
-                    case kIROp_Load:
-                    case kIROp_NonUniformResourceIndex:
-                        resWorkList.add(nonuniformUser);
-                        break;
-                    };
-
-                    // Clean up the base inst from the IR module, to avoid duplicate decorations.
-                    user->removeAndDeallocate();
-                });
-        }
-
-        // Once all the `NonUniformResourceIndex` insts are visited, and the inst type is bubbled up
-        // to the parent, a decoration is added to the operands of the insts.
-        for (int i = 0; i < resWorkList.getCount(); ++i)
-        {
-            // It is only required to decorate the base inst, if the `NonUniformResourceIndex` inst
-            // around it has any active uses.
-            auto inst = resWorkList[i];
-            if (!inst->hasUses())
-            {
-                inst->removeAndDeallocate();
-                continue;
-            }
-            // For each of the `NonUniformResourceIndex` inst that remain, decorate the base inst
-            // with a [NonUniformResource] decoration, which is the operand0 of the inst, only
-            // when the type is a resource type, or a pointer to a resource type, or a pointer
-            // in the Physical Storage buffer address space.
-            auto operand = inst->getOperand(0);
-            auto type = operand->getDataType();
-            if (isResourceType(type) || isPointerToResourceType(type))
-            {
-                IRBuilder builder(operand);
-                builder.addSPIRVNonUniformResourceDecoration(operand);
-            }
-            inst->replaceUsesWith(operand);
-            inst->removeAndDeallocate();
-        }
-    }
-
     void processImageSubscript(IRImageSubscript* subscript)
     {
         if (auto ptrType = as<IRPtrTypeBase>(subscript->getDataType()))
@@ -1765,7 +1642,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 processRWStructuredBufferStore(inst);
                 break;
             case kIROp_NonUniformResourceIndex:
-                processNonUniformResourceIndex(inst);
+                processNonUniformResourceIndex(inst, NonUniformResourceIndexFloatMode::SPIRV);
                 break;
             case kIROp_loop:
                 processLoop(as<IRLoop>(inst));
