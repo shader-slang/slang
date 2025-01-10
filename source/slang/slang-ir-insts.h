@@ -364,7 +364,7 @@ struct IRSPIRVNonUniformResourceDecoration : IRDecoration
     {
         kOp = kIROp_SPIRVNonUniformResourceDecoration
     };
-    IR_LEAF_ISA(RequireGLSLVersionDecoration)
+    IR_LEAF_ISA(SPIRVNonUniformResourceDecoration)
 
     IRConstant* getSPIRVNonUniformResourceOperand() { return cast<IRConstant>(getOperand(0)); }
     IntegerLiteralValue getSPIRVNonUniformResource()

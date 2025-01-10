@@ -557,6 +557,13 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(">");
             return;
         }
+    case kIROp_UnsizedArrayType:
+        {
+            m_writer->emit("array<");
+            emitType((IRType*)type->getOperand(0));
+            m_writer->emit(">");
+            return;
+        }
     case kIROp_TextureType:
         if (auto texType = as<IRTextureType>(type))
         {

@@ -616,7 +616,8 @@ static void _lookUpMembersInSuperTypeImpl(
                 request,
                 ioResult,
                 &derefBreacrumb);
-            return;
+            if (ioResult.isValid())
+                return;
         }
     }
 

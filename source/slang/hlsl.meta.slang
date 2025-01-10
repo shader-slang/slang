@@ -20932,14 +20932,38 @@ struct ConstBufferPointer
 // new aliased bindings for each distinct cast type.
 //
 
+/// Represent the kind of a descriptor type.
+enum DescriptorKind
+{
+    Unknown, /// Unknown descriptor kind.
+    Texture, /// A texture descriptor.
+    CombinedTextureSampler, /// A combined texture and sampler state descriptor.
+    Buffer, /// A buffer descriptor.
+    Sampler, /// A sampler state descriptor.
+    AccelerationStructure, /// A ray tracing acceleration structure descriptor.
+}
+
+/// Represents an opaque descriptor type, such as textures, samplers, and buffers etc,
+/// whose size may be undefined and can't be directly accessed as ordinary data.
+[sealed]
+[builtin]
+interface IOpaqueDescriptor
+{
+    /// The kind of the descriptor.
+    static const DescriptorKind kind;
+}
+
 __magic_type(DynamicResourceType)
 __intrinsic_type($(kIROp_DynamicResourceType))
 struct __DynamicResource<let kind = __DynamicResourceKind.General>
 {
     __intrinsic_op($(kIROp_CastDynamicResource))
     T as<T : __IDynamicResourceCastable<kind>>();
+
+    __intrinsic_op($(kIROp_CastDynamicResource))
+    T asOpaqueDescriptor<T : IOpaqueDescriptor>();
 }
-interface __IDynamicResourceCastable<let kind = __DynamicResourceKind.General>
+interface __IDynamicResourceCastable<let kind = __DynamicResourceKind.General> : IOpaqueDescriptor
 {
 }
 
@@ -20955,41 +20979,166 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     __intrinsic_op($(kIROp_CastDynamicResource))
     __implicit_conversion($(kConversionCost_GenericParamUpcast))
     __init(__DynamicResource res);
+
+    typealias Handle = DescriptorHandle<This>;
+
+    static const DescriptorKind kind = isCombined!=0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture;
+
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(DescriptorHandle<This> bindless)
+    {
+        return getDescriptorFromHandle(bindless);
+    }
 }
 
 ${{{{
-const char* kDynamicResourceCastableTypes[] = {
-    "StructuredBuffer<T, L>", "RWStructuredBuffer<T, L>",
-    "AppendStructuredBuffer<T, L>", "ConsumeStructuredBuffer<T, L>", "RasterizerOrderedStructuredBuffer<T, L>",
-    "ByteAddressBuffer", "RWByteAddressBuffer", "RasterizerOrderedByteAddressBuffer",
-
-    "SamplerState", "SamplerComparisonState",
-
-    "ConstantBuffer<T, L>", "TextureBuffer<T>",
+struct DynamicResourceTypeInfo
+{
+    const char* name;
+    const char* kind;
+    const char* dynamicKind;
 };
 
-for (auto typeName : kDynamicResourceCastableTypes) {
-    auto kind = strstr(typeName, "Sampler") ? "Sampler" : "General";
+const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
+    {"StructuredBuffer<T, L>", "Buffer", "General"},
+    {"RWStructuredBuffer<T, L>", "Buffer", "General"},
+    {"AppendStructuredBuffer<T, L>", "Buffer", "General"},
+    {"ConsumeStructuredBuffer<T, L>", "Buffer", "General"},
+    {"RasterizerOrderedStructuredBuffer<T, L>", "Buffer", "General"},
+    {"ByteAddressBuffer", "Buffer", "General"},
+    {"RWByteAddressBuffer", "Buffer", "General"},
+    {"RasterizerOrderedByteAddressBuffer", "Buffer", "General"},
+    {"SamplerState", "Sampler", "Sampler"},
+    {"SamplerComparisonState", "Sampler", "Sampler"},
+    {"ConstantBuffer<T, L>", "Buffer", "General"},
+    {"TextureBuffer<T>", "Buffer", "General"},
+    {"RaytracingAccelerationStructure", "AccelerationStructure", "General"},
+};
 
-    if (strstr(typeName, "StructuredBuffer<T, L>"))
-        sb << "__generic<T, L : IBufferDataLayout = DefaultDataLayout>\n";
-    else if (strstr(typeName, "ConstantBuffer<T, L>"))
-        sb << "__generic<T, L : IBufferDataLayout = DefaultDataLayout>\n";
-    else if (strstr(typeName, "Buffer<T>"))
+for (auto type : kDynamicResourceCastableTypes) {
+    auto dynamicKind = type.dynamicKind;
+    auto kind = type.kind;
+    auto typeName = type.name;
+    if (strstr(typeName, "<T, L>"))
+        sb << "__generic<T, L : IBufferDataLayout>\n";
+    else if (strstr(typeName, "<T>"))
         sb << "__generic<T>\n";
 }}}}
 
-extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(kind)>
+extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynamicKind)>
 {
     __intrinsic_op($(kIROp_CastDynamicResource))
     __implicit_conversion($(kConversionCost_GenericParamUpcast))
     __init(__DynamicResource res);
+
+    static const DescriptorKind kind = DescriptorKind.$(kind);
+
+    typealias Handle = DescriptorHandle<$(typeName)>;
+
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    [ForceInline]
+    __init(DescriptorHandle<$(typeName)> bindless)
+    {
+        return getDescriptorFromHandle(bindless);
+    }
 }
 
 ${{{{
 }
 }}}}
 
+/// Represents a bindless resource handle. A bindless resource handle is always a concrete type and can be
+/// declared in any memory location.
+__magic_type(DescriptorHandleType)
+__intrinsic_type($(kIROp_DescriptorHandleType))
+struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
+{
+    [require(glsl_spirv)]
+    [require(hlsl, sm_6_6)]
+    [require(wgsl)]
+    __intrinsic_op($(kIROp_CastUInt2ToDescriptorHandle))
+    __init(uint2 handleValue);
+
+    [ForceInline]
+    bool equals(DescriptorHandle<T> other) { return all(__vectorEql((uint2)this, (uint2)other)); }
+
+    [ForceInline]
+    bool lessThan(DescriptorHandle<T> other) { let vthis = ((uint2)this); let vother = (uint2)other; return vthis.x < vother.x || (vthis.x == vother.x && vthis.y < vother.y); }
+
+    [ForceInline]
+    bool lessThanOrEquals(DescriptorHandle<T> other) { let vthis = ((uint2)this); let vother = (uint2)other; return vthis.x < vother.x || (vthis.x == vother.x && vthis.y <= vother.y); }
+}
+
+extension uint2
+{
+    __intrinsic_op($(kIROp_CastDescriptorHandleToUInt2))
+    [require(glsl_spirv)]
+    [require(hlsl, sm_6_6)]
+    [require(wgsl)]
+    __init<T:IOpaqueDescriptor>(DescriptorHandle<T> bindless);
+}
+
+__generic<T:IOpaqueDescriptor>
+[ForceInline]
+__prefix T operator*(DescriptorHandle<T> value)
+{
+    return getDescriptorFromHandle(value);
+}
+
+__intrinsic_op($(kIROp_GetDynamicResourceHeap))
+T[] __getDynamicResourceHeap<T:IOpaqueDescriptor>();
+
+
+// Used by the HLSL backend only, load a sampler state handle from SamplerDescriptorHeap.
+__intrinsic_op($(kIROp_LoadSamplerDescriptorFromHeap))
+T __loadSamplerDescriptorFromHeap<T>(uint index);
+
+// Used by the HLSL backend only, load a resource handle from ResourceDescriptorHeap.
+__intrinsic_op($(kIROp_LoadResourceDescriptorFromHeap))
+T __loadResourceDescriptorFromHeap<T>(uint index);
+
+// Used by the HLSL and Metal backends only,
+// create a combined texture sampler object from a bindless handle.
+__intrinsic_op($(kIROp_MakeCombinedTextureSamplerFromHandle))
+T __makeCombinedTextureSamplerFromHandle<T, U>(U handle);
+
+__intrinsic_op($(kIROp_CastDescriptorHandleToResource))
+T __castDescriptorHandleToResource<T:IOpaqueDescriptor>(DescriptorHandle<T> ptr);
+
+/// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
+/// to a descriptor object.
+[ForceInline]
+T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
+{
+    __target_switch
+    {
+    case hlsl:
+        if (T.kind == DescriptorKind.Sampler)
+            return __loadSamplerDescriptorFromHeap<T>(((uint2)handleValue).x);
+        else if (T.kind == DescriptorKind.CombinedTextureSampler)
+            return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
+        else
+            return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
+    case spirv:
+    case glsl:
+    case wgsl:
+        return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
+    default:
+        return __castDescriptorHandleToResource<T>(handleValue);
+    }
+}
+
+/// Declaration of the `getDescriptorFromHandle` that the user code can provide to customize
+/// how a descriptor handle is converted into a actual descriptor.
+[ForceInline]
+extern T getDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
+{
+    return defaultGetDescriptorFromHandle(handleValue);
+}
+
+__intrinsic_op($(kIROp_NonUniformResourceIndex))
+DescriptorHandle<T> nonuniform<T:IOpaqueDescriptor>(DescriptorHandle<T> ptr);
 
 __glsl_version(450)
 __glsl_extension(GL_ARB_shader_clock)
