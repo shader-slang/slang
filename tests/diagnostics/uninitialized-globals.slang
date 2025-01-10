@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHK): -allow-glsl -target spirv
+//TEST:SIMPLE(filecheck=CHK): -allow-glsl -target spirv -entry computeMain
 
 // Using groupshared variables
 groupshared float4 gsUninitialized;
@@ -70,3 +70,10 @@ vec4 glsl_layout_out_ok()
 }
 
 //CHK-NOT: warning 41017
+
+[Shader("compute")]
+[NumThreads(4, 1, 1)]
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+{
+}
+

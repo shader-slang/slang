@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHK): -target spirv
+//TEST:SIMPLE(filecheck=CHK): -target spirv -entry computeMain
 
 // Using before assigning
 float regular_undefined_use(out float3 v)
@@ -92,3 +92,10 @@ void target_switching_blocks(uint x, out half v)
 
 //CHK-NOT: warning 41015
 //CHK-NOT: warning 41018
+
+[Shader("compute")]
+[NumThreads(4, 1, 1)]
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+{
+}
+
