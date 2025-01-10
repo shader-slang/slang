@@ -1089,6 +1089,7 @@ public:
     {
         m_checkForSynthesizedCtor = checkForSynthesizedCtor;
     }
+
 private:
     SharedSemanticsContext* m_shared = nullptr;
 
