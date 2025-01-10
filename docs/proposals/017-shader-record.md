@@ -1,4 +1,4 @@
-SP #000: Disambiguate `uniform` via `[[push_constant]]` and `[[shader_record]]` 
+SP #017: Disambiguate `uniform` via `[[push_constant]]` and `[[shader_record]]` 
 =======================================================================
 
 This document proposes a first step toward resolving ambiguities and bugs that
@@ -28,7 +28,7 @@ where current usage, `void anyhit(in MyConstPayload p)`, would otherwise incorre
 Status
 ------
 
-**Status**: Work-in-progress / Design Review
+**Status**: Design Review
 
 **Implementation**: 
 No implementation yet; to be proposed in future PR(s).
