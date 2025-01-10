@@ -760,6 +760,15 @@ public:
         m_mapTypePairToImplicitCastMethod[key] = candidate;
     }
 
+    bool* isCStyleStruct(StructDecl* structDecl)
+    {
+        return m_isCStyleStructCache.tryGetValue(structDecl);
+    }
+
+    void cacheCStyleStruct(StructDecl* structDecl, bool isCStyle)
+    {
+        m_isCStyleStructCache.addIfNotExists(structDecl, isCStyle);
+    }
     // Get the inner most generic decl that a decl-ref is dependent on.
     // For example, `Foo<T>` depends on the generic decl that defines `T`.
     //
@@ -889,6 +898,7 @@ private:
     Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
     Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
     Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
+    Dictionary<StructDecl*, bool> m_isCStyleStructCache;
 };
 
 /// Local/scoped state of the semantic-checking system
