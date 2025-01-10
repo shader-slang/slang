@@ -208,7 +208,7 @@ ConstructorDecl* SemanticsVisitor::_getSynthesizedConstructor(
     ConstructorDecl::ConstructorTags tags)
 {
     ConstructorDecl* synthesizedCtor = nullptr;
-    if(structDecl->m_synthesizedCtorMap.tryGetValue((int)tags, synthesizedCtor))
+    if (structDecl->m_synthesizedCtorMap.tryGetValue((int)tags, synthesizedCtor))
     {
         return synthesizedCtor;
     }
@@ -263,10 +263,8 @@ bool SemanticsVisitor::_cStyleStructBasicCheck(Decl* decl)
 
     // 4. All of its members have to have the same visibility as the struct itself.
     DeclVisibility structVisibility = getDeclVisibility(structDecl);
-    for (auto varDeclRef :
-         getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance))
+    for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
     {
-        auto varDecl = varDeclRef.getDecl();
         if (getDeclVisibility(varDecl) != structVisibility)
         {
             return false;
@@ -278,7 +276,7 @@ bool SemanticsVisitor::_cStyleStructBasicCheck(Decl* decl)
 bool SemanticsVisitor::isCStyleStruct(StructDecl* structDecl)
 {
     // Get the result from the cache first
-    if (bool *isCStyle = getShared()->isCStyleStruct(structDecl))
+    if (bool* isCStyle = getShared()->isCStyleStruct(structDecl))
     {
         return *isCStyle;
     }
@@ -291,25 +289,26 @@ bool SemanticsVisitor::isCStyleStruct(StructDecl* structDecl)
     }
 
     // 5. All its members are legacy C-Style structs or arrays of legacy C-style structs
-    for (auto varDeclRef :
-         getMembersOfType<VarDeclBase>(getASTBuilder(), structDecl, MemberFilterStyle::Instance))
+    for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
     {
-        auto varDecl = varDeclRef.getDecl();
-
         // if the member is an array, check if the element is legacy C-style rule.
         if (auto arrayType = as<ArrayExpressionType>(varDecl->getType()))
         {
             auto* elementType = arrayType->getElementType();
-            ArrayExpressionType* nextType = nullptr;
-            while (nextType = as<ArrayExpressionType>(elementType))
+            for (;;)
             {
+                ArrayExpressionType* nextType = as<ArrayExpressionType>(elementType);
+                if (!nextType)
+                    break;
+
                 elementType = nextType->getElementType();
             }
-            if (auto structDecl = _getStructDecl(elementType))
+
+            if (auto elemStructDecl = _getStructDecl(elementType))
             {
-                if (!_cStyleStructBasicCheck(structDecl))
+                if (!_cStyleStructBasicCheck(elemStructDecl))
                 {
-                    getShared()->cacheCStyleStruct(structDecl, false);
+                    getShared()->cacheCStyleStruct(elemStructDecl, false);
                     return false;
                 }
             }
@@ -396,6 +395,9 @@ bool SemanticsVisitor::_invokeExprForSynthesizedCtor(
     StructDecl* structDecl = isDeclRefTypeOf<StructDecl>(toType).getDecl();
 
     if (!structDecl || isFromCoreModule(structDecl))
+        return false;
+
+    if (structDecl->m_synthesizedCtorMap.getCount() == 0)
         return false;
 
     bool isCStyle = isCStyleStruct(structDecl);
