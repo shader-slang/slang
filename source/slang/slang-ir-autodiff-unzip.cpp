@@ -342,7 +342,7 @@ void markNonContextParamsAsSideEffectFree(IRBuilder* builder, IRFunc* func)
 {
     for (auto param : func->getParams())
     {
-        if (!isIntermediateContextType(param->getDataType()))
+        if (!param->findDecorationImpl(kIROp_PrimalContextDecoration))
             builder->addDecoration(param, kIROp_IgnoreSideEffectsDecoration);
     }
 }

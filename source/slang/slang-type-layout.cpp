@@ -847,6 +847,8 @@ struct GLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         {
         case ShaderParameterKind::SubpassInput:
             return SimpleLayoutInfo(LayoutResourceKind::InputAttachmentIndex, slotCount);
+        case ShaderParameterKind::ParameterBlock:
+            return SimpleLayoutInfo(LayoutResourceKind::SubElementRegisterSpace, 1);
         default:
             break;
         }
@@ -893,7 +895,8 @@ struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         {
         case ShaderParameterKind::ConstantBuffer:
             return SimpleLayoutInfo(LayoutResourceKind::ConstantBuffer, 1);
-
+        case ShaderParameterKind::ParameterBlock:
+            return SimpleLayoutInfo(LayoutResourceKind::SubElementRegisterSpace, 1);
         case ShaderParameterKind::TextureUniformBuffer:
         case ShaderParameterKind::StructuredBuffer:
         case ShaderParameterKind::RawBuffer:
@@ -1184,6 +1187,7 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         switch (kind)
         {
         case ShaderParameterKind::ConstantBuffer:
+        case ShaderParameterKind::ParameterBlock:
             // It's a pointer to the actual uniform data
             return SimpleLayoutInfo(
                 LayoutResourceKind::Uniform,
@@ -1268,6 +1272,7 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
         switch (kind)
         {
         case ShaderParameterKind::ConstantBuffer:
+        case ShaderParameterKind::ParameterBlock:
             {
                 // It's a pointer to the actual uniform data
                 return SimpleLayoutInfo(
@@ -1871,6 +1876,7 @@ struct MetalObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         switch (kind)
         {
         case ShaderParameterKind::ConstantBuffer:
+        case ShaderParameterKind::ParameterBlock:
         case ShaderParameterKind::StructuredBuffer:
         case ShaderParameterKind::MutableStructuredBuffer:
         case ShaderParameterKind::RawBuffer:
@@ -1934,6 +1940,7 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
         switch (kind)
         {
         case ShaderParameterKind::ConstantBuffer:
+        case ShaderParameterKind::ParameterBlock:
         case ShaderParameterKind::StructuredBuffer:
         case ShaderParameterKind::MutableStructuredBuffer:
         case ShaderParameterKind::RawBuffer:
@@ -2360,6 +2367,10 @@ static SimpleLayoutInfo _getParameterGroupLayoutInfo(
     }
     else if (as<ParameterBlockType>(type))
     {
+        auto info =
+            rules->GetObjectLayout(ShaderParameterKind::ParameterBlock, context.objectLayoutOptions)
+                .getSimple();
+
         // Note: we default to consuming zero register spces here, because
         // a parameter block might not contain anything (or all it contains
         // is other blocks), and so it won't get a space allocated.
@@ -2370,7 +2381,9 @@ static SimpleLayoutInfo _getParameterGroupLayoutInfo(
         //
         // TODO: wouldn't it be any different to just allocate this
         // as an empty `SimpleLayoutInfo` of any other kind?
-        return SimpleLayoutInfo(LayoutResourceKind::SubElementRegisterSpace, 0);
+        if (info.kind == LayoutResourceKind::SubElementRegisterSpace)
+            info.size = 0;
+        return info;
     }
 
     // TODO: the vertex-input and fragment-output cases should
@@ -2542,7 +2555,7 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
 
 bool areResourceTypesBindlessOnTarget(TargetRequest* targetReq)
 {
-    return isCPUTarget(targetReq) || isCUDATarget(targetReq);
+    return isCPUTarget(targetReq) || isCUDATarget(targetReq) || isMetalTarget(targetReq);
 }
 
 static bool isD3D11Target(TargetRequest*)
@@ -4068,6 +4081,21 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     RefPtr<TypeLayout> fieldTypeLayout = fieldResult.layout;
     UniformLayoutInfo fieldInfo = fieldResult.info.getUniformLayout();
 
+    if (fieldTypeLayout->resourceInfos.getCount() == 0)
+    {
+        if (auto paramGroupTypeLayout = as<ParameterGroupTypeLayout>(fieldTypeLayout))
+        {
+            // If field type layout is a parameter block and it has a size that is not just a space,
+            // we need to count for it in the struct layout.
+            auto containerTypeLayout = paramGroupTypeLayout->containerVarLayout->getTypeLayout();
+            if (containerTypeLayout->FindResourceInfo(
+                    LayoutResourceKind::SubElementRegisterSpace) == nullptr)
+            {
+                fieldTypeLayout = containerTypeLayout;
+            }
+        }
+    }
+
     // Note: we don't add any zero-size fields
     // when computing structure layout, just
     // to avoid having a resource type impact
@@ -4098,7 +4126,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     // for each field of the structure.
     RefPtr<VarLayout> fieldLayout = new VarLayout();
     fieldLayout->varDecl = field;
-    fieldLayout->typeLayout = fieldTypeLayout;
+    fieldLayout->typeLayout = fieldResult.layout;
     m_typeLayout->fields.add(fieldLayout);
 
     if (field)
@@ -4821,6 +4849,15 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             SimpleLayoutInfo(LayoutResourceKind::DescriptorTableSlot, 1),
             type,
             rules);
+    }
+    else if (auto resPtrType = as<DescriptorHandleType>(type))
+    {
+        if (areResourceTypesBindlessOnTarget(context.targetReq))
+            return _createTypeLayout(context, resPtrType->getElementType());
+        auto uint2Type = context.astBuilder->getVectorType(
+            context.astBuilder->getUIntType(),
+            context.astBuilder->getIntVal(context.astBuilder->getIntType(), 2));
+        return _createTypeLayout(context, uint2Type);
     }
     else if (auto optionalType = as<OptionalType>(type))
     {

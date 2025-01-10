@@ -1359,6 +1359,7 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
     auto ctxParam =
         builder->emitParam(as<IRFuncType>(diffFunc->getDataType())->getParamType(paramCount - 1));
     builder->addNameHintDecoration(ctxParam, UnownedStringSlice("_s_diff_ctx"));
+    builder->addDecoration(ctxParam, kIROp_PrimalContextDecoration);
     result.primalFuncParams.add(ctxParam);
     result.propagateFuncParams.add(ctxParam);
     result.dOutParam = dOutParam;

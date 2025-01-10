@@ -557,6 +557,13 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(">");
             return;
         }
+    case kIROp_UnsizedArrayType:
+        {
+            m_writer->emit("array<");
+            emitType((IRType*)type->getOperand(0));
+            m_writer->emit(">");
+            return;
+        }
     case kIROp_TextureType:
         if (auto texType = as<IRTextureType>(type))
         {
@@ -1365,10 +1372,10 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_Rsh:
     case kIROp_Lsh:
         {
-            // Shift amounts must be an unsigned type in WGSL
+            // Shift amounts must be an unsigned type in WGSL.
+            // We ensure this during legalization.
             // https://www.w3.org/TR/WGSL/#bit-expr
-            IRInst* const shiftAmount = inst->getOperand(1);
-            IRType* const shiftAmountType = shiftAmount->getDataType();
+            SLANG_ASSERT(inst->getOperand(1)->getDataType()->getOp() != kIROp_IntType);
 
             // Dawn complains about mixing '<<' and '|', '^' and a bunch of other bit operators
             // without a paranthesis, so we'll always emit paranthesis around the shift amount.
@@ -1385,18 +1392,9 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(info.op);
             m_writer->emit(" ");
 
-            if (shiftAmountType->getOp() == kIROp_IntType)
-            {
-                m_writer->emit("bitcast<u32>(");
-                emitOperand(inst->getOperand(1), rightSide(outerPrec, info));
-                m_writer->emit(")");
-            }
-            else
-            {
-                m_writer->emit("(");
-                emitOperand(inst->getOperand(1), rightSide(outerPrec, info));
-                m_writer->emit(")");
-            }
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(1), rightSide(outerPrec, info));
+            m_writer->emit(")");
 
             maybeCloseParens(needClose);
 
