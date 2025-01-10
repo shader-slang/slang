@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHK): -target spirv
+//TEST:SIMPLE(filecheck=CHK): -target spirv -entry computeMain
 
 // Both out and inout parameters
 // should have this treated as writes
@@ -111,3 +111,10 @@ void f()
 }
 
 //CHK-NOT: warning 41016
+
+[Shader("compute")]
+[NumThreads(4, 1, 1)]
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+{
+}
+
