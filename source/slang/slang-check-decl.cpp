@@ -103,7 +103,7 @@ struct SemanticsDeclAttributesVisitor : public SemanticsDeclVisitorBase,
     // We will defer the actual implementation of the constructor to the body visit, because
     // we will have full information about each field in the struct during that stage.
     void _synthesizeCtorSignature(StructDecl* structDecl);
-    void _searchMembersWithHigherVisibility(
+    bool _searchMembersWithHigherVisibility(
         StructDecl* structDecl,
         const DeclVisibility ctorVisibility,
         List<VarDeclBase*>& resultMembers);
@@ -2156,6 +2156,22 @@ static List<ConstructorDecl*> _getCtorList(
     }
 
     return ctorList;
+}
+
+template<typename VisitorType>
+static void checkSynthesizedConstructorWithoutDiagnostic(VisitorType& subVisitor, Decl* decl)
+{
+    subVisitor.dispatch(decl);
+    auto tempSink = subVisitor.getSink();
+    if (tempSink->getErrorCount() > 0)
+    {
+        auto structDecl = as<StructDecl>(decl->parentDecl);
+        structDecl->members.remove(decl);
+        structDecl->invalidateMemberDictionary();
+        structDecl->buildMemberDictionary();
+        structDecl->m_synthesizedCtorMap.remove((int)ConstructorDecl::ConstructorTags::MemberInitCtor);
+    }
+    return;
 }
 
 void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
@@ -8121,6 +8137,22 @@ SemanticsContext SemanticsDeclBodyVisitor::registerDifferentiableTypesForFunc(
 
 void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
 {
+    if (auto constructorDecl = as<ConstructorDecl>(decl))
+    {
+        // When checking the synthesized constructor, it's possible to hit error, but we don't want to
+        // report this error, because this function is not created by user. Instead, when we detect this
+        // error, we will remove this synthesized constructor from the struct.
+        if (constructorDecl->containsTag(ConstructorDecl::ConstructorTags::MemberInitCtor) && !m_checkForSynthesizedCtor)
+        {
+            DiagnosticSink tempSink;
+            SemanticsContext subContext = withSink(&tempSink);
+            subContext.setCheckForSynthesizedCtor(true);
+            SemanticsDeclBodyVisitor subVisitor(subContext);
+            checkSynthesizedConstructorWithoutDiagnostic(subVisitor, decl);
+            return;
+        }
+    }
+
     auto newContext = registerDifferentiableTypesForFunc(decl);
     if (const auto body = decl->body)
     {
@@ -9980,19 +10012,9 @@ void SemanticsDeclHeaderVisitor::visitConstructorDecl(ConstructorDecl* decl)
     {
         DiagnosticSink tempSink;
         SemanticsContext subContext = withSink(&tempSink);
+        subContext.setCheckForSynthesizedCtor(true);
         SemanticsDeclHeaderVisitor subVisitor(subContext);
-        subVisitor.m_checkForSynthesizedCtor = true;
-        subVisitor.dispatch(decl);
-
-        if (tempSink.getErrorCount() > 0)
-        {
-            auto structDecl = as<StructDecl>(decl->parentDecl);
-            structDecl->members.remove(decl);
-            structDecl->invalidateMemberDictionary();
-            structDecl->buildMemberDictionary();
-            structDecl->m_synthesizedCtorMap.remove(
-                (int)ConstructorDecl::ConstructorTags::MemberInitCtor);
-        }
+        checkSynthesizedConstructorWithoutDiagnostic(subVisitor, decl);
         return;
     }
 
@@ -12196,7 +12218,7 @@ void SemanticsDeclAttributesVisitor::checkPrimalSubstituteOfAttribute(
         DeclAssociationKind::PrimalSubstituteFunc);
 }
 
-void SemanticsDeclAttributesVisitor::_searchMembersWithHigherVisibility(
+bool SemanticsDeclAttributesVisitor::_searchMembersWithHigherVisibility(
     StructDecl* structDecl,
     const DeclVisibility ctorVisibility,
     List<VarDeclBase*>& resultMembers)
@@ -12247,6 +12269,7 @@ void SemanticsDeclAttributesVisitor::_searchMembersWithHigherVisibility(
 
     // Find the struct's members
     findMembers(structDecl);
+    return (resultMembers.getCount() > 0);
 }
 
 // If a struct's member:
@@ -12292,18 +12315,13 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
     // Only the members whose visibility level is higher or equal than the
     // constructor's visibility level will appear in the constructor's parameter list.
     List<VarDeclBase*> resultMembers;
-    _searchMembersWithHigherVisibility(structDecl, ctorVisibility, resultMembers);
-
-    // If there is no members or none of members are visible, then don't bother to synthesize the
-    // member initialize constructor.
-    if (resultMembers.getCount() == 0)
+    if(!_searchMembersWithHigherVisibility(structDecl, ctorVisibility, resultMembers))
         return;
 
     // synthesize the constructor signature:
     // 1. The constructor's name is always `$init`, we create one without parameters now.
     ConstructorDecl* ctor = _createCtor(this, getASTBuilder(), structDecl);
     ctor->addTag(ConstructorDecl::ConstructorTags::MemberInitCtor);
-    addVisibilityModifier(getASTBuilder(), ctor, ctorVisibility);
     structDecl->m_synthesizedCtorMap.addIfNotExists(
         (int)ConstructorDecl::ConstructorTags::MemberInitCtor,
         ctor);
@@ -12328,11 +12346,20 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
         ctorParam->nameAndLoc = NameLoc(member->getName(), ctor->loc);
         ctorParam->loc = ctor->loc;
         ctor->members.add(ctorParam);
+
+        // We need to ensure member is `no_diff` if it cannot be differentiated, `ctor` modifiers do not matter
+        // in this case since member-wise ctor is always differentiable or "treat as differentiable".
+        if (!isTypeDifferentiable(member->getType()) || member->hasModifier<NoDiffModifier>())
+        {
+            auto noDiffMod = m_astBuilder->create<NoDiffModifier>();
+            noDiffMod->loc = ctorParam->loc;
+            addModifier(ctorParam, noDiffMod);
+        }
     }
     ctor->members.reverse();
 
-    // 3. Add the modifiers, there is some special handling for the synthesized constructor that
-    // requires us to add some modifiers.
+    // 3. Add the necessary modifiers
+    addVisibilityModifier(getASTBuilder(), ctor, ctorVisibility);
 }
 
 void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
