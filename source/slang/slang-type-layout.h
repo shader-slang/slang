@@ -975,7 +975,7 @@ enum class ShaderParameterKind
     AtomicUint,
 
     SubpassInput,
-
+    AccelerationStructure,
     ParameterBlock,
 };
 
