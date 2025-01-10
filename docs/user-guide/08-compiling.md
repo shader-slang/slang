@@ -183,7 +183,7 @@ slangc hello-world.slang -target spirv -o hello-world.spv
 > The `slangc` CLI [does not currently support](https://github.com/shader-slang/slang/issues/5541) `[shader(...)]` attributes for targets other than SPIRV. For other targets, the `-entry` argument is mandatory. Example:
 > 
 > ```bat
-> slangc hello-world.slang -target hlsl -entry computeMain -o hello-world.spv
+> slangc hello-world.slang -target hlsl -entry computeMain -o hello-world.hlsl
 > ```
 
 ### Source Files and Translation Units
