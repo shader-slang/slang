@@ -62,6 +62,7 @@ void main(uint3 dispatchThreadID : SV_DispatchThreadID)
     // expected an expression of type 'GenericOuter<int>.NonGenericInner', got 'GenericOuter<float>.NonGenericInner'
     a.ng = b.ng;
     // expected an expression of type 'NonGenericOuter.GenericInner<int>', got 'int'
+    // explicit conversion from 'int' to 'GenericInner<int>' is possible
     c.i = 0;
     // expected an expression of type 'NonGenericOuter.GenericInner<int>', got 'NonGenericOuter.GenericInner<float>'
     c.i = c.f;

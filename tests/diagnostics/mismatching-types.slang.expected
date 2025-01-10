@@ -20,6 +20,7 @@ tests/diagnostics/mismatching-types.slang(63): error 30019: expected an expressi
 tests/diagnostics/mismatching-types.slang(65): error 30019: expected an expression of type 'GenericInner<int>', got 'int'
     c.i = 0;
           ^
+tests/diagnostics/mismatching-types.slang(65): note: explicit conversion from 'int' to 'GenericInner<int>' is possible
 tests/diagnostics/mismatching-types.slang(67): error 30019: expected an expression of type 'GenericInner<int>', got 'GenericInner<float>'
     c.i = c.f;
             ^

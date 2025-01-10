@@ -170,6 +170,7 @@ class StructDecl : public AggTypeDecl
     // We will use these auxiliary to help in synthesizing the member initialize constructor.
     Slang::HashSet<VarDeclBase*> m_membersVisibleInCtor;
     Dictionary<int, ConstructorDecl*> m_synthesizedCtorMap;
+    bool m_hasExplicitCtorInExtension = false;
 };
 
 class ClassDecl : public AggTypeDecl
