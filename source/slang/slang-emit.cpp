@@ -43,6 +43,7 @@
 #include "slang-ir-explicit-global-context.h"
 #include "slang-ir-explicit-global-init.h"
 #include "slang-ir-fix-entrypoint-callsite.h"
+#include "slang-ir-float-non-uniform-resource-index.h"
 #include "slang-ir-fuse-satcoop.h"
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-glsl-liveness.h"
@@ -64,6 +65,7 @@
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-lower-combined-texture-sampler.h"
+#include "slang-ir-lower-dynamic-resource-heap.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-glsl-ssbo-types.h"
 #include "slang-ir-lower-l-value-cast.h"
@@ -316,6 +318,7 @@ struct RequiredLoweringPassSet
     bool glslSSBO;
     bool byteAddressBuffer;
     bool dynamicResource;
+    bool dynamicResourceHeap;
     bool resolveVaryingInputRef;
 };
 
@@ -425,6 +428,9 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_DynamicResourceType:
         result.dynamicResource = true;
+        break;
+    case kIROp_GetDynamicResourceHeap:
+        result.dynamicResourceHeap = true;
         break;
     case kIROp_ResolveVaryingInputRef:
         result.resolveVaryingInputRef = true;
@@ -1122,6 +1128,9 @@ Result linkAndOptimizeIR(
     else
         simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
 
+    if (requiredLoweringPassSet.dynamicResourceHeap)
+        lowerDynamicResourceHeap(targetProgram, irModule, sink);
+
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER SSA");
 #endif
@@ -1389,6 +1398,11 @@ Result linkAndOptimizeIR(
 
     default:
         break;
+    }
+
+    if (!isSPIRV(targetRequest->getTarget()))
+    {
+        floatNonUniformResourceIndex(irModule, NonUniformResourceIndexFloatMode::Textual);
     }
 
     // Legalize non struct parameters that are expected to be structs for HLSL.
