@@ -20882,20 +20882,24 @@ struct ConstBufferPointer
 // new aliased bindings for each distinct cast type.
 //
 
+/// Represent the kind of a descriptor type.
 enum DescriptorKind
 {
-    Unknown,
-    Texture,
-    CombinedTextureSampler,
-    Buffer,
-    Sampler,
-    AccelerationStructure,
+    Unknown, /// Unknown descriptor kind.
+    Texture, /// A texture descriptor.
+    CombinedTextureSampler, /// A combined texture and sampler state descriptor.
+    Buffer, /// A buffer descriptor.
+    Sampler, /// A sampler state descriptor.
+    AccelerationStructure, /// A ray tracing acceleration structure descriptor.
 }
 
+/// Represents an opaque descriptor type, such as textures, samplers, and buffers etc,
+/// whose size may be undefined and can't be directly accessed as ordinary data.
 [sealed]
 [builtin]
 interface IOpaqueDescriptor
 {
+    /// The kind of the descriptor.
     static const DescriptorKind kind;
 }
 
@@ -21052,8 +21056,8 @@ T __makeCombinedTextureSamplerFromHandle<T, U>(U handle);
 __intrinsic_op($(kIROp_CastDescriptorHandleToResource))
 T __castDescriptorHandleToResource<T:IOpaqueDescriptor>(DescriptorHandle<T> ptr);
 
-/// The default implementation of `getDescriptorFromHandle`, which converts from a bindless resource handle
-/// to a typed resource object.
+/// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
+/// to a descriptor object.
 [ForceInline]
 T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
 {
@@ -21075,6 +21079,8 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
     }
 }
 
+/// Declaration of the `getDescriptorFromHandle` that the user code can provide to customize
+/// how a descriptor handle is converted into a actual descriptor.
 [ForceInline]
 extern T getDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
 {

@@ -58,7 +58,7 @@ All builtin types that implements `IOpaqueDescriptor` interface provide a conven
 
 - `operator *` to deference the pointer and obatin the actual descriptor handle `T`.
 - Implicit conversion to `T` when used in a location that expects `T`.
-- When targeting HLSL, GLSL and SPIRV, `DescriptorHandle<T>` can be casted to and from a `uint2` value.
+- When targeting HLSL, GLSL and SPIRV, `DescriptorHandle<T>` can be explicitly casted to and from a `uint2` value.
 - Equality comparison.
 
 For example:
@@ -168,7 +168,7 @@ void test(DescriptorHandle<Texture2D> t)
 If the descriptor handle value is not uniform and `nonuniform` is not called, the result may be
 undefined.
 
-### Combind Texture Samplers
+### Combined Texture Samplers
 
 On platforms without native support for combined texture samplers, we will use both components of the
 underlying `uint2` value: the `x` component stores the bindless handle for the texture, and the `y` component stores the bindless handle for the sampler.
