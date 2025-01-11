@@ -2606,37 +2606,18 @@ struct LegalizeShaderEntryPointContext
                 UnownedStringSlice outIndex;
                 bool hasStringIndex = splitNameAndIndex(semanticName, outName, outIndex);
 
-                if (isTargetMetal())
-                {
-                    if (hasStringIndex)
-                    {
-                        auto loweredName = String(outName).toLower();
-                        auto loweredNameSlice = loweredName.getUnownedSlice();
-                        auto newDecoration = builder.addSemanticDecoration(
-                            key,
-                            loweredNameSlice,
-                            stringToInt(outIndex));
-                        semanticDecoration->replaceUsesWith(newDecoration);
-                        semanticDecoration->removeAndDeallocate();
-                        semanticDecoration = newDecoration;
-                    }
-                }
-                else
-                {
-                    // user semantics gets all same semantic-name.
-                    auto loweredName = String(outName).toLower();
-                    auto loweredNameSlice = isUserSemantic ? wgslContext.userSemanticName
-                                                           : loweredName.getUnownedSlice();
-                    auto newDecoration = builder.addSemanticDecoration(
-                        key,
-                        loweredNameSlice,
-                        // hasStringIndex ? stringToInt(outIndex) : 0);
-                        hasStringIndex ? stringToInt(outIndex)
-                                       : semanticDecoration->getSemanticIndex());
-                    semanticDecoration->replaceUsesWith(newDecoration);
-                    semanticDecoration->removeAndDeallocate();
-                    semanticDecoration = newDecoration;
-                }
+                auto loweredName = String(outName).toLower();
+                auto loweredNameSlice = isTargetMetal() || !isUserSemantic
+                                            ? loweredName.getUnownedSlice()
+                                            : wgslContext.userSemanticName;
+                auto semanticIndex =
+                    hasStringIndex ? stringToInt(outIndex) : semanticDecoration->getSemanticIndex();
+                auto newDecoration =
+                    builder.addSemanticDecoration(key, loweredNameSlice, semanticIndex);
+
+                semanticDecoration->replaceUsesWith(newDecoration);
+                semanticDecoration->removeAndDeallocate();
+                semanticDecoration = newDecoration;
 
                 auto& semanticUse =
                     usedSemanticIndexSemanticDecor[semanticDecoration->getSemanticName()];
@@ -3143,8 +3124,8 @@ struct LegalizeShaderEntryPointContext
 
         // TODO FIXME: Enable these for WGSL
         // WGSL entry point legalization currently only applies attributes to struct parameters,
-        // apply the same hoisting from Metal to WGSL.
-        if (isTargetMetal())
+        // apply the same hoisting from Metal to WGSL to fix it.
+        // if (isTargetMetal())
         {
             hoistEntryPointParameterFromStruct(entryPoint);
             packStageInParameters(entryPoint);
