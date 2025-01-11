@@ -1550,11 +1550,6 @@ void depointerizeInputParams(IRFunc* entryPointFunc)
 class LegalizeShaderEntryPointContext
 {
 public:
-    LegalizeShaderEntryPointContext(IRModule* module, DiagnosticSink* sink, bool hoistParameters)
-        : m_module(module), m_sink(sink), hoistParameters(hoistParameters)
-    {
-    }
-
     void legalizeEntryPoints(List<EntryPointInfo>& entryPoints)
     {
         for (auto entryPoint : entryPoints)
@@ -1563,6 +1558,11 @@ public:
     }
 
 protected:
+    LegalizeShaderEntryPointContext(IRModule* module, DiagnosticSink* sink, bool hoistParameters)
+        : m_module(module), m_sink(sink), hoistParameters(hoistParameters)
+    {
+    }
+
     IRModule* m_module;
     DiagnosticSink* m_sink;
 
@@ -1596,7 +1596,7 @@ protected:
     virtual void flattenNestedStructsTransferKeyDecorations(IRInst* newKey, IRInst* oldKey)
         const = 0;
 
-    virtual UnownedStringSlice getUserSemanticName(String& loweredName, bool isUserSemantic)
+    virtual UnownedStringSlice getUserSemanticNameSlice(String& loweredName, bool isUserSemantic)
         const = 0;
 
     virtual void addFragmentShaderReturnValueDecoration(
@@ -2713,8 +2713,7 @@ private:
                 bool hasStringIndex = splitNameAndIndex(semanticName, outName, outIndex);
 
                 auto loweredName = String(outName).toLower();
-                auto loweredNameSlice = getUserSemanticName(loweredName, isUserSemantic);
-
+                auto loweredNameSlice = getUserSemanticNameSlice(loweredName, isUserSemantic);
                 auto semanticIndex =
                     hasStringIndex ? stringToInt(outIndex) : semanticDecoration->getSemanticIndex();
                 auto newDecoration =
@@ -3247,11 +3246,10 @@ protected:
     void flattenNestedStructsTransferKeyDecorations(IRInst* newKey, IRInst* oldKey) const
         SLANG_OVERRIDE
     {
-
         copyNameHintAndDebugDecorations(newKey, oldKey);
     }
 
-    UnownedStringSlice getUserSemanticName(String& loweredName, bool isUserSemantic) const
+    UnownedStringSlice getUserSemanticNameSlice(String& loweredName, bool isUserSemantic) const
         SLANG_OVERRIDE
     {
         SLANG_UNUSED(isUserSemantic);
@@ -3261,7 +3259,6 @@ protected:
     void addFragmentShaderReturnValueDecoration(IRBuilder& builder, IRInst* returnValueStructKey)
         const SLANG_OVERRIDE
     {
-
         builder.addTargetSystemValueDecoration(returnValueStructKey, toSlice("color(0)"));
     }
 
@@ -3294,7 +3291,7 @@ protected:
         const SystemValueInfo& info,
         IRBuilder& builder) SLANG_OVERRIDE
     {
-        auto var = workItem.var;
+        const auto var = workItem.var;
 
         if (info.systemValueNameEnum == SystemValueSemanticName::InnerCoverage)
         {
@@ -3852,10 +3849,9 @@ protected:
         oldKey->transferDecorationsTo(newKey);
     }
 
-    UnownedStringSlice getUserSemanticName(String& loweredName, bool isUserSemantic) const
+    UnownedStringSlice getUserSemanticNameSlice(String& loweredName, bool isUserSemantic) const
         SLANG_OVERRIDE
     {
-
         return isUserSemantic ? userSemanticName : loweredName.getUnownedSlice();
     }
 
