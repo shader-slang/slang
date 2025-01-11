@@ -2429,15 +2429,6 @@ private:
             // step 3a
             auto newKey = builder.createStructKey();
             flattenNestedStructsTransferKeyDecorations(newKey, oldKey);
-            // if (isTargetMetal())
-            // {
-            // copyNameHintAndDebugDecorations(newKey, oldKey);
-            // }
-            // else
-            // {
-            //     SLANG_ASSERT(isTargetWGSL());
-            // oldKey->transferDecorationsTo(newKey);
-            // }
 
             auto newField = builder.createStructField(dst, newKey, oldField->getFieldType());
             copyNameHintAndDebugDecorations(newField, oldField);
@@ -2722,10 +2713,6 @@ private:
                 bool hasStringIndex = splitNameAndIndex(semanticName, outName, outIndex);
 
                 auto loweredName = String(outName).toLower();
-                // auto loweredNameSlice = isTargetMetal() || !isUserSemantic
-                //                             ? loweredName.getUnownedSlice()
-                //                             : wgslContext.userSemanticName;
-
                 auto loweredNameSlice = getUserSemanticName(loweredName, isUserSemantic);
 
                 auto semanticIndex =
@@ -2912,22 +2899,6 @@ private:
         case Stage::Fragment:
             {
                 addFragmentShaderReturnValueDecoration(builder, key);
-                // if (isTargetMetal())
-                // {
-                //     builder.addTargetSystemValueDecoration(key, toSlice("color(0)"));
-                // }
-                // else
-                // {
-                //     SLANG_ASSERT(isTargetWGSL());
-                //     IRInst* operands[] = {
-                //         builder.getStringValue(wgslContext.userSemanticName),
-                //         builder.getIntValue(builder.getIntType(), 0)};
-                //     builder.addDecoration(
-                //         key,
-                //         kIROp_SemanticDecoration,
-                //         operands,
-                //         SLANG_COUNT_OF(operands));
-                // }
                 break;
             }
         case Stage::Vertex:
