@@ -1549,13 +1549,35 @@ void depointerizeInputParams(IRFunc* entryPointFunc)
 
 
 // Commony entry point legalization context for Metal and WGSL.
-struct LegalizeShaderEntryPointContext
+class LegalizeShaderEntryPointContext
 {
+public:
     enum class LegalizeTarget
     {
         Metal,
         WGSL,
     };
+
+    LegalizeShaderEntryPointContext(IRModule* module, DiagnosticSink* sink, LegalizeTarget target)
+        : m_module(module), m_sink(sink), m_target(target)
+    {
+    }
+
+    void legalizeEntryPoints(List<EntryPointInfo>& entryPoints)
+    {
+        for (auto entryPoint : entryPoints)
+            legalizeEntryPoint(entryPoint);
+        removeSemanticLayoutsFromLegalizedStructs();
+    }
+
+private:
+    IRModule* m_module;
+    DiagnosticSink* m_sink;
+    LegalizeTarget m_target;
+    HashSet<IRStructField*> semanticInfoToRemove;
+
+    bool isTargetMetal() const { return m_target == LegalizeTarget::Metal; }
+    bool isTargetWGSL() const { return m_target == LegalizeTarget::WGSL; }
 
     struct SystemValueInfo
     {
@@ -1589,19 +1611,6 @@ struct LegalizeShaderEntryPointContext
             SLANG_ASSERT(isTargetWGSL());
             return getWGSLSystemValueInfo(inSemanticName, optionalSemanticIndex, parentVar);
         }
-    }
-
-    IRModule* m_module;
-    DiagnosticSink* m_sink;
-    LegalizeTarget m_target;
-    HashSet<IRStructField*> semanticInfoToRemove;
-
-    bool isTargetMetal() const { return m_target == LegalizeTarget::Metal; }
-    bool isTargetWGSL() const { return m_target == LegalizeTarget::WGSL; }
-
-    LegalizeShaderEntryPointContext(IRModule* module, DiagnosticSink* sink, LegalizeTarget target)
-        : m_module(module), m_sink(sink), m_target(target)
-    {
     }
 
     void removeSemanticLayoutsFromLegalizedStructs()
@@ -3145,13 +3154,6 @@ struct LegalizeShaderEntryPointContext
         default:
             break;
         }
-    }
-
-    void legalizeEntryPoints(List<EntryPointInfo>& entryPoints)
-    {
-        for (auto entryPoint : entryPoints)
-            legalizeEntryPoint(entryPoint);
-        removeSemanticLayoutsFromLegalizedStructs();
     }
 
     // ******************************************************************
