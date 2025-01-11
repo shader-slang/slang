@@ -1,11 +1,12 @@
 // slang-ir-legalize-varying-params.cpp
 #include "slang-ir-legalize-varying-params.h"
 
-#include "core/slang-common.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 #include "slang-parameter-binding.h"
+#include "slang.h"
 
 #include <set>
 
@@ -1548,18 +1549,11 @@ void depointerizeInputParams(IRFunc* entryPointFunc)
 }
 
 
-// Commony entry point legalization context for Metal and WGSL.
 class LegalizeShaderEntryPointContext
 {
 public:
-    enum class LegalizeTarget
-    {
-        Metal,
-        WGSL,
-    };
-
-    LegalizeShaderEntryPointContext(IRModule* module, DiagnosticSink* sink, LegalizeTarget target)
-        : m_module(module), m_sink(sink), m_target(target)
+    LegalizeShaderEntryPointContext(IRModule* module, DiagnosticSink* sink, bool hoistParameters)
+        : m_module(module), m_sink(sink), hoistParameters(hoistParameters)
     {
     }
 
@@ -1570,48 +1564,188 @@ public:
         removeSemanticLayoutsFromLegalizedStructs();
     }
 
-private:
+protected:
     IRModule* m_module;
     DiagnosticSink* m_sink;
-    LegalizeTarget m_target;
-    HashSet<IRStructField*> semanticInfoToRemove;
-
-    bool isTargetMetal() const { return m_target == LegalizeTarget::Metal; }
-    bool isTargetWGSL() const { return m_target == LegalizeTarget::WGSL; }
 
     struct SystemValueInfo
     {
         String systemValueName;
         SystemValueSemanticName systemValueNameEnum;
-
         ShortList<IRType*> permittedTypes;
+
         bool isUnsupported = false;
-
-        // Only used by Metal.
         bool isSpecial = false;
-
-        SystemValueInfo()
-        {
-            // most commonly need 2
-            permittedTypes.reserveOverflowBuffer(2);
-        }
     };
 
-    SystemValueInfo getSystemValueInfo(
+    struct SystemValLegalizationWorkItem
+    {
+        IRInst* var;
+        IRType* varType;
+
+        String attrName;
+        UInt attrIndex;
+    };
+
+    virtual SystemValueInfo getSystemValueInfo(
         String inSemanticName,
         String* optionalSemanticIndex,
-        IRInst* parentVar)
+        IRInst* parentVar) const = 0;
+
+    virtual List<SystemValLegalizationWorkItem> collectSystemValFromEntryPoint(
+        EntryPointInfo entryPoint) const = 0;
+
+    virtual void flattenNestedStructsTransferKeyDecorations(IRInst* newKey, IRInst* oldKey)
+        const = 0;
+
+    virtual UnownedStringSlice getUserSemanticName(String& loweredName, bool isUserSemantic)
+        const = 0;
+
+    virtual void addFragmentShaderReturnValueDecoration(
+        IRBuilder& builder,
+        IRInst* returnValueStructKey) const = 0;
+
+
+    virtual IRVarLayout* handleGeometryStageParameterVarLayout(
+        IRBuilder& builder,
+        IRVarLayout* paramVarLayout) const
     {
-        if (isTargetMetal())
+        SLANG_UNUSED(builder);
+        return paramVarLayout;
+    }
+
+    virtual void handleSpecialSystemValue(
+        const EntryPointInfo& entryPoint,
+        SystemValLegalizationWorkItem& workItem,
+        const SystemValueInfo& info,
+        IRBuilder& builder)
+    {
+        SLANG_UNUSED(entryPoint);
+        SLANG_UNUSED(workItem);
+        SLANG_UNUSED(info);
+        SLANG_UNUSED(builder);
+    }
+
+    virtual void legalizeAmplificationStageEntryPoint(const EntryPointInfo& entryPoint) const
+    {
+        SLANG_UNUSED(entryPoint);
+    }
+
+    virtual void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint) const
+    {
+        SLANG_UNUSED(entryPoint);
+    }
+
+
+    std::optional<SystemValLegalizationWorkItem> tryToMakeSystemValWorkItem(
+        IRInst* var,
+        IRType* varType) const
+    {
+        if (auto semanticDecoration = var->findDecoration<IRSemanticDecoration>())
         {
-            return getMetalSystemValueInfo(inSemanticName, optionalSemanticIndex, parentVar);
+            if (semanticDecoration->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
+            {
+                return {
+                    {var,
+                     varType,
+                     String(semanticDecoration->getSemanticName()).toLower(),
+                     (UInt)semanticDecoration->getSemanticIndex()}};
+            }
         }
-        else
+
+        auto layoutDecor = var->findDecoration<IRLayoutDecoration>();
+        if (!layoutDecor)
+            return {};
+        auto sysValAttr = layoutDecor->findAttr<IRSystemValueSemanticAttr>();
+        if (!sysValAttr)
+            return {};
+        auto semanticName = String(sysValAttr->getName());
+        auto sysAttrIndex = sysValAttr->getIndex();
+
+        return {{var, varType, semanticName, sysAttrIndex}};
+    }
+
+    void legalizeSystemValue(EntryPointInfo entryPoint, SystemValLegalizationWorkItem& workItem)
+    {
+        IRBuilder builder(entryPoint.entryPointFunc);
+
+        auto var = workItem.var;
+        auto varType = workItem.varType;
+        auto semanticName = workItem.attrName;
+
+        auto indexAsString = String(workItem.attrIndex);
+        SystemValueInfo info = getSystemValueInfo(semanticName, &indexAsString, var);
+        if (info.isSpecial)
         {
-            SLANG_ASSERT(isTargetWGSL());
-            return getWGSLSystemValueInfo(inSemanticName, optionalSemanticIndex, parentVar);
+            handleSpecialSystemValue(entryPoint, workItem, info, builder);
+        }
+
+        if (info.isUnsupported)
+        {
+            reportUnsupportedSystemAttribute(var, semanticName);
+            return;
+        }
+        if (!info.permittedTypes.getCount())
+            return;
+
+        builder.addTargetSystemValueDecoration(var, info.systemValueName.getUnownedSlice());
+
+        bool varTypeIsPermitted = false;
+        for (auto& permittedType : info.permittedTypes)
+        {
+            varTypeIsPermitted = varTypeIsPermitted || permittedType == varType;
+        }
+
+        if (!varTypeIsPermitted)
+        {
+            // Note: we do not currently prefer any conversion
+            // example:
+            // * allowed types for semantic: `float4`, `uint4`, `int4`
+            // * user used, `float2`
+            // * Slang will equally prefer `float4` to `uint4` to `int4`.
+            //   This means the type may lose data if slang selects `uint4` or `int4`.
+            bool foundAConversion = false;
+            for (auto permittedType : info.permittedTypes)
+            {
+                var->setFullType(permittedType);
+                builder.setInsertBefore(
+                    entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
+
+                // get uses before we `tryConvertValue` since this creates a new use
+                List<IRUse*> uses;
+                for (auto use = var->firstUse; use; use = use->nextUse)
+                    uses.add(use);
+
+                auto convertedValue = tryConvertValue(builder, var, varType);
+                if (convertedValue == nullptr)
+                    continue;
+
+                foundAConversion = true;
+                copyNameHintAndDebugDecorations(convertedValue, var);
+
+                for (auto use : uses)
+                    builder.replaceOperand(use, convertedValue);
+            }
+            if (!foundAConversion)
+            {
+                // If we can't convert the value, report an error.
+                for (auto permittedType : info.permittedTypes)
+                {
+                    StringBuilder typeNameSB;
+                    getTypeNameHint(typeNameSB, permittedType);
+                    m_sink->diagnose(
+                        var->sourceLoc,
+                        Diagnostics::systemValueTypeIncompatible,
+                        semanticName,
+                        typeNameSB.produceString());
+                }
+            }
         }
     }
+
+private:
+    const bool hoistParameters;
+    HashSet<IRStructField*> semanticInfoToRemove;
 
     void removeSemanticLayoutsFromLegalizedStructs()
     {
@@ -1958,26 +2092,9 @@ private:
                 }
             }
 
-            // For Metal geometric stages, we need to translate VaryingInput offsets to
-            // MetalAttribute offsets.
-            if (isGeometryStage && isTargetMetal())
+            if (isGeometryStage)
             {
-                IRVarLayout::Builder elementVarLayoutBuilder(
-                    &builder,
-                    paramVarLayout->getTypeLayout());
-                elementVarLayoutBuilder.cloneEverythingButOffsetsFrom(paramVarLayout);
-                for (auto offsetAttr : paramVarLayout->getOffsetAttrs())
-                {
-                    auto resourceKind = offsetAttr->getResourceKind();
-                    if (resourceKind == LayoutResourceKind::VaryingInput)
-                    {
-                        resourceKind = LayoutResourceKind::MetalAttribute;
-                    }
-                    auto resInfo = elementVarLayoutBuilder.findOrAddResourceInfo(resourceKind);
-                    resInfo->offset = offsetAttr->getOffset();
-                    resInfo->space = offsetAttr->getSpace();
-                }
-                paramVarLayout = elementVarLayoutBuilder.build();
+                paramVarLayout = handleGeometryStageParameterVarLayout(builder, paramVarLayout);
             }
 
             layoutBuilder.addField(key, paramVarLayout);
@@ -2313,15 +2430,16 @@ private:
 
             // step 3a
             auto newKey = builder.createStructKey();
-            if (isTargetMetal())
-            {
-                copyNameHintAndDebugDecorations(newKey, oldKey);
-            }
-            else
-            {
-                SLANG_ASSERT(isTargetWGSL());
-                oldKey->transferDecorationsTo(newKey);
-            }
+            flattenNestedStructsTransferKeyDecorations(newKey, oldKey);
+            // if (isTargetMetal())
+            // {
+            // copyNameHintAndDebugDecorations(newKey, oldKey);
+            // }
+            // else
+            // {
+            //     SLANG_ASSERT(isTargetWGSL());
+            // oldKey->transferDecorationsTo(newKey);
+            // }
 
             auto newField = builder.createStructField(dst, newKey, oldField->getFieldType());
             copyNameHintAndDebugDecorations(newField, oldField);
@@ -2606,9 +2724,12 @@ private:
                 bool hasStringIndex = splitNameAndIndex(semanticName, outName, outIndex);
 
                 auto loweredName = String(outName).toLower();
-                auto loweredNameSlice = isTargetMetal() || !isUserSemantic
-                                            ? loweredName.getUnownedSlice()
-                                            : wgslContext.userSemanticName;
+                // auto loweredNameSlice = isTargetMetal() || !isUserSemantic
+                //                             ? loweredName.getUnownedSlice()
+                //                             : wgslContext.userSemanticName;
+
+                auto loweredNameSlice = getUserSemanticName(loweredName, isUserSemantic);
+
                 auto semanticIndex =
                     hasStringIndex ? stringToInt(outIndex) : semanticDecoration->getSemanticIndex();
                 auto newDecoration =
@@ -2792,22 +2913,23 @@ private:
         case Stage::Compute:
         case Stage::Fragment:
             {
-                if (isTargetMetal())
-                {
-                    builder.addTargetSystemValueDecoration(key, toSlice("color(0)"));
-                }
-                else
-                {
-                    SLANG_ASSERT(isTargetWGSL());
-                    IRInst* operands[] = {
-                        builder.getStringValue(wgslContext.userSemanticName),
-                        builder.getIntValue(builder.getIntType(), 0)};
-                    builder.addDecoration(
-                        key,
-                        kIROp_SemanticDecoration,
-                        operands,
-                        SLANG_COUNT_OF(operands));
-                }
+                addFragmentShaderReturnValueDecoration(builder, key);
+                // if (isTargetMetal())
+                // {
+                //     builder.addTargetSystemValueDecoration(key, toSlice("color(0)"));
+                // }
+                // else
+                // {
+                //     SLANG_ASSERT(isTargetWGSL());
+                //     IRInst* operands[] = {
+                //         builder.getStringValue(wgslContext.userSemanticName),
+                //         builder.getIntValue(builder.getIntType(), 0)};
+                //     builder.addDecoration(
+                //         key,
+                //         kIROp_SemanticDecoration,
+                //         operands,
+                //         SLANG_COUNT_OF(operands));
+                // }
                 break;
             }
         case Stage::Vertex:
@@ -2862,248 +2984,6 @@ private:
         return builder.emitCast(toType, val);
     }
 
-    struct SystemValLegalizationWorkItem
-    {
-        IRInst* var;
-
-        // Only used for WGSL.
-        IRType* varType;
-
-        String attrName;
-        UInt attrIndex;
-    };
-
-    // varType is only valid for WGSL.
-    std::optional<SystemValLegalizationWorkItem> tryToMakeSystemValWorkItem(
-        IRInst* var,
-        IRType* varType)
-    {
-        if (auto semanticDecoration = var->findDecoration<IRSemanticDecoration>())
-        {
-            if (semanticDecoration->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
-            {
-                return {
-                    {var,
-                     varType,
-                     String(semanticDecoration->getSemanticName()).toLower(),
-                     (UInt)semanticDecoration->getSemanticIndex()}};
-            }
-        }
-
-        auto layoutDecor = var->findDecoration<IRLayoutDecoration>();
-        if (!layoutDecor)
-            return {};
-        auto sysValAttr = layoutDecor->findAttr<IRSystemValueSemanticAttr>();
-        if (!sysValAttr)
-            return {};
-        auto semanticName = String(sysValAttr->getName());
-        auto sysAttrIndex = sysValAttr->getIndex();
-
-        return {{var, varType, semanticName, sysAttrIndex}};
-    }
-
-    List<SystemValLegalizationWorkItem> collectSystemValFromEntryPoint(EntryPointInfo entryPoint)
-    {
-        List<SystemValLegalizationWorkItem> systemValWorkItems;
-        for (auto param : entryPoint.entryPointFunc->getParams())
-        {
-            if (isTargetWGSL())
-            {
-                if (auto structType = as<IRStructType>(param->getDataType()))
-                {
-                    for (auto field : structType->getFields())
-                    {
-                        // Nested struct-s are flattened already by flattenInputParameters().
-                        SLANG_ASSERT(!as<IRStructType>(field->getFieldType()));
-
-                        auto key = field->getKey();
-                        auto fieldType = field->getFieldType();
-                        auto maybeWorkItem = tryToMakeSystemValWorkItem(key, fieldType);
-                        if (maybeWorkItem.has_value())
-                            systemValWorkItems.add(std::move(maybeWorkItem.value()));
-                    }
-                    continue;
-                }
-            }
-            auto maybeWorkItem = tryToMakeSystemValWorkItem(param, param->getFullType());
-            if (maybeWorkItem.has_value())
-                systemValWorkItems.add(std::move(maybeWorkItem.value()));
-        }
-        return systemValWorkItems;
-    }
-
-    void legalizeSystemValue(EntryPointInfo entryPoint, SystemValLegalizationWorkItem& workItem)
-    {
-        IRBuilder builder(entryPoint.entryPointFunc);
-
-        auto var = workItem.var;
-        auto varType = workItem.varType;
-        auto semanticName = workItem.attrName;
-
-        auto indexAsString = String(workItem.attrIndex);
-        SystemValueInfo info = getSystemValueInfo(semanticName, &indexAsString, var);
-        if (info.isSpecial)
-        {
-            SLANG_ASSERT(isTargetMetal());
-            if (info.systemValueNameEnum == SystemValueSemanticName::InnerCoverage)
-            {
-                // Metal does not support conservative rasterization, so this is always false.
-                auto val = builder.getBoolValue(false);
-                var->replaceUsesWith(val);
-                var->removeAndDeallocate();
-            }
-            else if (info.systemValueNameEnum == SystemValueSemanticName::GroupIndex)
-            {
-                // Ensure we have a cached "sv_groupthreadid" in our entry point
-                if (!metalContext.entryPointToGroupThreadId.containsKey(entryPoint.entryPointFunc))
-                {
-                    auto systemValWorkItems = collectSystemValFromEntryPoint(entryPoint);
-                    for (auto i : systemValWorkItems)
-                    {
-                        auto indexAsStringGroupThreadId = String(i.attrIndex);
-                        if (getSystemValueInfo(i.attrName, &indexAsStringGroupThreadId, i.var)
-                                .systemValueNameEnum == SystemValueSemanticName::GroupThreadID)
-                        {
-                            metalContext.entryPointToGroupThreadId[entryPoint.entryPointFunc] =
-                                i.var;
-                        }
-                    }
-                    if (!metalContext.entryPointToGroupThreadId.containsKey(
-                            entryPoint.entryPointFunc))
-                    {
-                        // Add the missing groupthreadid needed to compute sv_groupindex
-                        IRBuilder groupThreadIdBuilder(builder);
-                        groupThreadIdBuilder.setInsertInto(
-                            entryPoint.entryPointFunc->getFirstBlock());
-                        auto groupThreadId = groupThreadIdBuilder.emitParamAtHead(
-                            getMetalGroupThreadIdType(groupThreadIdBuilder));
-                        metalContext.entryPointToGroupThreadId[entryPoint.entryPointFunc] =
-                            groupThreadId;
-                        groupThreadIdBuilder.addNameHintDecoration(
-                            groupThreadId,
-                            metalContext.groupThreadIDString);
-
-                        // Since "sv_groupindex" will be translated out to a global var and no
-                        // longer be considered a system value we can reuse its layout and semantic
-                        // info
-                        Index foundRequiredDecorations = 0;
-                        IRLayoutDecoration* layoutDecoration = nullptr;
-                        UInt semanticIndex = 0;
-                        for (auto decoration : var->getDecorations())
-                        {
-                            if (auto layoutDecorationTmp = as<IRLayoutDecoration>(decoration))
-                            {
-                                layoutDecoration = layoutDecorationTmp;
-                                foundRequiredDecorations++;
-                            }
-                            else if (auto semanticDecoration = as<IRSemanticDecoration>(decoration))
-                            {
-                                semanticIndex = semanticDecoration->getSemanticIndex();
-                                groupThreadIdBuilder.addSemanticDecoration(
-                                    groupThreadId,
-                                    metalContext.groupThreadIDString,
-                                    (int)semanticIndex);
-                                foundRequiredDecorations++;
-                            }
-                            if (foundRequiredDecorations >= 2)
-                                break;
-                        }
-                        SLANG_ASSERT(layoutDecoration);
-                        layoutDecoration->removeFromParent();
-                        layoutDecoration->insertAtStart(groupThreadId);
-                        SystemValLegalizationWorkItem newWorkItem = {
-                            groupThreadId,
-                            groupThreadId->getFullType(),
-                            metalContext.groupThreadIDString,
-                            semanticIndex};
-                        legalizeSystemValue(entryPoint, newWorkItem);
-                    }
-                }
-
-                IRBuilder svBuilder(builder.getModule());
-                svBuilder.setInsertBefore(entryPoint.entryPointFunc->getFirstOrdinaryInst());
-                auto computeExtent = emitCalcGroupExtents(
-                    svBuilder,
-                    entryPoint.entryPointFunc,
-                    builder.getVectorType(
-                        builder.getUIntType(),
-                        builder.getIntValue(builder.getIntType(), 3)));
-                auto groupIndexCalc = emitCalcGroupIndex(
-                    svBuilder,
-                    metalContext.entryPointToGroupThreadId[entryPoint.entryPointFunc],
-                    computeExtent);
-                svBuilder.addNameHintDecoration(
-                    groupIndexCalc,
-                    UnownedStringSlice("sv_groupindex"));
-
-                var->replaceUsesWith(groupIndexCalc);
-                var->removeAndDeallocate();
-            }
-        }
-
-        if (info.isUnsupported)
-        {
-            reportUnsupportedSystemAttribute(var, semanticName);
-            return;
-        }
-        if (!info.permittedTypes.getCount())
-            return;
-
-        builder.addTargetSystemValueDecoration(var, info.systemValueName.getUnownedSlice());
-
-        bool varTypeIsPermitted = false;
-        for (auto& permittedType : info.permittedTypes)
-        {
-            varTypeIsPermitted = varTypeIsPermitted || permittedType == varType;
-        }
-
-        if (!varTypeIsPermitted)
-        {
-            // Note: we do not currently prefer any conversion
-            // example:
-            // * allowed types for semantic: `float4`, `uint4`, `int4`
-            // * user used, `float2`
-            // * Slang will equally prefer `float4` to `uint4` to `int4`.
-            //   This means the type may lose data if slang selects `uint4` or `int4`.
-            bool foundAConversion = false;
-            for (auto permittedType : info.permittedTypes)
-            {
-                var->setFullType(permittedType);
-                builder.setInsertBefore(
-                    entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
-
-                // get uses before we `tryConvertValue` since this creates a new use
-                List<IRUse*> uses;
-                for (auto use = var->firstUse; use; use = use->nextUse)
-                    uses.add(use);
-
-                auto convertedValue = tryConvertValue(builder, var, varType);
-                if (convertedValue == nullptr)
-                    continue;
-
-                foundAConversion = true;
-                copyNameHintAndDebugDecorations(convertedValue, var);
-
-                for (auto use : uses)
-                    builder.replaceOperand(use, convertedValue);
-            }
-            if (!foundAConversion)
-            {
-                // If we can't convert the value, report an error.
-                for (auto permittedType : info.permittedTypes)
-                {
-                    StringBuilder typeNameSB;
-                    getTypeNameHint(typeNameSB, permittedType);
-                    m_sink->diagnose(
-                        var->sourceLoc,
-                        Diagnostics::systemValueTypeIncompatible,
-                        semanticName,
-                        typeNameSB.produceString());
-                }
-            }
-        }
-    }
-
     void legalizeSystemValueParameters(EntryPointInfo entryPoint)
     {
         List<SystemValLegalizationWorkItem> systemValWorkItems =
@@ -3121,10 +3001,10 @@ private:
         // If the entrypoint is receiving varying inputs as a pointer, turn it into a value.
         depointerizeInputParams(entryPoint.entryPointFunc);
 
-        // TODO FIXME: Enable these for WGSL
+        // TODO FIXME: Enable these for WGSL and remove the `hoistParemeters` member field.
         // WGSL entry point legalization currently only applies attributes to struct parameters,
         // apply the same hoisting from Metal to WGSL to fix it.
-        if (isTargetMetal())
+        if (hoistParameters)
         {
             hoistEntryPointParameterFromStruct(entryPoint);
             packStageInParameters(entryPoint);
@@ -3144,71 +3024,32 @@ private:
         switch (entryPoint.entryPointDecor->getProfile().getStage())
         {
         case Stage::Amplification:
-            SLANG_ASSERT(isTargetMetal());
-            legalizeMetalDispatchMeshPayload(entryPoint);
+            legalizeAmplificationStageEntryPoint(entryPoint);
             break;
         case Stage::Mesh:
-            SLANG_ASSERT(isTargetMetal());
-            legalizeMetalMeshEntryPoint(entryPoint);
+            legalizeMeshStageEntryPoint(entryPoint);
             break;
         default:
             break;
         }
     }
+};
 
-    // ******************************************************************
-    //              Metal specific Legalization Logic
-    // ******************************************************************
-
-    struct MetalContext
+class LegalizeMetalEntryPointContext : public LegalizeShaderEntryPointContext
+{
+public:
+    LegalizeMetalEntryPointContext(IRModule* module, DiagnosticSink* sink)
+        : LegalizeShaderEntryPointContext(module, sink, true)
     {
-        ShortList<IRType*> permittedTypes_sv_target;
-        Dictionary<IRFunc*, IRInst*> entryPointToGroupThreadId;
-        const UnownedStringSlice groupThreadIDString = UnownedStringSlice("sv_groupthreadid");
-    } metalContext;
-
-    IRType* getMetalGroupThreadIdType(IRBuilder& builder)
-    {
-        SLANG_ASSERT(isTargetMetal());
-
-        return builder.getVectorType(
-            builder.getBasicType(BaseType::UInt),
-            builder.getIntValue(builder.getIntType(), 3));
+        generatePermittedTypes_sv_target();
     }
 
-    // Get all permitted types of "sv_target" for Metal
-    ShortList<IRType*>& getMetalPermittedTypes_sv_target(IRBuilder& builder)
-    {
-        SLANG_ASSERT(isTargetMetal());
-
-        metalContext.permittedTypes_sv_target.reserveOverflowBuffer(5 * 4);
-        if (metalContext.permittedTypes_sv_target.getCount() == 0)
-        {
-            for (auto baseType :
-                 {BaseType::Float,
-                  BaseType::Half,
-                  BaseType::Int,
-                  BaseType::UInt,
-                  BaseType::Int16,
-                  BaseType::UInt16})
-            {
-                for (IRIntegerValue i = 1; i <= 4; i++)
-                {
-                    metalContext.permittedTypes_sv_target.add(
-                        builder.getVectorType(builder.getBasicType(baseType), i));
-                }
-            }
-        }
-        return metalContext.permittedTypes_sv_target;
-    }
-
-    SystemValueInfo getMetalSystemValueInfo(
+protected:
+    SystemValueInfo getSystemValueInfo(
         String inSemanticName,
         String* optionalSemanticIndex,
-        IRInst* parentVar)
+        IRInst* parentVar) const SLANG_OVERRIDE
     {
-        SLANG_ASSERT(isTargetMetal());
-
         IRBuilder builder(m_module);
         SystemValueInfo result = {};
         UnownedStringSlice semanticName;
@@ -3305,7 +3146,7 @@ private:
         case SystemValueSemanticName::GroupThreadID:
             {
                 result.systemValueName = toSlice("thread_position_in_threadgroup");
-                result.permittedTypes.add(getMetalGroupThreadIdType(builder));
+                result.permittedTypes.add(getGroupThreadIdType(builder));
                 break;
             }
         case SystemValueSemanticName::GSInstanceID:
@@ -3393,7 +3234,7 @@ private:
                      << "color(" << (semanticIndex.getLength() != 0 ? semanticIndex : toSlice("0"))
                      << ")")
                         .produceString();
-                result.permittedTypes = getMetalPermittedTypes_sv_target(builder);
+                result.permittedTypes = permittedTypes_sv_target;
 
                 break;
             }
@@ -3419,10 +3260,163 @@ private:
         return result;
     }
 
-    void legalizeMetalDispatchMeshPayload(EntryPointInfo entryPoint)
-    {
-        SLANG_ASSERT(isTargetMetal());
 
+    List<SystemValLegalizationWorkItem> collectSystemValFromEntryPoint(
+        EntryPointInfo entryPoint) const SLANG_OVERRIDE
+    {
+        List<SystemValLegalizationWorkItem> systemValWorkItems;
+        for (auto param : entryPoint.entryPointFunc->getParams())
+        {
+            auto maybeWorkItem = tryToMakeSystemValWorkItem(param, param->getFullType());
+            if (maybeWorkItem.has_value())
+                systemValWorkItems.add(std::move(maybeWorkItem.value()));
+        }
+
+        return systemValWorkItems;
+    }
+
+    void flattenNestedStructsTransferKeyDecorations(IRInst* newKey, IRInst* oldKey) const
+        SLANG_OVERRIDE
+    {
+
+        copyNameHintAndDebugDecorations(newKey, oldKey);
+    }
+
+    UnownedStringSlice getUserSemanticName(String& loweredName, bool isUserSemantic) const
+        SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(isUserSemantic);
+        return loweredName.getUnownedSlice();
+    };
+
+    void addFragmentShaderReturnValueDecoration(IRBuilder& builder, IRInst* returnValueStructKey)
+        const SLANG_OVERRIDE
+    {
+
+        builder.addTargetSystemValueDecoration(returnValueStructKey, toSlice("color(0)"));
+    }
+
+    IRVarLayout* handleGeometryStageParameterVarLayout(
+        IRBuilder& builder,
+        IRVarLayout* paramVarLayout) const SLANG_OVERRIDE
+    {
+        // For Metal geometric stages, we need to translate VaryingInput offsets to
+        // MetalAttribute offsets.
+        IRVarLayout::Builder elementVarLayoutBuilder(&builder, paramVarLayout->getTypeLayout());
+        elementVarLayoutBuilder.cloneEverythingButOffsetsFrom(paramVarLayout);
+        for (auto offsetAttr : paramVarLayout->getOffsetAttrs())
+        {
+            auto resourceKind = offsetAttr->getResourceKind();
+            if (resourceKind == LayoutResourceKind::VaryingInput)
+            {
+                resourceKind = LayoutResourceKind::MetalAttribute;
+            }
+            auto resInfo = elementVarLayoutBuilder.findOrAddResourceInfo(resourceKind);
+            resInfo->offset = offsetAttr->getOffset();
+            resInfo->space = offsetAttr->getSpace();
+        }
+
+        return elementVarLayoutBuilder.build();
+    }
+
+    void handleSpecialSystemValue(
+        const EntryPointInfo& entryPoint,
+        SystemValLegalizationWorkItem& workItem,
+        const SystemValueInfo& info,
+        IRBuilder& builder) SLANG_OVERRIDE
+    {
+        auto var = workItem.var;
+
+        if (info.systemValueNameEnum == SystemValueSemanticName::InnerCoverage)
+        {
+            // Metal does not support conservative rasterization, so this is always false.
+            auto val = builder.getBoolValue(false);
+            var->replaceUsesWith(val);
+            var->removeAndDeallocate();
+        }
+        else if (info.systemValueNameEnum == SystemValueSemanticName::GroupIndex)
+        {
+            // Ensure we have a cached "sv_groupthreadid" in our entry point
+            if (!entryPointToGroupThreadId.containsKey(entryPoint.entryPointFunc))
+            {
+                auto systemValWorkItems = collectSystemValFromEntryPoint(entryPoint);
+                for (auto i : systemValWorkItems)
+                {
+                    auto indexAsStringGroupThreadId = String(i.attrIndex);
+                    if (getSystemValueInfo(i.attrName, &indexAsStringGroupThreadId, i.var)
+                            .systemValueNameEnum == SystemValueSemanticName::GroupThreadID)
+                    {
+                        entryPointToGroupThreadId[entryPoint.entryPointFunc] = i.var;
+                    }
+                }
+                if (!entryPointToGroupThreadId.containsKey(entryPoint.entryPointFunc))
+                {
+                    // Add the missing groupthreadid needed to compute sv_groupindex
+                    IRBuilder groupThreadIdBuilder(builder);
+                    groupThreadIdBuilder.setInsertInto(entryPoint.entryPointFunc->getFirstBlock());
+                    auto groupThreadId = groupThreadIdBuilder.emitParamAtHead(
+                        getGroupThreadIdType(groupThreadIdBuilder));
+                    entryPointToGroupThreadId[entryPoint.entryPointFunc] = groupThreadId;
+                    groupThreadIdBuilder.addNameHintDecoration(groupThreadId, groupThreadIDString);
+
+                    // Since "sv_groupindex" will be translated out to a global var and no
+                    // longer be considered a system value we can reuse its layout and
+                    // semantic info
+                    Index foundRequiredDecorations = 0;
+                    IRLayoutDecoration* layoutDecoration = nullptr;
+                    UInt semanticIndex = 0;
+                    for (auto decoration : var->getDecorations())
+                    {
+                        if (auto layoutDecorationTmp = as<IRLayoutDecoration>(decoration))
+                        {
+                            layoutDecoration = layoutDecorationTmp;
+                            foundRequiredDecorations++;
+                        }
+                        else if (auto semanticDecoration = as<IRSemanticDecoration>(decoration))
+                        {
+                            semanticIndex = semanticDecoration->getSemanticIndex();
+                            groupThreadIdBuilder.addSemanticDecoration(
+                                groupThreadId,
+                                groupThreadIDString,
+                                (int)semanticIndex);
+                            foundRequiredDecorations++;
+                        }
+                        if (foundRequiredDecorations >= 2)
+                            break;
+                    }
+                    SLANG_ASSERT(layoutDecoration);
+                    layoutDecoration->removeFromParent();
+                    layoutDecoration->insertAtStart(groupThreadId);
+                    SystemValLegalizationWorkItem newWorkItem = {
+                        groupThreadId,
+                        groupThreadId->getFullType(),
+                        groupThreadIDString,
+                        semanticIndex};
+                    legalizeSystemValue(entryPoint, newWorkItem);
+                }
+            }
+
+            IRBuilder svBuilder(builder.getModule());
+            svBuilder.setInsertBefore(entryPoint.entryPointFunc->getFirstOrdinaryInst());
+            auto computeExtent = emitCalcGroupExtents(
+                svBuilder,
+                entryPoint.entryPointFunc,
+                builder.getVectorType(
+                    builder.getUIntType(),
+                    builder.getIntValue(builder.getIntType(), 3)));
+            auto groupIndexCalc = emitCalcGroupIndex(
+                svBuilder,
+                entryPointToGroupThreadId[entryPoint.entryPointFunc],
+                computeExtent);
+            svBuilder.addNameHintDecoration(groupIndexCalc, UnownedStringSlice("sv_groupindex"));
+
+            var->replaceUsesWith(groupIndexCalc);
+            var->removeAndDeallocate();
+        }
+    }
+
+    void legalizeAmplificationStageEntryPoint(const EntryPointInfo& entryPoint) const SLANG_OVERRIDE
+    {
         // Find out DispatchMesh function
         IRGlobalValueWithCode* dispatchMeshFunc = nullptr;
         for (const auto globalInst : entryPoint.entryPointFunc->getModule()->getGlobalInsts())
@@ -3487,10 +3481,8 @@ private:
             });
     }
 
-    void legalizeMetalMeshEntryPoint(EntryPointInfo entryPoint)
+    void legalizeMeshStageEntryPoint(const EntryPointInfo& entryPoint) const SLANG_OVERRIDE
     {
-        SLANG_ASSERT(isTargetMetal());
-
         auto func = entryPoint.entryPointFunc;
 
         IRBuilder builder{func->getModule()};
@@ -3651,22 +3643,57 @@ private:
         }
     }
 
-    // ******************************************************************
-    //              WGSL specific Legalization Logic
-    // ******************************************************************
+private:
+    ShortList<IRType*> permittedTypes_sv_target;
+    Dictionary<IRFunc*, IRInst*> entryPointToGroupThreadId;
+    const UnownedStringSlice groupThreadIDString = UnownedStringSlice("sv_groupthreadid");
 
-    struct WGSLContext
+    static IRType* getGroupThreadIdType(IRBuilder& builder)
     {
-        UnownedStringSlice userSemanticName = toSlice("user_semantic");
-    } wgslContext;
+        return builder.getVectorType(
+            builder.getBasicType(BaseType::UInt),
+            builder.getIntValue(builder.getIntType(), 3));
+    }
 
-    SystemValueInfo getWGSLSystemValueInfo(
+    void generatePermittedTypes_sv_target()
+    {
+        IRBuilder builder(m_module);
+        permittedTypes_sv_target.reserveOverflowBuffer(5 * 4);
+        if (permittedTypes_sv_target.getCount() == 0)
+        {
+            for (auto baseType :
+                 {BaseType::Float,
+                  BaseType::Half,
+                  BaseType::Int,
+                  BaseType::UInt,
+                  BaseType::Int16,
+                  BaseType::UInt16})
+            {
+                for (IRIntegerValue i = 1; i <= 4; i++)
+                {
+                    permittedTypes_sv_target.add(
+                        builder.getVectorType(builder.getBasicType(baseType), i));
+                }
+            }
+        }
+    }
+};
+
+
+class LegalizeWGSLEntryPointContext : public LegalizeShaderEntryPointContext
+{
+public:
+    LegalizeWGSLEntryPointContext(IRModule* module, DiagnosticSink* sink)
+        : LegalizeShaderEntryPointContext(module, sink, false)
+    {
+    }
+
+protected:
+    SystemValueInfo getSystemValueInfo(
         String inSemanticName,
         String* optionalSemanticIndex,
-        IRInst* parentVar)
+        IRInst* parentVar) const SLANG_OVERRIDE
     {
-        SLANG_ASSERT(isTargetWGSL());
-
         IRBuilder builder(m_module);
         SystemValueInfo result = {};
         UnownedStringSlice semanticName;
@@ -3850,6 +3877,64 @@ private:
 
         return result;
     }
+    void flattenNestedStructsTransferKeyDecorations(IRInst* newKey, IRInst* oldKey) const
+        SLANG_OVERRIDE
+    {
+        oldKey->transferDecorationsTo(newKey);
+    }
+
+    UnownedStringSlice getUserSemanticName(String& loweredName, bool isUserSemantic) const
+        SLANG_OVERRIDE
+    {
+
+        return isUserSemantic ? userSemanticName : loweredName.getUnownedSlice();
+    }
+
+    void addFragmentShaderReturnValueDecoration(IRBuilder& builder, IRInst* returnValueStructKey)
+        const SLANG_OVERRIDE
+    {
+        IRInst* operands[] = {
+            builder.getStringValue(userSemanticName),
+            builder.getIntValue(builder.getIntType(), 0)};
+        builder.addDecoration(
+            returnValueStructKey,
+            kIROp_SemanticDecoration,
+            operands,
+            SLANG_COUNT_OF(operands));
+    };
+
+    List<SystemValLegalizationWorkItem> collectSystemValFromEntryPoint(
+        EntryPointInfo entryPoint) const SLANG_OVERRIDE
+    {
+        List<SystemValLegalizationWorkItem> systemValWorkItems;
+        for (auto param : entryPoint.entryPointFunc->getParams())
+        {
+            if (auto structType = as<IRStructType>(param->getDataType()))
+            {
+                for (auto field : structType->getFields())
+                {
+                    // Nested struct-s are flattened already by flattenInputParameters().
+                    SLANG_ASSERT(!as<IRStructType>(field->getFieldType()));
+
+                    auto key = field->getKey();
+                    auto fieldType = field->getFieldType();
+                    auto maybeWorkItem = tryToMakeSystemValWorkItem(key, fieldType);
+                    if (maybeWorkItem.has_value())
+                        systemValWorkItems.add(std::move(maybeWorkItem.value()));
+                }
+                continue;
+            }
+
+            auto maybeWorkItem = tryToMakeSystemValWorkItem(param, param->getFullType());
+            if (maybeWorkItem.has_value())
+                systemValWorkItems.add(std::move(maybeWorkItem.value()));
+        }
+
+        return systemValWorkItems;
+    }
+
+private:
+    const UnownedStringSlice userSemanticName = toSlice("user_semantic");
 };
 
 void legalizeEntryPointVaryingParamsForMetal(
@@ -3857,10 +3942,7 @@ void legalizeEntryPointVaryingParamsForMetal(
     DiagnosticSink* sink,
     List<EntryPointInfo>& entryPoints)
 {
-    LegalizeShaderEntryPointContext context(
-        module,
-        sink,
-        LegalizeShaderEntryPointContext::LegalizeTarget::Metal);
+    LegalizeMetalEntryPointContext context(module, sink);
     context.legalizeEntryPoints(entryPoints);
 }
 
@@ -3869,10 +3951,7 @@ void legalizeEntryPointVaryingParamsForWGSL(
     DiagnosticSink* sink,
     List<EntryPointInfo>& entryPoints)
 {
-    LegalizeShaderEntryPointContext context(
-        module,
-        sink,
-        LegalizeShaderEntryPointContext::LegalizeTarget::WGSL);
+    LegalizeWGSLEntryPointContext context(module, sink);
     context.legalizeEntryPoints(entryPoints);
 }
 
