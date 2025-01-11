@@ -1831,23 +1831,13 @@ struct LegalizeShaderEntryPointContext
                     mapOldFieldToNewField,
                     semanticInfoToRemove);
 
-                // XXX TODO: Clean this up maybe?
-                if (isTargetWGSL())
-                {
-                    // Validate/rearange all semantics which overlap in our flat struct.
-                    fixFieldSemanticsOfFlatStruct(flattenedStruct);
-                    ensureStructHasUserSemantic<LayoutResourceKind::VaryingInput>(
-                        flattenedStruct,
-                        layout);
-                }
+                // Validate/rearange all semantics which overlap in our flat struct.
+                fixFieldSemanticsOfFlatStruct(flattenedStruct);
+                ensureStructHasUserSemantic<LayoutResourceKind::VaryingInput>(
+                    flattenedStruct,
+                    layout);
                 if (flattenedStruct != structType)
                 {
-                    if (isTargetMetal())
-                    {
-                        // Validate/rearange all semantics which overlap in our flat struct
-                        fixFieldSemanticsOfFlatStruct(flattenedStruct);
-                    }
-
                     // Replace the 'old IRParam type' with a 'new IRParam type'
                     param->setFullType(flattenedStruct);
 
@@ -3125,7 +3115,7 @@ struct LegalizeShaderEntryPointContext
         // TODO FIXME: Enable these for WGSL
         // WGSL entry point legalization currently only applies attributes to struct parameters,
         // apply the same hoisting from Metal to WGSL to fix it.
-        // if (isTargetMetal())
+        if (isTargetMetal())
         {
             hoistEntryPointParameterFromStruct(entryPoint);
             packStageInParameters(entryPoint);
