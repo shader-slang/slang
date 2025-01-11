@@ -4,9 +4,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
-#include "slang-ir.h"
 #include "slang-parameter-binding.h"
-#include "slang.h"
 
 #include <set>
 
