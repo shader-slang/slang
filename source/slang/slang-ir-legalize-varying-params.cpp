@@ -1548,6 +1548,7 @@ void depointerizeInputParams(IRFunc* entryPointFunc)
 }
 
 
+// Commony entry point legalization context for Metal and WGSL.
 struct LegalizeShaderEntryPointContext
 {
     enum class LegalizeTarget
@@ -2817,6 +2818,7 @@ struct LegalizeShaderEntryPointContext
                 }
                 else
                 {
+                    SLANG_ASSERT(isTargetWGSL());
                     IRInst* operands[] = {
                         builder.getStringValue(wgslContext.userSemanticName),
                         builder.getIntValue(builder.getIntType(), 0)};
@@ -2884,7 +2886,7 @@ struct LegalizeShaderEntryPointContext
     {
         IRInst* var;
 
-        // Only valid for WGSL.
+        // Only used for WGSL.
         IRType* varType;
 
         String attrName;
@@ -2925,13 +2927,7 @@ struct LegalizeShaderEntryPointContext
         List<SystemValLegalizationWorkItem> systemValWorkItems;
         for (auto param : entryPoint.entryPointFunc->getParams())
         {
-            std::optional<SystemValLegalizationWorkItem> maybeWorkItem;
-
-            if (isTargetMetal())
-            {
-                maybeWorkItem = tryToMakeSystemValWorkItem(param, nullptr);
-            }
-            else
+            if (isTargetWGSL())
             {
                 if (auto structType = as<IRStructType>(param->getDataType()))
                 {
@@ -2948,9 +2944,8 @@ struct LegalizeShaderEntryPointContext
                     }
                     continue;
                 }
-                maybeWorkItem = tryToMakeSystemValWorkItem(param, param->getFullType());
             }
-
+            auto maybeWorkItem = tryToMakeSystemValWorkItem(param, param->getFullType());
             if (maybeWorkItem.has_value())
                 systemValWorkItems.add(std::move(maybeWorkItem.value()));
         }
@@ -2962,14 +2957,7 @@ struct LegalizeShaderEntryPointContext
         IRBuilder builder(entryPoint.entryPointFunc);
 
         auto var = workItem.var;
-
         auto varType = workItem.varType;
-        // XXX: can remove this by also passing this to Metal SV info?
-        if (isTargetMetal())
-        {
-            varType = var->getFullType();
-        }
-
         auto semanticName = workItem.attrName;
 
         auto indexAsString = String(workItem.attrIndex);
@@ -3045,7 +3033,7 @@ struct LegalizeShaderEntryPointContext
                         layoutDecoration->insertAtStart(groupThreadId);
                         SystemValLegalizationWorkItem newWorkItem = {
                             groupThreadId,
-                            nullptr,
+                            groupThreadId->getFullType(),
                             metalContext.groupThreadIDString,
                             semanticIndex};
                         legalizeSystemValue(entryPoint, newWorkItem);
@@ -3153,7 +3141,9 @@ struct LegalizeShaderEntryPointContext
         // If the entrypoint is receiving varying inputs as a pointer, turn it into a value.
         depointerizeInputParams(entryPoint.entryPointFunc);
 
-        // XXX: Enable these for WGSL
+        // TODO FIXME: Enable these for WGSL
+        // WGSL entry point legalization currently only applies attributes to struct parameters,
+        // apply the same hoisting from Metal to WGSL.
         if (isTargetMetal())
         {
             hoistEntryPointParameterFromStruct(entryPoint);
