@@ -973,6 +973,7 @@ typedef uint32_t SlangSizeT;
         ValidateUniformity,
         AllowGLSL,
         EnableExperimentalPasses,
+        BindlessSpaceIndex, // int
 
         // Internal
 

@@ -19,6 +19,7 @@ struct LoweredCombinedSamplerStructInfo
 struct LowerCombinedSamplerContext
 {
     Dictionary<IRType*, LoweredCombinedSamplerStructInfo> mapTypeToLoweredInfo;
+    Dictionary<IRType*, LoweredCombinedSamplerStructInfo> mapLoweredTypeToLoweredInfo;
     CodeGenTarget codeGenTarget;
 
     LoweredCombinedSamplerStructInfo lowerCombinedTextureSamplerType(IRTextureTypeBase* textureType)
@@ -96,6 +97,7 @@ struct LowerCombinedSamplerContext
         builder.addLayoutDecoration(structType, info.typeLayout);
 
         mapTypeToLoweredInfo.add(textureType, info);
+        mapLoweredTypeToLoweredInfo.add(info.type, info);
         return info;
     }
 };
@@ -182,10 +184,8 @@ void lowerCombinedTextureSamplers(
             continue;
         for (auto block : func->getBlocks())
         {
-            IRInst* nextInst = nullptr;
-            for (auto inst = block->getFirstInst(); inst; inst = nextInst)
+            for (auto inst : block->getModifiableChildren())
             {
-                nextInst = inst->getNextInst();
                 switch (inst->getOp())
                 {
                 case kIROp_CombinedTextureSamplerGetTexture:
@@ -194,6 +194,9 @@ void lowerCombinedTextureSamplers(
                         auto combinedSamplerType = inst->getOperand(0)->getDataType();
                         auto loweredInfo =
                             context.mapTypeToLoweredInfo.tryGetValue(combinedSamplerType);
+                        if (!loweredInfo)
+                            loweredInfo = context.mapLoweredTypeToLoweredInfo.tryGetValue(
+                                combinedSamplerType);
                         if (!loweredInfo)
                             continue;
                         builder.setInsertBefore(inst);
@@ -204,6 +207,65 @@ void lowerCombinedTextureSamplers(
                                 ? loweredInfo->sampler
                                 : loweredInfo->texture);
                         inst->replaceUsesWith(fieldExtract);
+                        inst->removeAndDeallocate();
+                    }
+                    break;
+                case kIROp_CastDescriptorHandleToResource:
+                    {
+                        auto handle = inst->getOperand(0);
+                        if (as<IRDescriptorHandleType>(handle->getDataType()))
+                        {
+                            // If handle is still a DescriptorHandle, we are on a target that
+                            // where native resource handles are already bindless, e.g. metal.
+                            // On these platforms, the handle is a struct containing texture
+                            // and sampler fields, so we just need to insert the extract operations.
+                            auto combinedSamplerType = inst->getDataType();
+                            auto loweredInfo =
+                                context.mapTypeToLoweredInfo.tryGetValue(combinedSamplerType);
+                            if (!loweredInfo)
+                                continue;
+                            builder.setInsertBefore(inst);
+                            auto textureVal = builder.emitFieldExtract(
+                                loweredInfo->textureType,
+                                handle,
+                                loweredInfo->texture);
+                            auto samplerVal = builder.emitFieldExtract(
+                                loweredInfo->samplerType,
+                                handle,
+                                loweredInfo->sampler);
+                            IRInst* args[] = {textureVal, samplerVal};
+                            auto combinedSampler =
+                                builder.emitMakeStruct(loweredInfo->type, 2, args);
+                            inst->replaceUsesWith(combinedSampler);
+                            inst->removeAndDeallocate();
+                        }
+                    }
+                    break;
+
+                case kIROp_MakeCombinedTextureSamplerFromHandle:
+                    {
+                        auto combinedSamplerType = inst->getDataType();
+                        auto loweredInfo =
+                            context.mapTypeToLoweredInfo.tryGetValue(combinedSamplerType);
+                        if (!loweredInfo)
+                            continue;
+                        auto handle = inst->getOperand(0);
+                        builder.setInsertBefore(inst);
+                        auto textureIndex = builder.emitElementExtract(handle, IRIntegerValue(0));
+                        auto texture = builder.emitIntrinsicInst(
+                            loweredInfo->textureType,
+                            kIROp_LoadResourceDescriptorFromHeap,
+                            1,
+                            &textureIndex);
+                        auto samplerIndex = builder.emitElementExtract(handle, IRIntegerValue(1));
+                        auto sampler = builder.emitIntrinsicInst(
+                            loweredInfo->samplerType,
+                            kIROp_LoadSamplerDescriptorFromHeap,
+                            1,
+                            &samplerIndex);
+                        IRInst* args[] = {texture, sampler};
+                        auto combinedSampler = builder.emitMakeStruct(loweredInfo->type, 2, args);
+                        inst->replaceUsesWith(combinedSampler);
                         inst->removeAndDeallocate();
                     }
                     break;
