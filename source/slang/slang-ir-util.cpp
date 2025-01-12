@@ -277,6 +277,31 @@ bool isSimpleHLSLDataType(IRInst* inst)
     return true;
 }
 
+bool isWrapperType(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_ArrayType:
+    case kIROp_TextureType:
+    case kIROp_VectorType:
+    case kIROp_MatrixType:
+    case kIROp_PtrType:
+    case kIROp_RefType:
+    case kIROp_ConstRefType:
+    case kIROp_HLSLStructuredBufferType:
+    case kIROp_HLSLRWStructuredBufferType:
+    case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+    case kIROp_HLSLAppendStructuredBufferType:
+    case kIROp_HLSLConsumeStructuredBufferType:
+    case kIROp_TupleType:
+    case kIROp_OptionalType:
+    case kIROp_TypePack:
+        return true;
+    default:
+        return false;
+    }
+}
+
 SourceLoc findFirstUseLoc(IRInst* inst)
 {
     for (auto use = inst->firstUse; use; use = use->nextUse)

@@ -3186,6 +3186,11 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
         }
     }
 
+    if (moduleDecl->findModifier<PublicModifier>())
+    {
+        moduleDecl->defaultVisibility = DeclVisibility::Public;
+    }
+
     // We need/want to visit any `import` declarations before
     // anything else, to make sure that scoping works.
     //
@@ -9242,12 +9247,16 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
             if (!decl->hasModifier<NoDiffThisAttribute>())
             {
                 // Build decl-ref-type from interface.
-                auto interfaceType =
-                    DeclRefType::create(getASTBuilder(), makeDeclRef(interfaceDecl));
+                auto thisType = DeclRefType::create(
+                    m_astBuilder,
+                    createDefaultSubstitutionsIfNeeded(
+                        m_astBuilder,
+                        this,
+                        makeDeclRef(interfaceDecl->getThisTypeDecl())));
 
                 // If the interface is differentiable, make the this type a pair.
-                if (tryGetDifferentialType(getASTBuilder(), interfaceType))
-                    reqDecl->diffThisType = getDifferentialPairType(interfaceType);
+                if (tryGetDifferentialType(getASTBuilder(), thisType))
+                    reqDecl->diffThisType = getDifferentialPairType(thisType);
             }
 
             auto reqRef = m_astBuilder->create<DerivativeRequirementReferenceDecl>();
@@ -9272,13 +9281,17 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                 reqDecl->parentDecl = interfaceDecl;
                 if (!decl->hasModifier<NoDiffThisAttribute>())
                 {
-                    // Build decl-ref-type from interface.
-                    auto interfaceType =
-                        DeclRefType::create(getASTBuilder(), makeDeclRef(interfaceDecl));
+                    // Build decl-ref-type for this-type.
+                    auto thisType = DeclRefType::create(
+                        m_astBuilder,
+                        createDefaultSubstitutionsIfNeeded(
+                            m_astBuilder,
+                            this,
+                            makeDeclRef(interfaceDecl->getThisTypeDecl())));
 
                     // If the interface is differentiable, make the this type a pair.
-                    if (tryGetDifferentialType(getASTBuilder(), interfaceType))
-                        reqDecl->diffThisType = getDifferentialPairType(interfaceType);
+                    if (tryGetDifferentialType(getASTBuilder(), thisType))
+                        reqDecl->diffThisType = getDifferentialPairType(thisType);
                 }
 
                 auto reqRef = m_astBuilder->create<DerivativeRequirementReferenceDecl>();
@@ -12604,8 +12617,10 @@ DeclVisibility getDeclVisibility(Decl* decl)
     }
     auto defaultVis = DeclVisibility::Default;
     if (auto parentModule = getModuleDecl(decl))
-        defaultVis =
-            parentModule->isInLegacyLanguage ? DeclVisibility::Public : DeclVisibility::Internal;
+    {
+        defaultVis = parentModule->isInLegacyLanguage ? DeclVisibility::Public
+                                                      : parentModule->defaultVisibility;
+    }
 
     // Members of other agg type decls will have their default visibility capped to the parents'.
     if (as<NamespaceDecl>(decl))
@@ -12789,10 +12804,6 @@ void diagnoseCapabilityProvenance(
                 break;
             auto moduleDecl = getModuleDecl(declToPrint);
             if (thisModule != moduleDecl)
-                break;
-            if (moduleDecl && moduleDecl->isInLegacyLanguage)
-                continue;
-            if (getDeclVisibility(declToPrint) == DeclVisibility::Public)
                 break;
         }
         if (previousDecl == declToPrint)

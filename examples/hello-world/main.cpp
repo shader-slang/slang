@@ -66,7 +66,8 @@ struct HelloWorldExample : public TestBase
     ~HelloWorldExample();
 };
 
-int main(int argc, char* argv[])
+
+int exampleMain(int argc, char** argv)
 {
     initDebugCallback();
     HelloWorldExample example;
@@ -80,7 +81,11 @@ int main(int argc, char* argv[])
 
 int HelloWorldExample::run()
 {
-    RETURN_ON_FAIL(initVulkanInstanceAndDevice());
+    // If VK failed to initialize, skip running but return success anyway.
+    // This allows our automated testing to distinguish between essential failures and the
+    // case where the application is just not supported.
+    if (int result = initVulkanInstanceAndDevice())
+        return (vkAPI.device == VK_NULL_HANDLE) ? 0 : result;
     RETURN_ON_FAIL(createComputePipelineFromShader());
     RETURN_ON_FAIL(createInOutBuffers());
     RETURN_ON_FAIL(dispatchCompute());
@@ -511,6 +516,9 @@ int HelloWorldExample::printComputeResults()
 
 HelloWorldExample::~HelloWorldExample()
 {
+    if (vkAPI.device == VK_NULL_HANDLE)
+        return;
+
     vkAPI.vkDestroyPipeline(vkAPI.device, pipeline, nullptr);
     for (int i = 0; i < 3; i++)
     {

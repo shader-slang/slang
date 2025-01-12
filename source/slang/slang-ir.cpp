@@ -8226,6 +8226,10 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_CastPtrToInt:
     case kIROp_CastIntToPtr:
     case kIROp_PtrCast:
+    case kIROp_CastUInt2ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToUInt2:
+    case kIROp_CastDescriptorHandleToResource:
+    case kIROp_GetDynamicResourceHeap:
     case kIROp_CastDynamicResource:
     case kIROp_AllocObj:
     case kIROp_BitfieldExtract:
@@ -8243,6 +8247,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetStringHash:
     case kIROp_AllocateOpaqueHandle:
     case kIROp_GetArrayLength:
+    case kIROp_ResolveVaryingInputRef:
+    case kIROp_GetPerVertexInputArray:
         return false;
 
     case kIROp_ForwardDifferentiate:

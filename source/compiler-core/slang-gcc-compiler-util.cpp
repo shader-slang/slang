@@ -735,6 +735,13 @@ static SlangResult _parseGCCFamilyLine(
         cmdLine.addArg(libPath);
     }
 
+    // Add compiler specific options from user.
+    for (auto compilerSpecificArg : options.compilerSpecificArguments)
+    {
+        const char* const arg = compilerSpecificArg;
+        cmdLine.addArg(arg);
+    }
+
     return SLANG_OK;
 }
 

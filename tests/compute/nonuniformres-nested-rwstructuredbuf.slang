@@ -8,9 +8,9 @@ RWStructuredBuffer<int> buffer[];
 [numthreads(8, 1, 1)]
 void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    // CHECK0: buffer_{{.*}}[nonuniformEXT(nonuniformEXT(nonuniformEXT({{.*}})))]
+    // CHECK0: buffer_{{.*}}[nonuniformEXT({{.*}})]
 
-    // CHECK1: buffer_{{.*}}[NonUniformResourceIndex(NonUniformResourceIndex(NonUniformResourceIndex(_{{.*}})))]
+    // CHECK1: buffer_{{.*}}[NonUniformResourceIndex(_{{.*}})]
 
     // CHECK2-DAG: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
     // CHECK2-DAG: OpDecorate %[[VAR2:[a-zA-Z0-9_]+]] NonUniform
@@ -21,11 +21,9 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
     // CHECK2: %[[VAR3]] = OpCopyObject %{{.*}}
     // CHECK2: %{{.*}} = OpBitcast %int %[[VAR3]]
 
-    // CHECK3-DAG: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK3-DAG: OpDecorate %[[VAR2:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK3: %[[VAR1]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %buffer %{{.*}}
+    // CHECK3: %[[VAR1:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %buffer %{{.*}}NonUniform
     // CHECK3: %{{.*}} = OpAccessChain %_ptr_StorageBuffer_int %[[VAR1]]
-    // CHECK3: %[[VAR2]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %buffer %{{.*}}
+    // CHECK3: %[[VAR2:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer %buffer %{{.*}}NonUniform
     // CHECK3: %{{.*}} = OpAccessChain %_ptr_StorageBuffer_int %[[VAR2]]
     RWStructuredBuffer<int> buffer1 = buffer[NonUniformResourceIndex(NonUniformResourceIndex(NonUniformResourceIndex(dispatchThreadID.x)))];
     buffer1[0] = 1;

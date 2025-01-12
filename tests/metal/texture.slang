@@ -3,7 +3,7 @@
 //TEST:SIMPLE(filecheck=HLSL): -stage compute -entry computeMain -target hlsl -DEXCLUDE_INTEGER_TYPE
 //TEST:SIMPLE(filecheck=SPIR): -stage compute -entry computeMain -target spirv -emit-spirv-directly -DEXCLUDE_HALF_TYPE -DEXCLUDE_SHORT_TYPE
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-slang -compute -dx12 -profile cs_6_6 -use-dxil -shaderobj -output-using-type -xslang -DEXCLUDE_INTEGER_TYPE
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-slang -compute -dx12 -profile cs_6_6 -use-dxil -shaderobj -output-using-type -xslang -DEXCLUDE_INTEGER_TYPE -xslang -DEXCLUDE_SM_6_7
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=FUNCTIONAL):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DEXCLUDE_HALF_TYPE -xslang -DEXCLUDE_SHORT_TYPE
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
@@ -341,6 +341,31 @@ bool TEST_texture(
         // METALLIB: call {{.*}}.calculate_clamped_lod_texture_cube_array(
         && float(0) == tCubeArray.CalculateLevelOfDetail(samplerState, normalize(float3(u, 1 - u, u)))
 
+        // SamplerComparisonState variant
+
+        // Functional tests that require SM higher than 6.6 (as of writing) cannot run.
+#if !defined(EXCLUDE_SM_6_7)
+        // METAL: t2D{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_texture_2d(
+        && float(0) == t2D.CalculateLevelOfDetail(shadowSampler, float2(u, u))
+
+        // METAL: t3D{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_texture_3d(
+        && float(0) == t3D.CalculateLevelOfDetail(shadowSampler, float3(u, u, u))
+
+        // METAL: tCube{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_texture_cube(
+        && float(0) == tCube.CalculateLevelOfDetail(shadowSampler, normalize(float3(u, 1 - u, u)))
+
+        // METAL: t2DArray{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_texture_2d_array(
+        && float(0) == t2DArray.CalculateLevelOfDetail(shadowSampler, float2(u, u))
+
+        // METAL: tCubeArray{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_texture_cube_array(
+        && float(0) == tCubeArray.CalculateLevelOfDetail(shadowSampler, normalize(float3(u, 1 - u, u)))
+#endif
+
         // ========================================
         // float CalculateLevelOfDetailUnclamped()
         // ========================================
@@ -366,6 +391,29 @@ bool TEST_texture(
         // METAL: tCubeArray{{.*}}.calculate_unclamped_lod({{.*}}
         // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_cube_array(
         && float(0) >= tCubeArray.CalculateLevelOfDetailUnclamped(samplerState, normalize(float3(u, 1 - u, u)))
+
+        // SamplerComparisonState variant
+#if !defined(EXCLUDE_SM_6_7)
+        // METAL: t2D{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_2d(
+        && float(0) >= t2D.CalculateLevelOfDetailUnclamped(shadowSampler, float2(u, u))
+
+        // METAL: t3D{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_3d(
+        && float(0) >= t3D.CalculateLevelOfDetailUnclamped(shadowSampler, float3(u, u, u))
+
+        // METAL: tCube{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_cube(
+        && float(0) >= tCube.CalculateLevelOfDetailUnclamped(shadowSampler, normalize(float3(u, 1 - u, u)))
+
+        // METAL: t2DArray{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_2d_array(
+        && float(0) >= t2DArray.CalculateLevelOfDetailUnclamped(shadowSampler, float2(u, u))
+
+        // METAL: tCubeArray{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_cube_array(
+        && float(0) >= tCubeArray.CalculateLevelOfDetailUnclamped(shadowSampler, normalize(float3(u, 1 - u, u)))
+#endif
 
         // ===========
         // T Sample()
@@ -566,6 +614,35 @@ bool TEST_texture(
         // METAL: d2D{{.*}}.sample_compare(
         // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
         && float(0) == d2D.SampleCmpLevelZero(shadowSampler, float2(u2, u), 0, int2(0, 0))
+
+        // ===================================
+        //  float SampleCmpLevel()
+        // ===================================
+
+        // These require SM 6.7 for dx12 but functional compute tests currently do not run with the cs_6_7.
+#if !defined(EXCLUDE_SM_6_7)
+        // METAL: d2D{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
+        && float(0) == d2D.SampleCmpLevel(shadowSampler, float2(u, u), 0, 0.0)
+
+        // METAL: d2DArray{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_2d_array.f32(
+        && float(0) == d2DArray.SampleCmpLevel(shadowSampler, float3(u, u, 0), 0, 0.0)
+
+        // METAL: dCube{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_cube.f32(
+        && float(0) == dCube.SampleCmpLevel(shadowSampler, normalize(float3(u, 1 - u, u)), 0, 0.0)
+
+        // METAL: dCubeArray{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_cube_array.f32(
+        && float(0) == dCubeArray.SampleCmpLevel(shadowSampler, float4(normalize(float3(u, 1-u, u)), 0), 0, 0.0)
+
+        // Offset variant
+
+        // METAL: d2D{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
+        && float(0) == d2D.SampleCmpLevel(shadowSampler, float2(u2, u), 0, 0.0, int2(0, 0))
+#endif
 
         // ==================================
         //  vector<T,4> Gather()

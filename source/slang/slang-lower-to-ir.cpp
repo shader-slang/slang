@@ -592,9 +592,19 @@ struct IRGenContext
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
 
+    // Callback function to call when after lowering a type.
+    std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> lowerTypeCallback =
+        nullptr;
+
     explicit IRGenContext(SharedIRGenContext* inShared, ASTBuilder* inAstBuilder)
         : shared(inShared), astBuilder(inAstBuilder), env(&inShared->globalEnv), irBuilder(nullptr)
     {
+    }
+
+    void registerTypeCallback(
+        std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> callback)
+    {
+        lowerTypeCallback = callback;
     }
 
     void setGlobalValue(Decl* decl, LoweredValInfo value) { shared->setGlobalValue(decl, value); }
@@ -2202,7 +2212,12 @@ IRType* lowerType(IRGenContext* context, Type* type)
 {
     ValLoweringVisitor visitor;
     visitor.context = context;
-    return (IRType*)getSimpleVal(context, visitor.dispatchType(type));
+    IRType* loweredType = (IRType*)getSimpleVal(context, visitor.dispatchType(type));
+
+    if (context->lowerTypeCallback && loweredType)
+        context->lowerTypeCallback(context, type, loweredType);
+
+    return loweredType;
 }
 
 void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
@@ -2767,14 +2782,15 @@ ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
 ///
 ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection defaultDirection)
 {
-    auto parentParent = getParentDecl(parentDecl);
+    auto parentParent = getParentAggTypeDecl(parentDecl);
+
     // The `this` parameter for a `class` is always `in`.
     if (as<ClassDecl>(parentParent))
     {
         return kParameterDirection_In;
     }
 
-    if (parentParent->findModifier<NonCopyableTypeAttribute>())
+    if (parentParent && parentParent->findModifier<NonCopyableTypeAttribute>())
     {
         if (parentDecl->hasModifier<MutatingAttribute>())
             return kParameterDirection_Ref;
@@ -2982,6 +2998,9 @@ struct IRLoweringParameterInfo
     // The direction (`in` vs `out` vs `in out`)
     ParameterDirection direction;
 
+    // The direction declared in user code.
+    ParameterDirection declaredDirection = ParameterDirection::kParameterDirection_In;
+
     // The variable/parameter declaration for
     // this parameter (if any)
     VarDeclBase* decl = nullptr;
@@ -3005,6 +3024,7 @@ IRLoweringParameterInfo getParameterInfo(
     info.type = getParamType(context->astBuilder, paramDecl);
     info.decl = paramDecl.getDecl();
     info.direction = getParameterDirection(paramDecl.getDecl());
+    info.declaredDirection = info.direction;
     info.isThisParam = false;
     return info;
 }
@@ -3051,6 +3071,7 @@ void addThisParameter(ParameterDirection direction, Type* type, ParameterLists* 
     info.type = type;
     info.decl = nullptr;
     info.direction = direction;
+    info.declaredDirection = direction;
     info.isThisParam = true;
 
     ioParameterLists->params.add(info);
@@ -3064,9 +3085,21 @@ void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resu
         info.type = resultType;
         info.decl = nullptr;
         info.direction = kParameterDirection_Ref;
+        info.declaredDirection = info.direction;
         info.isReturnDestination = true;
         ioParameterLists->params.add(info);
     }
+}
+
+void makeVaryingInputParamConstRef(IRLoweringParameterInfo& paramInfo)
+{
+    if (paramInfo.direction != kParameterDirection_In)
+        return;
+    if (paramInfo.decl->findModifier<HLSLUniformModifier>())
+        return;
+    if (as<HLSLPatchType>(paramInfo.type))
+        return;
+    paramInfo.direction = kParameterDirection_ConstRef;
 }
 //
 // And here is our function that will do the recursive walk:
@@ -3137,13 +3170,31 @@ void collectParameterLists(
     //
     if (auto callableDeclRef = declRef.as<CallableDecl>())
     {
+        // We need a special case here when lowering the varying parameters of an entrypoint
+        // function. Due to the existence of `EvaluateAttributeAtSample` and friends, we need to
+        // always lower the varying inputs as `__constref` parameters so we can pass pointers to
+        // these intrinsics.
+        // This means that although these parameters are declared as "in" parameters in the source,
+        // we will actually treat them as __constref parameters when lowering to IR. A complication
+        // result from this is that if the original source code actually modifies the input
+        // parameter we still need to create a local var to hold the modified value. In the future
+        // when we are able to update our language spec to always assume input parameters are
+        // immutable, then we can remove this adhoc logic of introducing temporary variables. For
+        // For now we will rely on a follow up pass to remove unnecessary temporary variables if
+        // we can determine that they are never actually writtten to by the user.
+        //
+        bool lowerVaryingInputAsConstRef = declRef.getDecl()->hasModifier<EntryPointAttribute>();
+
         // Don't collect parameters from the outer scope if
         // we are in a `static` context.
         if (mode == kParameterListCollectMode_Default)
         {
             for (auto paramDeclRef : getParameters(context->astBuilder, callableDeclRef))
             {
-                ioParameterLists->params.add(getParameterInfo(context, paramDeclRef));
+                auto paramInfo = getParameterInfo(context, paramDeclRef);
+                if (lowerVaryingInputAsConstRef)
+                    makeVaryingInputParamConstRef(paramInfo);
+                ioParameterLists->params.add(paramInfo);
             }
             maybeAddReturnDestinationParam(
                 ioParameterLists,
@@ -5623,9 +5674,7 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
     LoweredValInfo visitOpenRefExpr(OpenRefExpr* expr)
     {
         auto inner = lowerLValueExpr(context, expr->innerExpr);
-        auto builder = getBuilder();
-        auto irLoad = builder->emitLoad(inner.val);
-        return LoweredValInfo::simple(irLoad);
+        return LoweredValInfo::ptr(inner.val);
     }
 };
 
@@ -8088,6 +8137,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContextStorage.thisTypeWitness = outerContext->thisTypeWitness;
 
             subContextStorage.returnDestination = LoweredValInfo();
+            subContextStorage.lowerTypeCallback = nullptr;
         }
 
         IRBuilder* getBuilder() { return &subBuilderStorage; }
@@ -8612,7 +8662,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto finalVal = finishOuterGenerics(subBuilder, irInterface, outerGeneric);
 
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
-        context->setValue(decl, LoweredValInfo::simple(finalVal));
+        context->setGlobalValue(decl, LoweredValInfo::simple(finalVal));
 
         subBuilder->setInsertBefore(irInterface);
 
@@ -8765,7 +8815,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 addEntry(requirementKey, requirementDeclRef);
             }
         }
-
 
         addNameHint(context, irInterface, decl);
         addLinkageDecoration(context, irInterface, decl);
@@ -9893,6 +9942,48 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         else
             outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
+        // If our function is differentiable, register a callback so the derivative
+        // annotations for types can be lowered.
+        //
+        if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
+        {
+            auto diffTypeWitnessMap = diffAttr->getMapTypeToIDifferentiableWitness();
+            OrderedDictionary<DeclRefBase*, SubtypeWitness*> resolveddiffTypeWitnessMap;
+
+            // Go through each entry in the map and resolve the key.
+            for (auto& entry : diffTypeWitnessMap)
+            {
+                auto resolvedKey = as<DeclRefBase>(entry.key->resolve());
+                resolveddiffTypeWitnessMap[resolvedKey] =
+                    as<SubtypeWitness>(as<Val>(entry.value)->resolve());
+            }
+
+            subContext->registerTypeCallback(
+                [=](IRGenContext* context, Type* type, IRType* irType)
+                {
+                    if (!as<DeclRefType>(type))
+                        return irType;
+
+                    DeclRefBase* declRefBase = as<DeclRefType>(type)->getDeclRefBase();
+                    if (resolveddiffTypeWitnessMap.containsKey(declRefBase))
+                    {
+                        auto irWitness =
+                            lowerVal(subContext, resolveddiffTypeWitnessMap[declRefBase]).val;
+                        if (irWitness)
+                        {
+                            IRInst* args[] = {irType, irWitness};
+                            context->irBuilder->emitIntrinsicInst(
+                                context->irBuilder->getVoidType(),
+                                kIROp_DifferentiableTypeAnnotation,
+                                2,
+                                args);
+                        }
+                    }
+
+                    return irType;
+                });
+        }
+
         FuncDeclBaseTypeInfo info;
         _lowerFuncDeclBaseTypeInfo(
             subContext,
@@ -9997,6 +10088,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         if (paramInfo.isReturnDestination)
                             subContext->returnDestination = paramVal;
 
+                        if (paramInfo.declaredDirection == kParameterDirection_In &&
+                            paramInfo.direction == kParameterDirection_ConstRef)
+                        {
+                            // If the parameter is originally declared as "in", but we are
+                            // lowering it as constref for any reason (e.g. it is a varying input),
+                            // then we need to emit a local variable to hold the original value, so
+                            // that we can still generate correct code when the user trys to mutate
+                            // the variable.
+                            // The local variable introduced here is cleaned up by the SSA pass, if
+                            // we can determine that there are no actual writes into the local var.
+                            auto irLocal =
+                                subBuilder->emitVar(tryGetPointedToType(subBuilder, irParamType));
+                            auto localVal = LoweredValInfo::ptr(irLocal);
+                            assign(subContext, localVal, paramVal);
+                            paramVal = localVal;
+                        }
                         // TODO: We might want to copy the pointed-to value into
                         // a temporary at the start of the function, and then copy
                         // back out at the end, so that we don't have to worry
@@ -10186,6 +10293,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 }
             }
         }
+
+        subContext->registerTypeCallback(nullptr);
 
         getBuilder()->addHighLevelDeclDecoration(irFunc, decl);
 
@@ -10448,16 +10557,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     isInline = true;
                     break;
                 }
-            }
-        }
-
-        if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
-        {
-            if (decl->body)
-            {
-                subContext->irBuilder->setInsertInto(irFunc->getParent());
-                lowerDifferentiableAttribute(subContext, irFunc, diffAttr);
-                subContext->irBuilder->setInsertInto(irFunc);
             }
         }
 
@@ -11020,6 +11119,16 @@ static void lowerFrontEndEntryPointToIR(
     // and any such function should *not* be used as an ordinary function.
 
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
+
+    if (!entryPointFuncDecl->findModifier<EntryPointAttribute>())
+    {
+        // If the entry point doesn't have an explicit `[shader("...")]` attribute,
+        // then we make sure to add one here, so the lowering logic knows it is an
+        // entry point.
+        auto entryPointAttr = context->astBuilder->create<EntryPointAttribute>();
+        entryPointAttr->capabilitySet = entryPoint->getProfile().getCapabilityName();
+        addModifier(entryPointFuncDecl, entryPointAttr);
+    }
 
     auto builder = context->irBuilder;
     builder->setInsertInto(builder->getModule()->getModuleInst());

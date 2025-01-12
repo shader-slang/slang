@@ -7531,12 +7531,6 @@ static IRFloatingPointValue _foldFloatPrefixOp(TokenType tokenType, IRFloatingPo
 
 static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
 {
-    const auto slangIdentOperand = [&](auto flavor)
-    {
-        auto token = parser->tokenReader.peekToken();
-        return SPIRVAsmOperand{flavor, token, parseAtomicExpr(parser)};
-    };
-
     const auto slangTypeExprOperand = [&](auto flavor)
     {
         auto tok = parser->tokenReader.peekToken();
@@ -7673,12 +7667,13 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
     // A &foo variable reference (for the address of foo)
     else if (AdvanceIf(parser, TokenType::OpBitAnd))
     {
-        return slangIdentOperand(SPIRVAsmOperand::SlangValueAddr);
+        Expr* expr = parsePostfixExpr(parser);
+        return SPIRVAsmOperand{SPIRVAsmOperand::SlangValueAddr, Token{}, expr};
     }
     // A $foo variable
     else if (AdvanceIf(parser, TokenType::Dollar))
     {
-        Expr* expr = parseAtomicExpr(parser);
+        Expr* expr = parsePostfixExpr(parser);
         return SPIRVAsmOperand{SPIRVAsmOperand::SlangValue, Token{}, expr};
     }
     // A $$foo type

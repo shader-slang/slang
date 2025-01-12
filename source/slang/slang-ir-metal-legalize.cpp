@@ -2,6 +2,7 @@
 
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-legalize-binary-operator.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-util.h"
@@ -1938,6 +1939,7 @@ struct LegalizeMetalEntryPointContext
     void legalizeEntryPointForMetal(EntryPointInfo entryPoint)
     {
         // Input Parameter Legalize
+        depointerizeInputParams(entryPoint.entryPointFunc);
         hoistEntryPointParameterFromStruct(entryPoint);
         packStageInParameters(entryPoint);
         flattenInputParameters(entryPoint);
@@ -2133,6 +2135,40 @@ struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
     }
 };
 
+static void processInst(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_FRem:
+    case kIROp_IRem:
+    case kIROp_And:
+    case kIROp_Or:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+    case kIROp_Eql:
+    case kIROp_Neq:
+    case kIROp_Greater:
+    case kIROp_Less:
+    case kIROp_Geq:
+    case kIROp_Leq:
+        legalizeBinaryOp(inst);
+        break;
+
+    default:
+        for (auto child : inst->getModifiableChildren())
+        {
+            processInst(child);
+        }
+    }
+}
+
 void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink)
 {
     List<EntryPointInfo> entryPoints;
@@ -2158,6 +2194,8 @@ void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink)
 
     MetalAddressSpaceAssigner metalAddressSpaceAssigner;
     specializeAddressSpace(module, &metalAddressSpaceAssigner);
+
+    processInst(module->getModuleInst());
 }
 
 } // namespace Slang

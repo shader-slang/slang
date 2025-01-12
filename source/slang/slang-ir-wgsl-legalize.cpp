@@ -1,6 +1,7 @@
 #include "slang-ir-wgsl-legalize.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-legalize-binary-operator.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir-util.h"
@@ -1362,6 +1363,9 @@ struct LegalizeWGSLEntryPointContext
 
     void legalizeEntryPointForWGSL(EntryPointInfo entryPoint)
     {
+        // If the entrypoint is receiving varying inputs as a pointer, turn it into a value.
+        depointerizeInputParams(entryPoint.entryPointFunc);
+
         // Input Parameter Legalize
         flattenInputParameters(entryPoint);
 
@@ -1482,64 +1486,6 @@ struct LegalizeWGSLEntryPointContext
             cases.getBuffer());
         switchInst->transferDecorationsTo(newSwitch);
         switchInst->removeAndDeallocate();
-    }
-
-    void legalizeBinaryOp(IRInst* inst)
-    {
-        auto isVectorOrMatrix = [](IRType* type)
-        {
-            switch (type->getOp())
-            {
-            case kIROp_VectorType:
-            case kIROp_MatrixType:
-                return true;
-            default:
-                return false;
-            }
-        };
-        if (isVectorOrMatrix(inst->getOperand(0)->getDataType()) &&
-            as<IRBasicType>(inst->getOperand(1)->getDataType()))
-        {
-            IRBuilder builder(inst);
-            builder.setInsertBefore(inst);
-            auto newRhs = builder.emitMakeCompositeFromScalar(
-                inst->getOperand(0)->getDataType(),
-                inst->getOperand(1));
-            builder.replaceOperand(inst->getOperands() + 1, newRhs);
-        }
-        else if (
-            as<IRBasicType>(inst->getOperand(0)->getDataType()) &&
-            isVectorOrMatrix(inst->getOperand(1)->getDataType()))
-        {
-            IRBuilder builder(inst);
-            builder.setInsertBefore(inst);
-            auto newLhs = builder.emitMakeCompositeFromScalar(
-                inst->getOperand(1)->getDataType(),
-                inst->getOperand(0));
-            builder.replaceOperand(inst->getOperands(), newLhs);
-        }
-        else if (
-            isIntegralType(inst->getOperand(0)->getDataType()) &&
-            isIntegralType(inst->getOperand(1)->getDataType()))
-        {
-            // If integer operands differ in signedness, convert the signed one to unsigned.
-            // We're assuming that the cases where this is bad have already been caught by
-            // common validation checks.
-            IntInfo opIntInfo[2] = {
-                getIntTypeInfo(inst->getOperand(0)->getDataType()),
-                getIntTypeInfo(inst->getOperand(1)->getDataType())};
-            if (opIntInfo[0].isSigned != opIntInfo[1].isSigned)
-            {
-                int signedOpIndex = (int)opIntInfo[1].isSigned;
-                opIntInfo[signedOpIndex].isSigned = false;
-                IRBuilder builder(inst);
-                builder.setInsertBefore(inst);
-                auto newOp = builder.emitCast(
-                    builder.getType(getIntTypeOpFromInfo(opIntInfo[signedOpIndex])),
-                    inst->getOperand(signedOpIndex));
-                builder.replaceOperand(inst->getOperands() + signedOpIndex, newOp);
-            }
-        }
     }
 
     void processInst(IRInst* inst)

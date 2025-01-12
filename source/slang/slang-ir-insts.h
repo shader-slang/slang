@@ -364,7 +364,7 @@ struct IRSPIRVNonUniformResourceDecoration : IRDecoration
     {
         kOp = kIROp_SPIRVNonUniformResourceDecoration
     };
-    IR_LEAF_ISA(RequireGLSLVersionDecoration)
+    IR_LEAF_ISA(SPIRVNonUniformResourceDecoration)
 
     IRConstant* getSPIRVNonUniformResourceOperand() { return cast<IRConstant>(getOperand(0)); }
     IntegerLiteralValue getSPIRVNonUniformResource()
@@ -1335,6 +1335,18 @@ struct IRPrimalSubstitute : IRInst
     IRInst* getBaseFn() { return getOperand(0); }
 
     IR_LEAF_ISA(PrimalSubstitute)
+};
+
+struct IRDifferentiableTypeAnnotation : IRInst
+{
+    enum
+    {
+        kOp = kIROp_DifferentiableTypeAnnotation
+    };
+    IRInst* getBaseType() { return getOperand(0); }
+    IRInst* getWitness() { return getOperand(1); }
+
+    IR_LEAF_ISA(DifferentiableTypeAnnotation)
 };
 
 struct IRDispatchKernel : IRInst

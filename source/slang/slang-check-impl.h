@@ -1268,6 +1268,7 @@ public:
         Expr* originalExpr);
 
     Expr* ConstructDerefExpr(Expr* base, SourceLoc loc);
+    Expr* constructDerefExpr(Expr* base, QualType elementType, SourceLoc loc);
 
     InvokeExpr* constructUncheckedInvokeExpr(Expr* callee, const List<Expr*>& arguments);
 
