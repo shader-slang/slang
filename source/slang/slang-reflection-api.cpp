@@ -4037,9 +4037,9 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
         {
             if (auto cint =
                     entryPointLayout->program->tryFoldIntVal(numThreadsAttribute->extents[i]))
-                sizeAlongAxis[0] = (SlangUInt)cint->getValue();
+                sizeAlongAxis[i] = (SlangUInt)cint->getValue();
             else if (numThreadsAttribute->extents[i])
-                sizeAlongAxis[0] = 0;
+                sizeAlongAxis[i] = 0;
         }
     }
 
