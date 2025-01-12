@@ -3601,6 +3601,7 @@ public:
     IRPtrLit* getNullVoidPtrValue() { return getNullPtrValue(getPtrType(getVoidType())); }
     IRVoidLit* getVoidValue();
     IRInst* getCapabilityValue(CapabilitySet const& caps);
+    IRConstant* getClonedConstantValue(IRConstant& value);
 
     IRBasicType* getBasicType(BaseType baseType);
     IRBasicType* getVoidType();

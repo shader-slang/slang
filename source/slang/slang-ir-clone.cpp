@@ -51,16 +51,16 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     SLANG_ASSERT(builder);
     SLANG_ASSERT(oldInst);
 
-    // This logic will not handle any instructions
-    // with special-case data attached, but that only
-    // applies to `IRConstant`s at this point, and those
-    // should only appear at the global scope rather than
-    // in function bodies.
-    //
-    // TODO: It would be easy enough to extend this logic
-    // to handle constants gracefully, if it ever comes up.
-    //
-    SLANG_ASSERT(!as<IRConstant>(oldInst));
+    // IRConstants contain data other than just the operands, so cloning them
+    // is done separately.
+    IRConstant* oldConstant = as<IRConstant>(oldInst);
+    if (oldConstant)
+    {
+        IRConstant* newConstant = builder->getClonedConstantValue(*oldConstant);
+        builder->addInst(newConstant);
+        newConstant->sourceLoc = oldInst->sourceLoc;
+        return newConstant;
+    }
 
     // We start by mapping the type of the orignal instruction
     // to its replacement value, if any.
