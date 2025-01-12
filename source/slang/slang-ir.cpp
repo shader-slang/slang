@@ -2422,32 +2422,32 @@ IRConstant* IRBuilder::getClonedConstantValue(IRConstant& value)
     case kIROp_IntLit:
         {
             const size_t instSize = prefixSize + sizeof(IRIntegerValue);
-            irValue = static_cast<IRConstant*>(
-                _createInst(instSize, value.getFullType(), value.getOp()));
+            irValue =
+                static_cast<IRConstant*>(_createInst(instSize, value.getFullType(), value.getOp()));
             irValue->value.intVal = value.value.intVal;
             break;
         }
     case kIROp_FloatLit:
         {
             const size_t instSize = prefixSize + sizeof(IRFloatingPointValue);
-            irValue = static_cast<IRConstant*>(
-                _createInst(instSize, value.getFullType(), value.getOp()));
+            irValue =
+                static_cast<IRConstant*>(_createInst(instSize, value.getFullType(), value.getOp()));
             irValue->value.floatVal = value.value.floatVal;
             break;
         }
     case kIROp_PtrLit:
         {
             const size_t instSize = prefixSize + sizeof(void*);
-            irValue = static_cast<IRConstant*>(
-                _createInst(instSize, value.getFullType(), value.getOp()));
+            irValue =
+                static_cast<IRConstant*>(_createInst(instSize, value.getFullType(), value.getOp()));
             irValue->value.ptrVal = value.value.ptrVal;
             break;
         }
     case kIROp_VoidLit:
         {
             const size_t instSize = prefixSize + sizeof(void*);
-            irValue = static_cast<IRConstant*>(
-                _createInst(instSize, value.getFullType(), value.getOp()));
+            irValue =
+                static_cast<IRConstant*>(_createInst(instSize, value.getFullType(), value.getOp()));
             irValue->value.ptrVal = value.value.ptrVal;
             break;
         }
@@ -2460,8 +2460,8 @@ IRConstant* IRBuilder::getClonedConstantValue(IRConstant& value)
             const size_t instSize =
                 prefixSize + offsetof(IRConstant::StringValue, chars) + sliceSize;
 
-            irValue = static_cast<IRConstant*>(
-                _createInst(instSize, value.getFullType(), value.getOp()));
+            irValue =
+                static_cast<IRConstant*>(_createInst(instSize, value.getFullType(), value.getOp()));
 
             IRConstant::StringValue& dstString = irValue->value.stringVal;
 
