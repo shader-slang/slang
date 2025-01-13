@@ -740,6 +740,7 @@ SlangResult NVRTCDownstreamCompiler::_findOptixIncludePath(String& outPath)
     }
 #else
     const char* searchPattern = "NVIDIA-OptiX-SDK-*";
+    StringBuilder builder;
     if (SLANG_SUCCEEDED(
             PlatformUtil::getEnvironmentVariable(UnownedStringSlice::fromLiteral("HOME"), builder)))
     {
