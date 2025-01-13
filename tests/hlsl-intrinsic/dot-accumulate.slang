@@ -1,4 +1,6 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+// Does not run on DX11 as SM 6.4 is required.
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_4 -use-dxil -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-wgsl -compute -shaderobj -output-using-type
@@ -38,11 +40,15 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     //
     // dot2add()
     // [10.8 -3.3] dot [1.4 -20.3] - 2.11 
-    // (10.8 * 1.4) + (-3.3 * -20.3) - 2.11 = 80.0
+    // (10.8 * 1.4) + (-3.3 * -20.3) - 2.0 = 80.11
     //
     half2 half2X = half2(half(10.8), half(-3.3));
     half2 half2Y = half2(half(1.4), half(-20.3));
-    float half2Acc = -2.11;
+
+    // This will equal -2.0. This is done so `half2Acc` will not be implicitly emitted as literal `-2.0` which
+    // will overloaded as double in DXIL.
+    // TODO: Add `f` suffix for all float literals for HLSL.
+    float half2Acc = float(dispatchThreadID.x + 1) * -2.0f;
     float half2Result = dot2add(half2X, half2Y, half2Acc);
     outputBuffer[outputIndex++] = int(half2Result);
 }
