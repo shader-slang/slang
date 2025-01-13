@@ -127,11 +127,14 @@ protected:
         nvrtcProgram m_program;
     };
 
-    SlangResult _findIncludePath(String& outIncludePath);
+    SlangResult _findCUDAIncludePath(String& outIncludePath);
+    SlangResult _getCUDAIncludePath(String& outIncludePath);
 
-    SlangResult _getIncludePath(String& outIncludePath);
+    SlangResult _findOptixIncludePath(String& outIncludePath);
+    SlangResult _getOptixIncludePath(String& outIncludePath);
 
     SlangResult _maybeAddHalfSupport(const CompileOptions& options, CommandLine& ioCmdLine);
+    SlangResult _maybeAddOptixSupport(const CompileOptions& options, CommandLine& ioCmdLine);
 
 #define SLANG_NVTRC_MEMBER_FUNCS(ret, name, params) ret(*m_##name) params;
 
@@ -140,9 +143,16 @@ protected:
     // Holds list of paths passed in where cuda_fp16.h is found. Does *NOT* include cuda_fp16.h.
     List<String> m_cudaFp16FoundPaths;
 
-    bool m_includeSearched = false;
+    bool m_cudaIncludeSearched = false;
     // Holds location of where include (for cuda_fp16.h) is found.
-    String m_includePath;
+    String m_cudaIncludePath;
+
+    // Holds list of paths passed in where optix.h is found. Does *NOT* include optix.h.
+    List<String> m_optixFoundPaths;
+
+    bool m_optixIncludeSearched = false;
+    // Holds location of where include (for optix.h) is found.
+    String m_optixIncludePath;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
 };
@@ -602,21 +612,8 @@ static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
 }
 
 static const UnownedStringSlice g_fp16HeaderName = UnownedStringSlice::fromLiteral("cuda_fp16.h");
+static const UnownedStringSlice g_optixHeaderName = UnownedStringSlice::fromLiteral("optix.h");
 
-SlangResult NVRTCDownstreamCompiler::_getIncludePath(String& outPath)
-{
-    if (!m_includeSearched)
-    {
-        m_includeSearched = true;
-
-        SLANG_ASSERT(m_includePath.getLength() == 0);
-
-        _findIncludePath(m_includePath);
-    }
-
-    outPath = m_includePath;
-    return m_includePath.getLength() ? SLANG_OK : SLANG_E_NOT_FOUND;
-}
 
 SlangResult _findFileInIncludePath(
     const String& path,
@@ -650,7 +647,7 @@ SlangResult _findFileInIncludePath(
     return SLANG_E_NOT_FOUND;
 }
 
-SlangResult NVRTCDownstreamCompiler::_findIncludePath(String& outPath)
+SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
 {
     outPath = String();
 
@@ -711,6 +708,129 @@ SlangResult NVRTCDownstreamCompiler::_findIncludePath(String& outPath)
     return SLANG_E_NOT_FOUND;
 }
 
+SlangResult NVRTCDownstreamCompiler::_getCUDAIncludePath(String& outPath)
+{
+    if (!m_cudaIncludeSearched)
+    {
+        m_cudaIncludeSearched = true;
+
+        SLANG_ASSERT(m_cudaIncludePath.getLength() == 0);
+
+        _findCUDAIncludePath(m_cudaIncludePath);
+    }
+
+    outPath = m_cudaIncludePath;
+    return m_cudaIncludePath.getLength() ? SLANG_OK : SLANG_E_NOT_FOUND;
+}
+
+SlangResult NVRTCDownstreamCompiler::_findOptixIncludePath(String& outPath)
+{
+    outPath = String();
+
+    List<String> rootPaths;
+
+#if SLANG_WINDOWS_FAMILY
+    const char* searchPattern = "OptiX SDK *";
+    StringBuilder builder;
+    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+            UnownedStringSlice::fromLiteral("PROGRAMDATA"),
+            builder)))
+    {
+        rootPaths.add(Path::combine(builder, "NVIDIA Corporation"));
+    }
+#else
+    const char* searchPattern = "NVIDIA-OptiX-SDK-*";
+    if (SLANG_SUCCEEDED(
+            PlatformUtil::getEnvironmentVariable(UnownedStringSlice::fromLiteral("HOME"), builder)))
+    {
+        rootPaths.add(builder);
+    }
+#endif
+
+    struct OptixHeaders
+    {
+        String path;
+        SemanticVersion version;
+    };
+
+    // Visitor to find Optix headers.
+    struct Visitor : public Path::Visitor
+    {
+        const String& rootPath;
+        List<OptixHeaders>& optixPaths;
+        Visitor(const String& rootPath, List<OptixHeaders>& optixPaths)
+            : rootPath(rootPath), optixPaths(optixPaths)
+        {
+        }
+        void accept(Path::Type type, const UnownedStringSlice& path) SLANG_OVERRIDE
+        {
+            if (type != Path::Type::Directory)
+                return;
+
+            OptixHeaders optixPath;
+#if SLANG_WINDOWS_FAMILY
+            // Paths are expected to look like ".\OptiX SDK X.X.X"
+            auto versionString = path.subString(path.lastIndexOf(' ') + 1, path.getLength());
+#else
+            // Paths are expected to look like "./NVIDIA-OptiX-SDK-X.X.X-suffix"
+            auto versionString = path.subString(0, path.lastIndexOf('-'));
+            versionString =
+                versionString.subString(path.lastIndexOf('-') + 1, versionString.getLength());
+#endif
+            if (SLANG_SUCCEEDED(SemanticVersion::parse(versionString, '.', optixPath.version)))
+            {
+                optixPath.path = Path::combine(Path::combine(rootPath, path), "include");
+                String optixHeader = Path::combine(optixPath.path, g_optixHeaderName);
+                if (File::exists(optixHeader))
+                {
+                    optixPaths.add(optixPath);
+                }
+            }
+        }
+    };
+
+    List<OptixHeaders> optixPaths;
+
+    for (const String& rootPath : rootPaths)
+    {
+        Visitor visitor(rootPath, optixPaths);
+        Path::find(rootPath, searchPattern, &visitor);
+    }
+
+    // Find newest version
+    const OptixHeaders* newest = nullptr;
+    for (Index i = 0; i < optixPaths.getCount(); ++i)
+    {
+        if (!newest || optixPaths[i].version > newest->version)
+        {
+            newest = &optixPaths[i];
+        }
+    }
+
+    if (newest)
+    {
+        outPath = newest->path;
+        return SLANG_OK;
+    }
+
+    return SLANG_E_NOT_FOUND;
+}
+
+SlangResult NVRTCDownstreamCompiler::_getOptixIncludePath(String& outPath)
+{
+    if (!m_optixIncludeSearched)
+    {
+        m_optixIncludeSearched = true;
+
+        SLANG_ASSERT(m_optixIncludePath.getLength() == 0);
+
+        _findOptixIncludePath(m_optixIncludePath);
+    }
+
+    outPath = m_optixIncludePath;
+    return m_optixIncludePath.getLength() ? SLANG_OK : SLANG_E_NOT_FOUND;
+}
+
 SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(
     const DownstreamCompileOptions& options,
     CommandLine& ioCmdLine)
@@ -747,13 +867,55 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(
     }
 
     String includePath;
-    SLANG_RETURN_ON_FAIL(_getIncludePath(includePath));
+    SLANG_RETURN_ON_FAIL(_getCUDAIncludePath(includePath));
 
     // Add the found include path
     ioCmdLine.addArg("-I");
     ioCmdLine.addArg(includePath);
 
     ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_HALF");
+
+    return SLANG_OK;
+}
+
+SlangResult NVRTCDownstreamCompiler::_maybeAddOptixSupport(
+    const DownstreamCompileOptions& options,
+    CommandLine& ioCmdLine)
+{
+    // First check if we know if one of the include paths contains optix.h
+    for (const auto& includePath : options.includePaths)
+    {
+        if (m_optixFoundPaths.indexOf(includePath) >= 0)
+        {
+            // Okay we have an include path that we know works.
+            // Just need to enable OptiX in prelude
+            ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_OPTIX");
+            return SLANG_OK;
+        }
+    }
+
+    // Let's see if one of the paths finds optix.h
+    for (const auto& curIncludePath : options.includePaths)
+    {
+        const String includePath = asString(curIncludePath);
+        const String checkPath = Path::combine(includePath, g_optixHeaderName);
+        if (File::exists(checkPath))
+        {
+            m_optixFoundPaths.add(includePath);
+            // Just need to enable OptiX in prelude
+            ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_OPTIX");
+            return SLANG_OK;
+        }
+    }
+
+    String includePath;
+    SLANG_RETURN_ON_FAIL(_getOptixIncludePath(includePath));
+
+    // Add the found include path
+    ioCmdLine.addArg("-I");
+    ioCmdLine.addArg(includePath);
+
+    ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_OPTIX");
 
     return SLANG_OK;
 }
@@ -910,48 +1072,7 @@ SlangResult NVRTCDownstreamCompiler::compile(
     //
     if (options.pipelineType == PipelineType::RayTracing)
     {
-        // The device-side OptiX API is accessed through a constellation
-        // of headers provided by the OptiX SDK, so we need to set an
-        // include path for the compile that makes those visible.
-        //
-        // TODO: The OptiX SDK installer doesn't set any kind of environment
-        // variable to indicate where the SDK was installed, so we seemingly
-        // need to probe paths instead. The form of the path will differ
-        // betwene Windows and Unix-y platforms, and we will need some kind
-        // of approach to probe multiple versiosn and use the latest.
-        //
-        // HACK: For now I'm using the fixed path for the most recent SDK
-        // release on Windows. This means that OptiX cross-compilation will
-        // only "work" on a subset of platforms, but that doesn't matter
-        // for now since it doesn't really "work" at all.
-        //
-        cmdLine.addArg("-I");
-        cmdLine.addArg("C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.0.0/include/");
-
-        // The OptiX headers in turn `#include <stddef.h>` and expect that
-        // to work. We could try to also add in an include path from the CUDA
-        // SDK (which seems to provide a `stddef.h` in the most recent version),
-        // but using that version doesn't seem to work (and also bakes in a
-        // requirement that the user have the CUDA SDK installed in addition
-        // to the OptiX SDK).
-        //
-        // Instead, we will rely on the NVRTC feature that lets us set up
-        // memory buffers to be used as include files by the we compile.
-        // We will define a dummy `stddef.h` that includes the bare minimum
-        // lines required to get the OptiX headers to compile without complaint.
-        //
-        // TODO: Confirm that the `LP64` definition here is actually needed.
-        //
-        headerIncludeNames.add("stddef.h");
-        headers.add("#pragma once\n"
-                    "#define LP64\n");
-
-        // Finally, we want the CUDA prelude to be able to react to whether
-        // or not OptiX is required (most notably by `#include`ing the appropriate
-        // header(s)), so we will insert a preprocessor define to indicate
-        // the requirement.
-        //
-        cmdLine.addArg("-DSLANG_CUDA_ENABLE_OPTIX");
+        SLANG_RETURN_ON_FAIL(_maybeAddOptixSupport(options, cmdLine));
     }
 
     // Add any compiler specific options
