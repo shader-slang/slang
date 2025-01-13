@@ -12354,10 +12354,9 @@ bool SemanticsDeclAttributesVisitor::_searchMembersWithHigherVisibility(
             {
                 for (auto param : ctor->getParameters())
                 {
-                    if (getDeclVisibility(param) >= ctorVisibility)
-                    {
-                        resultMembers.add(param);
-                    }
+                    // Because the parameters in the ctor must have the higher or equal visibility than
+                    // the ctor itself, we don't need to check the visibility level of the parameter.
+                    resultMembers.add(param);
                 }
             }
         }
