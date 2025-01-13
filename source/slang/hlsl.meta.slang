@@ -16824,7 +16824,7 @@ int dot4add_i8packed(uint x, uint y, int acc)
 /// @category math
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_6_4)]
 float dot2add(half2 x, half2 y, float acc)
 {
     __target_switch
