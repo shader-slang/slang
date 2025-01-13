@@ -2192,7 +2192,71 @@ IRConstant* IRBuilder::_findOrEmitConstant(IRConstant& keyInst)
         return irValue;
     }
 
-    irValue = getClonedConstantValue(keyInst);
+    // Calculate the minimum object size (ie not including the payload of value)
+    const size_t prefixSize = SLANG_OFFSET_OF(IRConstant, value);
+
+    switch (keyInst.getOp())
+    {
+    default:
+        SLANG_UNEXPECTED("missing case for IR constant");
+        break;
+
+    case kIROp_BoolLit:
+    case kIROp_IntLit:
+        {
+            const size_t instSize = prefixSize + sizeof(IRIntegerValue);
+            irValue = static_cast<IRConstant*>(
+                _createInst(instSize, keyInst.getFullType(), keyInst.getOp()));
+            irValue->value.intVal = keyInst.value.intVal;
+            break;
+        }
+    case kIROp_FloatLit:
+        {
+            const size_t instSize = prefixSize + sizeof(IRFloatingPointValue);
+            irValue = static_cast<IRConstant*>(
+                _createInst(instSize, keyInst.getFullType(), keyInst.getOp()));
+            irValue->value.floatVal = keyInst.value.floatVal;
+            break;
+        }
+    case kIROp_PtrLit:
+        {
+            const size_t instSize = prefixSize + sizeof(void*);
+            irValue = static_cast<IRConstant*>(
+                _createInst(instSize, keyInst.getFullType(), keyInst.getOp()));
+            irValue->value.ptrVal = keyInst.value.ptrVal;
+            break;
+        }
+    case kIROp_VoidLit:
+        {
+            const size_t instSize = prefixSize + sizeof(void*);
+            irValue = static_cast<IRConstant*>(
+                _createInst(instSize, keyInst.getFullType(), keyInst.getOp()));
+            irValue->value.ptrVal = keyInst.value.ptrVal;
+            break;
+        }
+    case kIROp_BlobLit:
+    case kIROp_StringLit:
+        {
+            const UnownedStringSlice slice = keyInst.getStringSlice();
+
+            const size_t sliceSize = slice.getLength();
+            const size_t instSize =
+                prefixSize + offsetof(IRConstant::StringValue, chars) + sliceSize;
+
+            irValue = static_cast<IRConstant*>(
+                _createInst(instSize, keyInst.getFullType(), keyInst.getOp()));
+
+            IRConstant::StringValue& dstString = irValue->value.stringVal;
+
+            dstString.numChars = uint32_t(sliceSize);
+            // Turn into pointer to avoid warning of array overrun
+            char* dstChars = dstString.chars;
+            // Copy the chars
+            memcpy(dstChars, slice.begin(), sliceSize);
+
+            break;
+        }
+    }
 
     key.inst = irValue;
     m_dedupContext->getConstantMap().add(key, irValue);
@@ -2403,79 +2467,6 @@ IRInst* IRBuilder::getCapabilityValue(CapabilitySet const& caps)
         kIROp_CapabilityDisjunction,
         conjunctions.getCount(),
         conjunctions.getBuffer());
-}
-
-IRConstant* IRBuilder::getClonedConstantValue(IRConstant& value)
-{
-    IRConstant* irValue = nullptr;
-
-    // Calculate the minimum object size (ie not including the payload of value)
-    const size_t prefixSize = SLANG_OFFSET_OF(IRConstant, value);
-
-    switch (value.getOp())
-    {
-    default:
-        SLANG_UNEXPECTED("missing case for IR constant");
-        break;
-
-    case kIROp_BoolLit:
-    case kIROp_IntLit:
-        {
-            const size_t instSize = prefixSize + sizeof(IRIntegerValue);
-            irValue =
-                static_cast<IRConstant*>(_createInst(instSize, value.getFullType(), value.getOp()));
-            irValue->value.intVal = value.value.intVal;
-            break;
-        }
-    case kIROp_FloatLit:
-        {
-            const size_t instSize = prefixSize + sizeof(IRFloatingPointValue);
-            irValue =
-                static_cast<IRConstant*>(_createInst(instSize, value.getFullType(), value.getOp()));
-            irValue->value.floatVal = value.value.floatVal;
-            break;
-        }
-    case kIROp_PtrLit:
-        {
-            const size_t instSize = prefixSize + sizeof(void*);
-            irValue =
-                static_cast<IRConstant*>(_createInst(instSize, value.getFullType(), value.getOp()));
-            irValue->value.ptrVal = value.value.ptrVal;
-            break;
-        }
-    case kIROp_VoidLit:
-        {
-            const size_t instSize = prefixSize + sizeof(void*);
-            irValue =
-                static_cast<IRConstant*>(_createInst(instSize, value.getFullType(), value.getOp()));
-            irValue->value.ptrVal = value.value.ptrVal;
-            break;
-        }
-    case kIROp_BlobLit:
-    case kIROp_StringLit:
-        {
-            const UnownedStringSlice slice = value.getStringSlice();
-
-            const size_t sliceSize = slice.getLength();
-            const size_t instSize =
-                prefixSize + offsetof(IRConstant::StringValue, chars) + sliceSize;
-
-            irValue =
-                static_cast<IRConstant*>(_createInst(instSize, value.getFullType(), value.getOp()));
-
-            IRConstant::StringValue& dstString = irValue->value.stringVal;
-
-            dstString.numChars = uint32_t(sliceSize);
-            // Turn into pointer to avoid warning of array overrun
-            char* dstChars = dstString.chars;
-            // Copy the chars
-            memcpy(dstChars, slice.begin(), sliceSize);
-
-            break;
-        }
-    }
-
-    return irValue;
 }
 
 static void canonicalizeInstOperands(IRBuilder& builder, IROp op, ArrayView<IRInst*> operands)
@@ -5850,6 +5841,16 @@ IRGlobalConstant* IRBuilder::emitGlobalConstant(IRType* type, IRInst* val)
 {
     auto inst = createInst<IRGlobalConstant>(this, kIROp_GlobalConstant, type, val);
     addGlobalValue(this, inst);
+    return inst;
+}
+
+IRConstant* IRBuilder::emitPtrLit(IRType* type, void* ptrVal)
+{
+    const size_t prefixSize = SLANG_OFFSET_OF(IRConstant, value);
+    const size_t instSize = prefixSize + sizeof(void*);
+    auto inst = static_cast<IRConstant*>(_createInst(instSize, type, kIROp_PtrLit));
+    inst->value.ptrVal = ptrVal;
+    addInst(inst);
     return inst;
 }
 

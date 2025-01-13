@@ -3601,7 +3601,6 @@ public:
     IRPtrLit* getNullVoidPtrValue() { return getNullPtrValue(getPtrType(getVoidType())); }
     IRVoidLit* getVoidValue();
     IRInst* getCapabilityValue(CapabilitySet const& caps);
-    IRConstant* getClonedConstantValue(IRConstant& value);
 
     IRBasicType* getBasicType(BaseType baseType);
     IRBasicType* getVoidType();
@@ -4433,6 +4432,8 @@ public:
     IRGlobalConstant* emitGlobalConstant(IRType* type);
 
     IRGlobalConstant* emitGlobalConstant(IRType* type, IRInst* val);
+
+    IRConstant* emitPtrLit(IRType* type, void* ptr);
 
     IRInst* emitWaveMaskBallot(IRType* type, IRInst* mask, IRInst* condition);
     IRInst* emitWaveMaskMatch(IRType* type, IRInst* mask, IRInst* value);
