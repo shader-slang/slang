@@ -9286,20 +9286,13 @@ Expr* SemanticsDeclBodyVisitor::createCtorParamExpr(ConstructorDecl* ctor, Index
     {
         if (auto param = as<ParamDecl>(ctor->members[paramIndex]))
         {
-            if (param->initExpr)
-            {
-                return param->initExpr;
-            }
-            else
-            {
-                auto paramType = param->getType();
-                auto paramExpr = m_astBuilder->create<VarExpr>();
-                paramExpr->scope = ctor->ownedScope;
-                paramExpr->declRef = param;
-                paramExpr->type = paramType;
-                paramExpr->loc = param->loc;
-                return paramExpr;
-            }
+            auto paramType = param->getType();
+            auto paramExpr = m_astBuilder->create<VarExpr>();
+            paramExpr->scope = ctor->ownedScope;
+            paramExpr->declRef = param;
+            paramExpr->type = paramType;
+            paramExpr->loc = param->loc;
+            return paramExpr;
         }
     }
     return nullptr;
@@ -9361,7 +9354,7 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(
 
         auto assign = m_astBuilder->create<AssignExpr>();
         assign->left =
-            coerce(CoercionSite::Initializer, declInfo.defaultCtor->returnType.type, thisExpr);
+            coerce(CoercionSite::Initializer, baseCtor->returnType.type, thisExpr);
         assign->right = invoke;
 
         auto stmt = m_astBuilder->create<ExpressionStmt>();
