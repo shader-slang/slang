@@ -706,6 +706,35 @@ void CLikeSourceEmitter::emitLivenessImpl(IRInst* inst)
 // Expressions
 //
 
+static bool isBitLogicalOrRelationalOrEquality(EPrecedence prec)
+{
+    switch(prec)
+    {
+    case EPrecedence::kEPrecedence_And_Left:
+    case EPrecedence::kEPrecedence_And_Right:
+    case EPrecedence::kEPrecedence_BitAnd_Left:
+    case EPrecedence::kEPrecedence_BitAnd_Right:
+    case EPrecedence::kEPrecedence_BitOr_Left:
+    case EPrecedence::kEPrecedence_BitOr_Right:
+    case EPrecedence::kEPrecedence_BitXor_Left:
+    case EPrecedence::kEPrecedence_BitXor_Right:
+    case EPrecedence::kEPrecedence_Or_Left:
+    case EPrecedence::kEPrecedence_Or_Right:
+    case EPrecedence::kEPrecedence_Relational_Left:
+    case EPrecedence::kEPrecedence_Relational_Right:
+    case EPrecedence::kEPrecedence_Shift_Left:
+    case EPrecedence::kEPrecedence_Shift_Right:
+    case EPrecedence::kEPrecedence_Equality_Left:
+    case EPrecedence::kEPrecedence_Equality_Right:
+        return true;
+
+    default:
+        break;
+    }
+
+    return false;
+}
+
 bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo& prec)
 {
     bool needParens = (prec.leftPrecedence <= outerPrec.leftPrecedence) ||
@@ -715,152 +744,13 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo
     // for common mistakes when parentheses are not used with certain combinations
     // of the operations. We emit parentheses to avoid the warnings.
     //
-    // a | b & c => a | (b & c)
-    if (prec.leftPrecedence == EPrecedence::kEPrecedence_BitAnd_Left &&
-        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitOr_Right)
-    {
-        needParens = true;
-    }
-    // a & b | c => (a & b) | c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_BitAnd_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitOr_Left)
-    {
-        needParens = true;
-    }
-    // a << b + c => a << (b + c)
-    else if (
-        prec.leftPrecedence == EPrecedence::kEPrecedence_Additive_Left &&
-        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_Shift_Right)
-    {
-        needParens = true;
-    }
-    // a + b << c => (a + b) << c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Shift_Left)
-    {
-        needParens = true;
-    }
-    // a + b & c => (a + b) & c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitAnd_Left)
-    {
-        needParens = true;
-    }
-    // a ^ b * c => (a ^ b) * c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_BitXor_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left)
-    {
-        needParens = true;
-    }
-    // a ^ b + c => a ^ (b + c)
-    else if (
-        prec.leftPrecedence == EPrecedence::kEPrecedence_Additive_Left &&
-        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitXor_Right)
-    {
-        needParens = true;
-    }
-    // a + b ^ c => (a + b) ^ c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitXor_Left)
-    {
-        needParens = true;
-    }
-    // a | b + c => a | (b + c)
-    else if (
-        prec.leftPrecedence == EPrecedence::kEPrecedence_Additive_Left &&
-        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitOr_Right)
-    {
-        needParens = true;
-    }
-    // a + b | c => (a + b) | c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitOr_Left)
-    {
-        needParens = true;
-    }
-    // a ^ b * c => a ^ (b * c)
-    else if (
-        prec.leftPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left &&
-        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitXor_Right)
-    {
-        needParens = true;
-    }
-    // a * b ^ c => (a * b) ^ c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitXor_Left)
-    {
-        needParens = true;
-    }
-    // a | b * c => a | (b * c)
-    else if (
-        prec.leftPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left &&
-        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitOr_Right)
-    {
-        needParens = true;
-    }
-    // a * b | c => (a * b) | c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitOr_Left)
-    {
-        needParens = true;
-    }
-    // a & b * c => a & (b * c)
-    else if (
-        prec.leftPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left &&
-        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitAnd_Right)
-    {
-        needParens = true;
-    }
-    // a * b & c => (a * b) & c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitAnd_Left)
-    {
-        needParens = true;
-    }
-    // a << b * c => a << (b * c)
-    else if (
-        prec.leftPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left &&
-        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_Shift_Right)
-    {
-        needParens = true;
-    }
-    // a * b << c => (a * b) << c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Shift_Left)
-    {
-        needParens = true;
-    }
-    // a != b == c => (a != b) == c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_Equality_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Equality_Left)
-    {
-        needParens = true;
-    }
-    // a == b < c => a == (b < c)
-    else if (
-        prec.leftPrecedence == EPrecedence::kEPrecedence_Relational_Left &&
-        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_Equality_Right)
-    {
-        needParens = true;
-    }
-    // a < b == c => (a < b) == c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_Relational_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Equality_Left)
-    {
-        needParens = true;
-    }
+
+	if (isBitLogicalOrRelationalOrEquality(prec.leftPrecedence) &&
+        (outerPrec.leftPrecedence > kEPrecedence_Assign_Left))
+		needParens = true;
+        if (isBitLogicalOrRelationalOrEquality(outerPrec.leftPrecedence) ||
+            isBitLogicalOrRelationalOrEquality(outerPrec.rightPrecedence))
+		needParens = true;
 
     if (needParens)
     {
