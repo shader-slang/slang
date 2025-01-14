@@ -273,6 +273,10 @@ SlangResult JSONRPCConnection::sendCall(
 
 SlangResult JSONRPCConnection::waitForResult(Int timeOutInMs)
 {
+    // Invalidate m_jsonRoot before waitForResult, because when waitForResult fail,
+    // we don't want to use the result from the previous read.
+    m_jsonRoot.reset();
+
     SLANG_RETURN_ON_FAIL(m_connection->waitForResult(timeOutInMs));
     return tryReadMessage();
 }

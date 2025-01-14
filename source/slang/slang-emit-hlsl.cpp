@@ -903,6 +903,24 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             return true;
         }
+    case kIROp_LoadSamplerDescriptorFromHeap:
+        {
+            emitType(inst->getDataType());
+            m_writer->emit("(");
+            m_writer->emit("SamplerDescriptorHeap[");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit("])");
+            return true;
+        }
+    case kIROp_LoadResourceDescriptorFromHeap:
+        {
+            emitType(inst->getDataType());
+            m_writer->emit("(");
+            m_writer->emit("ResourceDescriptorHeap[");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit("])");
+            return true;
+        }
     case kIROp_ByteAddressBufferLoad:
         {
             // HLSL byte-address buffers have two kinds of `Load` operations.
@@ -1180,6 +1198,34 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     Super::emitSimpleValueImpl(inst);
 }
 
+void HLSLSourceEmitter::emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator)
+{
+    if (declarator)
+    {
+        // HLSL only allow matrix layout modifier when declaring a variable or struct field.
+        if (auto matType = as<IRMatrixType>(type))
+        {
+            auto matrixLayout = getIntVal(matType->getLayout());
+            if (getTargetProgram()->getOptionSet().getMatrixLayoutMode() !=
+                (MatrixLayoutMode)matrixLayout)
+            {
+                switch (matrixLayout)
+                {
+                case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
+                    m_writer->emit("column_major ");
+                    break;
+                case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
+                    m_writer->emit("row_major ");
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+    Super::emitSimpleTypeAndDeclaratorImpl(type, declarator);
+}
+
 void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
 {
     switch (type->getOp())
@@ -1311,6 +1357,11 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_AtomicType:
         {
             emitSimpleTypeImpl(cast<IRAtomicType>(type)->getElementType());
+            return;
+        }
+    case kIROp_ConstRefType:
+        {
+            emitSimpleTypeImpl(as<IRConstRefType>(type)->getValueType());
             return;
         }
     default:
@@ -1667,28 +1718,6 @@ void HLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
             if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
                 m_writer->emit("globallycoherent\n");
             continue;
-        }
-    }
-}
-
-void HLSLSourceEmitter::emitMatrixLayoutModifiersImpl(IRType* type)
-{
-    auto matType = as<IRMatrixType>(type);
-    if (!matType)
-        return;
-    auto matrixLayout = getIntVal(matType->getLayout());
-    if (getTargetProgram()->getOptionSet().getMatrixLayoutMode() != (MatrixLayoutMode)matrixLayout)
-    {
-        switch (matrixLayout)
-        {
-        case SLANG_MATRIX_LAYOUT_COLUMN_MAJOR:
-            m_writer->emit("column_major ");
-            break;
-        case SLANG_MATRIX_LAYOUT_ROW_MAJOR:
-            m_writer->emit("row_major ");
-            break;
-        default:
-            break;
         }
     }
 }

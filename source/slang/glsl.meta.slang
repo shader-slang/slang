@@ -2442,6 +2442,25 @@ public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
 
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_shadowlod)]
+public float textureLod(sampler2DArrayShadow sampler, vec4 p, float lod)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod";
+    case spirv:
+    {
+        float compareValue = p.w;
+        return spirv_asm {
+            result:$$float = OpImageSampleDrefExplicitLod $sampler $p $compareValue Lod $lod
+        };
+    }
+    default:
+        return sampler.SampleCmp(p.xyz, p.w);
+    }
+}
+
+[ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
 {
     __target_switch
@@ -9061,7 +9080,7 @@ public vector<float, N> fwidthCoarse(vector<float, N> p)
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
 [require(glsl_spirv, fragmentprocessing)]
-public float interpolateAtCentroid(__ref float interpolant)
+public float interpolateAtCentroid(__constref float interpolant)
 {
     __target_switch
     {
@@ -9080,7 +9099,7 @@ __generic<let N : int>
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
 [require(glsl_spirv, fragmentprocessing)]
-public vector<float, N> interpolateAtCentroid(__ref vector<float, N> interpolant)
+public vector<float, N> interpolateAtCentroid(__constref vector<float, N> interpolant)
 {
     __target_switch
     {
@@ -9099,7 +9118,7 @@ public vector<float, N> interpolateAtCentroid(__ref vector<float, N> interpolant
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
 [require(glsl_spirv, fragmentprocessing)]
-public float interpolateAtSample(__ref float interpolant, int sample)
+public float interpolateAtSample(__constref float interpolant, int sample)
 {
     __target_switch
     {
@@ -9118,7 +9137,7 @@ __generic<let N : int>
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
 [require(glsl_spirv, fragmentprocessing)]
-public vector<float, N> interpolateAtSample(__ref vector<float, N> interpolant, int sample)
+public vector<float, N> interpolateAtSample(__constref vector<float, N> interpolant, int sample)
 {
     __target_switch
     {
@@ -9137,7 +9156,7 @@ public vector<float, N> interpolateAtSample(__ref vector<float, N> interpolant, 
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
 [require(glsl_spirv, fragmentprocessing)]
-public float interpolateAtOffset(__ref float interpolant, vec2 offset)
+public float interpolateAtOffset(__constref float interpolant, vec2 offset)
 {
     __target_switch
     {
@@ -9156,7 +9175,7 @@ __generic<let N : int>
 [__NoSideEffect]
 [__GLSLRequireShaderInputParameter(0)]
 [require(glsl_spirv, fragmentprocessing)]
-public vector<float, N> interpolateAtOffset(__ref vector<float, N> interpolant, vec2 offset)
+public vector<float, N> interpolateAtOffset(__constref vector<float, N> interpolant, vec2 offset)
 {
     __target_switch
     {

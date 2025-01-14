@@ -51,15 +51,17 @@ struct SpecializationContext
     IRModule* module;
     DiagnosticSink* sink;
     TargetProgram* targetProgram;
+    SpecializationOptions options;
     bool changed = false;
 
 
-    SpecializationContext(IRModule* inModule, TargetProgram* target)
+    SpecializationContext(IRModule* inModule, TargetProgram* target, SpecializationOptions options)
         : workList(*inModule->getContainerPool().getList<IRInst>())
         , workListSet(*inModule->getContainerPool().getHashSet<IRInst>())
         , cleanInsts(*inModule->getContainerPool().getHashSet<IRInst>())
         , module(inModule)
         , targetProgram(target)
+        , options(options)
     {
     }
     ~SpecializationContext()
@@ -123,6 +125,12 @@ struct SpecializationContext
                 }
                 return false;
             }
+        }
+
+        if (isWrapperType(inst))
+        {
+            // For all the wrapper type, we need to make sure the operands are fully specialized.
+            return areAllOperandsFullySpecialized(inst);
         }
 
         // The default case is that a global value is always specialized.
@@ -1096,7 +1104,11 @@ struct SpecializationContext
             // Now we consider lower lookupWitnessMethod insts into dynamic dispatch calls,
             // which may open up more specialization opportunities.
             //
-            iterChanged = lowerWitnessLookup(module, sink);
+            if (options.lowerWitnessLookups)
+            {
+                iterChanged = lowerWitnessLookup(module, sink);
+            }
+
             if (!iterChanged || sink->getErrorCount())
                 break;
         }
@@ -2876,10 +2888,14 @@ struct SpecializationContext
     }
 };
 
-bool specializeModule(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+bool specializeModule(
+    TargetProgram* target,
+    IRModule* module,
+    DiagnosticSink* sink,
+    SpecializationOptions options)
 {
     SLANG_PROFILE;
-    SpecializationContext context(module, target);
+    SpecializationContext context(module, target, options);
     context.sink = sink;
     context.processModule();
     return context.changed;

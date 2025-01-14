@@ -599,4 +599,4 @@ void AftermathCrashExample::renderFrame(int frameBufferIndex)
 
 // This macro instantiates an appropriate main function to
 // run the application defined above.
-PLATFORM_UI_MAIN(innerMain<AftermathCrashExample>)
+EXAMPLE_MAIN(innerMain<AftermathCrashExample>)

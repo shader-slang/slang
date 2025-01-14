@@ -511,22 +511,39 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     }
 }
 
-Expr* SemanticsVisitor::ConstructDerefExpr(Expr* base, SourceLoc loc)
+Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, SourceLoc loc)
 {
-    auto elementType = getPointedToTypeIfCanImplicitDeref(base->type);
-    SLANG_ASSERT(elementType);
+    if (auto resPtrType = as<DescriptorHandleType>(base->type))
+    {
+        return coerce(CoercionSite::ExplicitCoercion, resPtrType->getElementType(), base);
+    }
 
     auto derefExpr = m_astBuilder->create<DerefExpr>();
     derefExpr->loc = loc;
     derefExpr->base = base;
     derefExpr->type = QualType(elementType);
 
-    if (as<PtrType>(base->type))
+    if (as<PtrType>(base->type) || as<RefType>(base->type))
+    {
         derefExpr->type.isLeftValue = true;
+    }
     else
+    {
         derefExpr->type.isLeftValue = base->type.isLeftValue;
+        derefExpr->type.isLeftValue = base->type.isLeftValue;
+        derefExpr->type.hasReadOnlyOnTarget = base->type.hasReadOnlyOnTarget;
+        derefExpr->type.isWriteOnly = base->type.isWriteOnly;
+    }
 
     return derefExpr;
+}
+
+Expr* SemanticsVisitor::ConstructDerefExpr(Expr* base, SourceLoc loc)
+{
+    auto elementType = getPointedToTypeIfCanImplicitDeref(base->type);
+    SLANG_ASSERT(elementType);
+
+    return constructDerefExpr(base, elementType, loc);
 }
 
 InvokeExpr* SemanticsVisitor::constructUncheckedInvokeExpr(
@@ -2301,8 +2318,7 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 
     auto indexExpr = subscriptExpr->indexExprs[0];
 
-    if (!indexExpr->type->equals(m_astBuilder->getIntType()) &&
-        !indexExpr->type->equals(m_astBuilder->getUIntType()))
+    if (!isScalarIntegerType(indexExpr->type.type))
     {
         getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
         return CreateErrorExpr(subscriptExpr);
@@ -4084,32 +4100,15 @@ Expr* SemanticsVisitor::maybeDereference(Expr* inExpr, CheckBaseContext checkBas
     for (;;)
     {
         auto baseType = expr->type;
-        QualType elementType;
-        if (auto pointerLikeType = as<PointerLikeType>(baseType))
-        {
-            elementType = QualType(pointerLikeType->getElementType());
-            elementType.isLeftValue = baseType.isLeftValue;
-            elementType.hasReadOnlyOnTarget = baseType.hasReadOnlyOnTarget;
-            elementType.isWriteOnly = baseType.isWriteOnly;
-        }
-        else if (auto ptrType = as<PtrType>(baseType))
+        if (as<PtrType>(baseType))
         {
             if (checkBaseContext == CheckBaseContext::Subscript)
                 return expr;
-            elementType = QualType(ptrType->getValueType());
-            elementType.isLeftValue = true;
         }
-        if (elementType.type)
-        {
-            auto derefExpr = m_astBuilder->create<DerefExpr>();
-            derefExpr->base = expr;
-            derefExpr->type = elementType;
-
-            expr = derefExpr;
-            continue;
-        }
-        // Default case: just use the expression as-is
-        return expr;
+        auto elementType = getPointedToTypeIfCanImplicitDeref(baseType);
+        if (!elementType)
+            return expr;
+        expr = constructDerefExpr(expr, elementType, inExpr->loc);
     }
 }
 
@@ -4730,8 +4729,12 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
             handleLeafCase(nsType->getDeclRef(), nsType);
         else if (auto aggType = as<DeclRefType>(e->type))
             handleLeafCase(aggType->getDeclRef(), aggType);
-        else if (auto typetype = as<TypeType>(e->type))
-            handleLeafCase(DeclRef<Decl>(), typetype->getType());
+        else if (as<TypeType>(e->type))
+        {
+            auto properType = CoerceToProperType(TypeExp(e));
+            if (properType.type)
+                handleLeafCase(DeclRef<Decl>(), properType.type);
+        }
     };
 
     auto& baseType = baseExpression->type;

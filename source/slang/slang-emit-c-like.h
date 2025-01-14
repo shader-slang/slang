@@ -512,6 +512,11 @@ protected:
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* inst) { SLANG_UNUSED(inst); }
     virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual bool doesTargetSupportPtrTypes() { return false; }
+    virtual bool isResourceTypeBindless(IRType* type)
+    {
+        SLANG_UNUSED(type);
+        return false;
+    }
     virtual void emitLayoutSemanticsImpl(
         IRInst* inst,
         char const* uniformSemanticSpelling,

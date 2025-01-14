@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHK): -target spirv
+//TEST:SIMPLE(filecheck=CHK): -target spirv -entry computeMain
 
 float f(float) { return 1; }
 
@@ -175,3 +175,10 @@ float nested_scopes(int x, inout float p)
 }
 
 //CHK-NOT: warning 41016
+
+[Shader("compute")]
+[NumThreads(4, 1, 1)]
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+{
+}
+
