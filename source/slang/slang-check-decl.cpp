@@ -9353,8 +9353,7 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(
         invoke->arguments.insertRange(0, argumentList);
 
         auto assign = m_astBuilder->create<AssignExpr>();
-        assign->left =
-            coerce(CoercionSite::Initializer, baseCtor->returnType.type, thisExpr);
+        assign->left = coerce(CoercionSite::Initializer, baseCtor->returnType.type, thisExpr);
         assign->right = invoke;
 
         auto stmt = m_astBuilder->create<ExpressionStmt>();
@@ -12354,8 +12353,9 @@ bool SemanticsDeclAttributesVisitor::_searchMembersWithHigherVisibility(
             {
                 for (auto param : ctor->getParameters())
                 {
-                    // Because the parameters in the ctor must have the higher or equal visibility than
-                    // the ctor itself, we don't need to check the visibility level of the parameter.
+                    // Because the parameters in the ctor must have the higher or equal visibility
+                    // than the ctor itself, we don't need to check the visibility level of the
+                    // parameter.
                     resultMembers.add(param);
                 }
             }
