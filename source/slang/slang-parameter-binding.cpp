@@ -1232,8 +1232,7 @@ static void addExplicitParameterBindings_GLSL(
     }
 
 
-    if (hlslToVulkanLayoutOptions == nullptr ||
-        !hlslToVulkanLayoutOptions->canInferBindings() ||
+    if (hlslToVulkanLayoutOptions == nullptr || !hlslToVulkanLayoutOptions->canInferBindings() ||
         !hlslToVulkanLayoutOptions->canInfer(vulkanKind, hlslInfo.space))
     {
         // If the user did not set how to interpret 'hlsl style bindings', we should map
