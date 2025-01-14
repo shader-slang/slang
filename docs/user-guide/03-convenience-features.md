@@ -149,7 +149,7 @@ int rs = foo.staticMethod(a,b);
 
 ### Mutability of member function
 
-For GPU performance considerations, the `this` argument in a member function is immutable by default. Attempting to modify `this` will throw compile errors. If you intend to define a member function that mutates the object, use `[mutating]` attribute on the member function as shown in the following example.
+For GPU performance considerations, the `this` argument in a member function is immutable by default. Attempting to modify `this` will result in a compile error. If you intend to define a member function that mutates the object, use `[mutating]` attribute on the member function as shown in the following example.
 
 ```hlsl
 struct Foo
