@@ -943,6 +943,9 @@ SlangResult NVRTCDownstreamCompiler::compile(
 
     CommandLine cmdLine;
 
+    // --dopt option is only available in CUDA 11.7 and later
+    bool hasDoptOption = m_desc.version >= SemanticVersion(11, 7);
+
     switch (options.debugInfoType)
     {
     case DebugInfoType::None:
@@ -952,14 +955,20 @@ SlangResult NVRTCDownstreamCompiler::compile(
     default:
         {
             cmdLine.addArg("--device-debug");
-            cmdLine.addArg("--dopt=on");
+            if (hasDoptOption)
+            {
+                cmdLine.addArg("--dopt=on");
+            }
             break;
         }
     case DebugInfoType::Maximal:
         {
             cmdLine.addArg("--device-debug");
             cmdLine.addArg("--generate-line-info");
-            cmdLine.addArg("--dopt=on");
+            if (hasDoptOption)
+            {
+                cmdLine.addArg("--dopt=on");
+            }
             break;
         }
     }
