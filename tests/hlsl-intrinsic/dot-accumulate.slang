@@ -45,9 +45,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     half2 half2X = half2(half(10.8), half(-3.3));
     half2 half2Y = half2(half(1.4), half(-20.3));
 
-    // This will equal -2.0. This is done so `half2Acc` will not be implicitly emitted as literal `-2.0` which
-    // will overloaded as double in DXIL.
-    // TODO: Add `f` suffix for all float literals for HLSL.
+    // `half2Acc` is assigned -2.0 here.
+    // Thread index is used so that `half2Acc` will not be implicitly emitted as literal `-2.0` which
+    // may be treated as a double by DXC and cause it to fail to compile because no overload exists for `dot2add` that
+    // accepts double.
     float half2Acc = float(dispatchThreadID.x + 1) * -2.0f;
     float half2Result = dot2add(half2X, half2Y, half2Acc);
     outputBuffer[outputIndex++] = int(half2Result);
