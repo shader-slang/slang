@@ -38,4 +38,6 @@ void validateIRModuleIfEnabled(CodeGenContext* codeGenContext, IRModule* module)
 void disableIRValidationAtInsert();
 void enableIRValidationAtInsert();
 
+void validateAtomicOperations(DiagnosticSink* sink, IRInst* inst);
+
 } // namespace Slang
