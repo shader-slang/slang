@@ -1060,22 +1060,6 @@ static void addExplicitParameterBindings_HLSL(
     }
 }
 
-static void _maybeDiagnoseMissingVulkanLayoutModifier(
-    ParameterBindingContext* context,
-    DeclRef<VarDeclBase> const& varDecl)
-{
-    // If the user didn't specify a `binding` (and optional `set`) for Vulkan,
-    // but they *did* specify a `register` for D3D, then that is probably an
-    // oversight on their part.
-    if (auto registerModifier = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>())
-    {
-        getSink(context)->diagnose(
-            registerModifier,
-            Diagnostics::registerModifierButNoVulkanLayout,
-            varDecl.getName());
-    }
-}
-
 static void addExplicitParameterBindings_GLSL(
     ParameterBindingContext* context,
     RefPtr<ParameterInfo> parameterInfo,
@@ -1212,13 +1196,6 @@ static void addExplicitParameterBindings_GLSL(
         return;
 
     auto hlslToVulkanLayoutOptions = context->getTargetProgram()->getHLSLToVulkanLayoutOptions();
-    bool warnedMissingVulkanLayoutModifier = false;
-    // If we are not told how to infer bindings with a compile option, we warn
-    if (hlslToVulkanLayoutOptions == nullptr || !hlslToVulkanLayoutOptions->canInferBindings())
-    {
-        warnedMissingVulkanLayoutModifier = true;
-        _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
-    }
 
     // We need an HLSL register semantic to to infer from
     auto hlslRegSemantic = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>();
@@ -1254,21 +1231,13 @@ static void addExplicitParameterBindings_GLSL(
         return;
     }
 
-    // If inference is not enabled for this kind, we can issue a warning
-    if (hlslToVulkanLayoutOptions &&
+
+    if (hlslToVulkanLayoutOptions == nullptr ||
+        !hlslToVulkanLayoutOptions->canInferBindings() ||
         !hlslToVulkanLayoutOptions->canInfer(vulkanKind, hlslInfo.space))
     {
-        if (!warnedMissingVulkanLayoutModifier)
-        {
-            _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
-            warnedMissingVulkanLayoutModifier = true;
-        }
-    }
-
-    if (warnedMissingVulkanLayoutModifier)
-    {
-        // If we warn due to invalid bindings and user did not set how to interpret 'hlsl style
-        // bindings', we should map `register` 1:1 with equivlent vulkan bindings.
+        // If the user did not set how to interpret 'hlsl style bindings', we should map
+        // `register` 1:1 with equivlent vulkan bindings.
         if (!hlslToVulkanLayoutOptions || hlslToVulkanLayoutOptions->getKindShiftEnabledFlags() ==
                                               HLSLToVulkanLayoutOptions::KindFlag::None)
         {
