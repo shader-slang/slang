@@ -301,6 +301,17 @@ There is potential to calculate the lane id using the [numthreads] markup in Sla
 * Intrinsics which only work in pixel shaders
   + QuadXXXX intrinsics
 
+OptiX Support
+=============
+
+Slang supports OptiX for raytracing. To compile raytracing programs, NVRTC must have access to the `optix.h` and dependent files that are typically distributed as part of the OptiX SDK. When Slang detects the use of raytracing in source, it will define `SLANG_CUDA_ENABLE_OPTIX` when `slang-cuda-prelude.h` is included. This will in turn try to include `optix.h`.
+
+Slang tries several mechanisms to locate `optix.h` when NVRTC is initiated. The first mechanism is to look in the include paths that are passed to Slang. If `optix.h` can be found in one of these paths, no more searching will be performed.
+
+If this fails, the default OptiX SDK install locations are searched. On Windows this is `%{PROGRAMDATA}\NVIDIA Corporation\OptiX SDK X.X.X\include`. On Linux this is `${HOME}/NVIDIA-OptiX-SDK-X.X.X-suffix`. 
+
+If OptiX headers cannot be found, compilation will fail.
+
 Limitations
 ===========
 
