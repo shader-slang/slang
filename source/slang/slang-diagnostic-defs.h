@@ -2460,6 +2460,12 @@ DIAGNOSTIC(
     unsupportedTargetIntrinsic,
     "intrinsic operation '$0' is not supported for the current target.")
 DIAGNOSTIC(
+    55205,
+    Error,
+    unsupportedSpecializationConstantForNumThreads,
+    "Specialization constants are not supported in the 'numthreads' attribute for the current "
+    "target.")
+DIAGNOSTIC(
     56001,
     Error,
     unableToAutoMapCUDATypeToHostType,
