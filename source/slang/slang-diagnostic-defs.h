@@ -2060,7 +2060,7 @@ DIAGNOSTIC(
 DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
 DIAGNOSTIC(41001, Error, recursiveType, "type '$0' contains cyclic reference to itself.")
 
-DIAGNOSTIC(41010, Warning, missingReturn, "control flow may reach end of non-'void' function")
+DIAGNOSTIC(41010, Warning, missingReturn, "non-void function does not return in all cases")
 DIAGNOSTIC(
     41011,
     Error,
