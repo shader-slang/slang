@@ -1322,6 +1322,8 @@ Result linkAndOptimizeIR(
             byteAddressBufferOptions);
     }
 
+    validateAtomicOperations(sink, irModule->getModuleInst());
+
     // For CUDA targets only, we will need to turn operations
     // the implicitly reference the "active mask" into ones
     // that use (and pass around) an explicit mask instead.
