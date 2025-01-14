@@ -490,11 +490,19 @@ static bool trySimplifyIfElse(IRBuilder& builder, IRIfElse* ifElseInst)
     bool isFalseBranchTrivial = false;
     if (isTrivialIfElse(ifElseInst, isTrueBranchTrivial, isFalseBranchTrivial))
     {
-        // If both branches of `if-else` are trivial jumps into after block,
+        // If either branch of `if-else` is a trivial jump into after block,
         // we can get rid of the entire conditional branch and replace it
         // with a jump into the after block.
-        if (auto termInst = as<IRUnconditionalBranch>(ifElseInst->getTrueBlock()->getTerminator()))
+        IRUnconditionalBranch* termInst =
+            as<IRUnconditionalBranch>(ifElseInst->getTrueBlock()->getTerminator());
+        if (!termInst || (termInst->getTargetBlock() != ifElseInst->getAfterBlock()))
         {
+            termInst = as<IRUnconditionalBranch>(ifElseInst->getFalseBlock()->getTerminator());
+        }
+
+        if (termInst)
+        {
+            SLANG_ASSERT(termInst->getTargetBlock() == ifElseInst->getAfterBlock());
             List<IRInst*> args;
             for (UInt i = 0; i < termInst->getArgCount(); i++)
                 args.add(termInst->getArg(i));
