@@ -20989,6 +20989,8 @@ struct ConstBufferPointer
 // new aliased bindings for each distinct cast type.
 //
 
+//@public:
+
 /// Represent the kind of a descriptor type.
 enum DescriptorKind
 {
@@ -21105,8 +21107,18 @@ ${{{{
 }
 }}}}
 
-/// Represents a bindless resource handle. A bindless resource handle is always a concrete type and can be
+/// Represents a bindless handle to a descriptor. A descriptor handle is always an ordinary data type and can be
 /// declared in any memory location.
+/// @remarks Opaque descriptor types such as textures(`Texture2D` etc.), `SamplerState` and buffers (e.g. `StructuredBuffer`)
+/// can have undefined size and data representation on many targets. On platforms such as Vulkan and D3D12, descriptors are
+/// communicated to the shader code by calling the host side API to write the descriptor into a descriptor set or table, instead
+/// of directly writing bytes into an ordinary GPU accessible buffer. As a result, oapque handle types cannot be used in places
+/// that refer to a ordinary buffer location, such as as element types of a `StructuredBuffer`.
+/// However, a `DescriptorHandle<T>` stores a handle (or address) to the actual descriptor, and is always an ordinary data type
+/// that can be manipulated directly in the shader code. This gives the developer the flexibility to embed and pass around descriptor
+/// parameters throughout the code, to enable cleaner modular designs.
+/// See [User Guide](https://shader-slang.com/slang/user-guide/convenience-features.html#descriptorhandle-for-bindless-descriptor-access)
+/// for more information on how to use `DescriptorHandle<T>` in your code.
 __magic_type(DescriptorHandleType)
 __intrinsic_type($(kIROp_DescriptorHandleType))
 struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
@@ -21196,6 +21208,8 @@ extern T getDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
 
 __intrinsic_op($(kIROp_NonUniformResourceIndex))
 DescriptorHandle<T> nonuniform<T:IOpaqueDescriptor>(DescriptorHandle<T> ptr);
+
+//@hidden:
 
 __glsl_version(450)
 __glsl_extension(GL_ARB_shader_clock)
