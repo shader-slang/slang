@@ -952,12 +952,14 @@ SlangResult NVRTCDownstreamCompiler::compile(
     default:
         {
             cmdLine.addArg("--device-debug");
+            cmdLine.addArg("--dopt=on");
             break;
         }
     case DebugInfoType::Maximal:
         {
             cmdLine.addArg("--device-debug");
             cmdLine.addArg("--generate-line-info");
+            cmdLine.addArg("--dopt=on");
             break;
         }
     }
