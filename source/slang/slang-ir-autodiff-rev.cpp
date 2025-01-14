@@ -528,10 +528,12 @@ InstPair BackwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRF
                 // If primal parameter is mutable, we need to pass in a temp var.
                 auto tempVar = builder.emitVar(primalParamPtrType->getValueType());
 
-                // We also need to setup the initial value of the temp var, otherwise
-                // the temp var will be uninitialized which could cause undefined behavior
-                // in the primal function.
-                builder.emitStore(tempVar, primalArg);
+                // If the parameter is not a pure 'out' param, we also need to setup the initial
+                // value of the temp var, otherwise the temp var will be uninitialized which could
+                // cause undefined behavior in the primal function.
+                //
+                if (!as<IROutType>(primalParamType))
+                    builder.emitStore(tempVar, primalArg);
 
                 primalArgs.add(tempVar);
             }
