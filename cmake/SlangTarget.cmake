@@ -505,10 +505,14 @@ function(slang_add_target dir type)
         endif()
         install(
             TARGETS ${target} ${export_args}
-            ARCHIVE DESTINATION ${archive_subdir} ${ARGN}
-            LIBRARY DESTINATION ${library_subdir} ${ARGN}
-            RUNTIME DESTINATION ${runtime_subdir} ${ARGN}
-            PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} ${ARGN}
+            ARCHIVE DESTINATION ${archive_subdir}
+            ${ARGN}
+            LIBRARY DESTINATION ${library_subdir}
+            ${ARGN}
+            RUNTIME DESTINATION ${runtime_subdir}
+            ${ARGN}
+            PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+            ${ARGN}
         )
     endmacro()
 
