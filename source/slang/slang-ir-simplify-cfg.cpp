@@ -493,7 +493,8 @@ static bool trySimplifyIfElse(IRBuilder& builder, IRIfElse* ifElseInst)
         // If either branch of `if-else` is a trivial jump into after block,
         // we can get rid of the entire conditional branch and replace it
         // with a jump into the after block.
-        IRUnconditionalBranch* termInst = as<IRUnconditionalBranch>(ifElseInst->getTrueBlock()->getTerminator());
+        IRUnconditionalBranch* termInst =
+            as<IRUnconditionalBranch>(ifElseInst->getTrueBlock()->getTerminator());
         if (!termInst || (termInst->getTargetBlock() != ifElseInst->getAfterBlock()))
         {
             termInst = as<IRUnconditionalBranch>(ifElseInst->getFalseBlock()->getTerminator());
