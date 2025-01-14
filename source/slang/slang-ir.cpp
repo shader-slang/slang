@@ -2395,9 +2395,8 @@ IRBlobLit* IRBuilder::getBlobValue(ISlangBlob* blob)
     return static_cast<IRBlobLit*>(_findOrEmitConstant(keyInst));
 }
 
-IRPtrLit* IRBuilder::_getPtrValue(void* data)
+IRPtrLit* IRBuilder::getPtrValue(IRType* type, void* data)
 {
-    auto type = getPtrType(getVoidType());
     IRConstant keyInst;
     memset(&keyInst, 0, sizeof(keyInst));
     keyInst.m_op = kIROp_PtrLit;
@@ -5844,16 +5843,6 @@ IRGlobalConstant* IRBuilder::emitGlobalConstant(IRType* type, IRInst* val)
     return inst;
 }
 
-IRConstant* IRBuilder::emitPtrLit(IRType* type, void* ptrVal)
-{
-    const size_t prefixSize = SLANG_OFFSET_OF(IRConstant, value);
-    const size_t instSize = prefixSize + sizeof(void*);
-    auto inst = static_cast<IRConstant*>(_createInst(instSize, type, kIROp_PtrLit));
-    inst->value.ptrVal = ptrVal;
-    addInst(inst);
-    return inst;
-}
-
 IRInst* IRBuilder::emitWaveMaskBallot(IRType* type, IRInst* mask, IRInst* condition)
 {
     auto inst = createInst<IRInst>(this, kIROp_WaveMaskBallot, type, mask, condition);
@@ -6334,7 +6323,7 @@ IRDecoration* IRBuilder::addDecoration(
 
 void IRBuilder::addHighLevelDeclDecoration(IRInst* inst, Decl* decl)
 {
-    auto ptrConst = _getPtrValue(decl);
+    auto ptrConst = getPtrValue(getPtrType(getVoidType()), decl);
     addDecoration(inst, kIROp_HighLevelDeclDecoration, ptrConst);
 }
 

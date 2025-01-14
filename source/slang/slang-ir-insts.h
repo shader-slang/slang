@@ -3596,7 +3596,7 @@ public:
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
     IRBlobLit* getBlobValue(ISlangBlob* blob);
-    IRPtrLit* _getPtrValue(void* ptr);
+    IRPtrLit* getPtrValue(IRType* type, void* ptr);
     IRPtrLit* getNullPtrValue(IRType* type);
     IRPtrLit* getNullVoidPtrValue() { return getNullPtrValue(getPtrType(getVoidType())); }
     IRVoidLit* getVoidValue();
@@ -4432,8 +4432,6 @@ public:
     IRGlobalConstant* emitGlobalConstant(IRType* type);
 
     IRGlobalConstant* emitGlobalConstant(IRType* type, IRInst* val);
-
-    IRConstant* emitPtrLit(IRType* type, void* ptr);
 
     IRInst* emitWaveMaskBallot(IRType* type, IRInst* mask, IRInst* condition);
     IRInst* emitWaveMaskMatch(IRType* type, IRInst* mask, IRInst* value);
