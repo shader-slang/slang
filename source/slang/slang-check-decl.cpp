@@ -8189,6 +8189,23 @@ void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
             subContext.setCheckForSynthesizedCtor(true);
             SemanticsDeclBodyVisitor subVisitor(subContext);
             checkSynthesizedConstructorWithoutDiagnostic(subVisitor, decl);
+            // Once we have checked the definition of synthesized constructor, we can return delete
+            // the default constructor if it exists, because we only need to have one constructor.
+            if (tempSink.getErrorCount() == 0)
+            {
+                auto structDecl = as<StructDecl>(constructorDecl->parentDecl);
+                ConstructorDecl* defaultCtor = nullptr;
+                if (structDecl->m_synthesizedCtorMap.tryGetValue(
+                        (int)ConstructorDecl::ConstructorTags::Synthesized,
+                        defaultCtor))
+                {
+                    structDecl->members.remove(defaultCtor);
+                    structDecl->invalidateMemberDictionary();
+                    structDecl->buildMemberDictionary();
+                    structDecl->m_synthesizedCtorMap.remove(
+                        (int)ConstructorDecl::ConstructorTags::Synthesized);
+                }
+            }
             return;
         }
     }
