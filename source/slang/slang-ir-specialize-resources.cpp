@@ -911,7 +911,7 @@ struct ResourceOutputSpecializationPass
         SpecializeFuncResult recursiveSpecializationResult = SpecializeFuncResult::Ok;
         List<IRStore*> stores;
 
-        // We'll first specialize any relevant calls that may affect the value stored into the 
+        // We'll first specialize any relevant calls that may affect the value stored into the
         // param. This may create more stores into the param.
         //
         traverseUses(
@@ -938,8 +938,9 @@ struct ResourceOutputSpecializationPass
                     return;
                 };
             });
-        
-        // If any call specialization fails, we may need to revisit this function at a later iteration.
+
+        // If any call specialization fails, we may need to revisit this function at a later
+        // iteration.
         if (failedResult(recursiveSpecializationResult))
             return recursiveSpecializationResult;
 
