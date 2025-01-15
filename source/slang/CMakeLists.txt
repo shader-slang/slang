@@ -102,6 +102,18 @@ target_include_directories(
 )
 
 #
+# generate language bindings
+#
+
+add_custom_target(
+    generate_language_bindings
+    COMMAND
+        slang-binding-generator -d "${slang_SOURCE_DIR}/include" slang.h -unit-test
+    DEPENDS "${slang_SOURCE_DIR}/include/slang.h" slang-binding-generator
+    VERBATIM
+)
+
+#
 # generated lookup tables
 #
 
@@ -212,6 +224,7 @@ set(slang_build_args
     ${SLANG_RECORD_REPLAY_SYSTEM}
     REQUIRES
     copy_slang_headers
+    generate_language_bindings
 )
 set(slang_link_args
     LINK_WITH_PRIVATE
