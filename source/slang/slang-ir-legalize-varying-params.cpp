@@ -3378,25 +3378,12 @@ protected:
 
             IRBuilder svBuilder(builder.getModule());
             svBuilder.setInsertBefore(entryPoint.entryPointFunc->getFirstOrdinaryInst());
-            auto uint3Type = builder.getVectorType(
-                builder.getUIntType(),
-                builder.getIntValue(builder.getIntType(), 3));
-            auto computeExtent =
-                emitCalcGroupExtents(svBuilder, entryPoint.entryPointFunc, uint3Type);
-            if (!computeExtent)
-            {
-                m_sink->diagnose(
-                    entryPoint.entryPointFunc,
-                    Diagnostics::unsupportedSpecializationConstantForNumThreads);
-
-                // Fill in placeholder values.
-                static const int kAxisCount = 3;
-                IRInst* groupExtentAlongAxis[kAxisCount] = {};
-                for (int axis = 0; axis < kAxisCount; axis++)
-                    groupExtentAlongAxis[axis] =
-                        builder.getIntValue(uint3Type->getElementType(), 1);
-                computeExtent = builder.emitMakeVector(uint3Type, kAxisCount, groupExtentAlongAxis);
-            }
+            auto computeExtent = emitCalcGroupExtents(
+                svBuilder,
+                entryPoint.entryPointFunc,
+                builder.getVectorType(
+                    builder.getUIntType(),
+                    builder.getIntValue(builder.getIntType(), 3)));
             auto groupIndexCalc = emitCalcGroupIndex(
                 svBuilder,
                 entryPointToGroupThreadId[entryPoint.entryPointFunc],
