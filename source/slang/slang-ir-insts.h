@@ -570,7 +570,6 @@ struct IRInstanceDecoration : IRDecoration
     IRIntLit* getCount() { return cast<IRIntLit>(getOperand(0)); }
 };
 
-struct IRGlobalParam;
 struct IRNumThreadsDecoration : IRDecoration
 {
     enum
@@ -579,13 +578,11 @@ struct IRNumThreadsDecoration : IRDecoration
     };
     IR_LEAF_ISA(NumThreadsDecoration)
 
-    IRIntLit* getX() { return as<IRIntLit>(getOperand(0)); }
-    IRIntLit* getY() { return as<IRIntLit>(getOperand(1)); }
-    IRIntLit* getZ() { return as<IRIntLit>(getOperand(2)); }
+    IRIntLit* getX() { return cast<IRIntLit>(getOperand(0)); }
+    IRIntLit* getY() { return cast<IRIntLit>(getOperand(1)); }
+    IRIntLit* getZ() { return cast<IRIntLit>(getOperand(2)); }
 
-    IRGlobalParam* getXSpecConst() { return as<IRGlobalParam>(getOperand(0)); }
-    IRGlobalParam* getYSpecConst() { return as<IRGlobalParam>(getOperand(1)); }
-    IRGlobalParam* getZSpecConst() { return as<IRGlobalParam>(getOperand(2)); }
+    IRIntLit* getExtentAlongAxis(int axis) { return cast<IRIntLit>(getOperand(axis)); }
 };
 
 struct IRWaveSizeDecoration : IRDecoration

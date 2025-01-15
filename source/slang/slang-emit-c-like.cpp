@@ -295,48 +295,14 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
 }
 
 
-IRNumThreadsDecoration* CLikeSourceEmitter::getComputeThreadGroupSize(
+/* static */ IRNumThreadsDecoration* CLikeSourceEmitter::getComputeThreadGroupSize(
     IRFunc* func,
     Int outNumThreads[kThreadGroupAxisCount])
 {
-    Int specializationConstantIds[kThreadGroupAxisCount];
-    IRNumThreadsDecoration* decor =
-        getComputeThreadGroupSize(func, outNumThreads, specializationConstantIds);
-
-    for (auto id : specializationConstantIds)
-    {
-        if (id >= 0)
-        {
-            getSink()->diagnose(decor, Diagnostics::unsupportedSpecializationConstantForNumThreads);
-            break;
-        }
-    }
-    return decor;
-}
-
-/* static */ IRNumThreadsDecoration* CLikeSourceEmitter::getComputeThreadGroupSize(
-    IRFunc* func,
-    Int outNumThreads[kThreadGroupAxisCount],
-    Int outSpecializationConstantIds[kThreadGroupAxisCount])
-{
     IRNumThreadsDecoration* decor = func->findDecoration<IRNumThreadsDecoration>();
-    for (int i = 0; i < kThreadGroupAxisCount; ++i)
+    for (int i = 0; i < 3; ++i)
     {
-        if (!decor)
-        {
-            outNumThreads[i] = 1;
-            outSpecializationConstantIds[i] = -1;
-        }
-        else if (auto specConst = as<IRGlobalParam>(decor->getOperand(i)))
-        {
-            outNumThreads[i] = 1;
-            outSpecializationConstantIds[i] = getSpecializationConstantId(specConst);
-        }
-        else
-        {
-            outNumThreads[i] = Int(getIntVal(decor->getOperand(i)));
-            outSpecializationConstantIds[i] = -1;
-        }
+        outNumThreads[i] = decor ? Int(getIntVal(decor->getOperand(i))) : 1;
     }
     return decor;
 }
