@@ -190,7 +190,7 @@ IRInst* emitCalcGroupExtents(IRBuilder& builder, IRFunc* entryPoint, IRVectorTyp
 
         for (int axis = 0; axis < kAxisCount; axis++)
         {
-            auto litValue = as<IRIntLit>(numThreadsDecor->getExtentAlongAxis(axis));
+            auto litValue = as<IRIntLit>(numThreadsDecor->getOperand(axis));
             if (!litValue)
                 return nullptr;
 
@@ -1433,6 +1433,20 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         // be passed in as part of `ComputeVaryingThreadInput`.
         //
         groupExtents = emitCalcGroupExtents(builder, m_entryPointFunc, uint3Type);
+
+        if (!groupExtents)
+        {
+            m_sink->diagnose(
+                m_entryPointFunc,
+                Diagnostics::unsupportedSpecializationConstantForNumThreads);
+
+            // Fill in placeholder values.
+            static const int kAxisCount = 3;
+            IRInst* groupExtentAlongAxis[kAxisCount] = {};
+            for (int axis = 0; axis < kAxisCount; axis++)
+                groupExtentAlongAxis[axis] = builder.getIntValue(uint3Type->getElementType(), 1);
+            groupExtents = builder.emitMakeVector(uint3Type, kAxisCount, groupExtentAlongAxis);
+        }
 
         dispatchThreadID =
             emitCalcDispatchThreadID(builder, uint3Type, groupID, groupThreadID, groupExtents);
