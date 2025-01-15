@@ -1055,6 +1055,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         IRType* typeToFetch,
         IRBuilder* builder)
     {
+        if (auto ptrValType = tryGetPointedToType(builder, typeToFetch))
+            typeToFetch = ptrValType;
         if (auto structType = as<IRStructType>(typeToFetch))
         {
             List<IRInst*> fieldVals;
