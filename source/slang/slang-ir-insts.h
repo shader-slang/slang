@@ -2415,6 +2415,7 @@ struct IRLoad : IRInst
     IRUse ptr;
     IR_LEAF_ISA(Load)
 
+    IRInst* getAddress() { return getOperand(0); }
     IRInst* getPtr() { return ptr.get(); }
 };
 
@@ -2489,6 +2490,13 @@ struct IRGetElementPtr : IRInst
     IR_LEAF_ISA(GetElementPtr);
     IRInst* getBase() { return getOperand(0); }
     IRInst* getIndex() { return getOperand(1); }
+};
+
+struct IRGetOffsetPtr : IRInst
+{
+    IR_LEAF_ISA(GetOffsetPtr);
+    IRInst* getBase() { return getOperand(0); }
+    IRInst* getOffset() { return getOperand(1); }
 };
 
 struct IRRWStructuredBufferGetElementPtr : IRInst

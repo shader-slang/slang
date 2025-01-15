@@ -52,6 +52,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-legalize-array-return-type.h"
+#include "slang-ir-legalize-atomic-operations.h"
 #include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-legalize-uniform-buffer-load.h"
@@ -1300,6 +1301,8 @@ Result linkAndOptimizeIR(
             codeGenContext->getSink(),
             byteAddressBufferOptions);
     }
+
+    legalizeAtomicOperations(sink, irModule);
 
     // For CUDA targets only, we will need to turn operations
     // the implicitly reference the "active mask" into ones
