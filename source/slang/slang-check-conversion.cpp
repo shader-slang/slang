@@ -386,6 +386,19 @@ bool SemanticsVisitor::_invokeExprForExplicitCtor(
                 fromInitializerListExpr->args);
 
             ctorInvokeExpr = CheckTerm(ctorInvokeExpr);
+
+            if (!canCoerce(toType, ctorInvokeExpr->type, ctorInvokeExpr, nullptr))
+            {
+                // We can report error here because struct having explicit constructor is
+                // not a C-Style struct, we should not fall back to the legacy initializer list.
+                getSink()->diagnose(
+                    fromInitializerListExpr->loc,
+                    Diagnostics::typeMismatch,
+                    toType,
+                    ctorInvokeExpr->type);
+                return false;
+            }
+
             if (outExpr && ctorInvokeExpr)
             {
                 *outExpr = ctorInvokeExpr;
@@ -425,6 +438,19 @@ bool SemanticsVisitor::_invokeExprForSynthesizedCtor(
 
     ctorInvokeExpr = subVisitor.CheckExpr(ctorInvokeExpr);
 
+    auto errorHandled = [&]()
+    {
+        if (!isCStyle)
+        {
+            Slang::ComPtr<ISlangBlob> blob;
+            tempSink.getBlobIfNeeded(blob.writeRef());
+            getSink()->diagnoseRaw(
+                Severity::Error,
+                static_cast<char const*>(blob->getBufferPointer()));
+        }
+        return false;
+    };
+
     if (ctorInvokeExpr)
     {
         // The reason we need to check the coercion again is that the ResolveInvoke() could still
@@ -438,41 +464,28 @@ bool SemanticsVisitor::_invokeExprForSynthesizedCtor(
         // will be called after 'ResolveInvoke()'. However, in this initialize list to synthesized
         // constructor translation path, 'coerce()' will not be called. But that is the only case,
         // therefore, we will do a quick check here.
-        //
-        // TODO: should we improve the ResolveInvoke() to handle this case? Because A.__init(int a)
-        // should not be found at first place, Base class cannot construct a Derived class.
         if (!tempSink.getErrorCount())
         {
             if (!canCoerce(toType, ctorInvokeExpr->type, ctorInvokeExpr, nullptr))
             {
-                // TODO:
-                // 1. Create a more explainable error message.
-                // 2. We should not diagnose here, because we will need a fall back mechanism.
                 tempSink.diagnose(
                     fromInitializerListExpr->loc,
                     Diagnostics::typeMismatch,
                     toType,
                     ctorInvokeExpr->type);
-                return false;
+                return errorHandled();
             }
             else
             {
                 if (outExpr)
                     *outExpr = ctorInvokeExpr;
+
                 return true;
             }
         }
         else
         {
-            if (isCStyle)
-            {
-                return false;
-            }
-            Slang::ComPtr<ISlangBlob> blob;
-            tempSink.getBlobIfNeeded(blob.writeRef());
-            getSink()->diagnoseRaw(
-                Severity::Error,
-                static_cast<char const*>(blob->getBufferPointer()));
+            return errorHandled();
         }
     }
     return false;
