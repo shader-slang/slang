@@ -910,6 +910,10 @@ struct ResourceOutputSpecializationPass
         //
         SpecializeFuncResult recursiveSpecializationResult = SpecializeFuncResult::Ok;
         List<IRStore*> stores;
+
+        // We'll first specialize any relevant calls that may affect the value stored into the 
+        // param. This may create more stores into the param.
+        //
         traverseUses(
             param,
             [&](IRUse* use)
@@ -917,14 +921,6 @@ struct ResourceOutputSpecializationPass
                 auto user = use->getUser();
                 switch (user->getOp())
                 {
-                case kIROp_Store:
-                    {
-                        auto store = as<IRStore>(user);
-                        if (store->ptr.get() != param)
-                            return;
-                        stores.add(store);
-                        return;
-                    }
                 case kIROp_Call:
                     {
                         // This call may require an inline if it fails to specialize
@@ -942,8 +938,31 @@ struct ResourceOutputSpecializationPass
                     return;
                 };
             });
+        
+        // If any call specialization fails, we may need to revisit this function at a later iteration.
         if (failedResult(recursiveSpecializationResult))
             return recursiveSpecializationResult;
+
+        // Then, traverse all stores into this param.
+        traverseUses(
+            param,
+            [&](IRUse* use)
+            {
+                auto user = use->getUser();
+                switch (user->getOp())
+                {
+                case kIROp_Store:
+                    {
+                        auto store = as<IRStore>(user);
+                        if (store->ptr.get() != param)
+                            return;
+                        stores.add(store);
+                        return;
+                    }
+                default:
+                    return;
+                };
+            });
 
         // Having identified the places where a value is stored to
         // the output parameter, we iterate over those values to
