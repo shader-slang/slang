@@ -8437,7 +8437,9 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
 
         int localSizeIndex = -1;
         if (nameText.startsWith(localSizePrefix) &&
-            nameText.getLength() == SLANG_COUNT_OF(localSizePrefix) - 1 + 1)
+            (nameText.getLength() == SLANG_COUNT_OF(localSizePrefix) - 1 + 1 ||
+             (nameText.endsWith("_id") &&
+              (nameText.getLength() == SLANG_COUNT_OF(localSizePrefix) - 1 + 4))))
         {
             char lastChar = nameText[SLANG_COUNT_OF(localSizePrefix) - 1];
             localSizeIndex = (lastChar >= 'x' && lastChar <= 'z') ? (lastChar - 'x') : -1;
@@ -8451,6 +8453,8 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
                 numThreadsAttrib->args.setCount(3);
                 for (auto& i : numThreadsAttrib->args)
                     i = nullptr;
+                for (auto& b : numThreadsAttrib->axisIsSpecConstId)
+                    b = false;
 
                 // Just mark the loc and name from the first in the list
                 numThreadsAttrib->keywordName = getName(parser, "numthreads");
@@ -8467,6 +8471,11 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
                 }
 
                 numThreadsAttrib->args[localSizeIndex] = expr;
+
+                // We can't resolve the specialization constant declaration
+                // here, because it may not even exist. IDs pointing to unnamed
+                // specialization constants are allowed in GLSL.
+                numThreadsAttrib->axisIsSpecConstId[localSizeIndex] = nameText.endsWith("_id");
             }
         }
         else if (nameText == "derivative_group_quadsNV")
