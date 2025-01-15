@@ -4033,14 +4033,18 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     auto numThreadsAttribute = entryPointFunc.getDecl()->findModifier<NumThreadsAttribute>();
     if (numThreadsAttribute)
     {
-        for (int i = 0; i < 3; ++i)
-        {
-            if (auto cint =
-                    entryPointLayout->program->tryFoldIntVal(numThreadsAttribute->extents[i]))
-                sizeAlongAxis[i] = (SlangUInt)cint->getValue();
-            else if (numThreadsAttribute->extents[i])
-                sizeAlongAxis[i] = 0;
-        }
+        if (auto cint = entryPointLayout->program->tryFoldIntVal(numThreadsAttribute->x))
+            sizeAlongAxis[0] = (SlangUInt)cint->getValue();
+        else if (numThreadsAttribute->x)
+            sizeAlongAxis[0] = 0;
+        if (auto cint = entryPointLayout->program->tryFoldIntVal(numThreadsAttribute->y))
+            sizeAlongAxis[1] = (SlangUInt)cint->getValue();
+        else if (numThreadsAttribute->y)
+            sizeAlongAxis[1] = 0;
+        if (auto cint = entryPointLayout->program->tryFoldIntVal(numThreadsAttribute->z))
+            sizeAlongAxis[2] = (SlangUInt)cint->getValue();
+        else if (numThreadsAttribute->z)
+            sizeAlongAxis[2] = 0;
     }
 
     //

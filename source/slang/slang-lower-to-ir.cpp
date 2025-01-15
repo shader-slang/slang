@@ -7625,29 +7625,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 verifyComputeDerivativeGroupModifier = true;
                 getAllEntryPointsNoOverride(entryPoints);
-
-                LoweredValInfo extents[3];
-
-                for (int i = 0; i < 3; ++i)
-                {
-                    extents[i] = layoutLocalSizeAttr->specConstExtents[i]
-                                     ? emitDeclRef(
-                                           context,
-                                           layoutLocalSizeAttr->specConstExtents[i],
-                                           lowerType(
-                                               context,
-                                               getType(
-                                                   context->astBuilder,
-                                                   layoutLocalSizeAttr->specConstExtents[i])))
-                                     : lowerVal(context, layoutLocalSizeAttr->extents[i]);
-                }
-
                 for (auto d : entryPoints)
                     as<IRNumThreadsDecoration>(getBuilder()->addNumThreadsDecoration(
                         d,
-                        getSimpleVal(context, extents[0]),
-                        getSimpleVal(context, extents[1]),
-                        getSimpleVal(context, extents[2])));
+                        getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->x)),
+                        getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->y)),
+                        getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->z))));
             }
             else if (as<GLSLLayoutDerivativeGroupQuadAttribute>(modifier))
             {
@@ -10353,28 +10336,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (auto numThreadsAttr = as<NumThreadsAttribute>(modifier))
             {
-                LoweredValInfo extents[3];
-
-                for (int i = 0; i < 3; ++i)
-                {
-                    extents[i] = numThreadsAttr->specConstExtents[i]
-                                     ? emitDeclRef(
-                                           context,
-                                           numThreadsAttr->specConstExtents[i],
-                                           lowerType(
-                                               context,
-                                               getType(
-                                                   context->astBuilder,
-                                                   numThreadsAttr->specConstExtents[i])))
-                                     : lowerVal(context, numThreadsAttr->extents[i]);
-                }
-
                 numThreadsDecor = as<IRNumThreadsDecoration>(getBuilder()->addNumThreadsDecoration(
                     irFunc,
-                    getSimpleVal(context, extents[0]),
-                    getSimpleVal(context, extents[1]),
-                    getSimpleVal(context, extents[2])));
-                numThreadsDecor->sourceLoc = numThreadsAttr->loc;
+                    getSimpleVal(context, lowerVal(context, numThreadsAttr->x)),
+                    getSimpleVal(context, lowerVal(context, numThreadsAttr->y)),
+                    getSimpleVal(context, lowerVal(context, numThreadsAttr->z))));
             }
             else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
             {
