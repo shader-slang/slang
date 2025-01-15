@@ -223,6 +223,8 @@ IRInst* GlobalInstInliningContextGeneric::maybeInlineGlobalValue(
         }
         if (as<IRType>(inst))
             return inst;
+        if (!wrapReferences)
+            return inst;
 
         // If we encounter a global value that shouldn't be inlined, e.g. a const literal,
         // we should insert a GlobalValueRef() inst to wrap around it, so all the dependent
@@ -281,7 +283,10 @@ struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextG
 
 void inlineGlobalConstantsForLegalization(IRModule* module)
 {
-    GlobalInstLegalizationInliningContext().inlineGlobalValuesAndRemoveIfUnused(module);
+    GlobalInstLegalizationInliningContext context;
+
+    context.wrapReferences = false;
+    context.inlineGlobalValuesAndRemoveIfUnused(module);
 }
 
 } // namespace Slang

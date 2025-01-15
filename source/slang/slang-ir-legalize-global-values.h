@@ -12,6 +12,7 @@ struct IRModule;
 struct GlobalInstInliningContextGeneric
 {
     Dictionary<IRInst*, bool> m_mapGlobalInstToShouldInline;
+    bool wrapReferences = true;
 
     // Target-specific control over how inlining happens
     virtual bool isLegalGlobalInstForTarget(IRInst* inst) = 0;
