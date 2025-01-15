@@ -244,4 +244,44 @@ IRInst* GlobalInstInliningContextGeneric::maybeInlineGlobalValue(
     return inlineInst(builder, cloneEnv, inst);
 }
 
+struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextGeneric
+{
+    static bool isSimpleConstantType(IRType* type)
+    {
+        for (;;)
+        {
+            if (!type)
+                return true;
+            if (as<IRBasicType>(type))
+                return true;
+            if (as<IRVectorType>(type))
+                return true;
+            if (as<IRMatrixType>(type))
+                return true;
+            if (auto arrayType = as<IRArrayTypeBase>(type))
+            {
+                type = arrayType->getElementType();
+                continue;
+            }
+            return false;
+        }
+    }
+    bool isLegalGlobalInstForTarget(IRInst* inst) override
+    {
+        auto type = inst->getDataType();
+        return isSimpleConstantType(type);
+    }
+
+    bool isInlinableGlobalInstForTarget(IRInst* /* inst */) override { return false; }
+
+    bool shouldBeInlinedForTarget(IRInst* /* user */) override { return false; }
+
+    IRInst* getOutsideASM(IRInst* beforeInst) override { return beforeInst; }
+};
+
+void inlineGlobalConstantsForLegalization(IRModule* module)
+{
+    GlobalInstLegalizationInliningContext().inlineGlobalValuesAndRemoveIfUnused(module);
+}
+
 } // namespace Slang

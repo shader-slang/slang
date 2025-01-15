@@ -43,4 +43,11 @@ struct GlobalInstInliningContextGeneric
         IRInst* inst,
         IRCloneEnv& cloneEnv);
 };
+
+// For global constant values that are resource typed or struct containing resource types,
+// we need to inline their uses to concrete function bodies so they can be legalized during
+// resource legalization.
+void inlineGlobalConstantsForLegalization(IRModule* module);
+
+
 } // namespace Slang
