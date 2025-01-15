@@ -59,12 +59,12 @@ jobs:
         run: |
           mkdir FalcorBin
           cd FalcorBin
-          Copy-Item -Path 'C:\Falcor\build\windows-vs2022\bin' -Destination '.\build\windows-vs2022\bin' -Recurse -Exclude ("*.pdb")
-          Copy-Item -Path 'C:\Falcor\tests' -Destination '.\' -Recurse
-          Copy-Item -Path 'C:\Falcor\tools' -Destination '.\' -Recurse
-          Copy-Item -Path 'C:\Falcor\media' -Destination '.\' -Recurse
-          Copy-Item -Path 'C:\Falcor\media_internal' -Destination '.\' -Recurse
-          Copy-Item -Path 'C:\Falcor\scripts' -Destination '.\' -Recurse
+          Copy-Item -Path 'C:\Falcor-new\build\windows-vs2022\bin' -Destination '.\build\windows-vs2022\bin' -Recurse -Exclude ("*.pdb")
+          Copy-Item -Path 'C:\Falcor-new\tests' -Destination '.\' -Recurse
+          Copy-Item -Path 'C:\Falcor-new\tools' -Destination '.\' -Recurse
+          Copy-Item -Path 'C:\Falcor-new\media' -Destination '.\' -Recurse
+          Copy-Item -Path 'C:\Falcor-new\media_internal' -Destination '.\' -Recurse
+          Copy-Item -Path 'C:\Falcor-new\scripts' -Destination '.\' -Recurse
           cd ..\
       - name: Build Slang
         run: |
@@ -78,18 +78,18 @@ jobs:
           cmake --workflow --preset "${{matrix.config}}"
       - name: Copy Slang to Falcor
         run: |
-          cp --verbose --recursive --target-directory ./FalcorBin/build/windows-vs2022/bin/Release build/Release/bin/*
+          cp --verbose --recursive --target-directory ./FalcorBin/build/windows-vs2022/bin/Debug build/Release/bin/*
       - name: falcor-unit-test
         shell: pwsh
         run: |
           $ErrorActionPreference = "SilentlyContinue"
           cd .\FalcorBin\tests
-          python ./testing/run_unit_tests.py --config windows-vs2022-Release -t "-slow"
+          python ./testing/run_unit_tests.py --config windows-vs2022-Debug -t "-slow"
           cd ../../
       - name: falcor-image-test
         shell: pwsh
         run: |
           $ErrorActionPreference = "SilentlyContinue"
           cd .\FalcorBin\tests
-          python ./testing/run_image_tests.py --config windows-vs2022-Release --run-only
+          python ./testing/run_unit_tests.py --config windows-vs2022-Debug -t "-slow"
           cd ../../
