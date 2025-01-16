@@ -18,6 +18,12 @@ tests/diagnostics/variable-redeclaration.slang(51): error 30200: declaration of 
 tests/diagnostics/variable-redeclaration.slang(50): note: see previous declaration of 'size'
     int     size,
             ^~~~
+tests/diagnostics/variable-redeclaration.slang(14): error 30076: global variable cannot have opaque type.
+static Texture2D gA;
+                 ^~
+tests/diagnostics/variable-redeclaration.slang(14): note: do you intend to define a `uniform` parameter instead?
+static Texture2D gA;
+                 ^~
 tests/diagnostics/variable-redeclaration.slang(21): error 30200: declaration of 'y' conflicts with existing declaration
     int y = x;
         ^
