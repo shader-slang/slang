@@ -738,6 +738,10 @@ DIAGNOSTIC(
     cannotSpecializeGeneric,
     "cannot specialize generic '$0' with the provided arguments.")
 
+DIAGNOSTIC(30076, Error, globalVarCannotHaveOpaqueType, "global variable cannot have opaque type.")
+DIAGNOSTIC(-1, Note, doYouMeanStaticConst, "do you intend to define a `static const` instead?")
+DIAGNOSTIC(-1, Note, doYouMeanUniform, "do you intend to define a `uniform` parameter instead?")
+
 DIAGNOSTIC(
     30100,
     Error,

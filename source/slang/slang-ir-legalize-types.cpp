@@ -572,7 +572,7 @@ private:
                     // We expect that the parent is actually an IR function.
                     //
                     // TODO: What about the case where we have an `IRGlobalVar`
-                    // of a type that needs legalization, and teh variable has
+                    // of a type that needs legalization, and the variable has
                     // an initializer? For now, I believe that case is disallowed
                     // in the legalization for global variables.
                     //

@@ -52,6 +52,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-legalize-array-return-type.h"
+#include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-legalize-uniform-buffer-load.h"
@@ -1073,6 +1074,8 @@ Result linkAndOptimizeIR(
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
+        inlineGlobalConstantsForLegalization(irModule);
+
         // The Slang language allows interfaces to be used like
         // ordinary types (including placing them in constant
         // buffers and entry-point parameter lists), but then
