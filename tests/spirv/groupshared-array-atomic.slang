@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -vk
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -vk -emit-spirv-directly
 groupshared Atomic<uint> values[10];
 
 //TEST_INPUT: set outputAddr = out ubuffer(data=[0 0 0 0], stride=4)
