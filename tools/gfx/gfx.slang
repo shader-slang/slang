@@ -105,9 +105,9 @@ public enum class ShaderModuleSourceType
 
 public struct ShaderProgramDesc2
 {
-    public ShaderModuleSourceType sourceType;
-    public void *sourceData;
-    public Size sourceDataSize;
+    public ShaderModuleSourceType sourceType = ShaderModuleSourceType::SlangSource;
+    public void *sourceData = nullptr;
+    public Size sourceDataSize = 0;
 
     // Number of entry points to include in the shader program. 0 means include all entry points
     // defined in the module.
@@ -378,12 +378,12 @@ public enum class ResourceType
 /// Base class for Descs
 public struct ResourceDescBase
 {
-    public ResourceType type;
-    public ResourceState defaultState;
-    public ResourceStateSet allowedStates;
-    public MemoryType memoryType;
-    public InteropHandle existingHandle;
-    public bool isShared;
+    public ResourceType type = ResourceType::Unknown;
+    public ResourceState defaultState = ResourceState::Undefined;
+    public ResourceStateSet allowedStates = {};
+    public MemoryType memoryType = MemoryType::DeviceLocal;
+    public InteropHandle existingHandle = {};
+    public bool isShared = false;
 };
 
 [COM("a0e39f34-8398-4522-95c2-ebc0f984ef3f")]
@@ -1056,6 +1056,7 @@ public struct AspectBlendDesc
     {
         srcFactor = BlendFactor::One;
         dstFactor = BlendFactor::Zero;
+        op = BlendOp::Add;
     }
 };
 
@@ -1076,10 +1077,10 @@ public struct TargetBlendDesc
 
 public struct BlendDesc
 {
-    public TargetBlendDesc targets[kMaxRenderTargetCount];
-    public GfxCount targetCount;
+    public TargetBlendDesc targets[kMaxRenderTargetCount] = {};
+    public GfxCount targetCount = 0;
 
-    public bool alphaToCoverageEnable;
+    public bool alphaToCoverageEnable = false;
 };
 
 public struct FramebufferTargetLayout
@@ -1113,7 +1114,13 @@ public struct GraphicsPipelineStateDesc
 
     public __init()
     {
+        program = {};
+        inputLayout = {};
+        framebufferLayout = {};
         primitiveType = PrimitiveType::Triangle;
+        depthStencil = {};
+        rasterizer = {};
+        blend = {};
     }
 };
 
@@ -1702,10 +1709,10 @@ public struct SlangDesc
 
     public slang::SlangMatrixLayoutMode defaultMatrixLayoutMode = slang::SlangMatrixLayoutMode::SLANG_MATRIX_LAYOUT_ROW_MAJOR;
 
-    public NativeString *searchPaths;
+    public NativeString *searchPaths = {};
     public GfxCount searchPathCount = 0;
 
-    public slang::PreprocessorMacroDesc *preprocessorMacros;
+    public slang::PreprocessorMacroDesc *preprocessorMacros = {};
     public GfxCount preprocessorMacroCount = 0;
 
     public NativeString targetProfile = {}; // (optional) Target shader profile. If null this will be set to platform dependent default.
@@ -1735,9 +1742,9 @@ public struct DeviceDesc
     // The device's handles (if they exist) and their associated API. For D3D12, this contains a single InteropHandle
     // for the ID3D12Device. For Vulkan, the first InteropHandle is the VkInstance, the second is the VkPhysicalDevice,
     // and the third is the VkDevice. For CUDA, this only contains a single value for the CUDADevice.
-    public DeviceInteropHandles existingDeviceHandles;
+    public DeviceInteropHandles existingDeviceHandles = {};
     // Name to identify the adapter to use
-    public NativeString adapter;
+    public NativeString adapter = {};
     // Number of required features.
     public GfxCount requiredFeatureCount = 0;
     // Array of required feature names, whose size is `requiredFeatureCount`.
