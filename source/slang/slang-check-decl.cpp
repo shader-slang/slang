@@ -2392,6 +2392,18 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         {
             getSink()->diagnose(varDecl, Diagnostics::varCannotBeUnsized);
         }
+
+        bool isOpaque = (((int)varTypeTags & (int)TypeTag::Opaque) != 0);
+        if (isOpaque && isGlobalDecl(varDecl) && !varDecl->hasModifier<ConstModifier>() &&
+            varDecl->hasModifier<HLSLStaticModifier>())
+        {
+            // Opaque type global variable must be const.
+            getSink()->diagnose(varDecl, Diagnostics::globalVarCannotHaveOpaqueType);
+            if (varDecl->initExpr)
+                getSink()->diagnose(varDecl, Diagnostics::doYouMeanStaticConst);
+            else
+                getSink()->diagnose(varDecl, Diagnostics::doYouMeanUniform);
+        }
     }
 
     if (auto elementType = getConstantBufferElementType(varDecl->getType()))

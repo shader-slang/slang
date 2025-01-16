@@ -52,6 +52,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-legalize-array-return-type.h"
+#include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-legalize-uniform-buffer-load.h"
@@ -550,6 +551,24 @@ static void unexportNonEmbeddableIR(CodeGenTarget target, IRModule* irModule)
                 {
                     dec->removeAndDeallocate();
                 }
+            }
+        }
+    }
+}
+
+static void validateMatrixDimensions(DiagnosticSink* sink, IRModule* module)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto matrixType = as<IRMatrixType>(globalInst))
+        {
+            auto colCount = as<IRIntLit>(matrixType->getColumnCount());
+            auto rowCount = as<IRIntLit>(matrixType->getRowCount());
+
+            if ((rowCount && (rowCount->getValue() == 1)) ||
+                (colCount && (colCount->getValue() == 1)))
+            {
+                sink->diagnose(matrixType->sourceLoc, Diagnostics::matrixColumnOrRowCountIsOne);
             }
         }
     }
@@ -1055,6 +1074,8 @@ Result linkAndOptimizeIR(
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
     {
+        inlineGlobalConstantsForLegalization(irModule);
+
         // The Slang language allows interfaces to be used like
         // ordinary types (including placing them in constant
         // buffers and entry-point parameter lists), but then
@@ -1503,6 +1524,10 @@ Result linkAndOptimizeIR(
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER STRIP WITNESS TABLES");
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    // Make sure there are no matrices with 1 row/column, except for D3D targets where it's allowed.
+    if (!isD3DTarget(targetRequest))
+        validateMatrixDimensions(sink, irModule);
 
     // The resource-based specialization pass above
     // may create specialized versions of functions, but

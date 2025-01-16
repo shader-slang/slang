@@ -1656,6 +1656,8 @@ public:
 
     void visitModifier(Modifier*);
 
+    DeclRef<VarDeclBase> tryGetIntSpecializationConstant(Expr* expr);
+
     AttributeDecl* lookUpAttributeDecl(Name* attributeName, Scope* scope);
 
     bool hasIntArgs(Attribute* attr, int numArgs);
