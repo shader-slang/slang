@@ -384,13 +384,6 @@ void initCommandOptions(CommandOptions& options)
          "-restrictive-capability-check",
          nullptr,
          "Many capability warnings will become an error."},
-        {OptionKind::ZeroInitialize,
-         "-zero-initialize",
-         nullptr,
-         "Initialize all variables to zero."
-         "Structs will set all struct-fields without an init expression to 0."
-         "All variables will call their default constructor if not explicitly initialized as "
-         "usual."},
         {OptionKind::IgnoreCapabilities,
          "-ignore-capabilities",
          nullptr,
@@ -2138,7 +2131,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::VulkanUseEntryPointName:
         case OptionKind::VulkanUseGLLayout:
         case OptionKind::VulkanEmitReflection:
-        case OptionKind::ZeroInitialize:
         case OptionKind::IgnoreCapabilities:
         case OptionKind::RestrictiveCapabilityCheck:
         case OptionKind::MinimumSlangOptimization:

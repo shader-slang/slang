@@ -869,7 +869,6 @@ typedef uint32_t SlangSizeT;
         Language,
         MatrixLayoutColumn,         // bool
         MatrixLayoutRow,            // bool
-        ZeroInitialize,             // bool
         IgnoreCapabilities,         // bool
         RestrictiveCapabilityCheck, // bool
         ModuleName,                 // stringValue0: module name.
@@ -1009,6 +1008,7 @@ typedef uint32_t SlangSizeT;
         EmitReflectionJSON, // bool
         SaveGLSLModuleBinSource,
         CountOf,
+        ZeroInitialize, // bool, disable this option for now, issue: 6109
     };
 
     enum class CompilerOptionValueKind
