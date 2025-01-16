@@ -3244,6 +3244,12 @@ __Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
 __intrinsic_op($(kIROp_RequireComputeDerivative))
 void __requireComputeDerivative();
 
+__intrinsic_op($(kIROp_RequireMaximallyReconverges))
+void __requireMaximallyReconverges();
+
+__intrinsic_op($(kIROp_RequireQuadDerivatives))
+void __requireQuadDerivatives();
+
 //@ public:
 /// @category misc_types 
 enum MemoryOrder
@@ -3977,6 +3983,21 @@ attribute_syntax [DerivativeGroupQuad] : DerivativeGroupQuadAttribute;
 /// effect on other targets.
 __attributeTarget(FuncDecl)
 attribute_syntax [DerivativeGroupLinear] : DerivativeGroupLinearAttribute;
+
+/// Emits `MaximallyReconvergesKHR` execution mode when producing SPIR-V.
+/// This attribute has no effect on other targets.
+__attributeTarget(FuncDecl)
+attribute_syntax [MaximallyReconverges] : MaximallyReconvergesAttribute;
+
+/// Emits `QuadDerivativesKHR` execution mode when producing SPIR-V.
+/// This attribute has no effect on other targets.
+__attributeTarget(FuncDecl)
+attribute_syntax [QuadDerivatives] : QuadDerivativesAttribute;
+
+/// Emits `RequireFullQuadsKHR` execution mode when producing SPIR-V.
+/// This attribute has no effect on other targets.
+__attributeTarget(FuncDecl)
+attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
 
 __generic<T>
 typealias NodePayloadPtr = Ptr<T, $( (uint64_t)AddressSpace::NodePayloadAMDX)>;

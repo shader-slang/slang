@@ -10337,6 +10337,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 derivativeGroupLinearDecor =
                     getBuilder()->addSimpleDecoration<IRDerivativeGroupLinearDecoration>(irFunc);
             }
+            else if (as<MaximallyReconvergesAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRMaximallyReconvergesDecoration>(irFunc);
+            }
+            else if (as<QuadDerivativesAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRQuadDerivativesDecoration>(irFunc);
+            }
+            else if (as<RequireFullQuadsAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRRequireFullQuadsDecoration>(irFunc);
+            }
             else if (as<NoRefInlineAttribute>(modifier))
             {
                 getBuilder()->addSimpleDecoration<IRNoRefInlineDecoration>(irFunc);
