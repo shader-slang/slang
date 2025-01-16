@@ -87,6 +87,8 @@ struct Options
 
     bool generateSPIRVDirectly = true;
 
+    bool enableBackendValidation = false;
+
     Options() { downstreamArgs.addName("slang"); }
 
     static SlangResult parse(
