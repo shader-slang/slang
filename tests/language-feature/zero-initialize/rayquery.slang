@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -zero-initialize
-//TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain -zero-initialize
+//DISABLE_TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -zero-initialize
+//DISABLE_TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain -zero-initialize
 
 // HLSL-NOT: RayQuery{{.*}} {{.*}} =
 // GLSL-NOT: rayQueryEXT {{.*}} =

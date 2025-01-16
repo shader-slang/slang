@@ -76,7 +76,7 @@ jobs:
 
           # A flag to set the download target as latest release
           # The default value is 'false'
-          tag: 'v0.0.2'
+          tag: "v0.0.2"
           # The name of the file to download.
           # Use this field only to specify filenames other than tarball or zipball, if any.
           # Supports wildcard pattern (eg: '*', '*.deb', '*.zip' etc..)
