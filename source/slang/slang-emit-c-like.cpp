@@ -708,7 +708,7 @@ void CLikeSourceEmitter::emitLivenessImpl(IRInst* inst)
 
 static bool isBitLogicalOrRelationalOrEquality(EPrecedence prec)
 {
-    switch(prec)
+    switch (prec)
     {
     case EPrecedence::kEPrecedence_And_Left:
     case EPrecedence::kEPrecedence_And_Right:
@@ -745,12 +745,12 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo
     // of the operations. We emit parentheses to avoid the warnings.
     //
 
-	if (isBitLogicalOrRelationalOrEquality(prec.leftPrecedence) &&
+    if (isBitLogicalOrRelationalOrEquality(prec.leftPrecedence) &&
         (outerPrec.leftPrecedence > kEPrecedence_Assign_Left))
-		needParens = true;
-        if (isBitLogicalOrRelationalOrEquality(outerPrec.leftPrecedence) ||
-            isBitLogicalOrRelationalOrEquality(outerPrec.rightPrecedence))
-		needParens = true;
+        needParens = true;
+    if (isBitLogicalOrRelationalOrEquality(outerPrec.leftPrecedence) ||
+        isBitLogicalOrRelationalOrEquality(outerPrec.rightPrecedence))
+        needParens = true;
 
     if (needParens)
     {
