@@ -20,11 +20,11 @@ struct TestStruct
 void main_kernel(uint3 tid: SV_DispatchThreadID)
 {
     // CHECK: uint [[WORD0:[a-zA-Z0-9_]+]] = as_type<uint>({{.*}}[(int(0))>>2]);
-    // CHECK: uint8_t [[A:[a-zA-Z0-9_]+]] = uint8_t([[WORD0]] >> 0U & 255U);
+    // CHECK: uint8_t [[A:[a-zA-Z0-9_]+]] = uint8_t(([[WORD0]] >> 0U) & 255U);
     // CHECK: uint [[WORD1:[a-zA-Z0-9_]+]] = as_type<uint>({{.*}}[(int(0))>>2]);
-    // CHECK: half [[H:[a-zA-Z0-9_]+]] = as_type<half>(ushort([[WORD1]] >> 16U & 65535U));
+    // CHECK: half [[H:[a-zA-Z0-9_]+]] = as_type<half>(ushort(([[WORD1]] >> 16U) & 65535U));
 
-    // CHECK: {{.*}}[(int(128))>>2] = as_type<uint32_t>(({{.*}} & 4294967040U) | uint([[A]]) << 0U);
-    // CHECK: {{.*}}[(int(128))>>2] = as_type<uint32_t>(({{.*}} & 65535U) | uint(as_type<ushort>([[H]])) << 16U);
+    // CHECK: {{.*}}[(int(128))>>2] = as_type<uint32_t>(({{.*}} & 4294967040U) | (uint([[A]]) << 0U));
+    // CHECK: {{.*}}[(int(128))>>2] = as_type<uint32_t>(({{.*}} & 65535U) | (uint(as_type<ushort>([[H]])) << 16U));
     buffer.Store(128, buffer.Load<TestStruct>(0));
 }
