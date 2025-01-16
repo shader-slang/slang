@@ -165,6 +165,12 @@ class AggTypeDecl : public AggTypeDeclBase
 class StructDecl : public AggTypeDecl
 {
     SLANG_AST_CLASS(StructDecl);
+
+    SLANG_UNREFLECTED
+    // We will use these auxiliary to help in synthesizing the member initialize constructor.
+    Slang::HashSet<VarDeclBase*> m_membersVisibleInCtor;
+    Dictionary<int, ConstructorDecl*> m_synthesizedCtorMap;
+    bool m_hasExplicitCtorInExtension = false;
 };
 
 class ClassDecl : public AggTypeDecl
@@ -372,9 +378,20 @@ class ConstructorDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(ConstructorDecl)
 
-    // Indicates whether the declaration was synthesized by
-    // slang and not actually provided by the user
-    bool isSynthesized = false;
+    enum class ConstructorTags : int
+    {
+        None = 0x00,
+        // Indicates whether the declaration was synthesized by
+        // Slang and not explicitly provided by the user
+        Synthesized = 0x01,
+        // Member initialize constructor is a synthesized ctor,
+        // but it takes parameters.
+        MemberInitCtor = 0x02
+    };
+
+    int m_tags = (int)ConstructorTags::None;
+    void addTag(ConstructorTags tag) { m_tags |= (int)tag; }
+    bool containsTag(ConstructorTags tag) { return m_tags & (int)tag; }
 };
 
 // A subscript operation used to index instances of a type

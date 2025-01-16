@@ -14,7 +14,7 @@ export __extern_cpp int main()
         return -1;
     }
     
-    gfx.CommandQueueDesc queueDesc = {};
+    gfx.CommandQueueDesc queueDesc = {gfx::QueueType::Graphics};
     queueDesc.type = gfx.QueueType.Graphics;
     Optional<gfx.ICommandQueue> queue;
     device.value.createCommandQueue(&queueDesc, queue);
@@ -42,12 +42,12 @@ export __extern_cpp int main()
     device.value.createProgram2(&programDesc, program, diagBlob);
 
     Optional<gfx.IPipelineState> pipeline;
-    gfx.ComputePipelineStateDesc pipelineDesc = {};
+    gfx.ComputePipelineStateDesc pipelineDesc;
     pipelineDesc.program = NativeRef<gfx.IShaderProgram>(program.value);
     device.value.createComputePipelineState(&pipelineDesc, pipeline);
 
     Optional<gfx.ITransientResourceHeap> transientHeap;
-    gfx.TransientResourceHeapDesc transientHeapDesc = {};
+    gfx.TransientResourceHeapDesc transientHeapDesc;
     transientHeapDesc.constantBufferDescriptorCount = 64;
     transientHeapDesc.constantBufferSize = 1024;
     transientHeapDesc.srvDescriptorCount = 1024;
@@ -67,7 +67,7 @@ export __extern_cpp int main()
     device.value.createBufferResource(&bufferDesc, nullptr, buffer);
 
     Optional<gfx.IResourceView> bufferView;
-    gfx.ResourceViewDesc viewDesc = {};
+    gfx.ResourceViewDesc viewDesc;
     viewDesc.type = gfx.ResourceViewType.UnorderedAccess;
     device.value.createBufferView(buffer.value, none, &viewDesc, bufferView);
 

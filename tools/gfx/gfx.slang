@@ -345,7 +345,7 @@ public enum class InteropHandleAPI
 public struct InteropHandle
 {
     public InteropHandleAPI api = InteropHandleAPI::Unknown;
-    public uint64_t handleValue;
+    public uint64_t handleValue = 0LLU;
 };
 
 // Declare opaque type
@@ -1230,14 +1230,14 @@ public struct WindowHandle
     public void* handleValues[2];
     public static WindowHandle fromHwnd(void *hwnd)
     {
-        WindowHandle handle = {};
+        WindowHandle handle = {WindowHandleType::Unknown, {nullptr, nullptr}};
         handle.type = WindowHandleType::Win32Handle;
         handle.handleValues[0] = hwnd;
         return handle;
     }
     public static WindowHandle fromXWindow(void *xdisplay, uint32_t xwindow)
     {
-        WindowHandle handle = {};
+        WindowHandle handle = {WindowHandleType::Unknown, {nullptr, nullptr}};
         handle.type = WindowHandleType::XLibHandle;
         handle.handleValues[0] = xdisplay;
         handle.handleValues[1] = (void*)xwindow;
@@ -1698,17 +1698,17 @@ public interface IDebugCallback
 
 public struct SlangDesc
 {
-    public NativeRef<slang::IGlobalSession> slangGlobalSession; // (optional) A slang global session object. If null will create automatically.
+    public NativeRef<slang::IGlobalSession> slangGlobalSession = {}; // (optional) A slang global session object. If null will create automatically.
 
     public slang::SlangMatrixLayoutMode defaultMatrixLayoutMode = slang::SlangMatrixLayoutMode::SLANG_MATRIX_LAYOUT_ROW_MAJOR;
 
     public NativeString *searchPaths;
-    public GfxCount searchPathCount;
+    public GfxCount searchPathCount = 0;
 
     public slang::PreprocessorMacroDesc *preprocessorMacros;
     public GfxCount preprocessorMacroCount = 0;
 
-    public NativeString targetProfile; // (optional) Target shader profile. If null this will be set to platform dependent default.
+    public NativeString targetProfile = {}; // (optional) Target shader profile. If null this will be set to platform dependent default.
     public slang::SlangFloatingPointMode floatingPointMode = slang::SlangFloatingPointMode::SLANG_FLOATING_POINT_MODE_DEFAULT;
     public slang::SlangOptimizationLevel optimizationLevel = slang::SlangOptimizationLevel::SLANG_OPTIMIZATION_LEVEL_DEFAULT;
     public slang::SlangTargetFlags targetFlags = slang::SlangTargetFlags.None;
@@ -1718,7 +1718,7 @@ public struct SlangDesc
 public struct ShaderCacheDesc
 {
     // The root directory for the shader cache. If not set, shader cache is disabled.
-    public NativeString shaderCachePath;
+    public NativeString shaderCachePath = {};
     // The maximum number of entries stored in the cache.
     public GfxCount maxEntryCount = 0;
 };

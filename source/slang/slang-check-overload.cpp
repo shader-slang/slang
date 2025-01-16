@@ -2548,7 +2548,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     // type coercion.
     bool typeOverloadChecked = false;
 
-    if (expr->arguments.getCount() == 1)
+    if (expr->arguments.getCount() == 1 && m_checkForSynthesizedCtor == false)
     {
         if (const auto typeType = as<TypeType>(funcExpr->type))
         {

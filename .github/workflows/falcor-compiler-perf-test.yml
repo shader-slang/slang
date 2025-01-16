@@ -76,12 +76,11 @@ jobs:
 
           # A flag to set the download target as latest release
           # The default value is 'false'
-          latest: true
-
+          tag: 'v0.0.2'
           # The name of the file to download.
           # Use this field only to specify filenames other than tarball or zipball, if any.
           # Supports wildcard pattern (eg: '*', '*.deb', '*.zip' etc..)
-          fileName: "falcor_perf_test-*-win-64.zip"
+          fileName: "falcor_perf_test-v0.0.2-win-64-beta.zip"
 
           # Download the attached zipball (*.zip)
           zipBall: true
