@@ -237,6 +237,12 @@ static void _lookUpDirectAndTransparentMembers(
     if ((int)request.mask & (int)LookupMask::Attribute)
         return;
 
+    // Also skip transparent members if they're explicitly excluded by the
+    // request. This prevents cyclic lookups e.g. when looking up UnscopedEnum's
+    // underlying types.
+    if (((int)request.options & (int)LookupOptions::IgnoreTransparentMembers) != 0)
+        return;
+
     for (auto transparentInfo : containerDecl->getTransparentMembers())
     {
         // The reference to the transparent member should use the same
@@ -1059,11 +1065,16 @@ LookupResult lookUp(
     Scope* scope,
     LookupMask mask,
     bool considerAllLocalNamesInScope,
-    Decl* declToExclude)
+    Decl* declToExclude,
+    bool ignoreTransparentMembers)
 {
     LookupResult result;
-    const auto options = considerAllLocalNamesInScope ? LookupOptions::ConsiderAllLocalNamesInScope
-                                                      : LookupOptions::None;
+    const auto options =
+        (LookupOptions)((int)(considerAllLocalNamesInScope
+                                  ? LookupOptions::ConsiderAllLocalNamesInScope
+                                  : LookupOptions::None) |
+                        (int)(ignoreTransparentMembers ? LookupOptions::IgnoreTransparentMembers
+                                                       : LookupOptions::None));
     LookupRequest request = initLookupRequest(semantics, name, mask, options, scope, declToExclude);
     _lookUpInScopes(astBuilder, name, request, result);
     return result;
