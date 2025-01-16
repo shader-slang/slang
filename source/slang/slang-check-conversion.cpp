@@ -889,11 +889,6 @@ bool SemanticsVisitor::_coerceInitializerList(
         !canCoerce(toType, fromInitializerListExpr->type, nullptr))
         return _failedCoercion(toType, outToExpr, fromInitializerListExpr);
 
-    // TODO: See issue #4874, we cannot handle the case of calling a constructor with
-    // resource types at global scope. So we will still use the legacy initializer list
-    // for the global variable.
-    bool isGlobalDecl = (m_outerScope && as<ModuleDecl>(m_outerScope->containerDecl));
-
     // Try to invoke the user-defined constructor if it exists. This call will
     // report error diagnostics if the used-defined constructor exists but does not
     // match the initialize list.
@@ -903,7 +898,7 @@ bool SemanticsVisitor::_coerceInitializerList(
     }
 
     // Try to invoke the synthesized constructor if it exists
-    if (_invokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr) && !isGlobalDecl)
+    if (_invokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
     {
         return true;
     }
