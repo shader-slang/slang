@@ -246,8 +246,9 @@ bool SemanticsVisitor::_cStyleStructBasicCheck(Decl* decl)
     {
         auto type = varDecl->getType();
         if (as<VectorExpressionType>(type) || as<MatrixExpressionType>(type) ||
-            as<BasicExpressionType>(type))
+            as<BasicExpressionType>(type) || isDeclRefTypeOf<EnumDecl>(type).getDecl())
             return true;
+
         // check for user-defined struct type
         structDecl = _getStructDecl(type);
         if (!structDecl)
