@@ -1406,7 +1406,9 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
     auto emitLocalSizeLayout = [&]()
     {
         Int sizeAlongAxis[kThreadGroupAxisCount];
-        numThreadsDecor = getComputeThreadGroupSize(irFunc, sizeAlongAxis);
+        Int specializationConstantIds[kThreadGroupAxisCount];
+        numThreadsDecor =
+            getComputeThreadGroupSize(irFunc, sizeAlongAxis, specializationConstantIds);
         m_writer->emit("layout(");
         char const* axes[] = {"x", "y", "z"};
         for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
@@ -1415,8 +1417,17 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
                 m_writer->emit(", ");
             m_writer->emit("local_size_");
             m_writer->emit(axes[ii]);
-            m_writer->emit(" = ");
-            m_writer->emit(sizeAlongAxis[ii]);
+
+            if (specializationConstantIds[ii] >= 0)
+            {
+                m_writer->emit("_id = ");
+                m_writer->emit(specializationConstantIds[ii]);
+            }
+            else
+            {
+                m_writer->emit(" = ");
+                m_writer->emit(sizeAlongAxis[ii]);
+            }
         }
         m_writer->emit(") in;\n");
     };

@@ -43,6 +43,7 @@
 #include "slang-ir-explicit-global-context.h"
 #include "slang-ir-explicit-global-init.h"
 #include "slang-ir-fix-entrypoint-callsite.h"
+#include "slang-ir-float-non-uniform-resource-index.h"
 #include "slang-ir-fuse-satcoop.h"
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-glsl-liveness.h"
@@ -64,6 +65,7 @@
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-lower-combined-texture-sampler.h"
+#include "slang-ir-lower-dynamic-resource-heap.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-glsl-ssbo-types.h"
 #include "slang-ir-lower-l-value-cast.h"
@@ -316,6 +318,7 @@ struct RequiredLoweringPassSet
     bool glslSSBO;
     bool byteAddressBuffer;
     bool dynamicResource;
+    bool dynamicResourceHeap;
     bool resolveVaryingInputRef;
 };
 
@@ -425,6 +428,9 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_DynamicResourceType:
         result.dynamicResource = true;
+        break;
+    case kIROp_GetDynamicResourceHeap:
+        result.dynamicResourceHeap = true;
         break;
     case kIROp_ResolveVaryingInputRef:
         result.resolveVaryingInputRef = true;
@@ -815,7 +821,18 @@ Result linkAndOptimizeIR(
         bool changed = false;
         dumpIRIfEnabled(codeGenContext, irModule, "BEFORE-SPECIALIZE");
         if (!codeGenContext->isSpecializationDisabled())
-            changed |= specializeModule(targetProgram, irModule, codeGenContext->getSink());
+        {
+            // Pre-autodiff, we will attempt to specialize as much as possible.
+            //
+            // Note: Lowered dynamic-dispatch code cannot be differentiated correctly due to
+            // missing information, so we defer that to after the auto-dff step.
+            //
+            SpecializationOptions specOptions;
+            specOptions.lowerWitnessLookups = false;
+            changed |=
+                specializeModule(targetProgram, irModule, codeGenContext->getSink(), specOptions);
+        }
+
         if (codeGenContext->getSink()->getErrorCount() != 0)
             return SLANG_FAIL;
         dumpIRIfEnabled(codeGenContext, irModule, "AFTER-SPECIALIZE");
@@ -867,9 +884,20 @@ Result linkAndOptimizeIR(
         reportCheckpointIntermediates(codeGenContext, sink, irModule);
 
     // Finalization is always run so AD-related instructions can be removed,
-    // even the AD pass itself is not run.
+    // even if the AD pass itself is not run.
     //
     finalizeAutoDiffPass(targetProgram, irModule);
+    eliminateDeadCode(irModule, deadCodeEliminationOptions);
+
+    // After auto-diff, we can perform more aggressive specialization with dynamic-dispatch
+    // lowering.
+    //
+    if (!codeGenContext->isSpecializationDisabled())
+    {
+        SpecializationOptions specOptions;
+        specOptions.lowerWitnessLookups = true;
+        specializeModule(targetProgram, irModule, codeGenContext->getSink(), specOptions);
+    }
 
     finalizeSpecialization(irModule);
 
@@ -929,6 +957,8 @@ Result linkAndOptimizeIR(
         return SLANG_FAIL;
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    inferAnyValueSizeWhereNecessary(targetProgram, irModule);
 
     // If we have any witness tables that are marked as `KeepAlive`,
     // but are not used for dynamic dispatch, unpin them so we don't
@@ -1097,6 +1127,9 @@ Result linkAndOptimizeIR(
         eliminateDeadCode(irModule, deadCodeEliminationOptions);
     else
         simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
+
+    if (requiredLoweringPassSet.dynamicResourceHeap)
+        lowerDynamicResourceHeap(targetProgram, irModule, sink);
 
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER SSA");
@@ -1365,6 +1398,11 @@ Result linkAndOptimizeIR(
 
     default:
         break;
+    }
+
+    if (!isSPIRV(targetRequest->getTarget()))
+    {
+        floatNonUniformResourceIndex(irModule, NonUniformResourceIndexFloatMode::Textual);
     }
 
     // Legalize non struct parameters that are expected to be structs for HLSL.

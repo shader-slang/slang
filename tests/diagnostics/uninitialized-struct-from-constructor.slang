@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHK): -target spirv
+//TEST:SIMPLE(filecheck=CHK): -target spirv -entry computeMain
 
 struct TangentSpace
 {
@@ -22,3 +22,10 @@ struct TangentSpace
 
 //CHK-NOT: warning 41020
 //CHK-NOT: warning 41021
+
+[Shader("compute")]
+[NumThreads(4, 1, 1)]
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+{
+}
+

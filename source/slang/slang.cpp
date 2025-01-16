@@ -1493,7 +1493,8 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
     DiagnosticSink* sink)
 {
     SemanticsVisitor visitor(getSemanticsForReflection());
-    visitor = visitor.withSink(sink);
+    SemanticsVisitor::ExprLocalScope scope;
+    visitor = visitor.withSink(sink).withExprLocalScope(&scope);
 
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 

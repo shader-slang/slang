@@ -499,10 +499,19 @@ public:
     /// different. Returns an empty slice if not a built in type
     static UnownedStringSlice getDefaultBuiltinTypeName(IROp op);
 
-    /// Finds the IRNumThreadsDecoration and gets the size from that or sets all dimensions to 1
-    static IRNumThreadsDecoration* getComputeThreadGroupSize(
+    /// Finds the IRNumThreadsDecoration and gets the size from that or sets all
+    /// dimensions to 1
+    IRNumThreadsDecoration* getComputeThreadGroupSize(
         IRFunc* func,
         Int outNumThreads[kThreadGroupAxisCount]);
+
+    /// Finds the IRNumThreadsDecoration and gets the size from that or sets all
+    /// dimensions to 1. If specialization constants are used for an axis, their
+    /// IDs is reported in non-negative entries of outSpecializationConstantIds.
+    static IRNumThreadsDecoration* getComputeThreadGroupSize(
+        IRFunc* func,
+        Int outNumThreads[kThreadGroupAxisCount],
+        Int outSpecializationConstantIds[kThreadGroupAxisCount]);
 
     /// Finds the IRWaveSizeDecoration and gets the size from that.
     static IRWaveSizeDecoration* getComputeWaveSize(IRFunc* func, Int* outWaveSize);
@@ -511,6 +520,11 @@ protected:
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* inst) { SLANG_UNUSED(inst); }
     virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual bool doesTargetSupportPtrTypes() { return false; }
+    virtual bool isResourceTypeBindless(IRType* type)
+    {
+        SLANG_UNUSED(type);
+        return false;
+    }
     virtual void emitLayoutSemanticsImpl(
         IRInst* inst,
         char const* uniformSemanticSpelling,

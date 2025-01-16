@@ -729,6 +729,18 @@ __generic<T, let N : int> __intrinsic_op(select) vector<T,N> operator?:(vector<b
 __generic<T> __intrinsic_op(select) T select(bool condition, T ifTrue, T ifFalse);
 __generic<T, let N : int> __intrinsic_op(select) vector<T,N> select(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
 
+[ForceInline]
+__generic<T> Optional<T> select(bool condition, __none_t ifTrue, T ifFalse)
+{
+    return select(condition, Optional<T>(none), Optional<T>(ifFalse));
+}
+
+[ForceInline]
+__generic<T> Optional<T> select(bool condition, T ifTrue, __none_t ifFalse)
+{
+    return select(condition, Optional<T>(ifTrue), Optional<T>(none));
+}
+
 // Allow real-number types to be cast into each other
 //@hidden:
 __intrinsic_op($(kIROp_FloatCast))
@@ -1463,6 +1475,11 @@ struct String
     __intrinsic_op($(kIROp_MakeString))
     __init(double val);
 
+    [require(cpp)]
+    __implicit_conversion($(kConversionCost_None))
+    __intrinsic_op($(kIROp_MakeString))
+    __init(NativeString value);
+
     /// Returns the length of the string.
     [require(cpp)]
     int64_t getLength();
@@ -1502,6 +1519,7 @@ struct NativeString
 
     property int length { [__unsafeForceInlineEarly] get{return getLength();} }
 
+    __implicit_conversion($(kConversionCost_None))
     __intrinsic_op($(kIROp_getNativeStr))
     __init(String value);
 };
@@ -3980,3 +3998,7 @@ attribute_syntax [QuadDerivatives] : QuadDerivativesAttribute;
 /// This attribute has no effect on other targets.
 __attributeTarget(FuncDecl)
 attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
+
+__generic<T>
+typealias NodePayloadPtr = Ptr<T, $( (uint64_t)AddressSpace::NodePayloadAMDX)>;
+
