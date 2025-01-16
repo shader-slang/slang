@@ -18,6 +18,7 @@ bool isFreeFormTypePackParam(SemanticsVisitor* visitor, Type* type, ParamDecl* p
         return visitor->GetOuterGeneric(declRef.getDecl()) ==
                visitor->GetOuterGeneric(paramDecl->parentDecl);
     }
+    return false;
 }
 
 SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(
