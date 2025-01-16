@@ -3201,7 +3201,9 @@ protected:
             }
         case SystemValueSemanticName::ViewID:
             {
-                result.isUnsupported = true;
+                result.systemValueName = toSlice("amplification_id");
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
+                result.permittedTypes.add(builder.getBasicType(BaseType::UInt16));
                 break;
             }
         case SystemValueSemanticName::ViewportArrayIndex:
