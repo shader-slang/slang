@@ -207,10 +207,10 @@ DeclRef<StructDecl> findBaseStructDeclRef(
 
 ConstructorDecl* SemanticsVisitor::_getSynthesizedConstructor(
     StructDecl* structDecl,
-    ConstructorDecl::ConstructorTags tags)
+    ConstructorDecl::ConstructorFlavor flavor)
 {
     ConstructorDecl* synthesizedCtor = nullptr;
-    if (structDecl->m_synthesizedCtorMap.tryGetValue((int)tags, synthesizedCtor))
+    if (structDecl->m_synthesizedCtorMap.tryGetValue((int)flavor, synthesizedCtor))
     {
         return synthesizedCtor;
     }
@@ -226,11 +226,8 @@ static StructDecl* _getStructDecl(Type* type)
         return nullptr;
     }
 
-    if (auto declRefType = as<DeclRefType>(type))
-    {
-        auto structDecl = as<StructDecl>(declRefType->getDeclRef());
+    if (auto structDecl = isDeclRefTypeOf<StructDecl>(type))
         return structDecl.getDecl();
-    }
 
     return nullptr;
 }
@@ -304,11 +301,23 @@ bool SemanticsVisitor::isCStyleStruct(StructDecl* structDecl)
         // if the member is an array, check if the element is legacy C-style rule.
         if (auto arrayType = as<ArrayExpressionType>(varDecl->getType()))
         {
+            if (arrayType->isUnsized())
+            {
+                getShared()->cacheCStyleStruct(structDecl, false);
+                return false;
+            }
             auto* elementType = arrayType->getElementType();
             for (;;)
             {
                 if (auto nextType = as<ArrayExpressionType>(elementType))
+                {
+                    if (arrayType->isUnsized())
+                    {
+                        getShared()->cacheCStyleStruct(structDecl, false);
+                        return false;
+                    }
                     elementType = nextType->getElementType();
+                }
                 else
                     break;
             }
@@ -365,7 +374,7 @@ Expr* SemanticsVisitor::_createCtorInvokeExpr(
 }
 
 // translation from initializer list to constructor invocation if the struct has constructor.
-bool SemanticsVisitor::_invokeExprForExplicitCtor(
+bool SemanticsVisitor::createInvokeExprForExplicitCtor(
     Type* toType,
     InitializerListExpr* fromInitializerListExpr,
     Expr** outExpr)
@@ -409,7 +418,7 @@ bool SemanticsVisitor::_invokeExprForExplicitCtor(
     return false;
 }
 
-bool SemanticsVisitor::_invokeExprForSynthesizedCtor(
+bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
     Type* toType,
     InitializerListExpr* fromInitializerListExpr,
     Expr** outExpr)
@@ -892,13 +901,13 @@ bool SemanticsVisitor::_coerceInitializerList(
     // Try to invoke the user-defined constructor if it exists. This call will
     // report error diagnostics if the used-defined constructor exists but does not
     // match the initialize list.
-    if (_invokeExprForExplicitCtor(toType, fromInitializerListExpr, outToExpr))
+    if (createInvokeExprForExplicitCtor(toType, fromInitializerListExpr, outToExpr))
     {
         return true;
     }
 
     // Try to invoke the synthesized constructor if it exists
-    if (_invokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
+    if (createInvokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
     {
         return true;
     }

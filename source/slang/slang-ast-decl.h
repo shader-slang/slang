@@ -380,20 +380,20 @@ class ConstructorDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(ConstructorDecl)
 
-    enum class ConstructorTags : int
+    enum class ConstructorFlavor : int
     {
-        None = 0x00,
+        UserDefined = 0x00,
         // Indicates whether the declaration was synthesized by
         // Slang and not explicitly provided by the user
-        Synthesized = 0x01,
+        SynthesizedDefault = 0x01,
         // Member initialize constructor is a synthesized ctor,
         // but it takes parameters.
-        MemberInitCtor = 0x02
+        SynthesizedMemberInit = 0x02
     };
 
-    int m_tags = (int)ConstructorTags::None;
-    void addTag(ConstructorTags tag) { m_tags |= (int)tag; }
-    bool containsTag(ConstructorTags tag) { return m_tags & (int)tag; }
+    int m_flavor = (int)ConstructorFlavor::UserDefined;
+    void addFlavor(ConstructorFlavor flavor) { m_flavor |= (int)flavor; }
+    bool containsFlavor(ConstructorFlavor flavor) { return m_flavor & (int)flavor; }
 };
 
 // A subscript operation used to index instances of a type

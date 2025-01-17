@@ -2090,7 +2090,7 @@ static ConstructorDecl* _createCtor(
     body->closingSourceLoc = ctor->closingSourceLoc;
     ctor->body = body;
     body->body = m_astBuilder->create<SeqStmt>();
-    ctor->addTag(ConstructorDecl::ConstructorTags::Synthesized);
+    ctor->addFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
     decl->addMember(ctor);
     addAutoDiffModifiersToFunc(visitor, m_astBuilder, ctor);
     addVisibilityModifier(m_astBuilder, ctor, ctorVisibility);
@@ -2184,7 +2184,7 @@ static void checkSynthesizedConstructorWithoutDiagnostic(VisitorType& subVisitor
         structDecl->invalidateMemberDictionary();
         structDecl->buildMemberDictionary();
         structDecl->m_synthesizedCtorMap.remove(
-            (int)ConstructorDecl::ConstructorTags::MemberInitCtor);
+            (int)ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
     }
     return;
 }
@@ -8181,7 +8181,8 @@ void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
         // When checking the synthesized constructor, it's possible to hit error, but we don't want
         // to report this error, because this function is not created by user. Instead, when we
         // detect this error, we will remove this synthesized constructor from the struct.
-        if (constructorDecl->containsTag(ConstructorDecl::ConstructorTags::MemberInitCtor) &&
+        if (constructorDecl->containsFlavor(
+                ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit) &&
             !m_checkForSynthesizedCtor)
         {
             DiagnosticSink tempSink;
@@ -8196,14 +8197,14 @@ void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
                 auto structDecl = as<StructDecl>(constructorDecl->parentDecl);
                 ConstructorDecl* defaultCtor = nullptr;
                 if (structDecl->m_synthesizedCtorMap.tryGetValue(
-                        (int)ConstructorDecl::ConstructorTags::Synthesized,
+                        (int)ConstructorDecl::ConstructorFlavor::SynthesizedDefault,
                         defaultCtor))
                 {
                     structDecl->members.remove(defaultCtor);
                     structDecl->invalidateMemberDictionary();
                     structDecl->buildMemberDictionary();
                     structDecl->m_synthesizedCtorMap.remove(
-                        (int)ConstructorDecl::ConstructorTags::Synthesized);
+                        (int)ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
                 }
             }
             return;
@@ -9334,7 +9335,7 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(
             // base's member initialize ctor. e.g. base->init(...);
             baseCtor = _getSynthesizedConstructor(
                 declInfo.parent,
-                ConstructorDecl::ConstructorTags::MemberInitCtor);
+                ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
             if (baseCtor)
             {
                 Index idx = 0;
@@ -9470,7 +9471,8 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBody(
         // We treat the ctor with parameters and all parameters have default value as default ctor
         // as well, but the method to synthesize them are totally different, therefore, we need to
         // differentiate them here.
-        bool isMemberInitCtor = ctor->containsTag(ConstructorDecl::ConstructorTags::MemberInitCtor);
+        bool isMemberInitCtor =
+            ctor->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
 
         // When we synthesize the member initialize constructor, we need to use the parameters in
         // the function body, so this inout parameter is used to keep track of the index of the
@@ -9564,7 +9566,7 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
             structDecl->invalidateMemberDictionary();
             structDecl->buildMemberDictionary();
             structDecl->m_synthesizedCtorMap.remove(
-                (int)ConstructorDecl::ConstructorTags::Synthesized);
+                (int)ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
         }
     }
 }
@@ -10119,7 +10121,7 @@ void SemanticsDeclHeaderVisitor::visitConstructorDecl(ConstructorDecl* decl)
     // When checking the synthesized constructor, it's possible to hit error, but we don't want to
     // report this error, because this function is not created by user. Instead, when we detect this
     // error, we will remove this synthesized constructor from the struct.
-    if (decl->containsTag(ConstructorDecl::ConstructorTags::MemberInitCtor) &&
+    if (decl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit) &&
         !m_checkForSynthesizedCtor)
     {
         DiagnosticSink tempSink;
@@ -12362,7 +12364,7 @@ bool SemanticsDeclAttributesVisitor::_searchMembersWithHigherVisibility(
             // constructor has parameters
             ConstructorDecl* ctor = _getSynthesizedConstructor(
                 baseTypeDeclRef.getDecl(),
-                ConstructorDecl::ConstructorTags::MemberInitCtor);
+                ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
 
             // The constructor has to have higher or equal visibility level than the struct itself,
             // otherwise, it's not accessible so we will not pick up.
@@ -12433,9 +12435,9 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
     // synthesize the constructor signature:
     // 1. The constructor's name is always `$init`, we create one without parameters now.
     ConstructorDecl* ctor = _createCtor(this, getASTBuilder(), structDecl, ctorVisibility);
-    ctor->addTag(ConstructorDecl::ConstructorTags::MemberInitCtor);
+    ctor->addFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
     structDecl->m_synthesizedCtorMap.addIfNotExists(
-        (int)ConstructorDecl::ConstructorTags::MemberInitCtor,
+        (int)ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit,
         ctor);
 
     ctor->members.reserve(resultMembers.getCount());
@@ -12486,7 +12488,7 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
         DeclVisibility ctorVisibility = getDeclVisibility(structDecl);
         auto ctor = _createCtor(this, m_astBuilder, structDecl, ctorVisibility);
         structDecl->m_synthesizedCtorMap.addIfNotExists(
-            (int)ConstructorDecl::ConstructorTags::Synthesized,
+            (int)ConstructorDecl::ConstructorFlavor::SynthesizedDefault,
             ctor);
     }
 
