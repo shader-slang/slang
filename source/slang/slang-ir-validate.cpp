@@ -448,8 +448,6 @@ static bool isValidAtomicDest(IRInst* dst)
         }
     }
 
-    if (auto load = as<IRLoad>(dst))
-        return isValidAtomicDest(load->getAddress());
     if (auto getElementPtr = as<IRGetElementPtr>(dst))
         return isValidAtomicDest(getElementPtr->getBase());
     if (auto getOffsetPtr = as<IRGetOffsetPtr>(dst))
