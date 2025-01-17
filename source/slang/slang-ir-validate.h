@@ -38,6 +38,13 @@ void validateIRModuleIfEnabled(CodeGenContext* codeGenContext, IRModule* module)
 void disableIRValidationAtInsert();
 void enableIRValidationAtInsert();
 
+// Validate that the destination of an atomic operation is appropriate, meaning it's
+// either 'groupshared' or in a device buffer.
+// Note that validation of atomic operations should be done after address space
+// specialization for targets (e.g. SPIR-V and Metal) which support this kind of use-case:
+//   void atomicOp(inout int array){ InterlockedAdd(array, 1);}
+//   groupshared int gArray;
+//   [numthreads(1, 1, 1)] void main() { atomicOp(gArray); }
 void validateAtomicOperations(DiagnosticSink* sink, IRInst* inst);
 
 } // namespace Slang

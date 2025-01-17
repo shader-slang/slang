@@ -1322,7 +1322,9 @@ Result linkAndOptimizeIR(
             byteAddressBufferOptions);
     }
 
-    validateAtomicOperations(sink, irModule->getModuleInst());
+    // For SPIR-V, this function is called elsewhere, so that it can happen after address space specialization
+    if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
+        validateAtomicOperations(sink, irModule->getModuleInst());
 
     // For CUDA targets only, we will need to turn operations
     // the implicitly reference the "active mask" into ones

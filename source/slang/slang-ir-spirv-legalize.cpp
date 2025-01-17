@@ -22,6 +22,7 @@
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-util.h"
+#include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 
@@ -1931,6 +1932,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // Specalize address space for all pointers.
         SpirvAddressSpaceAssigner addressSpaceAssigner;
         specializeAddressSpace(m_module, &addressSpaceAssigner);
+
+        validateAtomicOperations(m_sink, m_module->getModuleInst());
     }
 
     void updateFunctionTypes()
