@@ -907,6 +907,13 @@ void initCommandOptions(CommandOptions& options)
          "-parameter-blocks-use-register-spaces",
          nullptr,
          "Parameter blocks will use register spaces"},
+        {OptionKind::ZeroInitialize,
+         "-zero-initialize",
+         nullptr,
+         "Initialize all variables to zero."
+         "Structs will set all struct-fields without an init expression to 0."
+         "All variables will call their default constructor if not explicitly initialized as "
+         "usual."},
     };
     _addOptions(makeConstArrayView(deprecatedOpts), options);
 
