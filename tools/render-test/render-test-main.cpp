@@ -1372,9 +1372,11 @@ static SlangResult _innerMain(
 
 #if _DEBUG
         desc.enableValidation = true;
-        desc.enableBackendValidation = true;
         desc.debugCallback = &debugCallback;
 #endif
+
+        if (options.enableBackendValidation)
+            desc.enableBackendValidation = true;
 
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)

@@ -1172,6 +1172,15 @@ IRInst* cloneInst(
     {
         // We need to special-case any instruction that is not
         // allocated like an ordinary `IRInst` with trailing args.
+    case kIROp_IntLit:
+    case kIROp_FloatLit:
+    case kIROp_BoolLit:
+    case kIROp_StringLit:
+    case kIROp_BlobLit:
+    case kIROp_PtrLit:
+    case kIROp_VoidLit:
+        return cloneValue(context, originalInst);
+
     case kIROp_Func:
         return cloneFuncImpl(context, builder, cast<IRFunc>(originalInst), originalValues);
 

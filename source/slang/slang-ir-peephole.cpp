@@ -829,6 +829,8 @@ struct PeepholeContext : InstPassBase
         case kIROp_VectorReshape:
             {
                 auto fromType = as<IRVectorType>(inst->getOperand(0)->getDataType());
+                if (!fromType)
+                    break;
                 auto resultType = as<IRVectorType>(inst->getDataType());
                 if (!resultType)
                 {
