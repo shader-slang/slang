@@ -738,6 +738,10 @@ DIAGNOSTIC(
     cannotSpecializeGeneric,
     "cannot specialize generic '$0' with the provided arguments.")
 
+DIAGNOSTIC(30076, Error, globalVarCannotHaveOpaqueType, "global variable cannot have opaque type.")
+DIAGNOSTIC(-1, Note, doYouMeanStaticConst, "do you intend to define a `static const` instead?")
+DIAGNOSTIC(-1, Note, doYouMeanUniform, "do you intend to define a `uniform` parameter instead?")
+
 DIAGNOSTIC(
     30100,
     Error,
@@ -1657,6 +1661,12 @@ DIAGNOSTIC(
     Error,
     overloadedParameterToHigherOrderFunction,
     "passing overloaded functions to higher order functions is not supported")
+
+DIAGNOSTIC(
+    39999,
+    Error,
+    matrixColumnOrRowCountIsOne,
+    "matrices with 1 column or row are not supported by the current code generation target")
 
 // 38xxx
 

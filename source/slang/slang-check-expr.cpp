@@ -3092,7 +3092,8 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
         expr->scope,
         LookupMask::Default,
         false,
-        getDeclToExcludeFromLookup());
+        getDeclToExcludeFromLookup(),
+        getExcludeTransparentMembersFromLookup());
 
     bool diagnosed = false;
     lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);

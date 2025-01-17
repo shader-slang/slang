@@ -347,8 +347,15 @@ TypeTag SemanticsVisitor::getTypeTags(Type* type)
     if (auto parameterGroupType = as<UniformParameterGroupType>(type))
     {
         auto elementTags = getTypeTags(parameterGroupType->getElementType());
-        elementTags = (TypeTag)((int)elementTags & ~(int)TypeTag::Unsized);
+        elementTags = (TypeTag)(((int)elementTags & ~(int)TypeTag::Unsized) | (int)TypeTag::Opaque);
         return elementTags;
+    }
+    else if (
+        as<UntypedBufferResourceType>(type) || as<ResourceType>(type) ||
+        as<SamplerStateType>(type) || as<HLSLStructuredBufferTypeBase>(type) ||
+        as<DynamicResourceType>(type))
+    {
+        return TypeTag::Opaque;
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {

@@ -223,6 +223,8 @@ IRInst* GlobalInstInliningContextGeneric::maybeInlineGlobalValue(
         }
         if (as<IRType>(inst))
             return inst;
+        if (!wrapReferences)
+            return inst;
 
         // If we encounter a global value that shouldn't be inlined, e.g. a const literal,
         // we should insert a GlobalValueRef() inst to wrap around it, so all the dependent
@@ -242,6 +244,49 @@ IRInst* GlobalInstInliningContextGeneric::maybeInlineGlobalValue(
     // If the global value is inlinable, we make all its operands avaialble locally, and
     // then copy it to the local scope.
     return inlineInst(builder, cloneEnv, inst);
+}
+
+struct GlobalInstLegalizationInliningContext : public GlobalInstInliningContextGeneric
+{
+    static bool isSimpleConstantType(IRType* type)
+    {
+        for (;;)
+        {
+            if (!type)
+                return true;
+            if (as<IRBasicType>(type))
+                return true;
+            if (as<IRVectorType>(type))
+                return true;
+            if (as<IRMatrixType>(type))
+                return true;
+            if (auto arrayType = as<IRArrayTypeBase>(type))
+            {
+                type = arrayType->getElementType();
+                continue;
+            }
+            return false;
+        }
+    }
+    bool isLegalGlobalInstForTarget(IRInst* inst) override
+    {
+        auto type = inst->getDataType();
+        return isSimpleConstantType(type);
+    }
+
+    bool isInlinableGlobalInstForTarget(IRInst* /* inst */) override { return false; }
+
+    bool shouldBeInlinedForTarget(IRInst* /* user */) override { return false; }
+
+    IRInst* getOutsideASM(IRInst* beforeInst) override { return beforeInst; }
+};
+
+void inlineGlobalConstantsForLegalization(IRModule* module)
+{
+    GlobalInstLegalizationInliningContext context;
+
+    context.wrapReferences = false;
+    context.inlineGlobalValuesAndRemoveIfUnused(module);
 }
 
 } // namespace Slang
