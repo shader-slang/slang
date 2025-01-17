@@ -1574,8 +1574,8 @@ public:
     }
 
 protected:
-    LegalizeShaderEntryPointContext(IRModule* module, DiagnosticSink* sink, bool hoistParameters)
-        : m_module(module), m_sink(sink), hoistParameters(hoistParameters)
+    LegalizeShaderEntryPointContext(IRModule* module, DiagnosticSink* sink)
+        : m_module(module), m_sink(sink)
     {
     }
 
@@ -1758,7 +1758,6 @@ protected:
     }
 
 private:
-    const bool hoistParameters;
     HashSet<IRStructField*> semanticInfoToRemove;
 
     void removeSemanticLayoutsFromLegalizedStructs()
@@ -2985,16 +2984,9 @@ private:
         // If the entrypoint is receiving varying inputs as a pointer, turn it into a value.
         depointerizeInputParams(entryPoint.entryPointFunc);
 
-        // TODO FIXME: Enable these for WGSL and remove the `hoistParemeters` member field.
-        // WGSL entry point legalization currently only applies attributes to struct parameters,
-        // apply the same hoisting from Metal to WGSL to fix it.
-        if (hoistParameters)
-        {
-            hoistEntryPointParameterFromStruct(entryPoint);
-            packStageInParameters(entryPoint);
-        }
-
         // Input Parameter Legalize
+        hoistEntryPointParameterFromStruct(entryPoint);
+        packStageInParameters(entryPoint);
         flattenInputParameters(entryPoint);
 
         // System Value Legalize
@@ -3023,7 +3015,7 @@ class LegalizeMetalEntryPointContext : public LegalizeShaderEntryPointContext
 {
 public:
     LegalizeMetalEntryPointContext(IRModule* module, DiagnosticSink* sink)
-        : LegalizeShaderEntryPointContext(module, sink, true)
+        : LegalizeShaderEntryPointContext(module, sink)
     {
         generatePermittedTypes_sv_target();
     }
@@ -3681,7 +3673,7 @@ class LegalizeWGSLEntryPointContext : public LegalizeShaderEntryPointContext
 {
 public:
     LegalizeWGSLEntryPointContext(IRModule* module, DiagnosticSink* sink)
-        : LegalizeShaderEntryPointContext(module, sink, false)
+        : LegalizeShaderEntryPointContext(module, sink)
     {
     }
 
