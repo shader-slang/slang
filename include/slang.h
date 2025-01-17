@@ -869,7 +869,7 @@ typedef uint32_t SlangSizeT;
         Language,
         MatrixLayoutColumn,         // bool
         MatrixLayoutRow,            // bool
-        ZeroInitialize, // bool
+        ZeroInitialize,             // bool
         IgnoreCapabilities,         // bool
         RestrictiveCapabilityCheck, // bool
         ModuleName,                 // stringValue0: module name.
