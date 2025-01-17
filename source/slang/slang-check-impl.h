@@ -2799,12 +2799,12 @@ public:
         CompletionSuggestions::ScopeKind scopeKind,
         LookupResult const& lookupResult);
 
-    bool _invokeExprForExplicitCtor(
+    bool createInvokeExprForExplicitCtor(
         Type* toType,
         InitializerListExpr* fromInitializerListExpr,
         Expr** outExpr);
 
-    bool _invokeExprForSynthesizedCtor(
+    bool createInvokeExprForSynthesizedCtor(
         Type* toType,
         InitializerListExpr* fromInitializerListExpr,
         Expr** outExpr);
@@ -2813,7 +2813,7 @@ public:
     bool _hasExplicitConstructor(StructDecl* structDecl, bool checkBaseType);
     ConstructorDecl* _getSynthesizedConstructor(
         StructDecl* structDecl,
-        ConstructorDecl::ConstructorTags tags);
+        ConstructorDecl::ConstructorFlavor flavor);
     bool isCStyleStruct(StructDecl* structDecl);
     bool _cStyleStructBasicCheck(Decl* decl);
 };
