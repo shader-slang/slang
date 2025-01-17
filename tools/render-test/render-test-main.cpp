@@ -226,13 +226,18 @@ struct AssignValsFromLayoutContext
             device,
             bufferResource));
 
-        if (dstCursor.getTypeLayout()->getType()->getKind() == slang::TypeReflection::Kind::Pointer)
+        if ((dstCursor.getTypeLayout()->getType()->getKind() ==
+                 slang::TypeReflection::Kind::Scalar &&
+             dstCursor.getTypeLayout()->getType()->getScalarType() ==
+                 slang::TypeReflection::ScalarType::UInt64) ||
+            dstCursor.getTypeLayout()->getType()->getKind() == slang::TypeReflection::Kind::Pointer)
         {
             // dstCursor is pointer to an ordinary uniform data field,
             // we should write bufferResource as a pointer.
             uint64_t addr = bufferResource->getDeviceAddress();
             dstCursor.setData(&addr, sizeof(addr));
             resourceContext.resources.add(ComPtr<IResource>(bufferResource.get()));
+            maybeAddOutput(dstCursor, srcVal, bufferResource);
             return SLANG_OK;
         }
 
