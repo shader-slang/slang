@@ -521,7 +521,6 @@ interface ITexelElement
 {
     associatedtype Element : __BuiltinArithmeticType;
     static const int elementCount;
-    __init();
     __init(Element x);
 }
 
@@ -3531,7 +3530,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             case $(SLANG_TEXTURE_3D):
                 __intrinsic_asm "textureLoad($0, ($1).xyz, ($1).w)$z";
             }
-            return T();
+            return __default<T>();
         }
     }
 
@@ -17002,7 +17001,6 @@ struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType, ITexelElement {
     typealias Element = float;
     static const int elementCount = 1;
     __intrinsic_op(0) __init(float x){}
-    __init(){}
 };
 
 /// @category texture_types
@@ -17014,7 +17012,6 @@ struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType, ITexelEl
     typealias Element = float;
     static const int elementCount = 1;
     __intrinsic_op(0) __init(float x){}
-    __init(){}
 };
 
 // All of these objects are write-only resources that point to a special kind of unordered access view meant for sampler feedback.
