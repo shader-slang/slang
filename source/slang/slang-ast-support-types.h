@@ -1225,6 +1225,7 @@ enum class LookupOptions : uint8_t
     /// checking to see if a keyword is shadowed.
     IgnoreInheritance =
         1 << 4, ///< Lookup only non inheritance children of a struct (including `extension`)
+    IgnoreTransparentMembers = 1 << 5,
 };
 inline LookupOptions operator&(LookupOptions a, LookupOptions b)
 {
