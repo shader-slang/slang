@@ -3954,6 +3954,11 @@ static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
                 decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
             }
 
+            auto funcScope = parser->currentScope;
+            parser->PopScope();
+            maybeParseGenericConstraints(parser, genericParent);
+            parser->PushScope(funcScope);
+
             parseStorageDeclBody(parser, decl);
 
             parser->PopScope();
