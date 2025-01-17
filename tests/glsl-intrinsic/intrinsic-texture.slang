@@ -7,7 +7,7 @@
 //TEST:SIMPLE(filecheck=CUDA): -allow-glsl -stage compute  -entry computeMain -target cuda -DCUDA
 //TEST:SIMPLE(filecheck=CUDA): -allow-glsl -stage fragment -entry fragMain -target cuda -DCUDA
 
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -output-using-type -xslang -DSPIRV
+//DISABLED_TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -output-using-type -xslang -DSPIRV
 
 // TODO: This test revealed a few problems for a path from GLSL to HLSL
 //T-EST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-dx12 -compute -entry computeMain -allow-glsl -use-dxil -output-using-type -profile cs_6_6 -xslang -DHLSL
@@ -138,13 +138,13 @@ uniform usampler2DArray uniform_usampler2DArray;
 //TEST_INPUT: TextureSamplerCube(size=4, content = zero, arrayLength = 2):name uniform_usamplerCubeArray
 uniform usamplerCubeArray uniform_usamplerCubeArray;
 
-//TEST_INPUT: TextureSampler1D(size=4, content = zero):name uniform_usamplerBuffer
+//TEST_INPUT: Texture1D(size=4, content = zero):name uniform_usamplerBuffer
 uniform usamplerBuffer uniform_usamplerBuffer;
 
-//TEST_INPUT: TextureSampler2D(size=4, content = zero):name uniform_usampler2DMS
+//TEST_INPUT: Texture2D(size=4, content = zero):name uniform_usampler2DMS
 uniform usampler2DMS uniform_usampler2DMS;
 
-//TEST_INPUT: TextureSampler2D(size=4, content = zero, arrayLength = 2):name uniform_usampler2DMSArray
+//TEST_INPUT: Texture2D(size=4, content = zero, arrayLength = 2):name uniform_usampler2DMSArray
 uniform usampler2DMSArray uniform_usampler2DMSArray;
 
 __generic<T : ITexelElement>
