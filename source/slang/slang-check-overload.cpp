@@ -2177,7 +2177,6 @@ void SemanticsVisitor::AddTypeOverloadCandidates(Type* type, OverloadResolveCont
         context.sourceScope,
         LookupMask::Default,
         options);
-
     AddOverloadCandidates(initializers, context);
 }
 
@@ -2546,7 +2545,6 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     context.loc = expr->loc;
     context.sourceScope = m_outerScope;
     context.baseExpr = GetBaseExpr(funcExpr);
-
     // We run a special case here where an `InvokeExpr`
     // with a single argument where the base/func expression names
     // a type should always be treated as an explicit type coercion
