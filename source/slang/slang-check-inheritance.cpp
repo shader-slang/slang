@@ -470,8 +470,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
 
             // Check only the sub-type.
             visitor.CheckConstraintSubType(constraintDeclRef.getDecl()->sub);
-            auto sub = visitor.TranslateTypeNodeForced(constraintDeclRef.getDecl()->sub);
-            auto subType = constraintDeclRef.substitute(astBuilder, sub);
+            auto sub = constraintDeclRef.getDecl()->sub;
+            if (!sub.type)
+                sub = visitor.TranslateTypeNodeForced(sub);
+            auto subType = constraintDeclRef.substitute(astBuilder, sub.type);
 
             // We only consider constraints where the type represented
             // by `declRef` is the subtype, since those
