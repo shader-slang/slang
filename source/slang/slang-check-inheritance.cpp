@@ -1158,6 +1158,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         info.facets = FacetList(directFacet);
         return info;
     }
+    else if (auto modifiedType = as<ModifiedType>(type))
+    {
+        return _calcInheritanceInfo(modifiedType->getBase(), circularityInfo);
+    }
     else
     {
         // As a fallback, any type not covered by the above cases will

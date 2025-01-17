@@ -487,7 +487,11 @@ DIAGNOSTIC(
     Warning,
     unintendedEmptyStatement,
     "potentially unintended empty statement at this location; use {} instead.")
-
+DIAGNOSTIC(
+    20102,
+    Error,
+    unexpectedBodyAfterSemicolon,
+    "unexpected function body after signature declaration, is this ';' a typo?")
 DIAGNOSTIC(30102, Error, declNotAllowed, "$0 is not allowed here.")
 
 // 29xxx - Snippet parsing and inline asm
