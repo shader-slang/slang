@@ -6,7 +6,7 @@ interface IFoo<T : __BuiltinFloatingPointType>
     bool requirement(T v1);
 }
 
-struct Bar<T, A : IFoo<T>, B : IFoo<T>> where T : __BuiltinFloatingPointType
+struct Bar<T : __BuiltinFloatingPointType, A : IFoo<T>, B : IFoo<T>>
 {
     [Differentiable]
     T doThing(T a)
@@ -24,14 +24,13 @@ struct Foo : IFoo<float>
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
-RWStructuredBuffer<int> outputBuffer;
+RWStructuredBuffer<float> outputBuffer;
 
-[numthreads(2, 1, 1)]
+[numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
     Bar<float, Foo, Foo> obj;
     outputBuffer[tid] = obj.doThing(2.0f);
-    // CHECK: 0
-    // CHECK: 1
+    // CHECK: 4
 }
