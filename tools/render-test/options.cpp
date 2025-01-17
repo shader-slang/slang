@@ -249,6 +249,10 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             SLANG_RETURN_ON_FAIL(reader.expectArg(outOptions.entryPointName));
         }
+        else if (argValue == "-enable-backend-validation")
+        {
+            outOptions.enableBackendValidation = true;
+        }
         else
         {
             // Lookup

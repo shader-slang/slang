@@ -3478,6 +3478,15 @@ TestResult runComputeComparisonImpl(
     auto actualOutputFile = outputStem + ".actual.txt";
     cmdLine.addArg(actualOutputFile);
 
+#if _DEBUG
+    // When using test server, any validation warning printed from the backend
+    // gets misinterpreted as the result from the test.
+    // This is due to the limitation that Slang RPC implementation expects only
+    // one time communication.
+    if (input.spawnType != SpawnType::UseTestServer)
+        cmdLine.addArg("-enable-backend-validation");
+#endif
+
     if (context->isExecuting())
     {
         // clear the stale actual output file first. This will allow us to detect error if

@@ -1471,6 +1471,7 @@ Result linkAndOptimizeIR(
     default:
         break;
     case CodeGenTarget::GLSL:
+    case CodeGenTarget::WGSL:
         moveGlobalVarInitializationToEntryPoints(irModule);
         break;
     // For SPIR-V to SROA across 2 entry-points a value must not be a global
