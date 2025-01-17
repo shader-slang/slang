@@ -249,6 +249,11 @@ public:
         if (outerFuncInst->findDecoration<IRTorchEntryPointDecoration>())
             return;
 
+        bool isSynthesizeConstructor = false;
+
+        if(auto constructor = funcInst->findDecoration<IRConstructorDecorartion>())
+            isSynthesizeConstructor = constructor->getSynthesizedStatus();
+
         // This is a kernel function, we don't allow using TorchTensor type here.
         for (auto b : funcInst->getBlocks())
         {
@@ -256,6 +261,13 @@ public:
             {
                 if (!checkType(inst->getDataType()))
                 {
+                    if (isSynthesizeConstructor)
+                    {
+                        IRBuilder irBuilder(funcInst);
+                        irBuilder.addDecoration(funcInst, kIROp_CudaHostDecoration);
+                        return;
+                    }
+
                     auto loc = inst->sourceLoc;
                     if (!loc.isValid())
                         loc = funcInst->sourceLoc;
