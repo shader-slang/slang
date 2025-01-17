@@ -318,7 +318,7 @@ void DeclRefBase::toText(StringBuilder& out)
         return;
     }
 
-    if (as<GenericTypeParamDecl>(this->getDecl()))
+    if (as<GenericTypeParamDeclBase>(this->getDecl()))
     {
         SLANG_ASSERT(as<DirectDeclRef>(this));
         out << this->getDecl()->getName()->text;

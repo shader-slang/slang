@@ -2897,14 +2897,13 @@ void SemanticsDeclBasesVisitor::visitInheritanceDecl(InheritanceDecl* inheritanc
 {
     // check the type being inherited from
     auto base = inheritanceDecl->base;
-    Decl* toExclude = nullptr;
     Decl* parent = getParentDecl(inheritanceDecl);
-    // We exclude in the case that a circular reference is possible. This is when a parent is a
-    // transparent decl. If we just blanket "block" all ensure's of a parent a generic may fail when
-    // trying to fetch a parent
+    // We exclude transparent members in the case that a circular reference is
+    // possible. This is when a parent is also a transparent decl.
+    SemanticsContext context(*this);
     if (parent->findModifier<TransparentModifier>())
-        toExclude = parent;
-    SemanticsDeclVisitorBase baseVistor(this->withDeclToExcludeFromLookup(toExclude));
+        context = context.excludeTransparentMembersFromLookup();
+    SemanticsDeclVisitorBase baseVistor(context);
     baseVistor.CheckConstraintSubType(base);
     base = baseVistor.TranslateTypeNode(base);
     inheritanceDecl->base = base;
