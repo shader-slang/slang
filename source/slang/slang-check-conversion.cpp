@@ -396,18 +396,6 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
 
             ctorInvokeExpr = CheckTerm(ctorInvokeExpr);
 
-            if (!canCoerce(toType, ctorInvokeExpr->type, ctorInvokeExpr, nullptr))
-            {
-                // We can report error here because struct having explicit constructor is
-                // not a C-Style struct, we should not fall back to the legacy initializer list.
-                getSink()->diagnose(
-                    fromInitializerListExpr->loc,
-                    Diagnostics::typeMismatch,
-                    toType,
-                    ctorInvokeExpr->type);
-                return false;
-            }
-
             if (outExpr && ctorInvokeExpr)
             {
                 *outExpr = ctorInvokeExpr;
@@ -447,54 +435,23 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
 
     ctorInvokeExpr = subVisitor.CheckExpr(ctorInvokeExpr);
 
-    auto errorHandled = [&]()
+    if (ctorInvokeExpr)
     {
-        if (!isCStyle)
+        if (!tempSink.getErrorCount())
+        {
+            if (outExpr)
+                *outExpr = ctorInvokeExpr;
+
+            return true;
+        }
+        else if (!isCStyle)
         {
             Slang::ComPtr<ISlangBlob> blob;
             tempSink.getBlobIfNeeded(blob.writeRef());
             getSink()->diagnoseRaw(
                 Severity::Error,
                 static_cast<char const*>(blob->getBufferPointer()));
-        }
-        return false;
-    };
-
-    if (ctorInvokeExpr)
-    {
-        // The reason we need to check the coercion again is that the ResolveInvoke() could still
-        // find us the wrong constructor when there is inheritance.
-        // e.g.: struct A { int a; };     // __init(int a) will be synthesized.
-        // struct B : A { int b; };       // __init(int a, int b) will be synthesized.
-        // B b = {1};
-        // This should report an error, but the ResolveInvoke() will find A.__init(int a).
-        //
-        // This will not happen when both A and B have explicit constructors, because 'coerce()'
-        // will be called after 'ResolveInvoke()'. However, in this initialize list to synthesized
-        // constructor translation path, 'coerce()' will not be called. But that is the only case,
-        // therefore, we will do a quick check here.
-        if (!tempSink.getErrorCount())
-        {
-            if (!canCoerce(toType, ctorInvokeExpr->type, ctorInvokeExpr, nullptr))
-            {
-                tempSink.diagnose(
-                    fromInitializerListExpr->loc,
-                    Diagnostics::typeMismatch,
-                    toType,
-                    ctorInvokeExpr->type);
-                return errorHandled();
-            }
-            else
-            {
-                if (outExpr)
-                    *outExpr = ctorInvokeExpr;
-
-                return true;
-            }
-        }
-        else
-        {
-            return errorHandled();
+            return false;
         }
     }
     return false;
