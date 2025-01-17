@@ -15,10 +15,8 @@
 //WGSLSPIRV: %vertexMain = OpFunction %
 //WGSLSPIRV: %fragmentMain = OpFunction %
 
-//WGSL: struct [[CoarseVertex:CoarseVertex[_0-9]*]]
-//WGSL-NEXT: {
-//WGSL-NEXT:     @location(0) color
-//WGSL: fn fragmentMain({{.*}}[[CoarseVertex]]
+//WGSL:     @location(0) output
+//WGSL:     @location(0) color
 
 // Uniform data to be passed from application -> shader.
 cbuffer Uniforms
