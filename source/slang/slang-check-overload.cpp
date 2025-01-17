@@ -10,6 +10,17 @@
 
 namespace Slang
 {
+
+bool isFreeFormTypePackParam(SemanticsVisitor* visitor, Type* type, ParamDecl* paramDecl)
+{
+    if (auto declRef = isDeclRefTypeOf<GenericTypePackParamDecl>(type))
+    {
+        return visitor->GetOuterGeneric(declRef.getDecl()) ==
+               visitor->GetOuterGeneric(paramDecl->parentDecl);
+    }
+    return false;
+}
+
 SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(
     FilteredMemberRefList<ParamDecl> params)
 {
@@ -25,9 +36,14 @@ SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(
                 counts.required += typePack->getTypeCount();
                 allowedArgCountToAdd = typePack->getTypeCount();
             }
-            else
+            else if (isFreeFormTypePackParam(this, paramType, param.getDecl()))
             {
                 counts.allowed = -1;
+            }
+            else
+            {
+                counts.required++;
+                counts.allowed++;
             }
         }
         else if (!param.getDecl()->initExpr)
