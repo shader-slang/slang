@@ -738,6 +738,10 @@ DIAGNOSTIC(
     cannotSpecializeGeneric,
     "cannot specialize generic '$0' with the provided arguments.")
 
+DIAGNOSTIC(30076, Error, globalVarCannotHaveOpaqueType, "global variable cannot have opaque type.")
+DIAGNOSTIC(-1, Note, doYouMeanStaticConst, "do you intend to define a `static const` instead?")
+DIAGNOSTIC(-1, Note, doYouMeanUniform, "do you intend to define a `uniform` parameter instead?")
+
 DIAGNOSTIC(
     30100,
     Error,
@@ -1658,6 +1662,12 @@ DIAGNOSTIC(
     overloadedParameterToHigherOrderFunction,
     "passing overloaded functions to higher order functions is not supported")
 
+DIAGNOSTIC(
+    39999,
+    Error,
+    matrixColumnOrRowCountIsOne,
+    "matrices with 1 column or row are not supported by the current code generation target")
+
 // 38xxx
 
 DIAGNOSTIC(
@@ -2060,7 +2070,7 @@ DIAGNOSTIC(
 DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
 DIAGNOSTIC(41001, Error, recursiveType, "type '$0' contains cyclic reference to itself.")
 
-DIAGNOSTIC(41010, Warning, missingReturn, "control flow may reach end of non-'void' function")
+DIAGNOSTIC(41010, Warning, missingReturn, "non-void function does not return in all cases")
 DIAGNOSTIC(
     41011,
     Error,
@@ -2459,6 +2469,12 @@ DIAGNOSTIC(
     Error,
     unsupportedTargetIntrinsic,
     "intrinsic operation '$0' is not supported for the current target.")
+DIAGNOSTIC(
+    55205,
+    Error,
+    unsupportedSpecializationConstantForNumThreads,
+    "Specialization constants are not supported in the 'numthreads' attribute for the current "
+    "target.")
 DIAGNOSTIC(
     56001,
     Error,

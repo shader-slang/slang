@@ -16760,20 +16760,80 @@ static const uint HIT_KIND_TRIANGLE_BACK_FACE = 255;
 
 //
 // Shader Model 6.4
+// @public:
 //
 
-/// Treats `left` and `right` as 4-component vectors of `UInt8` and computes `dot(left, right) + acc`
+/// Treats `x` and `y` as 4-component vectors of `UInt8` and computes `dot(x, y) + acc`
 /// @category math
-uint dot4add_u8packed(uint left, uint right, uint acc);
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_6_4)]
+uint dot4add_u8packed(uint x, uint y, uint acc)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dot4add_u8packed";
+    case wgsl: __intrinsic_asm "(dot4U8Packed($0, $1) + $2)";
+    case spirv:
+        // OpUDotAccSat cannot be used as there should not be any saturation.
+        return spirv_asm
+        {
+            OpCapability DotProduct;
+            OpCapability DotProductInput4x8BitPacked;
+            OpExtension "SPV_KHR_integer_dot_product";
+            %dotResult = OpUDot $$uint $x $y 0;
+            result:$$uint = OpIAdd %dotResult $acc;
+        };
+    default:
+        uint4 vecX = unpack_u8u32(uint8_t4_packed(x));
+        uint4 vecY = unpack_u8u32(uint8_t4_packed(y));
+        return dot(vecX, vecY) + acc;
+    }
+}
 
-/// Treats `left` and `right` as 4-component vectors of `Int8` and computes `dot(left, right) + acc`
+/// Treats `x` and `y` as 4-component vectors of `int8` and computes `dot(x, y) + acc`
 /// @category math
-int dot4add_i8packed(uint left, uint right, int acc);
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_6_4)]
+int dot4add_i8packed(uint x, uint y, int acc)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dot4add_i8packed";
+    case wgsl: __intrinsic_asm "(dot4I8Packed($0, $1) + $2)";
+    case spirv:
+        // OpSDottAccSat cannot be used as there should not be any saturation.
+        return spirv_asm
+        {
+            OpCapability DotProduct;
+            OpCapability DotProductInput4x8BitPacked;
+            OpExtension "SPV_KHR_integer_dot_product";
+            %dotResult = OpSDot $$int $x $y 0;
+            result:$$int = OpIAdd %dotResult $acc;
+        };
+    default:
+        int4 vecX = unpack_s8s32(int8_t4_packed(x));
+        int4 vecY = unpack_s8s32(int8_t4_packed(y));
+        return dot(vecX, vecY) + acc;
+    }
+}
 
-/// Computes `dot(left, right) + acc`.
+/// Computes `dot(x, y) + acc`.
 /// May not produce infinities or NaNs for intermediate results that overflow the range of `half`
 /// @category math
-float dot2add(float2 left, float2 right, float acc);
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_6_4)]
+float dot2add(half2 x, half2 y, float acc)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dot2add";
+    default:
+        return float(dot(x, y)) + acc;
+    }
+}
 
 //
 // Shader Model 6.5
@@ -20932,6 +20992,8 @@ struct ConstBufferPointer
 // new aliased bindings for each distinct cast type.
 //
 
+//@public:
+
 /// Represent the kind of a descriptor type.
 enum DescriptorKind
 {
@@ -21048,8 +21110,18 @@ ${{{{
 }
 }}}}
 
-/// Represents a bindless resource handle. A bindless resource handle is always a concrete type and can be
+/// Represents a bindless handle to a descriptor. A descriptor handle is always an ordinary data type and can be
 /// declared in any memory location.
+/// @remarks Opaque descriptor types such as textures(`Texture2D` etc.), `SamplerState` and buffers (e.g. `StructuredBuffer`)
+/// can have undefined size and data representation on many targets. On platforms such as Vulkan and D3D12, descriptors are
+/// communicated to the shader code by calling the host side API to write the descriptor into a descriptor set or table, instead
+/// of directly writing bytes into an ordinary GPU accessible buffer. As a result, oapque handle types cannot be used in places
+/// that refer to a ordinary buffer location, such as as element types of a `StructuredBuffer`.
+/// However, a `DescriptorHandle<T>` stores a handle (or address) to the actual descriptor, and is always an ordinary data type
+/// that can be manipulated directly in the shader code. This gives the developer the flexibility to embed and pass around descriptor
+/// parameters throughout the code, to enable cleaner modular designs.
+/// See [User Guide](https://shader-slang.com/slang/user-guide/convenience-features.html#descriptorhandle-for-bindless-descriptor-access)
+/// for more information on how to use `DescriptorHandle<T>` in your code.
 __magic_type(DescriptorHandleType)
 __intrinsic_type($(kIROp_DescriptorHandleType))
 struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
@@ -21139,6 +21211,8 @@ extern T getDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
 
 __intrinsic_op($(kIROp_NonUniformResourceIndex))
 DescriptorHandle<T> nonuniform<T:IOpaqueDescriptor>(DescriptorHandle<T> ptr);
+
+//@hidden:
 
 __glsl_version(450)
 __glsl_extension(GL_ARB_shader_clock)

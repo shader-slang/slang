@@ -12,6 +12,7 @@ struct IRModule;
 struct GlobalInstInliningContextGeneric
 {
     Dictionary<IRInst*, bool> m_mapGlobalInstToShouldInline;
+    bool wrapReferences = true;
 
     // Target-specific control over how inlining happens
     virtual bool isLegalGlobalInstForTarget(IRInst* inst) = 0;
@@ -43,4 +44,11 @@ struct GlobalInstInliningContextGeneric
         IRInst* inst,
         IRCloneEnv& cloneEnv);
 };
+
+// For global constant values that are resource typed or struct containing resource types,
+// we need to inline their uses to concrete function bodies so they can be legalized during
+// resource legalization.
+void inlineGlobalConstantsForLegalization(IRModule* module);
+
+
 } // namespace Slang
