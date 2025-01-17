@@ -10,6 +10,7 @@ void __requireGLSLExtension(String extensionName);
 /// Represents an interface for buffer data layout.
 /// This interface is used as a base for defining specific data layouts for buffers.
 [sealed]
+[builtin]
 __magic_type(IBufferDataLayoutType)
 interface IBufferDataLayout
 {
@@ -518,8 +519,10 @@ vector<T,N+1> __makeVector(vector<T,N> vec, T scalar);
 [builtin]
 interface ITexelElement
 {
-    associatedtype Element;
+    associatedtype Element : __BuiltinArithmeticType;
     static const int elementCount;
+    __init();
+    __init(Element x);
 }
 
 ${{{
@@ -541,11 +544,13 @@ extension $(elementType) : ITexelElement
 {
     typealias Element = $(elementType);
     static const int elementCount = 1;
+    __intrinsic_op(0) __init(Element x);
 }
 extension<int N> vector<$(elementType), N> : ITexelElement
 {
     typealias Element = $(elementType);
     static const int elementCount = N;
+    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
 }
 ${{{
 } // end for texelElementScalarTypes.
@@ -556,31 +561,37 @@ extension double:ITexelElement
 {
     typealias Element = double;
     static const int elementCount = 1;
+    __intrinsic_op(0) __init(Element x);
 }
 extension double2:ITexelElement
 {
     typealias Element = double;
     static const int elementCount = 2;
+    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
 }
 extension uint64_t:ITexelElement
 {
     typealias Element = uint64_t;
     static const int elementCount = 1;
+    __intrinsic_op(0) __init(Element x);
 }
 extension int64_t:ITexelElement
 {
     typealias Element = int64_t;
     static const int elementCount = 1;
+    __intrinsic_op(0) __init(Element x);
 }
 extension vector<uint64_t,2>:ITexelElement
 {
     typealias Element = uint64_t;
     static const int elementCount = 2;
+    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
 }
 extension vector<int64_t,2>:ITexelElement
 {
     typealias Element = int64_t;
     static const int elementCount = 2;
+    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
 }
 
 //@public:
@@ -16987,13 +16998,24 @@ interface __BuiltinSamplerFeedbackType {};
 [sealed]
 __magic_type(FeedbackType, $(int(FeedbackType::Kind::MinMip)))
 __target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIN_MIP)
-struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType {};
+struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType, ITexelElement {
+    typealias Element = float;
+    static const int elementCount = 1;
+    __intrinsic_op(0) __init(float x){}
+    __init(){}
+};
 
 /// @category texture_types
 [sealed]
 __magic_type(FeedbackType, $(int(FeedbackType::Kind::MipRegionUsed)))
 __target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIP_REGION_USED)
-struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType {};
+struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType, ITexelElement
+{
+    typealias Element = float;
+    static const int elementCount = 1;
+    __intrinsic_op(0) __init(float x){}
+    __init(){}
+};
 
 // All of these objects are write-only resources that point to a special kind of unordered access view meant for sampler feedback.
 
