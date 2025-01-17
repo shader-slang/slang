@@ -73,15 +73,16 @@ RWStructuredBuffer<int> outputBuffer;
 [format("rgba16ui")] RWTexture2DArray<uint4> w2DArray_u32v4;
 
 
-__generic<T:__BuiltinArithmeticType, let N:int, let sampleIndex:int, let format:int>
+__generic<T, let sampleIndex:int, let format:int>
 [ForceInline] // Workaround for a WGSL requirement that `texture_storage_Xd` must always be a global variable
 bool TEST_textureStorage_StoreLoad(
-    RWTexture1D<vector<T,N>, sampleIndex, format> w1D,
-    RWTexture2D<vector<T,N>, sampleIndex, format> w2D,
-    RWTexture3D<vector<T,N>, sampleIndex, format> w3D,
-    RWTexture2DArray<vector<T,N>, sampleIndex, format> w2DArray)
+    RWTexture1D<T, sampleIndex, format> w1D,
+    RWTexture2D<T, sampleIndex, format> w2D,
+    RWTexture3D<T, sampleIndex, format> w3D,
+    RWTexture2DArray<T, sampleIndex, format> w2DArray)
+    where T:ITexelElement, IArithmetic
 {
-    typealias Tvn = vector<T,N>;
+    typealias Tvn = T;
 
     // ===================
     // o[i] = v;
@@ -90,16 +91,16 @@ bool TEST_textureStorage_StoreLoad(
 
     // TODO: store before load
     // WGSL: textureStore({{\(*}}w1D
-    w1D[0] = Tvn(T(1));
+    w1D[0] = Tvn(T.Element(1));
 
     // WGSL: textureStore({{\(*}}w2D
-    w2D[0] = Tvn(T(1));
+    w2D[0] = Tvn(T.Element(1));
 
     // WGSL: textureStore({{\(*}}w3D
-    w3D[0] = Tvn(T(1));
+    w3D[0] = Tvn(T.Element(1));
 
     // WGSL: textureStore({{\(*}}w2DArray
-    w2DArray[0] = Tvn(T(1));
+    w2DArray[0] = Tvn(T.Element(1));
 
     return true
         // ===================
@@ -108,28 +109,28 @@ bool TEST_textureStorage_StoreLoad(
         // ===================
 
         // WGSL: textureLoad({{\(*}}w1D
-        && all(Tvn(T(0)) == w1D.Load(0))
+        && all(Tvn(T.Element(0)) == w1D.Load(0))
 
         // WGSL: textureLoad({{\(*}}w2D
-        && all(Tvn(T(0)) == w2D.Load(int2(0, 0)))
+        && all(Tvn(T.Element(0)) == w2D.Load(int2(0, 0)))
 
         // WGSL: textureLoad({{\(*}}w3D
-        && all(Tvn(T(0)) == w3D.Load(int3(0, 0, 0)))
+        && all(Tvn(T.Element(0)) == w3D.Load(int3(0, 0, 0)))
 
         // WGSL: textureLoad({{\(*}}w2DArray
-        && all(Tvn(T(0)) == w2DArray.Load(int3(0, 0, 0)))
+        && all(Tvn(T.Element(0)) == w2DArray.Load(int3(0, 0, 0)))
         ;
 }
 
 void fragMain()
 {
     bool result = true
-        && TEST_textureStorage_StoreLoad<float,    2>(w1D_f32v2, w2D_f32v2, w3D_f32v2, w2DArray_f32v2)
-        && TEST_textureStorage_StoreLoad<float,    4>(w1D_f32v4, w2D_f32v4, w3D_f32v4, w2DArray_f32v4)
-        && TEST_textureStorage_StoreLoad<int32_t,  2>(w1D_i32v2, w2D_i32v2, w3D_i32v2, w2DArray_i32v2)
-        && TEST_textureStorage_StoreLoad<int32_t,  4>(w1D_i32v4, w2D_i32v4, w3D_i32v4, w2DArray_i32v4)
-        && TEST_textureStorage_StoreLoad<uint32_t, 2>(w1D_u32v2, w2D_u32v2, w3D_u32v2, w2DArray_u32v2)
-        && TEST_textureStorage_StoreLoad<uint32_t, 4>(w1D_u32v4, w2D_u32v4, w3D_u32v4, w2DArray_u32v4)
+        && TEST_textureStorage_StoreLoad<float2>(w1D_f32v2, w2D_f32v2, w3D_f32v2, w2DArray_f32v2)
+        && TEST_textureStorage_StoreLoad<float4>(w1D_f32v4, w2D_f32v4, w3D_f32v4, w2DArray_f32v4)
+        && TEST_textureStorage_StoreLoad<int32_t2>(w1D_i32v2, w2D_i32v2, w3D_i32v2, w2DArray_i32v2)
+        && TEST_textureStorage_StoreLoad<int32_t4>(w1D_i32v4, w2D_i32v4, w3D_i32v4, w2DArray_i32v4)
+        && TEST_textureStorage_StoreLoad<uint32_t2>(w1D_u32v2, w2D_u32v2, w3D_u32v2, w2DArray_u32v2)
+        && TEST_textureStorage_StoreLoad<uint32_t4>(w1D_u32v4, w2D_u32v4, w3D_u32v4, w2DArray_u32v4)
         ;
 
     outputBuffer[0] = int(result);
