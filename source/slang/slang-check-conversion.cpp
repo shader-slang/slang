@@ -307,11 +307,10 @@ bool SemanticsVisitor::isCStyleStruct(StructDecl* structDecl)
             auto* elementType = arrayType->getElementType();
             for (;;)
             {
-                ArrayExpressionType* nextType = as<ArrayExpressionType>(elementType);
-                if (!nextType)
+                if (auto nextType = as<ArrayExpressionType>(elementType))
+                    elementType = nextType->getElementType();
+                else
                     break;
-
-                elementType = nextType->getElementType();
             }
 
             if (auto elemStructDecl = _getStructDecl(elementType))
@@ -910,9 +909,7 @@ bool SemanticsVisitor::_coerceInitializerList(
             outToExpr,
             fromInitializerListExpr,
             argIndex))
-    {
         return false;
-    }
 
     if (argIndex != argCount)
     {
