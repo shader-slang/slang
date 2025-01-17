@@ -22,7 +22,7 @@
 // METAL-NOT: [[ATTR3]]
 // METAL-DAG: [[ATTR4:COARSEVERTEX_(1|2|3|4)]]
 
-// WGSL:struct FragmentStageInput
+// WGSL:struct pixelInput
 // WGSL-DAG:@location(0) [[VAR0:[A-Za-z_0-9]+]]
 // WGSL-DAG:@location(1) [[VAR1:[A-Za-z_0-9]+]]
 // WGSL-DAG:@location(2) [[VAR2:[A-Za-z_0-9]+]]
@@ -78,7 +78,7 @@ float4 fragmentMain(FragmentStageInput input)
     // METAL-DAG: {{.*}}->p3{{.*}}->p2{{.*}}->p1{{.*}}=
     // METAL-DAG: {{.*}}->p3{{.*}}->p3{{.*}}->p1{{.*}}=
 
-    // WGSL: var [[UnpackedInput:[A-Za-z_0-9]+]] : FragmentStageInput
+    // WGSL: var [[UnpackedInput:[A-Za-z_0-9]+]] : pixelInput
     // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR7]];
 
     // WGSL-DAG: [[UnpackedInput]].{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}}.{{[A-Za-z_0-9]+}} = [[InputVar]].[[VAR6]];

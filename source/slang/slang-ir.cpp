@@ -2395,9 +2395,8 @@ IRBlobLit* IRBuilder::getBlobValue(ISlangBlob* blob)
     return static_cast<IRBlobLit*>(_findOrEmitConstant(keyInst));
 }
 
-IRPtrLit* IRBuilder::_getPtrValue(void* data)
+IRPtrLit* IRBuilder::getPtrValue(IRType* type, void* data)
 {
-    auto type = getPtrType(getVoidType());
     IRConstant keyInst;
     memset(&keyInst, 0, sizeof(keyInst));
     keyInst.m_op = kIROp_PtrLit;
@@ -6324,7 +6323,7 @@ IRDecoration* IRBuilder::addDecoration(
 
 void IRBuilder::addHighLevelDeclDecoration(IRInst* inst, Decl* decl)
 {
-    auto ptrConst = _getPtrValue(decl);
+    auto ptrConst = getPtrValue(getPtrType(getVoidType()), decl);
     addDecoration(inst, kIROp_HighLevelDeclDecoration, ptrConst);
 }
 
