@@ -3932,28 +3932,33 @@ static void parseStorageDeclBody(Parser* parser, ContainerDecl* decl)
 
 static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
 {
-    SubscriptDecl* decl = parser->astBuilder->create<SubscriptDecl>();
-    parser->FillPosition(decl);
-    parser->PushScope(decl);
+    return parseOptGenericDecl(
+        parser,
+        [&](GenericDecl* genericParent)
+        {
+            SubscriptDecl* decl = parser->astBuilder->create<SubscriptDecl>();
+            parser->FillPosition(decl);
+            parser->PushScope(decl);
 
-    // TODO: the use of this name here is a bit magical...
-    decl->nameAndLoc.name = getName(parser, "operator[]");
+            // TODO: the use of this name here is a bit magical...
+            decl->nameAndLoc.name = getName(parser, "operator[]");
 
-    parseParameterList(parser, decl);
+            parseParameterList(parser, decl);
 
-    if (AdvanceIf(parser, TokenType::RightArrow))
-    {
-        decl->returnType = parser->ParseTypeExp();
-    }
-    else
-    {
-        decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
-    }
+            if (AdvanceIf(parser, TokenType::RightArrow))
+            {
+                decl->returnType = parser->ParseTypeExp();
+            }
+            else
+            {
+                decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
+            }
 
-    parseStorageDeclBody(parser, decl);
+            parseStorageDeclBody(parser, decl);
 
-    parser->PopScope();
-    return decl;
+            parser->PopScope();
+            return decl;
+        });
 }
 
 /// Peek in the token stream and return `true` if it looks like a modern-style variable declaration
