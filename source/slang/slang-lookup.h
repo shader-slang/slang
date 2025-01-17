@@ -21,7 +21,8 @@ LookupResult lookUp(
     Scope* scope,
     LookupMask mask = LookupMask::Default,
     bool considerAllLocalNamesInScope = false,
-    Decl* declToExclude = nullptr);
+    Decl* declToExclude = nullptr,
+    bool ignoreTransparentMembers = false);
 
 // Perform member lookup in the context of a type
 LookupResult lookUpMember(
