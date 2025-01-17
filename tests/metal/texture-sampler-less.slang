@@ -29,7 +29,7 @@ Sampler2DArray<float> t2DArray;
 SamplerCubeArray<float> tCubeArray;
 
 // Metal doc says "For depth texture types, T must be float."
-__generic<T : __BuiltinType, let sampleCount:int=0, let format:int=0>
+__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
 typealias depth2d = _Texture<
     T,
     __Shape2D,
@@ -42,7 +42,7 @@ typealias depth2d = _Texture<
     format
 >;
 
-__generic<T : __BuiltinType, let sampleCount:int=0, let format:int=0>
+__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
 typealias depth2d_array = _Texture<
     T,
     __Shape2D,
@@ -55,7 +55,7 @@ typealias depth2d_array = _Texture<
     format
 >;
 
-__generic<T : __BuiltinType, let sampleCount:int=0, let format:int=0>
+__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
 typealias depthcube = _Texture<
     T,
     __ShapeCube,
@@ -68,7 +68,7 @@ typealias depthcube = _Texture<
     format
 >;
 
-__generic<T : __BuiltinType, let sampleCount:int=0, let format:int=0>
+__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
 typealias depthcube_array = _Texture<
     T,
     __ShapeCube,
