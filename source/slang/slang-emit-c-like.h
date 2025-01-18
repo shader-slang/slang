@@ -470,7 +470,6 @@ public:
     void emitFrontMatter(TargetRequest* targetReq) { emitFrontMatterImpl(targetReq); }
 
     void emitPreModule() { emitPreModuleImpl(); }
-    void emitPostModule() { emitPostModuleImpl(); }
     void emitModule(IRModule* module, DiagnosticSink* sink)
     {
         m_irModule = module;
@@ -555,7 +554,6 @@ protected:
     /// For example on targets that don't have built in vector/matrix support, this is where
     /// the appropriate generated declarations occur.
     virtual void emitPreModuleImpl();
-    virtual void emitPostModuleImpl();
 
     virtual void emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator);
     void emitSimpleTypeAndDeclarator(IRType* type, DeclaratorInfo* declarator)
@@ -736,10 +734,6 @@ protected:
     Dictionary<IRInst*, String> m_mapInstToName;
 
     OrderedHashSet<IRStringLit*> m_requiredPreludes;
-    struct RequiredAfter
-    {
-        String requireComputeDerivatives;
-    } m_requiredAfter;
 
     Dictionary<const char*, IRStringLit*> m_builtinPreludes;
 };
