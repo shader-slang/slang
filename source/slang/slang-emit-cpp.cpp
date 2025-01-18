@@ -614,7 +614,10 @@ void CPPSourceEmitter::emitGlobalRTTISymbolPrefix()
 
 void CPPSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
 {
-    auto interfaceType = cast<IRInterfaceType>(witnessTable->getConformanceType());
+    auto interfaceType = as<IRInterfaceType>(witnessTable->getConformanceType());
+
+    if (!interfaceType)
+        return;
 
     // Ignore witness tables for builtin interface types.
     if (isBuiltin(interfaceType))

@@ -661,7 +661,7 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
         auto alignedElementCount = 1 << Math::Log2Ceil((uint32_t)elementCount);
 
         // Metal aligns vectors to 2/4 element boundaries.
-        size_t size = elementSize * elementCount;
+        size_t size = alignedElementCount * elementSize;
         size_t alignment = alignedElementCount * elementSize;
 
         SimpleLayoutInfo vectorInfo;
@@ -1147,6 +1147,14 @@ struct MetalLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
+struct MetalArgumentBufferTier2LayoutRulesFamilyImpl : MetalLayoutRulesFamilyImpl
+{
+    virtual LayoutRulesImpl* getConstantBufferRules(
+        CompilerOptionSet& compilerOptions,
+        Type* containerType) override;
+    virtual LayoutRulesImpl* getParameterBlockRules(CompilerOptionSet& compilerOptions) override;
+};
+
 struct WGSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getAnyValueRules() override;
@@ -1175,6 +1183,7 @@ HLSLLayoutRulesFamilyImpl kHLSLLayoutRulesFamilyImpl;
 CPULayoutRulesFamilyImpl kCPULayoutRulesFamilyImpl;
 CUDALayoutRulesFamilyImpl kCUDALayoutRulesFamilyImpl;
 MetalLayoutRulesFamilyImpl kMetalLayoutRulesFamilyImpl;
+MetalArgumentBufferTier2LayoutRulesFamilyImpl kMetalArgumentBufferTier2LayoutRulesFamilyImpl;
 WGSLLayoutRulesFamilyImpl kWGSLLayoutRulesFamilyImpl;
 
 // CPU case
@@ -1969,8 +1978,44 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
     }
 };
 
+struct MetalTier2ObjectLayoutRulesImpl : ObjectLayoutRulesImpl
+{
+    virtual ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& /* options */)
+        override
+    {
+        switch (kind)
+        {
+        case ShaderParameterKind::ConstantBuffer:
+        case ShaderParameterKind::ParameterBlock:
+        case ShaderParameterKind::StructuredBuffer:
+        case ShaderParameterKind::MutableStructuredBuffer:
+        case ShaderParameterKind::RawBuffer:
+        case ShaderParameterKind::Buffer:
+        case ShaderParameterKind::MutableRawBuffer:
+        case ShaderParameterKind::MutableBuffer:
+        case ShaderParameterKind::ShaderStorageBuffer:
+        case ShaderParameterKind::AccelerationStructure:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+        case ShaderParameterKind::AppendConsumeStructuredBuffer:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 16, 8);
+        case ShaderParameterKind::MutableTexture:
+        case ShaderParameterKind::TextureUniformBuffer:
+        case ShaderParameterKind::Texture:
+        case ShaderParameterKind::SamplerState:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+        case ShaderParameterKind::TextureSampler:
+        case ShaderParameterKind::MutableTextureSampler:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 16, 8);
+        default:
+            SLANG_UNEXPECTED("unhandled shader parameter kind");
+            UNREACHABLE_RETURN(SimpleLayoutInfo());
+        }
+    }
+};
+
 static MetalObjectLayoutRulesImpl kMetalObjectLayoutRulesImpl;
 static MetalArgumentBufferElementLayoutRulesImpl kMetalArgumentBufferElementLayoutRulesImpl;
+static MetalTier2ObjectLayoutRulesImpl kMetalTier2ObjectLayoutRulesImpl;
 static MetalLayoutRulesImpl kMetalLayoutRulesImpl;
 
 LayoutRulesImpl kMetalAnyValueLayoutRulesImpl_ = {
@@ -1989,6 +2034,18 @@ LayoutRulesImpl kMetalParameterBlockLayoutRulesImpl_ = {
     &kMetalLayoutRulesFamilyImpl,
     &kMetalArgumentBufferElementLayoutRulesImpl,
     &kMetalArgumentBufferElementLayoutRulesImpl,
+};
+
+LayoutRulesImpl kMetalTier2ConstantBufferLayoutRulesImpl_ = {
+    &kMetalLayoutRulesFamilyImpl,
+    &kMetalLayoutRulesImpl,
+    &kMetalTier2ObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kMetalTier2ParameterBlockLayoutRulesImpl_ = {
+    &kMetalLayoutRulesFamilyImpl,
+    &kMetalLayoutRulesImpl,
+    &kMetalTier2ObjectLayoutRulesImpl,
 };
 
 LayoutRulesImpl kMetalStructuredBufferLayoutRulesImpl_ = {
@@ -2078,6 +2135,20 @@ LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getHitAttributesParameterRules()
 {
     return nullptr;
 }
+
+LayoutRulesImpl* MetalArgumentBufferTier2LayoutRulesFamilyImpl::getConstantBufferRules(
+    CompilerOptionSet&,
+    Type*)
+{
+    return &kMetalTier2ConstantBufferLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* MetalArgumentBufferTier2LayoutRulesFamilyImpl::getParameterBlockRules(
+    CompilerOptionSet&)
+{
+    return &kMetalTier2ParameterBlockLayoutRulesImpl_;
+}
+
 
 // WGSL Family
 
@@ -2229,7 +2300,7 @@ TypeLayoutContext getInitialLayoutContextForTarget(
         rulesFamily = getDefaultLayoutRulesFamilyForTarget(targetReq);
         break;
     case slang::LayoutRules::MetalArgumentBufferTier2:
-        rulesFamily = &kCPULayoutRulesFamilyImpl;
+        rulesFamily = &kMetalArgumentBufferTier2LayoutRulesFamilyImpl;
         break;
     }
 

@@ -51,6 +51,20 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     SLANG_ASSERT(builder);
     SLANG_ASSERT(oldInst);
 
+    // We start by mapping the type of the orignal instruction
+    // to its replacement value, if any.
+    //
+    auto oldType = oldInst->getFullType();
+    auto newType = (IRType*)findCloneForOperand(env, oldType);
+
+    // Pointer literals need to be handled separately, as they carry other data
+    // than just the operands.
+    if (oldInst->getOp() == kIROp_PtrLit)
+    {
+        auto oldPtr = as<IRPtrLit>(oldInst);
+        return builder->getPtrValue(newType, oldPtr->value.ptrVal);
+    }
+
     // This logic will not handle any instructions
     // with special-case data attached, but that only
     // applies to `IRConstant`s at this point, and those
@@ -61,12 +75,6 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     // to handle constants gracefully, if it ever comes up.
     //
     SLANG_ASSERT(!as<IRConstant>(oldInst));
-
-    // We start by mapping the type of the orignal instruction
-    // to its replacement value, if any.
-    //
-    auto oldType = oldInst->getFullType();
-    auto newType = (IRType*)findCloneForOperand(env, oldType);
 
     // Next we will iterate over the operands of `oldInst`
     // to find their replacements and install them as
