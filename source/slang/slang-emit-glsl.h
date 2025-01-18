@@ -176,6 +176,8 @@ protected:
 
     void emitAtomicImageCoord(IRImageSubscript* operand);
 
+    void _beforeComputeEmitProcessInstruction(IRInst* parentFunc, IRInst* inst, IRBuilder& builder);
+
     Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingEntryPoints;
 
     RefPtr<GLSLExtensionTracker> m_glslExtensionTracker;

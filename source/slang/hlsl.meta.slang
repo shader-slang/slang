@@ -15687,6 +15687,63 @@ bool IsHelperLane()
     }
 }
 
+//
+// Quad Control intrinsics
+//
+// For SPIRV and GLSL targets, the behavior is taken from Vulkan's `VK_KHR_shader_quad_control` spec.
+// QuadAny/QuadAll will map to OpGroupNonUniformQuadAny/All, and using either of these functions will 
+// result in the QuadDerivativesKHR execution mode being used. If MaximallyReconvergesKHR is not already 
+// specified by other means, it will be added when using either of QuadAny/QuadAll,
+//
+
+//@public:
+/// Returns true if `expr` is true in any lane of the current quad.
+__glsl_extension(GL_KHR_shader_subgroup_vote)
+__glsl_extension(GL_EXT_maximal_reconvergence)
+__glsl_extension(GL_EXT_shader_quad_control)
+[ForceInline]
+[require(glsl_hlsl_metal_spirv, quad_control)]
+bool QuadAny(bool expr)
+{
+    __requireMaximallyReconverges();
+    __requireQuadDerivatives();
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "QuadAny";
+    case glsl: __intrinsic_asm "subgroupQuadAny";
+    case metal: __intrinsic_asm "quad_any";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$bool = OpGroupNonUniformQuadAnyKHR $expr;
+        };
+    }
+}
+
+//@public:
+/// Returns true if `expr` is true in all lanes of the current quad.
+__glsl_extension(GL_KHR_shader_subgroup_vote)
+__glsl_extension(GL_EXT_maximal_reconvergence)
+__glsl_extension(GL_EXT_shader_quad_control)
+[ForceInline]
+[require(glsl_hlsl_metal_spirv, quad_control)]
+bool QuadAll(bool expr)
+{
+    __requireMaximallyReconverges();
+    __requireQuadDerivatives();
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "QuadAll";
+    case glsl: __intrinsic_asm "subgroupQuadAll";
+    case metal: __intrinsic_asm "quad_all";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$bool = OpGroupNonUniformQuadAllKHR $expr;
+        };
+    }
+}
+
 // `typedef`s to help with the fact that HLSL has been sorta-kinda case insensitive at various points
 //@hidden:
 typedef Texture2D texture2D;
