@@ -2392,6 +2392,18 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         {
             getSink()->diagnose(varDecl, Diagnostics::varCannotBeUnsized);
         }
+
+        bool isOpaque = (((int)varTypeTags & (int)TypeTag::Opaque) != 0);
+        if (isOpaque && isGlobalDecl(varDecl) && !varDecl->hasModifier<ConstModifier>() &&
+            varDecl->hasModifier<HLSLStaticModifier>())
+        {
+            // Opaque type global variable must be const.
+            getSink()->diagnose(varDecl, Diagnostics::globalVarCannotHaveOpaqueType);
+            if (varDecl->initExpr)
+                getSink()->diagnose(varDecl, Diagnostics::doYouMeanStaticConst);
+            else
+                getSink()->diagnose(varDecl, Diagnostics::doYouMeanUniform);
+        }
     }
 
     if (auto elementType = getConstantBufferElementType(varDecl->getType()))
@@ -2885,14 +2897,13 @@ void SemanticsDeclBasesVisitor::visitInheritanceDecl(InheritanceDecl* inheritanc
 {
     // check the type being inherited from
     auto base = inheritanceDecl->base;
-    Decl* toExclude = nullptr;
     Decl* parent = getParentDecl(inheritanceDecl);
-    // We exclude in the case that a circular reference is possible. This is when a parent is a
-    // transparent decl. If we just blanket "block" all ensure's of a parent a generic may fail when
-    // trying to fetch a parent
+    // We exclude transparent members in the case that a circular reference is
+    // possible. This is when a parent is also a transparent decl.
+    SemanticsContext context(*this);
     if (parent->findModifier<TransparentModifier>())
-        toExclude = parent;
-    SemanticsDeclVisitorBase baseVistor(this->withDeclToExcludeFromLookup(toExclude));
+        context = context.excludeTransparentMembersFromLookup();
+    SemanticsDeclVisitorBase baseVistor(context);
     baseVistor.CheckConstraintSubType(base);
     base = baseVistor.TranslateTypeNode(base);
     inheritanceDecl->base = base;

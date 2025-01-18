@@ -8633,6 +8633,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         UInt operandCount = 0;
         for (auto requirementDecl : decl->members)
         {
+            if (as<GenericDecl>(requirementDecl))
+                requirementDecl = getInner(requirementDecl);
+
             if (as<SubscriptDecl>(requirementDecl) || as<PropertyDecl>(requirementDecl))
             {
                 for (auto accessorDecl : as<ContainerDecl>(requirementDecl)->members)
@@ -8782,6 +8785,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             auto requirementKey = getInterfaceRequirementKey(requirementDecl);
             if (!requirementKey)
             {
+                if (auto genericDecl = as<GenericDecl>(requirementDecl))
+                {
+                    // We need to form a declref into the inner decls in case of a generic
+                    // requirement.
+                    requirementDecl = getInner(genericDecl);
+                }
+
                 if (as<PropertyDecl>(requirementDecl) || as<SubscriptDecl>(requirementDecl))
                 {
                     for (auto member : as<ContainerDecl>(requirementDecl)->members)

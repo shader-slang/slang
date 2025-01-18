@@ -10,6 +10,7 @@ void __requireGLSLExtension(String extensionName);
 /// Represents an interface for buffer data layout.
 /// This interface is used as a base for defining specific data layouts for buffers.
 [sealed]
+[builtin]
 __magic_type(IBufferDataLayoutType)
 interface IBufferDataLayout
 {
@@ -513,6 +514,86 @@ __generic<T, let N:int>
 vector<T,N+1> __makeVector(vector<T,N> vec, T scalar);
 
 //@public:
+/// Represent types that can be used as texel element.
+[sealed]
+[builtin]
+interface ITexelElement
+{
+    associatedtype Element : __BuiltinArithmeticType;
+    static const int elementCount;
+    __init(Element x);
+}
+
+${{{
+// Scalar types that can be used as texel element.
+const char* texeElementScalarTypes[] = {
+    "half",
+    "float",
+    "int",
+    "uint",
+    "int8_t",
+    "int16_t",
+    "uint8_t",
+    "uint16_t"
+};
+for (auto elementType : texeElementScalarTypes)
+{
+}}}
+extension $(elementType) : ITexelElement
+{
+    typealias Element = $(elementType);
+    static const int elementCount = 1;
+    __intrinsic_op(0) __init(Element x);
+}
+extension<int N> vector<$(elementType), N> : ITexelElement
+{
+    typealias Element = $(elementType);
+    static const int elementCount = N;
+    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
+}
+${{{
+} // end for texelElementScalarTypes.
+}}}
+
+// Additional 64-bit types that can be used as texel element.
+extension double:ITexelElement
+{
+    typealias Element = double;
+    static const int elementCount = 1;
+    __intrinsic_op(0) __init(Element x);
+}
+extension double2:ITexelElement
+{
+    typealias Element = double;
+    static const int elementCount = 2;
+    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
+}
+extension uint64_t:ITexelElement
+{
+    typealias Element = uint64_t;
+    static const int elementCount = 1;
+    __intrinsic_op(0) __init(Element x);
+}
+extension int64_t:ITexelElement
+{
+    typealias Element = int64_t;
+    static const int elementCount = 1;
+    __intrinsic_op(0) __init(Element x);
+}
+extension vector<uint64_t,2>:ITexelElement
+{
+    typealias Element = uint64_t;
+    static const int elementCount = 2;
+    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
+}
+extension vector<int64_t,2>:ITexelElement
+{
+    typealias Element = int64_t;
+    static const int elementCount = 2;
+    __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
+}
+
+//@public:
 /// A parameterized type that represents all flavors of texture types supported by the Slang language.
 /// Please note that this type is not intended to be used directly in user code, and not all combinations
 /// of the generic arguments are valid.
@@ -591,7 +672,7 @@ vector<T,N+1> __makeVector(vector<T,N> vec, T scalar);
 /// @category texture_types Texture types
 __magic_type(TextureType)
 __intrinsic_type($(kIROp_TextureType))
-struct _Texture<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+struct _Texture<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 {
 }
 
@@ -776,7 +857,7 @@ float __glsl_texture_level_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture 
 
 //@public:
 
-__generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 {
     //@hidden:
@@ -1498,7 +1579,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
 // Non-combined texture types specific functions
 
-__generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
 {
     typealias TextureCoord = vector<float, Shape.dimensions>;
@@ -1596,7 +1677,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
     }
 }
 
-__generic<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 {
     [__readNone]
@@ -2720,7 +2801,7 @@ for (int isMS = 0; isMS <= 1; isMS++) {
     TextureTypeInfo textureTypeInfo(kBaseTextureShapes[shapeIndex], isArray, isMS, 0, sb, path);
 }}}}
 
-__generic<T, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+__generic<T:ITexelElement, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 extension _Texture<T,$(shapeTypeName),$(isArray),$(isMS),sampleCount,access,isShadow,isCombined,format>
 {
     ${{{{
@@ -2733,7 +2814,7 @@ ${{{{
 }}}}
 
 // Texture.GetSamplePosition(int s);
-__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 extension _Texture<T,Shape,isArray,1,sampleCount,access,isShadow,isCombined,format>
 {
     [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_1_vertex_fragment_geometry)]
@@ -2745,10 +2826,10 @@ Array<T,4> __makeArray<T>(T v0, T v1, T v2, T v3);
 
 
 // Beginning of Texture Gather
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
-vector<TElement,4> __texture_gather(
+vector<T.Element,4> __texture_gather(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerState s,
     vector<float, Shape.dimensions+isArray> location,
@@ -2781,7 +2862,7 @@ vector<TElement,4> __texture_gather(
     case spirv:
         return spirv_asm {
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
-            result:$$vector<TElement,4> = OpImageGather %sampledImage $location $component;
+            result:$$vector<T.Element,4> = OpImageGather %sampledImage $location $component;
         };
     case wgsl:
         if (isShadow == 1)
@@ -2814,10 +2895,10 @@ vector<TElement,4> __texture_gather(
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gather(
+vector<T.Element,4> __texture_gather(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     int component)
@@ -2828,15 +2909,15 @@ vector<TElement,4> __texture_gather(
         __intrinsic_asm "textureGather($0, $1, $2)";
     case spirv:
         return spirv_asm {
-            result:$$vector<TElement,4> = OpImageGather $sampler $location $component;
+            result:$$vector<T.Element,4> = OpImageGather $sampler $location $component;
         };
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
-vector<TElement,4> __texture_gather_offset(
+vector<T.Element,4> __texture_gather_offset(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerState s,
     vector<float, Shape.dimensions+isArray> location,
@@ -2862,7 +2943,7 @@ vector<TElement,4> __texture_gather_offset(
         return spirv_asm {
             OpCapability ImageGatherExtended;
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
-            result:$$vector<TElement,4> = OpImageGather %sampledImage $location $component Offset $offset;
+            result:$$vector<T.Element,4> = OpImageGather %sampledImage $location $component Offset $offset;
         };
     case wgsl:
         if (isShadow == 1)
@@ -2895,10 +2976,10 @@ vector<TElement,4> __texture_gather_offset(
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gather_offset(
+vector<T.Element,4> __texture_gather_offset(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset,
@@ -2911,15 +2992,15 @@ vector<TElement,4> __texture_gather_offset(
     case spirv:
         return spirv_asm {
             OpCapability ImageGatherExtended;
-            result:$$vector<TElement,4> = OpImageGather $sampler $location $component Offset $offset;
+            result:$$vector<T.Element,4> = OpImageGather $sampler $location $component Offset $offset;
         };
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gather_offsets(
+vector<T.Element,4> __texture_gather_offsets(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerState s,
     vector<float, Shape.dimensions+isArray> location,
@@ -2938,15 +3019,15 @@ vector<TElement,4> __texture_gather_offsets(
         return spirv_asm {
             OpCapability ImageGatherExtended;
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
-            result:$$vector<TElement,4> = OpImageGather %sampledImage $location $component ConstOffsets $offsets;
+            result:$$vector<T.Element,4> = OpImageGather %sampledImage $location $component ConstOffsets $offsets;
         };
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gather_offsets(
+vector<T.Element,4> __texture_gather_offsets(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
     constexpr vector<int, Shape.planeDimensions> offset1,
@@ -2963,19 +3044,19 @@ vector<TElement,4> __texture_gather_offsets(
         let offsets = __makeArray(offset1,offset2,offset3,offset4);
         return spirv_asm {
             OpCapability ImageGatherExtended;
-            result:$$vector<TElement,4> = OpImageGather $sampler $location $component ConstOffsets $offsets;
+            result:$$vector<T.Element,4> = OpImageGather $sampler $location $component ConstOffsets $offsets;
         };
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
-vector<TElement,4> __texture_gatherCmp(
+vector<T.Element,4> __texture_gatherCmp(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerComparisonState s,
     vector<float, Shape.dimensions+isArray> location,
-    TElement compareValue)
+    T.Element compareValue)
 {
     __target_switch
     {
@@ -2999,7 +3080,7 @@ vector<TElement,4> __texture_gatherCmp(
     case spirv:
         return spirv_asm {
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
-            result:$$vector<TElement,4> = OpImageDrefGather %sampledImage $location $compareValue;
+            result:$$vector<T.Element,4> = OpImageDrefGather %sampledImage $location $compareValue;
         };
     case wgsl:
         static_assert(isShadow == 1, "WGSL supports textureGatherCompare only for depth textures.");
@@ -3018,13 +3099,13 @@ vector<TElement,4> __texture_gatherCmp(
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gatherCmp(
+vector<T.Element,4> __texture_gatherCmp(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
-    TElement compareValue)
+    T.Element compareValue)
 {
     __target_switch
     {
@@ -3032,19 +3113,19 @@ vector<TElement,4> __texture_gatherCmp(
         __intrinsic_asm "textureGather($0, $1, $2)";
     case spirv:
         return spirv_asm {
-            result:$$vector<TElement,4> = OpImageDrefGather $sampler $location $compareValue;
+            result:$$vector<T.Element,4> = OpImageDrefGather $sampler $location $compareValue;
         };
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_metal_spirv_wgsl, texture_gather)]
-vector<TElement,4> __texture_gatherCmp_offset(
+vector<T.Element,4> __texture_gatherCmp_offset(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerComparisonState s,
     vector<float, Shape.dimensions+isArray> location,
-    TElement compareValue,
+    T.Element compareValue,
     constexpr vector<int, Shape.planeDimensions> offset)
 {
     __target_switch
@@ -3065,7 +3146,7 @@ vector<TElement,4> __texture_gatherCmp_offset(
     case spirv:
         return spirv_asm {
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
-            result:$$vector<TElement,4> = OpImageDrefGather %sampledImage $location $compareValue ConstOffset $offset;
+            result:$$vector<T.Element,4> = OpImageDrefGather %sampledImage $location $compareValue ConstOffset $offset;
         };
     case wgsl:
         static_assert(isShadow == 1, "WGSL supports textureGatherCompare only for depth textures.");
@@ -3084,13 +3165,13 @@ vector<TElement,4> __texture_gatherCmp_offset(
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gatherCmp_offset(
+vector<T.Element,4> __texture_gatherCmp_offset(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
-    TElement compareValue,
+    T.Element compareValue,
     constexpr vector<int, Shape.planeDimensions> offset)
 {
     __target_switch
@@ -3099,19 +3180,19 @@ vector<TElement,4> __texture_gatherCmp_offset(
         __intrinsic_asm "textureGatherOffset($0, $1, $2, $3)";
     case spirv:
         return spirv_asm {
-            result:$$vector<TElement,4> = OpImageDrefGather $sampler $location $compareValue ConstOffset $offset;
+            result:$$vector<T.Element,4> = OpImageDrefGather $sampler $location $compareValue ConstOffset $offset;
         };
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gatherCmp_offsets(
+vector<T.Element,4> __texture_gatherCmp_offsets(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 0, format> texture,
     SamplerComparisonState s,
     vector<float, Shape.dimensions+isArray> location,
-    TElement compareValue,
+    T.Element compareValue,
     vector<int, Shape.planeDimensions> offset1,
     vector<int, Shape.planeDimensions> offset2,
     vector<int, Shape.planeDimensions> offset3,
@@ -3126,18 +3207,18 @@ vector<TElement,4> __texture_gatherCmp_offsets(
         return spirv_asm {
             OpCapability ImageGatherExtended;
             %sampledImage : __sampledImageType(texture) = OpSampledImage $texture $s;
-            result:$$vector<TElement,4> = OpImageDrefGather %sampledImage $location $compareValue ConstOffsets $offsets;
+            result:$$vector<T.Element,4> = OpImageDrefGather %sampledImage $location $compareValue ConstOffsets $offsets;
         };
     }
 }
 
-__generic<TElement, T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let format:int>
 [ForceInline]
 [require(glsl_spirv, texture_gather)]
-vector<TElement,4> __texture_gatherCmp_offsets(
+vector<T.Element,4> __texture_gatherCmp_offsets(
     _Texture<T, Shape, isArray, 0, sampleCount, access, isShadow, 1, format> sampler,
     vector<float, Shape.dimensions+isArray> location,
-    TElement compareValue,
+    T.Element compareValue,
     vector<int, Shape.planeDimensions> offset1,
     vector<int, Shape.planeDimensions> offset2,
     vector<int, Shape.planeDimensions> offset3,
@@ -3151,30 +3232,26 @@ vector<TElement,4> __texture_gatherCmp_offsets(
         let offsets = __makeArray(offset1,offset2,offset3,offset4);
         return spirv_asm {
             OpCapability ImageGatherExtended;
-            result:$$vector<TElement,4> = OpImageDrefGather $sampler $location $compareValue ConstOffsets $offsets;
+            result:$$vector<T.Element,4> = OpImageDrefGather $sampler $location $compareValue ConstOffsets $offsets;
         };
     }
 }
 
 ${{{{
 for (int isCombined = 0; isCombined < 2; isCombined++)
-for (int isScalarTexture = 0; isScalarTexture < 2; isScalarTexture++)
 {
-    const char* extSizeParam = isScalarTexture ? "" : ", let N:int";
-    const char* extTexType = isScalarTexture ? "T" : "vector<T,N>";
-
 }}}}
-// Gather for [TextureType = $(extTexType), isCombined = $(isCombined)]
+// Gather for [isCombined = $(isCombined)]
 
-__generic<T:__BuiltinArithmeticType $(extSizeParam), Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
-extension _Texture<$(extTexType),Shape,isArray,0,sampleCount,0,isShadow,$(isCombined),format>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,$(isCombined),format>
 {
 ${{{{
     for (int isShadow = 0; isShadow < 2; isShadow++)
     for (auto componentId = 0;  componentId < 5; componentId++)
     {
         const char* compareFunc = isShadow ? "Cmp" : "";
-        const char* compareParam = isShadow ? ", T compareValue" : "";
+        const char* compareParam = isShadow ? ", T.Element compareValue" : "";
         const char* compareArg = isShadow ? ", compareValue" : "";
 
         // Some targets support the combined texture natively
@@ -3190,7 +3267,7 @@ ${{{{
 }}}}
     [ForceInline]
     [require(glsl_hlsl_metal_spirv_wgsl, texture_gather)]
-    vector<T,4> Gather$(compareFunc)$(componentFunc)(
+    vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
         $(compareParam))
@@ -3203,16 +3280,16 @@ ${{{{
         case hlsl: __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
         case metal:
         case wgsl:
-            return __texture_gather$(compareFunc)<T>($(getTexture) $(getSampler), location $(compareArg) $(componentArg));
+            return __texture_gather$(compareFunc)($(getTexture) $(getSampler), location $(compareArg) $(componentArg));
         case glsl:
         case spirv:
-            return __texture_gather$(compareFunc)<T>(this $(samplerArg), location $(compareArg) $(componentArg));
+            return __texture_gather$(compareFunc)(this $(samplerArg), location $(compareArg) $(componentArg));
         }
     }
 
     [ForceInline]
     [require(hlsl, texture_gather)]
-    vector<T,4> Gather$(compareFunc)$(componentFunc)(
+    vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
         $(compareParam),
@@ -3229,7 +3306,7 @@ ${{{{
 
     [ForceInline]
     [require(glsl_hlsl_metal_spirv_wgsl, texture_gather)]
-    vector<T,4> Gather$(compareFunc)$(componentFunc)(
+    vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
         $(compareParam),
@@ -3243,16 +3320,16 @@ ${{{{
         case hlsl: __intrinsic_asm ".Gather$(compareFunc)$(componentFunc)";
         case metal:
         case wgsl:
-            return __texture_gather$(compareFunc)_offset<T>($(getTexture) $(getSampler), location $(compareArg), offset $(componentArg));
+            return __texture_gather$(compareFunc)_offset($(getTexture) $(getSampler), location $(compareArg), offset $(componentArg));
         case glsl:
         case spirv:
-            return __texture_gather$(compareFunc)_offset<T>(this $(samplerArg), location $(compareArg), offset $(componentArg));
+            return __texture_gather$(compareFunc)_offset(this $(samplerArg), location $(compareArg), offset $(componentArg));
         }
     }
 
     [ForceInline]
     [require(hlsl, texture_gather)]
-    vector<T,4> Gather$(compareFunc)$(componentFunc)(
+    vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
         $(compareParam),
@@ -3270,7 +3347,7 @@ ${{{{
 
     [ForceInline]
     [require(glsl_hlsl_spirv, texture_gather)]
-    vector<T,4> Gather$(compareFunc)$(componentFunc)(
+    vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
         $(compareParam),
@@ -3293,7 +3370,7 @@ ${{{{
 
     [ForceInline]
     [require(hlsl, texture_gather)]
-    vector<T,4> Gather$(compareFunc)$(componentFunc)(
+    vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
         $(samplerParam)
         vector<float, Shape.dimensions+isArray> location
         $(compareParam),
@@ -3315,7 +3392,7 @@ ${{{{
 ${{{{
     } // for (componentId)
 }}}}
-} // End of: Gather for [TextureType = $(extTexType), isCombined = $(isCombined)]
+} // End of: Gather for [isCombined = $(isCombined)]
 
 ${{{{
 } // for (isScalarTexture)
@@ -3325,7 +3402,7 @@ ${{{{
 
 // Load/Subscript for readonly, no MS textures
 
-__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int, let format:int>
 extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 {
 //@hidden:
@@ -3453,7 +3530,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             case $(SLANG_TEXTURE_3D):
                 __intrinsic_asm "textureLoad($0, ($1).xyz, ($1).w)$z";
             }
-            return T();
+            return __default<T>();
         }
     }
 
@@ -3555,7 +3632,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 
 // Texture Load/Subscript for readonly, MS textures
 
-__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let isCombined:int, let format:int>
 extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 {
 //@hidden:
@@ -3746,7 +3823,7 @@ ${{{{
         const char* glslIntrinsicMSOffset = "$cimageLoad($0, ($1)+($3), $2)$z";
 }}}}
 
-__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
 {
     ${{{{
@@ -4081,7 +4158,7 @@ if (access == kCoreModule_ResourceAccessReadWrite) {
 
 // RW MS textures.
 
-__generic<T, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
 {
     [__readNone]
@@ -4234,7 +4311,7 @@ ${{{{
 }}}}
 
 // Definitions to support the legacy texture .mips[][] operator.
-struct __TextureMip<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+struct __TextureMip<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 {
     _Texture<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
     int mip;
@@ -4245,7 +4322,7 @@ struct __TextureMip<T, Shape : __ITextureShape, let isArray : int, let isCombine
     }
 }
 
-struct __TextureMips<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+struct __TextureMips<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 {
     _Texture<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
     __subscript(int mip)->__TextureMip<T, Shape, isArray, isCombined, format>
@@ -4256,7 +4333,7 @@ struct __TextureMips<T, Shape : __ITextureShape, let isArray : int, let isCombin
 }
 
 //@hidden:
-__generic<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+__generic<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 extension _Texture<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
 {
     property __TextureMips<T, Shape, isArray, isCombined, format> mips
@@ -4267,7 +4344,7 @@ extension _Texture<T, Shape, isArray, 0 /*isMS*/, 0 /*sampleCount*/, 0 /*access*
 }
 
 // Definitions to support the .sample[][] operator.
-struct __TextureSample<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+struct __TextureSample<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 {
     _Texture<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
     int sample;
@@ -4278,7 +4355,7 @@ struct __TextureSample<T, Shape : __ITextureShape, let isArray : int, let isComb
     }
 }
 
-struct __TextureSampleMS<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+struct __TextureSampleMS<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 {
     _Texture<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format> tex;
     __subscript(int sample)->__TextureSample<T, Shape, isArray, isCombined, format>
@@ -4288,7 +4365,7 @@ struct __TextureSampleMS<T, Shape : __ITextureShape, let isArray : int, let isCo
     }
 }
 
-__generic<T, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
+__generic<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
 extension _Texture<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*/, 0 /*isShadow*/, isCombined, format>
 {
     property __TextureSampleMS<T, Shape, isArray, isCombined, format> sample
@@ -4345,7 +4422,7 @@ ${{{{
 /// @param format The storage format of the texture.
 /// @see Please refer to `_Texture` for more information about texture types.
 /// @category texture_types
-typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<T=float4, let sampleCount:int=0, let format:int=0> = _Texture<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
+typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<T:ITexelElement=float4, let sampleCount:int=0, let format:int=0> = _Texture<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
 ${{{{
 }
 }}}}
@@ -15690,7 +15767,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
 {
     auto access = kBaseBufferAccessLevels[aa].access;
     sb << "/// @category texture_types\n";
-    sb << "__generic<T,let format:int=0>\n";
+    sb << "__generic<T:ITexelElement,let format:int=0>\n";
     sb << "typealias ";
     sb << kBaseBufferAccessLevels[aa].name;
     sb << "Buffer = _Texture<T, __ShapeBuffer, 0, 0, 0, " << aa << ", 0, 0, format>;\n";
@@ -15705,7 +15782,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     char const* requireToSet_onlyHLSL = (isReadOnly) ? "[require(hlsl, texture_sm_4_1)]" : "[require(hlsl, texture_sm_4_1_compute_fragment)]";
 }}}}
 
-__generic<T, let format:int>
+__generic<T:ITexelElement, let format:int>
 extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
 {
     [__readNone]
@@ -16817,20 +16894,80 @@ static const uint HIT_KIND_TRIANGLE_BACK_FACE = 255;
 
 //
 // Shader Model 6.4
+// @public:
 //
 
-/// Treats `left` and `right` as 4-component vectors of `UInt8` and computes `dot(left, right) + acc`
+/// Treats `x` and `y` as 4-component vectors of `UInt8` and computes `dot(x, y) + acc`
 /// @category math
-uint dot4add_u8packed(uint left, uint right, uint acc);
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_6_4)]
+uint dot4add_u8packed(uint x, uint y, uint acc)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dot4add_u8packed";
+    case wgsl: __intrinsic_asm "(dot4U8Packed($0, $1) + $2)";
+    case spirv:
+        // OpUDotAccSat cannot be used as there should not be any saturation.
+        return spirv_asm
+        {
+            OpCapability DotProduct;
+            OpCapability DotProductInput4x8BitPacked;
+            OpExtension "SPV_KHR_integer_dot_product";
+            %dotResult = OpUDot $$uint $x $y 0;
+            result:$$uint = OpIAdd %dotResult $acc;
+        };
+    default:
+        uint4 vecX = unpack_u8u32(uint8_t4_packed(x));
+        uint4 vecY = unpack_u8u32(uint8_t4_packed(y));
+        return dot(vecX, vecY) + acc;
+    }
+}
 
-/// Treats `left` and `right` as 4-component vectors of `Int8` and computes `dot(left, right) + acc`
+/// Treats `x` and `y` as 4-component vectors of `int8` and computes `dot(x, y) + acc`
 /// @category math
-int dot4add_i8packed(uint left, uint right, int acc);
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_6_4)]
+int dot4add_i8packed(uint x, uint y, int acc)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dot4add_i8packed";
+    case wgsl: __intrinsic_asm "(dot4I8Packed($0, $1) + $2)";
+    case spirv:
+        // OpSDottAccSat cannot be used as there should not be any saturation.
+        return spirv_asm
+        {
+            OpCapability DotProduct;
+            OpCapability DotProductInput4x8BitPacked;
+            OpExtension "SPV_KHR_integer_dot_product";
+            %dotResult = OpSDot $$int $x $y 0;
+            result:$$int = OpIAdd %dotResult $acc;
+        };
+    default:
+        int4 vecX = unpack_s8s32(int8_t4_packed(x));
+        int4 vecY = unpack_s8s32(int8_t4_packed(y));
+        return dot(vecX, vecY) + acc;
+    }
+}
 
-/// Computes `dot(left, right) + acc`.
+/// Computes `dot(x, y) + acc`.
 /// May not produce infinities or NaNs for intermediate results that overflow the range of `half`
 /// @category math
-float dot2add(float2 left, float2 right, float acc);
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_6_4)]
+float dot2add(half2 x, half2 y, float acc)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dot2add";
+    default:
+        return float(dot(x, y)) + acc;
+    }
+}
 
 //
 // Shader Model 6.5
@@ -16917,23 +17054,33 @@ interface __BuiltinSamplerFeedbackType {};
 [sealed]
 __magic_type(FeedbackType, $(int(FeedbackType::Kind::MinMip)))
 __target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIN_MIP)
-struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType {};
+struct SAMPLER_FEEDBACK_MIN_MIP : __BuiltinSamplerFeedbackType, ITexelElement {
+    typealias Element = float;
+    static const int elementCount = 1;
+    __intrinsic_op(0) __init(float x){}
+};
 
 /// @category texture_types
 [sealed]
 __magic_type(FeedbackType, $(int(FeedbackType::Kind::MipRegionUsed)))
 __target_intrinsic(hlsl, SAMPLER_FEEDBACK_MIP_REGION_USED)
-struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType {};
+struct SAMPLER_FEEDBACK_MIP_REGION_USED : __BuiltinSamplerFeedbackType, ITexelElement
+{
+    typealias Element = float;
+    static const int elementCount = 1;
+    __intrinsic_op(0) __init(float x){}
+};
 
 // All of these objects are write-only resources that point to a special kind of unordered access view meant for sampler feedback.
 
-__generic<T:__BuiltinSamplerFeedbackType>
-extension _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback), 0, 0, 0>
+extension<T> _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback), 0, 0, 0>
+    where T:ITexelElement
+    where T:__BuiltinSamplerFeedbackType
 {
     // With Clamp
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedback<S>(Texture2D<S> tex, SamplerState samp, float2 location, float clamp)
+    void WriteSamplerFeedback<S:ITexelElement>(Texture2D<S> tex, SamplerState samp, float2 location, float clamp)
     {
         __target_switch
         {
@@ -16943,7 +17090,7 @@ extension _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback), 
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackBias<S>(Texture2D<S> tex, SamplerState samp, float2 location, float bias, float clamp)
+    void WriteSamplerFeedbackBias<S:ITexelElement>(Texture2D<S> tex, SamplerState samp, float2 location, float bias, float clamp)
     {
         __target_switch
         {
@@ -16953,7 +17100,7 @@ extension _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback), 
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackGrad<S>(Texture2D<S> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy, float clamp)
+    void WriteSamplerFeedbackGrad<S:ITexelElement>(Texture2D<S> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy, float clamp)
     {
         __target_switch
         {
@@ -16965,7 +17112,7 @@ extension _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback), 
     // Level
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackLevel<S>(Texture2D<S> tex, SamplerState samp, float2 location, float lod)
+    void WriteSamplerFeedbackLevel<S:ITexelElement>(Texture2D<S> tex, SamplerState samp, float2 location, float lod)
     {
         __target_switch
         {
@@ -16977,7 +17124,7 @@ extension _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback), 
     // Without Clamp
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedback<S>(Texture2D<S> tex, SamplerState samp, float2 location)
+    void WriteSamplerFeedback<S:ITexelElement>(Texture2D<S> tex, SamplerState samp, float2 location)
     {
         __target_switch
         {
@@ -16987,7 +17134,7 @@ extension _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback), 
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackBias<S>(Texture2D<S> tex, SamplerState samp, float2 location, float bias)
+    void WriteSamplerFeedbackBias<S:ITexelElement>(Texture2D<S> tex, SamplerState samp, float2 location, float bias)
     {
         __target_switch
         {
@@ -16997,7 +17144,7 @@ extension _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback), 
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackGrad<S>(Texture2D<S> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy)
+    void WriteSamplerFeedbackGrad<S:ITexelElement>(Texture2D<S> tex, SamplerState samp, float2 location, float2 ddx, float2 ddy)
     {
         __target_switch
         {
@@ -17007,13 +17154,14 @@ extension _Texture<T,__Shape2D, 0, 0, 0, $(kCoreModule_ResourceAccessFeedback), 
     }
 };
 
-__generic<T:__BuiltinSamplerFeedbackType>
-extension _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback), 0, 0, 0>
+extension<T> _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback), 0, 0, 0>
+    where T:__BuiltinSamplerFeedbackType
+    where T:ITexelElement
 {
     // With Clamp
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedback<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float clamp)
+    void WriteSamplerFeedback<S:ITexelElement>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float clamp)
     {
         __target_switch
         {
@@ -17023,7 +17171,7 @@ extension _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback), 
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackBias<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float bias, float clamp)
+    void WriteSamplerFeedbackBias<S:ITexelElement>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float bias, float clamp)
     {
         __target_switch
         {
@@ -17033,7 +17181,7 @@ extension _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback), 
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackGrad<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy, float clamp)
+    void WriteSamplerFeedbackGrad<S:ITexelElement>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy, float clamp)
     {
         __target_switch
         {
@@ -17045,7 +17193,7 @@ extension _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback), 
     // Level
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackLevel<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float lod)
+    void WriteSamplerFeedbackLevel<S:ITexelElement>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float lod)
     {
         __target_switch
         {
@@ -17057,7 +17205,7 @@ extension _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback), 
     // Without Clamp
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedback<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location)
+    void WriteSamplerFeedback<S:ITexelElement>(Texture2DArray<S> texArray, SamplerState samp, float3 location)
     {
         __target_switch
         {
@@ -17067,7 +17215,7 @@ extension _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback), 
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackBias<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float bias)
+    void WriteSamplerFeedbackBias<S:ITexelElement>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float bias)
     {
         __target_switch
         {
@@ -17077,7 +17225,7 @@ extension _Texture<T,__Shape2D, 1, 0, 0, $(kCoreModule_ResourceAccessFeedback), 
     }
 
     [require(cpp_hlsl)]
-    void WriteSamplerFeedbackGrad<S>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy)
+    void WriteSamplerFeedbackGrad<S:ITexelElement>(Texture2DArray<S> texArray, SamplerState samp, float3 location, float3 ddx, float3 ddy)
     {
         __target_switch
         {
@@ -20022,10 +20170,10 @@ ${
 // for any resource type.
 }
 
-__intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
+__intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
 __intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace(SamplerState sampler);
 
-__intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex<T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
+__intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
 __intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex(SamplerState sampler);
 
 //@public:
@@ -20215,7 +20363,7 @@ ${
 // further clutter the original type declarations.
 }
 
-__generic<T, Shape: __ITextureShape, let sampleCount:int, let isShadow:int, let format:int>
+__generic<T:ITexelElement, Shape: __ITextureShape, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
 {
 ${
@@ -21032,7 +21180,7 @@ enum __DynamicResourceKind
     Sampler = 1
 }
 
-__generic<T, Shape : __ITextureShape, let isArray : int, let isMS : int, let sampleCount : int, let access : int, let isShadow : int, let isCombined : int, let format : int>
+__generic<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isMS : int, let sampleCount : int, let access : int, let isShadow : int, let isCombined : int, let format : int>
 extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCombined, format> : __IDynamicResourceCastable<__DynamicResourceKind.General>
 {
     __intrinsic_op($(kIROp_CastDynamicResource))

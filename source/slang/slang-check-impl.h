@@ -1068,6 +1068,15 @@ public:
 
     Decl* getDeclToExcludeFromLookup() { return m_declToExcludeFromLookup; }
 
+    SemanticsContext excludeTransparentMembersFromLookup()
+    {
+        SemanticsContext result(*this);
+        result.m_excludeTransparentMembersFromLookup = true;
+        return result;
+    }
+
+    bool getExcludeTransparentMembersFromLookup() { return m_excludeTransparentMembersFromLookup; }
+
     OrderedHashSet<Type*>* getCapturedTypePacks() { return m_capturedTypePacks; }
 
     GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker()
@@ -1083,6 +1092,8 @@ private:
     ExprLocalScope* m_exprLocalScope = nullptr;
 
     Decl* m_declToExcludeFromLookup = nullptr;
+
+    bool m_excludeTransparentMembersFromLookup = false;
 
 protected:
     // TODO: consider making more of this state `private`...

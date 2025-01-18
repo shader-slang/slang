@@ -466,10 +466,14 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             if (constraintDeclRef.getDecl()->checkState.isBeingChecked())
                 continue;
 
-            ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::CanSpecializeGeneric);
+            ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::ScopesWired);
 
-            auto subType = getSub(astBuilder, constraintDeclRef);
-            auto superType = getSup(astBuilder, constraintDeclRef);
+            // Check only the sub-type.
+            visitor.CheckConstraintSubType(constraintDeclRef.getDecl()->sub);
+            auto sub = constraintDeclRef.getDecl()->sub;
+            if (!sub.type)
+                sub = visitor.TranslateTypeNodeForced(sub);
+            auto subType = constraintDeclRef.substitute(astBuilder, sub.type);
 
             // We only consider constraints where the type represented
             // by `declRef` is the subtype, since those
@@ -488,6 +492,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             }
             if (subDeclRefType->getDeclRef() != declRef)
                 continue;
+
+            // Further check the constraint, since we now need the sup-type.
+            ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::CanSpecializeGeneric);
+
+            auto superType = getSup(astBuilder, constraintDeclRef);
 
             // Because the constraint is a declared inheritance relationship,
             // adding the base to our list of direct bases is as straightforward
@@ -1148,6 +1157,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         InheritanceInfo info;
         info.facets = FacetList(directFacet);
         return info;
+    }
+    else if (auto modifiedType = as<ModifiedType>(type))
+    {
+        return _calcInheritanceInfo(modifiedType->getBase(), circularityInfo);
     }
     else
     {

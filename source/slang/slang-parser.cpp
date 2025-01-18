@@ -1802,9 +1802,17 @@ public:
 /// Parse an optional body statement for a declaration that can have a body.
 static Stmt* parseOptBody(Parser* parser)
 {
-    if (AdvanceIf(parser, TokenType::Semicolon))
+    Token semiColonToken;
+    if (AdvanceIf(parser, TokenType::Semicolon, &semiColonToken))
     {
         // empty body
+        // if we see a `{` after a `;`, it is very likely an user error to
+        // have the `;`, so we will provide a better diagnostic for it.
+        if (peekTokenType(parser) == TokenType::LBrace)
+        {
+            parser->sink->diagnose(semiColonToken.loc, Diagnostics::unexpectedBodyAfterSemicolon);
+            return parser->parseBlockStatement();
+        }
         return nullptr;
     }
     else
@@ -3932,28 +3940,38 @@ static void parseStorageDeclBody(Parser* parser, ContainerDecl* decl)
 
 static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
 {
-    SubscriptDecl* decl = parser->astBuilder->create<SubscriptDecl>();
-    parser->FillPosition(decl);
-    parser->PushScope(decl);
+    return parseOptGenericDecl(
+        parser,
+        [&](GenericDecl* genericParent)
+        {
+            SubscriptDecl* decl = parser->astBuilder->create<SubscriptDecl>();
+            parser->FillPosition(decl);
+            parser->PushScope(decl);
 
-    // TODO: the use of this name here is a bit magical...
-    decl->nameAndLoc.name = getName(parser, "operator[]");
+            // TODO: the use of this name here is a bit magical...
+            decl->nameAndLoc.name = getName(parser, "operator[]");
 
-    parseParameterList(parser, decl);
+            parseParameterList(parser, decl);
 
-    if (AdvanceIf(parser, TokenType::RightArrow))
-    {
-        decl->returnType = parser->ParseTypeExp();
-    }
-    else
-    {
-        decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
-    }
+            if (AdvanceIf(parser, TokenType::RightArrow))
+            {
+                decl->returnType = parser->ParseTypeExp();
+            }
+            else
+            {
+                decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
+            }
 
-    parseStorageDeclBody(parser, decl);
+            auto funcScope = parser->currentScope;
+            parser->PopScope();
+            maybeParseGenericConstraints(parser, genericParent);
+            parser->PushScope(funcScope);
 
-    parser->PopScope();
-    return decl;
+            parseStorageDeclBody(parser, decl);
+
+            parser->PopScope();
+            return decl;
+        });
 }
 
 /// Peek in the token stream and return `true` if it looks like a modern-style variable declaration
@@ -4831,6 +4849,13 @@ static DeclBase* ParseDeclWithModifiers(
             // We shouldn't be seeing an LBrace or an LParent when expecting a decl.
             // However recovery logic may lead us here. In this case we just
             // skip the whole `{}` block and return an empty decl.
+            if (!parser->isRecovering)
+            {
+                parser->sink->diagnose(
+                    loc,
+                    Diagnostics::unexpectedToken,
+                    parser->tokenReader.peekToken());
+            }
             SkipBalancedToken(&parser->tokenReader);
             decl = parser->astBuilder->create<EmptyDecl>();
             decl->loc = loc;
