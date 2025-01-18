@@ -15,12 +15,12 @@ RWByteAddressBuffer iBuf;
 //TEST_INPUT: Sampler:name samplerState
 SamplerState samplerState;
 
-__generic<T : __BuiltinArithmeticType, let N:int>
-bool TEST_texture(
-    Texture2D<vector<T,N>> t2D,
-    Texture2DMS<vector<T,N>> t2DMS)
+bool TEST_texture<T>(
+    Texture2D<T> t2D,
+    Texture2DMS<T> t2DMS)
+    where T : ITexelElement, IArithmetic
 {
-    typealias TN = vector<T,N>;
+    typealias TN = T;
     constexpr const int2 offset = int2(0, 0);
     uint status;
     float clamp = 0;
