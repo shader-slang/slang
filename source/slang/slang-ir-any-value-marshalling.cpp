@@ -426,7 +426,7 @@ struct AnyValueMarshallingContext
                             uintPtrType,
                             anyValueVar,
                             anyValInfo->fieldKeys[fieldOffset]);
-                        builder->emitStore(dstAddr, lowBits);
+                        builder->emitStore(dstAddr, highBits);
                         fieldOffset++;
                     }
                 }
