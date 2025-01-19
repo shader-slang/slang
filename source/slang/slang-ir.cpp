@@ -4598,6 +4598,15 @@ IRGlobalParam* IRBuilder::createGlobalParam(IRType* valueType)
     return inst;
 }
 
+IRGlobalParam* IRBuilder::createGlobalParam(IRType* valueType, IRFunc* entryPointFunc)
+{
+    IRGlobalParam* inst =
+        createInst<IRGlobalParam>(this, kIROp_GlobalParam, valueType, entryPointFunc);
+    _maybeSetSourceLoc(inst);
+    addGlobalValue(this, inst);
+    return inst;
+}
+
 IRWitnessTable* IRBuilder::createWitnessTable(IRType* baseType, IRType* subType)
 {
     IRWitnessTable* witnessTable = createInst<IRWitnessTable>(

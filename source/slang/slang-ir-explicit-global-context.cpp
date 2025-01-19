@@ -452,6 +452,11 @@ struct IntroduceExplicitGlobalContextPass
         List<GlobalParamInfo> entryPointParams;
         for (auto globalParam : m_globalParams)
         {
+            // Do not add global params that explcitly originate from a different entry point.
+            if (globalParam->getOriginatingEntryPoint() &&
+                globalParam->getOriginatingEntryPoint() != entryPointFunc)
+                continue;
+
             auto entryPointParam = builder.createParam(globalParam->getFullType());
             IRCloneEnv cloneEnv;
             cloneInstDecorationsAndChildren(&cloneEnv, m_module, globalParam, entryPointParam);

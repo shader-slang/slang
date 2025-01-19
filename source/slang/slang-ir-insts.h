@@ -2842,6 +2842,14 @@ struct IRGlobalVar : IRGlobalValueWithCode
 struct IRGlobalParam : IRInst
 {
     IR_LEAF_ISA(GlobalParam)
+
+    /// Get the entry point if this global param originates from an entry point parameter,
+    /// or null if it originates from the global space. It is allowed to pass non-varying inputs
+    /// through entry point parameters.
+    IRFunc* getOriginatingEntryPoint()
+    {
+        return getOperandCount() != 0 ? cast<IRFunc>(getOperand(0)) : nullptr;
+    }
 };
 
 /// @brief A global constnat.
@@ -4150,6 +4158,7 @@ public:
     IRGlobalVar* createGlobalVar(IRType* valueType);
     IRGlobalVar* createGlobalVar(IRType* valueType, AddressSpace addressSpace);
     IRGlobalParam* createGlobalParam(IRType* valueType);
+    IRGlobalParam* createGlobalParam(IRType* valueType, IRFunc* entryPointFunc);
 
     /// Creates an IRWitnessTable value.
     /// @param baseType: The comformant-to type of this witness.
