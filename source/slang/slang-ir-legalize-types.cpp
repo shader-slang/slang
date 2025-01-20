@@ -2752,7 +2752,7 @@ static LegalVal declareSimpleVar(
 
     case kIROp_GlobalParam:
         {
-            IRGlobalParam* globalParam = builder->createGlobalParam(type);
+            auto globalParam = builder->createGlobalParam(type);
             globalParam->removeFromParent();
             globalParam->insertBefore(context->insertBeforeGlobal);
 
