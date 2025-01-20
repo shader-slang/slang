@@ -494,19 +494,27 @@ struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
             // for CPU/CUDA) that might want to treat entry-point parameters
             // different from other cases.
             //
-            // TODO: Once we have support for multiple entry points to be emitted
-            // at once, we need a way to associate these per-entry-point parameters
-            // more closely with the original entry point. The two easiest options
-            // are:
+            // We need a way to associate these per-entry-point parameters
+            // more closely with the original entry point. The two current
+            // methods are:
             //
             // 1. Don't move the new aggregate parameter to the global scope
             // on those targets, and instead keep it as a parameter of the
-            // entry point.
+            // entry point. This is used for CPU/CUDA targets.
             //
-            // 2. Use a decoration on the entry point itself to point at the
-            // global parameter for its per-entry-point parameter data.
+            // 2. Use a decoration on the global param itself to point at the
+            // entry point for its per-entry-point parameter data, without moving
+            // the parameter to the global scope. This is used for Metal targets, as
+            // Metal does not have global parameters at the global scope.
             //
-            builder->addDecoration(globalParam, kIROp_EntryPointParamDecoration);
+            // Method (1) is not used because Metal contains shading language concepts
+            // such as binding offets, similar to other shading language targets.
+            // We want to reuse code from other shading language targets for Metal, hence
+            // we move parameters to the global scope, and then move the parameters back to
+            // the entry points that they originate from. The originating entry points are
+            // tracked through this decoration.
+            //
+            builder->addEntryPointParamDecoration(globalParam, entryPointFunc);
 
             param->replaceUsesWith(globalParam);
             param->removeAndDeallocate();

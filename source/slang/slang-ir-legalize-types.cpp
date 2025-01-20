@@ -114,7 +114,7 @@ static void registerLegalizedValue(
 /// composite members during tuple flavored global param legalization.
 struct IRGlobalParamInfo
 {
-    IRGlobalParam* originalGlobalParam;
+    IREntryPointParamDecoration* entryPointParamDecoration = nullptr;
 };
 
 static LegalVal declareVars(
@@ -2752,23 +2752,22 @@ static LegalVal declareSimpleVar(
 
     case kIROp_GlobalParam:
         {
-            SLANG_ASSERT(globalParamInfo);
-            SLANG_ASSERT(globalParamInfo->originalGlobalParam);
-            const auto entryPointFunc =
-                globalParamInfo->originalGlobalParam->getOriginatingEntryPoint();
-
-            IRGlobalParam* globalParam;
-            if (entryPointFunc)
-            {
-                globalParam = builder->createGlobalParam(type, entryPointFunc);
-            }
-            else
-            {
-                globalParam = builder->createGlobalParam(type);
-            }
-
+            IRGlobalParam* globalParam = builder->createGlobalParam(type);
             globalParam->removeFromParent();
             globalParam->insertBefore(context->insertBeforeGlobal);
+
+            // Add originating entry point decoration if original global param
+            // comes from an entry point parameter. This is required in cases where the global
+            // param has to be linked back to the originating entry point, such as when
+            // emitting Metal where there global params have to be moved back to the
+            // entry point parameter.
+            SLANG_ASSERT(globalParamInfo);
+            if (globalParamInfo->entryPointParamDecoration)
+            {
+                builder->addEntryPointParamDecoration(
+                    globalParam,
+                    globalParamInfo->entryPointParamDecoration->getEntryPoint());
+            }
 
             irVar = globalParam;
             legalVarVal = LegalVal::simple(globalParam);
@@ -3699,7 +3698,11 @@ static LegalVal legalizeGlobalParam(
             LegalVarChainLink varChain(LegalVarChain(), varLayout);
 
             IRGlobalParamInfo globalParamInfo;
-            globalParamInfo.originalGlobalParam = irGlobalParam;
+            if (auto entryPointParamDecoration =
+                    irGlobalParam->findDecoration<IREntryPointParamDecoration>())
+            {
+                globalParamInfo.entryPointParamDecoration = entryPointParamDecoration;
+            }
 
             // TODO: need to handle initializer here!
 

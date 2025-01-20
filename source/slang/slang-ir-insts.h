@@ -812,6 +812,14 @@ struct IRKnownBuiltinDecoration : IRDecoration
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
 };
 
+struct IREntryPointParamDecoration : IRDecoration
+{
+    IR_LEAF_ISA(EntryPointParamDecoration)
+
+    /// Get the entry point that this parameter orignates from.
+    IRFunc* getEntryPoint() { return cast<IRFunc>(getOperand(0)); }
+};
+
 struct IRFormatDecoration : IRDecoration
 {
     enum
@@ -2842,14 +2850,6 @@ struct IRGlobalVar : IRGlobalValueWithCode
 struct IRGlobalParam : IRInst
 {
     IR_LEAF_ISA(GlobalParam)
-
-    /// Get the entry point if this global param originates from an entry point parameter,
-    /// or null if it originates from the global space. It is allowed to pass non-varying inputs
-    /// through entry point parameters.
-    IRFunc* getOriginatingEntryPoint()
-    {
-        return getOperandCount() != 0 ? cast<IRFunc>(getOperand(0)) : nullptr;
-    }
 };
 
 /// @brief A global constnat.
@@ -5234,6 +5234,11 @@ public:
     void addCheckpointIntermediateDecoration(IRInst* inst, IRGlobalValueWithCode* func)
     {
         addDecoration(inst, kIROp_CheckpointIntermediateDecoration, func);
+    }
+
+    void addEntryPointParamDecoration(IRInst* inst, IRFunc* entryPointFunc)
+    {
+        addDecoration(inst, kIROp_EntryPointParamDecoration, entryPointFunc);
     }
 };
 
