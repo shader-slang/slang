@@ -39,6 +39,7 @@ namespace Slang
 struct MoveGlobalVarInitializationToEntryPointsPass
 {
     IRModule* m_module;
+    TargetProgram* m_targetProgram;
 
     // In the Slang IR, a global variable represents a pointer
     // to the storage for the variable but it *also* encodes
@@ -66,9 +67,10 @@ struct MoveGlobalVarInitializationToEntryPointsPass
     };
     List<GlobalVarInfo> m_globalVarsWithInit;
 
-    void processModule(IRModule* module)
+    void processModule(IRModule* module, TargetProgram* targetProgram)
     {
         m_module = module;
+        m_targetProgram = targetProgram;
 
         // We start by looking for global variables with
         // initialization logic in the IR, and processing
@@ -113,8 +115,32 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         }
     }
 
+    bool shouldMoveGlobalVarInitialization(IRGlobalVar* globalVar)
+    {
+        // Currently CoopVector for DXC cannot be created from
+        // constructors with arguments. When CoopVector is used as a
+        // global variable, its initialization has to happen at the
+        // beginning of the entry point.
+        //
+        // At the same time, we don't want to apply
+        // "moveGlobalVarInitializationToEntryPoints" to the rest of
+        // the global variables when targeting HLSL.
+        //
+        if (isD3DTarget(m_targetProgram->getTargetReq()))
+        {
+            auto valueType = globalVar->getDataType()->getValueType();
+            if (as<IRCoopVectorType>(valueType))
+                return true;
+            return false;
+        }
+        return true;
+    }
+
     void processGlobalVarWithInit(IRGlobalVar* globalVar, IRBlock* firstBlock)
     {
+        if (!shouldMoveGlobalVarInitialization(globalVar))
+            return;
+
         IRBuilder builder(m_module);
         builder.setInsertBefore(globalVar);
 
@@ -216,10 +242,10 @@ struct MoveGlobalVarInitializationToEntryPointsPass
 };
 
 /// Move initialization logic off of global variables and onto each entry point
-void moveGlobalVarInitializationToEntryPoints(IRModule* module)
+void moveGlobalVarInitializationToEntryPoints(IRModule* module, TargetProgram* targetProgram)
 {
     MoveGlobalVarInitializationToEntryPointsPass pass;
-    pass.processModule(module);
+    pass.processModule(module, targetProgram);
 }
 
 } // namespace Slang

@@ -234,6 +234,7 @@ INST(Nop, nop, 0, 0)
 
 INST(RayQueryType, RayQuery, 1, HOISTABLE)
 INST(HitObjectType, HitObject, 0, HOISTABLE)
+INST(CoopVectorType, CoopVectorType, 2, HOISTABLE)
 
 // Opaque type that can be dynamically cast to other resource types.
 INST(DynamicResourceType, DynamicResource, 0, HOISTABLE)
@@ -363,6 +364,8 @@ INST(MatrixReshape, matrixReshape, 1, 0)
 INST(VectorReshape, vectorReshape, 1, 0)
 INST(MakeArray, makeArray, 0, 0)
 INST(MakeArrayFromElement, makeArrayFromElement, 1, 0)
+INST(MakeCoopVector, makeCoopVector, 0, 0)
+INST(MakeCoopVectorFromValuePack, makeCoopVectorFromValuePack, 1, 0)
 INST(MakeStruct, makeStruct, 0, 0)
 INST(MakeTuple, makeTuple, 0, 0)
 INST(MakeTargetTuple, makeTuple, 0, 0)
@@ -1249,6 +1252,11 @@ INST(CudaKernelLaunch, CudaKernelLaunch, 6, 0)
 
 // Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer
 INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)
+
+// Gets a T[] pointer to the underlying data of a StructuredBuffer etc...
+INST(GetStructuredBufferPtr,     getStructuredBufferPtr, 1, 0)
+// Gets a uint[] pointer to the underlying data of a ByteAddressBuffer etc...
+INST(GetUntypedBufferPtr,     getUntypedBufferPtr, 1, 0)
 
 /* Layout */
     INST(VarLayout, varLayout, 1, HOISTABLE)

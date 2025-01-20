@@ -475,6 +475,17 @@ class AtomicType : public DeclRefType
     Type* getElementType();
 };
 
+class CoopVectorExpressionType : public ArithmeticExpressionType
+{
+    SLANG_AST_CLASS(CoopVectorExpressionType)
+
+    void _toTextOverride(StringBuilder& out);
+    BasicExpressionType* _getScalarTypeOverride();
+
+    Type* getElementType();
+    IntVal* getElementCount();
+};
+
 // The "type" of an expression that resolves to a type.
 // For example, in the expression `float(2)` the sub-expression,
 // `float` would have the type `TypeType(float)`.

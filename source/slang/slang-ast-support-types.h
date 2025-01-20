@@ -170,6 +170,11 @@ enum : ConversionCost
     kConversionCost_ScalarIntegerToFloatMatrix =
         kConversionCost_IntegerToFloatConversion + kConversionCost_ScalarToMatrix,
 
+    // Additional conversion cost to add when promoting from a scalar to
+    // a CoopVector (this will be added to the cost, if any, of converting
+    // the element type of the CoopVector)
+    kConversionCost_ScalarToCoopVector = 1,
+
     // Additional cost when casting an LValue.
     kConversionCost_LValueCast = 800,
 

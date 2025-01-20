@@ -871,6 +871,7 @@ String GetHLSLProfileName(Profile profile)
         CASE(DX_6_5, _6_5);
         CASE(DX_6_6, _6_6);
         CASE(DX_6_7, _6_7);
+        CASE(DX_6_8, _6_8);
 #undef CASE
 
     default:

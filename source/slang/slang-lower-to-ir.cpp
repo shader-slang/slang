@@ -4852,6 +4852,29 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeMatrix(irType, args.getCount(), args.getBuffer()));
         }
+        else if (auto coopVecType = as<CoopVectorExpressionType>(type))
+        {
+            UInt elementCount = (UInt)getIntVal(coopVecType->getElementCount());
+
+            for (UInt ee = 0; ee < argCount; ++ee)
+            {
+                auto argExpr = expr->args[ee];
+                LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
+                args.add(getSimpleVal(context, argVal));
+            }
+            if (elementCount > argCount)
+            {
+                auto irDefaultValue =
+                    getSimpleVal(context, getDefaultVal(coopVecType->getElementType()));
+                for (UInt ee = argCount; ee < elementCount; ++ee)
+                {
+                    args.add(irDefaultValue);
+                }
+            }
+
+            return LoweredValInfo::simple(
+                getBuilder()->emitMakeCoopVector(irType, args.getCount(), args.getBuffer()));
+        }
         else if (auto declRefType = as<DeclRefType>(type))
         {
             DeclRef<Decl> declRef = declRefType->getDeclRef();
