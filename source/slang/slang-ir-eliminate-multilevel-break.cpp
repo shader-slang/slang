@@ -5,6 +5,7 @@
 #include "slang-ir-dominators.h"
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -475,6 +476,8 @@ struct EliminateMultiLevelBreakContext
                 }
             }
         }
+
+        legalizeDefUse(func);
     }
 };
 
