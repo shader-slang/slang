@@ -551,7 +551,7 @@ static SlangResult _parseGCCFamilyLine(
         }
     case OptimizationLevel::Maximal:
         {
-            cmdLine.addArg("-O4");
+            cmdLine.addArg("-O3");
             break;
         }
     default:
