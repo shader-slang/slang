@@ -485,7 +485,7 @@ struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
             auto paramType = param->getFullType();
 
             builder->setInsertBefore(entryPointFunc);
-            auto globalParam = builder->createGlobalParam(paramType, entryPointFunc);
+            auto globalParam = builder->createGlobalParam(paramType);
 
             param->transferDecorationsTo(globalParam);
 

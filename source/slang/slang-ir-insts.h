@@ -4158,7 +4158,6 @@ public:
     IRGlobalVar* createGlobalVar(IRType* valueType);
     IRGlobalVar* createGlobalVar(IRType* valueType, AddressSpace addressSpace);
     IRGlobalParam* createGlobalParam(IRType* valueType);
-    IRGlobalParam* createGlobalParam(IRType* valueType, IRFunc* entryPointFunc);
 
     /// Creates an IRWitnessTable value.
     /// @param baseType: The comformant-to type of this witness.
