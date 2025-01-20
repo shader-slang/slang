@@ -1933,7 +1933,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         SpirvAddressSpaceAssigner addressSpaceAssigner;
         specializeAddressSpace(m_module, &addressSpaceAssigner);
 
-        validateAtomicOperations(m_sink, m_module->getModuleInst());
+        // For SPIR-V, we don't skip this validation, because we might then be generating invalid SPIR-V.
+        bool skipFuncParamValidation = false;
+        validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
     }
 
     void updateFunctionTypes()

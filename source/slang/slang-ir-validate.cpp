@@ -412,7 +412,7 @@ void validateIRModuleIfEnabled(CodeGenContext* codeGenContext, IRModule* module)
 
 // Returns whether 'dst' is a valid destination for atomic operations, meaning
 // it leads either to 'groupshared' or 'device buffer' memory.
-static bool isValidAtomicDest(IRInst* dst)
+static bool isValidAtomicDest(bool skipFuncParamValidation, IRInst* dst)
 {
     bool isGroupShared = as<IRGroupSharedRate>(dst->getRate());
     if (isGroupShared)
@@ -450,20 +450,33 @@ static bool isValidAtomicDest(IRInst* dst)
     }
 
     if (auto param = as<IRParam>(dst))
-        if (auto outType = as<IROutTypeBase>(param->getDataType()))
+    {
+        auto paramType = param->getDataType();
+        if (auto outType = as<IROutTypeBase>(paramType))
+        {
             if (outType->getAddressSpace() == AddressSpace::GroupShared)
+            {
                 return true;
+            }
+            else if (skipFuncParamValidation)
+            {
+                // We haven't actually verified that this is a valid atomic operation destination, but
+                // the callee wants to skip this specific validation.
+                return true;
+            }
+        }
+    }
     if (auto getElementPtr = as<IRGetElementPtr>(dst))
-        return isValidAtomicDest(getElementPtr->getBase());
+        return isValidAtomicDest(skipFuncParamValidation, getElementPtr->getBase());
     if (auto getOffsetPtr = as<IRGetOffsetPtr>(dst))
-        return isValidAtomicDest(getOffsetPtr->getBase());
+        return isValidAtomicDest(skipFuncParamValidation, getOffsetPtr->getBase());
     if (auto fieldAddress = as<IRFieldAddress>(dst))
-        return isValidAtomicDest(fieldAddress->getBase());
+        return isValidAtomicDest(skipFuncParamValidation, fieldAddress->getBase());
 
     return false;
 }
 
-void validateAtomicOperations(DiagnosticSink* sink, IRInst* inst)
+void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst)
 {
     // There may be unused functions containing violations after address space specialization.
     if (auto func = as<IRFunc>(inst))
@@ -487,7 +500,7 @@ void validateAtomicOperations(DiagnosticSink* sink, IRInst* inst)
     case kIROp_AtomicDec:
         {
             IRInst* destinationPtr = inst->getOperand(0);
-            if (!isValidAtomicDest(destinationPtr))
+            if (!isValidAtomicDest(skipFuncParamValidation, destinationPtr))
                 sink->diagnose(inst->sourceLoc, Diagnostics::invalidAtomicDestinationPointer);
         }
         break;
@@ -498,7 +511,7 @@ void validateAtomicOperations(DiagnosticSink* sink, IRInst* inst)
 
     for (auto child : inst->getModifiableChildren())
     {
-        validateAtomicOperations(sink, child);
+        validateAtomicOperations(skipFuncParamValidation, sink, child);
     }
 }
 

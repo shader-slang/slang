@@ -45,6 +45,8 @@ void enableIRValidationAtInsert();
 //   void atomicOp(inout int array){ InterlockedAdd(array, 1);}
 //   groupshared int gArray;
 //   [numthreads(1, 1, 1)] void main() { atomicOp(gArray); }
-void validateAtomicOperations(DiagnosticSink* sink, IRInst* inst);
+// If 'skipFuncParamValidation' is true, then the validation allows destinations that 
+// lead back to in/inout parameters that we can't validate.
+void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst);
 
 } // namespace Slang

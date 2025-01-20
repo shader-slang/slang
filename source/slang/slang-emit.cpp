@@ -1324,7 +1324,10 @@ Result linkAndOptimizeIR(
 
     // For SPIR-V, this function is called elsewhere, so that it can happen after address space specialization
     if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
-        validateAtomicOperations(sink, irModule->getModuleInst());
+    {
+        bool skipFuncParamValidation = true;
+        validateAtomicOperations(skipFuncParamValidation, sink, irModule->getModuleInst());
+    }
 
     // For CUDA targets only, we will need to turn operations
     // the implicitly reference the "active mask" into ones
