@@ -1986,4 +1986,111 @@ Int getSpecializationConstantId(IRGlobalParam* param)
     return offset->getOffset();
 }
 
+void legalizeDefUse(IRGlobalValueWithCode* func)
+{
+    auto dom = computeDominatorTree(func);
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getModifiableChildren())
+        {
+            // Inspect all uses of `inst` and find the common dominator of all use sites.
+            IRBlock* commonDominator = block;
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                if (!userBlock)
+                    continue;
+                while (commonDominator && !dom->dominates(commonDominator, userBlock))
+                {
+                    commonDominator = dom->getImmediateDominator(commonDominator);
+                }
+            }
+            SLANG_ASSERT(commonDominator);
+
+            if (commonDominator == block)
+                continue;
+
+            // If the common dominator is not `block`, it means we have detected
+            // uses that is no longer dominated by the current definition, and need
+            // to be fixed.
+
+            // Normally, we can simply move the definition to the common dominator.
+            // An exception is when the common dominator is the target block of a
+            // loop. Note that after normalization, loops are in the form of:
+            // ```
+            // loop { if (condition) block; else break; }
+            // ```
+            // If we find ourselves needing to make the inst available right before
+            // the `if`, it means we are seeing uses of the inst outside the loop.
+            // In this case, we should insert a var/move the inst before the loop
+            // instead of before the `if`. This situation can occur in the IR if
+            // the original code is lowered from a `do-while` loop.
+            for (auto use = commonDominator->firstUse; use; use = use->nextUse)
+            {
+                if (auto loopUser = as<IRLoop>(use->getUser()))
+                {
+                    if (loopUser->getTargetBlock() == commonDominator)
+                    {
+                        bool shouldMoveToHeader = false;
+                        // Check that the break-block dominates any of the uses are past the break
+                        // block
+                        for (auto _use = inst->firstUse; _use; _use = _use->nextUse)
+                        {
+                            if (dom->dominates(
+                                    loopUser->getBreakBlock(),
+                                    _use->getUser()->getParent()))
+                            {
+                                shouldMoveToHeader = true;
+                                break;
+                            }
+                        }
+
+                        if (shouldMoveToHeader)
+                            commonDominator = as<IRBlock>(loopUser->getParent());
+                        break;
+                    }
+                }
+            }
+            // Now we can legalize uses based on the type of `inst`.
+            if (auto var = as<IRVar>(inst))
+            {
+                // If inst is an var, this is easy, we just move it to the
+                // common dominator.
+                var->insertBefore(commonDominator->getTerminator());
+            }
+            else
+            {
+                // For all other insts, we need to create a local var for it,
+                // and replace all uses with a load from the local var.
+                IRBuilder builder(func);
+                builder.setInsertBefore(commonDominator->getTerminator());
+                IRVar* tempVar = builder.emitVar(inst->getFullType());
+                auto defaultVal = builder.emitDefaultConstruct(inst->getFullType());
+                builder.emitStore(tempVar, defaultVal);
+
+                builder.setInsertAfter(inst);
+                builder.emitStore(tempVar, inst);
+
+                traverseUses(
+                    inst,
+                    [&](IRUse* use)
+                    {
+                        auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                        if (!userBlock)
+                            return;
+                        // Only fix the use of the current definition of `inst` does not
+                        // dominate it.
+                        if (!dom->dominates(block, userBlock))
+                        {
+                            // Replace the use with a load of tempVar.
+                            builder.setInsertBefore(use->getUser());
+                            auto load = builder.emitLoad(tempVar);
+                            builder.replaceOperand(use, load);
+                        }
+                    });
+            }
+        }
+    }
+}
+
 } // namespace Slang
