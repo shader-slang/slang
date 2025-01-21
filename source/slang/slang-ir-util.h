@@ -375,6 +375,8 @@ IRType* getIRVectorBaseType(IRType* type);
 
 Int getSpecializationConstantId(IRGlobalParam* param);
 
+void legalizeDefUse(IRGlobalValueWithCode* func);
+
 } // namespace Slang
 
 #endif
