@@ -4958,21 +4958,6 @@ void CLikeSourceEmitter::ensureInstOperand(
     }
 }
 
-// Returns true if operands of the instruction are 'view' only and will not be emitted, hence it is
-// safe to skip them during `ensureInstOperands*`.
-static bool areOperandsViewOnly(IRInst* inst)
-{
-    switch (inst->getOp())
-    {
-    case kIROp_EntryPointParamDecoration:
-        // Entry point func reference is used to know where the global param originates from and is
-        // not emitted.
-        return true;
-    default:
-        return false;
-    }
-}
-
 void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, IRInst* inst)
 {
     ensureInstOperand(ctx, inst->getFullType());
@@ -5026,21 +5011,18 @@ void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, I
         requiredLevel = EmitAction::ForwardDeclaration;
     }
 
-    if (!areOperandsViewOnly(inst))
+    for (UInt ii = 0; ii < operandCount; ++ii)
     {
-        for (UInt ii = 0; ii < operandCount; ++ii)
-        {
-            // TODO: there are some special cases we can add here,
-            // to avoid outputting full definitions in cases that
-            // can get by with forward declarations.
-            //
-            // For example, true pointer types should (in principle)
-            // only need the type they point to to be forward-declared.
-            // Similarly, a `call` instruction only needs the callee
-            // to be forward-declared, etc.
+        // TODO: there are some special cases we can add here,
+        // to avoid outputting full definitions in cases that
+        // can get by with forward declarations.
+        //
+        // For example, true pointer types should (in principle)
+        // only need the type they point to to be forward-declared.
+        // Similarly, a `call` instruction only needs the callee
+        // to be forward-declared, etc.
 
-            ensureInstOperand(ctx, inst->getOperand(ii), requiredLevel);
-        }
+        ensureInstOperand(ctx, inst->getOperand(ii), requiredLevel);
     }
 
     for (auto child : inst->getDecorationsAndChildren())
