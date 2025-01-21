@@ -2175,7 +2175,7 @@ void SemanticsVisitor::AddTypeOverloadCandidates(Type* type, OverloadResolveCont
         type,
         context.sourceScope,
         LookupMask::Default,
-        LookupOptions::NoDeref);
+        LookupOptions::IgnoreInheritance);
 
     AddOverloadCandidates(initializers, context);
 }
