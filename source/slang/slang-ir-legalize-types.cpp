@@ -114,7 +114,7 @@ static void registerLegalizedValue(
 /// composite members during tuple flavored global param legalization.
 struct IRGlobalParamInfo
 {
-    IREntryPointParamDecoration* entryPointParamDecoration = nullptr;
+    IRFunc* originatingEntryPoint = nullptr;
 };
 
 static LegalVal declareVars(
@@ -2762,11 +2762,11 @@ static LegalVal declareSimpleVar(
             // emitting Metal where there global params have to be moved back to the
             // entry point parameter.
             SLANG_ASSERT(globalParamInfo);
-            if (globalParamInfo->entryPointParamDecoration)
+            if (globalParamInfo->originatingEntryPoint)
             {
                 builder->addEntryPointParamDecoration(
                     globalParam,
-                    globalParamInfo->entryPointParamDecoration->getEntryPoint());
+                    globalParamInfo->originatingEntryPoint);
             }
 
             irVar = globalParam;
@@ -3701,7 +3701,7 @@ static LegalVal legalizeGlobalParam(
             if (auto entryPointParamDecoration =
                     irGlobalParam->findDecoration<IREntryPointParamDecoration>())
             {
-                globalParamInfo.entryPointParamDecoration = entryPointParamDecoration;
+                globalParamInfo.originatingEntryPoint = entryPointParamDecoration->getEntryPoint();
             }
 
             // TODO: need to handle initializer here!

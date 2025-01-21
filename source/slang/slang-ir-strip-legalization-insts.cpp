@@ -17,13 +17,16 @@ void stripLegalizationOnlyInstructions(IRModule* module)
         case kIROp_GenericSpecializationDictionary:
         case kIROp_ExistentialFuncSpecializationDictionary:
         case kIROp_ExistentialTypeSpecializationDictionary:
+            {
+                inst->removeAndDeallocate();
+                break;
+            }
 
         // Remove global param entry point param decoration.
         case kIROp_GlobalParam:
             {
-                auto entryPointParamDecoration =
-                    inst->findDecoration<IREntryPointParamDecoration>();
-                if (entryPointParamDecoration)
+                if (const auto entryPointParamDecoration =
+                        inst->findDecoration<IREntryPointParamDecoration>())
                     entryPointParamDecoration->removeAndDeallocate();
                 break;
             }
