@@ -436,7 +436,7 @@ static void _lookupMembersInSuperTypeFacets(
             continue;
         }
 
-        auto extensionFacet = as<ExtensionDecl>(facet.getImpl()->getDeclRef().getDecl());
+
         // If we are looking up in an interface, and the lookup request told us
         // to skip interfaces, we should do so here.
         if (auto baseInterfaceDeclRef = containerDeclRef.as<InterfaceDecl>())
@@ -448,10 +448,22 @@ static void _lookupMembersInSuperTypeFacets(
         // "Self"
         else if (
             int(request.options) & int(LookupOptions::IgnoreInheritance) &&
-            (facet.getImpl()->directness != Facet::Directness::Self &&
-             (!extensionFacet || !extensionFacet->targetType.type->equals(selfType))))
+            (facet.getImpl()->directness != Facet::Directness::Self))
         {
-            continue;
+            if (auto extensionDeclRef = facet.getImpl()->getDeclRef().as<ExtensionDecl>())
+            {
+                if (auto targetType = getTargetType(astBuilder, extensionDeclRef))
+                {
+                    if (!targetType->equals(selfType))
+                    {
+                        // If the extension is to the same type as the one we are looking up in, we
+                        // should include it in the lookup.
+                        continue;
+                    }
+                }
+            }
+            else
+                continue;
         }
 
         // Some things that are syntactically `InheritanceDecl`s don't actually
