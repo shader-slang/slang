@@ -175,7 +175,7 @@ void test2(float3x3 x) {}
 ```
 
 ```
-// test.py
+# test.py
 module = spy.Module.load_from_file(device, “test.slang”)
 
 module.test1([5, 6, 7]) // OK, passing a matching size array to a vector.
