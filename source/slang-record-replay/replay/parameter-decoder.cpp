@@ -71,6 +71,30 @@ size_t ParameterDecoder::decodePointer(
 size_t ParameterDecoder::decodeStruct(
     const uint8_t* buffer,
     int64_t bufferSize,
+    ValueDecoder<SlangGlobalSessionDesc>& sessionDesc)
+{
+    SLANG_RECORD_ASSERT((buffer != nullptr) && (bufferSize > 0));
+
+    if (bufferSize < (int64_t)sizeof(uint64_t))
+    {
+        return 0;
+    }
+
+    size_t readByte = 0;
+    SlangGlobalSessionDesc& desc = sessionDesc.getValue();
+    readByte = decodeUint32(buffer, bufferSize, desc.structureSize);
+    readByte += decodeUint32(buffer + readByte, bufferSize - readByte, desc.apiVersion);
+    readByte += decodeUint32(buffer + readByte, bufferSize - readByte, desc.languageVersion);
+    uint32_t val = 0;
+    readByte += decodeUint32(buffer + readByte, bufferSize - readByte, val);
+    desc.enableGLSL = (val != 0);
+
+    return readByte;
+}
+
+size_t ParameterDecoder::decodeStruct(
+    const uint8_t* buffer,
+    int64_t bufferSize,
     ValueDecoder<slang::SessionDesc>& sessionDesc)
 {
     SLANG_RECORD_ASSERT((buffer != nullptr) && (bufferSize > 0));

@@ -14,7 +14,9 @@ using namespace Slang;
 class GlobalSessionRecorder : public RefObject, public slang::IGlobalSession
 {
 public:
-    explicit GlobalSessionRecorder(slang::IGlobalSession* session);
+    explicit GlobalSessionRecorder(
+        const SlangGlobalSessionDesc* desc,
+        slang::IGlobalSession* session);
 
     SLANG_REF_OBJECT_IUNKNOWN_ADD_REF
     SLANG_REF_OBJECT_IUNKNOWN_RELEASE

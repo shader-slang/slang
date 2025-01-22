@@ -177,7 +177,7 @@ SLANG_API SlangResult slang_createGlobalSession2(
     if (SlangRecord::isRecordLayerEnabled())
     {
         SlangRecord::GlobalSessionRecorder* globalSessionRecorder =
-            new SlangRecord::GlobalSessionRecorder(globalSession.detach());
+            new SlangRecord::GlobalSessionRecorder(desc, globalSession.detach());
         Slang::ComPtr<SlangRecord::GlobalSessionRecorder> result(globalSessionRecorder);
         *outGlobalSession = result.detach();
     }

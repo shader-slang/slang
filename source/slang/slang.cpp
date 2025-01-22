@@ -407,7 +407,7 @@ const char* getBuiltinModuleNameStr(slang::BuiltinModuleName name)
     default:
         SLANG_UNEXPECTED("Unknown builtin module");
     }
-    return nullptr;
+    return result;
 }
 
 Session::BuiltinModuleInfo Session::getBuiltinModuleInfo(slang::BuiltinModuleName name)

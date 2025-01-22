@@ -82,7 +82,9 @@ slang::IGlobalSession* LanguageServerCore::getOrCreateGlobalSession()
     if (!m_session)
     {
         // Just create the global session in the regular way if there isn't one set
-        if (SLANG_FAILED(slang_createGlobalSession(SLANG_API_VERSION, m_session.writeRef())))
+        SlangGlobalSessionDesc desc = {};
+        desc.enableGLSL = true;
+        if (SLANG_FAILED(slang_createGlobalSession2(&desc, m_session.writeRef())))
         {
             return nullptr;
         }

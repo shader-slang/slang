@@ -11,7 +11,9 @@ namespace SlangRecord
 class IDecoderConsumer
 {
 public:
-    virtual void CreateGlobalSession(ObjectID outGlobalSessionId) = 0;
+    virtual void CreateGlobalSession(
+        SlangGlobalSessionDesc const& desc,
+        ObjectID outGlobalSessionId) = 0;
     virtual void IGlobalSession_createSession(
         ObjectID objectId,
         slang::SessionDesc const& desc,

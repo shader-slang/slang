@@ -54,6 +54,7 @@ size_t BlobDecoder::decode(const uint8_t* buffer, int64_t bufferSize)
     return readByte;
 }
 
+template class StructDecoder<SlangGlobalSessionDesc>;
 template class StructDecoder<slang::SessionDesc>;
 template class StructDecoder<slang::PreprocessorMacroDesc>;
 template class StructDecoder<slang::CompilerOptionEntry>;

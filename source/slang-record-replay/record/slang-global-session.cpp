@@ -8,7 +8,9 @@
 namespace SlangRecord
 {
 // constructor is called in slang_createGlobalSession
-GlobalSessionRecorder::GlobalSessionRecorder(slang::IGlobalSession* session)
+GlobalSessionRecorder::GlobalSessionRecorder(
+    const SlangGlobalSessionDesc* desc,
+    slang::IGlobalSession* session)
     : m_actualGlobalSession(session)
 {
     SLANG_RECORD_ASSERT(m_actualGlobalSession != nullptr);
@@ -24,6 +26,7 @@ GlobalSessionRecorder::GlobalSessionRecorder(slang::IGlobalSession* session)
     ParameterRecorder* recorder{};
     {
         m_recordManager->beginMethodRecord(ApiCallId::CreateGlobalSession, g_globalFunctionHandle);
+        recorder->recordStruct(*desc);
         recorder = m_recordManager->endMethodRecord();
     }
 

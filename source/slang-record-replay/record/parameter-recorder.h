@@ -40,7 +40,7 @@ public:
     {
         recordValue(reinterpret_cast<SlangRecord::AddressFormat>(value));
     }
-
+    void recordStruct(SlangGlobalSessionDesc const& desc);
     void recordStruct(slang::SessionDesc const& desc);
     void recordStruct(slang::PreprocessorMacroDesc const& desc);
     void recordStruct(slang::CompilerOptionEntry const& entry);
