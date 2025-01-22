@@ -3430,6 +3430,18 @@ public:
     SLANG_NO_THROW SlangResult SLANG_MCALL
     saveCoreModule(SlangArchiveType archiveType, ISlangBlob** outBlob) override;
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL compileBuiltinModule(
+        slang::BuiltinModuleName moduleName,
+        slang::CompileCoreModuleFlags flags) override;
+    SLANG_NO_THROW SlangResult SLANG_MCALL loadBuiltinModule(
+        slang::BuiltinModuleName moduleName,
+        const void* coreModule,
+        size_t coreModuleSizeInBytes) override;
+    SLANG_NO_THROW SlangResult SLANG_MCALL saveBuiltinModule(
+        slang::BuiltinModuleName moduleName,
+        SlangArchiveType archiveType,
+        ISlangBlob** outBlob) override;
+
     SLANG_NO_THROW SlangCapabilityID SLANG_MCALL findCapability(char const* name) override;
 
     SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerForTransition(
@@ -3470,7 +3482,8 @@ public:
     Scope* coreLanguageScope = nullptr;
     Scope* hlslLanguageScope = nullptr;
     Scope* slangLanguageScope = nullptr;
-    Scope* autodiffLanguageScope = nullptr;
+    Scope* glslLanguageScope = nullptr;
+    Name* glslModuleName = nullptr;
 
     ModuleDecl* baseModuleDecl = nullptr;
     List<RefPtr<Module>> coreModules;
@@ -3543,11 +3556,17 @@ public:
     /// Get the built in linkage -> handy to get the core module from
     Linkage* getBuiltinLinkage() const { return m_builtinLinkage; }
 
+    Module* getBuiltinModule(slang::BuiltinModuleName builtinModuleName);
+
     Name* getCompletionRequestTokenName() const { return m_completionTokenName; }
 
     void init();
 
-    void addBuiltinSource(Scope* scope, String const& path, ISlangBlob* sourceBlob);
+    void addBuiltinSource(
+        Scope* scope,
+        String const& path,
+        ISlangBlob* sourceBlob,
+        Module*& outModule);
     ~Session();
 
     void addDownstreamCompileTime(double time) { m_downstreamCompileTime += time; }
@@ -3571,9 +3590,21 @@ public:
     int m_typeDictionarySize = 0;
 
 private:
+    struct BuiltinModuleInfo
+    {
+        const char* name;
+        Scope* languageScope;
+    };
+
+    BuiltinModuleInfo getBuiltinModuleInfo(slang::BuiltinModuleName name);
+
     void _initCodeGenTransitionMap();
 
-    SlangResult _readBuiltinModule(ISlangFileSystem* fileSystem, Scope* scope, String moduleName);
+    SlangResult _readBuiltinModule(
+        ISlangFileSystem* fileSystem,
+        Scope* scope,
+        String moduleName,
+        Module*& outModule);
 
     SlangResult _loadRequest(EndToEndCompileRequest* request, const void* data, size_t size);
 
@@ -3591,6 +3622,8 @@ private:
     double m_downstreamCompileTime = 0.0;
     double m_totalCompileTime = 0.0;
 };
+
+const char* getBuiltinModuleNameStr(slang::BuiltinModuleName name);
 
 void checkTranslationUnit(
     TranslationUnitRequest* translationUnit,

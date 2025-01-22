@@ -23,11 +23,12 @@ SLANG_API SlangSession* spCreateSession(const char*)
     return globalSession.detach();
 }
 
-// Attempt to load a previously compiled core module from the same file system location as the slang
-// dll. Returns SLANG_OK when the cache is sucessfully loaded. Also returns the filename to the core
-// module cache and the timestamp of current slang dll.
-SlangResult tryLoadCoreModuleFromCache(
+// Attempt to load a previously compiled builtin module from the same file system location as the
+// slang dll. Returns SLANG_OK when the cache is sucessfully loaded. Also returns the filename to
+// the builtin module cache and the timestamp of current slang dll.
+SlangResult tryLoadBuiltinModuleFromCache(
     slang::IGlobalSession* globalSession,
+    slang::BuiltinModuleName builtinModuleName,
     Slang::String& outCachePath,
     uint64_t& outTimestamp)
 {
@@ -36,7 +37,10 @@ SlangResult tryLoadCoreModuleFromCache(
     uint64_t currentLibTimestamp =
         Slang::SharedLibraryUtils::getSharedLibraryTimestamp((void*)slang_createGlobalSession);
     auto dirName = Slang::Path::getParentDirectory(fileName);
-    auto cacheFileName = Slang::Path::combine(dirName, "slang-core-module.bin");
+    auto cacheFileName = Slang::Path::combine(
+        dirName,
+        Slang::String("slang-") + Slang::getBuiltinModuleNameStr(builtinModuleName) +
+            "-module.bin");
     outTimestamp = currentLibTimestamp;
     outCachePath = cacheFileName;
     if (currentLibTimestamp == 0)
@@ -52,21 +56,24 @@ SlangResult tryLoadCoreModuleFromCache(
     auto cacheTimestamp = *(uint64_t*)(cacheData.getData());
     if (cacheTimestamp != currentLibTimestamp)
         return SLANG_FAIL;
-    SLANG_RETURN_ON_FAIL(globalSession->loadCoreModule(
+    SLANG_RETURN_ON_FAIL(globalSession->loadBuiltinModule(
+        builtinModuleName,
         (uint8_t*)cacheData.getData() + sizeof(uint64_t),
         cacheData.getSizeInBytes() - sizeof(uint64_t)));
     return SLANG_OK;
 }
 
-SlangResult trySaveCoreModuleToCache(
+SlangResult trySaveBuiltinModuleToCache(
     slang::IGlobalSession* globalSession,
+    slang::BuiltinModuleName builtinModuleName,
     const Slang::String& cacheFilename,
     uint64_t dllTimestamp)
 {
     if (dllTimestamp != 0 && cacheFilename.getLength() != 0)
     {
         Slang::ComPtr<ISlangBlob> coreModuleBlobPtr;
-        SLANG_RETURN_ON_FAIL(globalSession->saveCoreModule(
+        SLANG_RETURN_ON_FAIL(globalSession->saveBuiltinModule(
+            builtinModuleName,
             SLANG_ARCHIVE_TYPE_RIFF_LZ4,
             coreModuleBlobPtr.writeRef()));
 
@@ -85,6 +92,15 @@ SlangResult trySaveCoreModuleToCache(
 SLANG_API SlangResult
 slang_createGlobalSession(SlangInt apiVersion, slang::IGlobalSession** outGlobalSession)
 {
+    SlangGlobalSessionDesc desc = {};
+    desc.apiVersion = (uint32_t)apiVersion;
+    return slang_createGlobalSession2(&desc, outGlobalSession);
+}
+
+SLANG_API SlangResult slang_createGlobalSession2(
+    const SlangGlobalSessionDesc* desc,
+    slang::IGlobalSession** outGlobalSession)
+{
     Slang::ComPtr<slang::IGlobalSession> globalSession;
 
 #ifdef SLANG_ENABLE_IR_BREAK_ALLOC
@@ -94,7 +110,7 @@ slang_createGlobalSession(SlangInt apiVersion, slang::IGlobalSession** outGlobal
 #endif
 
     SLANG_RETURN_ON_FAIL(
-        slang_createGlobalSessionWithoutCoreModule(apiVersion, globalSession.writeRef()));
+        slang_createGlobalSessionWithoutCoreModule(desc->apiVersion, globalSession.writeRef()));
 
     // If we have the embedded core module, load from that, else compile it
     ISlangBlob* coreModuleBlob = slang_getEmbeddedCoreModule();
@@ -112,17 +128,48 @@ slang_createGlobalSession(SlangInt apiVersion, slang::IGlobalSession** outGlobal
 #if SLANG_PROFILE_CORE_MODULE_COMPILE
         auto startTime = std::chrono::high_resolution_clock::now();
 #else
-        if (tryLoadCoreModuleFromCache(globalSession, cacheFilename, dllTimestamp) != SLANG_OK)
+        if (tryLoadBuiltinModuleFromCache(
+                globalSession,
+                slang::BuiltinModuleName::Core,
+                cacheFilename,
+                dllTimestamp) != SLANG_OK)
 #endif
         {
             // Compile std lib from embeded source.
-            SLANG_RETURN_ON_FAIL(globalSession->compileCoreModule(0));
+            SLANG_RETURN_ON_FAIL(
+                globalSession->compileBuiltinModule(slang::BuiltinModuleName::Core, 0));
 #if SLANG_PROFILE_CORE_MODULE_COMPILE
             auto timeElapsed = std::chrono::high_resolution_clock::now() - startTime;
             printf("core module compilation time: %.1fms\n", timeElapsed.count() / 1000000.0);
 #endif
             // Store the compiled core module to cache file.
-            trySaveCoreModuleToCache(globalSession, cacheFilename, dllTimestamp);
+            trySaveBuiltinModuleToCache(
+                globalSession,
+                slang::BuiltinModuleName::Core,
+                cacheFilename,
+                dllTimestamp);
+        }
+    }
+
+    if (desc->enableGLSL)
+    {
+        Slang::String cacheFilename;
+        uint64_t dllTimestamp = 0;
+        if (tryLoadBuiltinModuleFromCache(
+                globalSession,
+                slang::BuiltinModuleName::GLSL,
+                cacheFilename,
+                dllTimestamp) != SLANG_OK)
+        {
+            SLANG_RETURN_ON_FAIL(
+                globalSession->compileBuiltinModule(slang::BuiltinModuleName::GLSL, 0));
+
+            // Store the compiled core module to cache file.
+            trySaveBuiltinModuleToCache(
+                globalSession,
+                slang::BuiltinModuleName::GLSL,
+                cacheFilename,
+                dllTimestamp);
         }
     }
 

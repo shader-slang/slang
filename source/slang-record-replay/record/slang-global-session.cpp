@@ -416,6 +416,70 @@ GlobalSessionRecorder::saveCoreModule(SlangArchiveType archiveType, ISlangBlob**
     return res;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::compileBuiltinModule(
+    slang::BuiltinModuleName module,
+    slang::CompileCoreModuleFlags flags)
+{
+    slangRecordLog(LogLevel::Verbose, "%p: %s\n", m_actualGlobalSession.get(), __PRETTY_FUNCTION__);
+
+    ParameterRecorder* recorder{};
+    {
+        recorder = m_recordManager->beginMethodRecord(
+            ApiCallId::IGlobalSession_compileBuiltinModule,
+            m_globalSessionHandle);
+        recorder->recordEnumValue(module);
+        recorder->recordEnumValue(flags);
+        m_recordManager->endMethodRecord();
+    }
+
+    SlangResult res = m_actualGlobalSession->compileBuiltinModule(module, flags);
+    return res;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::loadBuiltinModule(
+    slang::BuiltinModuleName module,
+    const void* moduleData,
+    size_t sizeInBytes)
+{
+    slangRecordLog(LogLevel::Verbose, "%p: %s\n", m_actualGlobalSession.get(), __PRETTY_FUNCTION__);
+
+    ParameterRecorder* recorder{};
+    {
+        recorder = m_recordManager->beginMethodRecord(
+            ApiCallId::IGlobalSession_loadBuiltinModule,
+            m_globalSessionHandle);
+        recorder->recordEnumValue(module);
+        recorder->recordPointer(moduleData, false, sizeInBytes);
+        m_recordManager->endMethodRecord();
+    }
+
+    SlangResult res = m_actualGlobalSession->loadBuiltinModule(module, moduleData, sizeInBytes);
+    return res;
+}
+SLANG_NO_THROW SlangResult SLANG_MCALL GlobalSessionRecorder::saveBuiltinModule(
+    slang::BuiltinModuleName module,
+    SlangArchiveType archiveType,
+    ISlangBlob** outBlob)
+{
+    slangRecordLog(LogLevel::Verbose, "%p: %s\n", m_actualGlobalSession.get(), __PRETTY_FUNCTION__);
+
+    ParameterRecorder* recorder{};
+    {
+        recorder = m_recordManager->beginMethodRecord(
+            ApiCallId::IGlobalSession_saveBuiltinModule,
+            m_globalSessionHandle);
+        recorder->recordEnumValue(module);
+        recorder->recordEnumValue(archiveType);
+        recorder = m_recordManager->endMethodRecord();
+    }
+    SlangResult res = m_actualGlobalSession->saveBuiltinModule(module, archiveType, outBlob);
+    {
+        recorder->recordAddress(*outBlob);
+        m_recordManager->apendOutput();
+    }
+    return res;
+}
+
 SLANG_NO_THROW SlangCapabilityID SLANG_MCALL GlobalSessionRecorder::findCapability(char const* name)
 {
     // No need to record this function. It's just a query function and it won't impact the internal

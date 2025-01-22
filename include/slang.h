@@ -3520,6 +3520,12 @@ struct SessionDesc;
 struct SpecializationArg;
 struct TargetDesc;
 
+enum class BuiltinModuleName
+{
+    Core,
+    GLSL
+};
+
 /** A global session for interaction with the Slang library.
 
 An application may create and re-use a single global session across
@@ -3750,6 +3756,36 @@ struct IGlobalSession : public ISlangUnknown
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getSessionDescDigest(SessionDesc* sessionDesc, ISlangBlob** outBlob) = 0;
+
+    /** Compile from (embedded source) the builtin module on the session.
+    Will return a failure if there is already a builtin module available.
+    NOTE! API is experimental and not ready for production code.
+    @param module The builtin module name.
+    @param flags to control compilation
+    */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    compileBuiltinModule(BuiltinModuleName module, CompileCoreModuleFlags flags) = 0;
+
+    /** Load a builtin module. Currently loads modules from the file system.
+    @param module The builtin module name
+    @param moduleData Start address of the serialized core module
+    @param sizeInBytes The size in bytes of the serialized builtin module
+
+    NOTE! API is experimental and not ready for production code
+    */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    loadBuiltinModule(BuiltinModuleName module, const void* moduleData, size_t sizeInBytes) = 0;
+
+    /** Save the builtin module to the file system
+    @param module The builtin module name
+    @param archiveType The type of archive used to hold the builtin module
+    @param outBlob The serialized blob containing the builtin module
+
+    NOTE! API is experimental and not ready for production code  */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveBuiltinModule(
+        BuiltinModuleName module,
+        SlangArchiveType archiveType,
+        ISlangBlob** outBlob) = 0;
 };
 
     #define SLANG_UUID_IGlobalSession IGlobalSession::getTypeGuid()
@@ -4429,6 +4465,32 @@ struct SpecializationArg
     // using.
     #define SLANG_API_VERSION 0
 
+enum SlangLanguageVersion
+{
+    SLANG_LANGUAGE_VERSION_2025 = 2025
+};
+
+
+/* Description of a Slang global session.
+ */
+struct SlangGlobalSessionDesc
+{
+    /// Size of this struct.
+    uint32_t structureSize = sizeof(SlangGlobalSessionDesc);
+
+    /// Slang API version.
+    uint32_t apiVersion = SLANG_API_VERSION;
+
+    /// Slang language version.
+    uint32_t languageVersion = SLANG_LANGUAGE_VERSION_2025;
+
+    /// Whether to enable GLSL support.
+    bool enableGLSL = false;
+
+    /// Reserved for future use.
+    uint32_t reserved[16] = {};
+};
+
 /* Create a global session, with the built-in core module.
 
 @param apiVersion Pass in SLANG_API_VERSION
@@ -4436,6 +4498,16 @@ struct SpecializationArg
 */
 SLANG_EXTERN_C SLANG_API SlangResult
 slang_createGlobalSession(SlangInt apiVersion, slang::IGlobalSession** outGlobalSession);
+
+
+/* Create a global session, with the built-in core module.
+
+@param desc Description of the global session.
+@param outGlobalSession (out)The created global session.
+*/
+SLANG_EXTERN_C SLANG_API SlangResult slang_createGlobalSession2(
+    const SlangGlobalSessionDesc* desc,
+    slang::IGlobalSession** outGlobalSession);
 
 /* Create a global session, but do not set up the core module. The core module can
 then be loaded via loadCoreModule or compileCoreModule
@@ -4472,7 +4544,14 @@ namespace slang
 {
 inline SlangResult createGlobalSession(slang::IGlobalSession** outGlobalSession)
 {
-    return slang_createGlobalSession(SLANG_API_VERSION, outGlobalSession);
+    SlangGlobalSessionDesc defaultDesc = {};
+    return slang_createGlobalSession2(&defaultDesc, outGlobalSession);
+}
+inline SlangResult createGlobalSession(
+    const SlangGlobalSessionDesc* desc,
+    slang::IGlobalSession** outGlobalSession)
+{
+    return slang_createGlobalSession2(desc, outGlobalSession);
 }
 inline void shutdown()
 {

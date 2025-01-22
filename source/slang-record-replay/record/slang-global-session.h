@@ -64,6 +64,18 @@ public:
     SLANG_NO_THROW SlangResult SLANG_MCALL
     saveCoreModule(SlangArchiveType archiveType, ISlangBlob** outBlob) override;
 
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compileBuiltinModule(
+        slang::BuiltinModuleName module,
+        slang::CompileCoreModuleFlags flags) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadBuiltinModule(
+        slang::BuiltinModuleName module,
+        const void* moduleData,
+        size_t sizeInBytes) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveBuiltinModule(
+        slang::BuiltinModuleName module,
+        SlangArchiveType archiveType,
+        ISlangBlob** outBlob) override;
+
     SLANG_NO_THROW SlangCapabilityID SLANG_MCALL findCapability(char const* name) override;
 
     SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerForTransition(
