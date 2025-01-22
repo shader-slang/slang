@@ -2167,7 +2167,8 @@ void SemanticsVisitor::AddTypeOverloadCandidates(Type* type, OverloadResolveCont
     // from a value of the same type. There is no need in Slang for
     // "copy constructors" but the core module currently has to define
     // some just to make code that does, e.g., `float(1.0f)` work.)
-
+    LookupOptions options =
+        LookupOptions(uint8_t(LookupOptions::IgnoreInheritance) | uint8_t(LookupOptions::NoDeref));
     LookupResult initializers = lookUpMember(
         m_astBuilder,
         this,
@@ -2175,7 +2176,7 @@ void SemanticsVisitor::AddTypeOverloadCandidates(Type* type, OverloadResolveCont
         type,
         context.sourceScope,
         LookupMask::Default,
-        LookupOptions::NoDeref);
+        options);
 
     AddOverloadCandidates(initializers, context);
 }
