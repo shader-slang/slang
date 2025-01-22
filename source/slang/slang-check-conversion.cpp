@@ -381,10 +381,14 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
 {
     if (auto toStructDeclRef = isDeclRefTypeOf<StructDecl>(toType))
     {
-        if (isFromCoreModule(toStructDeclRef.getDecl()))
+        // TODO: This is just a special case for a backwards-compatibility feature
+        // for HLSL, this flag will imply that the initializer list is synthesized
+        // for a type cast from a literal zero to a 'struct'. In this case, we will fall
+        // back to legacy initializer list logic.
+        if (fromInitializerListExpr->m_synthesizedForTypeCastZero)
         {
-            // If the struct is from stdlib, we will not try to create a constructor.
-            return false;
+            if (!isCStyleStruct(toStructDeclRef.getDecl()))
+                return false;
         }
 
         if (_hasExplicitConstructor(toStructDeclRef.getDecl(), false))
@@ -396,7 +400,7 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
 
             ctorInvokeExpr = CheckTerm(ctorInvokeExpr);
 
-            if (outExpr && ctorInvokeExpr)
+            if (outExpr)
             {
                 *outExpr = ctorInvokeExpr;
                 return true;
@@ -413,13 +417,20 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
 {
     StructDecl* structDecl = isDeclRefTypeOf<StructDecl>(toType).getDecl();
 
-    if (!structDecl || isFromCoreModule(structDecl))
-        return false;
-
-    if (structDecl->m_synthesizedCtorMap.getCount() == 0)
+    if (!structDecl || structDecl->m_synthesizedCtorMap.getCount() == 0)
         return false;
 
     bool isCStyle = isCStyleStruct(structDecl);
+
+    // TODO: This is just a special case for a backwards-compatibility feature
+    // for HLSL, this flag will imply that the initializer list is synthesized
+    // for a type cast from a literal zero to a 'struct'. In this case, we will fall
+    // back to legacy initializer list logic.
+    if (fromInitializerListExpr->m_synthesizedForTypeCastZero)
+    {
+        if (isCStyle)
+            return false;
+    }
 
     DiagnosticSink tempSink(getSourceManager(), nullptr);
     SemanticsVisitor subVisitor(withSink(&tempSink));
@@ -855,18 +866,25 @@ bool SemanticsVisitor::_coerceInitializerList(
         !canCoerce(toType, fromInitializerListExpr->type, nullptr))
         return _failedCoercion(toType, outToExpr, fromInitializerListExpr);
 
-    // Try to invoke the user-defined constructor if it exists. This call will
-    // report error diagnostics if the used-defined constructor exists but does not
-    // match the initialize list.
-    if (createInvokeExprForExplicitCtor(toType, fromInitializerListExpr, outToExpr))
+    // TODO: This is just a special case for a backwards-compatibility feature
+    // for HLSL, this flag will imply that the initializer list is synthesized
+    // for a type cast from a literal zero to a 'struct'. In this case, we will fall
+    // back to legacy initializer list logic.
+    if (!fromInitializerListExpr->m_synthesizedForTypeCastZero)
     {
-        return true;
-    }
+        // Try to invoke the user-defined constructor if it exists. This call will
+        // report error diagnostics if the used-defined constructor exists but does not
+        // match the initialize list.
+        if (createInvokeExprForExplicitCtor(toType, fromInitializerListExpr, outToExpr))
+        {
+            return true;
+        }
 
-    // Try to invoke the synthesized constructor if it exists
-    if (createInvokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
-    {
-        return true;
+        // Try to invoke the synthesized constructor if it exists
+        if (createInvokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
+        {
+            return true;
+        }
     }
 
     // We will fall back to the legacy logic of initialize list.

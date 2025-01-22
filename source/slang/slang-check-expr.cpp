@@ -3790,7 +3790,9 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                         InitializerListExpr* initListExpr =
                             m_astBuilder->create<InitializerListExpr>();
                         initListExpr->loc = expr->loc;
+                        initListExpr->m_synthesizedForTypeCastZero = true;
                         auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
+
 
                         return coerce(CoercionSite::General, typeExp.type, checkedInitListExpr);
                     }

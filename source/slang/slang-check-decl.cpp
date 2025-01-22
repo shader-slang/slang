@@ -12477,8 +12477,7 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
 void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
 {
     // add the member initialize constructor here to avoid circular checking logic
-    if (!isFromCoreModule(structDecl))
-        _synthesizeCtorSignature(structDecl);
+    _synthesizeCtorSignature(structDecl);
 
     // add a empty deault CTor if missing; checking in attributes
     // to avoid circular checking logic
