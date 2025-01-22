@@ -25,7 +25,9 @@ GlobalSessionRecorder::GlobalSessionRecorder(
 
     ParameterRecorder* recorder{};
     {
-        m_recordManager->beginMethodRecord(ApiCallId::CreateGlobalSession, g_globalFunctionHandle);
+        recorder = m_recordManager->beginMethodRecord(
+            ApiCallId::CreateGlobalSession,
+            g_globalFunctionHandle);
         recorder->recordStruct(*desc);
         recorder = m_recordManager->endMethodRecord();
     }
