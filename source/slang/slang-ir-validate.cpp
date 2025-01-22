@@ -460,8 +460,8 @@ static bool isValidAtomicDest(bool skipFuncParamValidation, IRInst* dst)
             }
             else if (skipFuncParamValidation)
             {
-                // We haven't actually verified that this is a valid atomic operation destination, but
-                // the callee wants to skip this specific validation.
+                // We haven't actually verified that this is a valid atomic operation destination,
+                // but the callee wants to skip this specific validation.
                 return true;
             }
         }

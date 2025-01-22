@@ -1322,7 +1322,8 @@ Result linkAndOptimizeIR(
             byteAddressBufferOptions);
     }
 
-    // For SPIR-V, this function is called elsewhere, so that it can happen after address space specialization
+    // For SPIR-V, this function is called elsewhere, so that it can happen after address space
+    // specialization
     if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
     {
         bool skipFuncParamValidation = true;
