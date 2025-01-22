@@ -218,142 +218,71 @@ ConstructorDecl* SemanticsVisitor::_getSynthesizedConstructor(
     return nullptr;
 }
 
-static StructDecl* _getStructDecl(Type* type)
+bool SemanticsVisitor::isCStyleType(Type* type)
 {
-    if (as<VectorExpressionType>(type) || as<MatrixExpressionType>(type) ||
-        as<ArithmeticExpressionType>(type) || as<BuiltinType>(type))
+    auto cacheResult = [&](bool result)
     {
-        return nullptr;
-    }
+        getShared()->cacheCStyleType(type, result);
+        return result;
+    };
 
-    if (auto structDecl = isDeclRefTypeOf<StructDecl>(type))
-        return structDecl.getDecl();
-
-    return nullptr;
-}
-
-bool SemanticsVisitor::_cStyleStructBasicCheck(Decl* decl)
-{
-    // 1. It has to be a user-defined struct type, or a basic scalar, vector or matrix type
-    StructDecl* structDecl = nullptr;
-    if (isFromCoreModule(decl))
-        return false;
-
-    if (auto varDecl = as<VarDecl>(decl))
-    {
-        auto type = varDecl->getType();
-        if (as<VectorExpressionType>(type) || as<MatrixExpressionType>(type) ||
-            as<BasicExpressionType>(type) || isDeclRefTypeOf<EnumDecl>(type).getDecl())
-            return true;
-
-        // check for user-defined struct type
-        structDecl = _getStructDecl(type);
-        if (!structDecl)
-            return false;
-    }
-
-    if (!structDecl)
-        structDecl = as<StructDecl>(decl);
-
-    // 2. It cannot have inheritance, but inherit from interface is fine.
-    for (auto inheritanceDecl : structDecl->getMembersOfType<InheritanceDecl>())
-    {
-        if (!isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type))
-        {
-            return false;
-        }
-    }
-
-    // 3. It cannot have explicit constructor
-    if (_hasExplicitConstructor(structDecl, true))
-        return false;
-
-    // 4. All of its members have to have the same visibility as the struct itself.
-    DeclVisibility structVisibility = getDeclVisibility(structDecl);
-    for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
-    {
-        if (getDeclVisibility(varDecl) != structVisibility)
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool SemanticsVisitor::isCStyleStruct(StructDecl* structDecl)
-{
-    // Get the result from the cache first
-    if (bool* isCStyle = getShared()->isCStyleStruct(structDecl))
+    // Check cache first
+    if (bool* isCStyle = getShared()->isCStyleType(type))
     {
         return *isCStyle;
     }
 
-    // rules 1-4 are checked in _cStyleStructBasicCheck for all the non-array members
-    if (!_cStyleStructBasicCheck(structDecl))
+    // 1. It has to be basic scalar, vector or matrix type, or user-defined struct.
+    if (as<VectorExpressionType>(type) || as<MatrixExpressionType>(type) ||
+        as<BasicExpressionType>(type) || isDeclRefTypeOf<EnumDecl>(type).getDecl())
+        return cacheResult(true);
+
+
+    if (auto structDecl = isDeclRefTypeOf<StructDecl>(type).getDecl())
     {
-        getShared()->cacheCStyleStruct(structDecl, false);
-        return false;
+        // 2. It cannot have inheritance, but inherit from interface is fine.
+        for (auto inheritanceDecl : structDecl->getMembersOfType<InheritanceDecl>())
+        {
+            if (!isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type))
+            {
+                return cacheResult(false);
+            }
+        }
+
+        // 3. It cannot have explicit constructor
+        if (_hasExplicitConstructor(structDecl, true))
+            return cacheResult(false);
+
+        // 4. All of its members have to have the same visibility as the struct itself.
+        DeclVisibility structVisibility = getDeclVisibility(structDecl);
+        for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
+        {
+            if (getDeclVisibility(varDecl) != structVisibility)
+            {
+                return cacheResult(false);
+            }
+        }
+
+        for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
+        {
+            Type* varType = varDecl->getType();
+
+            // Recursively check the type of the member.
+            if (!isCStyleType(varType))
+                return cacheResult(false);
+        }
     }
 
     // 5. All its members are legacy C-Style structs or arrays of legacy C-style structs
-    for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
+    if (auto arrayType = as<ArrayExpressionType>(type))
     {
-        // if the member is an array, check if the element is legacy C-style rule.
-        if (auto arrayType = as<ArrayExpressionType>(varDecl->getType()))
+        if (arrayType->isUnsized())
         {
-            if (arrayType->isUnsized())
-            {
-                getShared()->cacheCStyleStruct(structDecl, false);
-                return false;
-            }
-            auto* elementType = arrayType->getElementType();
-            for (;;)
-            {
-                if (auto nextType = as<ArrayExpressionType>(elementType))
-                {
-                    if (arrayType->isUnsized())
-                    {
-                        getShared()->cacheCStyleStruct(structDecl, false);
-                        return false;
-                    }
-                    elementType = nextType->getElementType();
-                }
-                else
-                    break;
-            }
-
-            if (auto elemStructDecl = _getStructDecl(elementType))
-            {
-                if (!_cStyleStructBasicCheck(elemStructDecl))
-                {
-                    getShared()->cacheCStyleStruct(elemStructDecl, false);
-                    return false;
-                }
-            }
-            else
-            {
-                // if the element is not a struct, it has to be a scalar, vector or matrix.
-                if (!as<VectorExpressionType>(elementType) &&
-                    !as<MatrixExpressionType>(elementType) && !as<BasicExpressionType>(elementType))
-                {
-                    getShared()->cacheCStyleStruct(structDecl, false);
-                    return false;
-                }
-            }
-        }
-        else
-        {
-            // all the other members still go through the basic check.
-            if (!_cStyleStructBasicCheck(varDecl))
-            {
-                getShared()->cacheCStyleStruct(structDecl, false);
-                return false;
-            }
+            getShared()->cacheCStyleType(type, false);
+            return cacheResult(false);
         }
     }
-
-    getShared()->cacheCStyleStruct(structDecl, true);
-    return true;
+    return cacheResult(true);
 }
 
 Expr* SemanticsVisitor::_createCtorInvokeExpr(
@@ -387,7 +316,7 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
         // back to legacy initializer list logic.
         if (fromInitializerListExpr->m_synthesizedForTypeCastZero)
         {
-            if (!isCStyleStruct(toStructDeclRef.getDecl()))
+            if (!isCStyleType(toType))
                 return false;
         }
 
@@ -398,7 +327,22 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
                 fromInitializerListExpr->loc,
                 fromInitializerListExpr->args);
 
-            ctorInvokeExpr = CheckTerm(ctorInvokeExpr);
+            DiagnosticSink tempSink(getSourceManager(), nullptr);
+            SemanticsVisitor subVisitor(withSink(&tempSink));
+            ctorInvokeExpr = subVisitor.CheckTerm(ctorInvokeExpr);
+
+            if (tempSink.getErrorCount())
+            {
+                if (!isCStyleType(toType))
+                {
+                    Slang::ComPtr<ISlangBlob> blob;
+                    tempSink.getBlobIfNeeded(blob.writeRef());
+                    getSink()->diagnoseRaw(
+                        Severity::Error,
+                        static_cast<char const*>(blob->getBufferPointer()));
+                }
+                return false;
+            }
 
             if (outExpr)
             {
@@ -420,7 +364,7 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
     if (!structDecl || structDecl->m_synthesizedCtorMap.getCount() == 0)
         return false;
 
-    bool isCStyle = isCStyleStruct(structDecl);
+    bool isCStyle = isCStyleType(toType);
 
     // TODO: This is just a special case for a backwards-compatibility feature
     // for HLSL, this flag will imply that the initializer list is synthesized

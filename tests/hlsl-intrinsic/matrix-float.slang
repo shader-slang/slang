@@ -43,8 +43,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     float scalarF = idx * (1.0f / (4.0f));
 
-    // Note matrix<> is not C-Style struct, so we can't use {} to initialize it.
-    FloatMatrix ft = {float2(0.0f), float2(0.0f)};
+    FloatMatrix ft = {}; 
 
     FloatMatrix f = { { scalarF + 0.01, scalarF + 0.02f}, { scalarF + 0.011f, scalarF + 0.022f}};
     

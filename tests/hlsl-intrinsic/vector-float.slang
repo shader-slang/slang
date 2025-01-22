@@ -50,7 +50,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     FloatVector f = FloatVector(0.1f, vf, vf + 0.2f);
     
     // Operate over all values
-    FloatVector ft = {0.0f};    // vector is not C-Style struct
+    FloatVector ft = {};
 
     // fmod
     ft += FloatVector(IntVector(((f % 0.11f) * 100) + 0.5));
