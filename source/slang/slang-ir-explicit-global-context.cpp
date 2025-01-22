@@ -140,7 +140,19 @@ struct IntroduceExplicitGlobalContextPass
     IRStructType* m_contextStructType = nullptr;
     IRPtrType* m_contextStructPtrType = nullptr;
 
-    List<IRGlobalParam*> m_globalParams;
+    struct GlobalParamInfo
+    {
+        // Original global param inst.
+        IRGlobalParam* globalParam = nullptr;
+
+        // New entry point param that is created by this pass.
+        IRParam* entryPointParam = nullptr;
+
+        // Orignating entry point obtained from entry point param decoration, if it exists.
+        IRFunc* originatingEntryPoint = nullptr;
+    };
+
+    List<GlobalParamInfo> m_globalParams;
     List<IRGlobalVar*> m_globalVars;
     List<IRFunc*> m_entryPoints;
 
@@ -237,7 +249,22 @@ struct IntroduceExplicitGlobalContextPass
                     if (m_target == CodeGenTarget::CUDASource)
                         continue;
 
-                    m_globalParams.add(globalParam);
+                    GlobalParamInfo globalParamInfo;
+                    globalParamInfo.globalParam = globalParam;
+
+                    // Entry point param decorations are not required anymore after this pass and
+                    // must be removed for entry point param emit. Remoeving it here prevents the
+                    // decoration from being cloned when creating struct keys and entry point
+                    // parameters.
+                    if (const auto entryPointParamDecoration =
+                            globalParam->findDecoration<IREntryPointParamDecoration>())
+                    {
+                        globalParamInfo.originatingEntryPoint =
+                            entryPointParamDecoration->getEntryPoint();
+                        entryPointParamDecoration->removeAndDeallocate();
+                    }
+
+                    m_globalParams.add(globalParamInfo);
                 }
                 break;
 
@@ -305,11 +332,10 @@ struct IntroduceExplicitGlobalContextPass
             // For the parameter representing all the global uniform shader
             // parameters, we create a field that exactly matches its type.
             //
-
             createContextStructField(
-                globalParam,
+                globalParam.globalParam,
                 GlobalObjectKind::GlobalParam,
-                globalParam->getFullType());
+                globalParam.globalParam->getFullType());
         }
         for (auto globalVar : m_globalVars)
         {
@@ -347,7 +373,7 @@ struct IntroduceExplicitGlobalContextPass
         //
         for (auto globalParam : m_globalParams)
         {
-            replaceUsesOfGlobalParam(globalParam);
+            replaceUsesOfGlobalParam(globalParam.globalParam);
         }
         for (auto globalVar : m_globalVars)
         {
@@ -444,23 +470,32 @@ struct IntroduceExplicitGlobalContextPass
         // then we need to introduce an explicit parameter onto
         // each entry-point function to represent it.
         //
-        struct GlobalParamInfo
-        {
-            IRGlobalParam* globalParam;
-            IRParam* entryPointParam;
-        };
-        List<GlobalParamInfo> entryPointParams;
+
+        List<GlobalParamInfo> entryPointParamsToAdd;
         for (auto globalParam : m_globalParams)
         {
-            auto entryPointParam = builder.createParam(globalParam->getFullType());
+            // Do not add global param to current entry point if global param
+            // explicitly originates from a different entry point.
+            if (globalParam.originatingEntryPoint &&
+                globalParam.originatingEntryPoint != entryPointFunc)
+            {
+                continue;
+            }
+
+            globalParam.entryPointParam =
+                builder.createParam(globalParam.globalParam->getFullType());
             IRCloneEnv cloneEnv;
-            cloneInstDecorationsAndChildren(&cloneEnv, m_module, globalParam, entryPointParam);
-            entryPointParams.add({globalParam, entryPointParam});
+            cloneInstDecorationsAndChildren(
+                &cloneEnv,
+                m_module,
+                globalParam.globalParam,
+                globalParam.entryPointParam);
+            entryPointParamsToAdd.add(globalParam);
 
             // The new parameter will be the last one in the
             // parameter list of the entry point.
             //
-            entryPointParam->insertBefore(firstOrdinary);
+            globalParam.entryPointParam->insertBefore(firstOrdinary);
         }
 
         if (m_target == CodeGenTarget::CPPSource && m_globalParams.getCount() == 0)
@@ -485,7 +520,7 @@ struct IntroduceExplicitGlobalContextPass
         // to inialize the corresponding field of the `KernelContext`
         // before moving on with execution of the kernel body.
         //
-        for (auto entryPointParam : entryPointParams)
+        for (auto entryPointParam : entryPointParamsToAdd)
         {
             auto fieldInfo = m_mapInstToContextFieldInfo[entryPointParam.globalParam];
             auto fieldType = entryPointParam.globalParam->getFullType();

@@ -812,6 +812,14 @@ struct IRKnownBuiltinDecoration : IRDecoration
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
 };
 
+struct IREntryPointParamDecoration : IRDecoration
+{
+    IR_LEAF_ISA(EntryPointParamDecoration)
+
+    /// Get the entry point that this parameter orignates from.
+    IRFunc* getEntryPoint() { return cast<IRFunc>(getOperand(0)); }
+};
+
 struct IRFormatDecoration : IRDecoration
 {
     enum
@@ -5232,6 +5240,11 @@ public:
     void addCheckpointIntermediateDecoration(IRInst* inst, IRGlobalValueWithCode* func)
     {
         addDecoration(inst, kIROp_CheckpointIntermediateDecoration, func);
+    }
+
+    void addEntryPointParamDecoration(IRInst* inst, IRFunc* entryPointFunc)
+    {
+        addDecoration(inst, kIROp_EntryPointParamDecoration, entryPointFunc);
     }
 };
 

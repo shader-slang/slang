@@ -8292,6 +8292,30 @@ T dot(vector<T, N> x, vector<T, N> y)
     {
     case hlsl: __intrinsic_asm "dot";
     case wgsl: __intrinsic_asm "dot";
+    case spirv:
+    {
+        spirv_asm
+        {
+            OpCapability DotProduct;
+            OpCapability DotProductInputAll;
+            OpExtension "SPV_KHR_integer_dot_product";
+        };
+
+        if (__isSignedInt<T>())
+        {
+            return spirv_asm
+            {
+                result:$$T = OpSDot $x $y;
+            };
+        }
+        else
+        {
+            return spirv_asm
+            {
+                result:$$T = OpUDot $x $y;
+            };
+        }
+    }
     default:
         T result = T(0);
         for(int i = 0; i < N; ++i)
