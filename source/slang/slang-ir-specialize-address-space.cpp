@@ -13,6 +13,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
     Dictionary<IRInst*, AddressSpace> mapInstToAddrSpace;
     InitialAddressSpaceAssigner* addrSpaceAssigner;
+    HashSet<IRFunc*> functionsToConsiderRemoving;
 
     AddressSpaceContext(IRModule* inModule, InitialAddressSpaceAssigner* inAddrSpaceAssigner)
         : module(inModule), addrSpaceAssigner(inAddrSpaceAssigner)
@@ -279,6 +280,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                     callInst = as<IRCall>(builder.replaceOperand(
                                         callInst->getOperands(),
                                         specializedCallee));
+                                    // At this point, the original callee may be left without uses.
+                                    functionsToConsiderRemoving.add(callee);
                                 }
                                 auto callResultAddrSpace =
                                     getFuncResultAddrSpace(specializedCallee);
@@ -394,6 +397,13 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         }
 
         applyAddressSpaceToInstType();
+
+        for (IRFunc* func : functionsToConsiderRemoving)
+        {
+            SLANG_ASSERT(!func->findDecoration<IREntryPointDecoration>());
+            if (!func->hasUses())
+                func->removeAndDeallocate();
+        }
     }
 };
 

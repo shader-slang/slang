@@ -8470,21 +8470,24 @@ for (const auto& item : atomics)
 __glsl_version(430)
 [ForceInline]
 [require(glsl_spirv, atomic_glsl)]
+__intrinsic_op($(kIROp_AtomicAdd))
+$(item.name) atomicAddWithOrder(inout $(item.name) mem, $(item.name) data, MemoryOrder order);
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
 public $(item.name) atomicAdd(inout $(item.name) mem, $(item.name) data)
 {
     typeRequireChecks_atomic_using_float1_tier<$(item.name)>();
     typeRequireChecks_atomic_using_add<$(item.name)>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "atomicAdd($0, $1)";
-    case spirv:
-        return spirv_asm
-        {
-            OpAtomic$(item.classType)Add$(item.suffix) $$$(item.name) result &mem Device UniformMemory $data
-        };
-    }
+    return atomicAddWithOrder(mem, data, MemoryOrder::Relaxed);
 }
 
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+__intrinsic_op($(kIROp_AtomicMin))
+$(item.name) atomicMinWithOrder(inout $(item.name) mem, $(item.name) data, MemoryOrder order);
 
 __glsl_version(430)
 [ForceInline]
@@ -8493,17 +8496,14 @@ public $(item.name) atomicMin(inout $(item.name) mem, $(item.name) data)
 {
     typeRequireChecks_atomic_using_float2_tier<$(item.name)>();
     typeRequireChecks_atomic_using_MinMax<$(item.name)>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "atomicMin($0, $1)";
-    case spirv:
-        return spirv_asm
-        {
-            OpAtomic$(item.subclassType)Min$(item.suffix) $$$(item.name) result &mem Device UniformMemory $data
-        };
-    }
+    return atomicMinWithOrder(mem, data, MemoryOrder::Relaxed);
 }
 
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+__intrinsic_op($(kIROp_AtomicMax))
+$(item.name) atomicMaxWithOrder(inout $(item.name) mem, $(item.name) data, MemoryOrder order);
 
 __glsl_version(430)
 [ForceInline]
@@ -8512,17 +8512,14 @@ public $(item.name) atomicMax(inout $(item.name) mem, $(item.name) data)
 {
     typeRequireChecks_atomic_using_float2_tier<$(item.name)>();
     typeRequireChecks_atomic_using_MinMax<$(item.name)>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "atomicMax($0, $1)";
-    case spirv:
-        return spirv_asm
-        {
-            OpAtomic$(item.subclassType)Max$(item.suffix) $$$(item.name) result &mem Device UniformMemory $data
-        };
-    }
+    return atomicMaxWithOrder(mem, data, MemoryOrder::Relaxed);
 }
 
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+__intrinsic_op($(kIROp_AtomicExchange))
+$(item.name) atomicExchangeWithOrder(inout $(item.name) mem, $(item.name) data, MemoryOrder order);
 
 __glsl_version(430)
 [ForceInline]
@@ -8530,15 +8527,7 @@ __glsl_version(430)
 public $(item.name) atomicExchange(inout $(item.name) mem, $(item.name) data)
 {
     typeRequireChecks_atomic_using_float1_tier<$(item.name)>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "atomicExchange($0, $1)";
-    case spirv:
-        return spirv_asm
-        {
-            OpAtomicExchange $$$(item.name) result &mem Device UniformMemory $data
-        };
-    }
+    return atomicExchangeWithOrder(mem, data, MemoryOrder::Relaxed);
 }
 
 ${{{{
@@ -8550,24 +8539,24 @@ if(item.isFloat)
 __glsl_version(430)
 [ForceInline]
 [require(glsl_spirv, atomic_glsl)]
+__intrinsic_op($(kIROp_AtomicAnd))
+$(item.name) atomicAndWithOrder(inout $(item.name) mem, $(item.name) data, MemoryOrder order);
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
 public $(item.name) atomicAnd(inout $(item.name) mem, $(item.name) data)
 {
     typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
     typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
-    __target_switch
-    {
-    case glsl:
-    {
-        __intrinsic_asm "atomicAnd($0, $1)";
-    }
-    case spirv:
-        return spirv_asm
-        {
-            OpAtomicAnd $$$(item.name) result &mem Device UniformMemory $data
-        };
-    }
+    return atomicAndWithOrder(mem, data, MemoryOrder::Relaxed);
 }
 
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+__intrinsic_op($(kIROp_AtomicOr))
+$(item.name) atomicOrWithOrder(inout $(item.name) mem, $(item.name) data, MemoryOrder order);
 
 __glsl_version(430)
 [ForceInline]
@@ -8576,17 +8565,15 @@ public $(item.name) atomicOr(inout $(item.name) mem, $(item.name) data)
 {
     typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
     typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "atomicOr($0, $1)";
-    case spirv:
-        return spirv_asm
-        {
-            OpAtomicOr $$$(item.name) result &mem Device UniformMemory $data
-        };
-    }
+    return atomicOrWithOrder(mem, data, MemoryOrder::Relaxed);
 }
 
+
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+__intrinsic_op($(kIROp_AtomicXor))
+$(item.name) atomicXorWithOrder(inout $(item.name) mem, $(item.name) data, MemoryOrder order);
 
 __glsl_version(430)
 [ForceInline]
@@ -8595,17 +8582,14 @@ public $(item.name) atomicXor(inout $(item.name) mem, $(item.name) data)
 {
     typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
     typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "atomicXor($0, $1)";
-    case spirv:
-        return spirv_asm
-        {
-            OpAtomicXor $$$(item.name) result &mem Device UniformMemory $data
-        };
-    }
+    return atomicXorWithOrder(mem, data, MemoryOrder::Relaxed);
 }
 
+__glsl_version(430)
+[ForceInline]
+[require(glsl_spirv, atomic_glsl)]
+__intrinsic_op($(kIROp_AtomicCompareExchange))
+$(item.name) atomicCompSwapWithOrder(inout $(item.name) mem, $(item.name) compare, $(item.name) data, MemoryOrder successOrder, MemoryOrder failOrder);
 
 __glsl_version(430)
 [ForceInline]
@@ -8614,15 +8598,7 @@ public $(item.name) atomicCompSwap(inout $(item.name) mem, $(item.name) compare,
 {
     typeRequireChecks_atomic_using_float0_tier<$(item.name)>();
     typeRequireChecks_atomic_using_Logical_CAS<$(item.name)>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "atomicCompSwap($0, $1, $2)";
-    case spirv:
-        return spirv_asm
-        {
-            result:$$$(item.name) = OpAtomicCompareExchange &mem Device None None $data $compare
-        };
-    }
+    return atomicCompSwapWithOrder(mem, compare, data, MemoryOrder::Relaxed, MemoryOrder::Relaxed);
 }
 
 ${{{{
