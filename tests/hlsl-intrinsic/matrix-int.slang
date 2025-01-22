@@ -22,7 +22,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     matrix<int, 3, 3> a = { { 0, 1, 2}, {2, 4, 6}, {16, 21, 32}};
     matrix<int, 3, 3> b = { { 4, 9, -1}, {-2, 4, 2}, {31, -3, 7}};
 
-    matrix<int, 3, 3> t = {};
+    matrix<int, 3, 3> t = {int3(0), int3(0), int3(0)};  // matrix is not C-Style struct
     
     t += max(a, b);
     t += min(a, b);
