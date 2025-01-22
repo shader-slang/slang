@@ -395,12 +395,15 @@ void Session::writeCoreModuleDoc(String config)
 
 const char* getBuiltinModuleNameStr(slang::BuiltinModuleName name)
 {
+    const char* result = nullptr;
     switch (name)
     {
     case slang::BuiltinModuleName::Core:
-        return "core";
+        result = "core";
+        break;
     case slang::BuiltinModuleName::GLSL:
-        return "glsl";
+        result = "glsl";
+        break;
     default:
         SLANG_UNEXPECTED("Unknown builtin module");
     }
