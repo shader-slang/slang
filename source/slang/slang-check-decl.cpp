@@ -9394,7 +9394,11 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMember(
     auto varDeclBase = as<VarDeclBase>(member);
 
     // Static variables are initialized at start of runtime, not inside a constructor
-    if (!varDeclBase || varDeclBase->hasModifier<HLSLStaticModifier>())
+    // Once thing to notice is that if a member variable doesn't have name, it must be synthesized
+    // instead of defined by user, we should not put it into the constructor because it's not a real
+    // member.
+    if (!varDeclBase || varDeclBase->hasModifier<HLSLStaticModifier>() ||
+        varDeclBase->getName() == nullptr)
         return;
 
     Expr* initExpr = nullptr;

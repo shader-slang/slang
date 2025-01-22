@@ -12,9 +12,10 @@ struct Test
 
 int test(int inVal)
 {
+	// Note: int4 is not a C-Style struct, so {4, 5, 6,} is not a valid initializer list for it.
 	Test myArray[4] = {
 		{ int4(1), { 2, 3} },
-		{ {4, 5, 6, }, { 7, } },
+		{ {4, 5, 6, 0}, { 7, } },
 	};
 
 	return myArray[0].b[inVal]

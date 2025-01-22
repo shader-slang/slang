@@ -34,7 +34,7 @@ void computeMain(
     uint tid = dispatchThreadID.x;
     
     int2 fromScalar = tid.x;
-    uint2 another = {};
+    uint2 another = {0};    // uint2 is not C-Style struct
     
     float2 loc = dispatchThreadID.xy * 0.5f;
 
