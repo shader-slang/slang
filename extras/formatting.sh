@@ -108,12 +108,12 @@ require_bin() {
 }
 
 require_bin "git" "1.8"
-require_bin "gersemi" "0.17"
-require_bin "xargs" "3"
+((run_all || run_cmake)) && require_bin "gersemi" "0.17"
+((run_all || run_cpp)) && require_bin "xargs" "3"
 require_bin "diff" "2"
-require_bin "clang-format" "17" "18"
-require_bin "prettier" "3"
-require_bin "shfmt" "3"
+((run_all || run_cpp)) && require_bin "clang-format" "17" "18"
+((run_all || run_yaml || run_markdown)) && require_bin "prettier" "3"
+((run_all || run_sh)) &&  require_bin "shfmt" "3"
 
 if [ "$missing_bin" ]; then
   exit 1
