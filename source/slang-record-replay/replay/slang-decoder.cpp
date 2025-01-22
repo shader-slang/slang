@@ -446,6 +446,9 @@ bool SlangDecoder::processFunctionCall(
 
 bool SlangDecoder::CreateGlobalSession(ParameterBlock const& parameterBlock)
 {
+    StructDecoder<SlangGlobalSessionDesc> sessionDesc;
+    sessionDesc.decode(parameterBlock.parameterBuffer, parameterBlock.parameterBufferSize);
+
     ObjectID outGlobalSessionId = 0;
     ParameterDecoder::decodeAddress(
         parameterBlock.outputBuffer,
@@ -454,7 +457,7 @@ bool SlangDecoder::CreateGlobalSession(ParameterBlock const& parameterBlock)
 
     for (auto consumer : m_consumers)
     {
-        consumer->CreateGlobalSession(outGlobalSessionId);
+        consumer->CreateGlobalSession(sessionDesc.getValue(), outGlobalSessionId);
     }
     return true;
 }

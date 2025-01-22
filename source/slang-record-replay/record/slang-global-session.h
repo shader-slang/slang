@@ -14,7 +14,9 @@ using namespace Slang;
 class GlobalSessionRecorder : public RefObject, public slang::IGlobalSession
 {
 public:
-    explicit GlobalSessionRecorder(slang::IGlobalSession* session);
+    explicit GlobalSessionRecorder(
+        const SlangGlobalSessionDesc* desc,
+        slang::IGlobalSession* session);
 
     SLANG_REF_OBJECT_IUNKNOWN_ADD_REF
     SLANG_REF_OBJECT_IUNKNOWN_RELEASE
@@ -63,6 +65,18 @@ public:
     loadCoreModule(const void* coreModule, size_t coreModuleSizeInBytes) override;
     SLANG_NO_THROW SlangResult SLANG_MCALL
     saveCoreModule(SlangArchiveType archiveType, ISlangBlob** outBlob) override;
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL compileBuiltinModule(
+        slang::BuiltinModuleName module,
+        slang::CompileCoreModuleFlags flags) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadBuiltinModule(
+        slang::BuiltinModuleName module,
+        const void* moduleData,
+        size_t sizeInBytes) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveBuiltinModule(
+        slang::BuiltinModuleName module,
+        SlangArchiveType archiveType,
+        ISlangBlob** outBlob) override;
 
     SLANG_NO_THROW SlangCapabilityID SLANG_MCALL findCapability(char const* name) override;
 

@@ -26,7 +26,9 @@ SLANG_UNIT_TEST(glslCompile)
             }
         )";
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    SlangGlobalSessionDesc globalDesc = {};
+    globalDesc.enableGLSL = true;
+    SLANG_CHECK(slang_createGlobalSession2(&globalDesc, globalSession.writeRef()) == SLANG_OK);
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
     targetDesc.profile = globalSession->findProfile("spirv_1_5");

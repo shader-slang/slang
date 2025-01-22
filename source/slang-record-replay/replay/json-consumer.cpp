@@ -618,6 +618,24 @@ void JsonConsumer::_writeCompilerOptionEntryHelper(
     }
 }
 
+void JsonConsumer::_writeGlobalSessionDescHelper(
+    Slang::StringBuilder& builder,
+    int indent,
+    SlangGlobalSessionDesc const& desc,
+    Slang::String keyName,
+    bool isLastField)
+{
+    SLANG_UNUSED(isLastField);
+
+    ScopeWritterForKey scopeWritterForGlobalSessionDesc(&builder, &indent, keyName);
+    {
+        _writePair(builder, indent, "structureSize", (uint32_t)desc.structureSize);
+        _writePair(builder, indent, "apiVersion", (uint32_t)desc.apiVersion);
+        _writePair(builder, indent, "languageVersion", (uint32_t)desc.languageVersion);
+        _writePair(builder, indent, "enablGLSL", (uint32_t)desc.enableGLSL);
+    }
+}
+
 void JsonConsumer::_writeSessionDescHelper(
     Slang::StringBuilder& builder,
     int indent,
@@ -779,7 +797,9 @@ void JsonConsumer::_writeSessionDescHelper(
     }
 }
 
-void JsonConsumer::CreateGlobalSession(ObjectID outGlobalSessionId)
+void JsonConsumer::CreateGlobalSession(
+    SlangGlobalSessionDesc const& desc,
+    ObjectID outGlobalSessionId)
 {
     SANITY_CHECK();
     Slang::StringBuilder builder;
@@ -787,6 +807,7 @@ void JsonConsumer::CreateGlobalSession(ObjectID outGlobalSessionId)
 
     {
         ScopeWritterForKey scopeWritter(&builder, &indent, "IGlobalSession::createGlobalSession");
+        _writeGlobalSessionDescHelper(builder, indent, desc, "inDesc");
         _writePairNoComma(
             builder,
             indent,

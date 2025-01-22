@@ -1856,6 +1856,13 @@ DIAGNOSTIC(
     Error,
     errorInImportedModule,
     "import of module '$0' failed because of a compilation error")
+
+DIAGNOSTIC(
+    38201,
+    Error,
+    glslModuleNotAvailable,
+    "'glsl' module is not available from the current global session. To enable GLSL compatibility "
+    "mode, specify 'SlangGlobalSessionDesc::enableGLSL' when creating the global session.")
 DIAGNOSTIC(39999, Fatal, complationCeased, "compilation ceased")
 
 // 39xxx - Type layout and parameter binding.

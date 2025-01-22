@@ -96,7 +96,9 @@ private:
 class ReplayConsumer : public IDecoderConsumer, public Slang::RefObject
 {
 public:
-    virtual void CreateGlobalSession(ObjectID outGlobalSessionId) override;
+    virtual void CreateGlobalSession(
+        SlangGlobalSessionDesc const& desc,
+        ObjectID outGlobalSessionId) override;
     virtual void IGlobalSession_createSession(
         ObjectID objectId,
         slang::SessionDesc const& desc,

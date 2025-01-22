@@ -330,12 +330,14 @@ void ReplayConsumer::printDiagnosticMessage(slang::IBlob* diagnosticsBlob)
     }
 }
 
-void ReplayConsumer::CreateGlobalSession(ObjectID outGlobalSessionId)
+void ReplayConsumer::CreateGlobalSession(
+    SlangGlobalSessionDesc const& desc,
+    ObjectID outGlobalSessionId)
 {
     OutputObjectSanityCheck(outGlobalSessionId);
 
     slang::IGlobalSession* outGlobalSession{};
-    slang::createGlobalSession(&outGlobalSession);
+    slang::createGlobalSession(&desc, &outGlobalSession);
 
     if (outGlobalSession)
     {
