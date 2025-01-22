@@ -4,6 +4,7 @@ set -e
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 source_dir="$(dirname "$script_dir")"
+since_rev=""
 
 check_only=0
 no_version_check=0
@@ -30,6 +31,7 @@ Options:
     --md              Format only markdown files
     --sh              Format only shell script files
     --cmake           Format only CMake files
+    --since <rev>     Only format files since Git revision <rev>
 EOF
 }
 
@@ -63,6 +65,10 @@ while [[ "$#" -gt 0 ]]; do
     ;;
   --source)
     source_dir="$2"
+    shift
+    ;;
+  --since)
+    since_rev="$2"
     shift
     ;;
   *)
@@ -121,10 +127,18 @@ fi
 
 exit_code=0
 
+function list_files() {
+    if [ "$since_rev" ]; then
+        git diff --name-only "$since_rev" HEAD $@
+    else
+        git ls-files $@
+    fi
+}
+
 cmake_formatting() {
   echo "Formatting CMake files..." >&2
 
-  readarray -t files < <(git ls-files '*.cmake' 'CMakeLists.txt' '**/CMakeLists.txt')
+  readarray -t files < <(list_files '*.cmake' 'CMakeLists.txt' '**/CMakeLists.txt')
 
   common_args=(
     # turn on warning when this is fixed https://github.com/BlankSpruce/gersemi/issues/39
@@ -161,7 +175,7 @@ track_progress() {
 cpp_formatting() {
   echo "Formatting cpp files..." >&2
 
-  readarray -t files < <(git ls-files '*.cpp' '*.hpp' '*.c' '*.h' ':!external/**')
+  readarray -t files < <(list_files '*.cpp' '*.hpp' '*.c' '*.h' ':!external/**')
 
   # The progress reporting is a bit sneaky, we use `--verbose` with xargs which
   # prints a line to stderr for each command, and we simply count these...
@@ -211,7 +225,7 @@ prettier_formatting() {
 yaml_json_formatting() {
   echo "Formatting yaml and json files..." >&2
 
-  readarray -t files < <(git ls-files "*.yaml" "*.yml" "*.json" ':!external/**')
+  readarray -t files < <(list_files "*.yaml" "*.yml" "*.json" ':!external/**')
 
   prettier_formatting
 }
@@ -219,7 +233,7 @@ yaml_json_formatting() {
 markdown_formatting() {
   echo "Formatting markdown files..." >&2
 
-  readarray -t files < <(git ls-files "*.md" ':!external/**')
+  readarray -t files < <(list_files "*.md" ':!external/**')
 
   prettier_formatting
 }
@@ -227,7 +241,7 @@ markdown_formatting() {
 sh_formatting() {
   echo "Formatting sh files..." >&2
 
-  readarray -t files < <(git ls-files "*.sh")
+  readarray -t files < <(list_files "*.sh")
 
   common_args=(
     # default 8 is way too wide
