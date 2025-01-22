@@ -760,14 +760,11 @@ public:
         m_mapTypePairToImplicitCastMethod[key] = candidate;
     }
 
-    bool* isCStyleStruct(StructDecl* structDecl)
-    {
-        return m_isCStyleStructCache.tryGetValue(structDecl);
-    }
+    bool* isCStyleType(Type* type) { return m_isCStyleTypeCache.tryGetValue(type); }
 
-    void cacheCStyleStruct(StructDecl* structDecl, bool isCStyle)
+    void cacheCStyleType(Type* type, bool isCStyle)
     {
-        m_isCStyleStructCache.addIfNotExists(structDecl, isCStyle);
+        m_isCStyleTypeCache.addIfNotExists(type, isCStyle);
     }
     // Get the inner most generic decl that a decl-ref is dependent on.
     // For example, `Foo<T>` depends on the generic decl that defines `T`.
@@ -898,7 +895,7 @@ private:
     Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
     Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
     Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
-    Dictionary<StructDecl*, bool> m_isCStyleStructCache;
+    Dictionary<Type*, bool> m_isCStyleTypeCache;
 };
 
 /// Local/scoped state of the semantic-checking system
@@ -2814,8 +2811,7 @@ public:
     ConstructorDecl* _getSynthesizedConstructor(
         StructDecl* structDecl,
         ConstructorDecl::ConstructorFlavor flavor);
-    bool isCStyleStruct(StructDecl* structDecl);
-    bool _cStyleStructBasicCheck(Decl* decl);
+    bool isCStyleType(Type* type);
 };
 
 
