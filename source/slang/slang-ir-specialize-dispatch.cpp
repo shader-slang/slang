@@ -177,39 +177,6 @@ IRFunc* specializeDispatchFunction(
     return newDispatchFunc;
 }
 
-// Returns true if the witness table is transitively referenced through a witness table with
-// linkage.
-bool _isWitnessTableTransitivelyVisible(IRInst* witness)
-{
-    if (witness->findDecoration<IRLinkageDecoration>())
-        return true;
-
-    OrderedHashSet<IRInst*> workSet;
-    List<IRInst*> workList;
-    workList.add(witness);
-    for (int i = 0; i < workList.getCount(); i++)
-    {
-        auto item = workList[i];
-        if (item->findDecoration<IRLinkageDecoration>())
-            return true;
-        for (auto use = item->firstUse; use; use = use->nextUse)
-        {
-            auto user = use->getUser();
-            if (user->getOp() == kIROp_WitnessTableEntry)
-            {
-                if (user->getParent())
-                {
-                    if (workSet.add(user->getParent()))
-                    {
-                        workList.add(user->getParent());
-                    }
-                }
-            }
-        }
-    }
-    return false;
-}
-
 // Ensures every witness table object has been assigned a sequential ID.
 // All witness tables will have a SequentialID decoration after this function is run.
 // The sequantial ID in the decoration will be the same as the one specified in the Linkage.
@@ -242,27 +209,15 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
                     continue;
                 }
 
-                // If this witness table entry does not have a linkage,
-                // we need to check if it is transitively visible via
-                // associatedtypes from an existing witness table with linkage.
-                // If so we still need to include this witness talbe, otherwise
-                // don't assign sequential ID for it.
-                if (_isWitnessTableTransitivelyVisible(inst))
+                // generate a unique linkage for it.
+                static int32_t uniqueId = 0;
+                uniqueId++;
+                if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
                 {
-                    // generate a unique linkage for it.
-                    static int32_t uniqueId = 0;
-                    uniqueId++;
-                    if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
-                    {
-                        generatedMangledName << nameHint->getName();
-                    }
-                    generatedMangledName << "_generated_witness_uuid_" << uniqueId;
-                    witnessTableMangledName = generatedMangledName.getUnownedSlice();
+                    generatedMangledName << nameHint->getName();
                 }
-                else
-                {
-                    continue;
-                }
+                generatedMangledName << "_generated_witness_uuid_" << uniqueId;
+                witnessTableMangledName = generatedMangledName.getUnownedSlice();
             }
 
             // If the inst already has a SequentialIDDecoration, stop now.
