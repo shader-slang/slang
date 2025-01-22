@@ -164,7 +164,7 @@ track_progress() {
   local total=$1
   local current=0
 
-  while IFS= read -r _; do
+  ((total)) && while IFS= read -r _; do
     ((current++)) || :
     percent=$((current * 100 / total))
     printf '\rProgress: [%-50s] %d%%' "$(printf '#%.0s' $(seq 1 $((percent / 2))))" "$percent" >&2
