@@ -93,10 +93,8 @@
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-string-hash.h"
-#include "slang-ir-strip-cached-dict.h"
 #include "slang-ir-strip-default-construct.h"
-#include "slang-ir-strip-witness-tables.h"
-#include "slang-ir-strip.h"
+#include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-translate-glsl-global-var.h"
 #include "slang-ir-uniformity.h"
@@ -1322,6 +1320,14 @@ Result linkAndOptimizeIR(
             byteAddressBufferOptions);
     }
 
+    // For SPIR-V, this function is called elsewhere, so that it can happen after address space
+    // specialization
+    if (target != CodeGenTarget::SPIRV && target != CodeGenTarget::SPIRVAssembly)
+    {
+        bool skipFuncParamValidation = true;
+        validateAtomicOperations(skipFuncParamValidation, sink, irModule->getModuleInst());
+    }
+
     // For CUDA targets only, we will need to turn operations
     // the implicitly reference the "active mask" into ones
     // that use (and pass around) an explicit mask instead.
@@ -1501,12 +1507,10 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    stripCachedDictionaries(irModule);
-
     // TODO: our current dynamic dispatch pass will remove all uses of witness tables.
     // If we are going to support function-pointer based, "real" modular dynamic dispatch,
     // we will need to disable this pass.
-    stripWitnessTables(irModule);
+    stripLegalizationOnlyInstructions(irModule);
 
     switch (target)
     {

@@ -1353,6 +1353,30 @@ SLANG_NO_THROW slang::ITarget* SLANG_MCALL Linkage::getTargetByIndex(SlangInt in
 }
 #endif
 
+static void outputExceptionDiagnostic(
+    const AbortCompilationException& exception,
+    DiagnosticSink& sink,
+    slang::IBlob** outDiagnostics)
+{
+    sink.diagnoseRaw(Severity::Error, exception.Message.getUnownedSlice());
+    sink.getBlobIfNeeded(outDiagnostics);
+}
+
+static void outputExceptionDiagnostic(
+    const Exception& exception,
+    DiagnosticSink& sink,
+    slang::IBlob** outDiagnostics)
+{
+    sink.diagnoseRaw(Severity::Internal, exception.Message.getUnownedSlice());
+    sink.getBlobIfNeeded(outDiagnostics);
+}
+
+static void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnostics)
+{
+    sink.diagnoseRaw(Severity::Fatal, "An unknown exception occurred");
+    sink.getBlobIfNeeded(outDiagnostics);
+}
+
 SLANG_NO_THROW slang::IModule* SLANG_MCALL
 Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
 {
@@ -1375,9 +1399,19 @@ Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
 
         return asExternal(module);
     }
-    catch (const AbortCompilationException&)
+    catch (const AbortCompilationException& e)
     {
-        sink.getBlobIfNeeded(outDiagnostics);
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return nullptr;
+    }
+    catch (const Exception& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return nullptr;
+    }
+    catch (...)
+    {
+        outputExceptionDiagnostic(sink, outDiagnostics);
         return nullptr;
     }
 }
@@ -1438,9 +1472,19 @@ slang::IModule* Linkage::loadModuleFromBlob(
         sink.getBlobIfNeeded(outDiagnostics);
         return asExternal(module);
     }
-    catch (const AbortCompilationException&)
+    catch (const AbortCompilationException& e)
     {
-        sink.getBlobIfNeeded(outDiagnostics);
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return nullptr;
+    }
+    catch (const Exception& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return nullptr;
+    }
+    catch (...)
+    {
+        outputExceptionDiagnostic(sink, outDiagnostics);
         return nullptr;
     }
 }
@@ -5153,12 +5197,32 @@ ComponentType::link(slang::IComponentType** outLinkedComponentType, ISlangBlob**
     //
     SLANG_UNUSED(outDiagnostics);
 
-    auto linked = fillRequirements(this);
-    if (!linked)
-        return SLANG_FAIL;
+    DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
 
-    *outLinkedComponentType = ComPtr<slang::IComponentType>(linked).detach();
-    return SLANG_OK;
+    try
+    {
+        auto linked = fillRequirements(this);
+        if (!linked)
+            return SLANG_FAIL;
+
+        *outLinkedComponentType = ComPtr<slang::IComponentType>(linked).detach();
+        return SLANG_OK;
+    }
+    catch (const AbortCompilationException& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return SLANG_FAIL;
+    }
+    catch (const Exception& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return SLANG_FAIL;
+    }
+    catch (...)
+    {
+        outputExceptionDiagnostic(sink, outDiagnostics);
+        return SLANG_FAIL;
+    }
 }
 
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::linkWithOptions(

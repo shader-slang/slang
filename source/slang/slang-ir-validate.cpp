@@ -410,4 +410,104 @@ void validateIRModuleIfEnabled(CodeGenContext* codeGenContext, IRModule* module)
     validateIRModule(module, sink);
 }
 
+// Returns whether 'dst' is a valid destination for atomic operations, meaning
+// it leads either to 'groupshared' or 'device buffer' memory.
+static bool isValidAtomicDest(bool skipFuncParamValidation, IRInst* dst)
+{
+    bool isGroupShared = as<IRGroupSharedRate>(dst->getRate());
+    if (isGroupShared)
+        return true;
+
+    if (as<IRRWStructuredBufferGetElementPtr>(dst))
+        return true;
+    if (as<IRImageSubscript>(dst))
+        return true;
+
+    if (auto ptrType = as<IRPtrType>(dst->getDataType()))
+    {
+        switch (ptrType->getAddressSpace())
+        {
+        case AddressSpace::Global:
+        case AddressSpace::GroupShared:
+        case AddressSpace::StorageBuffer:
+        case AddressSpace::UserPointer:
+            return true;
+        default:
+            break;
+        }
+    }
+
+    if (as<IRGlobalParam>(dst))
+    {
+        switch (dst->getDataType()->getOp())
+        {
+        case kIROp_GLSLShaderStorageBufferType:
+        case kIROp_TextureType:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    if (auto param = as<IRParam>(dst))
+    {
+        auto paramType = param->getDataType();
+        if (auto outType = as<IROutTypeBase>(paramType))
+        {
+            if (outType->getAddressSpace() == AddressSpace::GroupShared)
+            {
+                return true;
+            }
+            else if (skipFuncParamValidation)
+            {
+                // We haven't actually verified that this is a valid atomic operation destination,
+                // but the callee wants to skip this specific validation.
+                return true;
+            }
+        }
+    }
+    if (auto getElementPtr = as<IRGetElementPtr>(dst))
+        return isValidAtomicDest(skipFuncParamValidation, getElementPtr->getBase());
+    if (auto getOffsetPtr = as<IRGetOffsetPtr>(dst))
+        return isValidAtomicDest(skipFuncParamValidation, getOffsetPtr->getBase());
+    if (auto fieldAddress = as<IRFieldAddress>(dst))
+        return isValidAtomicDest(skipFuncParamValidation, fieldAddress->getBase());
+
+    return false;
+}
+
+void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_AtomicLoad:
+    case kIROp_AtomicStore:
+    case kIROp_AtomicExchange:
+    case kIROp_AtomicCompareExchange:
+    case kIROp_AtomicAdd:
+    case kIROp_AtomicSub:
+    case kIROp_AtomicAnd:
+    case kIROp_AtomicOr:
+    case kIROp_AtomicXor:
+    case kIROp_AtomicMin:
+    case kIROp_AtomicMax:
+    case kIROp_AtomicInc:
+    case kIROp_AtomicDec:
+        {
+            IRInst* destinationPtr = inst->getOperand(0);
+            if (!isValidAtomicDest(skipFuncParamValidation, destinationPtr))
+                sink->diagnose(inst->sourceLoc, Diagnostics::invalidAtomicDestinationPointer);
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    for (auto child : inst->getModifiableChildren())
+    {
+        validateAtomicOperations(skipFuncParamValidation, sink, child);
+    }
+}
+
 } // namespace Slang
