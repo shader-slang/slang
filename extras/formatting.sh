@@ -119,7 +119,7 @@ require_bin "git" "1.8"
 require_bin "diff" "2"
 ((run_all || run_cpp)) && require_bin "clang-format" "17" "18"
 ((run_all || run_yaml || run_markdown)) && require_bin "prettier" "3"
-((run_all || run_sh)) &&  require_bin "shfmt" "3"
+((run_all || run_sh)) && require_bin "shfmt" "3"
 
 if [ "$missing_bin" ]; then
   exit 1
@@ -128,11 +128,11 @@ fi
 exit_code=0
 
 function list_files() {
-    if [ "$since_rev" ]; then
-        git diff --name-only "$since_rev" HEAD $@
-    else
-        git ls-files $@
-    fi
+  if [ "$since_rev" ]; then
+    git diff --name-only "$since_rev" HEAD $@
+  else
+    git ls-files $@
+  fi
 }
 
 cmake_formatting() {
