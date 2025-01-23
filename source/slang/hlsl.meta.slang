@@ -855,6 +855,10 @@ float __glsl_texture_level_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture 
     }
 }
 
+__intrinsic_op($(kIROp_MetalCastToDepthTexture))
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
+_Texture<T,Shape,isArray,isMS,sampleCount,access,1,isCombined,format> __metal_asDepthTexture(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> tex);
+
 //@public:
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
@@ -1676,6 +1680,96 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,0,format>
         }
     }
 }
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let format:int>
+float __metal_SampleCmp(_Texture<T,Shape,isArray,isMS,sampleCount,0,1,0,format> t, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue)
+{
+    if (isArray == 1)
+    {
+        switch (Shape.flavor)
+        {
+        case $(SLANG_TEXTURE_2D):
+            __intrinsic_asm "$0.sample_compare($1, ($2).xy, uint(($2).z), $3)";
+        case $(SLANG_TEXTURE_CUBE):
+            __intrinsic_asm "$0.sample_compare($1, ($2).xyz, uint(($2).w), $3)";
+        }
+    }
+    else
+    {
+        switch (Shape.flavor)
+        {
+        case $(SLANG_TEXTURE_2D):
+        case $(SLANG_TEXTURE_CUBE):
+            __intrinsic_asm ".sample_compare";
+        }
+    }
+    __intrinsic_asm "<invalid intrinsic>";
+}
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let format:int>
+float __metal_SampleCmp(_Texture<T,Shape,isArray,isMS,sampleCount,0,1,0,format> t, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset)
+{
+    if (isArray == 1)
+    {
+        switch (Shape.flavor)
+        {
+        case $(SLANG_TEXTURE_2D):
+            __intrinsic_asm "$0.sample_compare($1, ($2).xy, uint(($2).z), $3, $4)";
+        }
+    }
+    else
+    {
+        switch (Shape.flavor)
+        {
+        case $(SLANG_TEXTURE_2D):
+            __intrinsic_asm "$0.sample_compare($1, $2, $3, $4)";
+        }
+    }
+    __intrinsic_asm "<invalid intrinsic>";
+}
+
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let format:int>
+float __metal_SampleCmpLevel(_Texture<T,Shape,isArray,isMS,sampleCount,0,1,0,format> t, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float level)
+{
+    if (isArray == 1)
+    {
+        switch (Shape.flavor)
+        {
+        case $(SLANG_TEXTURE_2D):
+            __intrinsic_asm "$0.sample_compare($1, ($2).xy, uint(($2).z), $3, level($4))";
+        case $(SLANG_TEXTURE_CUBE):
+            __intrinsic_asm "$0.sample_compare($1, ($2).xyz, uint(($2).w), $3, level($4))";
+        }
+    }
+    else
+    {
+        switch (Shape.flavor)
+        {
+        case $(SLANG_TEXTURE_2D):
+        case $(SLANG_TEXTURE_CUBE):
+            __intrinsic_asm "$0.sample_compare($1, $2, $3, level($4))";
+        }
+    }
+    __intrinsic_asm "<invalid intrinsic>";
+}
+__generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let format:int>
+float __metal_SampleCmpLevel(_Texture<T,Shape,isArray,isMS,sampleCount,0,1,0,format> t, SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset)
+{
+    switch (Shape.flavor)
+    {
+    case $(SLANG_TEXTURE_2D):
+        if (isArray == 1)
+        {
+            // T sample_compare(sampler s, float2 coord, uint array, float compare_value, lod_options options, int2 offset = int2(0)) const
+            __intrinsic_asm "$0.sample_compare($1, ($2).xy, uint(($2).z), $3, level($4), $5)";
+        }
+        else
+        {
+            // T sample_compare(sampler s, float2 coord, float compare_value, lod_options options, int2 offset = int2(0)) const
+            __intrinsic_asm "$0.sample_compare($1, $2, $3, level($4), $5)";
+        }
+        break;
+    }
+    __intrinsic_asm "<invalid intrinsic>";
+}
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
@@ -2082,26 +2176,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmp";
         case metal:
-            if (isArray == 1)
-            {
-                switch (Shape.flavor)
-                {
-                case $(SLANG_TEXTURE_2D):
-                    __intrinsic_asm "$0.sample_compare($1, ($2).xy, uint(($2).z), $3)";
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "$0.sample_compare($1, ($2).xyz, uint(($2).w), $3)";
-                }
-            }
-            else
-            {
-                switch (Shape.flavor)
-                {
-                case $(SLANG_TEXTURE_2D):
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm ".sample_compare";
-                }
-            }
-            __intrinsic_asm "<invalid intrinsic>";
+            return __metal_SampleCmp(__metal_asDepthTexture(this), s, location, compareValue);
         case spirv:
             return spirv_asm
             {
@@ -2183,23 +2258,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmp";
         case metal:
-            if (isArray == 1)
-            {
-                switch (Shape.flavor)
-                {
-                case $(SLANG_TEXTURE_2D):
-                    __intrinsic_asm "$0.sample_compare($1, ($2).xy, uint(($2).z), $3, $4)";
-                }
-            }
-            else
-            {
-                switch (Shape.flavor)
-                {
-                case $(SLANG_TEXTURE_2D):
-                    __intrinsic_asm ".sample_compare";
-                }
-            }
-            __intrinsic_asm "<invalid intrinsic>";
+            return __metal_SampleCmp(__metal_asDepthTexture(this), s, location, compareValue, offset);
         case spirv:
             return spirv_asm
             {
@@ -2311,26 +2370,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpLevel";
         case metal:
-            if (isArray == 1)
-            {
-                switch (Shape.flavor)
-                {
-                case $(SLANG_TEXTURE_2D):
-                    __intrinsic_asm "$0.sample_compare($1, ($2).xy, uint(($2).z), $3, level($4))";
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "$0.sample_compare($1, ($2).xyz, uint(($2).w), $3, level($4))";
-                }
-            }
-            else
-            {
-                switch (Shape.flavor)
-                {
-                case $(SLANG_TEXTURE_2D):
-                case $(SLANG_TEXTURE_CUBE):
-                    __intrinsic_asm "$0.sample_compare($1, $2, $3, level($4))";
-                }
-            }
-            __intrinsic_asm "<invalid intrinsic>";
+            return __metal_SampleCmpLevel(__metal_asDepthTexture(this), s, location, compareValue, level);
         case spirv:
             return spirv_asm
             {
@@ -2362,25 +2402,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpLevel";
         case metal:
-            if (isShadow == 1)
-            {
-                switch (Shape.flavor)
-                {
-                case $(SLANG_TEXTURE_2D):
-                    if (isArray == 1)
-                    {
-                        // T sample_compare(sampler s, float2 coord, uint array, float compare_value, lod_options options, int2 offset = int2(0)) const
-                        __intrinsic_asm "$0.sample_compare($1, ($2).xy, uint(($2).z), $3, level($4), $5)";
-                    }
-                    else
-                    {
-                        // T sample_compare(sampler s, float2 coord, float compare_value, lod_options options, int2 offset = int2(0)) const
-                        __intrinsic_asm "$0.sample_compare($1, $2, $3, level($4), $5)";
-                    }
-                    break;
-                }
-            }
-            __intrinsic_asm "<invalid intrinsic>";
+            return __metal_SampleCmpLevel(__metal_asDepthTexture(this), s, location, compareValue, level, offset);
         case spirv:
             return spirv_asm
             {
