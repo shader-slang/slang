@@ -1,7 +1,6 @@
 // slang-emit-spirv.cpp
 
 #include "../core/slang-memory-arena.h"
-#include "slang-ast-support-types.h"
 #include "slang-compiler.h"
 #include "slang-emit-base.h"
 #include "slang-ir-call-graph.h"
@@ -1913,7 +1912,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 SourceLoc(),
                 Diagnostics::imageFormatUnsupportedByBackend,
                 imageFormatInfo.name,
-                "GLSL",
+                "SPIRV",
                 "unknown");
             imageFormat = ImageFormat::unknown;
         }

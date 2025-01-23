@@ -1151,7 +1151,7 @@ bool isImageFormatSupportedByGLSLAndSPIRV(ImageFormat format)
     switch (format)
     {
     case ImageFormat::bgra8:
-        // These are formats Slang accept, but are not explicitly available in GLSL and SPIRV.
+        // These are formats Slang accept, but are not explicitly supported in GLSL and SPIRV.
         return false;
     default:
         return true;
