@@ -1579,6 +1579,10 @@ void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
     {
         m_writer->emit("[payload] ");
     }
+    if (const auto payloadDecoration = inst->findDecoration<IRRayPayloadDecoration>())
+    {
+        m_writer->emit("[raypayload] ");
+    }
 }
 
 void HLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)
