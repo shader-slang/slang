@@ -142,8 +142,16 @@ static bool isDifferentiableFunc(IRInst* func)
 static IRInst* resolveSpecialization(IRSpecialize* spec)
 {
     IRInst* base = spec->getBase();
-    IRGeneric* generic = as<IRGeneric>(base);
-    return findInnerMostGenericReturnVal(generic);
+    while (auto baseSpecialize = as<IRSpecialize>(base))
+    {
+        base = resolveSpecialization(baseSpecialize);
+    }
+
+    auto baseGeneric = as<IRGeneric>(base);
+    if (!baseGeneric)
+        return base;
+
+    return findInnerMostGenericReturnVal(baseGeneric);
 }
 
 // The `upper` field contains the struct that the type is
@@ -172,6 +180,10 @@ static bool canIgnoreType(IRType* type, IRType* upper)
 
     // Nothing to initialize for a pure interface
     if (as<IRInterfaceType>(type))
+        return true;
+
+    // We don't know what TypeType will be yet.
+    if (as<IRParam>(type) && as<IRTypeType>(type->getDataType()))
         return true;
 
     // For pointers, check the value type (primarily for globals)
