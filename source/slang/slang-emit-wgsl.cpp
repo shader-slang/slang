@@ -326,7 +326,7 @@ void WGSLSourceEmitter::emit(const AddressSpace addressSpace)
     }
 }
 
-static const char* getWgslImageFormat(IRTextureTypeBase* type)
+const char* WGSLSourceEmitter::getWgslImageFormat(IRTextureTypeBase* type)
 {
     // You can find the supported WGSL texel format from the URL:
     // https://www.w3.org/TR/WGSL/#storage-texel-formats
@@ -411,7 +411,13 @@ static const char* getWgslImageFormat(IRTextureTypeBase* type)
         // Unlike SPIR-V, WGSL doesn't have a texel format for "unknown".
         return "rgba32float";
     default:
-        // We may need to print a warning for types WGSL doesn't support
+        const auto imageFormatInfo = getImageFormatInfo(imageFormat);
+        getSink()->diagnose(
+            SourceLoc(),
+            Diagnostics::imageFormatUnsupportedByBackend,
+            imageFormatInfo.name,
+            "WGSL",
+            "rgba32float");
         return "rgba32float";
     }
 }

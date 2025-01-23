@@ -1905,18 +1905,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         ImageFormat imageFormat =
             type->hasFormat() ? (ImageFormat)type->getFormat() : ImageFormat::unknown;
-        const auto imageFormatInfo = getImageFormatInfo(imageFormat);
-        if (!isImageFormatSupportedByGLSLAndSPIRV(imageFormat))
-        {
-            m_sink->diagnose(
-                SourceLoc(),
-                Diagnostics::imageFormatUnsupportedByBackend,
-                imageFormatInfo.name,
-                "SPIRV",
-                "unknown");
-            imageFormat = ImageFormat::unknown;
-        }
-
         switch (imageFormat)
         {
         case ImageFormat::unknown:
@@ -2004,7 +1992,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case ImageFormat::r64i:
             return SpvImageFormatR64i;
         default:
-            SLANG_UNIMPLEMENTED_X("unknown image format for spirv emit");
+            const auto imageFormatInfo = getImageFormatInfo(imageFormat);
+            m_sink->diagnose(
+                SourceLoc(),
+                Diagnostics::imageFormatUnsupportedByBackend,
+                imageFormatInfo.name,
+                "SPIRV",
+                "unknown");
+            return SpvImageFormatUnknown;
         }
     }
 

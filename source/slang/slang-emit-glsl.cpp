@@ -608,6 +608,19 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(
     m_writer->emit(";\n");
 }
 
+static bool isImageFormatSupportedByGLSL(ImageFormat format)
+{
+    switch (format)
+    {
+    case ImageFormat::bgra8:
+        // These are formats Slang accept, but are not explicitly supported in GLSL.
+        return false;
+    default:
+        return true;
+    }
+};
+
+
 void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType* resourceType)
 {
     SLANG_UNUSED(resourceType);
@@ -619,7 +632,7 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
     {
         auto format = formatDecoration->getFormat();
         const auto formatInfo = getImageFormatInfo(format);
-        if (!isImageFormatSupportedByGLSLAndSPIRV(format))
+        if (!isImageFormatSupportedByGLSL(format))
         {
             getSink()->diagnose(
                 SourceLoc(),

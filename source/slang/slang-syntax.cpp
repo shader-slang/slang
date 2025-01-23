@@ -1146,18 +1146,6 @@ bool findVkImageFormatByName(const UnownedStringSlice& name, ImageFormat* outFor
     return findImageFormatByName(name, outFormat);
 }
 
-bool isImageFormatSupportedByGLSLAndSPIRV(ImageFormat format)
-{
-    switch (format)
-    {
-    case ImageFormat::bgra8:
-        // These are formats Slang accept, but are not explicitly supported in GLSL and SPIRV.
-        return false;
-    default:
-        return true;
-    }
-};
-
 char const* getGLSLNameForImageFormat(ImageFormat format)
 {
     return kImageFormatInfos[Index(format)].name.begin();
