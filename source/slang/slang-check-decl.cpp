@@ -104,10 +104,10 @@ struct SemanticsDeclAttributesVisitor : public SemanticsDeclVisitorBase,
     // We will defer the actual implementation of the constructor to the body visit, because
     // we will have full information about each field in the struct during that stage.
     void _synthesizeCtorSignature(StructDecl* structDecl);
-    bool _searchMembersWithHigherVisibility(
+    bool _searchInitializableMembers(
         StructDecl* structDecl,
         const DeclVisibility ctorVisibility,
-        List<VarDeclBase*>& resultMembers);
+        List<KeyValuePair<VarDeclBase*, String>>& resultMembers);
 };
 
 struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
@@ -2170,23 +2170,6 @@ static List<ConstructorDecl*> _getCtorList(
     }
 
     return ctorList;
-}
-
-template<typename VisitorType>
-static void checkSynthesizedConstructorWithoutDiagnostic(VisitorType& subVisitor, Decl* decl)
-{
-    subVisitor.dispatch(decl);
-    auto tempSink = subVisitor.getSink();
-    if (tempSink->getErrorCount() > 0)
-    {
-        auto structDecl = as<StructDecl>(decl->parentDecl);
-        structDecl->members.remove(decl);
-        structDecl->invalidateMemberDictionary();
-        structDecl->buildMemberDictionary();
-        structDecl->m_synthesizedCtorMap.remove(
-            (int)ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
-    }
-    return;
 }
 
 void SemanticsDeclHeaderVisitor::visitStructDecl(StructDecl* structDecl)
@@ -8176,45 +8159,33 @@ SemanticsContext SemanticsDeclBodyVisitor::registerDifferentiableTypesForFunc(
 
 void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
 {
-    if (auto constructorDecl = as<ConstructorDecl>(decl))
-    {
-        // When checking the synthesized constructor, it's possible to hit error, but we don't want
-        // to report this error, because this function is not created by user. Instead, when we
-        // detect this error, we will remove this synthesized constructor from the struct.
-        if (constructorDecl->containsFlavor(
-                ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit) &&
-            !m_checkForSynthesizedCtor)
-        {
-            DiagnosticSink tempSink;
-            SemanticsContext subContext = withSink(&tempSink);
-            subContext.setCheckForSynthesizedCtor(true);
-            SemanticsDeclBodyVisitor subVisitor(subContext);
-            checkSynthesizedConstructorWithoutDiagnostic(subVisitor, decl);
-            // Once we have checked the definition of synthesized constructor, we can return delete
-            // the default constructor if it exists, because we only need to have one constructor.
-            if (tempSink.getErrorCount() == 0)
-            {
-                auto structDecl = as<StructDecl>(constructorDecl->parentDecl);
-                ConstructorDecl* defaultCtor = nullptr;
-                if (structDecl->m_synthesizedCtorMap.tryGetValue(
-                        (int)ConstructorDecl::ConstructorFlavor::SynthesizedDefault,
-                        defaultCtor))
-                {
-                    structDecl->members.remove(defaultCtor);
-                    structDecl->invalidateMemberDictionary();
-                    structDecl->buildMemberDictionary();
-                    structDecl->m_synthesizedCtorMap.remove(
-                        (int)ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
-                }
-            }
-            return;
-        }
-    }
-
     auto newContext = registerDifferentiableTypesForFunc(decl);
     if (const auto body = decl->body)
     {
         checkStmt(decl->body, newContext);
+    }
+
+    if (auto constructorDecl = as<ConstructorDecl>(decl))
+    {
+        if (constructorDecl->containsFlavor(
+                ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit) &&
+            !getSink()->getErrorCount())
+        {
+            // Once we have checked the definition of synthesized constructor, we can return delete
+            // the default constructor if it exists, because we only need to have one constructor.
+            auto structDecl = as<StructDecl>(constructorDecl->parentDecl);
+            ConstructorDecl* defaultCtor = nullptr;
+            if (structDecl->m_synthesizedCtorMap.tryGetValue(
+                    (int)ConstructorDecl::ConstructorFlavor::SynthesizedDefault,
+                    defaultCtor))
+            {
+                structDecl->members.remove(defaultCtor);
+                structDecl->invalidateMemberDictionary();
+                structDecl->buildMemberDictionary();
+                structDecl->m_synthesizedCtorMap.remove(
+                    (int)ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
+            }
+        }
     }
 }
 
@@ -9432,6 +9403,10 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMember(
     }
 
     MemberExpr* memberExpr = createMemberExpr(thisExpr, ctor->ownedScope, member);
+    auto memberDeclRef = m_astBuilder->getMemberDeclRef(structDecl, member);
+    auto type = GetTypeForDeclRef(memberDeclRef, member->loc);
+    if (!type.isLeftValue)
+        return;
 
     auto assign = m_astBuilder->create<AssignExpr>();
     assign->left = memberExpr;
@@ -10122,20 +10097,6 @@ Type* SemanticsVisitor::findResultTypeForConstructorDecl(ConstructorDecl* decl)
 
 void SemanticsDeclHeaderVisitor::visitConstructorDecl(ConstructorDecl* decl)
 {
-    // When checking the synthesized constructor, it's possible to hit error, but we don't want to
-    // report this error, because this function is not created by user. Instead, when we detect this
-    // error, we will remove this synthesized constructor from the struct.
-    if (decl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit) &&
-        !m_checkForSynthesizedCtor)
-    {
-        DiagnosticSink tempSink;
-        SemanticsContext subContext = withSink(&tempSink);
-        subContext.setCheckForSynthesizedCtor(true);
-        SemanticsDeclHeaderVisitor subVisitor(subContext);
-        checkSynthesizedConstructorWithoutDiagnostic(subVisitor, decl);
-        return;
-    }
-
     // We need to compute the result type for this declaration,
     // since it wasn't filled in for us.
     decl->returnType.type = findResultTypeForConstructorDecl(decl);
@@ -12336,10 +12297,10 @@ void SemanticsDeclAttributesVisitor::checkPrimalSubstituteOfAttribute(
         DeclAssociationKind::PrimalSubstituteFunc);
 }
 
-bool SemanticsDeclAttributesVisitor::_searchMembersWithHigherVisibility(
+bool SemanticsDeclAttributesVisitor::_searchInitializableMembers(
     StructDecl* structDecl,
     const DeclVisibility ctorVisibility,
-    List<VarDeclBase*>& resultMembers)
+    List<KeyValuePair<VarDeclBase*, String>>& resultMembers)
 {
     auto findMembers = [&](StructDecl* structDecl)
     {
@@ -12349,11 +12310,15 @@ bool SemanticsDeclAttributesVisitor::_searchMembersWithHigherVisibility(
                  MemberFilterStyle::Instance))
         {
             auto varDecl = varDeclRef.getDecl();
-            if (getDeclVisibility(varDecl) >= ctorVisibility)
-            {
-                resultMembers.add(varDecl);
-                structDecl->m_membersVisibleInCtor.add(varDecl);
-            }
+            if (getDeclVisibility(varDecl) < ctorVisibility)
+                continue;
+
+            auto type = GetTypeForDeclRef(varDeclRef, varDecl->loc);
+            if (!type.isLeftValue)
+                continue;
+
+            resultMembers.add(KeyValuePair(varDecl, structDecl->getName()->text));
+            structDecl->m_membersVisibleInCtor.add(varDecl);
         }
     };
 
@@ -12374,12 +12339,14 @@ bool SemanticsDeclAttributesVisitor::_searchMembersWithHigherVisibility(
             // otherwise, it's not accessible so we will not pick up.
             if (ctor && getDeclVisibility(ctor) >= ctorVisibility)
             {
-                for (auto param : ctor->getParameters())
+                for (ParamDecl* param : ctor->getParameters())
                 {
                     // Because the parameters in the ctor must have the higher or equal visibility
                     // than the ctor itself, we don't need to check the visibility level of the
                     // parameter.
-                    resultMembers.add(param);
+                    resultMembers.add(KeyValuePair(
+                        as<VarDeclBase>(param),
+                        baseTypeDeclRef.getDecl()->getName()->text));
                 }
             }
         }
@@ -12432,8 +12399,8 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
 
     // Only the members whose visibility level is higher or equal than the
     // constructor's visibility level will appear in the constructor's parameter list.
-    List<VarDeclBase*> resultMembers;
-    if (!_searchMembersWithHigherVisibility(structDecl, ctorVisibility, resultMembers))
+    List<KeyValuePair<VarDeclBase*, String>> resultMembers;
+    if (!_searchInitializableMembers(structDecl, ctorVisibility, resultMembers))
         return;
 
     // synthesize the constructor signature:
@@ -12450,7 +12417,9 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
     bool stopProcessingDefaultValues = false;
     for (SlangInt i = resultMembers.getCount() - 1; i >= 0; i--)
     {
-        auto member = resultMembers[i];
+        auto member = resultMembers[i].key;
+        auto memberContainerName = resultMembers[i].value;
+
         auto ctorParam = m_astBuilder->create<ParamDecl>();
         ctorParam->type = (TypeExp)member->type;
 
@@ -12461,7 +12430,13 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
             stopProcessingDefaultValues = true;
 
         ctorParam->parentDecl = ctor;
-        ctorParam->nameAndLoc = NameLoc(member->getName(), ctor->loc);
+
+        Name* paramName = (memberContainerName == structDecl->getName()->text)
+                              ? member->getName()
+                              : getName(memberContainerName + "_" + member->getName()->text);
+
+        ctorParam->nameAndLoc = NameLoc(paramName, ctor->loc);
+
         ctorParam->loc = ctor->loc;
         ctor->members.add(ctorParam);
 

@@ -30,6 +30,12 @@ tests/diagnostics/variable-redeclaration.slang(21): error 30200: declaration of 
 tests/diagnostics/variable-redeclaration.slang(20): note: see previous declaration of 'y'
     int y = x;
         ^
+tests/diagnostics/variable-redeclaration.slang(41): error 30200: declaration of 'f' conflicts with existing declaration
+struct S
+       ^
+tests/diagnostics/variable-redeclaration.slang(41): note: see previous declaration of 'f'
+struct S
+       ^
 tests/diagnostics/variable-redeclaration.slang(53): error 39999: ambiguous reference to 'size'
     return size;
            ^~~~
