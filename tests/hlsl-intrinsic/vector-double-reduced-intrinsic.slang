@@ -25,7 +25,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     FloatVector f = FloatVector(0.1f, vf, vf + 0.2f);
     
     // Operate over all values
-    FloatVector ft = {0.0f};
+    FloatVector ft = {};
 
     // TODO(JS):
     // fmod - disabled not available on D3D for double
