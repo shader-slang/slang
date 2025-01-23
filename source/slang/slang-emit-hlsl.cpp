@@ -1669,6 +1669,18 @@ void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
     {
         m_writer->emit("[payload] ");
     }
+    if (const auto payloadDecoration = inst->findDecoration<IRRayPayloadDecoration>())
+    {
+        ensurePrelude(
+            R"(
+#if __DXC_VERSION_MAJOR > 1 || (__DXC_VERSION_MAJOR == 1 && __DXC_VERSION_MINOR >= 8)
+    #define SLANG_RAYPAYLOAD [raypayload]
+#else
+    #define SLANG_RAYPAYLOAD
+#endif
+)");
+        m_writer->emit("SLANG_RAYPAYLOAD ");
+    }
 }
 
 void HLSLSourceEmitter::_emitPrefixTypeAttr(IRAttr* attr)

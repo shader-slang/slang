@@ -16423,6 +16423,13 @@ __generic<T>
 __intrinsic_op($(kIROp_ForceVarIntoStructTemporarily))
 Ref<T> __forceVarIntoStructTemporarily(inout T maybeStruct);
 
+// Some functions require a struct type which is decorated with a [raypayload]
+// attribute. This will do the same as __forceVarIntoStructTemporarily and also
+// ensure that the struct type in question is decorated appropriately.
+__generic<T>
+__intrinsic_op($(kIROp_ForceVarIntoRayPayloadStructTemporarily))
+Ref<T> __forceVarIntoRayPayloadStructTemporarily(inout T maybeStruct);
+
 __generic<payload_t>
 [require(hlsl, raytracing)]
 void __traceRayHLSL(
@@ -16507,7 +16514,7 @@ void TraceRay(
             MultiplierForGeometryContributionToHitGroupIndex,
             MissShaderIndex,
             Ray,
-            __forceVarIntoStructTemporarily(Payload));
+            __forceVarIntoRayPayloadStructTemporarily(Payload));
         return;
     case cuda: __intrinsic_asm "traceOptiXRay";
     case glsl:
@@ -16645,7 +16652,7 @@ void TraceMotionRay(
             MissShaderIndex,
             Ray,
             CurrentTime,
-            __forceVarIntoStructTemporarily(Payload));
+            __forceVarIntoRayPayloadStructTemporarily(Payload));
         return;
     case glsl:
     {
@@ -18789,7 +18796,7 @@ struct HitObject
                     MultiplierForGeometryContributionToHitGroupIndex, 
                     MissShaderIndex, 
                     Ray, 
-                    __forceVarIntoStructTemporarily(Payload),
+                    __forceVarIntoRayPayloadStructTemporarily(Payload),
                     hitObj);
                 return hitObj;
             }
@@ -18882,7 +18889,7 @@ struct HitObject
                 MissShaderIndex,
                 Ray,
                 CurrentTime,
-                __forceVarIntoStructTemporarily(Payload));
+                __forceVarIntoRayPayloadStructTemporarily(Payload));
         case glsl:
             {
                 [__vulkanRayPayload]
@@ -19400,7 +19407,7 @@ struct HitObject
             __InvokeHLSL(
                 AccelerationStructure,
                 HitOrMiss,
-                __forceVarIntoStructTemporarily(Payload));
+                __forceVarIntoRayPayloadStructTemporarily(Payload));
         case glsl:
             {
                 [__vulkanRayPayload]
