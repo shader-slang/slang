@@ -405,6 +405,8 @@ static const char* getWgslImageFormat(IRTextureTypeBase* type)
         return "rgba32sint";
     case ImageFormat::rgba32f:
         return "rgba32float";
+    case ImageFormat::bgra8:
+        return "bgra8unorm";
     case ImageFormat::unknown:
         // Unlike SPIR-V, WGSL doesn't have a texel format for "unknown".
         return "rgba32float";

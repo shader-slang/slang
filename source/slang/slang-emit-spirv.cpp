@@ -1,6 +1,7 @@
 // slang-emit-spirv.cpp
 
 #include "../core/slang-memory-arena.h"
+#include "slang-ast-support-types.h"
 #include "slang-compiler.h"
 #include "slang-emit-base.h"
 #include "slang-ir-call-graph.h"
@@ -1901,10 +1902,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    static SpvImageFormat getSpvImageFormat(IRTextureTypeBase* type)
+    SpvImageFormat getSpvImageFormat(IRTextureTypeBase* type)
     {
         ImageFormat imageFormat =
             type->hasFormat() ? (ImageFormat)type->getFormat() : ImageFormat::unknown;
+        const auto imageFormatInfo = getImageFormatInfo(imageFormat);
+        if (!isImageFormatSupportedByGLSLAndSPIRV(imageFormat))
+        {
+            m_sink->diagnose(
+                SourceLoc(),
+                Diagnostics::imageFormatUnsupportedByBackend,
+                imageFormatInfo.name,
+                "GLSL",
+                "unknown");
+            imageFormat = ImageFormat::unknown;
+        }
+
         switch (imageFormat)
         {
         case ImageFormat::unknown:

@@ -205,6 +205,8 @@ const ImageFormatInfo& getImageFormatInfo(ImageFormat format);
 bool findImageFormatByName(const UnownedStringSlice& name, ImageFormat* outFormat);
 bool findVkImageFormatByName(const UnownedStringSlice& name, ImageFormat* outFormat);
 
+bool isImageFormatSupportedByGLSLAndSPIRV(ImageFormat format);
+
 char const* getGLSLNameForImageFormat(ImageFormat format);
 
 // TODO(tfoley): We should ditch this enumeration

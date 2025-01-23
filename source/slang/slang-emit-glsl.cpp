@@ -618,6 +618,18 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
     if (auto formatDecoration = var->findDecoration<IRFormatDecoration>())
     {
         auto format = formatDecoration->getFormat();
+        const auto formatInfo = getImageFormatInfo(format);
+        if (!isImageFormatSupportedByGLSLAndSPIRV(format))
+        {
+            getSink()->diagnose(
+                SourceLoc(),
+                Diagnostics::imageFormatUnsupportedByBackend,
+                formatInfo.name,
+                "GLSL",
+                "unknown");
+            format = ImageFormat::unknown;
+        }
+
         if (format == ImageFormat::unknown)
         {
             // If the user explicitly opts out of having a format, then
@@ -636,7 +648,6 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
         }
         else
         {
-            auto formatInfo = getImageFormatInfo(format);
             if (formatInfo.scalarType == SLANG_SCALAR_TYPE_UINT64 ||
                 formatInfo.scalarType == SLANG_SCALAR_TYPE_INT64)
             {
