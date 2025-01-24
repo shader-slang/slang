@@ -107,7 +107,7 @@ struct SemanticsDeclAttributesVisitor : public SemanticsDeclVisitorBase,
     bool _searchInitializableMembers(
         StructDecl* structDecl,
         const DeclVisibility ctorVisibility,
-        List<KeyValuePair<VarDeclBase*, String>>& resultMembers);
+        List<VarDeclBase*>& resultMembers);
 };
 
 struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
@@ -12300,7 +12300,7 @@ void SemanticsDeclAttributesVisitor::checkPrimalSubstituteOfAttribute(
 bool SemanticsDeclAttributesVisitor::_searchInitializableMembers(
     StructDecl* structDecl,
     const DeclVisibility ctorVisibility,
-    List<KeyValuePair<VarDeclBase*, String>>& resultMembers)
+    List<VarDeclBase*>& resultMembers)
 {
     auto findMembers = [&](StructDecl* structDecl)
     {
@@ -12317,7 +12317,7 @@ bool SemanticsDeclAttributesVisitor::_searchInitializableMembers(
             if (!type.isLeftValue)
                 continue;
 
-            resultMembers.add(KeyValuePair(varDecl, structDecl->getName()->text));
+            resultMembers.add(varDecl);
             structDecl->m_membersVisibleInCtor.add(varDecl);
         }
     };
@@ -12344,9 +12344,7 @@ bool SemanticsDeclAttributesVisitor::_searchInitializableMembers(
                     // Because the parameters in the ctor must have the higher or equal visibility
                     // than the ctor itself, we don't need to check the visibility level of the
                     // parameter.
-                    resultMembers.add(KeyValuePair(
-                        as<VarDeclBase>(param),
-                        baseTypeDeclRef.getDecl()->getName()->text));
+                    resultMembers.add(param);
                 }
             }
         }
@@ -12399,7 +12397,7 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
 
     // Only the members whose visibility level is higher or equal than the
     // constructor's visibility level will appear in the constructor's parameter list.
-    List<KeyValuePair<VarDeclBase*, String>> resultMembers;
+    List<VarDeclBase*> resultMembers;
     if (!_searchInitializableMembers(structDecl, ctorVisibility, resultMembers))
         return;
 
@@ -12417,8 +12415,8 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
     bool stopProcessingDefaultValues = false;
     for (SlangInt i = resultMembers.getCount() - 1; i >= 0; i--)
     {
-        auto member = resultMembers[i].key;
-        auto memberContainerName = resultMembers[i].value;
+        auto member = resultMembers[i];
+        auto parentAggDecl = getParentAggTypeDecl(member);;
 
         auto ctorParam = m_astBuilder->create<ParamDecl>();
         ctorParam->type = (TypeExp)member->type;
@@ -12431,9 +12429,9 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
 
         ctorParam->parentDecl = ctor;
 
-        Name* paramName = (memberContainerName == structDecl->getName()->text)
+        Name* paramName = (parentAggDecl == structDecl)
                               ? member->getName()
-                              : getName(memberContainerName + "_" + member->getName()->text);
+                              : getName(parentAggDecl->getName()->text + "_" + member->getName()->text);
 
         ctorParam->nameAndLoc = NameLoc(paramName, ctor->loc);
 
