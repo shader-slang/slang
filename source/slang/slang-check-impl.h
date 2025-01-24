@@ -1091,11 +1091,6 @@ public:
         return m_shared->getGLSLBindingOffsetTracker();
     }
 
-    void setCheckForSynthesizedCtor(bool checkForSynthesizedCtor)
-    {
-        m_checkForSynthesizedCtor = checkForSynthesizedCtor;
-    }
-
 private:
     SharedSemanticsContext* m_shared = nullptr;
 
@@ -1143,9 +1138,6 @@ protected:
     ExpandExpr* m_parentExpandExpr = nullptr;
 
     OrderedHashSet<Type*>* m_capturedTypePacks = nullptr;
-
-    // Flag to indicate whether this check is to check a synthesized constructor
-    bool m_checkForSynthesizedCtor = false;
 };
 
 struct OuterScopeContextRAII
