@@ -136,8 +136,7 @@ class InitializerListExpr : public Expr
     SLANG_AST_CLASS(InitializerListExpr)
     List<Expr*> args;
 
-    SLANG_UNREFLECTED
-    bool m_synthesizedForTypeCastZero = false;
+    bool useCStyleInitialization = true;
 };
 
 class GetArrayLengthExpr : public Expr

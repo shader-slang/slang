@@ -317,7 +317,7 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
         // for HLSL, this flag will imply that the initializer list is synthesized
         // for a type cast from a literal zero to a 'struct'. In this case, we will fall
         // back to legacy initializer list logic.
-        if (fromInitializerListExpr->m_synthesizedForTypeCastZero)
+        if (!fromInitializerListExpr->useCStyleInitialization)
         {
             if (!isCStyleType(toType))
                 return false;
@@ -373,7 +373,7 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
     // for HLSL, this flag will imply that the initializer list is synthesized
     // for a type cast from a literal zero to a 'struct'. In this case, we will fall
     // back to legacy initializer list logic.
-    if (fromInitializerListExpr->m_synthesizedForTypeCastZero)
+    if (!fromInitializerListExpr->useCStyleInitialization)
     {
         if (isCStyle)
             return false;
@@ -812,25 +812,18 @@ bool SemanticsVisitor::_coerceInitializerList(
         !canCoerce(toType, fromInitializerListExpr->type, nullptr))
         return _failedCoercion(toType, outToExpr, fromInitializerListExpr);
 
-    // TODO: This is just a special case for a backwards-compatibility feature
-    // for HLSL, this flag will imply that the initializer list is synthesized
-    // for a type cast from a literal zero to a 'struct'. In this case, we will fall
-    // back to legacy initializer list logic.
-    if (!fromInitializerListExpr->m_synthesizedForTypeCastZero)
+    // Try to invoke the user-defined constructor if it exists. This call will
+    // report error diagnostics if the used-defined constructor exists but does not
+    // match the initialize list.
+    if (createInvokeExprForExplicitCtor(toType, fromInitializerListExpr, outToExpr))
     {
-        // Try to invoke the user-defined constructor if it exists. This call will
-        // report error diagnostics if the used-defined constructor exists but does not
-        // match the initialize list.
-        if (createInvokeExprForExplicitCtor(toType, fromInitializerListExpr, outToExpr))
-        {
-            return true;
-        }
+        return true;
+    }
 
-        // Try to invoke the synthesized constructor if it exists
-        if (createInvokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
-        {
-            return true;
-        }
+    // Try to invoke the synthesized constructor if it exists
+    if (createInvokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
+    {
+        return true;
     }
 
     // We will fall back to the legacy logic of initialize list.
