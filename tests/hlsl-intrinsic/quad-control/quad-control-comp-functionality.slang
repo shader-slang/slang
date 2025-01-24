@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile cs_6_7 -dx12 -use-dxil -shaderobj -render-feature hardware-device
-//TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj -DMETAL
+//TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj -xslang -DMETAL
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
