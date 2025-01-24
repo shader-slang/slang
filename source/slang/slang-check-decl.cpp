@@ -7747,9 +7747,6 @@ bool SemanticsVisitor::_hasExplicitConstructor(StructDecl* structDecl, bool chec
     auto _hasExplicitCtor = [](StructDecl* structDecl) -> bool
     {
         // First check if the extension of this struct defines an explicit constructor.
-        if (structDecl->m_hasExplicitCtorInExtension)
-            return true;
-
         for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
         {
             // constructor that is not synthesized must be user defined.
@@ -9978,15 +9975,6 @@ void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
         // on the type as originally declared.
 
         _validateCrossModuleInheritance(decl, inheritanceDecl);
-    }
-
-    if (decl->getMembersOfType<ConstructorDecl>().getCount() > 0)
-    {
-        if (auto structDeclRef = isDeclRefTypeOf<StructDecl>(decl->targetType.type))
-        {
-            auto structDecl = structDeclRef.getDecl();
-            structDecl->m_hasExplicitCtorInExtension = true;
-        }
     }
 }
 
@@ -12416,7 +12404,8 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
     for (SlangInt i = resultMembers.getCount() - 1; i >= 0; i--)
     {
         auto member = resultMembers[i];
-        auto parentAggDecl = getParentAggTypeDecl(member);;
+        auto parentAggDecl = getParentAggTypeDecl(member);
+        ;
 
         auto ctorParam = m_astBuilder->create<ParamDecl>();
         ctorParam->type = (TypeExp)member->type;
@@ -12429,9 +12418,10 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
 
         ctorParam->parentDecl = ctor;
 
-        Name* paramName = (parentAggDecl == structDecl)
-                              ? member->getName()
-                              : getName(parentAggDecl->getName()->text + "_" + member->getName()->text);
+        Name* paramName =
+            (parentAggDecl == structDecl)
+                ? member->getName()
+                : getName(parentAggDecl->getName()->text + "_" + member->getName()->text);
 
         ctorParam->nameAndLoc = NameLoc(paramName, ctor->loc);
 
