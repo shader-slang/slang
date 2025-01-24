@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -profile cs_6_7 -dx12 -use-dxil -shaderobj -render-feature hardware-device
-//TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj 
+//TEST(compute):COMPARE_COMPUTE_EX:-metal -compute -shaderobj -xslang -DMETAL
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -8,7 +8,11 @@ RWStructuredBuffer<uint> outputBuffer;
 [numthreads(16, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
+#if !defined(METAL)
+    uint index = WaveGetLaneIndex();
+#else
     uint index = dispatchThreadID.x;
+#endif
 
     if (index < 4)
     {

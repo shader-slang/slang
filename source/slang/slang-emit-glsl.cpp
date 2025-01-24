@@ -608,6 +608,19 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(
     m_writer->emit(";\n");
 }
 
+static bool isImageFormatSupportedByGLSL(ImageFormat format)
+{
+    switch (format)
+    {
+    case ImageFormat::bgra8:
+        // These are formats Slang accept, but are not explicitly supported in GLSL.
+        return false;
+    default:
+        return true;
+    }
+};
+
+
 void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType* resourceType)
 {
     SLANG_UNUSED(resourceType);
@@ -618,6 +631,18 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
     if (auto formatDecoration = var->findDecoration<IRFormatDecoration>())
     {
         auto format = formatDecoration->getFormat();
+        const auto formatInfo = getImageFormatInfo(format);
+        if (!isImageFormatSupportedByGLSL(format))
+        {
+            getSink()->diagnose(
+                SourceLoc(),
+                Diagnostics::imageFormatUnsupportedByBackend,
+                formatInfo.name,
+                "GLSL",
+                "unknown");
+            format = ImageFormat::unknown;
+        }
+
         if (format == ImageFormat::unknown)
         {
             // If the user explicitly opts out of having a format, then
@@ -636,7 +661,6 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
         }
         else
         {
-            auto formatInfo = getImageFormatInfo(format);
             if (formatInfo.scalarType == SLANG_SCALAR_TYPE_UINT64 ||
                 formatInfo.scalarType == SLANG_SCALAR_TYPE_INT64)
             {
