@@ -3790,7 +3790,7 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                         InitializerListExpr* initListExpr =
                             m_astBuilder->create<InitializerListExpr>();
                         initListExpr->loc = expr->loc;
-                        initListExpr->m_synthesizedForTypeCastZero = true;
+                        initListExpr->useCStyleInitialization = false;
                         auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
 
 
