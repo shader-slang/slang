@@ -1,7 +1,7 @@
 if(SLANG_ENABLE_SLANGRT)
     slang_add_target(
         .
-        SHARED
+        ${SLANG_LIB_TYPE}
         # This compiles 'core' again with the SLANG_RT_DYNAMIC_EXPORT macro defined
         EXTRA_SOURCE_DIRS ${slang_SOURCE_DIR}/source/core
         USE_EXTRA_WARNINGS

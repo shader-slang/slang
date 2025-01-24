@@ -193,6 +193,8 @@ option(
     ON
 )
 
+option(SLANG_ENABLE_RELEASE_LTO "Enable LTO for Release builds" ON)
+
 option(
     SLANG_ENABLE_SPLIT_DEBUG_INFO
     "Generate split debug info for debug builds"
@@ -383,12 +385,14 @@ configure_package_config_file(
 # linkable targets. In this case do not export the targets. Otherwise, just
 # export the slang targets. 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    install(
-        EXPORT SlangTargets
-        FILE ${PROJECT_NAME}Targets.cmake
-        NAMESPACE ${PROJECT_NAME}::
-        DESTINATION cmake
-    )
+    if(NOT ${SLANG_BUILD_TYPE} STREQUAL "STATIC")
+        install(
+            EXPORT SlangTargets
+            FILE ${PROJECT_NAME}Targets.cmake
+            NAMESPACE ${PROJECT_NAME}::
+            DESTINATION cmake
+        )
+    endif()
 endif()
 
 install(

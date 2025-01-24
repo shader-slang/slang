@@ -1428,7 +1428,11 @@ DIAGNOSTIC(
     ambiguousDefaultInitializerForType,
     "more than one default initializer was found for type '$0'")
 DIAGNOSTIC(30623, Error, cannotHaveInitializer, "'$0' cannot have an initializer because it is $1")
-
+DIAGNOSTIC(
+    30623,
+    Error,
+    genericValueParameterMustHaveType,
+    "a generic value parameter must be given an explicit type")
 
 // 307xx: parameters
 DIAGNOSTIC(

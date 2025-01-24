@@ -28,8 +28,10 @@ add_custom_command(
 slang_add_target(
     slang-capability-defs
     OBJECT
+    EXPORT_MACRO_PREFIX SLANG
     USE_EXTRA_WARNINGS
     EXPLICIT_SOURCE ${SLANG_CAPABILITY_GENERATED_HEADERS}
+    EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
     LINK_WITH_PRIVATE core
     INCLUDE_DIRECTORIES_PUBLIC
         "${SLANG_CAPABILITY_OUTPUT_DIR}"
@@ -40,8 +42,10 @@ slang_add_target(
 slang_add_target(
     slang-capability-lookup
     OBJECT
+    EXPORT_MACRO_PREFIX SLANG
     USE_EXTRA_WARNINGS
     EXPLICIT_SOURCE ${SLANG_CAPABILITY_GENERATED_SOURCE}
+    EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
     LINK_WITH_PRIVATE core slang-capability-defs
     EXCLUDE_FROM_ALL
     FOLDER generated
@@ -157,10 +161,12 @@ add_custom_command(
 slang_add_target(
     slang-lookup-tables
     OBJECT
+    EXPORT_MACRO_PREFIX SLANG
     USE_EXTRA_WARNINGS
     EXPLICIT_SOURCE
         ${SLANG_LOOKUP_GENERATED_SOURCE}
         ${SLANG_SPIRV_CORE_GRAMMAR_SOURCE}
+    EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
     LINK_WITH_PRIVATE core SPIRV-Headers
     EXCLUDE_FROM_ALL
     FOLDER generated
@@ -274,6 +280,7 @@ else()
     slang_add_target(
         .
         ${SLANG_LIB_TYPE}
+        EXPORT_MACRO_PREFIX SLANG
         ${slang_link_args}
         ${slang_interface_args}
         NO_SOURCE
@@ -291,6 +298,7 @@ else()
     slang_add_target(
         .
         ${SLANG_LIB_TYPE}
+        EXPORT_MACRO_PREFIX SLANG
         ${slang_link_args}
         ${slang_interface_args}
         ${slang_public_lib_args}
