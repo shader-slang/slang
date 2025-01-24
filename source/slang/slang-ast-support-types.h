@@ -80,6 +80,7 @@ class SyntaxNode;
 SourceLoc getDiagnosticPos(SyntaxNode const* syntax);
 SourceLoc getDiagnosticPos(TypeExp const& typeExp);
 SourceLoc getDiagnosticPos(DeclRefBase* declRef);
+SourceLoc getDiagnosticPos(Decl* decl);
 
 typedef NodeBase* (*SyntaxParseCallback)(Parser* parser, void* userData);
 
