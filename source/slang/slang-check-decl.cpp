@@ -103,7 +103,7 @@ struct SemanticsDeclAttributesVisitor : public SemanticsDeclVisitorBase,
     //
     // We will defer the actual implementation of the constructor to the body visit, because
     // we will have full information about each field in the struct during that stage.
-    void _synthesizeCtorSignature(StructDecl* structDecl);
+    bool _synthesizeCtorSignature(StructDecl* structDecl);
     bool _searchInitializableMembers(
         StructDecl* structDecl,
         const DeclVisibility ctorVisibility,
@@ -8161,29 +8161,6 @@ void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
     {
         checkStmt(decl->body, newContext);
     }
-
-    if (auto constructorDecl = as<ConstructorDecl>(decl))
-    {
-        if (constructorDecl->containsFlavor(
-                ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit) &&
-            !getSink()->getErrorCount())
-        {
-            // Once we have checked the definition of synthesized constructor, we can return delete
-            // the default constructor if it exists, because we only need to have one constructor.
-            auto structDecl = as<StructDecl>(constructorDecl->parentDecl);
-            ConstructorDecl* defaultCtor = nullptr;
-            if (structDecl->m_synthesizedCtorMap.tryGetValue(
-                    (int)ConstructorDecl::ConstructorFlavor::SynthesizedDefault,
-                    defaultCtor))
-            {
-                structDecl->members.remove(defaultCtor);
-                structDecl->invalidateMemberDictionary();
-                structDecl->buildMemberDictionary();
-                structDecl->m_synthesizedCtorMap.remove(
-                    (int)ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
-            }
-        }
-    }
 }
 
 void SemanticsVisitor::getGenericParams(
@@ -9336,7 +9313,7 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(
 
         auto invoke = m_astBuilder->create<InvokeExpr>();
         invoke->functionExpr = ctorToInvoke;
-        invoke->arguments.insertRange(0, argumentList);
+        invoke->arguments.addRange(argumentList);
 
         auto assign = m_astBuilder->create<AssignExpr>();
         assign->left = coerce(CoercionSite::Initializer, baseCtor->returnType.type, thisExpr);
@@ -9541,8 +9518,6 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
             structDecl->members.remove(structDeclInfo.defaultCtor);
             structDecl->invalidateMemberDictionary();
             structDecl->buildMemberDictionary();
-            structDecl->m_synthesizedCtorMap.remove(
-                (int)ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
         }
     }
 }
@@ -12366,13 +12341,13 @@ static Expr* _getParamDefaultValue(SemanticsVisitor* visitor, VarDeclBase* varDe
     return constructDefaultConstructorForType(visitor, varDecl->type.type);
 }
 
-void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* structDecl)
+bool SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* structDecl)
 {
     // If a type or its base type already defines any explicit constructors, do not synthesize any
     // constructors. see:
     // https://github.com/shader-slang/slang/blob/master/docs/proposals/004-initialization.md#inheritance-initialization
     if (_hasExplicitConstructor(structDecl, true))
-        return;
+        return false;
 
     // synthesize the signature first.
     // The constructor's visibility level is the same as the struct itself.
@@ -12384,15 +12359,12 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
     // constructor's visibility level will appear in the constructor's parameter list.
     List<VarDeclBase*> resultMembers;
     if (!_searchInitializableMembers(structDecl, ctorVisibility, resultMembers))
-        return;
+        return false;
 
     // synthesize the constructor signature:
     // 1. The constructor's name is always `$init`, we create one without parameters now.
     ConstructorDecl* ctor = _createCtor(this, getASTBuilder(), structDecl, ctorVisibility);
     ctor->addFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
-    structDecl->m_synthesizedCtorMap.addIfNotExists(
-        (int)ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit,
-        ctor);
 
     ctor->members.reserve(resultMembers.getCount());
 
@@ -12436,23 +12408,22 @@ void SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
         }
     }
     ctor->members.reverse();
+    return true;
 }
 
 void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
 {
     // add the member initialize constructor here to avoid circular checking logic
-    _synthesizeCtorSignature(structDecl);
-
-    // add a empty deault CTor if missing; checking in attributes
-    // to avoid circular checking logic
-    auto defaultCtor = _getDefaultCtor(structDecl);
-    if (!defaultCtor)
+    if (!_synthesizeCtorSignature(structDecl))
     {
-        DeclVisibility ctorVisibility = getDeclVisibility(structDecl);
-        auto ctor = _createCtor(this, m_astBuilder, structDecl, ctorVisibility);
-        structDecl->m_synthesizedCtorMap.addIfNotExists(
-            (int)ConstructorDecl::ConstructorFlavor::SynthesizedDefault,
-            ctor);
+        // add a default CTor if missing; checking in attributes
+        // to avoid circular checking logic
+        auto defaultCtor = _getDefaultCtor(structDecl);
+        if (!defaultCtor)
+        {
+            DeclVisibility ctorVisibility = getDeclVisibility(structDecl);
+            _createCtor(this, m_astBuilder, structDecl, ctorVisibility);
+        }
     }
 
     int backingWidth = 0;

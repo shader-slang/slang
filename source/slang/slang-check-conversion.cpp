@@ -209,12 +209,11 @@ ConstructorDecl* SemanticsVisitor::_getSynthesizedConstructor(
     StructDecl* structDecl,
     ConstructorDecl::ConstructorFlavor flavor)
 {
-    ConstructorDecl* synthesizedCtor = nullptr;
-    if (structDecl->m_synthesizedCtorMap.tryGetValue((int)flavor, synthesizedCtor))
+    for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
     {
-        return synthesizedCtor;
+        if (ctor->containsFlavor(flavor))
+            return ctor;
     }
-
     return nullptr;
 }
 
@@ -364,7 +363,9 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
 {
     StructDecl* structDecl = isDeclRefTypeOf<StructDecl>(toType).getDecl();
 
-    if (!structDecl || structDecl->m_synthesizedCtorMap.getCount() == 0)
+    if (!structDecl || !_getSynthesizedConstructor(
+                           structDecl,
+                           ConstructorDecl::ConstructorFlavor::SynthesizedDefault))
         return false;
 
     bool isCStyle = isCStyleType(toType);
