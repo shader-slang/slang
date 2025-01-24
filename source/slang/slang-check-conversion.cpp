@@ -278,9 +278,12 @@ bool SemanticsVisitor::isCStyleType(Type* type)
     {
         if (arrayType->isUnsized())
         {
-            getShared()->cacheCStyleType(type, false);
             return cacheResult(false);
         }
+
+        auto elementType = arrayType->getElementType();
+        if (!isCStyleType(elementType))
+            return cacheResult(false);
     }
     return cacheResult(true);
 }
