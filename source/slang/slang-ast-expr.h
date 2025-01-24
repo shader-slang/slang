@@ -195,6 +195,11 @@ class InvokeExpr : public AppExprBase
     SLANG_AST_CLASS(InvokeExpr)
 };
 
+class ExplicitCtorInvokeExpr : public InvokeExpr
+{
+    SLANG_AST_CLASS(ExplicitCtorInvokeExpr)
+};
+
 enum class TryClauseType
 {
     None,

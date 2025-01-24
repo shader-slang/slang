@@ -297,7 +297,7 @@ Expr* SemanticsVisitor::_createCtorInvokeExpr(
     varExpr->type = (QualType)getASTBuilder()->getTypeType(toType);
     varExpr->declRef = isDeclRefTypeOf<Decl>(toType);
 
-    auto* constructorExpr = getASTBuilder()->create<InvokeExpr>();
+    auto* constructorExpr = getASTBuilder()->create<ExplicitCtorInvokeExpr>();
     constructorExpr->functionExpr = varExpr;
     constructorExpr->arguments.addRange(coercedArgs);
     constructorExpr->loc = loc;
