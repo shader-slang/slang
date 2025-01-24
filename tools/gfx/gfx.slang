@@ -1715,7 +1715,7 @@ public struct SlangDesc
     public slang::PreprocessorMacroDesc *preprocessorMacros = nullptr;
     public GfxCount preprocessorMacroCount = 0;
 
-    public NativeString targetProfile = {0}; // (optional) Target shader profile. If null this will be set to platform dependent default.
+    public NativeString targetProfile = ""; // (optional) Target shader profile. If null this will be set to platform dependent default.
     public slang::SlangFloatingPointMode floatingPointMode = slang::SlangFloatingPointMode::SLANG_FLOATING_POINT_MODE_DEFAULT;
     public slang::SlangOptimizationLevel optimizationLevel = slang::SlangOptimizationLevel::SLANG_OPTIMIZATION_LEVEL_DEFAULT;
     public slang::SlangTargetFlags targetFlags = slang::SlangTargetFlags.None;
@@ -1725,7 +1725,7 @@ public struct SlangDesc
 public struct ShaderCacheDesc
 {
     // The root directory for the shader cache. If not set, shader cache is disabled.
-    public NativeString shaderCachePath = {0};
+    public NativeString shaderCachePath = "";
     // The maximum number of entries stored in the cache.
     public GfxCount maxEntryCount = 0;
 };
@@ -1744,7 +1744,7 @@ public struct DeviceDesc
     // and the third is the VkDevice. For CUDA, this only contains a single value for the CUDADevice.
     public DeviceInteropHandles existingDeviceHandles = {};
     // Name to identify the adapter to use
-    public NativeString adapter = {0};
+    public NativeString adapter = "";
     // Number of required features.
     public GfxCount requiredFeatureCount = 0;
     // Array of required feature names, whose size is `requiredFeatureCount`.
