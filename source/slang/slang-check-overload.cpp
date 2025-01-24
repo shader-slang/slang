@@ -1313,6 +1313,21 @@ int SemanticsVisitor::CompareLookupResultItems(
     bool rightIsExtension = as<ExtensionDecl>(rightDeclRefParent.getDecl()) != nullptr;
     if (leftIsExtension != rightIsExtension)
     {
+        // Add a special case for constructors, where we prefer the one that is not synthesized,
+        if (auto leftCtor = as<ConstructorDecl>(left.declRef.getDecl()))
+        {
+            auto rightCtor = as<ConstructorDecl>(right.declRef.getDecl());
+            bool leftIsSynthesized =
+                leftCtor->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
+            bool rightIsSynthesized =
+                rightCtor->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
+
+            if (leftIsSynthesized != rightIsSynthesized)
+            {
+                return int(leftIsSynthesized) - int(rightIsSynthesized);
+            }
+        }
+
         return int(leftIsExtension) - int(rightIsExtension);
     }
     else if (leftIsExtension)
