@@ -36,6 +36,24 @@ struct S
 tests/diagnostics/variable-redeclaration.slang(41): note: see previous declaration of 'f'
 struct S
        ^
+tests/diagnostics/variable-redeclaration.slang(43): error 39999: ambiguous reference to 'f'
+    int f;
+        ^
+tests/diagnostics/variable-redeclaration.slang(44): note 39999: candidate: float S.f
+    float f;
+          ^
+tests/diagnostics/variable-redeclaration.slang(43): note 39999: candidate: int S.f
+    int f;
+        ^
+tests/diagnostics/variable-redeclaration.slang(44): error 39999: ambiguous reference to 'f'
+    float f;
+          ^
+tests/diagnostics/variable-redeclaration.slang(44): note 39999: candidate: float S.f
+    float f;
+          ^
+tests/diagnostics/variable-redeclaration.slang(43): note 39999: candidate: int S.f
+    int f;
+        ^
 tests/diagnostics/variable-redeclaration.slang(53): error 39999: ambiguous reference to 'size'
     return size;
            ^~~~
