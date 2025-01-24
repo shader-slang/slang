@@ -27,9 +27,7 @@ struct MyType
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    // Note 'MyType' is not a C-Style struct because it has an interface typed member.
-    // slang will synthesize a constructor for it. __init(IFoo foo)
-    MyType t = {{}};
+    MyType t = {};
     // BUFFER: 1
     outputBuffer[0] = t.foo.method();
 }
