@@ -1,6 +1,7 @@
 slang_add_target(
     .
     STATIC
+    EXPORT_MACRO_PREFIX SLANG
     EXCLUDE_FROM_ALL
     USE_EXTRA_WARNINGS
     LINK_WITH_PRIVATE miniz lz4_static Threads::Threads ${CMAKE_DL_LIBS}

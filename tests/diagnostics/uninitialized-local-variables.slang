@@ -38,13 +38,14 @@ int use_undefined_value(int k)
     return x;
 }
 
-// Returning uninitialized values
+// We don't know the exact type of T yet.
+// T may not have any members, and it may not need any initialization.
 __generic<T>
 T generic_undefined_return()
 {
-    T x;
-    //CHK-DAG: warning 41016: use of uninitialized variable 'x'
-    return x;
+    T y;
+    //CHK-NOT: warning 41016: use of uninitialized variable 'y'
+    return y;
 }
 
 // Array variables

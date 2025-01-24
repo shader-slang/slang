@@ -284,7 +284,18 @@ SourceLoc getDiagnosticPos(DeclRefBase* declRef)
 {
     if (!declRef)
         return SourceLoc();
-    return declRef->getDecl()->loc;
+    return getDiagnosticPos(declRef->getDecl());
+}
+
+SourceLoc getDiagnosticPos(Decl* decl)
+{
+    if (!decl)
+        return SourceLoc();
+    if (decl->getNameLoc().isValid())
+    {
+        return decl->getNameLoc();
+    }
+    return decl->loc;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!  Free functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
