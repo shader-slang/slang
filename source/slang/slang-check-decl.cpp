@@ -1775,7 +1775,14 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         {
             if (!varDecl->type.type)
             {
-                getSink()->diagnose(varDecl, Diagnostics::varWithoutTypeMustHaveInitializer);
+                if (as<GenericValueParamDecl>(varDecl))
+                {
+                    getSink()->diagnose(varDecl, Diagnostics::genericValueParameterMustHaveType);
+                }
+                else
+                {
+                    getSink()->diagnose(varDecl, Diagnostics::varWithoutTypeMustHaveInitializer);
+                }
                 varDecl->type.type = m_astBuilder->getErrorType();
             }
         }
