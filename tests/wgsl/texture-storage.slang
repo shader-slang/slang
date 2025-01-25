@@ -28,6 +28,16 @@ RWStructuredBuffer<int> outputBuffer;
 [format("rgba8")] RWTexture3D<float4>      w3D_f32v4;
 [format("rgba8")] RWTexture2DArray<float4> w2DArray_f32v4;
 
+//TEST_INPUT: RWTexture1D(format=B8G8R8A8_UNORM, size=4, content = zero):name w1D_f32_bgra_v4
+//TEST_INPUT: RWTexture2D(format=B8G8R8A8_UNORM, size=4, content = zero):name w2D_f32_bgra_v4
+//TEST_INPUT: RWTexture3D(format=B8G8R8A8_UNORM, size=4, content = zero):name w3D_f32_bgra_v4
+//TEST_INPUT: RWTexture2D(format=B8G8R8A8_UNORM, size=4, content = zero, arrayLength=2):name w2DArray_f32_bgra_v4
+// WGSL: var w1D_f32_bgra_v4{{[^:]*}}: texture_storage_1d<bgra8unorm, read_write>
+[format("bgra8")] RWTexture1D<float4>      w1D_f32_bgra_v4;
+[format("bgra8")] RWTexture2D<float4>      w2D_f32_bgra_v4;
+[format("bgra8")] RWTexture3D<float4>      w3D_f32_bgra_v4;
+[format("bgra8")] RWTexture2DArray<float4> w2DArray_f32_bgra_v4;
+
 // i32 types
 
 //TEST_INPUT: RWTexture1D(format=R32G32_SINT, size=4, content = zero):name w1D_i32v2
@@ -127,6 +137,7 @@ void fragMain()
     bool result = true
         && TEST_textureStorage_StoreLoad<float2>(w1D_f32v2, w2D_f32v2, w3D_f32v2, w2DArray_f32v2)
         && TEST_textureStorage_StoreLoad<float4>(w1D_f32v4, w2D_f32v4, w3D_f32v4, w2DArray_f32v4)
+        && TEST_textureStorage_StoreLoad<float4>(w1D_f32_bgra_v4, w2D_f32_bgra_v4, w3D_f32_bgra_v4, w2DArray_f32_bgra_v4)
         && TEST_textureStorage_StoreLoad<int32_t2>(w1D_i32v2, w2D_i32v2, w3D_i32v2, w2DArray_i32v2)
         && TEST_textureStorage_StoreLoad<int32_t4>(w1D_i32v4, w2D_i32v4, w3D_i32v4, w2DArray_i32v4)
         && TEST_textureStorage_StoreLoad<uint32_t2>(w1D_u32v2, w2D_u32v2, w3D_u32v2, w2DArray_u32v2)

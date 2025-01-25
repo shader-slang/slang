@@ -71,6 +71,8 @@ private:
         const IRIntegerValue& rowCountWGSL,
         const IRIntegerValue& colCountWGSL);
 
+    const char* getWgslImageFormat(IRTextureTypeBase* type);
+
     bool m_f16ExtensionEnabled = false;
 };
 
