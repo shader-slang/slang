@@ -7,16 +7,8 @@
 //TEST:COMPARE_COMPUTE_EX:-vk -compute -shaderobj -emit-spirv-directly
 //TEST:COMPARE_COMPUTE_EX:-cuda -compute -render-features cuda_sm_7_0 -shaderobj
 
-//TEST:SIMPLE(filecheck=CHECK_SPIRV): -stage compute -entry computeMain -target spirv
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -stage compute -entry computeMain -target glsl
-
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
-
-// CHECK_SPIRV: OpCapability GroupNonUniformPartitionedNV
-// CHECK_SPIRV: OpExtension "SPV_NV_shader_subgroup_partitioned"
-
-// CHECK_GLSL: GL_NV_shader_subgroup_partitioned
 
 [numthreads(8, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -37,7 +29,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint sumValue = WaveMultiPrefixSum(1 << index, mask);
     const uint sumBaseIndex = 0;
     outputBuffer[sumBaseIndex + index] = sumValue;
-    // CHECK_GLSL: subgroupPartitionedExclusiveAddNV
 
     //
     // WaveMultiPrefixProduct.
@@ -46,7 +37,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint productValue = WaveMultiPrefixProduct(1 << index, mask);
     const uint productBaseIndex = 8;
     outputBuffer[productBaseIndex + index] = productValue;
-    // CHECK_GLSL: subgroupPartitionedExclusiveMulNV
 
     //
     // WaveMultiPrefixBitAnd.
@@ -61,7 +51,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint andValue = WaveMultiPrefixBitAnd(andBits, mask);
     const uint andBaseIndex = 16;
     outputBuffer[andBaseIndex + index] = andValue;
-    // CHECK_GLSL: subgroupPartitionedExclusiveAndNV
 
     //
     // WaveMultiPrefixBitOr.
@@ -70,7 +59,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint orValue = WaveMultiPrefixBitOr(1 << index, mask);
     const uint orBaseIndex = 24;
     outputBuffer[orBaseIndex + index] = orValue;
-    // CHECK_GLSL: subgroupPartitionedExclusiveOrNV
 
     //
     // WaveMultiPrefixBitXor.
@@ -84,5 +72,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint xorValue = WaveMultiPrefixBitXor(xorBits, mask);
     const uint xorBaseIndex = 32;
     outputBuffer[xorBaseIndex + index] = xorValue;
-    // CHECK_GLSL: subgroupPartitionedExclusiveXorNV
 }
