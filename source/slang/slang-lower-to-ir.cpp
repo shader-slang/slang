@@ -9761,11 +9761,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         for (auto extensionMod : decl->getModifiersOfType<RequiredGLSLExtensionModifier>())
         {
-            getBuilder()->addRequireGLSLExtensionDecoration(inst, extensionMod->extensionNameToken.getContent());
+            getBuilder()->addRequireGLSLExtensionDecoration(
+                inst,
+                extensionMod->extensionNameToken.getContent());
         }
         for (auto versionMod : decl->getModifiersOfType<RequiredGLSLVersionModifier>())
         {
-            getBuilder()->addRequireGLSLVersionDecoration(inst, Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+            getBuilder()->addRequireGLSLVersionDecoration(
+                inst,
+                Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
         }
         for (auto versionMod : decl->getModifiersOfType<RequiredSPIRVVersionModifier>())
         {
