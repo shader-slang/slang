@@ -1901,7 +1901,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    static SpvImageFormat getSpvImageFormat(IRTextureTypeBase* type)
+    SpvImageFormat getSpvImageFormat(IRTextureTypeBase* type)
     {
         ImageFormat imageFormat =
             type->hasFormat() ? (ImageFormat)type->getFormat() : ImageFormat::unknown;
@@ -1992,7 +1992,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case ImageFormat::r64i:
             return SpvImageFormatR64i;
         default:
-            SLANG_UNIMPLEMENTED_X("unknown image format for spirv emit");
+            const auto imageFormatInfo = getImageFormatInfo(imageFormat);
+            m_sink->diagnose(
+                SourceLoc(),
+                Diagnostics::imageFormatUnsupportedByBackend,
+                imageFormatInfo.name,
+                "SPIRV",
+                "unknown");
+            return SpvImageFormatUnknown;
         }
     }
 

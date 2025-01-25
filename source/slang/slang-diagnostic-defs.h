@@ -1059,6 +1059,13 @@ DIAGNOSTIC(
     explicitUniformLocation,
     "Explicit binding of uniform locations is discouraged. Prefer 'ConstantBuffer<$0>' over "
     "'uniform $0'")
+DIAGNOSTIC(
+    31105,
+    Warning,
+    imageFormatUnsupportedByBackend,
+    "Image format '$0' is not explicitly supported by the $1 backend, using supported format '$2' "
+    "instead.")
+
 
 DIAGNOSTIC(31120, Error, invalidAttributeTarget, "invalid syntax target for user defined attribute")
 
@@ -1421,7 +1428,11 @@ DIAGNOSTIC(
     ambiguousDefaultInitializerForType,
     "more than one default initializer was found for type '$0'")
 DIAGNOSTIC(30623, Error, cannotHaveInitializer, "'$0' cannot have an initializer because it is $1")
-
+DIAGNOSTIC(
+    30623,
+    Error,
+    genericValueParameterMustHaveType,
+    "a generic value parameter must be given an explicit type")
 
 // 307xx: parameters
 DIAGNOSTIC(

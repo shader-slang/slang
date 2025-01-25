@@ -205,11 +205,13 @@ typedef signed char int8_t;
 typedef short int16_t;
 typedef int int32_t;
 typedef long long int64_t;
+typedef ptrdiff_t intptr_t;
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;
 typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
+typedef size_t uintptr_t;
 
 #endif
 
@@ -1902,6 +1904,39 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_countbits(uint64_t v)
     return __popcll(v);
 }
 
+// ----------------------------- IPTR -----------------------------------------
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL intptr_t IPTR_abs(intptr_t f)
+{
+    return (f < 0) ? -f : f;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL intptr_t IPTR_min(intptr_t a, intptr_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL intptr_t IPTR_max(intptr_t a, intptr_t b)
+{
+    return a > b ? a : b;
+}
+
+// ----------------------------- UPTR -----------------------------------------
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uintptr_t UPTR_abs(uintptr_t f)
+{
+    return f;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uintptr_t UPTR_min(uintptr_t a, uintptr_t b)
+{
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uintptr_t UPTR_max(uintptr_t a, uintptr_t b)
+{
+    return a > b ? a : b;
+}
 
 // ----------------------------- ResourceType -----------------------------------------
 
