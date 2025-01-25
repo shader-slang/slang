@@ -1024,7 +1024,9 @@ alias fragmentshaderbarycentric = GL_EXT_fragment_shader_barycentric | _sm_6_1;
 alias shadermemorycontrol = glsl | _spirv_1_0 | _sm_5_0;
 /// Capabilities needed to use HLSL tier wave operations
 /// [Compound]
-alias waveprefix = _sm_6_5 | _cuda_sm_7_0 | GL_KHR_shader_subgroup_arithmetic;
+alias waveprefix = _sm_6_5
+                 | _cuda_sm_7_0
+                 | GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_arithmetic + GL_NV_shader_subgroup_partitioned;
 /// Capabilities needed to use GLSL buffer-reference's
 /// [Compound]
 alias bufferreference = GL_EXT_buffer_reference;
