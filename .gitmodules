@@ -12,7 +12,7 @@
 	url = https://github.com/ocornut/imgui.git
 [submodule "external/slang-binaries"]
 	path = external/slang-binaries
-	url = https://github.com/shader-slang/slang-binaries
+	url = https://github.com/jkwak-work/slang-binaries.git
 [submodule "external/spirv-tools"]
 	path = external/spirv-tools
 	url = https://github.com/KhronosGroup/SPIRV-Tools.git
