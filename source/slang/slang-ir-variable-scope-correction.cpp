@@ -121,28 +121,13 @@ void VariableScopeCorrectionContext::_processFunction(IRFunc* funcInst)
 
     auto instAfterParam = funcInst->getFirstBlock()->getFirstOrdinaryInst();
 
-    while (true)
+    for (int i = 0; i < workList.getCount(); i++)
     {
-        // We cannot modify workList while iterating it
-        List<IRInst*> workList2;
-
-        for (auto inst = workList.begin(); inst != workList.end(); inst++)
+        auto inst = workList[i];
+        if (auto loopHeaderList = loopHeaderMap.tryGetValue(getBlock(inst)))
         {
-            if (auto loopHeaderList = loopHeaderMap.tryGetValue(getBlock(*inst)))
-            {
-                _processInstruction(
-                    dominatorTree,
-                    instAfterParam,
-                    *inst,
-                    *loopHeaderList,
-                    workList2);
-            }
+            _processInstruction(dominatorTree, instAfterParam, inst, *loopHeaderList, workList);
         }
-
-        if (workList2.getCount() == 0)
-            break;
-
-        workList = workList2;
     }
 }
 
