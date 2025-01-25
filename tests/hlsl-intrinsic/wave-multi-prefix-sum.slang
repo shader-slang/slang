@@ -4,8 +4,10 @@
 // We need SM6.5 for these tests
 // Disable because version of dxc we are currently using doesn't support SM6.5
 //DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile sm_6_5 -shaderobj
-// Disabled because we don't have GLSL intrinsics for these it seems 
-//DISABLE_TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
+
+// Disable emitting SPIRV via GLSL as our glslang does not emit the required SPIRV version.
+//TEST:COMPARE_COMPUTE_EX:-vk -compute -shaderobj -emit-spirv-directly
+
 //TEST:COMPARE_COMPUTE_EX:-cuda -compute -render-features cuda_sm_7_0 -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
