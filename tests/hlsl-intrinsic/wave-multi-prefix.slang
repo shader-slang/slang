@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK_SPIRV): -stage compute -entry computeMain -target spirv -DNO_MATRIX
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -stage compute -entry computeMain -target glsl -DNO_MATRIX
+//TEST:SIMPLE(filecheck=CHECK_SPIRV): -stage compute -entry computeMain -target spirv -DNO_INTEGER_MATRIX
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -stage compute -entry computeMain -target glsl -DNO_INTEGER_MATRIX
 //TEST:SIMPLE(filecheck=CHECK_CUDA): -stage compute -entry computeMain -target cuda
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -stage compute -entry computeMain -target hlsl
 
@@ -113,7 +113,17 @@ void computeMain(uint3 dTid : SV_DispatchThreadID)
     output.floatVectorSum = floatVectorSum.x;
     output.floatVectorProduct = floatVectorProduct.x;
 
-#if !defined(NO_MATRIX)
+    float3x3 floatMatrixVal = float3x3(
+        float(dTid.x) + 0.5f, float(dTid.y) + 0.5f, float(dTid.z) + 0.5f,
+        float(dTid.z) + 0.5f, float(dTid.x) + 0.5f, float(dTid.y) + 0.5f,
+        float(dTid.y) + 0.5f, float(dTid.z) + 0.5f, float(dTid.x) + 0.5f
+    );
+    float3x3 floatMatrixSum = WaveMultiPrefixSum(floatMatrixVal, floatMask);
+    float3x3 floatMatrixProduct = WaveMultiPrefixProduct(floatMatrixVal, floatMask);
+    output.floatMatrixSum = floatMatrixSum[0][0];
+    output.floatMatrixProduct = floatMatrixProduct[0][0];
+
+#if !defined(NO_INTEGER_MATRIX)
     int3x3 matrixVal = int3x3(
         dTid.x, dTid.y, dTid.z,
         dTid.z, dTid.x, dTid.y,
@@ -124,21 +134,11 @@ void computeMain(uint3 dTid : SV_DispatchThreadID)
     int3x3 matrixBitAnd = WaveMultiPrefixBitAnd(matrixVal, mask);
     int3x3 matrixBitOr = WaveMultiPrefixBitOr(matrixVal, mask);
     int3x3 matrixBitXor = WaveMultiPrefixBitXor(matrixVal, mask);
-    float3x3 floatMatrixVal = float3x3(
-        float(dTid.x) + 0.5f, float(dTid.y) + 0.5f, float(dTid.z) + 0.5f,
-        float(dTid.z) + 0.5f, float(dTid.x) + 0.5f, float(dTid.y) + 0.5f,
-        float(dTid.y) + 0.5f, float(dTid.z) + 0.5f, float(dTid.x) + 0.5f
-    );
-    float3x3 floatMatrixSum = WaveMultiPrefixSum(floatMatrixVal, floatMask);
-    float3x3 floatMatrixProduct = WaveMultiPrefixProduct(floatMatrixVal, floatMask);
-
     output.matrixSum = matrixSum[0][0];
     output.matrixProduct = matrixProduct[0][0];
     output.matrixBitAnd = matrixBitAnd[0][0];
     output.matrixBitOr = matrixBitOr[0][0];
     output.matrixBitXor = matrixBitXor[0][0];
-    output.floatMatrixSum = floatMatrixSum[0][0];
-    output.floatMatrixProduct = floatMatrixProduct[0][0];
 #endif
 
     outputBuffer[dTid.x] = output;

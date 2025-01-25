@@ -15757,13 +15757,19 @@ vector<T,N> WaveMultiPrefixProduct(vector<T,N> value, uint4 mask)
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 matrix<T,N,M> WaveMultiPrefixProduct(matrix<T,N,M> value, uint4 mask)
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "_wavePrefixProductMultiple(_getMultiPrefixMask(($1).x), $0)";
     case hlsl: __intrinsic_asm "WaveMultiPrefixProduct";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiPrefixProduct(value[i], mask);
+        return result;
     }
 }
 
@@ -15841,13 +15847,19 @@ vector<T,N> WaveMultiPrefixSum(vector<T,N> value, uint4 mask)
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask)
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "_wavePrefixSumMultiple(_getMultiPrefixMask(($1).x), $0)";
     case hlsl: __intrinsic_asm "WaveMultiPrefixSum";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiPrefixSum(value[i], mask);
+        return result;
     }
 }
 
