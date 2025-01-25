@@ -206,7 +206,17 @@ static void processInst(IRInst* inst)
     case kIROp_Leq:
         legalizeBinaryOp(inst);
         break;
-
+    case kIROp_MetalCastToDepthTexture:
+        {
+            // If the operand is already a depth texture, don't do anything.
+            auto textureType = as<IRTextureTypeBase>(inst->getOperand(0)->getDataType());
+            if (textureType && getIntVal(textureType->getIsShadowInst()) == 1)
+            {
+                inst->replaceUsesWith(inst->getOperand(0));
+                inst->removeAndDeallocate();
+            }
+            break;
+        }
     default:
         for (auto child : inst->getModifiableChildren())
         {

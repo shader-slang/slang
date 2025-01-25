@@ -1413,6 +1413,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // or statement).
     case kIROp_UpdateElement:
     case kIROp_DefaultConstruct:
+    case kIROp_MetalCastToDepthTexture:
         return false;
 
     // Always fold these in, because they are trivial
@@ -3129,6 +3130,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_AtomicCompareExchange:
     case kIROp_StructuredBufferGetDimensions:
     case kIROp_MetalAtomicCast:
+    case kIROp_MetalCastToDepthTexture:
         emitInstStmt(inst);
         break;
 
