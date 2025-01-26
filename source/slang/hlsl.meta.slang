@@ -15530,6 +15530,7 @@ uint WaveMultiPrefixCountBits(bool value, uint4 mask)
 /// @category wave
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 T WaveMultiPrefixBitAnd(T expr, uint4 mask)
 {
@@ -15550,6 +15551,7 @@ T WaveMultiPrefixBitAnd(T expr, uint4 mask)
 
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 vector<T,N> WaveMultiPrefixBitAnd(vector<T,N> expr, uint4 mask)
 {
@@ -15569,19 +15571,26 @@ vector<T,N> WaveMultiPrefixBitAnd(vector<T,N> expr, uint4 mask)
 }
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_hlsl, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 matrix<T,N,M> WaveMultiPrefixBitAnd(matrix<T,N,M> expr, uint4 mask)
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "_wavePrefixAndMultiple(_getMultiPrefixMask(($1).x), $0)";
     case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiPrefixBitAnd(expr[i], mask);
+        return result;
     }
 }
 
 /// @category wave
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 T WaveMultiPrefixBitOr(T expr, uint4 mask)
 {
@@ -15602,6 +15611,7 @@ T WaveMultiPrefixBitOr(T expr, uint4 mask)
 
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 vector<T,N> WaveMultiPrefixBitOr(vector<T,N> expr, uint4 mask)
 {
@@ -15621,19 +15631,26 @@ vector<T,N> WaveMultiPrefixBitOr(vector<T,N> expr, uint4 mask)
 }
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_hlsl, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 matrix<T,N,M> WaveMultiPrefixBitOr(matrix<T,N,M> expr, uint4 mask)
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "_wavePrefixOrMultiple(_getMultiPrefixMask(($1).x), $0)";
     case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiPrefixBitOr(expr[i], mask);
+        return result;
     }
 }
 
 /// @category wave
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 T WaveMultiPrefixBitXor(T expr, uint4 mask)
 {
@@ -15654,6 +15671,7 @@ T WaveMultiPrefixBitXor(T expr, uint4 mask)
 
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 vector<T,N> WaveMultiPrefixBitXor(vector<T,N> expr, uint4 mask)
 {
@@ -15673,19 +15691,26 @@ vector<T,N> WaveMultiPrefixBitXor(vector<T,N> expr, uint4 mask)
 }
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_hlsl, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 matrix<T,N,M> WaveMultiPrefixBitXor(matrix<T,N,M> expr, uint4 mask)
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "_wavePrefixXorMultiple(_getMultiPrefixMask(($1).x), $0)";
     case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor";
+    case glsl:
+    case spirv:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiPrefixBitXor(expr[i], mask);
+        return result;
     }
 }
 
 /// @category wave
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 T WaveMultiPrefixProduct(T value, uint4 mask)
 {
@@ -15722,6 +15747,7 @@ T WaveMultiPrefixProduct(T value, uint4 mask)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 vector<T,N> WaveMultiPrefixProduct(vector<T,N> value, uint4 mask)
 {
@@ -15776,6 +15802,7 @@ matrix<T,N,M> WaveMultiPrefixProduct(matrix<T,N,M> value, uint4 mask)
 /// @category wave
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
 [require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 T WaveMultiPrefixSum(T value, uint4 mask)
 {
@@ -15813,6 +15840,7 @@ T WaveMultiPrefixSum(T value, uint4 mask)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 [require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+__spirv_version(1.3)
 vector<T,N> WaveMultiPrefixSum(vector<T,N> value, uint4 mask)
 {
     __target_switch
