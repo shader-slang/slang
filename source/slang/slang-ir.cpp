@@ -7394,8 +7394,6 @@ static bool _isTypeOperandEqual(IRInst* a, IRInst* b)
     {
         return _areTypeOperandsEqual(a, b);
     }
-    SLANG_ASSERT(!"Unhandled comparison");
-
     // We can't equate any other type..
     return false;
 }
