@@ -103,7 +103,7 @@ struct SemanticsDeclAttributesVisitor : public SemanticsDeclVisitorBase,
     // We will defer the actual implementation of the constructor to the body visit, because
     // we will have full information about each field in the struct during that stage.
     bool _synthesizeCtorSignature(StructDecl* structDecl);
-    bool _searchInitializableMembers(
+    bool collectInitializableMembers(
         StructDecl* structDecl,
         const DeclVisibility ctorVisibility,
         List<VarDeclBase*>& resultMembers);
@@ -12254,7 +12254,7 @@ void SemanticsDeclAttributesVisitor::checkPrimalSubstituteOfAttribute(
         DeclAssociationKind::PrimalSubstituteFunc);
 }
 
-bool SemanticsDeclAttributesVisitor::_searchInitializableMembers(
+bool SemanticsDeclAttributesVisitor::collectInitializableMembers(
     StructDecl* structDecl,
     const DeclVisibility ctorVisibility,
     List<VarDeclBase*>& resultMembers)
@@ -12355,7 +12355,7 @@ bool SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
     // Only the members whose visibility level is higher or equal than the
     // constructor's visibility level will appear in the constructor's parameter list.
     List<VarDeclBase*> resultMembers;
-    if (!_searchInitializableMembers(structDecl, ctorVisibility, resultMembers))
+    if (!collectInitializableMembers(structDecl, ctorVisibility, resultMembers))
         return false;
 
     // synthesize the constructor signature:
