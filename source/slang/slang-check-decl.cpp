@@ -7741,10 +7741,10 @@ bool SemanticsVisitor::_hasExplicitConstructor(StructDecl* structDecl, bool chec
     if (!structDecl)
         return false;
 
-    auto _hasExplicitCtor = [](StructDecl* structDecl) -> bool
+    auto _hasExplicitCtor = [](AggTypeDecl* aggDecl) -> bool
     {
         // First check if the extension of this struct defines an explicit constructor.
-        for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
+        for (auto ctor : aggDecl->getMembersOfType<ConstructorDecl>())
         {
             // constructor that is not synthesized must be user defined.
             if (ctor->findModifier<SynthesizedModifier>() == nullptr)
@@ -7763,7 +7763,8 @@ bool SemanticsVisitor::_hasExplicitConstructor(StructDecl* structDecl, bool chec
 
     for (auto inheritanceMember : structDecl->getMembersOfType<InheritanceDecl>())
     {
-        if (auto baseTypeDecl = isDeclRefTypeOf<StructDecl>(inheritanceMember->base.type))
+        auto baseTypeDecl = isDeclRefTypeOf<AggTypeDecl>(inheritanceMember->base.type);
+        if (baseTypeDecl && !as<InterfaceDecl>(baseTypeDecl))
         {
             if (_hasExplicitCtor(baseTypeDecl.getDecl()))
                 return true;
