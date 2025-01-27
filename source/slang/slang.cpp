@@ -1337,7 +1337,10 @@ void Linkage::addTarget(slang::TargetDesc const& desc)
     optionSet.setProfile(Profile(desc.profile));
     optionSet.set(CompilerOptionName::LineDirectiveMode, LineDirectiveMode(desc.lineDirectiveMode));
     optionSet.set(CompilerOptionName::GLSLForceScalarLayout, desc.forceGLSLScalarBufferLayout);
-    optionSet.load(desc.compilerOptionEntryCount, desc.compilerOptionEntries);
+
+    CompilerOptionSet targetOptions;
+    targetOptions.load(desc.compilerOptionEntryCount, desc.compilerOptionEntries);
+    optionSet.overrideWith(targetOptions);
 }
 
 #if 0
