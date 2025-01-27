@@ -2333,16 +2333,30 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
                 inst,
                 IRIntegerValue(collection->getMemoryQualifierBit()));
         }
-        else if (as<HLSLTriangleModifier>(mod))
-            builder->addDecoration(inst, kIROp_TriangleInputPrimitiveTypeDecoration);
-        else if (as<HLSLPointModifier>(mod))
-            builder->addDecoration(inst, kIROp_PointInputPrimitiveTypeDecoration);
-        else if (as<HLSLLineModifier>(mod))
-            builder->addDecoration(inst, kIROp_LineInputPrimitiveTypeDecoration);
-        else if (as<HLSLLineAdjModifier>(mod))
-            builder->addDecoration(inst, kIROp_LineAdjInputPrimitiveTypeDecoration);
-        else if (as<HLSLTriangleAdjModifier>(mod))
-            builder->addDecoration(inst, kIROp_TriangleAdjInputPrimitiveTypeDecoration);
+        else if (auto geometryModifier = as<HLSLGeometryShaderInputPrimitiveTypeModifier>(mod))
+        {
+            IROp op = kIROp_Invalid;
+            switch (geometryModifier->astNodeType)
+            {
+            case ASTNodeType::HLSLTriangleModifier:
+                op = kIROp_TriangleInputPrimitiveTypeDecoration;
+                break;
+            case ASTNodeType::HLSLPointModifier:
+                op = kIROp_PointInputPrimitiveTypeDecoration;
+                break;
+            case ASTNodeType::HLSLLineModifier:
+                op = kIROp_LineInputPrimitiveTypeDecoration;
+                break;
+            case ASTNodeType::HLSLLineAdjModifier:
+                op = kIROp_LineAdjInputPrimitiveTypeDecoration;
+                break;
+            case ASTNodeType::HLSLTriangleAdjModifier:
+                op = kIROp_TriangleAdjInputPrimitiveTypeDecoration;
+                break;
+            }
+            if (op != kIROp_Invalid)
+                builder->addDecoration(inst, op);
+        }
         // TODO: what are other modifiers we need to propagate through?
     }
     if (auto t =
