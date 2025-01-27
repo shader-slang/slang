@@ -9235,7 +9235,7 @@ MemberExpr* SemanticsDeclBodyVisitor::createMemberExpr(
     memberExpr->scope = scope;
     memberExpr->loc = member->loc;
     memberExpr->name = member->getName();
-    memberExpr->type = DeclRefType::create(getASTBuilder(), member->getDefaultDeclRef());
+    memberExpr->type = GetTypeForDeclRef(member->getDefaultDeclRef(), member->loc);
 
     return memberExpr;
 }
@@ -9374,9 +9374,7 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMember(
     }
 
     MemberExpr* memberExpr = createMemberExpr(thisExpr, ctor->ownedScope, member);
-    auto memberDeclRef = m_astBuilder->getMemberDeclRef(structDecl, member);
-    auto type = GetTypeForDeclRef(memberDeclRef, member->loc);
-    if (!type.isLeftValue)
+    if (!memberExpr->type.isLeftValue)
         return;
 
     auto assign = m_astBuilder->create<AssignExpr>();

@@ -3026,9 +3026,7 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 
     void checkModule(ModuleDecl* programNode);
 
-    ConstructorDecl* createCtor(
-        AggTypeDecl* decl,
-        DeclVisibility ctorVisibility);
+    ConstructorDecl* createCtor(AggTypeDecl* decl, DeclVisibility ctorVisibility);
 };
 
 bool isUnsizedArrayType(Type* type);
