@@ -2107,13 +2107,13 @@ static inline bool _isDefaultCtor(ConstructorDecl* ctor)
         return true;
     };
 
-    // 1. default ctor must have definition
-    // 2. either 2.1 or 2.2 is safisfied
-    // 2.1. default ctor must have no parameters
-    // 2.2. default ctor can have parameters, but all parameters have init expr (Because we won't
+    // 1. default ctor must have no parameters
+    // 2. default ctor can have parameters, but all parameters have init expr (Because we won't
     // differentiate this case from 2.)
-    if (ctor->body && (ctor->members.getCount() == 0 || allParamHaveInitExpr(ctor)))
+    if (ctor->members.getCount() == 0 || allParamHaveInitExpr(ctor))
+    {
         return true;
+    }
 
     return false;
 }
