@@ -100,15 +100,6 @@ struct VulkanAPI
     VkDevice device = VK_NULL_HANDLE;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 
-#if 0
-    VkDebugReportCallbackEXT debugReportCallback = VK_NULL_HANDLE;
-    void* vulkanLibraryHandle = nullptr;
-    VkPhysicalDeviceProperties deviceProperties;
-    VkPhysicalDeviceFeatures deviceFeatures;
-    VkPhysicalDeviceMemoryProperties deviceMemoryProperties;
-    int queueFamilyIndex = -1;
-#endif
-
     VK_API_ALL_PROCS(VK_API_DECLARE_PROC)
 
     gfx::Result initGlobalProcs();
@@ -116,18 +107,8 @@ struct VulkanAPI
     /// Initialize the instance functions
     gfx::Result initInstanceProcs();
 
-#if 0
-    /// Called before initDevice
-    int initPhysicalDevice(VkPhysicalDevice physicalDevice);
-#endif
-
     /// Initialize the device functions
     gfx::Result initDeviceProcs();
-
-#if 0
-    /// Finds the proper memory type index for a given requirement.
-    int findMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties);
-#endif
 
     /// Clean up
     ~VulkanAPI();
