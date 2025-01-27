@@ -5,142 +5,205 @@ permalink: /user-guide/autodiff
 
 # Automatic Differentiation
 
-Neural networks and other machine learning techniques are becoming an increasingly popular way to solve many difficult problems in modern visual computing systems. However, to take advantage of these techniques, developers often need to reimplement many existing system components in a differentiable form to allow computing the derivatives of a function, or to propagate the derivative of a result backwards to each parameter. Slang provides built-in auto differentiation features to support developers adding differentiability to their existing code with as little effort as possible. In this chapter, we provide an overview of the auto differentiation features, followed by a detailed description on the new syntax and rules.
+To support differentiable graphics systems such as Gaussian splatters, neural radiance fields, differentiable path tracers, and more,
+Slang provides first class support for differentiable programming. 
+An overiew: 
+- Slang supports the `fwd_diff` and `bwd_diff` operators that can generate the forward and backward-mode derivative propagation functions for any valid Slang function annotated with the `[Differentiable]` attribute. 
+- The `DifferentialPair<T>` built-in generic type is used to pass derivatives associated with each function input. 
+- The `IDifferentiable`, and the experimental `IDifferentiablePtrType`, interfaces denote differentiable value and pointer types respectively, and allow finer control over how types behave under differentiation.
+- Futher, Slang allows for user-defined derivative functions through the `[ForwardDerivative(custom_fn)]` and `[BackwardDerivative(custom_fn)]`
+- All Slang features, such as control-flow, generics, interfaces, extensions, and more are compatible with automatic differentiation, though the bottom of this chapter documents some sharp edges & known issues.
 
-## Using Automatic Differentiation in Slang
+## Auto-diff operations `fwd_diff` and `bwd_diff`
 
-In this section, we walk through the steps to compute forward-derivative from input, and backward propagate the derivative from output to input.
+In Slang, `fwd_diff` and `bwd_diff` are higher-order functions used to transform Slang functions into their forward or backward derivative methods. To better understand what these methods do, here is a small refresher on differentiable calculus:
+### Mathematical overview: Jacobian and its vector products
+Forward and backward derivative methods are two different ways of computing a dot product with the Jacobian of a given function.
+Parts of this overview are based on JAX's excellent auto-diff cookbook [here](https://jax.readthedocs.io/en/latest/notebooks/autodiff_cookbook.html#how-it-s-made-two-foundational-autodiff-functions). The relevant [wikipedia article](https://en.wikipedia.org/wiki/Automatic_differentiation) is also a great resource for understanding auto-diff.
+ 
+The [Jacobian](https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant) (also called the total derivative) of a function $\mathbf{f}(\mathbf{x})$ is represented by $D\mathbf{f}(\mathbf{x})$. 
 
-### Forward Differentiation
+For a general function with multiple scalar inputs and multiple scalar outputs, the Jacobian is a _matrix_ where $D\mathbf{f}_{ij}$ represents the [partial derivative](https://en.wikipedia.org/wiki/Partial_derivative) of the $i^{th}$ output element w.r.t the $j^{th}$ input element $\frac{\partial f_i}{\partial x_j}$
 
-Suppose the user has already written a function that computes some mathematic term:
+As an example, consider a polynomial function
+$$ f(x, y) = x^3 + x^2 - y $$
+Here, $f$ here has 1 output and 2 inputs. $Df$ is therefore the row matrix:
+$$ Df(x, y) = [\frac{\partial f}{\partial x}, \frac{\partial f}{\partial y}] = [3x^2 + 2x, -1] $$
 
-```csharp
-float myFunc(float a, float x)
+Another, more complex example with a function that has multiple outputs (for clarity, denoted by $f_1$, $f_2$, etc..)
+$$ \mathbf{f}(x, y) = \begin{bmatrix} f_0(x, y) & f_1(x, y) & f_2(x, y) \end{bmatrix} = \begin{bmatrix} x^3 & y^2x & y^3 \end{bmatrix} $$
+Here, $Df$ is a 3x2 matrix with each element containing a partial derivative:
+$$ D\mathbf{f}(x, y) = \begin{bmatrix} 
+\partial f_0 / \partial x & \partial f_0 / \partial y \\  
+\partial f_1 / \partial x & \partial f_1 / \partial y \\
+\partial f_2 / \partial x & \partial f_2 / \partial y
+\end{bmatrix} = 
+\begin{bmatrix} 
+3x^2  & 0   \\  
+y^2   & 2yx \\
+0     & 3y^2
+\end{bmatrix} $$
+
+Computing full Jacobians is often unnecessary and expensive. Instead, auto-diff offers ways to compute _products_ of the Jacobian with a vector, which is a much faster operation.
+There are two basic ways to compute this product: 
+ 1. the Jacobian-vector product $\langle D\mathbf{f}(\mathbf{x}), \mathbf{v} \rangle$, also called forward-mode autodiff, and can be computed using `fwd_diff` operator in Slang, and
+ 2. the vector-Jacobian product $\langle \mathbf{v}^T, D\mathbf{f}(\mathbf{x}) \rangle$, also called reverse-mode autodiff, and can be computed using `bwd_diff` operator in Slang. From a linear algebra perspective, this is the transpose of the forward-mode operator. 
+
+#### Propagating derivatives with forward-mode auto-diff
+The products described above allow the _propagation_ of derivatives forward and backward through the function $f$
+
+The forward-mode derivative (Jacobian-vector product) can convert a derivative of the inputs to a derivative of the outputs. 
+For example, lets say inputs $\mathbf{x}$ depend on some scalar $\theta$, and $\frac{\partial \mathbf{x}}{\partial \theta}$ is a vector of partial derivatives describing that dependency.
+
+Invoking forward-mode auto-diff with $\mathbf{v} = \frac{\partial \mathbf{x}}{\partial \theta}$ converts this into a derivative of the outputs w.r.t the same scalar $\theta$.
+This can be verified by expanding the Jacobian and applying the [chain rule](https://en.wikipedia.org/wiki/Chain_rule) of derivatives:
+$$\langle D\mathbf{f}(\mathbf{x}), \frac{\partial \mathbf{x}}{\partial \theta} \rangle = \langle \begin{bmatrix} \frac{\partial f_0}{\partial x_0} & \frac{\partial f_0}{\partial x_1} & \cdots \\ \frac{\partial f_1}{\partial x_0} & \frac{\partial f_1}{\partial x_1} & \cdots \\ \cdots & \cdots & \cdots \end{bmatrix}, \begin{bmatrix} \frac{\partial x_0}{\partial \theta} \\ \frac{\partial x_1}{\partial \theta} \\ \cdots \end{bmatrix} \rangle = \begin{bmatrix} \frac{\partial f_0}{\partial \theta} \\ \frac{\partial f_1}{\partial \theta} \\ \cdots \end{bmatrix} = \frac{\partial \mathbf{f}}{\partial \theta}$$
+
+#### Propagating derivatives with reverse-mode auto-diff
+The reverse-mode derivative (vector-Jacobian product) can convert a derivative w.r.t outputs into a derivative w.r.t inputs.
+For example, lets say we have some scalar $\mathcal{L}$ that depends on the outputs $\mathbf{f}$, and $\frac{\partial \mathcal{L}}{\partial \mathbf{f}}$ is a vector of partial derivatives describing that dependency.
+
+Invoking forward-mode auto-diff with $\mathbf{v} = \frac{\partial \mathcal{L}}{\partial \mathbf{f}}$ converts this into a derivative of the same scalar $\mathcal{L}$ w.r.t the inputs $\mathbf{x}$.
+To provide more intuition for this, we can expand the Jacobian in a same way we did above:
+$$\langle \frac{\partial \mathcal{L}}{\partial \mathbf{f}}^T, D\mathbf{f}(\mathbf{x}) \rangle = \langle \begin{bmatrix}\frac{\partial \mathcal{L}}{\partial f_0} & \frac{\partial \mathcal{L}}{\partial f_1} & \cdots \end{bmatrix}, \begin{bmatrix} \frac{\partial f_0}{\partial x_0} & \frac{\partial f_0}{\partial x_1} & \cdots \\ \frac{\partial f_1}{\partial x_0} & \frac{\partial f_1}{\partial x_1} & \cdots \\ \cdots & \cdots & \cdots \end{bmatrix} \rangle = \begin{bmatrix} \frac{\partial \mathcal{L}}{\partial x_0} & \frac{\partial \mathcal{L}}{\partial x_1} & \cdots \end{bmatrix} = \frac{\partial \mathcal{L}}{\partial \mathbf{x}}^T$$
+
+This mode is the most popular, since machine learning systems often construct their differentiable pipeline with multiple inputs (which can number in the millions or billions), and a single scalar output often referred to as the 'loss' denoted by $\mathcal{L}$. The desired derivative can be constructed with a single reverse-mode invocation.
+
+### Invoking auto-diff in Slang
+With the mathematical foundations established, we can describe concretely how to compute derivatives using Slang.
+
+In Slang derivatives are computed using `fwd_diff`/`bwd_diff` which each correspond to Jacobian-vector and vector-Jacobian products.
+For forward-diff, to pass the vector $\mathbf{v}$ and receive the outputs, we use the `DifferentialPair<T>` type. We use pairs of inputs because every input element $x_i$ has a corresponding element $v_i$ in the vector, and each original output element has a corresponding output element in the product.
+
+Example of `fwd_diff`:
+```hlsl
+[Differentiable] // Auto-diff requires that functions are marked differentiable
+float2 foo(float a, float b) 
+{ 
+    return float2(a * b * b, a * a);
+}
+
+void main()
 {
-    return a * x * x;
+    DifferentialPair<float> dp_a = diffPair(
+        1.0, // input 'a'
+        1.0  // vector 'v' for vector-Jacobian product input (for 'a')
+    );
+
+    DifferentialPair<float> dp_b = diffPair(2.4, 0.0);
+
+    // fwd_diff to compute output and d_output w.r.t 'a'.
+    // Our output is also a differential pair.
+    //
+    DifferentiaPair<float2> dp_output = fwd_diff(foo)(dp_a, dp_b);
+
+    // Extract output's primal part, which is just the standard output when foo is called normally.
+    // Can also use `.getPrimal()`
+    //
+    float2 output_p = output.p;
+
+    // Extract output's derivative part. Can also use `.getDifferential()`
+    float2 output_d = output.d;
+
+    print("foo(1.0, 2.4) = (%f %f)", output_p.x, output_p.y)
+    print("d(foo)/d(a) at (1.0, 2.4) = (%f, %f)", output_d.x, output_d.y);
 }
 ```
 
-The user can make this function *forward-differentiable* by adding a `[ForwardDerivative]` attribute:
-```csharp
-[ForwardDifferentiable]
-float myFunc(float a, float x)
+Note that all the inputs and outputs to our function become 'paired'. This only applies to differentiable types, such as `float`, `float2`, etc. See the section on differentiable types for more info.
+
+`diffPair<T>()` is a built-in utility function that constructs the pair from the primal and differential values.  
+
+Additionally, invoking forward-mode also computes the regular (or 'primal') output value (can be obtained from `output.getPrimal()` or `output.p`). The same is _not_ true for reverse-mode.
+
+For reverse-mode, the example proceeds in a similar way, and we still use `DifferentialPair<T>` type. However, note that each input gets a corresponding _output_ and each output gets a corresponding _input_. Thus, all inputs become `inout` differential pairs, to allow the function to write into the derivative part (the primal part is still accepted as an input in the same pair data-structure).
+The one extra rule is that the derivative corresponding to the return value of the function is accepted as the last argument (an extra input). This value does not need to be a pair.
+
+Example:
+```hlsl
+[Differentiable] // Auto-diff requires that functions are marked differentiable
+float2 foo(float a, float b) 
+{ 
+    return float2(a * b * b, a * a);
+}
+
+void main()
 {
-    return a * x * x;
+    DifferentialPair<float> dp_a = diffPair(
+        1.0 // input 'a'
+    ); // Calling diffPair without a derivative part initializes to 0.
+
+    DifferentialPair<float> dp_b = diffPair(2.4);
+
+    // Derivatives of scalar L w.r.t output.
+    float2 dL_doutput = float2(1.0, 0.0);
+
+    // bwd_diff to compute dL_da and dL_db
+    // The derivative of the output is provided as an additional _input_ to the call
+    // Derivatives w.r.t inputs are written into dp_a.d and dp_b.d
+    //
+    bwd_diff(foo)(dp_a, dp_b, dL_doutput);
+
+    // Extract the derivatives of L w.r.t input
+    dL_da = dp_a.d;
+    dL_db = dp_b.d;
+
+    print("If dL/dOutput = (1.0, 0.0), then (dL/da, dL/db) at (1.0, 2.4) = (%f, %f)", dL_da, dL_db);
 }
 ```
 
-This allows the function to be used in the `fwd_diff` operator, which is a higher order operation that takes in a forward-differentiable function and returns the forward-derivative of the function.
+## Differentiable Type Systems
 
-The expression `fwd_diff(myFunc)` will have the following signature:
-```csharp
-DifferentialPair<float> myFunc_fwd_derivative(DifferentialPair<float> a, DifferentialPair<float> x);
-```
-
-Where `DifferentialPair<T>` is a built-in type that encodes both the primal(original) value and the derivative value of a term.
-To use this function to compute the derivative of `myFunc` with regard to `x`, the user can call the forward-derivative function by supplying the derivative value of `x` with `1.0` and the derivative value of `a` with `0.0`, as in the following code:
-
-```csharp
-float a = 2.0;
-float x = 3.0;
-// Compute derivative with regard to `x`:
-let result = fwd_diff(myFunc)(diffPair(a, 0.0), diffPair(x, 1.0));
-// Print the derivative.
-printf("%f", result.d);
-
-// Output: 12.0
-```
-
-In the example code above, `diffPair()` is a built-in function to construct a value of `DifferentialPair<T>` with a primal value and a derivative value. The primal value and derivative value stored in a `DifferentialPair` can be accessed with the `.p` and a `.d` property.
-
-### Backward Propagation
-
-The forward derivative function allows the user to compute the derivative of a function with regard to a specific combination of input parameters at a time. In many cases, we need to know how each parameter affects the output. Instead of calling the forward derivative function once for each parameter, it is more efficient to call the *backward propagation* function that propagate the derivative of outputs to each input parameter.
-
-To allow the compiler to generate the backward propagation function, we simply mark our function with the `[Differentiable]` or `[BackwardDifferentiable]` attribute:
-```csharp
-[Differentiable]
-float myFunc(float a, float x)
-{
-    return a * x * x;
-}
-```
-
-> #### Note:
-> When a function is marked as `[Differentiable]`, it is implied that the function is both `[ForwardDifferentiable]` and `[BackwardDifferentiable]` and can be used in the `fwd_diff` operator.
-
-
-The `bwd_diff` operator applies to a backward differentiable function and returns the backward propagation function. In this case, `bwd_diff(myFunc)` will have the following signature:
-
-```csharp
-void myFunc_backProp(inout DifferentialPair<float> a, inout DifferentialPair<float> x, float dResult);
-```
-
-Where `a` is an `inout DifferentialPair` where the initial value of `a` is passed into the function as primal value (in the `.p` property), and the propagated derivative of `a` is returned via the `.d` property of the `DifferentialPair`. The same rules apply to `x`.
-
-The additional `dResult` parameter is the derivative of the return value to be propagated to the input parameters. Note that in a backward propagation function, an input will become a `inout DifferentialPair` where the `.d` property of the pair is intended for receiving the propagation result, and the return value will become an input parameter that represents the source of backward propagation.
-
-The backward propagation function can be called as in the following code:
-```csharp
-var a = diffPair(2.0); // constructs DifferentialPair{2.0, 0.0}
-var x = diffPair(3.0); // constructs DifferentialPair{3.0, 0.0}
-
-bwd_diff(myFunc)(a, x, 1.0);
-
-// a.d is now 9.0
-// x.d is now 12.0
-```
-
-This completes the walkthrough of automatic differentiation features. The following sections will cover each perspective of the auto differentiation feature in more detail.
-
-## Mathematic Concepts and Terminologies
-
-This section briefly reviews the mathematic theories behind differentiable programming with the intention to clarify the concepts and terminologies that will be used in the rest of this documentation. We assume the reader is already familiar with the basic theories behind neural network training, in particular the back-propagation algorithm.
-
-A differentiable system can be represented a composition of differentiable functions (kernels) with learnable parameters, where each differentiable function has the form:
-
-$$\mathbf{w}_{i+1} = f_i(\mathbf{w}_i) $$
-
-Where $$f_i$$ represents a differentiable function (kernel) in the system, $$\mathbf{w}$$ represents a collection of learnable parameters defined in function $$f_i$$, and $$\mathbf{w}_{i+1}$$ is the output of $$f_i$$. We will use $$\omega$$ to denote a specific parameter in $$\mathbf{w}$$.
-
-In a composed system, the value of $$\mathbf{w}$$ used to evaluate $$f_i$$ may come from an *upstream* function
-
-$$ \mathbf{w}_i = f_{i-1}(\mathbf{w}_{i-1}) $$
-
-Similarly, the value computed by $$f_i$$ may be used as argument to a *downstream* function
-
-$$ h = f_{i+1}(\mathbf{w}_{i+1}) = f_{i+1}(f_{i}(\mathbf{w}_{i}))$$
-
-The entire system composed from differentiable functions can be noted as
-
-$$Y = f_1 \circ f_2 \circ \cdots \circ f_n(\mathbf{w}_0)$$
-
-Where $$\mathbf{w}_0$$ is the first layer of parameters.
-
-### Forward Propagation of Derivatives
-When developing and training such a system, we often need to evaluate the partial derivative of a differentiable function with regard to some parameter $$\omega$$. The simplest way to obtain a partial derivative is to call a forward derivative propagation function, which is defined by:
-
-$$ \mathbb{F}[f_i] = f_i'(\mathbf{w}_i, \mathbf{w}_i') = \sum_{\omega_i\in\mathbf{w}_i} \frac{\partial f}{\partial \omega_i} \omega_i' $$
-
-Where $$\omega' \in \mathbf{w}'$$ represents the partial derivative of $$\omega_i$$ with regard to some upstream parameter $$\omega_{i-1}$$ that is used to compute $$\omega_i$$, i.e. $$\omega'=\frac{\partial \omega_{i}}{\partial \omega_{i-1}}$$.
-
-Given this definition, $$\mathbb{F}[f]$$ can be used as a forward propagation function that is able to compute $$\frac{\partial f_i}{\partial \omega_0}$$ from $$\frac{\partial \omega_{i-1}}{\partial \omega_0}$$.
-
-### Backward Propagation of Derivatives
-When using the backpropagation algorithm to train a neural network, we are more interested in figuring out the partial derivative of the final system output with regard to a parameter $$\omega_i$$ in $$f_i$$. To do so, we generally utilize the backward derivative propagation function
-
-$$\mathbb{B}[f_i] = f_i^{-1}(\frac{\partial Y}{\partial f_i}) = \frac{\partial Y}{\partial \mathbf{w}_i}$$
-
-Where the backward propagation function $$\mathbb{B}[f_i]$$ takes as input the partial derivative of the final system output $$Y$$ with regard to the output of $$f_i$$ (i.e. $$\mathbf{w}_i$$), and computes the partial derivative of the final system output with regard to the input of $$f_i$$ (i.e. $$\mathbf{w}_{i-1}$$).
-
-The higher order operator $$\mathbb{F}$$ and $$\mathbb{B}$$ represent the operations that converts an original or primal function $$f$$ to its forward or backward derivative propagation function. Slang's automatic differentiation feature provide built-in support for these operators to automatically generate the derivative propagation functions from a user defined primal function. The remaining documentation will discuss this feature from a programming language perspective.
-
-## Differentiable Value Types
 Slang will only generate differentiation code for values that has a *differentiable* type. 
 Differentiable types are defining through conformance to one of two built-in interfaces:
 1. `IDifferentiable`: For value types (e.g. `float`, structs of value types, etc..)
 2. `IDifferentiablePtrType`: For buffer, pointer & reference types that represent locations rather than values.
+
+### Differentiable Value Types
+All basic types (`float`, `int`, `double`, etc..) and all aggregate types (i.e. `struct`) that use any combination of these are considered value types in Slang.
+
+Slang uses the `IDifferentiable` interface to define differentiable types. Basic types that describe a continuous value (`float`, `double` and `half`) and their vector/matrix versions (`float3`, `half2x2`, etc..) are defined as differentiable by the standard library. For all basic types, the type used for the differential (can be obtained with `T.Differential`) is the same as the primal.
+
+#### User-defined differentiable value types
+However, it is easy to define your own differentiable types.
+Typically, all you need is to implement the `IDifferentiable` interface. 
+
+```hlsl
+struct MyType : IDifferentiable
+{
+    float x;
+    float y;
+}
+```
+
+Slang can automatically derive the required information about the differential type by analyzing the constituent elements.
+For instance, in the above case, Slang will derive that
+```hlsl
+struct MyType : IDifferentiable
+{
+    // Automatically inferred from the fact that MyType has 2 floats
+    typealias Differential = MyType;
+    // ...
+}
+```
+
+For more complex types that aren't fully differentiable, a new type is synthesized automatically
+
+```hlsl
+struct MyPartialDiffType : IDifferentiable
+{
+    float x;
+    uint y;
+};
+
+// Synthesized
+struct MyPartialDiffType_Differential
+{
+    float x;
+};
+```
+
+
 
 The `IDifferentiable` interface requires the following definitions (which can be auto-generated by the compiler for most scenarios)
 ```csharp
