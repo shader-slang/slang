@@ -13,7 +13,7 @@ Author: Darren Wihandi and Slang community
 
 Reviewer:
 
-##Background
+## Background
 
 Floating-point pack and unpack functions provide great utility and exist as built-in intrinsics on GLSL, SPIRV, Metal and WGSL but not on HLSL.
 Since Slang's core mudle is derived from HLSL, floating-point pack/unpack intrinsics are not defined and there is no way to access the intrinsics
@@ -71,6 +71,10 @@ Unlike HLSL's implementation with introduces new packed datatypes, `uint8_t4_pac
 and no new pakced datatypes are introduced.
 
 ### Targets without built-in intrinsics
-For targets without built-in floating-point pack/unpack intrinsics, the implementation is done manually through code with a combination of arithmetic and bitwise operations.
+For targets without built-in intrinsics, the implementation is done manually through code with a combination of arithmetic and bitwise operations.
 
-### Normalized float value conversions
+### Normalized float conversion rules
+Normalized float conversion rules are standard across GLSL/SPIRV, Metal and WGSL. Slang follows these standards. Details of the conversion rules for each target can be found in:
+- Section 8.4, `Floating-Point Pack and Unpack Functions`, of the GLSL language specification, which is also used by the SPIR-V extended instrucsion for GLSL.
+- Section 7.7.1, `Conversion Rules for Normalized Integer Pixel Data Types` of the Metal Shading language specification.
+- Sections [16.9, Data Packing Built-in Functions](https://www.w3.org/TR/WGSL/#pack-builtin-functions) and [16.10, Data Unpacking Built-in Functions](https://www.w3.org/TR/WGSL/#unpack-builtin-functions) of the WebGPU Shading language specification.
