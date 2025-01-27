@@ -29,7 +29,6 @@ static List<ConstructorDecl*> _getCtorList(
     StructDecl* structDecl,
     ConstructorDecl** defaultCtorOut);
 static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclBase* varDecl);
-void addVisibilityModifier(ASTBuilder* builder, Decl* decl, DeclVisibility vis);
 
 /// Visitor to transition declarations to `DeclCheckState::CheckedModifiers`
 struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
@@ -2062,28 +2061,26 @@ static void addAutoDiffModifiersToFunc(
         addModifier(func, m_astBuilder->create<TreatAsDifferentiableAttribute>());
 }
 
-static ConstructorDecl* _createCtor(
-    SemanticsDeclVisitorBase* visitor,
-    ASTBuilder* m_astBuilder,
+ConstructorDecl* SemanticsDeclVisitorBase::createCtor(
     AggTypeDecl* decl,
     DeclVisibility ctorVisibility)
 {
     auto ctor = m_astBuilder->create<ConstructorDecl>();
     addModifier(ctor, m_astBuilder->create<SynthesizedModifier>());
-    auto ctorName = visitor->getName("$init");
+    auto ctorName = getName("$init");
     ctor->ownedScope = m_astBuilder->create<Scope>();
     ctor->ownedScope->containerDecl = ctor;
-    ctor->ownedScope->parent = visitor->getScope(decl);
+    ctor->ownedScope->parent = getScope(decl);
     ctor->parentDecl = decl;
     ctor->loc = decl->loc;
     ctor->closingSourceLoc = ctor->loc;
     ctor->nameAndLoc.name = ctorName;
     ctor->nameAndLoc.loc = ctor->loc;
-    ctor->returnType.type = visitor->calcThisType(makeDeclRef(decl));
+    ctor->returnType.type = calcThisType(makeDeclRef(decl));
     auto body = m_astBuilder->create<BlockStmt>();
     body->scopeDecl = m_astBuilder->create<ScopeDecl>();
     body->scopeDecl->ownedScope = m_astBuilder->create<Scope>();
-    body->scopeDecl->ownedScope->parent = visitor->getScope(ctor);
+    body->scopeDecl->ownedScope->parent = getScope(ctor);
     body->scopeDecl->parentDecl = ctor;
     body->scopeDecl->loc = ctor->loc;
     body->scopeDecl->closingSourceLoc = ctor->loc;
@@ -2092,8 +2089,8 @@ static ConstructorDecl* _createCtor(
     body->body = m_astBuilder->create<SeqStmt>();
     ctor->addFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
     decl->addMember(ctor);
-    addAutoDiffModifiersToFunc(visitor, m_astBuilder, ctor);
-    addVisibilityModifier(m_astBuilder, ctor, ctorVisibility);
+    addAutoDiffModifiersToFunc(this, m_astBuilder, ctor);
+    addVisibilityModifier(ctor, ctorVisibility);
     return ctor;
 }
 
@@ -2547,18 +2544,18 @@ void SemanticsVisitor::CheckConstraintSubType(TypeExp& typeExp)
     }
 }
 
-void addVisibilityModifier(ASTBuilder* builder, Decl* decl, DeclVisibility vis)
+void SemanticsVisitor::addVisibilityModifier(Decl* decl, DeclVisibility vis)
 {
     switch (vis)
     {
     case DeclVisibility::Public:
-        addModifier(decl, builder->create<PublicModifier>());
+        addModifier(decl, m_astBuilder->create<PublicModifier>());
         break;
     case DeclVisibility::Internal:
-        addModifier(decl, builder->create<InternalModifier>());
+        addModifier(decl, m_astBuilder->create<InternalModifier>());
         break;
     case DeclVisibility::Private:
-        addModifier(decl, builder->create<PrivateModifier>());
+        addModifier(decl, m_astBuilder->create<PrivateModifier>());
         break;
     default:
         break;
@@ -2704,7 +2701,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
         aggTypeDecl->members.add(diffField);
 
         auto visibility = getDeclVisibility(member);
-        addVisibilityModifier(m_astBuilder, diffField, visibility);
+        addVisibilityModifier(diffField, visibility);
 
         aggTypeDecl->invalidateMemberDictionary();
 
@@ -2817,7 +2814,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
         auto requirementVisibility = getDeclVisibility(requirementDeclRef.getDecl());
         auto thisVisibility = getDeclVisibility(context->parentDecl);
         auto visibility = Math::Min(thisVisibility, requirementVisibility);
-        addVisibilityModifier(m_astBuilder, aggTypeDecl, visibility);
+        addVisibilityModifier(aggTypeDecl, visibility);
     }
 
     // Synthesize the rest of IDifferential method conformances by recursively checking
@@ -4480,7 +4477,7 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
         auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
         auto thisVisibility = getDeclVisibility(context->parentDecl);
         auto visibility = Math::Min(thisVisibility, requirementVisibility);
-        addVisibilityModifier(m_astBuilder, synthesized, visibility);
+        addVisibilityModifier(synthesized, visibility);
     }
 }
 
@@ -5387,7 +5384,7 @@ bool SemanticsVisitor::trySynthesizePropertyRequirementWitness(
         auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
         auto thisVisibility = getDeclVisibility(context->parentDecl);
         auto visibility = Math::Min(thisVisibility, requirementVisibility);
-        addVisibilityModifier(m_astBuilder, synPropertyDecl, visibility);
+        addVisibilityModifier(synPropertyDecl, visibility);
     }
     return true;
 }
@@ -5556,7 +5553,7 @@ bool SemanticsVisitor::trySynthesizeWrapperTypePropertyRequirementWitness(
     if (innerProperty.getDecl()->findModifier<VisibilityModifier>())
     {
         auto vis = getDeclVisibility(innerProperty.getDecl());
-        addVisibilityModifier(m_astBuilder, synPropertyDecl, vis);
+        addVisibilityModifier(synPropertyDecl, vis);
     }
 
     context->parentDecl->addMember(synPropertyDecl);
@@ -5943,7 +5940,7 @@ bool SemanticsVisitor::trySynthesizeWrapperTypeSubscriptRequirementWitness(
         auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
         auto thisVisibility = getDeclVisibility(context->parentDecl);
         auto visibility = Math::Min(thisVisibility, requirementVisibility);
-        addVisibilityModifier(m_astBuilder, synSubscriptDecl, visibility);
+        addVisibilityModifier(synSubscriptDecl, visibility);
     }
 
     return true;
@@ -6064,7 +6061,7 @@ bool SemanticsVisitor::trySynthesizeSubscriptRequirementWitness(
         auto requirementVisibility = getDeclVisibility(requiredMemberDeclRef.getDecl());
         auto thisVisibility = getDeclVisibility(context->parentDecl);
         auto visibility = Math::Min(thisVisibility, requirementVisibility);
-        addVisibilityModifier(m_astBuilder, synSubscriptDecl, visibility);
+        addVisibilityModifier(synSubscriptDecl, visibility);
     }
 
     return true;
@@ -12363,7 +12360,7 @@ bool SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
 
     // synthesize the constructor signature:
     // 1. The constructor's name is always `$init`, we create one without parameters now.
-    ConstructorDecl* ctor = _createCtor(this, getASTBuilder(), structDecl, ctorVisibility);
+    ConstructorDecl* ctor = createCtor(structDecl, ctorVisibility);
     ctor->addFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
 
     ctor->members.reserve(resultMembers.getCount());
@@ -12422,7 +12419,7 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
         if (!defaultCtor)
         {
             DeclVisibility ctorVisibility = getDeclVisibility(structDecl);
-            _createCtor(this, m_astBuilder, structDecl, ctorVisibility);
+            createCtor(structDecl, ctorVisibility);
         }
     }
 
