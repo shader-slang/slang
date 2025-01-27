@@ -93,6 +93,7 @@
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-ssa.h"
 #include "slang-ir-string-hash.h"
+#include "slang-ir-strip-debug-info.h"
 #include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-synthesize-active-mask.h"
@@ -300,6 +301,7 @@ struct LinkingAndOptimizationOptions
 //
 struct RequiredLoweringPassSet
 {
+    bool debugInfo;
     bool resultType;
     bool optionalType;
     bool combinedTextureSamplers;
@@ -331,6 +333,13 @@ void calcRequiredLoweringPassSet(
 {
     switch (inst->getOp())
     {
+    case kIROp_DebugValue:
+    case kIROp_DebugVar:
+    case kIROp_DebugLine:
+    case kIROp_DebugLocationDecoration:
+    case kIROp_DebugSource:
+        result.debugInfo = true;
+        break;
     case kIROp_ResultType:
         result.resultType = true;
         break;
@@ -583,6 +592,7 @@ Result linkAndOptimizeIR(
     auto target = codeGenContext->getTargetFormat();
     auto targetRequest = codeGenContext->getTargetReq();
     auto targetProgram = codeGenContext->getTargetProgram();
+    auto targetCompilerOptions = targetRequest->getOptionSet();
 
     // Get the artifact desc for the target
     const auto artifactDesc = ArtifactDescUtil::makeDescForCompileTarget(asExternal(target));
@@ -613,6 +623,13 @@ Result linkAndOptimizeIR(
     // Scan the IR module and determine which lowering/legalization passes are needed.
     RequiredLoweringPassSet requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
+
+    // Debug info is added by the front-end, and therefore needs to be stripped out by targets that
+    // opt out of debug info.
+    if (requiredLoweringPassSet.debugInfo &&
+        (targetCompilerOptions.getIntOption(CompilerOptionName::DebugInformation) ==
+         SLANG_DEBUG_INFO_LEVEL_NONE))
+        stripDebugInfo(irModule);
 
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
         lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(irModule, sink);
