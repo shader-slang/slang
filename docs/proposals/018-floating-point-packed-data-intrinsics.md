@@ -72,8 +72,8 @@ uint pack_half_f16(half2 unpackedVal);
 ### Normalized float conversion rules
 Normalized float conversion rules are standard across GLSL/SPIRV, Metal and WGSL. Slang follows these standards. Details of the conversion rules for each target can be found in:
 - Section 8.4, `Floating-Point Pack and Unpack Functions`, of the GLSL language specification, which is also used by the SPIR-V extended instrucsion for GLSL.
-- Section 7.7.1, `Conversion Rules for Normalized Integer Pixel Data Types` of the Metal Shading language specification.
-- Sections [16.9, Data Packing Built-in Functions](https://www.w3.org/TR/WGSL/#pack-builtin-functions) and [16.10, Data Unpacking Built-in Functions](https://www.w3.org/TR/WGSL/#unpack-builtin-functions) of the WebGPU Shading language specification.
+- Section 7.7.1, `Conversion Rules for Normalized Integer Pixel Data Types`, of the Metal Shading language specification.
+- Sections [16.9  Data Packing Built-in Functions](https://www.w3.org/TR/WGSL/#pack-builtin-functions) and [16.10 Data Unpacking Built-in Functions](https://www.w3.org/TR/WGSL/#unpack-builtin-functions) of the WebGPU Shading language specification.
 
 ### Built-in packed Datatypes
 Unlike HLSL's implementation with introduces new packed datatypes, `uint8_t4_packed` and `int8_t4_packed`, unsigned 32-bit integers are used directly 
