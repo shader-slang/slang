@@ -2333,6 +2333,16 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
                 inst,
                 IRIntegerValue(collection->getMemoryQualifierBit()));
         }
+        else if (as<HLSLTriangleModifier>(mod))
+            builder->addDecoration(inst, kIROp_TriangleInputPrimitiveTypeDecoration);
+        else if (as<HLSLPointModifier>(mod))
+            builder->addDecoration(inst, kIROp_PointInputPrimitiveTypeDecoration);
+        else if (as<HLSLLineModifier>(mod))
+            builder->addDecoration(inst, kIROp_LineInputPrimitiveTypeDecoration);
+        else if (as<HLSLLineAdjModifier>(mod))
+            builder->addDecoration(inst, kIROp_LineAdjInputPrimitiveTypeDecoration);
+        else if (as<HLSLTriangleAdjModifier>(mod))
+            builder->addDecoration(inst, kIROp_TriangleAdjInputPrimitiveTypeDecoration);
         // TODO: what are other modifiers we need to propagate through?
     }
     if (auto t =
@@ -11179,50 +11189,6 @@ static void lowerFrontEndEntryPointToIR(
             entryPoint->getProfile(),
             entryPointName->text.getUnownedSlice(),
             moduleName.getUnownedSlice());
-    }
-
-    // Go through the entry point parameters creating decorations from layout as appropriate
-    // But only if this is a definition not a declaration
-    if (isDefinition(instToDecorate))
-    {
-        FilteredMemberList<ParamDecl> params = entryPointFuncDecl->getParameters();
-
-        IRGlobalValueWithParams* valueWithParams = as<IRGlobalValueWithParams>(instToDecorate);
-        if (valueWithParams)
-        {
-            IRParam* irParam = valueWithParams->getFirstParam();
-
-            for (auto param : params)
-            {
-                if (auto modifier =
-                        param->findModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
-                {
-                    IROp op = kIROp_Invalid;
-
-                    if (as<HLSLTriangleModifier>(modifier))
-                        op = kIROp_TriangleInputPrimitiveTypeDecoration;
-                    else if (as<HLSLPointModifier>(modifier))
-                        op = kIROp_PointInputPrimitiveTypeDecoration;
-                    else if (as<HLSLLineModifier>(modifier))
-                        op = kIROp_LineInputPrimitiveTypeDecoration;
-                    else if (as<HLSLLineAdjModifier>(modifier))
-                        op = kIROp_LineAdjInputPrimitiveTypeDecoration;
-                    else if (as<HLSLTriangleAdjModifier>(modifier))
-                        op = kIROp_TriangleAdjInputPrimitiveTypeDecoration;
-
-                    if (op != kIROp_Invalid)
-                    {
-                        builder->addDecoration(irParam, op);
-                    }
-                    else
-                    {
-                        SLANG_UNEXPECTED("unhandled primitive type");
-                    }
-                }
-
-                irParam = irParam->getNextParam();
-            }
-        }
     }
 }
 
