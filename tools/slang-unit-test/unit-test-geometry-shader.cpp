@@ -13,6 +13,8 @@ using namespace Slang;
 
 // Test the compilation API for compiling geometry shaders to DXIL.
 
+#ifdef SLANG_WINDOWS_FAMILY
+
 SLANG_UNIT_TEST(geometryShader)
 {
     const char* userSourceBody = R"(
@@ -87,3 +89,5 @@ SLANG_UNIT_TEST(geometryShader)
 
     SLANG_CHECK(code != nullptr);
 }
+
+#endif
