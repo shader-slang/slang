@@ -94,8 +94,7 @@
 
 struct VulkanAPI
 {
-    gfx::Result initFromGFX(
-        gfx::IDevice* gfxDevice);
+    gfx::Result initFromGFX(gfx::IDevice* gfxDevice);
 
     VkInstance instance = VK_NULL_HANDLE;
     VkDevice device = VK_NULL_HANDLE;

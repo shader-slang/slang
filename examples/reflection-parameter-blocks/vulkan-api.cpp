@@ -62,7 +62,7 @@ gfx::Result VulkanAPI::initGlobalProcs()
 
 gfx::Result initializeVulkanDevice(VulkanAPI& api)
 {
-    if(api.initGlobalProcs() != 0)
+    if (api.initGlobalProcs() != 0)
         return -1;
 
     // Enable validation layer if available.

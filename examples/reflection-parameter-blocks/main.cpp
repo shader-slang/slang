@@ -60,8 +60,8 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
 
     struct PipelineLayoutBuilder
     {
-        std::vector<VkDescriptorSetLayout>  descriptorSetLayouts;
-        std::vector<VkPushConstantRange>    pushConstantRanges;
+        std::vector<VkDescriptorSetLayout> descriptorSetLayouts;
+        std::vector<VkPushConstantRange> pushConstantRanges;
     };
 
     // Unlike how things are presented in the document, we do not
@@ -77,7 +77,8 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
     {
         filterOutEmptyDescriptorSets(builder);
 
-        VkPipelineLayoutCreateInfo pipelineLayoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+        VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
+            VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
 
         pipelineLayoutInfo.setLayoutCount = builder.descriptorSetLayouts.size();
         pipelineLayoutInfo.pSetLayouts = builder.descriptorSetLayouts.data();
@@ -86,11 +87,7 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
         pipelineLayoutInfo.pPushConstantRanges = builder.pushConstantRanges.data();
 
         VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
-        vkAPI.vkCreatePipelineLayout(
-            vkAPI.device,
-            &pipelineLayoutInfo,
-            nullptr,
-            &pipelineLayout);
+        vkAPI.vkCreatePipelineLayout(vkAPI.device, &pipelineLayoutInfo, nullptr, &pipelineLayout);
 
         *outPipelineLayout = pipelineLayout;
         return SLANG_OK;
@@ -98,7 +95,7 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
 
     // What Goes Into a Descriptor Set Layout?
     // =======================================
-    
+
     struct DescriptorSetLayoutBuilder
     {
         std::vector<VkDescriptorSetLayoutBinding> descriptorRanges;
@@ -121,8 +118,7 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
             return;
 
         VkDescriptorSetLayoutCreateInfo descriptorSetLayoutInfo = {
-            VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO
-        };
+            VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
 
         descriptorSetLayoutInfo.bindingCount = descriptorSetLayoutBuilder.descriptorRanges.size();
         descriptorSetLayoutInfo.pBindings = descriptorSetLayoutBuilder.descriptorRanges.data();
@@ -134,8 +130,8 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
             nullptr,
             &descriptorSetLayout);
 
-        pipelineLayoutBuilder.descriptorSetLayouts[
-            descriptorSetLayoutBuilder.setIndex] = descriptorSetLayout;
+        pipelineLayoutBuilder.descriptorSetLayouts[descriptorSetLayoutBuilder.setIndex] =
+            descriptorSetLayout;
     }
 
     // Parameter Blocks
@@ -146,15 +142,14 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
         slang::TypeLayoutReflection* parameterBlockTypeLayout)
     {
         DescriptorSetLayoutBuilder descriptorSetLayoutBuilder;
-        startBuildingDescriptorSetLayout(
-            pipelineLayoutBuilder, descriptorSetLayoutBuilder);
+        startBuildingDescriptorSetLayout(pipelineLayoutBuilder, descriptorSetLayoutBuilder);
 
         addRangesForParameterBlockElement(
-            pipelineLayoutBuilder, descriptorSetLayoutBuilder,
+            pipelineLayoutBuilder,
+            descriptorSetLayoutBuilder,
             parameterBlockTypeLayout->getElementTypeLayout());
 
-        finishBuildingDescriptorSetLayout(
-            pipelineLayoutBuilder, descriptorSetLayoutBuilder);
+        finishBuildingDescriptorSetLayout(pipelineLayoutBuilder, descriptorSetLayoutBuilder);
     }
 
     // Automatically-Introduced Uniform Buffer
@@ -167,18 +162,14 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
     {
         if (elementTypeLayout->getSize() > 0)
         {
-            addAutomaticallyIntroducedUniformBuffer(
-                descriptorSetLayoutBuilder);
+            addAutomaticallyIntroducedUniformBuffer(descriptorSetLayoutBuilder);
         }
 
         // Once we have accounted for the possibility of an implicitly-introduced
         // constant buffer, we can move on and add bindings based on whatever
         // non-ordinary data (textures, buffers, etc.) is in the element type:
         //
-        addRanges(
-            pipelineLayoutBuilder,
-            descriptorSetLayoutBuilder,
-            elementTypeLayout);
+        addRanges(pipelineLayoutBuilder, descriptorSetLayoutBuilder, elementTypeLayout);
     }
 
     void addAutomaticallyIntroducedUniformBuffer(
@@ -209,8 +200,7 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
     // Empty Ranges
     // ------------
 
-    void filterOutEmptyDescriptorSets(
-        PipelineLayoutBuilder& builder)
+    void filterOutEmptyDescriptorSets(PipelineLayoutBuilder& builder)
     {
         std::vector<VkDescriptorSetLayout> filteredDescriptorSetLayouts;
         for (auto descriptorSetLayout : builder.descriptorSetLayouts)
@@ -248,10 +238,11 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
         int relativeSetIndex,
         int rangeIndex)
     {
-        slang::BindingType bindingType = typeLayout->getDescriptorSetDescriptorRangeType(
-            relativeSetIndex, rangeIndex);
+        slang::BindingType bindingType =
+            typeLayout->getDescriptorSetDescriptorRangeType(relativeSetIndex, rangeIndex);
         auto descriptorCount = typeLayout->getDescriptorSetDescriptorRangeDescriptorCount(
-            relativeSetIndex, rangeIndex);
+            relativeSetIndex,
+            rangeIndex);
 
         // Some Ranges Need to Be Skipped
         // ------------------------------
@@ -280,8 +271,9 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
     {
         switch (bindingType)
         {
-#define CASE(FROM, TO) \
-    case slang::BindingType::FROM: return VK_DESCRIPTOR_TYPE_##TO
+#define CASE(FROM, TO)             \
+    case slang::BindingType::FROM: \
+        return VK_DESCRIPTOR_TYPE_##TO
 
             CASE(Sampler, SAMPLER);
             CASE(CombinedTextureSampler, COMBINED_IMAGE_SAMPLER);
@@ -320,12 +312,10 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
         slang::TypeLayoutReflection* typeLayout)
     {
         int subObjectRangeCount = typeLayout->getSubObjectRangeCount();
-        for (int subObjectRangeIndex = 0; subObjectRangeIndex < subObjectRangeCount; ++subObjectRangeIndex)
+        for (int subObjectRangeIndex = 0; subObjectRangeIndex < subObjectRangeCount;
+             ++subObjectRangeIndex)
         {
-            addSubObjectRange(
-                pipelineLayoutBuilder,
-                typeLayout,
-                subObjectRangeIndex);
+            addSubObjectRange(pipelineLayoutBuilder, typeLayout, subObjectRangeIndex);
         }
     }
 
@@ -334,36 +324,37 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
         slang::TypeLayoutReflection* typeLayout,
         int subObjectRangeIndex)
     {
-        auto bindingRangeIndex = typeLayout->getSubObjectRangeBindingRangeIndex(subObjectRangeIndex);
+        auto bindingRangeIndex =
+            typeLayout->getSubObjectRangeBindingRangeIndex(subObjectRangeIndex);
         auto bindingType = typeLayout->getBindingRangeType(bindingRangeIndex);
         switch (bindingType)
         {
         default:
             return;
 
-        // Nested Parameter Blocks
-        // -----------------------
+            // Nested Parameter Blocks
+            // -----------------------
 
         case slang::BindingType::ParameterBlock:
-        {
-            auto parameterBlockTypeLayout = typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
-            addDescriptorSetForParameterBlock(
-                pipelineLayoutBuilder,
-                parameterBlockTypeLayout);
-        }
-        break;
+            {
+                auto parameterBlockTypeLayout =
+                    typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
+                addDescriptorSetForParameterBlock(pipelineLayoutBuilder, parameterBlockTypeLayout);
+            }
+            break;
 
-        // Push-Constant Ranges
-        // --------------------
+            // Push-Constant Ranges
+            // --------------------
 
         case slang::BindingType::PushConstant:
-        {
-            auto constantBufferTypeLayout = typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
-            addPushConstantRangeForConstantBuffer(
-                pipelineLayoutBuilder,
-                constantBufferTypeLayout);
-        }
-        break;
+            {
+                auto constantBufferTypeLayout =
+                    typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
+                addPushConstantRangeForConstantBuffer(
+                    pipelineLayoutBuilder,
+                    constantBufferTypeLayout);
+            }
+            break;
         }
     }
 
@@ -395,9 +386,7 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
         PipelineLayoutBuilder pipelineLayoutBuilder;
 
         DescriptorSetLayoutBuilder defaultDescriptorSetLayoutBuilder;
-        startBuildingDescriptorSetLayout(
-            pipelineLayoutBuilder,
-            defaultDescriptorSetLayoutBuilder);
+        startBuildingDescriptorSetLayout(pipelineLayoutBuilder, defaultDescriptorSetLayoutBuilder);
 
         addGlobalScopeParameters(
             pipelineLayoutBuilder,
@@ -409,12 +398,8 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
             defaultDescriptorSetLayoutBuilder,
             programLayout);
 
-        finishBuildingDescriptorSetLayout(
-            pipelineLayoutBuilder,
-            defaultDescriptorSetLayoutBuilder);
-        finishBuildingPipelineLayout(
-            pipelineLayoutBuilder,
-            outPipelineLayout);
+        finishBuildingDescriptorSetLayout(pipelineLayoutBuilder, defaultDescriptorSetLayoutBuilder);
+        finishBuildingPipelineLayout(pipelineLayoutBuilder, outPipelineLayout);
 
         return SLANG_OK;
     }
@@ -458,8 +443,7 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
         DescriptorSetLayoutBuilder& descriptorSetLayoutBuilder,
         slang::EntryPointLayout* entryPointLayout)
     {
-        _currentStageFlags = getShaderStageFlags(
-            entryPointLayout->getStage());
+        _currentStageFlags = getShaderStageFlags(entryPointLayout->getStage());
         addRangesForParameterBlockElement(
             pipelineLayoutBuilder,
             descriptorSetLayoutBuilder,
@@ -471,23 +455,24 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
     {
         switch (stage)
         {
-#define CASE(FROM, TO) \
-        case SLANG_STAGE_##FROM: return VK_SHADER_STAGE_##TO
+#define CASE(FROM, TO)       \
+    case SLANG_STAGE_##FROM: \
+        return VK_SHADER_STAGE_##TO
 
-        CASE(VERTEX, VERTEX_BIT);
-        CASE(HULL, TESSELLATION_CONTROL_BIT);
-        CASE(DOMAIN, TESSELLATION_EVALUATION_BIT);
-        CASE(GEOMETRY, GEOMETRY_BIT);
-        CASE(FRAGMENT, FRAGMENT_BIT);
-        CASE(COMPUTE, COMPUTE_BIT);
-        CASE(RAY_GENERATION, RAYGEN_BIT_KHR);
-        CASE(ANY_HIT, ANY_HIT_BIT_KHR);
-        CASE(CLOSEST_HIT, CLOSEST_HIT_BIT_KHR);
-        CASE(MISS, MISS_BIT_KHR);
-        CASE(INTERSECTION, INTERSECTION_BIT_KHR);
-        CASE(CALLABLE, CALLABLE_BIT_KHR);
-        CASE(MESH, MESH_BIT_EXT);
-        CASE(AMPLIFICATION, TASK_BIT_EXT);
+            CASE(VERTEX, VERTEX_BIT);
+            CASE(HULL, TESSELLATION_CONTROL_BIT);
+            CASE(DOMAIN, TESSELLATION_EVALUATION_BIT);
+            CASE(GEOMETRY, GEOMETRY_BIT);
+            CASE(FRAGMENT, FRAGMENT_BIT);
+            CASE(COMPUTE, COMPUTE_BIT);
+            CASE(RAY_GENERATION, RAYGEN_BIT_KHR);
+            CASE(ANY_HIT, ANY_HIT_BIT_KHR);
+            CASE(CLOSEST_HIT, CLOSEST_HIT_BIT_KHR);
+            CASE(MISS, MISS_BIT_KHR);
+            CASE(INTERSECTION, INTERSECTION_BIT_KHR);
+            CASE(CALLABLE, CALLABLE_BIT_KHR);
+            CASE(MESH, MESH_BIT_EXT);
+            CASE(AMPLIFICATION, TASK_BIT_EXT);
 
 #undef CASE
         default:
@@ -513,18 +498,14 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
 
     Result validatePipelineLayout(VkPipelineLayout pipelineLayout)
     {
-        VkShaderModuleCreateInfo shaderModuleInfo = { VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+        VkShaderModuleCreateInfo shaderModuleInfo = {VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
         shaderModuleInfo.pCode = (uint32_t const*)_slangCompiledProgramBlob->getBufferPointer();
         shaderModuleInfo.codeSize = _slangCompiledProgramBlob->getBufferSize();
 
         VkShaderModule vkShaderModule;
-        vkAPI.vkCreateShaderModule(
-            vkAPI.device,
-            &shaderModuleInfo,
-            nullptr,
-            &vkShaderModule);
+        vkAPI.vkCreateShaderModule(vkAPI.device, &shaderModuleInfo, nullptr, &vkShaderModule);
 
-        VkComputePipelineCreateInfo pipelineInfo = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+        VkComputePipelineCreateInfo pipelineInfo = {VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
         pipelineInfo.layout = pipelineLayout;
         pipelineInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         pipelineInfo.stage.module = vkShaderModule;
@@ -540,10 +521,7 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
             nullptr,
             &pipeline);
 
-        vkAPI.vkDestroyPipeline(
-            vkAPI.device,
-            pipeline,
-            nullptr);
+        vkAPI.vkDestroyPipeline(vkAPI.device, pipeline, nullptr);
 
         return SLANG_OK;
     }
@@ -575,8 +553,7 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
         SLANG_RETURN_ON_FAIL(createPipelineLayout(_slangProgramLayout, &pipelineLayout));
         SLANG_RETURN_ON_FAIL(validatePipelineLayout(pipelineLayout));
 
-        vkAPI.vkDestroyPipelineLayout(
-            vkAPI.device, pipelineLayout, nullptr);
+        vkAPI.vkDestroyPipelineLayout(vkAPI.device, pipelineLayout, nullptr);
     }
 
     VulkanAPI vkAPI;
@@ -605,7 +582,7 @@ struct ReflectionParameterBlocksExampleApp : public TestBase
 #endif
         gfx::IDevice::Desc deviceDesc = {};
         deviceDesc.deviceType = gfx::DeviceType::Vulkan;
- 
+
         ComPtr<gfx::IDevice> gfxDevice;
         SLANG_RETURN_ON_FAIL(gfxCreateDevice(&deviceDesc, gfxDevice.writeRef()));
 
