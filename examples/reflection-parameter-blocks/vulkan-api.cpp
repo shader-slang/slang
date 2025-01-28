@@ -45,11 +45,11 @@ gfx::Result VulkanAPI::initGlobalProcs()
 #elif SLANG_APPLE_FAMILY
     dynamicLibraryName = "libvulkan.dylib";
     void* vulkanLibraryHandle = dlopen(dynamicLibraryName, RTLD_NOW);
-#define VK_API_GET_GLOBAL_PROC(x) this->x = (PFN_##x)dlsym(api.vulkanLibraryHandle, #x);
+#define VK_API_GET_GLOBAL_PROC(x) this->x = (PFN_##x)dlsym(vulkanLibraryHandle, #x);
 #else
     dynamicLibraryName = "libvulkan.so.1";
     void* vulkanLibraryHandle = dlopen(dynamicLibraryName, RTLD_NOW);
-#define VK_API_GET_GLOBAL_PROC(x) this->x = (PFN_##x)dlsym(api.vulkanLibraryHandle, #x);
+#define VK_API_GET_GLOBAL_PROC(x) this->x = (PFN_##x)dlsym(vulkanLibraryHandle, #x);
 #endif
 
     // Initialize all the global functions.
