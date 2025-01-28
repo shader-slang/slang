@@ -46,10 +46,10 @@ struct DefaultStruct4 : DefaultStruct_base
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    DefaultStruct1 s1;
+    DefaultStruct1 s1 = {};
     DefaultStruct2 s2;
     DefaultStruct3 s3;
-    DefaultStruct4 s4;
+    DefaultStruct4 s4 = {};
     // BUF: 1
     outputBuffer[0] = true
         && s1.data0 == 1
