@@ -2427,9 +2427,13 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 // for the variable, that will be used for all downstream
                 // code generation.
                 //
-                auto constructorDecl = as<ConstructorDecl>(overloadContext.bestCandidate->item.declRef).getDecl();
-                // We don't allow implicit initialization of struct only have synthesized default ctor.
-                if ((constructorDecl && !constructorDecl->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault)) ||
+                auto constructorDecl =
+                    as<ConstructorDecl>(overloadContext.bestCandidate->item.declRef).getDecl();
+                // We don't allow implicit initialization of struct only have synthesized default
+                // ctor.
+                if ((constructorDecl &&
+                     !constructorDecl->containsFlavor(
+                         ConstructorDecl::ConstructorFlavor::SynthesizedDefault)) ||
                     !constructorDecl)
                 {
                     varDecl->initExpr =
