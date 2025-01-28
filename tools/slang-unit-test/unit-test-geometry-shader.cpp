@@ -13,7 +13,7 @@ using namespace Slang;
 
 // Test the compilation API for compiling geometry shaders to DXIL.
 
-#ifdef SLANG_WINDOWS_FAMILY
+#if SLANG_WINDOWS_FAMILY
 
 SLANG_UNIT_TEST(geometryShader)
 {
