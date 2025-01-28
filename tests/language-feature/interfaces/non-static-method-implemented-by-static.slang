@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute  -output-using-type
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0], stride=4);
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0], stride=4);
 RWStructuredBuffer<int> outputBuffer;
 
 interface Base
@@ -29,7 +29,12 @@ void computeMain()
     Impl1 impl1;
     Impl2 impl2;
 
-    outputBuffer[0] = impl1.getValue();
-    outputBuffer[1] = impl2.getValue();
-    outputBuffer[2] = impl2.getValue(5);
+    uint index = 0;
+
+    outputBuffer[index++] = Impl1::getValue();
+    outputBuffer[index++] = impl1.getValue();
+
+    outputBuffer[index++] = Impl2::getValue();
+    outputBuffer[index++] = impl2.getValue();
+    outputBuffer[index++] = impl2.getValue(5);
 }
