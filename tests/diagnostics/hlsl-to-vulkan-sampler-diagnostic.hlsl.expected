@@ -1,0 +1,8 @@
+result code = 0
+standard error = {
+tests/diagnostics/hlsl-to-vulkan-sampler-diagnostic.hlsl(25): warning 39013: shader parameter 'cs3' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` specified for Vulkan
+Sampler2D       cs3 : register(s1): register(t1);
+                      ^~~~~~~~
+}
+standard output = {
+}

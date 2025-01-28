@@ -1078,9 +1078,23 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
     // oversight on their part.
     if (auto registerModifier = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>())
     {
+        auto varType = getType(context->getASTBuilder(), varDecl.as<VarDeclBase>());
+        if (auto textureType = as<TextureType>(varType))
+        {
+            if (textureType->isCombined())
+            {
+                // Recommend [[vk::binding]] but not '-fvk-xxx-shift` for combined texture samplers
+                getSink(context)->diagnose(
+                    registerModifier,
+                    Diagnostics::registerModifierButNoVulkanLayout,
+                    varDecl.getName());
+                return;
+            }
+        }
+
         getSink(context)->diagnose(
             registerModifier,
-            Diagnostics::registerModifierButNoVulkanLayout,
+            Diagnostics::registerModifierButNoVkBindingNorShift,
             varDecl.getName());
     }
 }
@@ -1256,7 +1270,6 @@ static void addExplicitParameterBindings_GLSL(
         return;
     }
 
-
     const auto hlslInfo = _extractLayoutSemanticInfo(context, hlslRegSemantic);
     if (hlslInfo.kind == LayoutResourceKind::None)
     {
@@ -1270,7 +1283,14 @@ static void addExplicitParameterBindings_GLSL(
     if (auto textureType = as<TextureType>(varType))
     {
         if (textureType->isCombined())
+        {
+            if (!warnedMissingVulkanLayoutModifier)
+            {
+                _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
+                warnedMissingVulkanLayoutModifier = true;
+            }
             return;
+        }
     }
 
     // Can we map to a Vulkan kind in principal?
