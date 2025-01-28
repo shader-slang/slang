@@ -5,7 +5,6 @@
 #include "../slang/slang-language-server.h"
 
 #include <slang.h>
-#include <string>
 #include <vector>
 
 using namespace slang;
@@ -143,7 +142,6 @@ emscripten::val Module::findEntryPointByName(const std::string& name)
     m_session->addComponentType(entryPoint.get());
     return emscripten::val(EntryPoint(entryPoint.get(), m_session));
 }
-
 
 emscripten::val Module::findAndCheckEntryPoint(const std::string& name, int stage)
 {
@@ -409,12 +407,12 @@ emscripten::val ComponentType::loadStrings()
     return emscripten::val::array(result);
 }
 
-ProgramLayout* ComponentType::getLayout(unsigned int targetIndex)
+ProgramLayout* ComponentType::getLayout(uint32_t targetIndex)
 {
     return (slang::wgsl::ProgramLayout*)interface()->getLayout(targetIndex);
 }
 
-unsigned int ProgramLayout::getParameterCount()
+uint32_t ProgramLayout::getParameterCount()
 {
     return interface()->getParameterCount();
 }
@@ -432,7 +430,7 @@ emscripten::val ProgramLayout::toJsonObject()
     return parsedObject;
 }
 
-VariableLayoutReflection* ProgramLayout::getParameterByIndex(unsigned int index)
+VariableLayoutReflection* ProgramLayout::getParameterByIndex(uint32_t index)
 {
     return (slang::wgsl::VariableLayoutReflection*)(interface()->getParameterByIndex(index));
 }
@@ -440,6 +438,11 @@ VariableLayoutReflection* ProgramLayout::getParameterByIndex(unsigned int index)
 TypeLayoutReflection* ProgramLayout::getGlobalParamsTypeLayout()
 {
     return (slang::wgsl::TypeLayoutReflection*)(interface()->getGlobalParamsTypeLayout());
+}
+
+FunctionReflection* ProgramLayout::findFunctionByName(std::string name)
+{
+    return (slang::wgsl::FunctionReflection*)(interface()->findFunctionByName(name.c_str()));
 }
 
 EntryPointReflection* ProgramLayout::findEntryPointByName(std::string name)
@@ -455,10 +458,95 @@ EntryPointReflection::ThreadGroupSize EntryPointReflection::getComputeThreadGrou
 }
 
 BindingType TypeLayoutReflection::getDescriptorSetDescriptorRangeType(
-    unsigned int setIndex,
-    unsigned int rangeIndex)
+    uint32_t setIndex,
+    uint32_t rangeIndex)
 {
     return interface()->getDescriptorSetDescriptorRangeType(setIndex, rangeIndex);
+}
+
+std::string DeclReflection::getName()
+{
+    return interface()->getName();
+}
+
+
+slang::DeclReflection::Kind DeclReflection::getKind()
+{
+    return interface()->getKind();
+}
+
+uint32_t DeclReflection::getChildrenCount()
+{
+    return interface()->getChildrenCount();
+};
+
+slang::wgsl::DeclReflection* DeclReflection::getChild(uint32_t index)
+{
+    return (slang::wgsl::DeclReflection*)interface()->getChild(index);
+}
+
+slang::wgsl::TypeReflection* DeclReflection::getType()
+{
+    return (slang::wgsl::TypeReflection*)interface()->getType();
+}
+slang::wgsl::VariableReflection* DeclReflection::asVariable()
+{
+    return (slang::wgsl::VariableReflection*)interface()->asVariable();
+}
+slang::wgsl::FunctionReflection* DeclReflection::asFunction()
+{
+    return (slang::wgsl::FunctionReflection*)interface()->asFunction();
+}
+slang::wgsl::GenericReflection* DeclReflection::asGeneric()
+{
+    return (slang::wgsl::GenericReflection*)interface()->asGeneric();
+}
+slang::wgsl::DeclReflection* DeclReflection::getParent()
+{
+    return (slang::wgsl::DeclReflection*)interface()->getParent();
+}
+
+
+std::string GenericReflection::getName()
+{
+    return interface()->getName();
+}
+
+slang::wgsl::DeclReflection* GenericReflection::asDecl()
+{
+    return (slang::wgsl::DeclReflection*)interface()->asDecl();
+}
+
+uint32_t GenericReflection::getTypeParameterCount()
+{
+    return interface()->getTypeParameterCount();
+}
+slang::wgsl::VariableReflection* GenericReflection::getTypeParameter(unsigned index)
+{
+    return (slang::wgsl::VariableReflection*)interface()->getTypeParameter(index);
+}
+uint32_t GenericReflection::getValueParameterCount()
+{
+    return interface()->getValueParameterCount();
+}
+slang::wgsl::VariableReflection* GenericReflection::getValueParameter(unsigned index)
+{
+    return (slang::wgsl::VariableReflection*)interface()->getValueParameter(index);
+}
+
+slang::wgsl::DeclReflection* GenericReflection::getInnerDecl()
+{
+    return (slang::wgsl::DeclReflection*)interface()->getInnerDecl();
+}
+
+SlangDeclKind GenericReflection::getInnerKind()
+{
+    return interface()->getInnerKind();
+}
+
+slang::wgsl::GenericReflection* GenericReflection::getOuterGenericContainer()
+{
+    return (slang::wgsl::GenericReflection*)interface()->getOuterGenericContainer();
 }
 
 std::string VariableLayoutReflection::getName()
@@ -466,16 +554,107 @@ std::string VariableLayoutReflection::getName()
     return interface()->getName();
 }
 
-TypeLayoutReflection* VariableLayoutReflection::getTypeLayout()
+slang::wgsl::TypeLayoutReflection* VariableLayoutReflection::getTypeLayout()
 {
     return (slang::wgsl::TypeLayoutReflection*)(interface()->getTypeLayout());
 }
 
-unsigned int VariableLayoutReflection::getBindingIndex()
+uint32_t VariableLayoutReflection::getBindingIndex()
 {
     return interface()->getBindingIndex();
 }
 
+std::string VariableReflection::getName()
+{
+    return interface()->getName();
+}
+
+uint32_t VariableReflection::getUserAttributeCount()
+{
+    return interface()->getUserAttributeCount();
+}
+
+slang::wgsl::UserAttribute* VariableReflection::getUserAttributeByIndex(uint32_t index)
+{
+    return (slang::wgsl::UserAttribute*)interface()->getUserAttributeByIndex(index);
+}
+
+bool VariableReflection::hasDefaultValue()
+{
+    return interface()->hasDefaultValue();
+}
+
+slang::wgsl::TypeReflection* VariableReflection::getType()
+{
+    return (slang::wgsl::TypeReflection*)interface()->getType();
+}
+
+Modifier* VariableReflection::findModifier(Modifier::ID id)
+{
+    return interface()->findModifier(id);
+}
+
+slang::wgsl::VariableReflection* TypeReflection::getFieldByIndex(uint32_t index)
+{
+    return (slang::wgsl::VariableReflection*)interface()->getFieldByIndex(index);
+}
+
+slang::TypeReflection::ScalarType TypeReflection::getScalarType()
+{
+    return interface()->getScalarType();
+}
+
+slang::TypeReflection::Kind TypeReflection::getKind()
+{
+    return interface()->getKind();
+}
+
+
+std::string UserAttribute::getName()
+{
+    return interface()->getName();
+}
+
+float UserAttribute::getArgumentValueFloat(uint32_t index)
+{
+    float value;
+    interface()->getArgumentValueFloat(index, &value);
+    return value;
+}
+
+std::string UserAttribute::getArgumentValueString(uint32_t index)
+{
+    size_t len = 0;
+    const char* out = interface()->getArgumentValueString(index, &len);
+    return std::string(out, len);
+}
+
+
+slang::wgsl::TypeReflection* UserAttribute::getArgumentType(uint32_t index)
+{
+    return (slang::wgsl::TypeReflection*)interface()->getArgumentType(index);
+}
+
+
+uint32_t UserAttribute::getArgumentCount()
+{
+    return interface()->getArgumentCount();
+}
+
+std::string FunctionReflection::getName()
+{
+    return interface()->getName();
+}
+
+uint32_t FunctionReflection::getUserAttributeCount()
+{
+    return interface()->getUserAttributeCount();
+}
+
+slang::wgsl::UserAttribute* FunctionReflection::getUserAttributeByIndex(uint32_t index)
+{
+    return (slang::wgsl::UserAttribute*)interface()->getUserAttributeByIndex(index);
+}
 
 namespace lsp
 {
@@ -666,8 +845,10 @@ std::optional<lsp::CompletionItem> LanguageServer::completionResolve(lsp::Comple
     editItem.documentation.kind = coreArgs.documentation.kind;
     editItem.documentation.value = coreArgs.documentation.value;
     editItem.data = coreArgs.data;
+
     for (auto character : coreArgs.commitCharacters)
         editItem.commitCharacters.add(character);
+
     auto coreResult = m_core->completionResolve(coreArgs, editItem);
     if (coreResult.isNull)
         return std::nullopt;

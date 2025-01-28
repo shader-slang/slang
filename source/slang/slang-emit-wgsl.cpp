@@ -49,18 +49,6 @@ fn _slang_getNan() -> f32
 }
 )";
 
-void WGSLSourceEmitter::ensurePrelude(const char* preludeText)
-{
-    IRStringLit* stringLit;
-    if (!m_builtinPreludes.tryGetValue(preludeText, stringLit))
-    {
-        IRBuilder builder(m_irModule);
-        stringLit = builder.getStringValue(UnownedStringSlice(preludeText));
-        m_builtinPreludes[preludeText] = stringLit;
-    }
-    m_requiredPreludes.add(stringLit);
-}
-
 void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
     const SwitchRegion::Case* const currentCase,
     const bool isDefault)
@@ -338,7 +326,7 @@ void WGSLSourceEmitter::emit(const AddressSpace addressSpace)
     }
 }
 
-static const char* getWgslImageFormat(IRTextureTypeBase* type)
+const char* WGSLSourceEmitter::getWgslImageFormat(IRTextureTypeBase* type)
 {
     // You can find the supported WGSL texel format from the URL:
     // https://www.w3.org/TR/WGSL/#storage-texel-formats
@@ -417,11 +405,19 @@ static const char* getWgslImageFormat(IRTextureTypeBase* type)
         return "rgba32sint";
     case ImageFormat::rgba32f:
         return "rgba32float";
+    case ImageFormat::bgra8:
+        return "bgra8unorm";
     case ImageFormat::unknown:
         // Unlike SPIR-V, WGSL doesn't have a texel format for "unknown".
         return "rgba32float";
     default:
-        // We may need to print a warning for types WGSL doesn't support
+        const auto imageFormatInfo = getImageFormatInfo(imageFormat);
+        getSink()->diagnose(
+            SourceLoc(),
+            Diagnostics::imageFormatUnsupportedByBackend,
+            imageFormatInfo.name,
+            "WGSL",
+            "rgba32float");
         return "rgba32float";
     }
 }
@@ -507,6 +503,10 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_UIntPtrType:
         m_writer->emit("u64");
         return;
+    case kIROp_Int8x4PackedType:
+    case kIROp_UInt8x4PackedType:
+        m_writer->emit("u32");
+        return;
     case kIROp_StructType:
         m_writer->emit(getName(type));
         return;
@@ -562,6 +562,13 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             emitType((IRType*)type->getOperand(0));
             m_writer->emit(", ");
             emitVal(type->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(">");
+            return;
+        }
+    case kIROp_UnsizedArrayType:
+        {
+            m_writer->emit("array<");
+            emitType((IRType*)type->getOperand(0));
             m_writer->emit(">");
             return;
         }
@@ -952,6 +959,8 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         return;
                     }
                 case BaseType::UInt:
+                case BaseType::Int8x4Packed:
+                case BaseType::UInt8x4Packed:
                     {
                         m_writer->emit("u32(");
                         m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
@@ -1371,10 +1380,10 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
     case kIROp_Rsh:
     case kIROp_Lsh:
         {
-            // Shift amounts must be an unsigned type in WGSL
+            // Shift amounts must be an unsigned type in WGSL.
+            // We ensure this during legalization.
             // https://www.w3.org/TR/WGSL/#bit-expr
-            IRInst* const shiftAmount = inst->getOperand(1);
-            IRType* const shiftAmountType = shiftAmount->getDataType();
+            SLANG_ASSERT(inst->getOperand(1)->getDataType()->getOp() != kIROp_IntType);
 
             // Dawn complains about mixing '<<' and '|', '^' and a bunch of other bit operators
             // without a paranthesis, so we'll always emit paranthesis around the shift amount.
@@ -1391,18 +1400,9 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(info.op);
             m_writer->emit(" ");
 
-            if (shiftAmountType->getOp() == kIROp_IntType)
-            {
-                m_writer->emit("bitcast<u32>(");
-                emitOperand(inst->getOperand(1), rightSide(outerPrec, info));
-                m_writer->emit(")");
-            }
-            else
-            {
-                m_writer->emit("(");
-                emitOperand(inst->getOperand(1), rightSide(outerPrec, info));
-                m_writer->emit(")");
-            }
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(1), rightSide(outerPrec, info));
+            m_writer->emit(")");
 
             maybeCloseParens(needClose);
 

@@ -263,18 +263,6 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
     }
 }
 
-void MetalSourceEmitter::ensurePrelude(const char* preludeText)
-{
-    IRStringLit* stringLit;
-    if (!m_builtinPreludes.tryGetValue(preludeText, stringLit))
-    {
-        IRBuilder builder(m_irModule);
-        stringLit = builder.getStringValue(UnownedStringSlice(preludeText));
-        m_builtinPreludes[preludeText] = stringLit;
-    }
-    m_requiredPreludes.add(stringLit);
-}
-
 void MetalSourceEmitter::emitMemoryOrderOperand(IRInst* inst)
 {
     auto memoryOrder = (IRMemoryOrder)getIntVal(inst);
@@ -648,6 +636,22 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 m_writer->emit(");\n");
             return true;
         }
+    case kIROp_MetalCastToDepthTexture:
+        {
+            emitType(inst->getDataType(), getName(inst));
+            m_writer->emit(";\n{\n");
+            m_writer->indent();
+            m_writer->emit("auto _slang_ordinary_texture = ");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+            m_writer->emit(getName(inst));
+            m_writer->emit(" = *(");
+            emitType(inst->getDataType());
+            m_writer->emit(" thread*)(&_slang_ordinary_texture);\n");
+            m_writer->dedent();
+            m_writer->emit("}\n");
+            return true;
+        }
     }
     return false;
 }
@@ -700,6 +704,21 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
+        }
+    case kIROp_Neg:
+        {
+            if (as<IRMatrixType>(inst->getOperand(0)->getDataType()))
+            {
+                // Metal does not support negate operator on matrices,
+                // we should emit "(matrix(0) - op0)" instead.
+                m_writer->emit("(");
+                emitType(inst->getDataType());
+                m_writer->emit("(0) - ");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(")");
+                return true;
+            }
+            break;
         }
     case kIROp_Mul:
         {
@@ -1050,7 +1069,6 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_UInt8Type:
     case kIROp_UIntType:
     case kIROp_FloatType:
-    case kIROp_DoubleType:
     case kIROp_HalfType:
         {
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
@@ -1074,10 +1092,17 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_UIntPtrType:
         m_writer->emit("ulong");
         return;
+    case kIROp_Int8x4PackedType:
+    case kIROp_UInt8x4PackedType:
+        m_writer->emit("uint");
+        return;
     case kIROp_StructType:
         m_writer->emit(getName(type));
         return;
 
+    case kIROp_DoubleType:
+        SLANG_UNEXPECTED("'double' type emitted");
+        return;
     case kIROp_VectorType:
         {
             auto vecType = (IRVectorType*)type;

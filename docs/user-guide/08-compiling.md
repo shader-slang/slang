@@ -589,11 +589,15 @@ A global session is created using the function `slang::createGlobalSession()`:
 using namespace slang;
 
 Slang::ComPtr<IGlobalSession> globalSession;
-createGlobalSession(globalSession.writeRef());
+SlangGlobalSessionDesc desc = {};
+createGlobalSession(&desc, globalSession.writeRef());
 ```
 
 When a global session is created, the Slang system will load its internal representation of the _core module_ that the compiler provides to user code.
 The core module can take a significant amount of time to load, so applications are advised to use a single global session if possible, rather than creating and then disposing of one for each compile.
+
+If you want to enable GLSL compatibility mode, you need to set `SlangGlobalSessionDesc::enableGLSL` to `true` when calling `createGlobalSession()`. This will load the necessary GLSL intrinsic module
+for compiling GLSL code. Without this setting, compiling GLSL code will result in an error.
 
 > #### Note ####
 > Currently, the global session type is *not* thread-safe.
@@ -874,6 +878,7 @@ The only functions which are currently thread safe are
 ```C++
 SlangSession* spCreateSession(const char* deprecated);
 SlangResult slang_createGlobalSession(SlangInt apiVersion, slang::IGlobalSession** outGlobalSession);
+SlangResult slang_createGlobalSession2(const SlangGlobalSessionDesc* desc, slang::IGlobalSession** outGlobalSession);
 SlangResult slang_createGlobalSessionWithoutCoreModule(SlangInt apiVersion, slang::IGlobalSession** outGlobalSession);
 ISlangBlob* slang_getEmbeddedCoreModule();
 SlangResult slang::createGlobalSession(slang::IGlobalSession** outGlobalSession);
@@ -924,7 +929,7 @@ meanings of their `CompilerOptionValue` encodings.
 
 |CompilerOptionName | Description |
 |:------------------ |:----------- |
-| MacroDefine        | Specifies a prepreocessor macro define entry. `stringValue0` encodes macro name, `stringValue1` encodes the macro value.
+| MacroDefine        | Specifies a preprocessor macro define entry. `stringValue0` encodes macro name, `stringValue1` encodes the macro value.
 | Include            | Specifies an additional search path. `stringValue0` encodes the additional path. |
 | Language           | Specifies the input language. `intValue0` encodes a value defined in `SlangSourceLanguage`. |
 | MatrixLayoutColumn | Use column major matrix layout as default. `intValue0` encodes a bool value for the setting. |
@@ -973,5 +978,5 @@ meanings of their `CompilerOptionValue` encodings.
 ## Debugging
 
 Slang's SPIRV backend supports generating debug information using the [NonSemantic Shader DebugInfo Instructions](https://github.com/KhronosGroup/SPIRV-Registry/blob/main/nonsemantic/NonSemantic.Shader.DebugInfo.100.asciidoc).
-To enable debugging information when targing SPIRV, specify the `-emit-spirv-directly` and the `-g2` argument when using `slangc` tool, or set `EmitSpirvDirectly` to `1` and `DebugInformation` to `SLANG_DEBUG_INFO_LEVEL_STANDARD` when using the API.
+To enable debugging information when targeting SPIRV, specify the `-emit-spirv-directly` and the `-g2` argument when using `slangc` tool, or set `EmitSpirvDirectly` to `1` and `DebugInformation` to `SLANG_DEBUG_INFO_LEVEL_STANDARD` when using the API.
 Debugging support has been tested with RenderDoc.

@@ -2421,6 +2421,13 @@ static SlangResult _writeDependencyFile(EndToEndCompileRequest* compileRequest)
         }
     }
 
+    // When the output is a binary module, linkage->targets can be empty. So
+    // we need to do their dependencies separately.
+    if (compileRequest->m_containerFormat == ContainerFormat::SlangModule)
+    {
+        _writeDependencyStatement(stream, compileRequest, compileRequest->m_containerOutputPath);
+    }
+
     return SLANG_OK;
 }
 

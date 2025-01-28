@@ -416,6 +416,7 @@ static void emitReflectionResourceTypeBaseInfoJSON(
         CASE(TEXTURE_BUFFER, textureBuffer);
         CASE(STRUCTURED_BUFFER, structuredBuffer);
         CASE(BYTE_ADDRESS_BUFFER, byteAddressBuffer);
+        CASE(ACCELERATION_STRUCTURE, accelerationStructure);
 #undef CASE
     }
     writer << "\"";
@@ -1006,22 +1007,22 @@ static void emitReflectionEntryPointJSON(
     switch (entryPoint->getStage())
     {
     case SLANG_STAGE_VERTEX:
-        writer << ",\n\"stage:\": \"vertex\"";
+        writer << ",\n\"stage\": \"vertex\"";
         break;
     case SLANG_STAGE_HULL:
-        writer << ",\n\"stage:\": \"hull\"";
+        writer << ",\n\"stage\": \"hull\"";
         break;
     case SLANG_STAGE_DOMAIN:
-        writer << ",\n\"stage:\": \"domain\"";
+        writer << ",\n\"stage\": \"domain\"";
         break;
     case SLANG_STAGE_GEOMETRY:
-        writer << ",\n\"stage:\": \"geometry\"";
+        writer << ",\n\"stage\": \"geometry\"";
         break;
     case SLANG_STAGE_FRAGMENT:
-        writer << ",\n\"stage:\": \"fragment\"";
+        writer << ",\n\"stage\": \"fragment\"";
         break;
     case SLANG_STAGE_COMPUTE:
-        writer << ",\n\"stage:\": \"compute\"";
+        writer << ",\n\"stage\": \"compute\"";
         break;
     default:
         break;
@@ -1051,7 +1052,7 @@ static void emitReflectionEntryPointJSON(
     }
     if (auto resultVarLayout = entryPoint->getResultVarLayout())
     {
-        writer << ",\n\"result:\": ";
+        writer << ",\n\"result\": ";
         emitReflectionParamJSON(writer, resultVarLayout);
     }
 

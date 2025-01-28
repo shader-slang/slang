@@ -129,14 +129,6 @@ void CLikeSourceEmitter::emitPreModuleImpl()
         m_writer->emit("\n");
     }
 }
-void CLikeSourceEmitter::emitPostModuleImpl()
-{
-    if (m_requiredAfter.requireComputeDerivatives.getLength() > 0)
-    {
-        m_writer->emit(m_requiredAfter.requireComputeDerivatives);
-        m_writer->emit("\n");
-    }
-}
 
 //
 // Types
@@ -274,6 +266,11 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
     case kIROp_UIntPtrType:
         return UnownedStringSlice("uintptr_t");
 
+    case kIROp_Int8x4PackedType:
+        return UnownedStringSlice("int8_t4_packed");
+    case kIROp_UInt8x4PackedType:
+        return UnownedStringSlice("uint8_t4_packed");
+
     case kIROp_HalfType:
         return UnownedStringSlice("half");
 
@@ -290,14 +287,48 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
 }
 
 
-/* static */ IRNumThreadsDecoration* CLikeSourceEmitter::getComputeThreadGroupSize(
+IRNumThreadsDecoration* CLikeSourceEmitter::getComputeThreadGroupSize(
     IRFunc* func,
     Int outNumThreads[kThreadGroupAxisCount])
 {
-    IRNumThreadsDecoration* decor = func->findDecoration<IRNumThreadsDecoration>();
-    for (int i = 0; i < 3; ++i)
+    Int specializationConstantIds[kThreadGroupAxisCount];
+    IRNumThreadsDecoration* decor =
+        getComputeThreadGroupSize(func, outNumThreads, specializationConstantIds);
+
+    for (auto id : specializationConstantIds)
     {
-        outNumThreads[i] = decor ? Int(getIntVal(decor->getOperand(i))) : 1;
+        if (id >= 0)
+        {
+            getSink()->diagnose(decor, Diagnostics::unsupportedSpecializationConstantForNumThreads);
+            break;
+        }
+    }
+    return decor;
+}
+
+/* static */ IRNumThreadsDecoration* CLikeSourceEmitter::getComputeThreadGroupSize(
+    IRFunc* func,
+    Int outNumThreads[kThreadGroupAxisCount],
+    Int outSpecializationConstantIds[kThreadGroupAxisCount])
+{
+    IRNumThreadsDecoration* decor = func->findDecoration<IRNumThreadsDecoration>();
+    for (int i = 0; i < kThreadGroupAxisCount; ++i)
+    {
+        if (!decor)
+        {
+            outNumThreads[i] = 1;
+            outSpecializationConstantIds[i] = -1;
+        }
+        else if (auto specConst = as<IRGlobalParam>(decor->getOperand(i)))
+        {
+            outNumThreads[i] = 1;
+            outSpecializationConstantIds[i] = getSpecializationConstantId(specConst);
+        }
+        else
+        {
+            outNumThreads[i] = Int(getIntVal(decor->getOperand(i)));
+            outSpecializationConstantIds[i] = -1;
+        }
     }
     return decor;
 }
@@ -384,6 +415,23 @@ void CLikeSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
         {
             auto rateQualifiedType = cast<IRRateQualifiedType>(type);
             _emitType(rateQualifiedType->getValueType(), declarator);
+        }
+        break;
+    case kIROp_DescriptorHandleType:
+        {
+            // If the T is already bindless for target, emit it directly.
+            auto resPtrType = cast<IRDescriptorHandleType>(type);
+            if (isResourceTypeBindless(resPtrType->getResourceType()))
+                _emitType(resPtrType->getResourceType(), declarator);
+            else
+            {
+                // Otherwise, emit the DescriptorHandle<T> as uint2.
+                IRBuilder builder(resPtrType);
+                builder.setInsertBefore(resPtrType);
+                emitSimpleTypeAndDeclarator(
+                    builder.getVectorType(builder.getUIntType(), 2),
+                    declarator);
+            }
         }
         break;
 
@@ -650,6 +698,35 @@ void CLikeSourceEmitter::emitLivenessImpl(IRInst* inst)
 // Expressions
 //
 
+static bool isBitLogicalOrRelationalOrEquality(EPrecedence prec)
+{
+    switch (prec)
+    {
+    case EPrecedence::kEPrecedence_And_Left:
+    case EPrecedence::kEPrecedence_And_Right:
+    case EPrecedence::kEPrecedence_BitAnd_Left:
+    case EPrecedence::kEPrecedence_BitAnd_Right:
+    case EPrecedence::kEPrecedence_BitOr_Left:
+    case EPrecedence::kEPrecedence_BitOr_Right:
+    case EPrecedence::kEPrecedence_BitXor_Left:
+    case EPrecedence::kEPrecedence_BitXor_Right:
+    case EPrecedence::kEPrecedence_Or_Left:
+    case EPrecedence::kEPrecedence_Or_Right:
+    case EPrecedence::kEPrecedence_Relational_Left:
+    case EPrecedence::kEPrecedence_Relational_Right:
+    case EPrecedence::kEPrecedence_Shift_Left:
+    case EPrecedence::kEPrecedence_Shift_Right:
+    case EPrecedence::kEPrecedence_Equality_Left:
+    case EPrecedence::kEPrecedence_Equality_Right:
+        return true;
+
+    default:
+        break;
+    }
+
+    return false;
+}
+
 bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo& prec)
 {
     bool needParens = (prec.leftPrecedence <= outerPrec.leftPrecedence) ||
@@ -659,47 +736,13 @@ bool CLikeSourceEmitter::maybeEmitParens(EmitOpInfo& outerPrec, const EmitOpInfo
     // for common mistakes when parentheses are not used with certain combinations
     // of the operations. We emit parentheses to avoid the warnings.
     //
-    // a | b & c => a | (b & c)
-    if (prec.leftPrecedence == EPrecedence::kEPrecedence_BitAnd_Left &&
-        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_BitOr_Right)
-    {
+
+    if (isBitLogicalOrRelationalOrEquality(prec.leftPrecedence) &&
+        (outerPrec.leftPrecedence > kEPrecedence_Assign_Left))
         needParens = true;
-    }
-    // a & b | c => (a & b) | c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_BitAnd_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitOr_Left)
-    {
+    if (isBitLogicalOrRelationalOrEquality(outerPrec.leftPrecedence) ||
+        isBitLogicalOrRelationalOrEquality(outerPrec.rightPrecedence))
         needParens = true;
-    }
-    // a << b + c => a << (b + c)
-    else if (
-        prec.leftPrecedence == EPrecedence::kEPrecedence_Additive_Left &&
-        outerPrec.leftPrecedence == EPrecedence::kEPrecedence_Shift_Right)
-    {
-        needParens = true;
-    }
-    // a + b << c => (a + b) << c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Shift_Left)
-    {
-        needParens = true;
-    }
-    // a + b & c => (a + b) & c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_Additive_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_BitAnd_Left)
-    {
-        needParens = true;
-    }
-    // a ^ b * c => (a ^ b) * c
-    else if (
-        prec.rightPrecedence == EPrecedence::kEPrecedence_BitXor_Right &&
-        outerPrec.rightPrecedence == EPrecedence::kEPrecedence_Multiplicative_Left)
-    {
-        needParens = true;
-    }
 
     if (needParens)
     {
@@ -1272,6 +1315,8 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         return;
                     }
                 case BaseType::UInt:
+                case BaseType::Int8x4Packed:
+                case BaseType::UInt8x4Packed:
                     {
                         m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
                         m_writer->emit("U");
@@ -1368,6 +1413,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // or statement).
     case kIROp_UpdateElement:
     case kIROp_DefaultConstruct:
+    case kIROp_MetalCastToDepthTexture:
         return false;
 
     // Always fold these in, because they are trivial
@@ -1528,6 +1574,30 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     {
         if (!inst->mightHaveSideEffects())
             return true;
+    }
+
+    if (auto load = as<IRLoad>(inst))
+    {
+        // Loads from a constref global param should always be folded.
+        auto ptrType = load->getPtr()->getDataType();
+        if (load->getPtr()->getOp() == kIROp_GlobalParam)
+        {
+            if (ptrType->getOp() == kIROp_ConstRefType)
+                return true;
+            if (auto ptrTypeBase = as<IRPtrTypeBase>(ptrType))
+            {
+                auto addrSpace = ptrTypeBase->getAddressSpace();
+                switch (addrSpace)
+                {
+                case Slang::AddressSpace::Uniform:
+                case Slang::AddressSpace::Input:
+                case Slang::AddressSpace::BuiltinInput:
+                    return true;
+                default:
+                    break;
+                }
+            }
+        }
     }
 
     // Always hold if inst is a call into an [__alwaysFoldIntoUseSite] function.
@@ -2432,7 +2502,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             emitOperand(inst->getOperand(1), rightSide(outerPrec, prec));
             break;
         }
-
+    case kIROp_CastDescriptorHandleToUInt2:
+    case kIROp_CastUInt2ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToResource:
+        emitOperand(inst->getOperand(0), outerPrec);
+        break;
     // Binary ops
     case kIROp_Add:
     case kIROp_Sub:
@@ -2862,6 +2936,16 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
             break;
         }
+    case kIROp_BitfieldExtract:
+        {
+            emitBitfieldExtractImpl(inst);
+            break;
+        }
+    case kIROp_BitfieldInsert:
+        {
+            emitBitfieldInsertImpl(inst);
+            break;
+        }
     case kIROp_PackAnyValue:
         {
             m_writer->emit("packAnyValue<");
@@ -2963,6 +3047,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         {
             break; // should already have been parsed and used.
         }
+    case kIROp_GlobalValueRef:
+        {
+            emitOperand(as<IRGlobalValueRef>(inst)->getOperand(0), getInfo(EmitOp::General));
+            break;
+        }
     default:
         diagnoseUnhandledInst(inst);
         break;
@@ -3041,6 +3130,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_AtomicCompareExchange:
     case kIROp_StructuredBufferGetDimensions:
     case kIROp_MetalAtomicCast:
+    case kIROp_MetalCastToDepthTexture:
         emitInstStmt(inst);
         break;
 
@@ -3834,6 +3924,374 @@ void CLikeSourceEmitter::emitFuncDecorationsImpl(IRFunc* func)
     }
 }
 
+bool CLikeSourceEmitter::tryGetIntInfo(IRType* elementType, bool& isSigned, int& bitWidth)
+{
+    Slang::IROp type = elementType->getOp();
+    if (!(type >= kIROp_Int8Type && type <= kIROp_UInt64Type))
+        return false;
+    isSigned = (type >= kIROp_Int8Type && type <= kIROp_Int64Type);
+
+    Slang::IROp stype = (isSigned) ? type : Slang::IROp(type - 4);
+    bitWidth = 8 << (stype - kIROp_Int8Type);
+    return true;
+}
+
+void CLikeSourceEmitter::emitVecNOrScalar(
+    IRVectorType* vectorType,
+    std::function<void()> emitComponentLogic)
+{
+    if (vectorType)
+    {
+        int N = int(getIntVal(vectorType->getElementCount()));
+        Slang::IRType* elementType = vectorType->getElementType();
+
+        // Special handling required for CUDA target
+        if (isCUDATarget(getTargetReq()))
+        {
+            m_writer->emit("make_");
+
+            switch (elementType->getOp())
+            {
+            case kIROp_Int8Type:
+                m_writer->emit("char");
+                break;
+            case kIROp_Int16Type:
+                m_writer->emit("short");
+                break;
+            case kIROp_IntType:
+                m_writer->emit("int");
+                break;
+            case kIROp_Int64Type:
+                m_writer->emit("longlong");
+                break;
+            case kIROp_UInt8Type:
+                m_writer->emit("uchar");
+                break;
+            case kIROp_UInt16Type:
+                m_writer->emit("ushort");
+                break;
+            case kIROp_UIntType:
+            case kIROp_Int8x4PackedType:
+            case kIROp_UInt8x4PackedType:
+                m_writer->emit("uint");
+                break;
+            case kIROp_UInt64Type:
+                m_writer->emit("ulonglong");
+                break;
+            default:
+                SLANG_ABORT_COMPILATION("Unhandled type emitting CUDA vector");
+            }
+
+            m_writer->emitRawText(std::to_string(N).c_str());
+        }
+
+        // In other languages, we can output the Slang vector type directly
+        else
+        {
+            emitType(vectorType);
+        }
+
+        m_writer->emit("(");
+        for (int i = 0; i < N; ++i)
+        {
+            emitType(elementType);
+            m_writer->emit("(");
+            emitComponentLogic();
+            m_writer->emit(")");
+            if (i != N - 1)
+                m_writer->emit(", ");
+        }
+        m_writer->emit(")");
+    }
+    else
+    {
+        m_writer->emit("(");
+        emitComponentLogic();
+        m_writer->emit(")");
+    }
+}
+
+String CLikeSourceEmitter::_emitLiteralOneWithType(int bitWidth)
+{
+    if (getTarget() == CodeGenTarget::WGSL)
+    {
+        if (bitWidth != 32)
+        {
+            SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unexpected bit width");
+            return String();
+        }
+        else
+        {
+            String one;
+            one = "u32(1)";
+            return one;
+        }
+    }
+
+    String one;
+    switch (bitWidth)
+    {
+    case 8:
+        one = "uint8_t(1)";
+        break;
+    case 16:
+        one = "uint16_t(1)";
+        break;
+    case 32:
+        one = "uint32_t(1)";
+        break;
+    case 64:
+        one = "uint64_t(1)";
+        break;
+    default:
+        SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unexpected bit width");
+    }
+    return one;
+}
+
+void CLikeSourceEmitter::emitBitfieldExtractImpl(IRInst* inst)
+{
+    // If unsigned, bfue := ((val>>off)&((1u<<bts)-1))
+    // Else signed, bfse := (((val>>off)&((1u<<bts)-1))<<(nbts-bts)>>(nbts-bts));
+    //
+    // Note: In WGSL, the data type for bit operators are more restricted than in other languages.
+    // The number of bits to shift must be a u32 or vecN<u32>, therefore we have to cast this
+    // operand to u32 always. Another constraint is that for "&" and "|" operators, the operands
+    // must have the same type.
+    // TODO: We can consider to bring the logic to WGSLSourceEmitter::emitBitfieldExtractImpl so
+    // that we don't have to have those special handling here.
+    Slang::IRType* dataType = inst->getDataType();
+    Slang::IRInst* val = inst->getOperand(0);
+    Slang::IRInst* off = inst->getOperand(1);
+    Slang::IRInst* bts = inst->getOperand(2);
+
+    Slang::IRType* elementType = dataType;
+    IRVectorType* vectorType = as<IRVectorType>(elementType);
+    IRVectorType* vectorTypeForShiftNumber = nullptr;
+
+    if (vectorType)
+    {
+        elementType = vectorType->getElementType();
+
+        if (getTarget() == CodeGenTarget::WGSL)
+        {
+            IRBuilder builder(elementType);
+            vectorTypeForShiftNumber =
+                builder.getVectorType(builder.getUIntType(), vectorType->getElementCount());
+        }
+        else
+        {
+            vectorTypeForShiftNumber = vectorType;
+        }
+    }
+
+    bool isSigned;
+    int bitWidth;
+    if (!tryGetIntInfo(elementType, isSigned, bitWidth))
+    {
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            SourceLoc(),
+            "non-integer element type given to bitfieldExtract");
+        return;
+    }
+
+    String one = _emitLiteralOneWithType(bitWidth);
+
+    // Emit open paren and type cast for later sign extension
+    if (isSigned)
+    {
+        m_writer->emit("(");
+        emitType(inst->getDataType());
+        m_writer->emit("(");
+    }
+
+    // Emit bitfield extraction ( (val >> off) & ((1u << bts) - 1) )
+    m_writer->emit("(");
+
+    // In WGSL, "&" operator requires the operands to have the same type, since the
+    // right operand '((1u << bts) - 1)' is known to be u32, we need to cast the left operand to
+    // u32.
+    if (getTarget() == CodeGenTarget::WGSL)
+    {
+        (vectorTypeForShiftNumber != nullptr) ? emitType(vectorTypeForShiftNumber)
+                                              : m_writer->emit("u32");
+    }
+
+    m_writer->emit("(");
+
+    emitOperand(val, getInfo(EmitOp::General));
+    m_writer->emit(">>");
+    emitVecNOrScalar(
+        vectorTypeForShiftNumber,
+        [&]() { emitOperand(off, getInfo(EmitOp::General)); });
+
+    m_writer->emit(")&(");
+    emitVecNOrScalar(
+        vectorTypeForShiftNumber,
+        [&]()
+        {
+            m_writer->emit("((" + one + "<<");
+            emitOperand(bts, getInfo(EmitOp::General));
+            m_writer->emit(")-" + one + ")");
+        });
+    m_writer->emit("))");
+
+    // Emit sign extension logic
+    // ( type(bitfield << (numBits - bts) ) >> (numBits - bts) )
+    //           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    if (isSigned)
+    {
+        m_writer->emit("<<");
+        emitVecNOrScalar(
+            vectorTypeForShiftNumber,
+            [&]()
+            {
+                m_writer->emit("(");
+                m_writer->emit(bitWidth);
+                m_writer->emit("-");
+                emitOperand(bts, getInfo(EmitOp::General));
+                m_writer->emit(")");
+            });
+        m_writer->emit(")>>");
+        emitVecNOrScalar(
+            vectorTypeForShiftNumber,
+            [&]()
+            {
+                m_writer->emit("(");
+                m_writer->emit(bitWidth);
+                m_writer->emit("-");
+                emitOperand(bts, getInfo(EmitOp::General));
+                m_writer->emit(")");
+            });
+        m_writer->emit(")");
+    }
+}
+
+void CLikeSourceEmitter::emitBitfieldInsertImpl(IRInst* inst)
+{
+    // uint clearMask = ~(((1u << bits) - 1u) << offset);
+    // uint clearedBase = base & clearMask;
+    // uint maskedInsert = (insert & ((1u << bits) - 1u)) << offset;
+    // BitfieldInsert := T(uint(clearedBase) | uint(maskedInsert));
+    Slang::IRType* dataType = inst->getDataType();
+    Slang::IRInst* base = inst->getOperand(0);
+    Slang::IRInst* insert = inst->getOperand(1);
+    Slang::IRInst* off = inst->getOperand(2);
+    Slang::IRInst* bts = inst->getOperand(3);
+
+
+    Slang::IRType* elementType = dataType;
+    IRVectorType* vectorType = as<IRVectorType>(elementType);
+    IRVectorType* vectorTypeForShiftNumber = nullptr;
+
+    if (vectorType)
+    {
+        elementType = vectorType->getElementType();
+
+        if (getTarget() == CodeGenTarget::WGSL)
+        {
+            IRBuilder builder(elementType);
+            vectorTypeForShiftNumber =
+                builder.getVectorType(builder.getUIntType(), vectorType->getElementCount());
+        }
+        else
+        {
+            vectorTypeForShiftNumber = vectorType;
+        }
+    }
+
+    bool isSigned;
+    int bitWidth;
+    if (!tryGetIntInfo(elementType, isSigned, bitWidth))
+    {
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            SourceLoc(),
+            "non-integer element type given to bitfieldInsert");
+        return;
+    }
+
+    String one = _emitLiteralOneWithType(bitWidth);
+
+    if (isSigned)
+    {
+        emitType(inst->getDataType());
+        m_writer->emit("(");
+    }
+    m_writer->emit("(");
+
+    // emit clearedBase := uint( base & ~( ((1u << bts) - 1u) << off ) )
+
+    // In WGSL, "&" operator requires the operands to have the same type, since the
+    // right operand '~( ((1u << bts) - 1u) << off )' is known to be u32, we need to
+    // cast the left operand to u32.
+    if (getTarget() == CodeGenTarget::WGSL)
+    {
+        (vectorTypeForShiftNumber != nullptr) ? emitType(vectorTypeForShiftNumber)
+                                              : m_writer->emit("u32");
+    }
+
+    m_writer->emit("(");
+    emitOperand(base, getInfo(EmitOp::General));
+    m_writer->emit(")");
+
+    m_writer->emit("&");
+    emitVecNOrScalar(
+        vectorTypeForShiftNumber,
+        [&]()
+        {
+            m_writer->emit("~(((" + one + "<<");
+            emitOperand(bts, getInfo(EmitOp::General));
+
+            m_writer->emit(")-" + one + ")<<");
+
+            emitOperand(off, getInfo(EmitOp::General));
+            m_writer->emit(")");
+        });
+
+    // bitwise or clearedBase with maskedInsert
+    m_writer->emit(")|(");
+
+    // Emit maskedInsert := ((insert & ((1u << bits) - 1u)) << offset);
+
+    // - first emit mask := (insert & ((1u << bits) - 1u))
+    m_writer->emit("(");
+
+    // For the same reason as above, we need to cast the left operand to u32 for WGSL target.
+    if (getTarget() == CodeGenTarget::WGSL)
+    {
+        (vectorTypeForShiftNumber != nullptr) ? emitType(vectorTypeForShiftNumber)
+                                              : m_writer->emit("u32");
+    }
+    m_writer->emit("(");
+    emitOperand(insert, getInfo(EmitOp::General));
+    m_writer->emit(")");
+
+    m_writer->emit("&");
+    emitVecNOrScalar(
+        vectorTypeForShiftNumber,
+        [&]()
+        {
+            m_writer->emit("(" + one + "<<");
+            emitOperand(bts, getInfo(EmitOp::General));
+            m_writer->emit(")-" + one);
+        });
+    m_writer->emit(")");
+
+    // then emit shift := << offset
+    m_writer->emit("<<");
+    emitVecNOrScalar(
+        vectorTypeForShiftNumber,
+        [&]() { emitOperand(off, getInfo(EmitOp::General)); });
+    m_writer->emit(")");
+
+    if (isSigned)
+    {
+        m_writer->emit(")");
+    }
+}
+
 void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 {
     ensureTypePrelude(structType);
@@ -4319,9 +4777,21 @@ void CLikeSourceEmitter::emitGlobalParam(IRGlobalParam* varDecl)
     auto rawType = varDecl->getDataType();
 
     auto varType = rawType;
-    if (auto outType = as<IROutTypeBase>(varType))
+    if (auto ptrType = as<IRPtrTypeBase>(varType))
     {
-        varType = outType->getValueType();
+        switch (ptrType->getAddressSpace())
+        {
+        case AddressSpace::Input:
+        case AddressSpace::Output:
+        case AddressSpace::BuiltinInput:
+        case AddressSpace::BuiltinOutput:
+            varType = ptrType->getValueType();
+            break;
+        default:
+            if (as<IROutTypeBase>(ptrType))
+                varType = ptrType->getValueType();
+            break;
+        }
     }
     if (as<IRVoidType>(varType))
         return;
@@ -4756,4 +5226,15 @@ void CLikeSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
     executeEmitActions(actions);
 }
 
+void CLikeSourceEmitter::ensurePrelude(const char* preludeText)
+{
+    IRStringLit* stringLit;
+    if (!m_builtinPreludes.tryGetValue(preludeText, stringLit))
+    {
+        IRBuilder builder(m_irModule);
+        stringLit = builder.getStringValue(UnownedStringSlice(preludeText));
+        m_builtinPreludes[preludeText] = stringLit;
+    }
+    m_requiredPreludes.add(stringLit);
+}
 } // namespace Slang

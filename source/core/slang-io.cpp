@@ -992,12 +992,12 @@ static SlangResult _calcExectuablePath(char* outPath, size_t* ioSize)
     {
         return SLANG_FAIL;
     }
-    if (size_t(resSize) >= bufferSize)
+    if (size_t(resSize + 1) >= bufferSize)
     {
         return SLANG_E_BUFFER_TOO_SMALL;
     }
     // Zero terminate
-    outPath[resSize - 1] = 0;
+    outPath[resSize] = 0;
     return SLANG_OK;
 #else
     String text = Slang::File::readAllText("/proc/self/maps");

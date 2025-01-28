@@ -237,6 +237,12 @@ static void _lookUpDirectAndTransparentMembers(
     if ((int)request.mask & (int)LookupMask::Attribute)
         return;
 
+    // Also skip transparent members if they're explicitly excluded by the
+    // request. This prevents cyclic lookups e.g. when looking up UnscopedEnum's
+    // underlying types.
+    if (((int)request.options & (int)LookupOptions::IgnoreTransparentMembers) != 0)
+        return;
+
     for (auto transparentInfo : containerDecl->getTransparentMembers())
     {
         // The reference to the transparent member should use the same
@@ -430,7 +436,7 @@ static void _lookupMembersInSuperTypeFacets(
             continue;
         }
 
-        auto extensionFacet = as<ExtensionDecl>(facet.getImpl()->getDeclRef().getDecl());
+
         // If we are looking up in an interface, and the lookup request told us
         // to skip interfaces, we should do so here.
         if (auto baseInterfaceDeclRef = containerDeclRef.as<InterfaceDecl>())
@@ -442,10 +448,22 @@ static void _lookupMembersInSuperTypeFacets(
         // "Self"
         else if (
             int(request.options) & int(LookupOptions::IgnoreInheritance) &&
-            (facet.getImpl()->directness != Facet::Directness::Self &&
-             (!extensionFacet || !extensionFacet->targetType.type->equals(selfType))))
+            (facet.getImpl()->directness != Facet::Directness::Self))
         {
-            continue;
+            if (auto extensionDeclRef = facet.getImpl()->getDeclRef().as<ExtensionDecl>())
+            {
+                if (auto targetType = getTargetType(astBuilder, extensionDeclRef))
+                {
+                    if (!targetType->equals(selfType))
+                    {
+                        // If the extension is to the same type as the one we are looking up in, we
+                        // should include it in the lookup.
+                        continue;
+                    }
+                }
+            }
+            else
+                continue;
         }
 
         // Some things that are syntactically `InheritanceDecl`s don't actually
@@ -616,7 +634,8 @@ static void _lookUpMembersInSuperTypeImpl(
                 request,
                 ioResult,
                 &derefBreacrumb);
-            return;
+            if (ioResult.isValid())
+                return;
         }
     }
 
@@ -1058,11 +1077,16 @@ LookupResult lookUp(
     Scope* scope,
     LookupMask mask,
     bool considerAllLocalNamesInScope,
-    Decl* declToExclude)
+    Decl* declToExclude,
+    bool ignoreTransparentMembers)
 {
     LookupResult result;
-    const auto options = considerAllLocalNamesInScope ? LookupOptions::ConsiderAllLocalNamesInScope
-                                                      : LookupOptions::None;
+    const auto options =
+        (LookupOptions)((int)(considerAllLocalNamesInScope
+                                  ? LookupOptions::ConsiderAllLocalNamesInScope
+                                  : LookupOptions::None) |
+                        (int)(ignoreTransparentMembers ? LookupOptions::IgnoreTransparentMembers
+                                                       : LookupOptions::None));
     LookupRequest request = initLookupRequest(semantics, name, mask, options, scope, declToExclude);
     _lookUpInScopes(astBuilder, name, request, result);
     return result;

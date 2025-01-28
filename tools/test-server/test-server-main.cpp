@@ -18,6 +18,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if defined(_WIN32)
+// https://devblogs.microsoft.com/directx/gettingstarted-dx12agility/#2.-set-agility-sdk-parameters
+
+extern "C"
+{
+    __declspec(dllexport) extern const uint32_t D3D12SDKVersion = 711;
+}
+
+extern "C"
+{
+    __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\";
+}
+#endif
+
 namespace TestServer
 {
 using namespace Slang;
@@ -206,7 +220,9 @@ slang::IGlobalSession* TestServer::getOrCreateGlobalSession()
     if (!m_session)
     {
         // Just create the global session in the regular way if there isn't one set
-        if (SLANG_FAILED(slang_createGlobalSession(SLANG_API_VERSION, m_session.writeRef())))
+        SlangGlobalSessionDesc desc = {};
+        desc.enableGLSL = true;
+        if (SLANG_FAILED(slang_createGlobalSession2(&desc, m_session.writeRef())))
         {
             return nullptr;
         }

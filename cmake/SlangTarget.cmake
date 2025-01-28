@@ -166,12 +166,14 @@ function(slang_add_target dir type)
 
     # Enable link-time optimization for release builds
     # See: https://cmake.org/cmake/help/latest/prop_tgt/INTERPROCEDURAL_OPTIMIZATION.html
-    set_target_properties(
-        ${target}
-        PROPERTIES
-            INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
-            INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
-    )
+    if(SLANG_ENABLE_RELEASE_LTO)
+        set_target_properties(
+            ${target}
+            PROPERTIES
+                INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+                INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
+        )
+    endif()
 
     #
     # Set the output directory
@@ -505,10 +507,14 @@ function(slang_add_target dir type)
         endif()
         install(
             TARGETS ${target} ${export_args}
-            ARCHIVE DESTINATION ${archive_subdir} ${ARGN}
-            LIBRARY DESTINATION ${library_subdir} ${ARGN}
-            RUNTIME DESTINATION ${runtime_subdir} ${ARGN}
-            PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} ${ARGN}
+            ARCHIVE DESTINATION ${archive_subdir}
+            ${ARGN}
+            LIBRARY DESTINATION ${library_subdir}
+            ${ARGN}
+            RUNTIME DESTINATION ${runtime_subdir}
+            ${ARGN}
+            PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+            ${ARGN}
         )
     endmacro()
 

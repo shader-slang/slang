@@ -1,3 +1,5 @@
+//public module core;
+
 // Slang `core` library
 
 // Aliases for base types
@@ -726,6 +728,18 @@ __generic<T, let N : int> __intrinsic_op(select) vector<T,N> operator?:(vector<b
 //@public:
 __generic<T> __intrinsic_op(select) T select(bool condition, T ifTrue, T ifFalse);
 __generic<T, let N : int> __intrinsic_op(select) vector<T,N> select(vector<bool,N> condition, vector<T,N> ifTrue, vector<T,N> ifFalse);
+
+[ForceInline]
+__generic<T> Optional<T> select(bool condition, __none_t ifTrue, T ifFalse)
+{
+    return select(condition, Optional<T>(none), Optional<T>(ifFalse));
+}
+
+[ForceInline]
+__generic<T> Optional<T> select(bool condition, T ifTrue, __none_t ifFalse)
+{
+    return select(condition, Optional<T>(ifTrue), Optional<T>(none));
+}
 
 // Allow real-number types to be cast into each other
 //@hidden:
@@ -1461,6 +1475,11 @@ struct String
     __intrinsic_op($(kIROp_MakeString))
     __init(double val);
 
+    [require(cpp)]
+    __implicit_conversion($(kConversionCost_None))
+    __intrinsic_op($(kIROp_MakeString))
+    __init(NativeString value);
+
     /// Returns the length of the string.
     [require(cpp)]
     int64_t getLength();
@@ -1500,6 +1519,7 @@ struct NativeString
 
     property int length { [__unsafeForceInlineEarly] get{return getLength();} }
 
+    __implicit_conversion($(kConversionCost_None))
     __intrinsic_op($(kIROp_getNativeStr))
     __init(String value);
 };
@@ -2714,6 +2734,23 @@ __generic<T, U>
 __intrinsic_op($(kIROp_Reinterpret))
 T reinterpret(U value);
 
+/// `bitfieldInsert` inserts the bits least significant bits of `insert` into base at `offset` offset.
+/// The returned value will have bits [offset, offset + bits + 1] taken from [0, bits - 1] of `insert`
+/// and all other bits taken directly from the corresponding bits of `base`.
+__generic<T>
+[__readNone]
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_BitfieldInsert))
+T bitfieldInsert(T base, T insert, uint offset, uint bits);
+
+/// `bitfieldExtract` extracts a subset of the bits of `value` and
+/// returns it in the least significant bits of the result. The range of bits extracted is [offset, offset + bits - 1].
+__generic<T>
+[__readNone]
+[__unsafeForceInlineEarly]
+__intrinsic_op($(kIROp_BitfieldExtract))
+T bitfieldExtract(T value, uint offset, uint bits);
+
 /// Use an otherwise unused value
 /// This can be used to silence the warning about returning before initializing an out paramter.
 __generic<T>
@@ -3206,6 +3243,12 @@ __Addr<T> __getLegalizedSPIRVGlobalParamAddr(T val);
 
 __intrinsic_op($(kIROp_RequireComputeDerivative))
 void __requireComputeDerivative();
+
+__intrinsic_op($(kIROp_RequireMaximallyReconverges))
+void __requireMaximallyReconverges();
+
+__intrinsic_op($(kIROp_RequireQuadDerivatives))
+void __requireQuadDerivatives();
 
 //@ public:
 /// @category misc_types 
@@ -3940,3 +3983,22 @@ attribute_syntax [DerivativeGroupQuad] : DerivativeGroupQuadAttribute;
 /// effect on other targets.
 __attributeTarget(FuncDecl)
 attribute_syntax [DerivativeGroupLinear] : DerivativeGroupLinearAttribute;
+
+/// Emits `MaximallyReconvergesKHR` execution mode when producing SPIR-V.
+/// This attribute has no effect on other targets.
+__attributeTarget(FuncDecl)
+attribute_syntax [MaximallyReconverges] : MaximallyReconvergesAttribute;
+
+/// Emits `QuadDerivativesKHR` execution mode when producing SPIR-V.
+/// This attribute has no effect on other targets.
+__attributeTarget(FuncDecl)
+attribute_syntax [QuadDerivatives] : QuadDerivativesAttribute;
+
+/// Emits `RequireFullQuadsKHR` execution mode when producing SPIR-V.
+/// This attribute has no effect on other targets.
+__attributeTarget(FuncDecl)
+attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
+
+__generic<T>
+typealias NodePayloadPtr = Ptr<T, $( (uint64_t)AddressSpace::NodePayloadAMDX)>;
+

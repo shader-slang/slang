@@ -1,6 +1,7 @@
 // slang-reflection-api.cpp
 
 #include "../core/slang-basic.h"
+#include "slang-check-impl.h"
 #include "slang-check.h"
 #include "slang-compiler.h"
 #include "slang-syntax.h"
@@ -352,6 +353,15 @@ SLANG_API SlangResult spReflectionUserAttribute_GetArgumentValueFloat(
     {
         *rs = (float)cexpr->value;
         return 0;
+    }
+    else if (auto implicitCastExpr = as<ImplicitCastExpr>(userAttr->args[index]))
+    {
+        auto base = implicitCastExpr->arguments[0];
+        if (auto intLit = as<IntegerLiteralExpr>(base))
+        {
+            *rs = (float)intLit->value;
+            return 0;
+        }
     }
     return SLANG_E_INVALID_ARG;
 }
@@ -4023,18 +4033,14 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     auto numThreadsAttribute = entryPointFunc.getDecl()->findModifier<NumThreadsAttribute>();
     if (numThreadsAttribute)
     {
-        if (auto cint = entryPointLayout->program->tryFoldIntVal(numThreadsAttribute->x))
-            sizeAlongAxis[0] = (SlangUInt)cint->getValue();
-        else if (numThreadsAttribute->x)
-            sizeAlongAxis[0] = 0;
-        if (auto cint = entryPointLayout->program->tryFoldIntVal(numThreadsAttribute->y))
-            sizeAlongAxis[1] = (SlangUInt)cint->getValue();
-        else if (numThreadsAttribute->y)
-            sizeAlongAxis[1] = 0;
-        if (auto cint = entryPointLayout->program->tryFoldIntVal(numThreadsAttribute->z))
-            sizeAlongAxis[2] = (SlangUInt)cint->getValue();
-        else if (numThreadsAttribute->z)
-            sizeAlongAxis[2] = 0;
+        for (int i = 0; i < 3; ++i)
+        {
+            if (auto cint =
+                    entryPointLayout->program->tryFoldIntVal(numThreadsAttribute->extents[i]))
+                sizeAlongAxis[i] = (SlangUInt)cint->getValue();
+            else if (numThreadsAttribute->extents[i])
+                sizeAlongAxis[i] = 0;
+        }
     }
 
     //

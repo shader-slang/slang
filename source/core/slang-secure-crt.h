@@ -1,4 +1,4 @@
-#ifndef _MSC_VER
+#ifndef _WIN32
 #ifndef SLANG_CORE_SECURE_CRT_H
 #define SLANG_CORE_SECURE_CRT_H
 #include <assert.h>

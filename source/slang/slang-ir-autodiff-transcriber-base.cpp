@@ -256,7 +256,7 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
         return nullptr;
 
     // Special-case for differentiable existential types.
-    if (as<IRInterfaceType>(origType) || as<IRAssociatedType>(origType))
+    if (as<IRInterfaceType>(origType))
     {
         if (differentiableTypeConformanceContext.lookUpConformanceForType(
                 origType,
@@ -268,6 +268,10 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
             return autoDiffSharedContext->differentiablePtrInterfaceType;
         else
             return nullptr;
+    }
+    else if (as<IRAssociatedType>(origType))
+    {
+        SLANG_UNEXPECTED("unexpected associated type during auto-diff");
     }
 
     auto primalType = lookupPrimalInst(builder, origType, origType);
@@ -324,9 +328,7 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
             auto primalPairType = as<IRDifferentialPairTypeBase>(primalType);
             return getOrCreateDiffPairType(
                 builder,
-                differentiableTypeConformanceContext.getDiffTypeFromPairType(
-                    builder,
-                    primalPairType),
+                differentiateType(builder, primalPairType->getValueType()),
                 differentiableTypeConformanceContext.getDiffTypeWitnessFromPairType(
                     builder,
                     primalPairType));
@@ -336,9 +338,7 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
         {
             auto primalPairType = as<IRDifferentialPairUserCodeType>(primalType);
             return builder->getDifferentialPairUserCodeType(
-                (IRType*)differentiableTypeConformanceContext.getDiffTypeFromPairType(
-                    builder,
-                    primalPairType),
+                differentiateType(builder, primalPairType->getValueType()),
                 differentiableTypeConformanceContext.getDiffTypeWitnessFromPairType(
                     builder,
                     primalPairType));
@@ -406,6 +406,7 @@ bool AutoDiffTranscriberBase::isExistentialType(IRType* type)
     case kIROp_ExtractExistentialType:
     case kIROp_InterfaceType:
     case kIROp_AssociatedType:
+    case kIROp_LookupWitness:
         return true;
     default:
         return false;
@@ -460,47 +461,34 @@ void AutoDiffTranscriberBase::maybeMigrateDifferentiableDictionaryFromDerivative
     IRBuilder* builder,
     IRInst* origFunc)
 {
-    auto decor = origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>();
-    if (decor)
-        return;
-    // A differentiable func must have `IRDifferentiableTypeDictionaryDecoration`, except it has a
-    // `IRUserDefinedBackwardDerivativeDecoration`.
-    auto udfDecor = origFunc->findDecoration<IRUserDefinedBackwardDerivativeDecoration>();
-    SLANG_RELEASE_ASSERT(udfDecor);
-    // We need to migrate the dictionary from the backward derivative func so we can properly
-    // differentiate the function header.
-    IRBuilder subBuilder = *builder;
-    subBuilder.setInsertBefore(origFunc);
+    // There's one corner case where our function may not have the differentiable type annotations.
+    // If the function is not declared differentiable, but has a custom derivative, we need to copy
+    // over any IRDifferentiableTypeAnnotation insts
+    if (auto udfDecor = origFunc->findDecoration<IRUserDefinedBackwardDerivativeDecoration>())
+    {
+        // We need to migrate the dictionary from the backward derivative func so we can properly
+        // differentiate the function header.
+        IRBuilder subBuilder = *builder;
+        subBuilder.setInsertBefore(origFunc);
 
-    auto derivative = udfDecor->getBackwardDerivativeFunc();
-    if (auto specialize = as<IRSpecialize>(derivative))
-    {
-        auto derivativeGeneric = cast<IRGeneric>(specialize->getBase());
-        GenericChildrenMigrationContext migrationContext;
-        migrationContext.init(
-            derivativeGeneric,
-            cast<IRGeneric>(findOuterGeneric(origFunc)),
-            origFunc);
-        auto derivativeFunc = findGenericReturnVal(derivativeGeneric);
-        auto derivativeBlock = cast<IRBlock>(derivativeFunc->getParent());
-        for (auto dInst = derivativeBlock->getFirstOrdinaryInst(); dInst != derivativeFunc;
-             dInst = dInst->getNextInst())
+        auto derivative = udfDecor->getBackwardDerivativeFunc();
+        if (auto specialize = as<IRSpecialize>(derivative))
         {
-            migrationContext.cloneInst(&subBuilder, dInst);
-        }
-        auto udfDictDecor =
-            derivativeFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>();
-        SLANG_RELEASE_ASSERT(udfDictDecor);
-        subBuilder.setInsertBefore(origFunc->getFirstDecorationOrChild());
-        migrationContext.cloneInst(&subBuilder, udfDictDecor);
-        eliminateDeadCode(origFunc->getParent());
-    }
-    else
-    {
-        auto udfDictDecor = derivative->findDecoration<IRDifferentiableTypeDictionaryDecoration>();
-        if (udfDictDecor)
-        {
-            cloneDecoration(udfDictDecor, origFunc);
+            auto derivativeGeneric = cast<IRGeneric>(specialize->getBase());
+
+            GenericChildrenMigrationContext migrationContext;
+            migrationContext.init(
+                derivativeGeneric,
+                cast<IRGeneric>(findOuterGeneric(origFunc)),
+                origFunc);
+            auto derivativeFunc = findGenericReturnVal(derivativeGeneric);
+            auto derivativeBlock = cast<IRBlock>(derivativeFunc->getParent());
+            for (auto dInst = derivativeBlock->getFirstOrdinaryInst(); dInst != derivativeFunc;
+                 dInst = dInst->getNextInst())
+            {
+                migrationContext.cloneInst(&subBuilder, dInst);
+            }
+            eliminateDeadCode(origFunc->getParent());
         }
     }
 }
@@ -565,6 +553,9 @@ IRType* AutoDiffTranscriberBase::tryGetDiffPairType(IRBuilder* builder, IRType* 
     // If this is a PtrType (out, inout, etc..), then create diff pair from
     // value type and re-apply the appropropriate PtrType wrapper.
     //
+    if (isNoDiffType(originalType))
+        return nullptr;
+
     if (auto origPtrType = as<IRPtrTypeBase>(originalType))
     {
         if (auto diffPairValueType = tryGetDiffPairType(builder, origPtrType->getValueType()))
@@ -572,8 +563,8 @@ IRType* AutoDiffTranscriberBase::tryGetDiffPairType(IRBuilder* builder, IRType* 
         else
             return nullptr;
     }
-    auto diffType = differentiateType(builder, originalType);
-    if (diffType)
+
+    if (tryGetDifferentiableWitness(builder, originalType, DiffConformanceKind::Any))
         return (IRType*)getOrCreateDiffPairType(builder, originalType);
     return nullptr;
 }
@@ -685,6 +676,15 @@ InstPair AutoDiffTranscriberBase::transcribeLookupInterfaceMethod(
             builder->markInstAsPrimal(diffWitness);
 
             return InstPair(primal, diffWitness);
+        }
+    }
+    else if (as<IRTypeKind>(lookupInst->getDataType()))
+    {
+        if (auto diffType = differentiableTypeConformanceContext.getDifferentialForType(
+                builder,
+                (IRType*)primalType))
+        {
+            return InstPair(primal, diffType);
         }
     }
 
@@ -994,8 +994,15 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
     if (auto innerFunc = as<IRFunc>(innerVal))
     {
         maybeMigrateDifferentiableDictionaryFromDerivativeFunc(inBuilder, innerFunc);
-        if (!innerFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
+        // Is our function differentiable?
+        if (!(innerFunc->findDecoration<IRForwardDifferentiableDecoration>() ||
+              innerFunc->findDecoration<IRBackwardDifferentiableDecoration>() ||
+              innerFunc->findDecoration<IRUserDefinedBackwardDerivativeDecoration>() ||
+              innerFunc->findDecoration<IRForwardDerivativeDecoration>()))
+        {
             return InstPair(origGeneric, nullptr);
+        }
+
         differentiableTypeConformanceContext.setFunc(innerFunc);
     }
     else if (const auto funcType = as<IRFuncType>(innerVal))
@@ -1024,7 +1031,14 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
     IRType* diffType = nullptr;
     if (primalType)
     {
-        diffType = (IRType*)findOrTranscribeDiffInst(&builder, primalType);
+        if (as<IRGenericKind>(primalType))
+        {
+            diffType = builder.getGenericKind();
+        }
+        else
+        {
+            diffType = (IRType*)findOrTranscribeDiffInst(&builder, primalType);
+        }
     }
 
     diffGeneric->setFullType(diffType);
@@ -1106,7 +1120,6 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
     {
         mapPrimalInst(origInst, pair.primal);
         mapDifferentialInst(origInst, pair.differential);
-
 
         if (pair.primal != pair.differential &&
             !pair.primal->findDecoration<IRAutodiffInstDecoration>() &&

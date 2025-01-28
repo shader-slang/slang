@@ -104,6 +104,8 @@ bool isSimpleDataType(IRType* type);
 
 bool isSimpleHLSLDataType(IRInst* inst);
 
+bool isWrapperType(IRInst* inst);
+
 SourceLoc findFirstUseLoc(IRInst* inst);
 
 inline bool isChildInstOf(IRInst* inst, IRInst* parent)
@@ -370,6 +372,10 @@ inline bool isSPIRV(CodeGenTarget codeGenTarget)
 
 int getIRVectorElementSize(IRType* type);
 IRType* getIRVectorBaseType(IRType* type);
+
+Int getSpecializationConstantId(IRGlobalParam* param);
+
+void legalizeDefUse(IRGlobalValueWithCode* func);
 
 } // namespace Slang
 

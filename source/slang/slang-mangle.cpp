@@ -186,6 +186,11 @@ void emitBaseType(ManglingContext* context, BaseType baseType)
     case BaseType::IntPtr:
         emitRaw(context, "ip");
         break;
+    case BaseType::Int8x4Packed:
+        emitRaw(context, "c4p");
+        break;
+    case BaseType::UInt8x4Packed:
+        emitRaw(context, "C4p");
         break;
 
     default:
@@ -408,6 +413,19 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
     if (declRef.getDecl()->hasModifier<ExternCppModifier>())
     {
         emit(context, declRef.getDecl()->getName()->text);
+        return;
+    }
+
+    if (auto genTypeParamDecl = as<GenericTypeParamDeclBase>(declRef.getDecl()))
+    {
+        emit(context, "GP");
+        emit(context, genTypeParamDecl->parameterIndex);
+        return;
+    }
+    if (auto genValParamDecl = as<GenericValueParamDecl>(declRef.getDecl()))
+    {
+        emit(context, "GP");
+        emit(context, genValParamDecl->parameterIndex);
         return;
     }
 

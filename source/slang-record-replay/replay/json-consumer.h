@@ -92,7 +92,9 @@ class JsonConsumer : public IDecoderConsumer, public Slang::RefObject
 public:
     JsonConsumer(const Slang::String& filePath);
     virtual ~JsonConsumer() = default;
-    virtual void CreateGlobalSession(ObjectID outGlobalSessionId);
+    virtual void CreateGlobalSession(
+        SlangGlobalSessionDesc const& desc,
+        ObjectID outGlobalSessionId);
     virtual void IGlobalSession_createSession(
         ObjectID objectId,
         slang::SessionDesc const& desc,
@@ -539,6 +541,12 @@ public:
         int indent,
         slang::CompilerOptionEntry* compilerOptionEntries,
         uint32_t compilerOptionEntryCount,
+        bool isLast = false);
+    static void _writeGlobalSessionDescHelper(
+        Slang::StringBuilder& builder,
+        int indent,
+        SlangGlobalSessionDesc const& globalSessionDesc,
+        Slang::String keyName,
         bool isLast = false);
     static void _writeSessionDescHelper(
         Slang::StringBuilder& builder,

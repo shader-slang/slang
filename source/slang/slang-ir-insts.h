@@ -364,7 +364,7 @@ struct IRSPIRVNonUniformResourceDecoration : IRDecoration
     {
         kOp = kIROp_SPIRVNonUniformResourceDecoration
     };
-    IR_LEAF_ISA(RequireGLSLVersionDecoration)
+    IR_LEAF_ISA(SPIRVNonUniformResourceDecoration)
 
     IRConstant* getSPIRVNonUniformResourceOperand() { return cast<IRConstant>(getOperand(0)); }
     IntegerLiteralValue getSPIRVNonUniformResource()
@@ -453,6 +453,9 @@ IR_SIMPLE_DECORATION(GlobalInputDecoration)
 IR_SIMPLE_DECORATION(GlobalOutputDecoration)
 IR_SIMPLE_DECORATION(DownstreamModuleExportDecoration)
 IR_SIMPLE_DECORATION(DownstreamModuleImportDecoration)
+IR_SIMPLE_DECORATION(MaximallyReconvergesDecoration)
+IR_SIMPLE_DECORATION(QuadDerivativesDecoration)
+IR_SIMPLE_DECORATION(RequireFullQuadsDecoration)
 
 struct IRAvailableInDownstreamIRDecoration : IRDecoration
 {
@@ -570,6 +573,7 @@ struct IRInstanceDecoration : IRDecoration
     IRIntLit* getCount() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+struct IRGlobalParam;
 struct IRNumThreadsDecoration : IRDecoration
 {
     enum
@@ -578,11 +582,13 @@ struct IRNumThreadsDecoration : IRDecoration
     };
     IR_LEAF_ISA(NumThreadsDecoration)
 
-    IRIntLit* getX() { return cast<IRIntLit>(getOperand(0)); }
-    IRIntLit* getY() { return cast<IRIntLit>(getOperand(1)); }
-    IRIntLit* getZ() { return cast<IRIntLit>(getOperand(2)); }
+    IRIntLit* getX() { return as<IRIntLit>(getOperand(0)); }
+    IRIntLit* getY() { return as<IRIntLit>(getOperand(1)); }
+    IRIntLit* getZ() { return as<IRIntLit>(getOperand(2)); }
 
-    IRIntLit* getExtentAlongAxis(int axis) { return cast<IRIntLit>(getOperand(axis)); }
+    IRGlobalParam* getXSpecConst() { return as<IRGlobalParam>(getOperand(0)); }
+    IRGlobalParam* getYSpecConst() { return as<IRGlobalParam>(getOperand(1)); }
+    IRGlobalParam* getZSpecConst() { return as<IRGlobalParam>(getOperand(2)); }
 };
 
 struct IRWaveSizeDecoration : IRDecoration
@@ -804,6 +810,14 @@ struct IRKnownBuiltinDecoration : IRDecoration
 
     IRStringLit* getNameOperand() { return cast<IRStringLit>(getOperand(0)); }
     UnownedStringSlice getName() { return getNameOperand()->getStringSlice(); }
+};
+
+struct IREntryPointParamDecoration : IRDecoration
+{
+    IR_LEAF_ISA(EntryPointParamDecoration)
+
+    /// Get the entry point that this parameter orignates from.
+    IRFunc* getEntryPoint() { return cast<IRFunc>(getOperand(0)); }
 };
 
 struct IRFormatDecoration : IRDecoration
@@ -1332,6 +1346,18 @@ struct IRPrimalSubstitute : IRInst
     IRInst* getBaseFn() { return getOperand(0); }
 
     IR_LEAF_ISA(PrimalSubstitute)
+};
+
+struct IRDifferentiableTypeAnnotation : IRInst
+{
+    enum
+    {
+        kOp = kIROp_DifferentiableTypeAnnotation
+    };
+    IRInst* getBaseType() { return getOperand(0); }
+    IRInst* getWitness() { return getOperand(1); }
+
+    IR_LEAF_ISA(DifferentiableTypeAnnotation)
 };
 
 struct IRDispatchKernel : IRInst
@@ -2476,6 +2502,13 @@ struct IRGetElementPtr : IRInst
     IRInst* getIndex() { return getOperand(1); }
 };
 
+struct IRGetOffsetPtr : IRInst
+{
+    IR_LEAF_ISA(GetOffsetPtr);
+    IRInst* getBase() { return getOperand(0); }
+    IRInst* getOffset() { return getOperand(1); }
+};
+
 struct IRRWStructuredBufferGetElementPtr : IRInst
 {
     IR_LEAF_ISA(RWStructuredBufferGetElementPtr);
@@ -3421,6 +3454,16 @@ struct IRRequireComputeDerivative : IRInst
     IR_LEAF_ISA(RequireComputeDerivative)
 };
 
+struct IRRequireMaximallyReconverges : IRInst
+{
+    IR_LEAF_ISA(RequireMaximallyReconverges)
+};
+
+struct IRRequireQuadDerivatives : IRInst
+{
+    IR_LEAF_ISA(RequireQuadDerivatives)
+};
+
 struct IRStaticAssert : IRInst
 {
     IR_LEAF_ISA(StaticAssert)
@@ -3584,7 +3627,7 @@ public:
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
     IRStringLit* getStringValue(const UnownedStringSlice& slice);
     IRBlobLit* getBlobValue(ISlangBlob* blob);
-    IRPtrLit* _getPtrValue(void* ptr);
+    IRPtrLit* getPtrValue(IRType* type, void* ptr);
     IRPtrLit* getNullPtrValue(IRType* type);
     IRPtrLit* getNullVoidPtrValue() { return getNullPtrValue(getPtrType(getVoidType())); }
     IRVoidLit* getVoidValue();
@@ -3892,6 +3935,10 @@ public:
     IRInst* emitAlloca(IRInst* type, IRInst* rttiObjPtr);
 
     IRInst* emitGlobalValueRef(IRInst* globalInst);
+
+    IRInst* emitBitfieldExtract(IRType* type, IRInst* op0, IRInst* op1, IRInst* op2);
+
+    IRInst* emitBitfieldInsert(IRType* type, IRInst* op0, IRInst* op1, IRInst* op2, IRInst* op3);
 
     IRInst* emitPackAnyValue(IRType* type, IRInst* value);
 
@@ -5193,6 +5240,11 @@ public:
     void addCheckpointIntermediateDecoration(IRInst* inst, IRGlobalValueWithCode* func)
     {
         addDecoration(inst, kIROp_CheckpointIntermediateDecoration, func);
+    }
+
+    void addEntryPointParamDecoration(IRInst* inst, IRFunc* entryPointFunc)
+    {
+        addDecoration(inst, kIROp_EntryPointParamDecoration, entryPointFunc);
     }
 };
 

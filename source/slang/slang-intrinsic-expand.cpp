@@ -704,6 +704,8 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
                 CASE(UInt16Type, U16);
                 CASE(UIntType, U32);
                 CASE(UInt64Type, U64);
+                CASE(IntPtrType, IPTR);
+                CASE(UIntPtrType, UPTR);
                 CASE(HalfType, F16);
                 CASE(FloatType, F32);
                 CASE(DoubleType, F64);

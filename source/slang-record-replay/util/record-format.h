@@ -89,6 +89,9 @@ enum ApiCallId : uint32_t
     IGlobalSession_setSPIRVCoreGrammar = makeApiCallId(Class_IGlobalSession, 0x0018),
     IGlobalSession_parseCommandLineArguments = makeApiCallId(Class_IGlobalSession, 0x0019),
     IGlobalSession_getSessionDescDigest = makeApiCallId(Class_IGlobalSession, 0x001A),
+    IGlobalSession_compileBuiltinModule = makeApiCallId(Class_IGlobalSession, 0x001B),
+    IGlobalSession_loadBuiltinModule = makeApiCallId(Class_IGlobalSession, 0x001C),
+    IGlobalSession_saveBuiltinModule = makeApiCallId(Class_IGlobalSession, 0x001D),
 
     ISession_getGlobalSession = makeApiCallId(Class_ISession, 0x0001),
     ISession_loadModule = makeApiCallId(Class_ISession, 0x0002),

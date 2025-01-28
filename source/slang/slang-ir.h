@@ -1563,6 +1563,8 @@ SIMPLE_IR_TYPE(PrimitivesType, MeshOutputType)
 
 struct IRMetalMeshType : IRType
 {
+    IR_LEAF_ISA(MetalMeshType);
+
     IRType* getVerticesType() { return (IRType*)getOperand(0); }
     IRType* getPrimitivesType() { return (IRType*)getOperand(1); }
     IRInst* getNumVertices() { return (IRInst*)getOperand(2); }
@@ -1652,6 +1654,11 @@ struct IRRateQualifiedType : IRType
     IR_LEAF_ISA(RateQualifiedType)
 };
 
+struct IRDescriptorHandleType : IRType
+{
+    IRType* getResourceType() { return (IRType*)getOperand(0); }
+    IR_LEAF_ISA(DescriptorHandleType)
+};
 
 // Unlike the AST-level type system where `TypeType` tracks the
 // underlying type, the "type of types" in the IR is a simple

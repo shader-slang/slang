@@ -1,4 +1,6 @@
 function(example dir)
+    cmake_parse_arguments(ARG "WIN32_EXECUTABLE" "" "" ${ARGN})
+
     set(debug_dir ${CMAKE_CURRENT_BINARY_DIR}/${dir})
 
     file(
@@ -30,6 +32,22 @@ function(example dir)
         )
     endif()
 
+    # Libraries providing a main function that prints stack traces on exceptions
+    if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+        # On Windows we have two different versions: main for "console applications" and
+        # WinMain for normal Windows applications.
+        if(${ARG_WIN32_EXECUTABLE})
+            set(main_wrapper_libraries example-winmain)
+        else()
+            set(main_wrapper_libraries example-main)
+        endif()
+        # Add stack printing support
+        set(main_wrapper_libraries ${main_wrapper_libraries} stacktrace-windows)
+        set(main_wrapper_libraries ${main_wrapper_libraries} dbghelp.lib)
+    else()
+        set(main_wrapper_libraries example-main)
+    endif()
+
     slang_add_target(
         ${dir}
         EXECUTABLE
@@ -42,7 +60,9 @@ function(example dir)
             gfx-util
             platform
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
+            ${main_wrapper_libraries}
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
+            SLANG_EXAMPLE_NAME=${dir}
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
         REQUIRED_BY all-examples
         OPTIONAL_REQUIRES ${copy_assets_target} copy-prebuilt-binaries
@@ -68,6 +88,9 @@ if(SLANG_ENABLE_EXAMPLES)
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
         FOLDER examples
     )
+    slang_add_target(example-main STATIC FOLDER examples)
+    slang_add_target(example-winmain STATIC FOLDER examples EXCLUDE_FROM_ALL)
+    slang_add_target(stacktrace-windows STATIC FOLDER examples EXCLUDE_FROM_ALL)
 
     add_custom_target(
         all-examples
@@ -83,6 +106,7 @@ if(SLANG_ENABLE_EXAMPLES)
     example(platform-test WIN32_EXECUTABLE)
     example(ray-tracing WIN32_EXECUTABLE)
     example(ray-tracing-pipeline WIN32_EXECUTABLE)
+    example(reflection-api)
     example(shader-object)
     example(shader-toy WIN32_EXECUTABLE)
     example(triangle WIN32_EXECUTABLE)

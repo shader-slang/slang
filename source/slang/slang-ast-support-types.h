@@ -80,6 +80,7 @@ class SyntaxNode;
 SourceLoc getDiagnosticPos(SyntaxNode const* syntax);
 SourceLoc getDiagnosticPos(TypeExp const& typeExp);
 SourceLoc getDiagnosticPos(DeclRefBase* declRef);
+SourceLoc getDiagnosticPos(Decl* decl);
 
 typedef NodeBase* (*SyntaxParseCallback)(Parser* parser, void* userData);
 
@@ -1225,6 +1226,7 @@ enum class LookupOptions : uint8_t
     /// checking to see if a keyword is shadowed.
     IgnoreInheritance =
         1 << 4, ///< Lookup only non inheritance children of a struct (including `extension`)
+    IgnoreTransparentMembers = 1 << 5,
 };
 inline LookupOptions operator&(LookupOptions a, LookupOptions b)
 {
@@ -1633,6 +1635,8 @@ enum ParameterDirection
     kParameterDirection_Ref,      ///< By-reference
     kParameterDirection_ConstRef, ///< By-const-reference
 };
+
+void printDiagnosticArg(StringBuilder& sb, ParameterDirection direction);
 
 /// The kind of a builtin interface requirement that can be automatically synthesized.
 enum class BuiltinRequirementKind

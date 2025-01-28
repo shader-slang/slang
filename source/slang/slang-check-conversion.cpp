@@ -699,6 +699,8 @@ int getTypeBitSize(Type* t)
         return 16;
     case BaseType::Int:
     case BaseType::UInt:
+    case BaseType::Int8x4Packed:
+    case BaseType::UInt8x4Packed:
         return 32;
     case BaseType::Int64:
     case BaseType::UInt64:
@@ -783,8 +785,8 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
-    // If both are string types we assume they are convertable in both directions
-    if (as<StringTypeBase>(fromType) && as<StringTypeBase>(toType))
+    // Assume string literals are convertible to any string type.
+    if (as<StringLiteralExpr>(fromExpr) && as<StringTypeBase>(toType))
     {
         if (outToExpr)
             *outToExpr = fromExpr;

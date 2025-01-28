@@ -27,6 +27,11 @@ int TestBase::parseOption(int argc, char** argv)
             m_isTestMode = true;
         }
     }
+
+#ifdef _WIN32
+    LocalFree(szArglist);
+#endif
+
     return 0;
 }
 

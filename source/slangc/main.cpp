@@ -100,7 +100,9 @@ SLANG_TEST_TOOL_API SlangResult innerMain(
     else if (!session)
     {
         // Just create the global session in the regular way if there isn't one set
-        SLANG_RETURN_ON_FAIL(slang_createGlobalSession(SLANG_API_VERSION, session.writeRef()));
+        SlangGlobalSessionDesc desc = {};
+        desc.enableGLSL = true;
+        SLANG_RETURN_ON_FAIL(slang_createGlobalSession2(&desc, session.writeRef()));
     }
 
     if (!shouldEmbedPrelude(argv, argc))

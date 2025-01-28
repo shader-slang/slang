@@ -85,7 +85,10 @@ SlangResult TestContext::locateFileCheck()
 
 Result TestContext::init(const char* inExePath)
 {
-    m_session = spCreateSession(nullptr);
+    SlangGlobalSessionDesc desc = {};
+    desc.enableGLSL = true;
+    slang_createGlobalSession2(&desc, &m_session);
+
     if (!m_session)
     {
         return SLANG_FAIL;

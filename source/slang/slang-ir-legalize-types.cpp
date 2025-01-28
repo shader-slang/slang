@@ -110,10 +110,11 @@ static void registerLegalizedValue(
     context->mapValToLegalVal[irValue] = legalVal;
 }
 
-struct IRGlobalNameInfo
+/// Structure to pass information from the original/old global param to
+/// composite members during tuple flavored global param legalization.
+struct IRGlobalParamInfo
 {
-    IRInst* globalVar;
-    UInt counter;
+    IRFunc* originatingEntryPoint = nullptr;
 };
 
 static LegalVal declareVars(
@@ -124,7 +125,7 @@ static LegalVal declareVars(
     LegalVarChain const& varChain,
     UnownedStringSlice nameHint,
     IRInst* leafVar,
-    IRGlobalNameInfo* globalNameInfo,
+    IRGlobalParamInfo* globalParamInfo,
     bool isSpecial);
 
 /// Unwrap a value with flavor `wrappedBuffer`
@@ -572,7 +573,7 @@ private:
                     // We expect that the parent is actually an IR function.
                     //
                     // TODO: What about the case where we have an `IRGlobalVar`
-                    // of a type that needs legalization, and teh variable has
+                    // of a type that needs legalization, and the variable has
                     // an initializer? For now, I believe that case is disallowed
                     // in the legalization for global variables.
                     //
@@ -837,7 +838,7 @@ static LegalVal legalizeDebugVar(
     case LegalType::Flavor::simple:
         {
             auto legalVal = context->builder->emitDebugVar(
-                type.getSimple(),
+                tryGetPointedToType(context->builder, type.getSimple()),
                 originalInst->getSource(),
                 originalInst->getLine(),
                 originalInst->getCol(),
@@ -887,7 +888,7 @@ static LegalVal legalizeDebugValue(
         {
             auto ordinaryVal = legalizeDebugValue(
                 context,
-                debugVar,
+                debugVar.getPair()->ordinaryVal,
                 debugValue.getPair()->ordinaryVal,
                 originalInst);
             return ordinaryVal;
@@ -2088,7 +2089,9 @@ static LegalVal legalizeInst(
     case kIROp_Return:
         result = legalizeRetVal(context, args[0], (IRReturn*)inst);
         break;
-
+    case kIROp_CastDescriptorHandleToResource:
+        result = LegalVal::simple(inst);
+        break;
     case kIROp_DebugVar:
         result = legalizeDebugVar(context, type, (IRDebugVar*)inst);
         break;
@@ -2725,10 +2728,8 @@ static LegalVal declareSimpleVar(
     LegalVarChain const& varChain,
     UnownedStringSlice nameHint,
     IRInst* leafVar,
-    IRGlobalNameInfo* globalNameInfo)
+    IRGlobalParamInfo* globalParamInfo)
 {
-    SLANG_UNUSED(globalNameInfo);
-
     IRVarLayout* varLayout = createVarLayout(context->builder, varChain, typeLayout);
 
     IRBuilder* builder = context->builder;
@@ -2754,6 +2755,19 @@ static LegalVal declareSimpleVar(
             auto globalParam = builder->createGlobalParam(type);
             globalParam->removeFromParent();
             globalParam->insertBefore(context->insertBeforeGlobal);
+
+            // Add originating entry point decoration if original global param
+            // comes from an entry point parameter. This is required in cases where the global
+            // param has to be linked back to the originating entry point, such as when
+            // emitting Metal where there global params have to be moved back to the
+            // entry point parameter.
+            SLANG_ASSERT(globalParamInfo);
+            if (globalParamInfo->originatingEntryPoint)
+            {
+                builder->addEntryPointParamDecoration(
+                    globalParam,
+                    globalParamInfo->originatingEntryPoint);
+            }
 
             irVar = globalParam;
             legalVarVal = LegalVal::simple(globalParam);
@@ -3414,7 +3428,7 @@ static LegalVal declareVars(
     LegalVarChain const& inVarChain,
     UnownedStringSlice nameHint,
     IRInst* leafVar,
-    IRGlobalNameInfo* globalNameInfo,
+    IRGlobalParamInfo* globalParamInfo,
     bool isSpecial)
 {
     LegalVarChain varChain = inVarChain;
@@ -3449,7 +3463,7 @@ static LegalVal declareVars(
             varChain,
             nameHint,
             leafVar,
-            globalNameInfo);
+            globalParamInfo);
         break;
 
     case LegalType::Flavor::implicitDeref:
@@ -3464,7 +3478,7 @@ static LegalVal declareVars(
                 varChain,
                 nameHint,
                 leafVar,
-                globalNameInfo,
+                globalParamInfo,
                 isSpecial);
             return LegalVal::implicitDeref(val);
         }
@@ -3481,7 +3495,7 @@ static LegalVal declareVars(
                 varChain,
                 nameHint,
                 leafVar,
-                globalNameInfo,
+                globalParamInfo,
                 false);
             auto specialVal = declareVars(
                 context,
@@ -3491,7 +3505,7 @@ static LegalVal declareVars(
                 varChain,
                 nameHint,
                 leafVar,
-                globalNameInfo,
+                globalParamInfo,
                 true);
             return LegalVal::pair(ordinaryVal, specialVal, pairType->pairInfo);
         }
@@ -3543,7 +3557,7 @@ static LegalVal declareVars(
                     newVarChain,
                     fieldNameHint,
                     ee.key,
-                    globalNameInfo,
+                    globalParamInfo,
                     true);
 
                 TuplePseudoVal::Element element;
@@ -3598,7 +3612,7 @@ static LegalVal declareVars(
                 varChain,
                 nameHint,
                 leafVar,
-                globalNameInfo);
+                globalParamInfo);
 
             return LegalVal::wrappedBuffer(innerVal, wrappedBuffer->elementInfo);
         }
@@ -3632,10 +3646,6 @@ static LegalVal legalizeGlobalVar(IRTypeLegalizationContext* context, IRGlobalVa
         {
             context->insertBeforeGlobal = irGlobalVar;
 
-            IRGlobalNameInfo globalNameInfo;
-            globalNameInfo.globalVar = irGlobalVar;
-            globalNameInfo.counter = 0;
-
             UnownedStringSlice nameHint = findNameHint(irGlobalVar);
             context->builder->setInsertBefore(irGlobalVar);
             LegalVal newVal = declareVars(
@@ -3646,7 +3656,7 @@ static LegalVal legalizeGlobalVar(IRTypeLegalizationContext* context, IRGlobalVa
                 LegalVarChain(),
                 nameHint,
                 irGlobalVar,
-                &globalNameInfo,
+                nullptr,
                 context->isSpecialType(originalValueType));
 
             // Register the new value as the replacement for the old
@@ -3687,9 +3697,12 @@ static LegalVal legalizeGlobalParam(
 
             LegalVarChainLink varChain(LegalVarChain(), varLayout);
 
-            IRGlobalNameInfo globalNameInfo;
-            globalNameInfo.globalVar = irGlobalParam;
-            globalNameInfo.counter = 0;
+            IRGlobalParamInfo globalParamInfo;
+            if (auto entryPointParamDecoration =
+                    irGlobalParam->findDecoration<IREntryPointParamDecoration>())
+            {
+                globalParamInfo.originatingEntryPoint = entryPointParamDecoration->getEntryPoint();
+            }
 
             // TODO: need to handle initializer here!
 
@@ -3703,7 +3716,7 @@ static LegalVal legalizeGlobalParam(
                 varChain,
                 nameHint,
                 irGlobalParam,
-                &globalNameInfo,
+                &globalParamInfo,
                 context->isSpecialType(irGlobalParam->getDataType()));
 
             // Register the new value as the replacement for the old

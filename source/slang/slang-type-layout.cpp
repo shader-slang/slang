@@ -110,6 +110,10 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
                 sizeof(intptr_t),
                 sizeof(intptr_t));
 
+        case BaseType::Int8x4Packed:
+        case BaseType::UInt8x4Packed:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
+
         case BaseType::Half:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
         case BaseType::Float:
@@ -657,7 +661,7 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
         auto alignedElementCount = 1 << Math::Log2Ceil((uint32_t)elementCount);
 
         // Metal aligns vectors to 2/4 element boundaries.
-        size_t size = elementSize * elementCount;
+        size_t size = alignedElementCount * elementSize;
         size_t alignment = alignedElementCount * elementSize;
 
         SimpleLayoutInfo vectorInfo;
@@ -787,6 +791,7 @@ static LayoutResourceKind _getHLSLLayoutResourceKind(ShaderParameterKind kind)
     case ShaderParameterKind::RawBuffer:
     case ShaderParameterKind::Buffer:
     case ShaderParameterKind::Texture:
+    case ShaderParameterKind::AccelerationStructure:
         return LayoutResourceKind::ShaderResource;
 
     case ShaderParameterKind::MutableStructuredBuffer:
@@ -794,6 +799,7 @@ static LayoutResourceKind _getHLSLLayoutResourceKind(ShaderParameterKind kind)
     case ShaderParameterKind::MutableBuffer:
     case ShaderParameterKind::MutableTexture:
     case ShaderParameterKind::AppendConsumeStructuredBuffer:
+    case ShaderParameterKind::ShaderStorageBuffer:
         return LayoutResourceKind::UnorderedAccess;
 
     case ShaderParameterKind::SamplerState:
@@ -841,6 +847,8 @@ struct GLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         {
         case ShaderParameterKind::SubpassInput:
             return SimpleLayoutInfo(LayoutResourceKind::InputAttachmentIndex, slotCount);
+        case ShaderParameterKind::ParameterBlock:
+            return SimpleLayoutInfo(LayoutResourceKind::SubElementRegisterSpace, 1);
         default:
             break;
         }
@@ -887,14 +895,17 @@ struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         {
         case ShaderParameterKind::ConstantBuffer:
             return SimpleLayoutInfo(LayoutResourceKind::ConstantBuffer, 1);
-
+        case ShaderParameterKind::ParameterBlock:
+            return SimpleLayoutInfo(LayoutResourceKind::SubElementRegisterSpace, 1);
         case ShaderParameterKind::TextureUniformBuffer:
         case ShaderParameterKind::StructuredBuffer:
         case ShaderParameterKind::RawBuffer:
         case ShaderParameterKind::Buffer:
         case ShaderParameterKind::Texture:
+        case ShaderParameterKind::AccelerationStructure:
             return SimpleLayoutInfo(LayoutResourceKind::ShaderResource, 1);
 
+        case ShaderParameterKind::ShaderStorageBuffer:
         case ShaderParameterKind::MutableStructuredBuffer:
         case ShaderParameterKind::MutableRawBuffer:
         case ShaderParameterKind::MutableBuffer:
@@ -1136,6 +1147,14 @@ struct MetalLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
+struct MetalArgumentBufferTier2LayoutRulesFamilyImpl : MetalLayoutRulesFamilyImpl
+{
+    virtual LayoutRulesImpl* getConstantBufferRules(
+        CompilerOptionSet& compilerOptions,
+        Type* containerType) override;
+    virtual LayoutRulesImpl* getParameterBlockRules(CompilerOptionSet& compilerOptions) override;
+};
+
 struct WGSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getAnyValueRules() override;
@@ -1164,6 +1183,7 @@ HLSLLayoutRulesFamilyImpl kHLSLLayoutRulesFamilyImpl;
 CPULayoutRulesFamilyImpl kCPULayoutRulesFamilyImpl;
 CUDALayoutRulesFamilyImpl kCUDALayoutRulesFamilyImpl;
 MetalLayoutRulesFamilyImpl kMetalLayoutRulesFamilyImpl;
+MetalArgumentBufferTier2LayoutRulesFamilyImpl kMetalArgumentBufferTier2LayoutRulesFamilyImpl;
 WGSLLayoutRulesFamilyImpl kWGSLLayoutRulesFamilyImpl;
 
 // CPU case
@@ -1176,6 +1196,7 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         switch (kind)
         {
         case ShaderParameterKind::ConstantBuffer:
+        case ShaderParameterKind::ParameterBlock:
             // It's a pointer to the actual uniform data
             return SimpleLayoutInfo(
                 LayoutResourceKind::Uniform,
@@ -1210,6 +1231,8 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
                 sizeof(void*) * 2,
                 SLANG_ALIGN_OF(void*));
 
+        case ShaderParameterKind::ShaderStorageBuffer:
+        case ShaderParameterKind::AccelerationStructure:
         case ShaderParameterKind::SamplerState:
             // It's a pointer
             return SimpleLayoutInfo(
@@ -1258,6 +1281,7 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
         switch (kind)
         {
         case ShaderParameterKind::ConstantBuffer:
+        case ShaderParameterKind::ParameterBlock:
             {
                 // It's a pointer to the actual uniform data
                 return SimpleLayoutInfo(
@@ -1298,6 +1322,15 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
                 const size_t size =
                     _roundToAlignment(sizeof(CUDAPtr) + sizeof(CUDACount), sizeof(CUDAPtr));
                 return SimpleLayoutInfo(LayoutResourceKind::Uniform, size, sizeof(CUDAPtr));
+            }
+        case ShaderParameterKind::ShaderStorageBuffer:
+        case ShaderParameterKind::AccelerationStructure:
+            {
+                // It's a pointer.
+                return SimpleLayoutInfo(
+                    LayoutResourceKind::Uniform,
+                    sizeof(CUDAPtr),
+                    sizeof(CUDAPtr));
             }
         case ShaderParameterKind::SamplerState:
             {
@@ -1852,12 +1885,15 @@ struct MetalObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         switch (kind)
         {
         case ShaderParameterKind::ConstantBuffer:
+        case ShaderParameterKind::ParameterBlock:
         case ShaderParameterKind::StructuredBuffer:
         case ShaderParameterKind::MutableStructuredBuffer:
         case ShaderParameterKind::RawBuffer:
         case ShaderParameterKind::Buffer:
         case ShaderParameterKind::MutableRawBuffer:
         case ShaderParameterKind::MutableBuffer:
+        case ShaderParameterKind::ShaderStorageBuffer:
+        case ShaderParameterKind::AccelerationStructure:
             return SimpleLayoutInfo(LayoutResourceKind::MetalBuffer, 1);
         case ShaderParameterKind::AppendConsumeStructuredBuffer:
             return SimpleLayoutInfo(LayoutResourceKind::MetalBuffer, 2);
@@ -1894,12 +1930,26 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
         return SimpleLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 1);
     }
 
+    SimpleLayoutInfo GetVectorLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t elementCount) override
+    {
+        SLANG_UNUSED(elementType);
+        SLANG_UNUSED(elementInfo);
+        SLANG_UNUSED(elementCount);
+
+        // A vector occupies one [[id]] slot in a metal argument buffer.
+        return SimpleLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 1);
+    }
+
     virtual ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& /* options */)
         override
     {
         switch (kind)
         {
         case ShaderParameterKind::ConstantBuffer:
+        case ShaderParameterKind::ParameterBlock:
         case ShaderParameterKind::StructuredBuffer:
         case ShaderParameterKind::MutableStructuredBuffer:
         case ShaderParameterKind::RawBuffer:
@@ -1910,6 +1960,8 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
         case ShaderParameterKind::TextureUniformBuffer:
         case ShaderParameterKind::Texture:
         case ShaderParameterKind::SamplerState:
+        case ShaderParameterKind::ShaderStorageBuffer:
+        case ShaderParameterKind::AccelerationStructure:
             {
                 return SimpleLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 1);
             }
@@ -1926,8 +1978,44 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
     }
 };
 
+struct MetalTier2ObjectLayoutRulesImpl : ObjectLayoutRulesImpl
+{
+    virtual ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& /* options */)
+        override
+    {
+        switch (kind)
+        {
+        case ShaderParameterKind::ConstantBuffer:
+        case ShaderParameterKind::ParameterBlock:
+        case ShaderParameterKind::StructuredBuffer:
+        case ShaderParameterKind::MutableStructuredBuffer:
+        case ShaderParameterKind::RawBuffer:
+        case ShaderParameterKind::Buffer:
+        case ShaderParameterKind::MutableRawBuffer:
+        case ShaderParameterKind::MutableBuffer:
+        case ShaderParameterKind::ShaderStorageBuffer:
+        case ShaderParameterKind::AccelerationStructure:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+        case ShaderParameterKind::AppendConsumeStructuredBuffer:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 16, 8);
+        case ShaderParameterKind::MutableTexture:
+        case ShaderParameterKind::TextureUniformBuffer:
+        case ShaderParameterKind::Texture:
+        case ShaderParameterKind::SamplerState:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+        case ShaderParameterKind::TextureSampler:
+        case ShaderParameterKind::MutableTextureSampler:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 16, 8);
+        default:
+            SLANG_UNEXPECTED("unhandled shader parameter kind");
+            UNREACHABLE_RETURN(SimpleLayoutInfo());
+        }
+    }
+};
+
 static MetalObjectLayoutRulesImpl kMetalObjectLayoutRulesImpl;
 static MetalArgumentBufferElementLayoutRulesImpl kMetalArgumentBufferElementLayoutRulesImpl;
+static MetalTier2ObjectLayoutRulesImpl kMetalTier2ObjectLayoutRulesImpl;
 static MetalLayoutRulesImpl kMetalLayoutRulesImpl;
 
 LayoutRulesImpl kMetalAnyValueLayoutRulesImpl_ = {
@@ -1946,6 +2034,18 @@ LayoutRulesImpl kMetalParameterBlockLayoutRulesImpl_ = {
     &kMetalLayoutRulesFamilyImpl,
     &kMetalArgumentBufferElementLayoutRulesImpl,
     &kMetalArgumentBufferElementLayoutRulesImpl,
+};
+
+LayoutRulesImpl kMetalTier2ConstantBufferLayoutRulesImpl_ = {
+    &kMetalLayoutRulesFamilyImpl,
+    &kMetalLayoutRulesImpl,
+    &kMetalTier2ObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kMetalTier2ParameterBlockLayoutRulesImpl_ = {
+    &kMetalLayoutRulesFamilyImpl,
+    &kMetalLayoutRulesImpl,
+    &kMetalTier2ObjectLayoutRulesImpl,
 };
 
 LayoutRulesImpl kMetalStructuredBufferLayoutRulesImpl_ = {
@@ -2035,6 +2135,20 @@ LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getHitAttributesParameterRules()
 {
     return nullptr;
 }
+
+LayoutRulesImpl* MetalArgumentBufferTier2LayoutRulesFamilyImpl::getConstantBufferRules(
+    CompilerOptionSet&,
+    Type*)
+{
+    return &kMetalTier2ConstantBufferLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* MetalArgumentBufferTier2LayoutRulesFamilyImpl::getParameterBlockRules(
+    CompilerOptionSet&)
+{
+    return &kMetalTier2ParameterBlockLayoutRulesImpl_;
+}
+
 
 // WGSL Family
 
@@ -2186,7 +2300,7 @@ TypeLayoutContext getInitialLayoutContextForTarget(
         rulesFamily = getDefaultLayoutRulesFamilyForTarget(targetReq);
         break;
     case slang::LayoutRules::MetalArgumentBufferTier2:
-        rulesFamily = &kCPULayoutRulesFamilyImpl;
+        rulesFamily = &kMetalArgumentBufferTier2LayoutRulesFamilyImpl;
         break;
     }
 
@@ -2324,6 +2438,10 @@ static SimpleLayoutInfo _getParameterGroupLayoutInfo(
     }
     else if (as<ParameterBlockType>(type))
     {
+        auto info =
+            rules->GetObjectLayout(ShaderParameterKind::ParameterBlock, context.objectLayoutOptions)
+                .getSimple();
+
         // Note: we default to consuming zero register spces here, because
         // a parameter block might not contain anything (or all it contains
         // is other blocks), and so it won't get a space allocated.
@@ -2334,7 +2452,9 @@ static SimpleLayoutInfo _getParameterGroupLayoutInfo(
         //
         // TODO: wouldn't it be any different to just allocate this
         // as an empty `SimpleLayoutInfo` of any other kind?
-        return SimpleLayoutInfo(LayoutResourceKind::SubElementRegisterSpace, 0);
+        if (info.kind == LayoutResourceKind::SubElementRegisterSpace)
+            info.size = 0;
+        return info;
     }
 
     // TODO: the vertex-input and fragment-output cases should
@@ -2506,7 +2626,7 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
 
 bool areResourceTypesBindlessOnTarget(TargetRequest* targetReq)
 {
-    return isCPUTarget(targetReq) || isCUDATarget(targetReq);
+    return isCPUTarget(targetReq) || isCUDATarget(targetReq) || isMetalTarget(targetReq);
 }
 
 static bool isD3D11Target(TargetRequest*)
@@ -4032,6 +4152,21 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     RefPtr<TypeLayout> fieldTypeLayout = fieldResult.layout;
     UniformLayoutInfo fieldInfo = fieldResult.info.getUniformLayout();
 
+    if (fieldTypeLayout->resourceInfos.getCount() == 0)
+    {
+        if (auto paramGroupTypeLayout = as<ParameterGroupTypeLayout>(fieldTypeLayout))
+        {
+            // If field type layout is a parameter block and it has a size that is not just a space,
+            // we need to count for it in the struct layout.
+            auto containerTypeLayout = paramGroupTypeLayout->containerVarLayout->getTypeLayout();
+            if (containerTypeLayout->FindResourceInfo(
+                    LayoutResourceKind::SubElementRegisterSpace) == nullptr)
+            {
+                fieldTypeLayout = containerTypeLayout;
+            }
+        }
+    }
+
     // Note: we don't add any zero-size fields
     // when computing structure layout, just
     // to avoid having a resource type impact
@@ -4062,7 +4197,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     // for each field of the structure.
     RefPtr<VarLayout> fieldLayout = new VarLayout();
     fieldLayout->varDecl = field;
-    fieldLayout->typeLayout = fieldTypeLayout;
+    fieldLayout->typeLayout = fieldResult.layout;
     m_typeLayout->fields.add(fieldLayout);
 
     if (field)
@@ -4612,6 +4747,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     CASE(GLSLInputAttachmentType, InputRenderTarget);
 
     // This case is mostly to allow users to add new resource types...
+    CASE(RaytracingAccelerationStructureType, AccelerationStructure);
     CASE(UntypedBufferResourceType, RawBuffer);
 
     CASE(GLSLShaderStorageBufferType, MutableRawBuffer);
@@ -4785,10 +4921,27 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             type,
             rules);
     }
+    else if (auto resPtrType = as<DescriptorHandleType>(type))
+    {
+        if (areResourceTypesBindlessOnTarget(context.targetReq))
+            return _createTypeLayout(context, resPtrType->getElementType());
+        auto uint2Type = context.astBuilder->getVectorType(
+            context.astBuilder->getUIntType(),
+            context.astBuilder->getIntVal(context.astBuilder->getIntType(), 2));
+        return _createTypeLayout(context, uint2Type);
+    }
+    else if (auto optionalType = as<OptionalType>(type))
+    {
+        // OptionalType should be laid out the same way as Tuple<T, bool>.
+        Array<Type*, 2> types =
+            makeArray(optionalType->getValueType(), context.astBuilder->getBoolType());
+        auto tupleType = context.astBuilder->getTupleType(types.getView());
+        return _createTypeLayout(context, tupleType);
+    }
     else if (auto tupleType = as<TupleType>(type))
     {
         // A `Tuple` type is laid out exactly the same way as a `struct` type,
-        // except that we want have a declref to the field.
+        // except that we won't have a declref to the field.
 
         StructTypeLayoutBuilder typeLayoutBuilder;
         StructTypeLayoutBuilder pendingDataTypeLayoutBuilder;

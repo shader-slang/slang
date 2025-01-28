@@ -45,12 +45,16 @@ struct Vertex
     float position[3];
     float color[3];
     float uv[2];
+    float customData0[4];
+    float customData1[4];
+    float customData2[4];
+    float customData3[4];
 };
 
 static const Vertex kVertexData[] = {
-    {{0, 0, 0.5}, {1, 0, 0}, {0, 0}},
-    {{0, 1, 0.5}, {0, 0, 1}, {1, 0}},
-    {{1, 0, 0.5}, {0, 1, 0}, {1, 1}},
+    {{0, 0, 0.5}, {1, 0, 0}, {0, 0}, {1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}, {13, 14, 15, 16}},
+    {{0, 1, 0.5}, {0, 0, 1}, {1, 0}, {1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}, {13, 14, 15, 16}},
+    {{1, 0, 0.5}, {0, 1, 0}, {1, 1}, {1, 2, 3, 4}, {5, 6, 7, 8}, {9, 10, 11, 12}, {13, 14, 15, 16}},
 };
 static const int kVertexCount = SLANG_COUNT_OF(kVertexData);
 
@@ -222,13 +226,18 @@ struct AssignValsFromLayoutContext
             device,
             bufferResource));
 
-        if (dstCursor.getTypeLayout()->getType()->getKind() == slang::TypeReflection::Kind::Pointer)
+        if ((dstCursor.getTypeLayout()->getType()->getKind() ==
+                 slang::TypeReflection::Kind::Scalar &&
+             dstCursor.getTypeLayout()->getType()->getScalarType() ==
+                 slang::TypeReflection::ScalarType::UInt64) ||
+            dstCursor.getTypeLayout()->getType()->getKind() == slang::TypeReflection::Kind::Pointer)
         {
             // dstCursor is pointer to an ordinary uniform data field,
             // we should write bufferResource as a pointer.
             uint64_t addr = bufferResource->getDeviceAddress();
             dstCursor.setData(&addr, sizeof(addr));
             resourceContext.resources.add(ComPtr<IResource>(bufferResource.get()));
+            maybeAddOutput(dstCursor, srcVal, bufferResource);
             return SLANG_OK;
         }
 
@@ -614,6 +623,10 @@ SlangResult RenderTestApp::initialize(
                     {"A", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position)},
                     {"A", 1, Format::R32G32B32_FLOAT, offsetof(Vertex, color)},
                     {"A", 2, Format::R32G32_FLOAT, offsetof(Vertex, uv)},
+                    {"A", 3, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData0)},
+                    {"A", 4, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData1)},
+                    {"A", 5, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData2)},
+                    {"A", 6, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData3)},
                 };
 
                 ComPtr<IInputLayout> inputLayout;
@@ -1359,9 +1372,11 @@ static SlangResult _innerMain(
 
 #if _DEBUG
         desc.enableValidation = true;
-        desc.enableBackendValidation = true;
         desc.debugCallback = &debugCallback;
 #endif
+
+        if (options.enableBackendValidation)
+            desc.enableBackendValidation = true;
 
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)

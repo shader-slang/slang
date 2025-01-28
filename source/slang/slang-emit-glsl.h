@@ -64,6 +64,9 @@ protected:
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) SLANG_OVERRIDE;
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* decl) SLANG_OVERRIDE;
 
+    virtual void emitBitfieldExtractImpl(IRInst* inst) SLANG_OVERRIDE;
+    virtual void emitBitfieldInsertImpl(IRInst* inst) SLANG_OVERRIDE;
+
     virtual void handleRequiredCapabilitiesImpl(IRInst* inst) SLANG_OVERRIDE;
 
     virtual bool tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* varType) SLANG_OVERRIDE;
@@ -172,6 +175,8 @@ protected:
     void _emitSpecialFloatImpl(IRType* type, const char* valueExpr);
 
     void emitAtomicImageCoord(IRImageSubscript* operand);
+
+    void _beforeComputeEmitProcessInstruction(IRInst* parentFunc, IRInst* inst, IRBuilder& builder);
 
     Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingEntryPoints;
 

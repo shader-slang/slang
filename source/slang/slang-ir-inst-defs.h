@@ -133,6 +133,10 @@ INST(Nop, nop, 0, 0)
     INST(ComPtrType, ComPtr, 1, HOISTABLE)
     // A NativePtr<T> type represents a native pointer to a managed resource.
     INST(NativePtrType, NativePtr, 1, HOISTABLE)
+
+    // A DescriptorHandle<T> type represents a bindless handle to an opaue resource type.
+    INST(DescriptorHandleType, DescriptorHandle, 1, HOISTABLE)
+
     // An AtomicUint is a placeholder type for a storage buffer, and will be mangled during compiling.
     INST(GLSLAtomicUintType, GLSLAtomicUint, 0, HOISTABLE)
 
@@ -365,6 +369,9 @@ INST(MakeTargetTuple, makeTuple, 0, 0)
 INST(MakeValuePack, makeValuePack, 0, 0)
 INST(GetTargetTupleElement, getTargetTupleElement, 0, 0)
 INST(GetTupleElement, getTupleElement, 2, 0)
+INST(LoadResourceDescriptorFromHeap, LoadResourceDescriptorFromHeap, 1, 0)
+INST(LoadSamplerDescriptorFromHeap, LoadSamplerDescriptorFromHeap, 1, 0)
+INST(MakeCombinedTextureSamplerFromHandle, MakeCombinedTextureSamplerFromHandle, 1, 0)
 INST(MakeWitnessPack, MakeWitnessPack, 0, HOISTABLE)
 INST(Expand, Expand, 1, 0)
 INST(Each, Each, 1, HOISTABLE)
@@ -386,6 +393,9 @@ INST(Alloca, alloca, 1, 0)
 
 INST(UpdateElement, updateElement, 2, 0)
 INST(DetachDerivative, detachDerivative, 1, 0)
+
+INST(BitfieldExtract, bitfieldExtract, 3, 0)
+INST(BitfieldInsert, bitfieldInsert, 4, 0)
 
 INST(PackAnyValue, packAnyValue, 1, 0)
 INST(UnpackAnyValue, unpackAnyValue, 1, 0)
@@ -545,6 +555,8 @@ INST(MetalSetVertex, metalSetVertex, 2, 0)
 INST(MetalSetPrimitive, metalSetPrimitive, 2, 0)
 INST(MetalSetIndices, metalSetIndices, 2, 0)
 
+INST(MetalCastToDepthTexture, MetalCastToDepthTexture, 1, 0)
+
 // Construct a vector from a scalar
 //
 // %dst = MakeVectorFromScalar %T %N %val
@@ -653,6 +665,10 @@ INST(RequireComputeDerivative, RequireComputeDerivative, 0, 0)
 INST(StaticAssert, StaticAssert, 2, 0)
 INST(Printf, Printf, 1, 0)
 
+// Quad control execution modes.
+INST(RequireMaximallyReconverges, RequireMaximallyReconverges, 0, 0)
+INST(RequireQuadDerivatives, RequireQuadDerivatives, 0, 0)
+
 // TODO: We should consider splitting the basic arithmetic/comparison
 // ops into cases for signed integers, unsigned integers, and floating-point
 // values, to better match downstream targets that want to treat them
@@ -733,7 +749,8 @@ INST(GetVulkanRayTracingPayloadLocation, GetVulkanRayTracingPayloadLocation, 1, 
 
 INST(GetLegalizedSPIRVGlobalParamAddr, GetLegalizedSPIRVGlobalParamAddr, 1, 0)
 
-INST(GetPerVertexInputArray, GetPerVertexInputArray, 1, 0)
+INST(GetPerVertexInputArray, GetPerVertexInputArray, 1, HOISTABLE)
+INST(ResolveVaryingInputRef, ResolveVaryingInputRef, 1, HOISTABLE)
 
 INST(ForceVarIntoStructTemporarily, ForceVarIntoStructTemporarily, 1, 0)
 INST(MetalAtomicCast, MetalAtomicCast, 1, 0)
@@ -949,6 +966,10 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(DerivativeGroupQuadDecoration, DerivativeGroupQuad, 0, 0)
     INST(DerivativeGroupLinearDecoration, DerivativeGroupLinear, 0, 0)
 
+    INST(MaximallyReconvergesDecoration, MaximallyReconverges, 0, 0)
+    INST(QuadDerivativesDecoration, QuadDerivatives, 0, 0)
+    INST(RequireFullQuadsDecoration, RequireFullQuads, 0, 0)
+
         // Marks a type to be non copyable, causing SSA pass to skip turning variables of the the type into SSA values.
     INST(NonCopyableTypeDecoration, nonCopyable, 0, 0)
 
@@ -1029,6 +1050,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(BackwardDerivativePrimalContextDecoration, BackwardDerivativePrimalContextDecoration, 1, 0)
     INST(BackwardDerivativePrimalReturnDecoration, BackwardDerivativePrimalReturnDecoration, 1, 0)
 
+        // Mark a parameter as autodiff primal context.
+    INST(PrimalContextDecoration, PrimalContextDecoration, 0, 0)
     INST(LoopCounterDecoration, loopCounterDecoration, 0, 0)
     INST(LoopCounterUpdateDecoration, loopCounterUpdateDecoration, 0, 0)
 
@@ -1181,6 +1204,12 @@ INST(CastPtrToInt, CastPtrToInt, 1, 0)
 INST(CastIntToPtr, CastIntToPtr, 1, 0)
 INST(CastToVoid, castToVoid, 1, 0)
 INST(PtrCast, PtrCast, 1, 0)
+INST(CastUInt2ToDescriptorHandle, CastUInt2ToDescriptorHandle, 1, 0)
+INST(CastDescriptorHandleToUInt2, CastDescriptorHandleToUInt2, 1, 0)
+
+// Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are already concrete types.
+INST(CastDescriptorHandleToResource, CastDescriptorHandleToResource, 1, 0)
+
 INST(TreatAsDynamicUniform, TreatAsDynamicUniform, 1, 0)
 
 INST(SizeOf,                            sizeOf,                     1, 0)
@@ -1197,6 +1226,7 @@ INST(IsHalf, IsHalf, 1, 0)
 INST(IsUnsignedInt, IsUnsignedInt, 1, 0)
 INST(IsSignedInt, IsSignedInt, 1, 0)
 INST(IsVector, IsVector, 1, 0)
+INST(GetDynamicResourceHeap, GetDynamicResourceHeap, 0, HOISTABLE)
 
 INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
 
@@ -1277,6 +1307,9 @@ INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDicti
 
 /* Differentiable Type Dictionary */
 INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
+
+/* Differentiable Type Annotation (for run-time types)*/
+INST(DifferentiableTypeAnnotation, DifferentiableTypeAnnotation, 2, HOISTABLE)
 
 INST(BeginFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)
 INST(EndFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)

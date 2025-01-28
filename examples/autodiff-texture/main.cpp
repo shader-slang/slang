@@ -285,7 +285,7 @@ struct AutoDiffTexture : public WindowedAppBase
     }
     Slang::Result initialize()
     {
-        initializeBase("autodiff-texture", 1024, 768);
+        SLANG_RETURN_ON_FAIL(initializeBase("autodiff-texture", 1024, 768));
         srand(20421);
 
         if (!isTestMode())
@@ -823,4 +823,4 @@ struct AutoDiffTexture : public WindowedAppBase
     }
 };
 
-PLATFORM_UI_MAIN(innerMain<AutoDiffTexture>)
+EXAMPLE_MAIN(innerMain<AutoDiffTexture>);

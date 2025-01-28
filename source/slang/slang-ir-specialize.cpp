@@ -51,15 +51,17 @@ struct SpecializationContext
     IRModule* module;
     DiagnosticSink* sink;
     TargetProgram* targetProgram;
+    SpecializationOptions options;
     bool changed = false;
 
 
-    SpecializationContext(IRModule* inModule, TargetProgram* target)
+    SpecializationContext(IRModule* inModule, TargetProgram* target, SpecializationOptions options)
         : workList(*inModule->getContainerPool().getList<IRInst>())
         , workListSet(*inModule->getContainerPool().getHashSet<IRInst>())
         , cleanInsts(*inModule->getContainerPool().getHashSet<IRInst>())
         , module(inModule)
         , targetProgram(target)
+        , options(options)
     {
     }
     ~SpecializationContext()
@@ -67,6 +69,42 @@ struct SpecializationContext
         module->getContainerPool().free(&workList);
         module->getContainerPool().free(&workListSet);
         module->getContainerPool().free(&cleanInsts);
+    }
+
+    bool isUnsimplifiedArithmeticInst(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_Add:
+        case kIROp_Sub:
+        case kIROp_Mul:
+        case kIROp_Div:
+        case kIROp_Neg:
+        case kIROp_Not:
+        case kIROp_Eql:
+        case kIROp_Neq:
+        case kIROp_Leq:
+        case kIROp_Geq:
+        case kIROp_Less:
+        case kIROp_IRem:
+        case kIROp_FRem:
+        case kIROp_Greater:
+        case kIROp_Lsh:
+        case kIROp_Rsh:
+        case kIROp_BitAnd:
+        case kIROp_BitOr:
+        case kIROp_BitXor:
+        case kIROp_BitNot:
+        case kIROp_BitCast:
+        case kIROp_CastIntToFloat:
+        case kIROp_CastFloatToInt:
+        case kIROp_IntCast:
+        case kIROp_FloatCast:
+        case kIROp_Select:
+            return true;
+        default:
+            return false;
+        }
     }
 
     // An instruction is then fully specialized if and only
@@ -123,6 +161,20 @@ struct SpecializationContext
                 }
                 return false;
             }
+        }
+
+        if (isWrapperType(inst))
+        {
+            // For all the wrapper type, we need to make sure the operands are fully specialized.
+            return areAllOperandsFullySpecialized(inst);
+        }
+
+        if (isUnsimplifiedArithmeticInst(inst))
+        {
+            // For arithmetic insts, we want to wait for simplification before specialization,
+            // since different insts can simplify to the same value.
+            //
+            return false;
         }
 
         // The default case is that a global value is always specialized.
@@ -1084,6 +1136,7 @@ struct SpecializationContext
             {
                 this->changed = true;
                 eliminateDeadCode(module->getModuleInst());
+                applySparseConditionalConstantPropagationForGlobalScope(this->module, this->sink);
             }
 
             // Once the work list has gone dry, we should have the invariant
@@ -1096,7 +1149,11 @@ struct SpecializationContext
             // Now we consider lower lookupWitnessMethod insts into dynamic dispatch calls,
             // which may open up more specialization opportunities.
             //
-            iterChanged = lowerWitnessLookup(module, sink);
+            if (options.lowerWitnessLookups)
+            {
+                iterChanged = lowerWitnessLookup(module, sink);
+            }
+
             if (!iterChanged || sink->getErrorCount())
                 break;
         }
@@ -2876,10 +2933,14 @@ struct SpecializationContext
     }
 };
 
-bool specializeModule(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+bool specializeModule(
+    TargetProgram* target,
+    IRModule* module,
+    DiagnosticSink* sink,
+    SpecializationOptions options)
 {
     SLANG_PROFILE;
-    SpecializationContext context(module, target);
+    SpecializationContext context(module, target, options);
     context.sink = sink;
     context.processModule();
     return context.changed;

@@ -114,6 +114,36 @@ void SemanticsVisitor::visitModifier(Modifier*)
     // Do nothing with modifiers for now
 }
 
+DeclRef<VarDeclBase> SemanticsVisitor::tryGetIntSpecializationConstant(Expr* expr)
+{
+    // First type-check the expression as normal
+    expr = CheckExpr(expr);
+
+    if (IsErrorExpr(expr))
+        return DeclRef<VarDeclBase>();
+
+    if (!isScalarIntegerType(expr->type))
+        return DeclRef<VarDeclBase>();
+
+    auto specConstVar = as<VarExpr>(expr);
+    if (!specConstVar || !specConstVar->declRef)
+        return DeclRef<VarDeclBase>();
+
+    auto decl = specConstVar->declRef.getDecl();
+    if (!decl)
+        return DeclRef<VarDeclBase>();
+
+    for (auto modifier : decl->modifiers)
+    {
+        if (as<SpecializationConstantAttribute>(modifier) || as<VkConstantIdAttribute>(modifier))
+        {
+            return specConstVar->declRef.as<VarDeclBase>();
+        }
+    }
+
+    return DeclRef<VarDeclBase>();
+}
+
 static bool _isDeclAllowedAsAttribute(DeclRef<Decl> declRef)
 {
     if (as<AttributeDecl>(declRef.getDecl()))
@@ -350,8 +380,6 @@ Modifier* SemanticsVisitor::validateAttribute(
     {
         SLANG_ASSERT(attr->args.getCount() == 3);
 
-        IntVal* values[3];
-
         for (int i = 0; i < 3; ++i)
         {
             IntVal* value = nullptr;
@@ -359,6 +387,14 @@ Modifier* SemanticsVisitor::validateAttribute(
             auto arg = attr->args[i];
             if (arg)
             {
+                auto specConstDecl = tryGetIntSpecializationConstant(arg);
+                if (specConstDecl)
+                {
+                    numThreadsAttr->extents[i] = nullptr;
+                    numThreadsAttr->specConstExtents[i] = specConstDecl;
+                    continue;
+                }
+
                 auto intValue = checkLinkTimeConstantIntVal(arg);
                 if (!intValue)
                 {
@@ -390,12 +426,8 @@ Modifier* SemanticsVisitor::validateAttribute(
             {
                 value = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1);
             }
-            values[i] = value;
+            numThreadsAttr->extents[i] = value;
         }
-
-        numThreadsAttr->x = values[0];
-        numThreadsAttr->y = values[1];
-        numThreadsAttr->z = values[2];
     }
     else if (auto waveSizeAttr = as<WaveSizeAttribute>(attr))
     {
@@ -512,6 +544,17 @@ Modifier* SemanticsVisitor::validateAttribute(
             return nullptr;
 
         inputAttachmentIndexLayoutAttribute->location = location->getValue();
+    }
+    else if (auto locationLayoutAttr = as<GLSLLocationAttribute>(attr))
+    {
+        if (attr->args.getCount() != 1)
+            return nullptr;
+
+        auto location = checkConstantIntVal(attr->args[0]);
+        if (!location)
+            return nullptr;
+
+        locationLayoutAttr->value = int32_t(location->getValue());
     }
     else if (auto bindingAttr = as<GLSLBindingAttribute>(attr))
     {
@@ -1242,12 +1285,22 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
         return ASTNodeType::OutModifier;
 
         // Modifiers that are their own exclusive group.
-    case ASTNodeType::GLSLLayoutModifier:
-    case ASTNodeType::GLSLParsedLayoutModifier:
-    case ASTNodeType::GLSLLocationLayoutModifier:
     case ASTNodeType::GLSLInputAttachmentIndexLayoutAttribute:
     case ASTNodeType::GLSLOffsetLayoutAttribute:
     case ASTNodeType::GLSLUnparsedLayoutModifier:
+    case ASTNodeType::UncheckedGLSLBindingLayoutAttribute:
+    case ASTNodeType::UncheckedGLSLSetLayoutAttribute:
+    case ASTNodeType::UncheckedGLSLOffsetLayoutAttribute:
+    case ASTNodeType::UncheckedGLSLInputAttachmentIndexLayoutAttribute:
+    case ASTNodeType::UncheckedGLSLLocationLayoutAttribute:
+    case ASTNodeType::UncheckedGLSLIndexLayoutAttribute:
+    case ASTNodeType::UncheckedGLSLConstantIdAttribute:
+    case ASTNodeType::UncheckedGLSLRayPayloadAttribute:
+    case ASTNodeType::UncheckedGLSLRayPayloadInAttribute:
+    case ASTNodeType::UncheckedGLSLHitObjectAttributesAttribute:
+    case ASTNodeType::UncheckedGLSLCallablePayloadAttribute:
+    case ASTNodeType::UncheckedGLSLCallablePayloadInAttribute:
+    case ASTNodeType::GLSLBufferDataLayoutModifier:
     case ASTNodeType::GLSLLayoutModifierGroupMarker:
     case ASTNodeType::GLSLLayoutModifierGroupBegin:
     case ASTNodeType::GLSLLayoutModifierGroupEnd:
@@ -1321,12 +1374,10 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::InModifier:
     case ASTNodeType::InOutModifier:
     case ASTNodeType::OutModifier:
-    case ASTNodeType::GLSLLayoutModifier:
-    case ASTNodeType::GLSLParsedLayoutModifier:
-    case ASTNodeType::GLSLLocationLayoutModifier:
     case ASTNodeType::GLSLInputAttachmentIndexLayoutAttribute:
     case ASTNodeType::GLSLOffsetLayoutAttribute:
     case ASTNodeType::GLSLUnparsedLayoutModifier:
+    case ASTNodeType::UncheckedGLSLLayoutAttribute:
     case ASTNodeType::GLSLLayoutModifierGroupMarker:
     case ASTNodeType::GLSLLayoutModifierGroupBegin:
     case ASTNodeType::GLSLLayoutModifierGroupEnd:
@@ -1502,14 +1553,28 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
 
         SLANG_ASSERT(uncheckedAttr->args.getCount() == 2);
     }
-    else if (as<UncheckedGLSLOffsetLayoutAttribute>(uncheckedAttr))
-    {
-        attr = m_astBuilder->create<GLSLOffsetLayoutAttribute>();
+
+#define CASE(UncheckedType, CheckedType)            \
+    else if (as<UncheckedType>(uncheckedAttr))      \
+    {                                               \
+        attr = m_astBuilder->create<CheckedType>(); \
     }
+
+    CASE(UncheckedGLSLOffsetLayoutAttribute, GLSLOffsetLayoutAttribute)
+    CASE(UncheckedGLSLInputAttachmentIndexLayoutAttribute, GLSLInputAttachmentIndexLayoutAttribute)
+    CASE(UncheckedGLSLLocationLayoutAttribute, GLSLLocationAttribute)
+    CASE(UncheckedGLSLIndexLayoutAttribute, GLSLIndexAttribute)
+    CASE(UncheckedGLSLConstantIdAttribute, VkConstantIdAttribute)
+    CASE(UncheckedGLSLRayPayloadAttribute, VulkanRayPayloadAttribute)
+    CASE(UncheckedGLSLRayPayloadInAttribute, VulkanRayPayloadInAttribute)
+    CASE(UncheckedGLSLHitObjectAttributesAttribute, VulkanHitObjectAttributesAttribute)
+    CASE(UncheckedGLSLCallablePayloadAttribute, VulkanCallablePayloadAttribute)
+    CASE(UncheckedGLSLCallablePayloadInAttribute, VulkanCallablePayloadInAttribute)
     else
     {
         getSink()->diagnose(uncheckedAttr, Diagnostics::unrecognizedGLSLLayoutQualifier);
     }
+#undef CASE
 
     if (attr)
     {
@@ -1559,21 +1624,6 @@ Modifier* SemanticsVisitor::checkModifier(
         return checkedAttr;
     }
 
-    if (auto glslLayoutAttribute = as<UncheckedGLSLLayoutAttribute>(m))
-    {
-        return checkGLSLLayoutAttribute(glslLayoutAttribute, syntaxNode);
-    }
-
-    if (const auto glslImplicitOffsetAttribute = as<GLSLImplicitOffsetLayoutAttribute>(m))
-    {
-        auto offsetAttr = m_astBuilder->create<GLSLOffsetLayoutAttribute>();
-        offsetAttr->loc = glslImplicitOffsetAttribute->loc;
-
-        // Offset constant folding computation is deferred until all other modifiers are checked to
-        // ensure bindinig is checked first.
-        return offsetAttr;
-    }
-
     if (auto decl = as<Decl>(syntaxNode))
     {
         auto moduleDecl = getModuleDecl(decl);
@@ -1589,6 +1639,21 @@ Modifier* SemanticsVisitor::checkModifier(
             }
             return m;
         }
+    }
+
+    if (auto glslLayoutAttribute = as<UncheckedGLSLLayoutAttribute>(m))
+    {
+        return checkGLSLLayoutAttribute(glslLayoutAttribute, syntaxNode);
+    }
+
+    if (const auto glslImplicitOffsetAttribute = as<GLSLImplicitOffsetLayoutAttribute>(m))
+    {
+        auto offsetAttr = m_astBuilder->create<GLSLOffsetLayoutAttribute>();
+        offsetAttr->loc = glslImplicitOffsetAttribute->loc;
+
+        // Offset constant folding computation is deferred until all other modifiers are checked to
+        // ensure bindinig is checked first.
+        return offsetAttr;
     }
 
     MemoryQualifierSetModifier::Flags::MemoryQualifiersBit memoryQualifierBit =
@@ -1798,15 +1863,24 @@ Modifier* SemanticsVisitor::checkModifier(
     {
         SLANG_ASSERT(attr->args.getCount() == 3);
 
-        IntVal* values[3];
+        // GLSLLayoutLocalSizeAttribute is always attached to an EmptyDecl.
+        auto decl = as<EmptyDecl>(syntaxNode);
+        SLANG_ASSERT(decl);
 
         for (int i = 0; i < 3; ++i)
         {
-            IntVal* value = nullptr;
+            attr->extents[i] = nullptr;
 
             auto arg = attr->args[i];
             if (arg)
             {
+                auto specConstDecl = tryGetIntSpecializationConstant(arg);
+                if (specConstDecl)
+                {
+                    attr->specConstExtents[i] = specConstDecl;
+                    continue;
+                }
+
                 auto intValue = checkConstantIntVal(arg);
                 if (!intValue)
                 {
@@ -1814,7 +1888,45 @@ Modifier* SemanticsVisitor::checkModifier(
                 }
                 if (auto cintVal = as<ConstantIntVal>(intValue))
                 {
-                    if (cintVal->getValue() < 1)
+                    if (attr->axisIsSpecConstId[i])
+                    {
+                        // This integer should actually be a reference to a
+                        // specialization constant with this ID.
+                        Int specConstId = cintVal->getValue();
+
+                        for (auto member : decl->parentDecl->members)
+                        {
+                            auto constantId = member->findModifier<VkConstantIdAttribute>();
+                            if (constantId)
+                            {
+                                SLANG_ASSERT(constantId->args.getCount() == 1);
+                                auto id = checkConstantIntVal(constantId->args[0]);
+                                if (id->getValue() == specConstId)
+                                {
+                                    attr->specConstExtents[i] =
+                                        DeclRef<VarDeclBase>(member->getDefaultDeclRef());
+                                    break;
+                                }
+                            }
+                        }
+
+                        // If not found, we need to create a new specialization
+                        // constant with this ID.
+                        if (!attr->specConstExtents[i])
+                        {
+                            auto specConstVarDecl = getASTBuilder()->create<VarDecl>();
+                            auto constantIdModifier =
+                                getASTBuilder()->create<VkConstantIdAttribute>();
+                            constantIdModifier->location = (int32_t)specConstId;
+                            specConstVarDecl->type.type = getASTBuilder()->getIntType();
+                            addModifier(specConstVarDecl, constantIdModifier);
+                            decl->parentDecl->addMember(specConstVarDecl);
+                            attr->specConstExtents[i] =
+                                DeclRef<VarDeclBase>(specConstVarDecl->getDefaultDeclRef());
+                        }
+                        continue;
+                    }
+                    else if (cintVal->getValue() < 1)
                     {
                         getSink()->diagnose(
                             attr,
@@ -1823,18 +1935,13 @@ Modifier* SemanticsVisitor::checkModifier(
                         return nullptr;
                     }
                 }
-                value = intValue;
+                attr->extents[i] = intValue;
             }
             else
             {
-                value = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1);
+                attr->extents[i] = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1);
             }
-            values[i] = value;
         }
-
-        attr->x = values[0];
-        attr->y = values[1];
-        attr->z = values[2];
     }
 
     // Default behavior is to leave things as they are,

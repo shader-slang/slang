@@ -178,6 +178,8 @@ struct BitCastLoweringContext
         case kIROp_UIntType:
         case kIROp_FloatType:
         case kIROp_BoolType:
+        case kIROp_Int8x4PackedType:
+        case kIROp_UInt8x4PackedType:
 #if SLANG_PTR_IS_32
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:

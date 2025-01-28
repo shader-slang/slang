@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         os: [linux, macos, windows]
-        config: [debug, releaseWithDebugInfo]
+        config: [debug, release]
         compiler: [gcc, clang, cl]
         platform: [x86_64, aarch64, wasm]
         exclude:
@@ -44,14 +44,14 @@ jobs:
           # quick or full conditionally otherwise
           - test-category: smoke
           - { os: windows, test-category: quick }
-          - { config: releaseWithDebugInfo, test-category: full }
+          - { config: release, test-category: full }
           # default not full gpu tests
           - full-gpu-tests: false
           # The runners don't have a GPU by default except for the self-hosted ones
           - has-gpu: false
           # Self-hosted aarch64 build
           - os: linux
-            config: releaseWithDebugInfo
+            config: release
             compiler: gcc
             platform: aarch64
             test-category: smoke
@@ -60,7 +60,7 @@ jobs:
             has-gpu: true
           # Self-hosted full gpu build
           - os: windows
-            config: releaseWithDebugInfo
+            config: release
             compiler: cl
             platform: x86_64
             test-category: full
@@ -125,10 +125,9 @@ jobs:
               mkdir generators
               cmake --install build --prefix generators --component generators
               emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
-              cmake --build --preset emscripten --config "$cmake_config" --target slang
-              [ -f "build.em/$cmake_config/lib/libslang.a" ]
-              [ -f "build.em/$cmake_config/lib/libcompiler-core.a" ]
-              [ -f "build.em/$cmake_config/lib/libcore.a" ]
+              cmake --build --preset emscripten --config "$cmake_config" --target slang-wasm
+              [ -f "build.em/$cmake_config/bin/slang-wasm.wasm" ]
+              [ -f "build.em/$cmake_config/bin/slang-wasm.js" ]
           else
             if [[ "${{ matrix.os }}" =~ "windows" && "${{ matrix.config }}" != "release" && "${{ matrix.config }}" != "releaseWithDebugInfo" ]]; then
               # Doing a debug build will try to link against a release built llvm, this
@@ -176,6 +175,15 @@ jobs:
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-record-replay-tests.txt
           fi
+      - name: Run Slang examples
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm'
+        run: |
+          .github/workflows/ci-examples.sh \
+           --bin-dir "$bin_dir" \
+           --os "${{matrix.os}}" \
+           --platform "${{matrix.platform}}" \
+           --config "${{matrix.config}}" \
+           --skip-file tests/expected-example-failure-github.txt
       - name: Test Slang via glsl
         if: steps.filter.outputs.should-run == 'true' && matrix.full-gpu-tests && matrix.platform != 'wasm'
         run: |
@@ -188,7 +196,7 @@ jobs:
             -emit-spirv-via-glsl \
             -api vk \
             -expected-failure-list tests/expected-failure.txt
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests
         with:
           name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}

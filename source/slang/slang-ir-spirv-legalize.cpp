@@ -8,9 +8,11 @@
 #include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
+#include "slang-ir-float-non-uniform-resource-index.h"
 #include "slang-ir-glsl-legalize.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-mesh-outputs.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-buffer-element-type.h"
@@ -20,6 +22,7 @@
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-util.h"
+#include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 
@@ -308,7 +311,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // Skip load's for referenced `Input` variables since a ref implies
                 // passing as is, which needs to be a pointer (pass as is).
                 if (user->getDataType() && user->getDataType()->getOp() == kIROp_RefType &&
-                    addressSpace == AddressSpace::Input)
+                    (addressSpace == AddressSpace::Input ||
+                     addressSpace == AddressSpace::BuiltinInput))
                 {
                     builder.replaceOperand(use, addr);
                     continue;
@@ -430,7 +434,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     String semanticName = systemValueAttr->getName();
                     semanticName = semanticName.toLower();
                     if (semanticName == "sv_pointsize")
-                        addressSpace = AddressSpace::Input;
+                        addressSpace = AddressSpace::BuiltinInput;
                 }
             }
 
@@ -659,6 +663,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     SLANG_UNEXPECTED("Var layout contains conflicting resource uses, cannot "
                                      "resolve a storage class address space.");
             }
+        }
+
+        switch (result)
+        {
+        case AddressSpace::Input:
+            if (varLayout->findSystemValueSemanticAttr())
+                result = AddressSpace::BuiltinInput;
+            break;
+        case AddressSpace::Output:
+            if (varLayout->findSystemValueSemanticAttr())
+                result = AddressSpace::BuiltinOutput;
+            break;
         }
         return result;
     }
@@ -1084,130 +1100,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         addUsersToWorkList(newStore);
     }
 
-    void processNonUniformResourceIndex(IRInst* nonUniformResourceIndexInst)
-    {
-        // implement the translation to spirv by walking up the use-def chain
-        // from nonUniformResource inst of an index to an array of buffer or
-        // texture def all the way to the leaf operations. To be precise:
-        // - go through GEP and see if it calls an intrinsic function,
-        //   then decorate the address itself (GetElementPtr)
-        // - go through GEP to identify the pointer access and the Loads that it
-        //   accesses (GetElementPtr -> Load), then decorate the load instruction.
-        // - go through IntCasts to deal with u32 -> i32 / vice-versa (IntCast)
-        List<IRInst*> resWorkList;
-
-        // Handle cases when `nonUniformResourceIndexInst` inst is wrapped around
-        // an index in a nested fashion, i.e. nonUniform(nonUniform(index)) by
-        // only adding the inner-most inst in the worklist, and work our way out.
-        auto insti = nonUniformResourceIndexInst;
-        while (insti->getOp() == kIROp_NonUniformResourceIndex)
-        {
-            if (resWorkList.getCount() != 0)
-                resWorkList.removeLast();
-            resWorkList.add(insti);
-            insti = insti->getOperand(0);
-        }
-
-        // For all the users of a `nonUniformResourceIndexInst`, make them directly
-        // use the underlying base inst that is wrapped by `nonUniformResourceIndex`
-        // and finally wrap them with a `nonUniformResourceIndex`, and add back to the
-        // worklist, and keep bubbling them up until it can.
-        for (Index i = 0; i < resWorkList.getCount(); i++)
-        {
-            auto inst = resWorkList[i];
-            traverseUses(
-                inst,
-                [&](IRUse* use)
-                {
-                    auto user = use->getUser();
-                    IRBuilder builder(user);
-                    builder.setInsertBefore(user);
-
-                    IRInst* newUser = nullptr;
-                    switch (user->getOp())
-                    {
-                    case kIROp_IntCast:
-                        // Replace intCast(nonUniformRes(x)), into nonUniformRes(intCast(x))
-                        newUser = builder.emitCast(user->getFullType(), inst->getOperand(0));
-                        break;
-                    case kIROp_GetElementPtr:
-                        // Ignore when `NonUniformResourceIndex` is not on the index
-                        if (user->getOperand(1) == inst)
-                        {
-                            // Replace gep(pArray, nonUniformRes(x)), into
-                            // nonUniformRes(gep(pArray, x))
-                            newUser = builder.emitElementAddress(
-                                user->getFullType(),
-                                user->getOperand(0),
-                                inst->getOperand(0));
-                        }
-                        break;
-                    case kIROp_NonUniformResourceIndex:
-                        // Replace nonUniformRes(nonUniformRes(x)), into nonUniformRes(x)
-                        newUser = inst->getOperand(0);
-                        break;
-                    case kIROp_Load:
-                        // Replace load(nonUniformRes(x)), into nonUniformRes(load(x))
-                        newUser = builder.emitLoad(user->getFullType(), inst->getOperand(0));
-                        break;
-                    default:
-                        // Ignore for all other unknown insts.
-                        break;
-                    };
-
-                    // Early exit when we could not process the `NonUniformResourceIndex` inst.
-                    if (!newUser)
-                        return;
-
-                    auto nonuniformUser = builder.emitNonUniformResourceIndexInst(newUser);
-                    user->replaceUsesWith(nonuniformUser);
-
-                    // Update the worklist with the newly added `NonUniformResourceIndex` inst,
-                    // based on the base inst it was constructed around, in case we need to further
-                    // bubble up the `NonUniformResourceIndex` inst.
-                    switch (user->getOp())
-                    {
-                    case kIROp_IntCast:
-                    case kIROp_GetElementPtr:
-                    case kIROp_Load:
-                    case kIROp_NonUniformResourceIndex:
-                        resWorkList.add(nonuniformUser);
-                        break;
-                    };
-
-                    // Clean up the base inst from the IR module, to avoid duplicate decorations.
-                    user->removeAndDeallocate();
-                });
-        }
-
-        // Once all the `NonUniformResourceIndex` insts are visited, and the inst type is bubbled up
-        // to the parent, a decoration is added to the operands of the insts.
-        for (int i = 0; i < resWorkList.getCount(); ++i)
-        {
-            // It is only required to decorate the base inst, if the `NonUniformResourceIndex` inst
-            // around it has any active uses.
-            auto inst = resWorkList[i];
-            if (!inst->hasUses())
-            {
-                inst->removeAndDeallocate();
-                continue;
-            }
-            // For each of the `NonUniformResourceIndex` inst that remain, decorate the base inst
-            // with a [NonUniformResource] decoration, which is the operand0 of the inst, only
-            // when the type is a resource type, or a pointer to a resource type, or a pointer
-            // in the Physical Storage buffer address space.
-            auto operand = inst->getOperand(0);
-            auto type = operand->getDataType();
-            if (isResourceType(type) || isPointerToResourceType(type))
-            {
-                IRBuilder builder(operand);
-                builder.addSPIRVNonUniformResourceDecoration(operand);
-            }
-            inst->replaceUsesWith(operand);
-            inst->removeAndDeallocate();
-        }
-    }
-
     void processImageSubscript(IRImageSubscript* subscript)
     {
         if (auto ptrType = as<IRPtrTypeBase>(subscript->getDataType()))
@@ -1590,196 +1482,51 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
-    struct GlobalInstInliningContext
+    struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
     {
-        Dictionary<IRInst*, bool> m_mapGlobalInstToShouldInline;
-
-        // Opcodes that can exist in global scope, as long as the operands are.
-        bool isLegalGlobalInst(IRInst* inst)
+        bool isLegalGlobalInstForTarget(IRInst* inst) override
         {
-            switch (inst->getOp())
-            {
-            case kIROp_MakeStruct:
-            case kIROp_MakeArray:
-            case kIROp_MakeArrayFromElement:
-            case kIROp_MakeVector:
-            case kIROp_MakeMatrix:
-            case kIROp_MakeMatrixFromScalar:
-            case kIROp_MakeVectorFromScalar:
-                return true;
-            default:
-                if (as<IRConstant>(inst))
-                    return true;
-                if (as<IRSPIRVAsmOperand>(inst))
-                    return true;
-                return false;
-            }
+            return as<IRSPIRVAsmOperand>(inst);
         }
 
-        // Opcodes that can be inlined into function bodies.
-        bool isInlinableGlobalInst(IRInst* inst)
+        bool isInlinableGlobalInstForTarget(IRInst* inst) override
         {
             switch (inst->getOp())
             {
-            case kIROp_Add:
-            case kIROp_Sub:
-            case kIROp_Mul:
-            case kIROp_FRem:
-            case kIROp_IRem:
-            case kIROp_Lsh:
-            case kIROp_Rsh:
-            case kIROp_And:
-            case kIROp_Or:
-            case kIROp_Not:
-            case kIROp_Neg:
-            case kIROp_Div:
-            case kIROp_FieldExtract:
-            case kIROp_FieldAddress:
-            case kIROp_GetElement:
-            case kIROp_GetElementPtr:
-            case kIROp_GetOffsetPtr:
-            case kIROp_UpdateElement:
-            case kIROp_MakeTuple:
-            case kIROp_GetTupleElement:
-            case kIROp_MakeStruct:
-            case kIROp_MakeArray:
-            case kIROp_MakeArrayFromElement:
-            case kIROp_MakeVector:
-            case kIROp_MakeMatrix:
-            case kIROp_MakeMatrixFromScalar:
-            case kIROp_MakeVectorFromScalar:
-            case kIROp_swizzle:
-            case kIROp_swizzleSet:
-            case kIROp_MatrixReshape:
-            case kIROp_MakeString:
-            case kIROp_MakeResultError:
-            case kIROp_MakeResultValue:
-            case kIROp_GetResultError:
-            case kIROp_GetResultValue:
-            case kIROp_CastFloatToInt:
-            case kIROp_CastIntToFloat:
-            case kIROp_CastIntToPtr:
-            case kIROp_PtrCast:
-            case kIROp_CastPtrToBool:
-            case kIROp_CastPtrToInt:
-            case kIROp_BitAnd:
-            case kIROp_BitNot:
-            case kIROp_BitOr:
-            case kIROp_BitXor:
-            case kIROp_BitCast:
-            case kIROp_IntCast:
-            case kIROp_FloatCast:
-            case kIROp_Greater:
-            case kIROp_Less:
-            case kIROp_Geq:
-            case kIROp_Leq:
-            case kIROp_Neq:
-            case kIROp_Eql:
-            case kIROp_Call:
             case kIROp_SPIRVAsm:
                 return true;
             default:
-                if (as<IRSPIRVAsmInst>(inst))
-                    return true;
-                if (as<IRSPIRVAsmOperand>(inst))
-                    return true;
-                return false;
+                break;
             }
+
+            if (as<IRSPIRVAsmInst>(inst))
+                return true;
+            if (as<IRSPIRVAsmOperand>(inst))
+                return true;
+            return false;
         }
 
-        bool shouldInlineInstImpl(IRInst* inst)
+        bool shouldBeInlinedForTarget(IRInst* user) override
         {
-            if (!isInlinableGlobalInst(inst))
-                return false;
-            if (isLegalGlobalInst(inst))
-            {
-                for (UInt i = 0; i < inst->getOperandCount(); i++)
-                    if (shouldInlineInst(inst->getOperand(i)))
-                        return true;
-                return false;
-            }
-            return true;
+            if (as<IRSPIRVAsmOperand>(user) && as<IRSPIRVAsmOperandInst>(user))
+                return true;
+            else if (as<IRSPIRVAsmInst>(user))
+                return true;
+            return false;
         }
 
-        bool shouldInlineInst(IRInst* inst)
+        IRInst* getOutsideASM(IRInst* beforeInst) override
         {
-            bool result = false;
-            if (m_mapGlobalInstToShouldInline.tryGetValue(inst, result))
-                return result;
-            result = shouldInlineInstImpl(inst);
-            m_mapGlobalInstToShouldInline[inst] = result;
-            return result;
-        }
-
-        IRInst* inlineInst(IRBuilder& builder, IRCloneEnv& cloneEnv, IRInst* inst)
-        {
-            IRInst* result;
-            if (cloneEnv.mapOldValToNew.tryGetValue(inst, result))
-                return result;
-
-            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            auto parent = beforeInst->getParent();
+            while (parent)
             {
-                auto operand = inst->getOperand(i);
-                IRBuilder operandBuilder(builder);
-                setInsertBeforeOutsideASM(operandBuilder, builder.getInsertLoc().getInst());
-                maybeInlineGlobalValue(operandBuilder, inst, operand, cloneEnv);
-            }
-            result = cloneInstAndOperands(&cloneEnv, &builder, inst);
-            cloneEnv.mapOldValToNew[inst] = result;
-            IRBuilder subBuilder(builder);
-            subBuilder.setInsertInto(result);
-            for (auto child : inst->getDecorations())
-            {
-                cloneInst(&cloneEnv, &subBuilder, child);
-            }
-            for (auto child : inst->getChildren())
-            {
-                inlineInst(subBuilder, cloneEnv, child);
-            }
-            return result;
-        }
-
-        /// Inline `inst` in the local function body so they can be emitted as a local inst.
-        ///
-        IRInst* maybeInlineGlobalValue(
-            IRBuilder& builder,
-            IRInst* user,
-            IRInst* inst,
-            IRCloneEnv& cloneEnv)
-        {
-            if (!shouldInlineInst(inst))
-            {
-                switch (inst->getOp())
+                if (as<IRSPIRVAsm>(parent))
                 {
-                case kIROp_Func:
-                case kIROp_Specialize:
-                case kIROp_Generic:
-                case kIROp_LookupWitness:
-                    return inst;
+                    return parent;
                 }
-                if (as<IRType>(inst))
-                    return inst;
-
-                // If we encounter a global value that shouldn't be inlined, e.g. a const literal,
-                // we should insert a GlobalValueRef() inst to wrap around it, so all the dependent
-                // uses can be pinned to the function body.
-                auto result = inst;
-                bool shouldWrapGlobalRef = true;
-                if (!isLegalGlobalInst(user) && !getIROpInfo(user->getOp()).isHoistable())
-                    shouldWrapGlobalRef = false;
-                else if (as<IRSPIRVAsmOperand>(user) && as<IRSPIRVAsmOperandInst>(user))
-                    shouldWrapGlobalRef = false;
-                else if (as<IRSPIRVAsmInst>(user))
-                    shouldWrapGlobalRef = false;
-                if (shouldWrapGlobalRef)
-                    result = builder.emitGlobalValueRef(inst);
-                cloneEnv.mapOldValToNew[inst] = result;
-                return result;
+                parent = parent->getParent();
             }
-
-            // If the global value is inlinable, we make all its operands avaialble locally, and
-            // then copy it to the local scope.
-            return inlineInst(builder, cloneEnv, inst);
+            return beforeInst;
         }
     };
 
@@ -1896,7 +1643,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 processRWStructuredBufferStore(inst);
                 break;
             case kIROp_NonUniformResourceIndex:
-                processNonUniformResourceIndex(inst);
+                processNonUniformResourceIndex(inst, NonUniformResourceIndexFloatMode::SPIRV);
                 break;
             case kIROp_loop:
                 processLoop(as<IRLoop>(inst));
@@ -1963,21 +1710,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
             }
         }
-    }
-
-    static void setInsertBeforeOutsideASM(IRBuilder& builder, IRInst* beforeInst)
-    {
-        auto parent = beforeInst->getParent();
-        while (parent)
-        {
-            if (as<IRSPIRVAsm>(parent))
-            {
-                builder.setInsertBefore(parent);
-                return;
-            }
-            parent = parent->getParent();
-        }
-        builder.setInsertBefore(beforeInst);
     }
 
     void determineSpirvVersion()
@@ -2160,11 +1892,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             t->replaceUsesWith(lowered);
         }
 
-        // Inline global values that can't represented by SPIRV constant inst
-        // to their use sites.
-        List<IRUse*> globalInstUsesToInline;
-        GlobalInstInliningContext globalInstInliningContext;
-
         for (auto globalInst : m_module->getGlobalInsts())
         {
             if (auto func = as<IRFunc>(globalInst))
@@ -2178,28 +1905,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // true.
                 sortBlocksInFunc(func);
             }
-
-            if (globalInstInliningContext.isInlinableGlobalInst(globalInst))
-            {
-                for (auto use = globalInst->firstUse; use; use = use->nextUse)
-                {
-                    if (getParentFunc(use->getUser()) != nullptr)
-                        globalInstUsesToInline.add(use);
-                }
-            }
         }
 
-        for (auto use : globalInstUsesToInline)
-        {
-            auto user = use->getUser();
-            IRBuilder builder(user);
-            setInsertBeforeOutsideASM(builder, user);
-            IRCloneEnv cloneEnv;
-            auto val = globalInstInliningContext
-                           .maybeInlineGlobalValue(builder, use->getUser(), use->get(), cloneEnv);
-            if (val != use->get())
-                builder.replaceOperand(use, val);
-        }
+        GlobalInstInliningContext().inlineGlobalValuesAndRemoveIfUnused(m_module);
 
         // Some legalization processing may change the function parameter types,
         // so we need to update the function types to match that.
@@ -2224,6 +1932,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // Specalize address space for all pointers.
         SpirvAddressSpaceAssigner addressSpaceAssigner;
         specializeAddressSpace(m_module, &addressSpaceAssigner);
+
+        // For SPIR-V, we don't skip this validation, because we might then be generating invalid
+        // SPIR-V.
+        bool skipFuncParamValidation = false;
+        validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
     }
 
     void updateFunctionTypes()

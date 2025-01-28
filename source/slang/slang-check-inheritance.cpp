@@ -76,7 +76,7 @@ bool SharedSemanticsContext::_checkForCircularityInExtensionTargetType(
 
 InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
     DeclRef<Decl> declRef,
-    DeclRefType* declRefType,
+    Type* selfType,
     InheritanceCircularityInfo* circularityInfo)
 {
     // Just as with `Type`s, we cache and re-use the inheritance
@@ -95,7 +95,7 @@ InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
     //
     m_mapDeclRefToInheritanceInfo[declRef] = InheritanceInfo();
 
-    auto info = _calcInheritanceInfo(declRef, declRefType, circularityInfo);
+    auto info = _calcInheritanceInfo(declRef, selfType, circularityInfo);
     m_mapDeclRefToInheritanceInfo[declRef] = info;
 
     getSession()->m_typeDictionarySize = Math::Max(
@@ -154,7 +154,7 @@ DeclRef<GenericDecl> SharedSemanticsContext::getDependentGenericParent(DeclRef<D
 
 InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     DeclRef<Decl> declRef,
-    DeclRefType* declRefType,
+    Type* selfType,
     InheritanceCircularityInfo* circularityInfo)
 {
     // This method is the main engine for computing linearized inheritance
@@ -200,14 +200,6 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     //
     FacetList::Builder allFacets;
 
-    // It is possible that `declRef` is itself a type declaration,
-    // in which case `declRefType` will be the coresponding type.
-    // However, if `declRef` is an `extension` declaration, we
-    // will extract the type that the extension applies to, so
-    // that we can have a consistent "self type" to represent
-    // the type that is at the root of the inheritance list.
-    //
-    Type* selfType = declRefType;
     Facet::Kind selfFacetKind = Facet::Kind::Type;
 
     auto astBuilder = _getASTBuilder();
@@ -474,10 +466,14 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             if (constraintDeclRef.getDecl()->checkState.isBeingChecked())
                 continue;
 
-            ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::CanSpecializeGeneric);
+            ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::ScopesWired);
 
-            auto subType = getSub(astBuilder, constraintDeclRef);
-            auto superType = getSup(astBuilder, constraintDeclRef);
+            // Check only the sub-type.
+            visitor.CheckConstraintSubType(constraintDeclRef.getDecl()->sub);
+            auto sub = constraintDeclRef.getDecl()->sub;
+            if (!sub.type)
+                sub = visitor.TranslateTypeNodeForced(sub);
+            auto subType = constraintDeclRef.substitute(astBuilder, sub.type);
 
             // We only consider constraints where the type represented
             // by `declRef` is the subtype, since those
@@ -496,6 +492,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             }
             if (subDeclRefType->getDeclRef() != declRef)
                 continue;
+
+            // Further check the constraint, since we now need the sup-type.
+            ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::CanSpecializeGeneric);
+
+            auto superType = getSup(astBuilder, constraintDeclRef);
 
             // Because the constraint is a declared inheritance relationship,
             // adding the base to our list of direct bases is as straightforward
@@ -1043,6 +1044,13 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         //
         return _getInheritanceInfo(declRefType->getDeclRef(), declRefType, circularityInfo);
     }
+    else if (auto extractExistentialType = as<ExtractExistentialType>(type))
+    {
+        return _getInheritanceInfo(
+            extractExistentialType->getThisTypeDeclRef(),
+            extractExistentialType,
+            circularityInfo);
+    }
     else if (auto conjunctionType = as<AndType>(type))
     {
         // In this case, we have a type of the form `L & R`,
@@ -1149,6 +1157,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         InheritanceInfo info;
         info.facets = FacetList(directFacet);
         return info;
+    }
+    else if (auto modifiedType = as<ModifiedType>(type))
+    {
+        return _calcInheritanceInfo(modifiedType->getBase(), circularityInfo);
     }
     else
     {

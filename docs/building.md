@@ -152,6 +152,7 @@ See the [documentation on testing](../tools/slang-test/README.md) for more infor
 | `SLANG_VERSION`                   | Latest `v*` tag            | The project version, detected using git if available                                         |
 | `SLANG_EMBED_CORE_MODULE`         | `TRUE`                     | Build slang with an embedded version of the core module                                      |
 | `SLANG_EMBED_CORE_MODULE_SOURCE`  | `TRUE`                     | Embed the core module source in the binary                                                   |
+| `SLANG_ENABLE_DXIL`               | `TRUE`                     | Enable generating DXIL using DXC                                                             |
 | `SLANG_ENABLE_ASAN`               | `FALSE`                    | Enable ASAN (address sanitizer)                                                              |
 | `SLANG_ENABLE_FULL_IR_VALIDATION` | `FALSE`                    | Enable full IR validation (SLOW!)                                                            |
 | `SLANG_ENABLE_IR_BREAK_ALLOC`     | `FALSE`                    | Enable IR BreakAlloc functionality for debugging.                                            |
@@ -164,6 +165,7 @@ See the [documentation on testing](../tools/slang-test/README.md) for more infor
 | `SLANG_ENABLE_EXAMPLES`           | `TRUE`                     | Enable example targets, requires SLANG_ENABLE_GFX                                            |
 | `SLANG_LIB_TYPE`                  | `SHARED`                   | How to build the slang library                                                               |
 | `SLANG_ENABLE_RELEASE_DEBUG_INFO` | `TRUE`                     | Enable generating debug info for Release configs                                             |
+| `SLANG_ENABLE_RELEASE_LTO`        | `TRUE`                     | Enable LTO for Release builds                                                                |
 | `SLANG_ENABLE_SPLIT_DEBUG_INFO`   | `TRUE`                     | Enable generating split debug info for Debug and RelWithDebInfo configs                      |
 | `SLANG_SLANG_LLVM_FLAVOR`         | `FETCH_BINARY_IF_POSSIBLE` | How to set up llvm support                                                                   |
 | `SLANG_SLANG_LLVM_BINARY_URL`     | System dependent           | URL specifying the location of the slang-llvm prebuilt library                               |

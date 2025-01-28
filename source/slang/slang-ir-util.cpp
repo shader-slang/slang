@@ -105,6 +105,8 @@ IROp getTypeStyle(IROp op)
     case kIROp_UInt64Type:
     case kIROp_IntPtrType:
     case kIROp_UIntPtrType:
+    case kIROp_Int8x4PackedType:
+    case kIROp_UInt8x4PackedType:
         {
             // All int like
             return kIROp_IntType;
@@ -140,6 +142,8 @@ IROp getTypeStyle(BaseType op)
     case BaseType::UInt:
     case BaseType::UInt64:
     case BaseType::UIntPtr:
+    case BaseType::Int8x4Packed:
+    case BaseType::UInt8x4Packed:
         return kIROp_IntType;
     case BaseType::Half:
     case BaseType::Float:
@@ -271,6 +275,31 @@ bool isSimpleHLSLDataType(IRInst* inst)
     // https://github.com/shader-slang/slang/issues/4792
     SLANG_UNUSED(inst);
     return true;
+}
+
+bool isWrapperType(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_ArrayType:
+    case kIROp_TextureType:
+    case kIROp_VectorType:
+    case kIROp_MatrixType:
+    case kIROp_PtrType:
+    case kIROp_RefType:
+    case kIROp_ConstRefType:
+    case kIROp_HLSLStructuredBufferType:
+    case kIROp_HLSLRWStructuredBufferType:
+    case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+    case kIROp_HLSLAppendStructuredBufferType:
+    case kIROp_HLSLConsumeStructuredBufferType:
+    case kIROp_TupleType:
+    case kIROp_OptionalType:
+    case kIROp_TypePack:
+        return true;
+    default:
+        return false;
+    }
 }
 
 SourceLoc findFirstUseLoc(IRInst* inst)
@@ -444,6 +473,12 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         break;
     case kIROp_UIntPtrType:
         sb << "uintptr";
+        break;
+    case kIROp_Int8x4PackedType:
+        sb << "int8_t4_packed";
+        break;
+    case kIROp_UInt8x4PackedType:
+        sb << "uint8_t4_packed";
         break;
     case kIROp_CharType:
         sb << "char";
@@ -1735,6 +1770,10 @@ UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
         return UnownedStringSlice::fromLiteral("uint64");
     case kIROp_UIntPtrType:
         return UnownedStringSlice::fromLiteral("uintptr");
+    case kIROp_Int8x4PackedType:
+        return UnownedStringSlice::fromLiteral("int8_t4_packed");
+    case kIROp_UInt8x4PackedType:
+        return UnownedStringSlice::fromLiteral("uint8_t4_packed");
     case kIROp_FloatType:
         return UnownedStringSlice::fromLiteral("float");
     case kIROp_HalfType:
@@ -1932,6 +1971,126 @@ IRType* getIRVectorBaseType(IRType* type)
     if (type->getOp() != kIROp_VectorType)
         return type;
     return as<IRVectorType>(type)->getElementType();
+}
+
+Int getSpecializationConstantId(IRGlobalParam* param)
+{
+    auto layout = findVarLayout(param);
+    if (!layout)
+        return 0;
+
+    auto offset = layout->findOffsetAttr(LayoutResourceKind::SpecializationConstant);
+    if (!offset)
+        return 0;
+
+    return offset->getOffset();
+}
+
+void legalizeDefUse(IRGlobalValueWithCode* func)
+{
+    auto dom = computeDominatorTree(func);
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getModifiableChildren())
+        {
+            // Inspect all uses of `inst` and find the common dominator of all use sites.
+            IRBlock* commonDominator = block;
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                if (!userBlock)
+                    continue;
+                while (commonDominator && !dom->dominates(commonDominator, userBlock))
+                {
+                    commonDominator = dom->getImmediateDominator(commonDominator);
+                }
+            }
+            SLANG_ASSERT(commonDominator);
+
+            if (commonDominator == block)
+                continue;
+
+            // If the common dominator is not `block`, it means we have detected
+            // uses that is no longer dominated by the current definition, and need
+            // to be fixed.
+
+            // Normally, we can simply move the definition to the common dominator.
+            // An exception is when the common dominator is the target block of a
+            // loop. Note that after normalization, loops are in the form of:
+            // ```
+            // loop { if (condition) block; else break; }
+            // ```
+            // If we find ourselves needing to make the inst available right before
+            // the `if`, it means we are seeing uses of the inst outside the loop.
+            // In this case, we should insert a var/move the inst before the loop
+            // instead of before the `if`. This situation can occur in the IR if
+            // the original code is lowered from a `do-while` loop.
+            for (auto use = commonDominator->firstUse; use; use = use->nextUse)
+            {
+                if (auto loopUser = as<IRLoop>(use->getUser()))
+                {
+                    if (loopUser->getTargetBlock() == commonDominator)
+                    {
+                        bool shouldMoveToHeader = false;
+                        // Check that the break-block dominates any of the uses are past the break
+                        // block
+                        for (auto _use = inst->firstUse; _use; _use = _use->nextUse)
+                        {
+                            if (dom->dominates(
+                                    loopUser->getBreakBlock(),
+                                    _use->getUser()->getParent()))
+                            {
+                                shouldMoveToHeader = true;
+                                break;
+                            }
+                        }
+
+                        if (shouldMoveToHeader)
+                            commonDominator = as<IRBlock>(loopUser->getParent());
+                        break;
+                    }
+                }
+            }
+            // Now we can legalize uses based on the type of `inst`.
+            if (auto var = as<IRVar>(inst))
+            {
+                // If inst is an var, this is easy, we just move it to the
+                // common dominator.
+                var->insertBefore(commonDominator->getTerminator());
+            }
+            else
+            {
+                // For all other insts, we need to create a local var for it,
+                // and replace all uses with a load from the local var.
+                IRBuilder builder(func);
+                builder.setInsertBefore(commonDominator->getTerminator());
+                IRVar* tempVar = builder.emitVar(inst->getFullType());
+                auto defaultVal = builder.emitDefaultConstruct(inst->getFullType());
+                builder.emitStore(tempVar, defaultVal);
+
+                builder.setInsertAfter(inst);
+                builder.emitStore(tempVar, inst);
+
+                traverseUses(
+                    inst,
+                    [&](IRUse* use)
+                    {
+                        auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                        if (!userBlock)
+                            return;
+                        // Only fix the use of the current definition of `inst` does not
+                        // dominate it.
+                        if (!dom->dominates(block, userBlock))
+                        {
+                            // Replace the use with a load of tempVar.
+                            builder.setInsertBefore(use->getUser());
+                            auto load = builder.emitLoad(tempVar);
+                            builder.replaceOperand(use, load);
+                        }
+                    });
+            }
+        }
+    }
 }
 
 } // namespace Slang

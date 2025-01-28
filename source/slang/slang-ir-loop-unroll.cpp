@@ -463,6 +463,9 @@ bool unrollLoopsInFunc(
 
     for (auto loop : loops)
     {
+        if (!loop->parent)
+            continue;
+
         // Remove any continue jumps from the loop.
         eliminateContinueBlocks(module, loop);
 

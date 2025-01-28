@@ -90,6 +90,10 @@ public:
     static size_t decodeStruct(
         const uint8_t* buffer,
         int64_t bufferSize,
+        ValueDecoder<SlangGlobalSessionDesc>& sessionDesc);
+    static size_t decodeStruct(
+        const uint8_t* buffer,
+        int64_t bufferSize,
         ValueDecoder<slang::SessionDesc>& sessionDesc);
     static size_t decodeStruct(
         const uint8_t* buffer,

@@ -1025,26 +1025,24 @@ static Modifier* parseUncheckedGLSLLayoutAttribute(Parser* parser, NameLoc& name
 
     UncheckedGLSLLayoutAttribute* attr;
 
-    if (nameLoc.name->text == "binding")
-    {
-        // An explicit type for binding is used so that it can be looked up quickly
-        // through the list builder when implicitly injecting an offset qualifier.
-        attr = parser->astBuilder->create<UncheckedGLSLBindingLayoutAttribute>();
-    }
-    else if (nameLoc.name->text == "offset")
-    {
-        // An explicit type for offset is used so that it can be looked up quickly
-        // through the list builder when implicitly injecting an offset qualifier.
-        attr = parser->astBuilder->create<UncheckedGLSLOffsetLayoutAttribute>();
-    }
-    else if (nameLoc.name->text == "set")
-    {
-        attr = parser->astBuilder->create<UncheckedGLSLSetLayoutAttribute>();
-    }
+#define CASE(key, ResultType)                            \
+    if (nameLoc.name->text == #key)                      \
+    {                                                    \
+        attr = parser->astBuilder->create<ResultType>(); \
+    }                                                    \
     else
+
+    CASE(binding, UncheckedGLSLBindingLayoutAttribute)
+    CASE(set, UncheckedGLSLSetLayoutAttribute)
+    CASE(offset, UncheckedGLSLOffsetLayoutAttribute)
+    CASE(input_attachment_index, UncheckedGLSLInputAttachmentIndexLayoutAttribute)
+    CASE(location, UncheckedGLSLLocationLayoutAttribute)
+    CASE(index, UncheckedGLSLIndexLayoutAttribute)
+    CASE(constant_id, UncheckedGLSLConstantIdAttribute)
     {
         attr = parser->astBuilder->create<UncheckedGLSLLayoutAttribute>();
     }
+#undef CASE
 
     attr->keywordName = nameLoc.name;
     attr->loc = nameLoc.loc;
@@ -1804,9 +1802,17 @@ public:
 /// Parse an optional body statement for a declaration that can have a body.
 static Stmt* parseOptBody(Parser* parser)
 {
-    if (AdvanceIf(parser, TokenType::Semicolon))
+    Token semiColonToken;
+    if (AdvanceIf(parser, TokenType::Semicolon, &semiColonToken))
     {
         // empty body
+        // if we see a `{` after a `;`, it is very likely an user error to
+        // have the `;`, so we will provide a better diagnostic for it.
+        if (peekTokenType(parser) == TokenType::LBrace)
+        {
+            parser->sink->diagnose(semiColonToken.loc, Diagnostics::unexpectedBodyAfterSemicolon);
+            return parser->parseBlockStatement();
+        }
         return nullptr;
     }
     else
@@ -2337,6 +2343,7 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
         case TokenType::Dot:
         case TokenType::LParent:
         case TokenType::RParent:
+        case TokenType::LBracket:
         case TokenType::RBracket:
         case TokenType::Colon:
         case TokenType::Comma:
@@ -3361,6 +3368,16 @@ static Decl* ParseBufferBlockDecl(
         reflectionNameModifier->nameAndLoc = bufferVarDecl->nameAndLoc;
         parser->ReadToken(TokenType::Semicolon);
     }
+    else if (
+        parser->options.allowGLSLInput && parser->LookAheadToken(TokenType::Identifier) &&
+        parser->LookAheadToken(TokenType::LBracket, 1))
+    {
+        // GLSL bindless buffers are denoted with [] after the name.
+        bufferVarDecl->nameAndLoc = ParseDeclName(parser);
+        bufferVarDecl->type.exp = parseBracketTypeSuffix(parser, bufferVarDecl->type.exp);
+        reflectionNameModifier->nameAndLoc = bufferVarDecl->nameAndLoc;
+        parser->ReadToken(TokenType::Semicolon);
+    }
     else
     {
         // Otherwise, we need to generate a name for the buffer variable.
@@ -3923,28 +3940,38 @@ static void parseStorageDeclBody(Parser* parser, ContainerDecl* decl)
 
 static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
 {
-    SubscriptDecl* decl = parser->astBuilder->create<SubscriptDecl>();
-    parser->FillPosition(decl);
-    parser->PushScope(decl);
+    return parseOptGenericDecl(
+        parser,
+        [&](GenericDecl* genericParent)
+        {
+            SubscriptDecl* decl = parser->astBuilder->create<SubscriptDecl>();
+            parser->FillPosition(decl);
+            parser->PushScope(decl);
 
-    // TODO: the use of this name here is a bit magical...
-    decl->nameAndLoc.name = getName(parser, "operator[]");
+            // TODO: the use of this name here is a bit magical...
+            decl->nameAndLoc.name = getName(parser, "operator[]");
 
-    parseParameterList(parser, decl);
+            parseParameterList(parser, decl);
 
-    if (AdvanceIf(parser, TokenType::RightArrow))
-    {
-        decl->returnType = parser->ParseTypeExp();
-    }
-    else
-    {
-        decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
-    }
+            if (AdvanceIf(parser, TokenType::RightArrow))
+            {
+                decl->returnType = parser->ParseTypeExp();
+            }
+            else
+            {
+                decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
+            }
 
-    parseStorageDeclBody(parser, decl);
+            auto funcScope = parser->currentScope;
+            parser->PopScope();
+            maybeParseGenericConstraints(parser, genericParent);
+            parser->PushScope(funcScope);
 
-    parser->PopScope();
-    return decl;
+            parseStorageDeclBody(parser, decl);
+
+            parser->PopScope();
+            return decl;
+        });
 }
 
 /// Peek in the token stream and return `true` if it looks like a modern-style variable declaration
@@ -4636,14 +4663,6 @@ static void CompleteDecl(
     ContainerDecl* containerDecl,
     Modifiers modifiers)
 {
-
-    // If this is a namespace and already added, we don't want to add to the parent
-    // Or add any modifiers
-    if (as<NamespaceDecl>(decl) && decl->parentDecl)
-    {
-        return;
-    }
-
     // Add any modifiers we parsed before the declaration to the list
     // of modifiers on the declaration itself.
     //
@@ -4699,6 +4718,13 @@ static void CompleteDecl(
                         declToModify->astNodeType);
                 }
             }
+        }
+
+        // If this is a namespace and already added, we don't want to add to the parent
+        // Or add any modifiers
+        if (as<NamespaceDecl>(decl) && decl->parentDecl)
+        {
+            return;
         }
 
         if (!as<GenericDecl>(containerDecl))
@@ -4823,6 +4849,13 @@ static DeclBase* ParseDeclWithModifiers(
             // We shouldn't be seeing an LBrace or an LParent when expecting a decl.
             // However recovery logic may lead us here. In this case we just
             // skip the whole `{}` block and return an empty decl.
+            if (!parser->isRecovering)
+            {
+                parser->sink->diagnose(
+                    loc,
+                    Diagnostics::unexpectedToken,
+                    parser->tokenReader.peekToken());
+            }
             SkipBalancedToken(&parser->tokenReader);
             decl = parser->astBuilder->create<EmptyDecl>();
             decl->loc = loc;
@@ -7523,12 +7556,6 @@ static IRFloatingPointValue _foldFloatPrefixOp(TokenType tokenType, IRFloatingPo
 
 static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
 {
-    const auto slangIdentOperand = [&](auto flavor)
-    {
-        auto token = parser->tokenReader.peekToken();
-        return SPIRVAsmOperand{flavor, token, parseAtomicExpr(parser)};
-    };
-
     const auto slangTypeExprOperand = [&](auto flavor)
     {
         auto tok = parser->tokenReader.peekToken();
@@ -7665,12 +7692,13 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
     // A &foo variable reference (for the address of foo)
     else if (AdvanceIf(parser, TokenType::OpBitAnd))
     {
-        return slangIdentOperand(SPIRVAsmOperand::SlangValueAddr);
+        Expr* expr = parsePostfixExpr(parser);
+        return SPIRVAsmOperand{SPIRVAsmOperand::SlangValueAddr, Token{}, expr};
     }
     // A $foo variable
     else if (AdvanceIf(parser, TokenType::Dollar))
     {
-        Expr* expr = parseAtomicExpr(parser);
+        Expr* expr = parsePostfixExpr(parser);
         return SPIRVAsmOperand{SPIRVAsmOperand::SlangValue, Token{}, expr};
     }
     // A $$foo type
@@ -8327,6 +8355,26 @@ static NodeBase* parseCUDASMVersionModifier(Parser* parser, void* /*userData*/)
     parser->sink->diagnose(token, Diagnostics::invalidCUDASMVersion);
     return nullptr;
 }
+
+static NodeBase* parseSharedModifier(Parser* parser, void* /*userData*/)
+{
+    Modifier* modifier = nullptr;
+
+    // While in GLSL compatibility mode, 'shared' = 'groupshared' and not the
+    // D3D11 effect syntax.
+    if (parser->options.allowGLSLInput)
+    {
+        modifier = parser->astBuilder->create<HLSLGroupSharedModifier>();
+    }
+    else
+    {
+        modifier = parser->astBuilder->create<HLSLEffectSharedModifier>();
+    }
+    modifier->keywordName = getName(parser, "shared");
+    modifier->loc = parser->tokenReader.peekLoc();
+    return modifier;
+}
+
 static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
 {
     ModifierListBuilder listBuilder;
@@ -8414,7 +8462,9 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
 
         int localSizeIndex = -1;
         if (nameText.startsWith(localSizePrefix) &&
-            nameText.getLength() == SLANG_COUNT_OF(localSizePrefix) - 1 + 1)
+            (nameText.getLength() == SLANG_COUNT_OF(localSizePrefix) - 1 + 1 ||
+             (nameText.endsWith("_id") &&
+              (nameText.getLength() == SLANG_COUNT_OF(localSizePrefix) - 1 + 4))))
         {
             char lastChar = nameText[SLANG_COUNT_OF(localSizePrefix) - 1];
             localSizeIndex = (lastChar >= 'x' && lastChar <= 'z') ? (lastChar - 'x') : -1;
@@ -8428,6 +8478,8 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
                 numThreadsAttrib->args.setCount(3);
                 for (auto& i : numThreadsAttrib->args)
                     i = nullptr;
+                for (auto& b : numThreadsAttrib->axisIsSpecConstId)
+                    b = false;
 
                 // Just mark the loc and name from the first in the list
                 numThreadsAttrib->keywordName = getName(parser, "numthreads");
@@ -8444,6 +8496,11 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
                 }
 
                 numThreadsAttrib->args[localSizeIndex] = expr;
+
+                // We can't resolve the specialization constant declaration
+                // here, because it may not even exist. IDs pointing to unnamed
+                // specialization constants are allowed in GLSL.
+                numThreadsAttrib->axisIsSpecConstId[localSizeIndex] = nameText.endsWith("_id");
             }
         }
         else if (nameText == "derivative_group_quadsNV")
@@ -8455,17 +8512,6 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
         {
             derivativeGroupLinearAttrib =
                 parser->astBuilder->create<GLSLLayoutDerivativeGroupLinearAttribute>();
-        }
-        else if (nameText == "input_attachment_index")
-        {
-            inputAttachmentIndexLayoutAttribute =
-                parser->astBuilder->create<GLSLInputAttachmentIndexLayoutAttribute>();
-            if (AdvanceIf(parser, TokenType::OpAssign))
-            {
-                auto token = parser->ReadToken(TokenType::IntegerLiteral);
-                auto intVal = getIntegerLiteralValue(token);
-                inputAttachmentIndexLayoutAttribute->location = intVal;
-            }
         }
         else if (findImageFormatByName(nameText.getUnownedSlice(), &format))
         {
@@ -8486,11 +8532,9 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
             CASE(push_constant, PushConstantAttribute)
             CASE(shaderRecordNV, ShaderRecordAttribute)
             CASE(shaderRecordEXT, ShaderRecordAttribute)
-            CASE(constant_id, VkConstantIdAttribute)
             CASE(std140, GLSLStd140Modifier)
             CASE(std430, GLSLStd430Modifier)
             CASE(scalar, GLSLScalarModifier)
-            CASE(location, GLSLLocationLayoutModifier)
             {
                 modifier = parseUncheckedGLSLLayoutAttribute(parser, nameAndLoc);
             }
@@ -8499,21 +8543,6 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
 
             modifier->keywordName = nameAndLoc.name;
             modifier->loc = nameAndLoc.loc;
-
-
-            // Special handling for GLSLLayoutModifier
-            if (auto glslModifier = as<GLSLLayoutModifier>(modifier))
-            {
-                // not all GLSLLayoutModifier subtypes have an OpAssign after
-                if (AdvanceIf(parser, TokenType::OpAssign))
-                    glslModifier->valToken = parser->ReadToken(TokenType::IntegerLiteral);
-            }
-            else if (auto specConstAttr = as<VkConstantIdAttribute>(modifier))
-            {
-                parser->ReadToken(TokenType::OpAssign);
-                specConstAttr->location =
-                    (int)getIntegerLiteralValue(parser->ReadToken(TokenType::IntegerLiteral));
-            }
 
             if (as<GLSLUnparsedLayoutModifier>(modifier))
             {
@@ -8530,23 +8559,31 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
         parser->ReadToken(TokenType::Comma);
     }
 
-#define CASE(key, type)                                                                    \
-    if (AdvanceIf(parser, #key))                                                           \
-    {                                                                                      \
-        auto modifier = parser->astBuilder->create<type>();                                \
-        modifier->location =                                                               \
-            int(getIntegerLiteralValue(listBuilder.find<GLSLLayoutModifier>()->valToken)); \
-        listBuilder.add(modifier);                                                         \
-    }                                                                                      \
+#define CASE(key, type)                                                                         \
+    if (AdvanceIf(parser, #key))                                                                \
+    {                                                                                           \
+        auto modifier = parser->astBuilder->create<type>();                                     \
+        if (const auto locationExpr = listBuilder.find<UncheckedGLSLLocationLayoutAttribute>()) \
+        {                                                                                       \
+            modifier->args.add(locationExpr->args[0]);                                          \
+        }                                                                                       \
+        else                                                                                    \
+        {                                                                                       \
+            auto defaultLocationExpr = parser->astBuilder->create<IntegerLiteralExpr>();        \
+            defaultLocationExpr->value = 0;                                                     \
+            modifier->args.add(defaultLocationExpr);                                            \
+        }                                                                                       \
+        listBuilder.add(modifier);                                                              \
+    }                                                                                           \
     else
 
-    CASE(rayPayloadEXT, VulkanRayPayloadAttribute)
-    CASE(rayPayloadNV, VulkanRayPayloadAttribute)
-    CASE(rayPayloadInEXT, VulkanRayPayloadInAttribute)
-    CASE(rayPayloadInNV, VulkanRayPayloadInAttribute)
-    CASE(hitObjectAttributeNV, VulkanHitObjectAttributesAttribute)
-    CASE(callableDataEXT, VulkanCallablePayloadAttribute)
-    CASE(callableDataInEXT, VulkanCallablePayloadInAttribute) {}
+    CASE(rayPayloadEXT, UncheckedGLSLRayPayloadAttribute)
+    CASE(rayPayloadNV, UncheckedGLSLRayPayloadAttribute)
+    CASE(rayPayloadInEXT, UncheckedGLSLRayPayloadInAttribute)
+    CASE(rayPayloadInNV, UncheckedGLSLRayPayloadInAttribute)
+    CASE(hitObjectAttributeNV, UncheckedGLSLHitObjectAttributesAttribute)
+    CASE(callableDataEXT, UncheckedGLSLCallablePayloadAttribute)
+    CASE(callableDataInEXT, UncheckedGLSLCallablePayloadAttribute) {}
 
 #undef CASE
 
@@ -8774,7 +8811,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("sample", HLSLSampleModifier::kReflectClassInfo),
     _makeParseModifier("centroid", HLSLCentroidModifier::kReflectClassInfo),
     _makeParseModifier("precise", PreciseModifier::kReflectClassInfo),
-    _makeParseModifier("shared", HLSLEffectSharedModifier::kReflectClassInfo),
+    _makeParseModifier("shared", parseSharedModifier),
     _makeParseModifier("groupshared", HLSLGroupSharedModifier::kReflectClassInfo),
     _makeParseModifier("static", HLSLStaticModifier::kReflectClassInfo),
     _makeParseModifier("uniform", HLSLUniformModifier::kReflectClassInfo),

@@ -249,7 +249,7 @@ standard output = {
     "entryPoints": [
         {
             "name": "main",
-            "stage:": "compute",
+            "stage": "compute",
             "parameters": [
                 {
                     "name": "dispatchThreadID",

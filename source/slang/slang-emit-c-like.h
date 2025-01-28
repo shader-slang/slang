@@ -470,7 +470,6 @@ public:
     void emitFrontMatter(TargetRequest* targetReq) { emitFrontMatterImpl(targetReq); }
 
     void emitPreModule() { emitPreModuleImpl(); }
-    void emitPostModule() { emitPostModuleImpl(); }
     void emitModule(IRModule* module, DiagnosticSink* sink)
     {
         m_irModule = module;
@@ -500,10 +499,19 @@ public:
     /// different. Returns an empty slice if not a built in type
     static UnownedStringSlice getDefaultBuiltinTypeName(IROp op);
 
-    /// Finds the IRNumThreadsDecoration and gets the size from that or sets all dimensions to 1
-    static IRNumThreadsDecoration* getComputeThreadGroupSize(
+    /// Finds the IRNumThreadsDecoration and gets the size from that or sets all
+    /// dimensions to 1
+    IRNumThreadsDecoration* getComputeThreadGroupSize(
         IRFunc* func,
         Int outNumThreads[kThreadGroupAxisCount]);
+
+    /// Finds the IRNumThreadsDecoration and gets the size from that or sets all
+    /// dimensions to 1. If specialization constants are used for an axis, their
+    /// IDs is reported in non-negative entries of outSpecializationConstantIds.
+    static IRNumThreadsDecoration* getComputeThreadGroupSize(
+        IRFunc* func,
+        Int outNumThreads[kThreadGroupAxisCount],
+        Int outSpecializationConstantIds[kThreadGroupAxisCount]);
 
     /// Finds the IRWaveSizeDecoration and gets the size from that.
     static IRWaveSizeDecoration* getComputeWaveSize(IRFunc* func, Int* outWaveSize);
@@ -512,6 +520,11 @@ protected:
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* inst) { SLANG_UNUSED(inst); }
     virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual bool doesTargetSupportPtrTypes() { return false; }
+    virtual bool isResourceTypeBindless(IRType* type)
+    {
+        SLANG_UNUSED(type);
+        return false;
+    }
     virtual void emitLayoutSemanticsImpl(
         IRInst* inst,
         char const* uniformSemanticSpelling,
@@ -541,7 +554,6 @@ protected:
     /// For example on targets that don't have built in vector/matrix support, this is where
     /// the appropriate generated declarations occur.
     virtual void emitPreModuleImpl();
-    virtual void emitPostModuleImpl();
 
     virtual void emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator);
     void emitSimpleTypeAndDeclarator(IRType* type, DeclaratorInfo* declarator)
@@ -615,6 +627,11 @@ protected:
         SLANG_UNUSED(baseName);
     }
 
+    bool tryGetIntInfo(IRType* elementType, bool& isSigned, int& bitWidth);
+    void emitVecNOrScalar(IRVectorType* vectorType, std::function<void()> func);
+    virtual void emitBitfieldExtractImpl(IRInst* inst);
+    virtual void emitBitfieldInsertImpl(IRInst* inst);
+
     virtual void emitSubpassInputTypeImpl(IRSubpassInputType* type) { SLANG_UNUSED(type); }
 
     // Again necessary for & prefix intrinsics. May be removable in the future
@@ -671,6 +688,11 @@ protected:
     // one.
     void _emitSwizzleStorePerElement(IRInst* inst);
 
+    String _emitLiteralOneWithType(int bitWidth);
+
+
+    virtual void ensurePrelude(const char* preludeText);
+
     CodeGenContext* m_codeGenContext = nullptr;
     IRModule* m_irModule = nullptr;
 
@@ -712,10 +734,8 @@ protected:
     Dictionary<IRInst*, String> m_mapInstToName;
 
     OrderedHashSet<IRStringLit*> m_requiredPreludes;
-    struct RequiredAfter
-    {
-        String requireComputeDerivatives;
-    } m_requiredAfter;
+
+    Dictionary<const char*, IRStringLit*> m_builtinPreludes;
 };
 
 } // namespace Slang

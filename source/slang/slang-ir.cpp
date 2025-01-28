@@ -1951,6 +1951,20 @@ static T* createInst(
 }
 
 template<typename T>
+static T* createInst(
+    IRBuilder* builder,
+    IROp op,
+    IRType* type,
+    IRInst* arg1,
+    IRInst* arg2,
+    IRInst* arg3,
+    IRInst* arg4)
+{
+    IRInst* args[] = {arg1, arg2, arg3, arg4};
+    return createInstImpl<T>(builder, op, type, 4, &args[0]);
+}
+
+template<typename T>
 static T* createInstWithTrailingArgs(
     IRBuilder* builder,
     IROp op,
@@ -2381,9 +2395,8 @@ IRBlobLit* IRBuilder::getBlobValue(ISlangBlob* blob)
     return static_cast<IRBlobLit*>(_findOrEmitConstant(keyInst));
 }
 
-IRPtrLit* IRBuilder::_getPtrValue(void* data)
+IRPtrLit* IRBuilder::getPtrValue(IRType* type, void* data)
 {
-    auto type = getPtrType(getVoidType());
     IRConstant keyInst;
     memset(&keyInst, 0, sizeof(keyInst));
     keyInst.m_op = kIROp_PtrLit;
@@ -3625,7 +3638,25 @@ IRInst* IRBuilder::emitLookupInterfaceMethodInst(
 IRInst* IRBuilder::emitGetSequentialIDInst(IRInst* rttiObj)
 {
     auto inst = createInst<IRAlloca>(this, kIROp_GetSequentialID, getUIntType(), rttiObj);
+    addInst(inst);
+    return inst;
+}
 
+IRInst* IRBuilder::emitBitfieldExtract(IRType* type, IRInst* value, IRInst* offset, IRInst* bits)
+{
+    auto inst = createInst<IRInst>(this, kIROp_BitfieldExtract, type, value, offset, bits);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitBitfieldInsert(
+    IRType* type,
+    IRInst* base,
+    IRInst* insert,
+    IRInst* offset,
+    IRInst* bits)
+{
+    auto inst = createInst<IRInst>(this, kIROp_BitfieldInsert, type, base, insert, offset, bits);
     addInst(inst);
     return inst;
 }
@@ -3766,6 +3797,8 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
     case kIROp_UIntType:
     case kIROp_UIntPtrType:
     case kIROp_UInt64Type:
+    case kIROp_Int8x4PackedType:
+    case kIROp_UInt8x4PackedType:
     case kIROp_CharType:
         return getIntValue(type, 0);
     case kIROp_BoolType:
@@ -6290,7 +6323,7 @@ IRDecoration* IRBuilder::addDecoration(
 
 void IRBuilder::addHighLevelDeclDecoration(IRInst* inst, Decl* decl)
 {
-    auto ptrConst = _getPtrValue(decl);
+    auto ptrConst = getPtrValue(getPtrType(getVoidType()), decl);
     addDecoration(inst, kIROp_HighLevelDeclDecoration, ptrConst);
 }
 
@@ -7389,6 +7422,8 @@ bool isIntegralType(IRType* t)
         case BaseType::UInt64:
         case BaseType::IntPtr:
         case BaseType::UIntPtr:
+        case BaseType::Int8x4Packed:
+        case BaseType::UInt8x4Packed:
             return true;
         default:
             return false;
@@ -7434,6 +7469,10 @@ IntInfo getIntTypeInfo(const IRType* intType)
         return {32, true};
     case kIROp_Int64Type:
         return {64, true};
+
+    case kIROp_Int8x4PackedType:
+    case kIROp_UInt8x4PackedType:
+        return {32, false};
 
     case kIROp_IntPtrType:  // target platform dependent
     case kIROp_UIntPtrType: // target platform dependent
@@ -7971,7 +8010,7 @@ void IRInst::removeOperand(Index index)
 }
 
 // Remove this instruction from its parent block,
-// and then destroy it (it had better have no uses!)
+// and then destroy it (it had better have no uses, or descendants with uses!)
 void IRInst::removeAndDeallocate()
 {
     removeAndDeallocateAllDecorationsAndChildren();
@@ -8186,8 +8225,14 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_CastPtrToInt:
     case kIROp_CastIntToPtr:
     case kIROp_PtrCast:
+    case kIROp_CastUInt2ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToUInt2:
+    case kIROp_CastDescriptorHandleToResource:
+    case kIROp_GetDynamicResourceHeap:
     case kIROp_CastDynamicResource:
     case kIROp_AllocObj:
+    case kIROp_BitfieldExtract:
+    case kIROp_BitfieldInsert:
     case kIROp_PackAnyValue:
     case kIROp_UnpackAnyValue:
     case kIROp_Reinterpret:
@@ -8201,6 +8246,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetStringHash:
     case kIROp_AllocateOpaqueHandle:
     case kIROp_GetArrayLength:
+    case kIROp_ResolveVaryingInputRef:
+    case kIROp_GetPerVertexInputArray:
+    case kIROp_MetalCastToDepthTexture:
         return false;
 
     case kIROp_ForwardDifferentiate:

@@ -153,6 +153,8 @@ struct AnyValueMarshallingContext
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
         case kIROp_PtrType:
+        case kIROp_Int8x4PackedType:
+        case kIROp_UInt8x4PackedType:
             context->marshalBasicType(builder, dataType, concreteTypedVar);
             break;
         case kIROp_VectorType:
@@ -309,6 +311,8 @@ struct AnyValueMarshallingContext
                     break;
                 }
             case kIROp_UIntType:
+            case kIROp_Int8x4PackedType:
+            case kIROp_UInt8x4PackedType:
 #if SLANG_PTR_IS_32
             case kIROp_UIntPtrType:
 #endif
@@ -371,6 +375,25 @@ struct AnyValueMarshallingContext
                 }
             case kIROp_Int8Type:
             case kIROp_UInt8Type:
+                if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcVal = builder->emitLoad(concreteVar);
+                    srcVal = builder->emitCast(builder->getType(kIROp_UIntType), srcVal);
+                    auto dstAddr = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset]);
+                    auto dstVal = builder->emitLoad(dstAddr);
+                    dstVal = builder->emitBitfieldInsert(
+                        dstVal->getFullType(),
+                        dstVal,
+                        srcVal,
+                        builder->getIntValue(builder->getUIntType(), 8 * intraFieldOffset),
+                        builder->getIntValue(builder->getUIntType(), 8));
+                    builder->emitStore(dstAddr, dstVal);
+                }
+                advanceOffset(1);
+                break;
             case kIROp_UInt64Type:
             case kIROp_Int64Type:
             case kIROp_DoubleType:
@@ -403,7 +426,7 @@ struct AnyValueMarshallingContext
                             uintPtrType,
                             anyValueVar,
                             anyValInfo->fieldKeys[fieldOffset]);
-                        builder->emitStore(dstAddr, lowBits);
+                        builder->emitStore(dstAddr, highBits);
                         fieldOffset++;
                     }
                 }
@@ -537,6 +560,8 @@ struct AnyValueMarshallingContext
                     break;
                 }
             case kIROp_UIntType:
+            case kIROp_Int8x4PackedType:
+            case kIROp_UInt8x4PackedType:
                 {
                     ensureOffsetAt4ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
@@ -594,11 +619,35 @@ struct AnyValueMarshallingContext
                     advanceOffset(2);
                     break;
                 }
+            case kIROp_Int8Type:
+            case kIROp_UInt8Type:
+                if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcAddr = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset]);
+                    auto srcVal = builder->emitLoad(srcAddr);
+                    srcVal = builder->emitBitfieldExtract(
+                        srcVal->getFullType(),
+                        srcVal,
+                        builder->getIntValue(builder->getUIntType(), 8 * intraFieldOffset),
+                        builder->getIntValue(builder->getUIntType(), 8));
+                    if (dataType->getOp() == kIROp_Int8Type)
+                    {
+                        srcVal = builder->emitCast(builder->getType(kIROp_Int8Type), srcVal);
+                    }
+                    else
+                    {
+                        srcVal = builder->emitCast(builder->getType(kIROp_UInt8Type), srcVal);
+                    }
+                    builder->emitStore(concreteVar, srcVal);
+                }
+                advanceOffset(1);
+                break;
             case kIROp_UInt64Type:
             case kIROp_Int64Type:
             case kIROp_DoubleType:
-            case kIROp_Int8Type:
-            case kIROp_UInt8Type:
             case kIROp_PtrType:
 #if SLANG_PTR_IS_64
             case kIROp_IntPtrType:
@@ -812,6 +861,8 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
     case kIROp_FloatType:
     case kIROp_UIntType:
     case kIROp_BoolType:
+    case kIROp_Int8x4PackedType:
+    case kIROp_UInt8x4PackedType:
         return alignUp(offset, 4) + 4;
     case kIROp_UInt64Type:
     case kIROp_Int64Type:
@@ -824,7 +875,7 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
         return alignUp(offset, 2) + 2;
     case kIROp_UInt8Type:
     case kIROp_Int8Type:
-        return -1;
+        return offset + 1;
     case kIROp_VectorType:
         {
             auto vectorType = static_cast<IRVectorType*>(type);

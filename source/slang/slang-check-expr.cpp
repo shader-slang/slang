@@ -312,12 +312,17 @@ static bool isMutableGLSLBufferBlockVarExpr(Expr* expr)
     const auto derefExpr = as<DerefExpr>(expr);
     if (!derefExpr)
         return false;
-    const auto varExpr = as<VarExpr>(derefExpr->base);
+
+    // For SSBO arrays, derefExpr is expected to be IndexExpr instead of VarExpr
+    const auto indexExpr = as<IndexExpr>(derefExpr->base);
+
+    const auto varExpr =
+        indexExpr ? as<VarExpr>(indexExpr->baseExpression) : as<VarExpr>(derefExpr->base);
     // Check the declaration type
     if (!varExpr)
         return false;
 
-    const auto varExprType = varExpr->type->getCanonicalType();
+    const auto varExprType = (indexExpr ? indexExpr->type : varExpr->type)->getCanonicalType();
     const auto ssbt = as<GLSLShaderStorageBufferType>(varExprType);
     if (!ssbt)
         return false;
@@ -506,22 +511,39 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     }
 }
 
-Expr* SemanticsVisitor::ConstructDerefExpr(Expr* base, SourceLoc loc)
+Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, SourceLoc loc)
 {
-    auto elementType = getPointedToTypeIfCanImplicitDeref(base->type);
-    SLANG_ASSERT(elementType);
+    if (auto resPtrType = as<DescriptorHandleType>(base->type))
+    {
+        return coerce(CoercionSite::ExplicitCoercion, resPtrType->getElementType(), base);
+    }
 
     auto derefExpr = m_astBuilder->create<DerefExpr>();
     derefExpr->loc = loc;
     derefExpr->base = base;
     derefExpr->type = QualType(elementType);
 
-    if (as<PtrType>(base->type))
+    if (as<PtrType>(base->type) || as<RefType>(base->type))
+    {
         derefExpr->type.isLeftValue = true;
+    }
     else
+    {
         derefExpr->type.isLeftValue = base->type.isLeftValue;
+        derefExpr->type.isLeftValue = base->type.isLeftValue;
+        derefExpr->type.hasReadOnlyOnTarget = base->type.hasReadOnlyOnTarget;
+        derefExpr->type.isWriteOnly = base->type.isWriteOnly;
+    }
 
     return derefExpr;
+}
+
+Expr* SemanticsVisitor::ConstructDerefExpr(Expr* base, SourceLoc loc)
+{
+    auto elementType = getPointedToTypeIfCanImplicitDeref(base->type);
+    SLANG_ASSERT(elementType);
+
+    return constructDerefExpr(base, elementType, loc);
 }
 
 InvokeExpr* SemanticsVisitor::constructUncheckedInvokeExpr(
@@ -1939,6 +1961,13 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
     // In HLSL, `const` is used to mark compile-time constant expressions.
     if (!decl->hasModifier<ConstModifier>())
         return nullptr;
+
+    // The values of specialization constants aren't known at compile time even
+    // if they're marked `const`.
+    if (decl->hasModifier<SpecializationConstantAttribute>() ||
+        decl->hasModifier<VkConstantIdAttribute>())
+        return nullptr;
+
     if (decl->hasModifier<ExternModifier>())
     {
         // Extern const is not considered compile-time constant by the front-end.
@@ -2289,8 +2318,7 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 
     auto indexExpr = subscriptExpr->indexExprs[0];
 
-    if (!indexExpr->type->equals(m_astBuilder->getIntType()) &&
-        !indexExpr->type->equals(m_astBuilder->getUIntType()))
+    if (!isScalarIntegerType(indexExpr->type.type))
     {
         getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
         return CreateErrorExpr(subscriptExpr);
@@ -3064,7 +3092,8 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
         expr->scope,
         LookupMask::Default,
         false,
-        getDeclToExcludeFromLookup());
+        getDeclToExcludeFromLookup(),
+        getExcludeTransparentMembersFromLookup());
 
     bool diagnosed = false;
     lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
@@ -4072,32 +4101,15 @@ Expr* SemanticsVisitor::maybeDereference(Expr* inExpr, CheckBaseContext checkBas
     for (;;)
     {
         auto baseType = expr->type;
-        QualType elementType;
-        if (auto pointerLikeType = as<PointerLikeType>(baseType))
-        {
-            elementType = QualType(pointerLikeType->getElementType());
-            elementType.isLeftValue = baseType.isLeftValue;
-            elementType.hasReadOnlyOnTarget = baseType.hasReadOnlyOnTarget;
-            elementType.isWriteOnly = baseType.isWriteOnly;
-        }
-        else if (auto ptrType = as<PtrType>(baseType))
+        if (as<PtrType>(baseType))
         {
             if (checkBaseContext == CheckBaseContext::Subscript)
                 return expr;
-            elementType = QualType(ptrType->getValueType());
-            elementType.isLeftValue = true;
         }
-        if (elementType.type)
-        {
-            auto derefExpr = m_astBuilder->create<DerefExpr>();
-            derefExpr->base = expr;
-            derefExpr->type = elementType;
-
-            expr = derefExpr;
-            continue;
-        }
-        // Default case: just use the expression as-is
-        return expr;
+        auto elementType = getPointedToTypeIfCanImplicitDeref(baseType);
+        if (!elementType)
+            return expr;
+        expr = constructDerefExpr(expr, elementType, inExpr->loc);
     }
 }
 
@@ -4718,8 +4730,12 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
             handleLeafCase(nsType->getDeclRef(), nsType);
         else if (auto aggType = as<DeclRefType>(e->type))
             handleLeafCase(aggType->getDeclRef(), aggType);
-        else if (auto typetype = as<TypeType>(e->type))
-            handleLeafCase(DeclRef<Decl>(), typetype->getType());
+        else if (as<TypeType>(e->type))
+        {
+            auto properType = CoerceToProperType(TypeExp(e));
+            if (properType.type)
+                handleLeafCase(DeclRef<Decl>(), properType.type);
+        }
     };
 
     auto& baseType = baseExpression->type;
@@ -5299,6 +5315,10 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     // We will iterate over all the operands in all the insts and check
     // them
     bool failed = false;
+
+    // Track %id's that have been defined in this asm block.
+    HashSet<Name*> definedIds;
+
     for (auto& inst : expr->insts)
     {
         // It's not automatically a failure to not have info, we just won't
@@ -5314,6 +5334,52 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                 inst.opcode.token,
                 0);
             continue;
+        }
+        int resultIdIndex = -1;
+        if (opInfo)
+        {
+            resultIdIndex = opInfo->resultIdIndex;
+        }
+        else if (inst.opcode.flavor == SPIRVAsmOperand::TruncateMarker)
+        {
+            // If this is __truncate, register the result id in the third operand.
+            resultIdIndex = 1;
+        }
+        else
+        {
+            // If there is no opInfo, just register all Ids as defined.
+            for (auto& operand : inst.operands)
+            {
+                if (operand.flavor == SPIRVAsmOperand::Id)
+                {
+                    definedIds.add(operand.token.getName());
+                }
+            }
+        }
+
+        // Register result ID.
+        if (resultIdIndex != -1)
+        {
+            if (inst.operands.getCount() <= resultIdIndex)
+            {
+                failed = true;
+                getSink()->diagnose(
+                    inst.opcode.token,
+                    Diagnostics::spirvInstructionWithNotEnoughOperands,
+                    inst.opcode.token);
+                continue;
+            }
+            auto& resultIdOperand = inst.operands[resultIdIndex];
+
+            if (!definedIds.add(resultIdOperand.token.getName()))
+            {
+                failed = true;
+                getSink()->diagnose(
+                    inst.opcode.token,
+                    Diagnostics::spirvIdRedefinition,
+                    inst.opcode.token);
+                continue;
+            }
         }
 
         const bool isLast = &inst == &expr->insts.getLast();
@@ -5425,6 +5491,18 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                         return;
                     }
                     operand.knownValue = builtinVarKind.value();
+                }
+                else if (operand.flavor == SPIRVAsmOperand::Id)
+                {
+                    if (!definedIds.contains(operand.token.getName()))
+                    {
+                        failed = true;
+                        getSink()->diagnose(
+                            operand.token,
+                            Diagnostics::spirvUndefinedId,
+                            operand.token);
+                        return;
+                    }
                 }
                 if (operand.bitwiseOrWith.getCount() &&
                     operand.flavor != SPIRVAsmOperand::Literal &&

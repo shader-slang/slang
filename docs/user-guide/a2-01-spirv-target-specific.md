@@ -60,8 +60,8 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_RenderTargetArrayIndex`   | `BuiltIn Layer`                   |
 | `SV_SampleIndex`              | `BuiltIn SampleId`                |
 | `SV_ShadingRate`              | `BuiltIn PrimitiveShadingRateKHR` |
-| `SV_StartVertexLocation`      | `*Not supported*                  |
-| `SV_StartInstanceLocation`    | `*Not supported*                  |
+| `SV_StartVertexLocation`      | `BuiltIn BaseVertex`              |
+| `SV_StartInstanceLocation`    | `BuiltIn BaseInstance`            |
 | `SV_StencilRef`               | `BuiltIn FragStencilRefEXT`       |
 | `SV_Target<N>`                | `Location`                        |
 | `SV_TessFactor`               | `BuiltIn TessLevelOuter`          |
@@ -291,7 +291,7 @@ Another way to put, Slang treats column as row and row as column when targeting 
 
 Due to the swap of row and column in terminology, the matrix multiplication needs to be performed little differently. Slang translates a matrix multiplication, `mul(mat1, mat2)`, to `transpose(mul(transpose(mat2), transpose(mat1)))` when targeting SPIR-V.
 
-Note that the matrix translation explained above is orthogoal to the memory layout of a matrix. The memory layout is related to how CPU places matrix values in the memory and how GPU reads them. It is like how `std140` or `std430` works. DXC by default uses `column_major` memory layout and Slang uses row-major memory layout. For more information about the matrix memory layout, please see [a1-01-matrix-layout](a1-01-matrix-layout.md).
+Note that the matrix translation explained above is orthogonal to the memory layout of a matrix. The memory layout is related to how CPU places matrix values in the memory and how GPU reads them. It is like how `std140` or `std430` works. DXC by default uses `column_major` memory layout and Slang uses row-major memory layout. For more information about the matrix memory layout, please see [a1-01-matrix-layout](a1-01-matrix-layout.md).
 
 
 Legalization

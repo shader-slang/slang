@@ -73,6 +73,7 @@ generator(
 slang_add_target(
     slang-cpp-parser
     STATIC
+    EXPORT_MACRO_PREFIX SLANG
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core compiler-core
     INCLUDE_DIRECTORIES_PUBLIC .
@@ -104,7 +105,7 @@ if(SLANG_ENABLE_GFX)
     #
     slang_add_target(
         platform
-        SHARED
+        ${SLANG_LIB_TYPE}
         EXCLUDE_FROM_ALL
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE
@@ -128,7 +129,7 @@ if(SLANG_ENABLE_GFX)
     #
     slang_add_target(
         gfx
-        SHARED
+        ${SLANG_LIB_TYPE}
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE
             core
@@ -235,6 +236,8 @@ if(SLANG_ENABLE_TESTS)
             slang-llvm
             copy-webgpu_dawn
             copy-slang-tint
+            # See issue 5305.
+            copy-prebuilt-binaries
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )

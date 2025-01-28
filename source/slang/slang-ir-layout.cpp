@@ -128,6 +128,9 @@ static Result _calcSizeAndAlignment(
         BASE(UIntPtr, kPointerSize);
         BASE(Double, 8);
 
+        BASE(Int8x4Packed, 4);
+        BASE(UInt8x4Packed, 4);
+
         // We are currently handling `bool` following the HLSL
         // precednet of storing it in 4 bytes.
         //
@@ -352,6 +355,14 @@ static Result _calcSizeAndAlignment(
     case kIROp_DefaultBufferLayoutType:
         *outSizeAndAlignment = IRSizeAndAlignment(0, 4);
         return SLANG_OK;
+    case kIROp_DescriptorHandleType:
+        {
+            IRBuilder builder(type);
+            builder.setInsertBefore(type);
+            auto uintType = builder.getUIntType();
+            auto uint2Type = builder.getVectorType(uintType, 2);
+            return getSizeAndAlignment(optionSet, rules, uint2Type, outSizeAndAlignment);
+        }
     case kIROp_AttributedType:
         {
             auto attributedType = cast<IRAttributedType>(type);

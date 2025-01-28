@@ -789,12 +789,12 @@ private:
 
     InheritanceInfo _getInheritanceInfo(
         DeclRef<Decl> declRef,
-        DeclRefType* correspondingType,
+        Type* selfType,
         InheritanceCircularityInfo* circularityInfo);
     InheritanceInfo _calcInheritanceInfo(Type* type, InheritanceCircularityInfo* circularityInfo);
     InheritanceInfo _calcInheritanceInfo(
         DeclRef<Decl> declRef,
-        DeclRefType* correspondingType,
+        Type* selfType,
         InheritanceCircularityInfo* circularityInfo);
 
     void getDependentGenericParentImpl(DeclRef<GenericDecl>& genericParent, DeclRef<Decl> declRef);
@@ -1068,6 +1068,15 @@ public:
 
     Decl* getDeclToExcludeFromLookup() { return m_declToExcludeFromLookup; }
 
+    SemanticsContext excludeTransparentMembersFromLookup()
+    {
+        SemanticsContext result(*this);
+        result.m_excludeTransparentMembersFromLookup = true;
+        return result;
+    }
+
+    bool getExcludeTransparentMembersFromLookup() { return m_excludeTransparentMembersFromLookup; }
+
     OrderedHashSet<Type*>* getCapturedTypePacks() { return m_capturedTypePacks; }
 
     GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker()
@@ -1083,6 +1092,8 @@ private:
     ExprLocalScope* m_exprLocalScope = nullptr;
 
     Decl* m_declToExcludeFromLookup = nullptr;
+
+    bool m_excludeTransparentMembersFromLookup = false;
 
 protected:
     // TODO: consider making more of this state `private`...
@@ -1142,6 +1153,12 @@ struct OuterScopeContextRAII
     OuterScopeContextRAII _outerScopeContextRAII(          \
         context,                                           \
         decl->ownedScope ? decl->ownedScope : context->getOuterScope())
+
+struct RequirementSynthesisResult
+{
+    bool suceeded = false;
+    operator bool() const { return suceeded; }
+};
 
 struct SemanticsVisitor : public SemanticsContext
 {
@@ -1262,6 +1279,7 @@ public:
         Expr* originalExpr);
 
     Expr* ConstructDerefExpr(Expr* base, SourceLoc loc);
+    Expr* constructDerefExpr(Expr* base, QualType elementType, SourceLoc loc);
 
     InvokeExpr* constructUncheckedInvokeExpr(Expr* callee, const List<Expr*>& arguments);
 
@@ -1649,6 +1667,8 @@ public:
 
     void visitModifier(Modifier*);
 
+    DeclRef<VarDeclBase> tryGetIntSpecializationConstant(Expr* expr);
+
     AttributeDecl* lookUpAttributeDecl(Name* attributeName, Scope* scope);
 
     bool hasIntArgs(Attribute* attr, int numArgs);
@@ -1741,6 +1761,9 @@ public:
         /// The outer declaration for the conformances being checked (either a type or `extension`
         /// declaration)
         ContainerDecl* parentDecl;
+
+        // An inner diagnostic sink to store diagnostics about why requirement synthesis failed.
+        DiagnosticSink innerSink;
 
         Dictionary<DeclRef<InterfaceDecl>, RefPtr<WitnessTable>> mapInterfaceToWitnessTable;
     };

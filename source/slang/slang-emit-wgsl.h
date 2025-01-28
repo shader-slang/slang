@@ -12,7 +12,11 @@ public:
         : CLikeSourceEmitter(desc)
     {
     }
-
+    virtual bool isResourceTypeBindless(IRType* type) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(type);
+        return true;
+    }
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
         SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(
@@ -57,10 +61,6 @@ public:
     void emit(const AddressSpace addressSpace);
 
     virtual bool shouldFoldInstIntoUseSites(IRInst* inst) SLANG_OVERRIDE;
-    Dictionary<const char*, IRStringLit*> m_builtinPreludes;
-
-protected:
-    void ensurePrelude(const char* preludeText);
 
 private:
     bool maybeEmitSystemSemantic(IRInst* inst);
@@ -70,6 +70,8 @@ private:
         IRType* const elementType,
         const IRIntegerValue& rowCountWGSL,
         const IRIntegerValue& colCountWGSL);
+
+    const char* getWgslImageFormat(IRTextureTypeBase* type);
 
     bool m_f16ExtensionEnabled = false;
 };
