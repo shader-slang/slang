@@ -554,6 +554,8 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
         SLANG_RETURN_ON_FAIL(validatePipelineLayout(pipelineLayout));
 
         vkAPI.vkDestroyPipelineLayout(vkAPI.device, pipelineLayout, nullptr);
+
+        return SLANG_OK;
     }
 
     VulkanAPI vkAPI;
