@@ -2803,7 +2803,7 @@ public:
     ConstructorDecl* _getSynthesizedConstructor(
         StructDecl* structDecl,
         ConstructorDecl::ConstructorFlavor flavor);
-    bool isCStyleType(Type* type);
+    bool isCStyleType(Type* type, HashSet<Type*>& isVisit);
 
     void addVisibilityModifier(Decl* decl, DeclVisibility vis);
 };

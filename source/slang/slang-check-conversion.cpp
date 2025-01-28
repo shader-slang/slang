@@ -217,8 +217,9 @@ ConstructorDecl* SemanticsVisitor::_getSynthesizedConstructor(
     return nullptr;
 }
 
-bool SemanticsVisitor::isCStyleType(Type* type)
+bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
 {
+    isVisit.add(type);
     auto cacheResult = [&](bool result)
     {
         getShared()->cacheCStyleType(type, result);
@@ -266,12 +267,15 @@ bool SemanticsVisitor::isCStyleType(Type* type)
         {
             Type* varType = varDecl->getType();
 
-            // Skip the type if it is a reference to the struct itself.
-            if (varType == type)
-                continue;
+            if (isDeclRefTypeOf<StructDecl>(varType))
+            {
+                // Avoid infinite loop in case of circular reference.
+                if (isVisit.contains(varType))
+                    continue;
+            }
 
             // Recursively check the type of the member.
-            if (!isCStyleType(varType))
+            if (!isCStyleType(varType, isVisit))
                 return cacheResult(false);
         }
     }
@@ -285,7 +289,14 @@ bool SemanticsVisitor::isCStyleType(Type* type)
         }
 
         auto elementType = arrayType->getElementType();
-        if (!isCStyleType(elementType))
+        if (isDeclRefTypeOf<StructDecl>(elementType))
+        {
+            // Avoid infinite loop in case of circular reference.
+            if (isVisit.contains(elementType))
+                cacheResult(true);
+        }
+
+        if (!isCStyleType(elementType, isVisit))
             return cacheResult(false);
     }
     return cacheResult(true);
@@ -322,7 +333,8 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
         // back to legacy initializer list logic.
         if (!fromInitializerListExpr->useCStyleInitialization)
         {
-            if (!isCStyleType(toType))
+            HashSet<Type*> isVisit;
+            if (!isCStyleType(toType, isVisit))
                 return false;
         }
 
@@ -339,7 +351,8 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
 
             if (tempSink.getErrorCount())
             {
-                if (!isCStyleType(toType))
+                HashSet<Type*> isVisit;
+                if (!isCStyleType(toType, isVisit))
                 {
                     Slang::ComPtr<ISlangBlob> blob;
                     tempSink.getBlobIfNeeded(blob.writeRef());
@@ -372,7 +385,8 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
                            ConstructorDecl::ConstructorFlavor::SynthesizedDefault))
         return false;
 
-    bool isCStyle = isCStyleType(toType);
+    HashSet<Type*> isVisit;
+    bool isCStyle = isCStyleType(toType, isVisit);
 
     // TODO: This is just a special case for a backwards-compatibility feature
     // for HLSL, this flag will imply that the initializer list is synthesized
