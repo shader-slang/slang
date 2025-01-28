@@ -1,20 +1,118 @@
 
-// Custom Forward Derivative Function reference
+/// `[ForwardDerivative(fwdFn)]` attribute can be used to provide a forward-mode
+/// derivative implementation. 
+/// Invoking `fwd_diff(decoratedFn)` will place a call to `fwdFn` instead of synthesizing
+/// a derivative implementation.  
+/// The same behavior holds if `decoratedFn` is used in a differentiable context.
+///
+/// @remarks
+/// The signature of `fwdFn` must match the expected signature of `fwd_diff(decoratedFn)`. 
+/// See the reference for `fwd_diff` for a full list of signature rules (TODO: Link reference)
+///
+/// @remarks 
+/// See the user guide's section on custom derivatives for an introduction to this approach. (TODO: Link guide)
+///
+/// @remarks
+/// This attribute can be used on generic functions, member functions and accessors.
+/// For generic functions, the generic signatures (parameters + constraints) of both functions
+/// must match exactly.
+/// 
+/// Example:
+/// ```csharp
+/// [ForwardDerivative(foo_fwd)]
+/// T foo<T : IFloat, P : IArray<T>>(T x, P xarr) { /* ... */ }
+///
+/// DifferentialPair<T> foo_fwd<T : IFloat, P : IArray<T>>( // Use the same generic signature for a match.
+///     DifferentialPair<T> x, P dp_xarr) { /* ... */ }
+/// ```
+/// 
+/// For member functions, or functions nested inside namespaces, `fwdFn` may need a fully qualified name.
+///
+/// Example:
+/// ```csharp
+/// namespace A
+/// {
+///     DifferentialPair<float> foo(DifferentialPair<float> x) { /* ... */ }
+/// }
+/// [ForwardDerivative(A.foo)] // Use namespace and/or parent struct names
+/// float bar(float x) { /* ... */ }
+/// ```
+///
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForwardDerivative(function)] : ForwardDerivativeAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [BackwardDerivative(function)] : BackwardDerivativeAttribute;
 
+/// `[PrimalSubstitute(substFn)]` attribute denotes a substitute `substFn` that should be used for 
+/// differentiation instead of the original function. This serves as a sort of 'reference' implementation
+/// where the original function cannot be differentiated (for whatever reason).
+///
+/// @example The following example shows in more detail on how primal substitute affects derivative computation.
+/// ```csharp
+/// [PrimalSubstitute(myFuncSubst)]
+/// float myFunc(float x) { return x*x; }
+///
+/// [Differentiable]
+/// float myFuncSubst(float x) { return x*x*x; }
+///
+/// [Differentiable]
+/// float caller(float x) { return myFunc(x); }
+///
+/// let a = caller(4.0); /// a == 16.0 (calling myFunc)
+/// let b = fwd_diff(caller)(diffPair(4.0, 1.0)).p; /// b == 64.0 (calling myFuncSubst)
+/// let c = fwd_diff(caller)(diffPair(4.0, 1.0)).d; /// c == 48.0 (calling derivative of myFuncSubst)
+/// ```
+/// @remarks
+/// `substFn` must have a function definition (i.e. a body).
+/// 
+/// @remarks
+/// In case that a function has both custom defined derivatives and a differentiable 
+/// primal substitute, the primal substitute overrides the custom defined derivative 
+/// on the original function. All calls to the original function will be translated 
+/// into calls to the primal substitute first, and differentiation step follows after. 
+/// This means that the derivatives of the primal substitute function will be used instead 
+/// of the derivatives defined on the original function.
+///
+/// @remarks
+/// This attribute can be used on generic functions and member functions. 
+/// For generic functions, the generic signatures (parameters + constraints) of both functions
+/// must match exactly.
+/// For member functions, or functions nested inside namespaces, `substFn` should be a fully qualified name.
+/// `substFn`
+/// Example:
+/// ```csharp
+/// namespace A
+/// {
+///     float foo(float x) { /* ... */ }
+/// }
+/// [PrimalSubstitute(A.foo)] // Use namespace and/or parent struct names
+/// float bar(float x) { /* ... */ }
+/// ```
+///
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [PrimalSubstitute(function)] : PrimalSubstituteAttribute;
 
+/// `[ForwardDerivativeOf(fn)]` is the back-reference version of `[ForwardDerivative(derivFn)]`
+///
+/// When used to decorate a function, that function is considered the substitute for the 
+/// referenced `fn`. 
+/// Apart from this difference, the semantics of the substitution are the same as for 
+/// `[ForwardDerivative(derivFn)]`
+///
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForwardDerivativeOf(function)] : ForwardDerivativeOfAttribute;
 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [BackwardDerivativeOf(function)] : BackwardDerivativeOfAttribute;
 
+/// `[PrimalSubstituteOf(fn)]` is the back-reference version of `[PrimalSubstitute(substFn)]`
+///
+/// When used to decorate a function, that function is considered the substitute for the 
+/// referenced `fn`. 
+/// Apart from this difference, the semantics of the substitution are the same as for 
+/// `[PrimalSubstitute(substFn)]`
+///
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [PrimalSubstituteOf(function)] : PrimalSubstituteOfAttribute;
 
