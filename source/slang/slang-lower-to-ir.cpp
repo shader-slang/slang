@@ -12189,7 +12189,9 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         // has been emitted to this module, so that we will have something
         // to decorate.
         //
-        auto irVar = getSimpleVal(context, ensureDecl(context, varDecl.getDecl()));
+        auto irVar = materialize(context, ensureDecl(context, varDecl.getDecl())).val;
+        if (!irVar)
+            SLANG_UNEXPECTED("unhandled value flavor");
 
         auto irLayout = lowerVarLayout(context, varLayout);
 
