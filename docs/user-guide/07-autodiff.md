@@ -409,90 +409,166 @@ void sin_bwd(inout DifferentialPair<float> dpx, float dresult) { /* ... */ }
 ```
 
 User-defined derivatives also work for generic functions, member functions, accessors, and more. 
-See the reference section for the `[ForwardDerivative(fn)]` and `[BackwardDerivative(fn)]` attributes for more
+See the reference section for the `[ForwardDerivative(fn)]` and `[BackwardDerivative(fn)]` attributes for more.
+(TODO: Links)
 
-<!--
-If `derivative` is defined in a different scope from `original`, such as in a different namespace or `struct` type, a fully qualified name is required. For example:
-```csharp
-struct MyType
-{
-    // Implementing derivative function in a different name scope.
-    static DifferentialPair<R> derivative(DifferentialPair<T0> p0, inout DifferentialPair<T1> p1, T2 p2)
-    {
-        ....
-    }
-}
+## Using Auto-diff with Generics
+Automatic differentiation works seamlessly with generically-defined types and methods.
+For generic methods, differentiability of a type is defined either through an explicit `IDifferentiable` constraint or any other
+interface that extends `IDifferentiable`.
 
-// Use fully qualified name in the attribute.
-[ForwardDerivative(MyType.derivative)]
-R original(T0 p0, inout T1, p1, T2 p2);
-```
-
-Sometimes the derivative function needs to be defined in a different module from the original function, or the derivative function cannot be made visible from the original function. In this case, we can use the `[ForwardDerivativeOf(originalFunc)]` attribute to inform the compiler that `originalFunc` should be treated as a forward-differentiable function, and the current function is the derivative implementation of `originalFunc`. The following code will have the same effect to associate `derivative` and the forward-derivative implementation of `original`:
-
-```csharp
-R original(T0 p0, inout T1, p1, T2 p2);
-
-[ForwardDerivativeOf(original)]
-DifferentialPair<R> derivative(DifferentialPair<T0> p0, inout DifferentialPair<T1> p1, T2 p2)
-{
-    ....
-}
-```
-### Automatically Implemented Backward Propagation Functions
-
-A function can be made backward-differentiable with a `[Differentiable]` or `[BackwardDifferentiable]` attribute. This attribute will cause the compiler to automatically implement the backward propagation function. The syntax for using `[Differentiable]` is:
-
+Example for generic methods:
 ```csharp
 [Differentiable]
-R original(T0 p0, inout T1, p1, T2 p2);
-```
+T calcFoo<T : IDifferentiable>(T x) { /* ... */ }
 
-Once the function is made backward-differentiable, the backward propagation function can then be called with the `bwd_diff` operator:
-```csharp
-bwd_diff(original)(...);
-```
+[Differentiable]
+T calcBar<T : __BuiltinFloatingPointType>(T x) { /* ... */ }
 
-### User Defined Backward Propagation Functions
-Similar to user-defined forward derivative functions, the `[BackwardDerivative]` and `[BackwardDerivativeOf]` attributes can be used to supply a function with user defined backward propagation function.
-
-The syntax for using `[BackwardDerivative]` attribute is:
-```csharp
-void back_prop(
-    inout DifferentialPair<T> p0,
-    T1.Differential p1,
-    inout DifferentialPair<T> p2,
-    ND p3,
-    ND p5,
-    DifferentialPtrPair<P> p6,
-    R.Differential dResult)
+[Differentiable]
+void main()
 {
-    ...
-}
+    DifferentialPair<float4> dpa = /* ... */;
 
-[BackwardDerivative(back_prop)]
-R original(T0 p0, inout T1, p1, T2 p2);
-```
+    // Can call with any type that is IDifferentiable. Generic parameters
+    // are inferred like any other call.
+    //
+    bwd_diff(calcFoo)(dpa, float4(1.f));
 
-Similarly, the `[BackwardDerivativeOf]` attribute can be used on the back-prop function in case it is not convenient to modify the definition of the original function, or the back-prop function can't be made visible from the original function:
+    // But you can also be explicit with < >
+    bwd_diff(calcFoo<float4>)(dpa, float4(1.f));
 
-```csharp
-R original(T0 p0, inout T1, p1, T2 p2);
-
-[BackwardDerivativeOf(original)]
-void back_prop(
-    inout DifferentialPair<T> p0,
-    T1.Differential p1,
-    inout DifferentialPair<T> p2,
-    ND p3,
-    ND p5,
-    DifferentialPtrPair<P> p6,
-    R.Differential dResult)
-{
-    ...
+    // x is differentiable for calcBar because 
+    // __BuiltinFloatingPointType : IDifferentiable
+    //
+    DifferentiablePair<double> dpb = /* .. */;
+    bwd_diff(calcBar)(dpb, 1.0);
 }
 ```
--->
+
+You can implement `IDifferentiable` on a generic type. Automatic synthesis still applies and will use
+generic constraints to resolve whether a field is differentiable or not.
+```csharp
+struct Foo<T : IDifferentiable, U> : IDifferentiable
+{
+    T t;
+    U u;
+};
+
+// The synthesized Foo<T, U>.Differential will contain a field for
+// 't' but not 'U'
+//
+```
+
+## Using Auto-diff with Interface Requirements and Interface Types
+For interface requirements, using `[Differentiable]` attribute enforces that any implementation of that method must also be
+differentiable. You can, of course, provide a manual derivative implementation to satisfy the requirement.
+```csharp
+interface IFoo
+{
+    [Differentiable]
+    float calc(float x);
+}
+
+struct FooImpl : IFoo
+{
+    // Implementation via automatic differentiation.
+    [Differentiable]
+    float calc(float x)
+    { /* ... */ }
+}
+
+struct FooImpl2 : IFoo
+{
+    // Implementation via manually providing derivative methods.
+    [ForwardDerivative(FooImpl2.calc_fwd)]
+    [BackwardDerivative(FooImpl2.calc_bwd)]
+    float calc(float x)
+    { /* ... */ }
+
+    DifferentialPair<float> calc_fwd(DifferentialPair<float> x)
+    { /* ... */ }
+
+    void calc_bwd(inout DifferentialPair<float> x, float dresult)
+    { /* ... */ }
+}
+
+[Differentiable]
+void compute(float x, uint obj_id)
+{
+    // Create an instance of either FooImpl1 or FooImpl2
+    IFoo foo = createDynamicObject<IFoo>(obj_id); 
+    
+    // Dynamic dispatch to appropriate 'calc'
+    // Note that foo itself is non-differentiable, and 
+    // has no differential data, but 'x' and 'result'
+    // are.
+    //
+    var result = foo.calc(x);
+}
+```
+
+### Differentiable Interfaces and Associated Types
+> Note: This is an advanced use-case and support is currently experimental.
+You can have an interface or an interface associated type extend `IDifferentiable` and use that to define
+differentiable types or carry differentiable information for the abstract type.
+
+```csharp
+interface IFoo : IDifferentiable
+{
+    associatedtype BaseType : IDifferentiable;
+
+    [Differentiable]
+    BaseType foo(BaseType x);
+};
+
+struct FooImpl1 : IFoo
+{
+    typealias BaseType = double;
+    
+    double factor;
+
+    [Differentiable]
+    double foo(double x) { return factor * x; }
+}
+
+struct FooImpl2 : IFoo
+{
+    typealias BaseType = half;
+
+    half factor;
+
+    [Differentiable]
+    half foo(half x) { return factor * x; }
+}
+
+[Differentiable]
+IFoo makeObj(uint id, float val)
+{
+    if (id == 1)
+        return FooImpl1((double)val);
+    else if (id == 2)
+        return FooImpl2((half)val);
+}
+
+[Differentiable]
+float calc(uint precision, float mul, float x)
+{
+    // Note that since IFoo is differentiable, the 'factor' member
+    // does have a correponding differential.
+    //
+    IFoo obj = makeObj(precision, mul);
+    return obj.foo(x);
+}
+
+// 'calc' provides derivatives for both mul and x and can select its implementation dynamically
+// with 'id'.
+```
+
+Under the hood, Slang will automatically construct an anonymous abstract type to represent the differentials. 
+However, on targets that don't support true dynamic dispatch, these are lowered into tagged unions. 
+While we are working to improve the implementation, this union can currently include all active differential 
+types, rather than just the relevant ones. This can lead to increased memory use.
 
 ## Primal Substitute Functions
 
@@ -531,18 +607,6 @@ float computePixel(Texture2D<float> x, float a, float b)
 ```
 
 Similar to `[ForwardDerivativeOf(fn)]` and `[BackwardDerivativeOf(fn)]` attributes, Slang provides a `[PrimalSubstituteOf(fn)]` attribute that can be used on the substitute function to reference the primal one.
-
-<!--Primal substitute can be used as another way to make a function differentiable. A function is considered differentiable if it has a primal substitute that is differentiable. The following code illustrates this mechanism.
-```csharp
-float myFunc(float x) {...}
-
-[PrimalSubstituteOf(myFunc)]
-[Differentiable]
-float myFuncSubst(float x) {...}
-
-// myFunc is now considered backward differentiable.
-```
--->
 
 ## Working with Mixed Differentiable and Non-Differentiable Code
 
@@ -630,7 +694,7 @@ struct MyType : IDifferentiable
     no_diff float member;
     float someOtherMember;
 }
-[ForwardDifferentiable]
+[Differentiable]
 float f(float x)
 {
     MyType t;
@@ -643,7 +707,7 @@ let result = fwd_diff(f)(diffPair(3.0, 1.0)).d; // result == 0.0
 In this case, we are assigning the value `x*x`, which carries a derivative, into a non-differentiable location `MyType.member`, thus throwing away any derivative info. When `f` returns `t.member`, there will be no derivative associated with it, so the function will not propagate the derivative through. This code is most likely not intending to discard the derivative through the assignment. To help avoid this kind of unintentional behavior, Slang will treat any assignments of a value with derivative info into a non-differentiable location as a compile-time error. To eliminate this error, the user should either make `t.member` differentiable, or to force the assignment by clarifying the intention to discard any derivatives using the built-in `detach` method.
 The following code will compile, and the derivatives will be discarded:
 ```csharp
-[ForwardDifferentiable]
+[Differentiable]
 float f(float x)
 {
     MyType t;
@@ -663,7 +727,7 @@ float g(float x)
     return 2*x;
 }
 
-[ForwardDifferentiable]
+[Differentiable]
 float f(float x)
 {
     // Error: implicit call to non-differentiable function g.
@@ -673,7 +737,7 @@ float f(float x)
 The derivative will not propagate through the call to `g` in `f`. As a result, `fwd_diff(f)(diffPair(1.0, 1.0))` will return
 `{3.0, 2.0}` instead of `{3.0, 4.0}` as the derivative from `2*x` is lost through the non-differentiable call. To prevent unintended error, it is treated as a compile-time error to call `g` from `f`. If such a non-differentiable call is intended, a `no_diff` prefix is required in the call:
 ```csharp
-[ForwardDifferentiable]
+[Differentiable]
 float f(float x)
 {
     // OK. The intention to call a non-differentiable function is clarified.
@@ -718,7 +782,7 @@ float result = fwd_diff(use)(obj, diffPair(2.0, 1.0)).d;
 // being generated regardless of the original code.
 ```
 
-## Higher Order Differentiation
+## Higher-Order Differentiation
 
 Slang supports generating higher order forward and backward derivative propagation functions. It is allowed to use `fwd_diff` and `bwd_diff` operators inside a forward or backward differentiable function, or to nest `fwd_diff` and `bwd_diff` operators. For example, `fwd_diff(fwd_diff(sin))` will have the following signature:
 
@@ -730,19 +794,14 @@ The input parameter `x` contains four fields: `x.p.p`, `x.p.d,`, `x.d.p`, `x.d.d
 
 User defined higher-order derivative functions can be specified by using `[ForwardDerivative]` or `[BackwardDerivative]` attribute on the derivative function, or by using `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute on the higher-order derivative function.
 
-## Interactions with Generics and Interfaces
-
-Automatic differentiation for generic functions is supported. The forward-derivative and backward propagation functions of a generic function is also a generic function with the same set of generic parameters and constraints. Using `[ForwardDerivative]`, `[ForwardDerivativeOf]`, `[BackwardDerivative]` or `[BackwardDerivativeOf]` attributes to associate a derivative function with different set of generic parameters or constraints is a compile-time error.
-
-An interface method requirement can be marked as `[ForwardDifferentiable]` or `[Differentiable]`, so they may be called in a forward or backward differentiable function and have the derivatives propagate through the call. This works regardless of whether the call can be specialized or has to go through dynamic dispatch. However, calls to interface methods are only differentiable once. Higher order differentiation through interface method calls are not supported.
-
-## Restrictions of Automatic Differentiation
+## Restrictions and Known Issues
 
 The compiler can generate forward derivative and backward propagation implementations for most uses of array and struct types, including arbitrary read and write access at dynamic array indices, and supports uses of all types of control flows, mutable parameters, generics and interfaces. This covers the set of operations that is sufficient for a lot of functions. However, the user needs to be aware of the following restrictions when using automatic differentiation:
 
-- All operations to global resources, global variables and shader parameters, including texture reads or atomic writes, are treating as a non-differentiable operation.
-- If a differentiable function contains calls that cause side-effects such as updates to global memory, there will not be a guarantee on how many times the side-effect will occur during the resulting derivative function or back-propagation function.
-- Loops: Loops must use the attribute `[MaxIters(<count>)]` to specify a maximum number of iterations. This will be used by compiler to allocate space to store intermediate data. If the actual number of iterations exceeds the provided maximum, the behavior is undefined. You can always mark a loop with the `[ForceUnroll]` attribute to instruct the Slang compiler to unroll the loop before generating derivative propagation functions. Unrolled loops will be treated the same way as ordinary code and are not subject to any additional restrictions.
+- All operations to global resources, global variables and shader parameters, including texture reads or atomic writes, are treated as a non-differentiable operation. Slang provides support for special data-structures (such as `Tensor`) through libraries such as `SlangPy`, which come with custom derivative implementations
+- If a differentiable function contains calls that cause side-effects such as updates to global memory, there is currently no guarantee on how many times side-effects will occur during the resulting derivative function or back-propagation function.
+- Loops: Loops must have a bounded number of iterations. If this cannot be inferred statically from the loop structure, the attribute `[MaxIters(<count>)]` can be used specify a maximum number of iterations. This will be used by compiler to allocate space to store intermediate data. If the actual number of iterations exceeds the provided maximum, the behavior is undefined. You can always mark a loop with the `[ForceUnroll]` attribute to instruct the Slang compiler to unroll the loop before generating derivative propagation functions. Unrolled loops will be treated the same way as ordinary code and are not subject to any additional restrictions.
+- Double backward derivatives (higher-order differentiation): The compiler does not currently support multiple backward derivative calls such as `bwd_diff(bwd_diff(fn))`. The vast majority of higher-order derivative applications can be acheived more efficiently via multiple forward-derivative calls or a single layer of `bwd_diff` on functions that use one or more `fwd_diff` passes.
 
 The above restrictions do not apply if a user-defined derivative or backward propagation function is provided.
 

@@ -523,54 +523,50 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 // }
 /// ```
 /// 
-// Note that for each struct field that is differentiable, we need to use the `[DerivativeMember]` attribute to associate it with the
-// corresponding field in the `Differential` type, so the compiler knows how to access the derivative for the field.
-
-// However, there is still a missing piece in the above code: we also need to make `MyRayDifferential` conform to `IDifferentiable` because it is required that the `Differential` of a type must itself be `Differential`. Again we can use automatic fulfillment by simply adding `IDifferentiable` conformance to `MyRayDifferential`:
-// ```csharp
-// struct MyRayDifferential : IDifferentiable
-// {
-//     float3 d_origin;
-//     float3 d_dir;
-// }
-// ```
-// In this case, since all fields in `MyRayDifferential` are differentiable, and the `Differential` of each field is the same as the original type of each field (i.e. `float3.Differential == float3` as defined in the core module), the compiler will automatically use the type itself as its own `Differential`, making `MyRayDifferential` suitable for use as `Differential` of `MyRay`.
-
-// We can also choose to manually implement `IDifferentiable` interface for `MyRayDifferential` as in the following code:
-
-// ```csharp
-// struct MyRayDifferential : IDifferentiable
-// {
-//     typealias Differential = MyRayDifferential;
-
-//     [DerivativeMember(MyRayDifferential.d_origin)]
-//     float3 d_origin;
-
-//     [DerivativeMember(MyRayDifferential.d_dir)]
-//     float3 d_dir;
-
-//     static MyRayDifferential dzero()
-//     {
-//         return {float3(0.0), float3(0.0)};
-//     }
-
-//     static MyRayDifferential dadd(MyRayDifferential v1, MyRayDifferential v2)
-//     {
-//         MyRayDifferential result;
-//         result.d_origin = v1.d_origin + v2.d_origin;
-//         result.d_dir = v1.d_dir + v2.d_dir;
-//         return result;
-//     }
-// }
-// ```
-// In this specific case, the automatically generated `IDifferentiable` implementation will be exactly the same as the manually written code listed above.
-
+/// Note that for each struct field that is differentiable, we need to use the `[DerivativeMember]` attribute to associate it with the
+/// corresponding field in the `Differential` type, so the compiler knows how to access the derivative for the field.
 ///
-/// @remarks Types that implement `IDifferentiable` can be used with the automatic differentiation
-/// primitives `bwd_diff` and `fwd_diff` to load and store gradients of parameters. 
-/// @remarks This interface supports automatic synthesis of requirements. A struct that conforms to `IDifferentiable`
-/// will have its `Differential`, `dzero()` and `dadd()` methods automatically synthesized based on its fields, if 
-/// they are not already defined.
+/// However, there is still a missing piece in the above code: we also need to make `MyRayDifferential` conform to `IDifferentiable` because it is required that the `Differential` of a type must itself be `Differential`. Again we can use automatic fulfillment by simply adding `IDifferentiable` conformance to `MyRayDifferential`:
+/// ```csharp
+/// struct MyRayDifferential : IDifferentiable
+/// {
+///     float3 d_origin;
+///     float3 d_dir;
+/// }
+/// ```
+/// In this case, since all fields in `MyRayDifferential` are differentiable, and the `Differential` of each field is the same as the original type of each field (i.e. `float3.Differential == float3` as defined in the core module), the compiler will automatically use the type itself as its own `Differential`, making `MyRayDifferential` suitable for use as `Differential` of `MyRay`.
+///
+/// We can also choose to manually implement `IDifferentiable` interface for `MyRayDifferential` as in the following code:
+///
+/// ```csharp
+/// struct MyRayDifferential : IDifferentiable
+/// {
+///     typealias Differential = MyRayDifferential;
+///
+///    [DerivativeMember(MyRayDifferential.d_origin)]
+///    float3 d_origin;
+///
+///    [DerivativeMember(MyRayDifferential.d_dir)]
+///    float3 d_dir;
+///
+///    static MyRayDifferential dzero()
+///    {
+///        return {float3(0.0), float3(0.0)};
+///    }
+///
+///    static MyRayDifferential dadd(MyRayDifferential v1, MyRayDifferential v2)
+///    {
+///        MyRayDifferential result;
+///        result.d_origin = v1.d_origin + v2.d_origin;
+///         result.d_dir = v1.d_dir + v2.d_dir;
+///         return result;
+///     }
+/// }
+/// ```
+/// In this specific case, the automatically generated `IDifferentiable` 
+/// implementation will be exactly the same as the manually written code listed above.
+///
+/// 
 __magic_type(DifferentiableType)
 interface IDifferentiable
 {
@@ -596,8 +592,20 @@ interface IDifferentiable
 
 /// @experimental
 ///
-/// Represents a type that supports differentiation operations for pointers, buffers and
-/// any other types 
+/// The `IDifferentiablePtrType` interface requires the following definitions.
+///
+/// ```csharp
+/// interface IDifferentiablePtrType
+/// {
+///     associatedtype Differential : IDifferentiablePtrType
+///         where Differential.Differential == Differential;
+/// }
+/// ```
+///
+/// Types that conform to this interface can be used with `DifferentiablePtrPair<T>`
+/// to pass the derivative components to calls to `fwd_diff(fn)` or `bwd_diff(fn)`
+/// 
+/// See the auto-diff user guide for more details ([TODO: Link])
 ///
 /// @remarks Support for this interface is still experimental and subject to change.
 ///
@@ -727,8 +735,7 @@ struct DifferentialPair : IDifferentiable
 /// Note that derivative ptr pairs are used to pass derivatives into and out of auto-diff functions.
 /// See documentation on `fwd_diff` and `bwd_diff` operators for more information.
 ///
-/// @remarks
-/// Differential
+/// 
 __generic<T : IDifferentiablePtrType>
 __magic_type(DifferentialPtrPairType)
 __intrinsic_type($(kIROp_DifferentialPtrPairType))
