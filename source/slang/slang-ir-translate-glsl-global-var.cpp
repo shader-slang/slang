@@ -86,11 +86,6 @@ struct GlobalVarTranslationContext
                 IRTypeLayout::Builder fieldTypeLayout(&builder);
                 IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout.build());
                 varLayoutBuilder.setStage(entryPointDecor->getProfile().getStage());
-                if (auto locationDecoration = input->findDecoration<IRGLSLLocationDecoration>())
-                {
-                    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::VaryingInput)
-                        ->offset = (UInt)getIntVal(locationDecoration->getLocation());
-                }
                 if (auto semanticDecor = input->findDecoration<IRSemanticDecoration>())
                 {
                     varLayoutBuilder.setSystemValueSemantic(
@@ -102,6 +97,16 @@ struct GlobalVarTranslationContext
                     fieldTypeLayout.addResourceUsage(
                         LayoutResourceKind::VaryingInput,
                         LayoutSize(1));
+                    if (auto layoutDecor = findVarLayout(input))
+                    {
+                        if (auto offsetAttr =
+                                layoutDecor->findOffsetAttr(LayoutResourceKind::VaryingInput))
+                        {
+                            varLayoutBuilder
+                                .findOrAddResourceInfo(LayoutResourceKind::VaryingInput)
+                                ->offset = (UInt)offsetAttr->getOffset();
+                        }
+                    }
                     if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
                     {
                         varLayoutBuilder.setUserSemantic("COLOR", inputVarIndex);
@@ -180,13 +185,15 @@ struct GlobalVarTranslationContext
                         fieldTypeLayout.addResourceUsage(
                             LayoutResourceKind::VaryingOutput,
                             LayoutSize(1));
-
-                        if (auto locationDecoration =
-                                output->findDecoration<IRGLSLLocationDecoration>())
+                        if (auto layoutDecor = findVarLayout(output))
                         {
-                            varLayoutBuilder
-                                .findOrAddResourceInfo(LayoutResourceKind::VaryingOutput)
-                                ->offset = (UInt)getIntVal(locationDecoration->getLocation());
+                            if (auto offsetAttr =
+                                    layoutDecor->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+                            {
+                                varLayoutBuilder
+                                    .findOrAddResourceInfo(LayoutResourceKind::VaryingOutput)
+                                    ->offset = (UInt)offsetAttr->getOffset();
+                            }
                         }
                         if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
                         {

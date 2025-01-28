@@ -7394,8 +7394,6 @@ static bool _isTypeOperandEqual(IRInst* a, IRInst* b)
     {
         return _areTypeOperandsEqual(a, b);
     }
-    SLANG_ASSERT(!"Unhandled comparison");
-
     // We can't equate any other type..
     return false;
 }
@@ -8248,6 +8246,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetArrayLength:
     case kIROp_ResolveVaryingInputRef:
     case kIROp_GetPerVertexInputArray:
+    case kIROp_MetalCastToDepthTexture:
         return false;
 
     case kIROp_ForwardDifferentiate:

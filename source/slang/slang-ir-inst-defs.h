@@ -555,6 +555,8 @@ INST(MetalSetVertex, metalSetVertex, 2, 0)
 INST(MetalSetPrimitive, metalSetPrimitive, 2, 0)
 INST(MetalSetIndices, metalSetIndices, 2, 0)
 
+INST(MetalCastToDepthTexture, MetalCastToDepthTexture, 1, 0)
+
 // Construct a vector from a scalar
 //
 // %dst = MakeVectorFromScalar %T %N %val

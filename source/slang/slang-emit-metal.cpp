@@ -636,6 +636,22 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 m_writer->emit(");\n");
             return true;
         }
+    case kIROp_MetalCastToDepthTexture:
+        {
+            emitType(inst->getDataType(), getName(inst));
+            m_writer->emit(";\n{\n");
+            m_writer->indent();
+            m_writer->emit("auto _slang_ordinary_texture = ");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+            m_writer->emit(getName(inst));
+            m_writer->emit(" = *(");
+            emitType(inst->getDataType());
+            m_writer->emit(" thread*)(&_slang_ordinary_texture);\n");
+            m_writer->dedent();
+            m_writer->emit("}\n");
+            return true;
+        }
     }
     return false;
 }
