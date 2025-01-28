@@ -392,6 +392,7 @@ template<typename T, int ROWS, int COLS>
 struct Matrix
 {
     Vector<T, COLS> rows[ROWS];
+    const Vector<T, COLS>& operator[](size_t index) const { return rows[index]; }
     Vector<T, COLS>& operator[](size_t index) { return rows[index]; }
     Matrix() = default;
     Matrix(T scalar)
