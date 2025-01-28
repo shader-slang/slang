@@ -23,6 +23,11 @@ struct Impl2 : Base
     int getValue(float a) { return int(a) + 5; }
 }
 
+int callGet<T : Base>(T t)
+{
+    return t.getValue();
+}
+
 [numthreads(1, 1, 1)]
 void computeMain()
 {
@@ -32,9 +37,9 @@ void computeMain()
     uint index = 0;
 
     outputBuffer[index++] = Impl1::getValue();
-    outputBuffer[index++] = impl1.getValue();
+    outputBuffer[index++] = callGet(impl1);
 
     outputBuffer[index++] = Impl2::getValue();
-    outputBuffer[index++] = impl2.getValue();
+    outputBuffer[index++] = callGet(impl2);
     outputBuffer[index++] = impl2.getValue(5);
 }
