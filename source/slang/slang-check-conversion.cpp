@@ -266,6 +266,10 @@ bool SemanticsVisitor::isCStyleType(Type* type)
         {
             Type* varType = varDecl->getType();
 
+            // Skip the type if it is a reference to the struct itself.
+            if (varType == type)
+                continue;
+
             // Recursively check the type of the member.
             if (!isCStyleType(varType))
                 return cacheResult(false);
