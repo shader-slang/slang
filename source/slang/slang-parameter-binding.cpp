@@ -712,6 +712,15 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
         return createTypeLayoutWith(layoutContext, specializationConstantRule, type);
     }
 
+    if (varDecl->hasModifier<InModifier>())
+    {
+        return createTypeLayoutWith(layoutContext, rules->getVaryingInputRules(), type);
+    }
+    else if (varDecl->hasModifier<OutModifier>())
+    {
+        return createTypeLayoutWith(layoutContext, rules->getVaryingOutputRules(), type);
+    }
+
     // TODO(tfoley): there may be other cases that we need to handle here
 
     // An "ordinary" global variable is implicitly a uniform
@@ -1116,6 +1125,25 @@ static void addExplicitParameterBindings_GLSL(
 
         if (auto layoutAttr = varDecl.getDecl()->findModifier<VkConstantIdAttribute>())
             info[kResInfo].semanticInfo.index = layoutAttr->location;
+        else
+            return;
+    }
+
+    if (auto foundVaryingInput = typeLayout->FindResourceInfo(LayoutResourceKind::VaryingInput))
+    {
+        info[kResInfo].resInfo = foundVaryingInput;
+
+        if (auto layoutAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
+            info[kResInfo].semanticInfo.index = layoutAttr->value;
+        else
+            return;
+    }
+    if (auto foundVaryingOutput = typeLayout->FindResourceInfo(LayoutResourceKind::VaryingOutput))
+    {
+        info[kResInfo].resInfo = foundVaryingOutput;
+
+        if (auto layoutAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
+            info[kResInfo].semanticInfo.index = layoutAttr->value;
         else
             return;
     }
