@@ -2,7 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj -vk
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj
 
-import moduleA;
+import modulea;
 
 // Definition of the Foo struct
 // struct Foo
