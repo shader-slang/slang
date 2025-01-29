@@ -384,7 +384,21 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 
             processedUses.add(use);
 
-            HoistResult result = this->classify(use);
+            HoistResult result = HoistResult::none();
+
+            // Sometimes, we already have a decision for this val.
+            //
+            // This is a workaround to some of the problems
+            // with the multi-pass approach where we can see an
+            // inst that was already classified, but through a
+            // different use.
+            //
+            if (checkpointInfo->recomputeSet.contains(use.usedVal))
+                result = HoistResult::recompute(use.usedVal);
+            else if (checkpointInfo->storeSet.contains(use.usedVal))
+                result = HoistResult::store(use.usedVal);
+            else
+                result = this->classify(use);
 
             if (result.mode == HoistResult::Mode::Store)
             {
@@ -499,6 +513,15 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                         if (callVarWorkListSet.add(callUser))
                             callVarWorkList.add(callUser);
                     }
+                }
+
+                // This is a bit of a hack.. ideally we need to add the var to the worklist for
+                // further processing rather than replicating those operations here.
+                //
+                for (auto use = var->firstUse; use; use = use->nextUse)
+                {
+                    if (isDifferentialInst(use->getUser()))
+                        usesToReplace.add(use);
                 }
             }
             else if (auto call = as<IRCall>(inst))

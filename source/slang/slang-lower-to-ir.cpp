@@ -9101,6 +9101,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 subBuilder->addAutoDiffBuiltinDecoration(irAggType);
         }
 
+        addTargetRequirementDecorations(irAggType, decl);
 
         return LoweredValInfo::simple(finalFinishedVal);
     }
@@ -9774,6 +9775,36 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
     }
 
+    void addTargetRequirementDecorations(IRInst* inst, Decl* decl)
+    {
+        // If this declaration requires certain GLSL extension (or a particular GLSL version)
+        // for it to be usable, then declare that here. Similarly for SPIR-V or CUDA
+        //
+        // TODO: We should wrap this an `SpecializedForTargetModifier` together into a single
+        // case for enumerating the "capabilities" that a declaration requires.
+        //
+        for (auto extensionMod : decl->getModifiersOfType<RequiredGLSLExtensionModifier>())
+        {
+            getBuilder()->addRequireGLSLExtensionDecoration(
+                inst,
+                extensionMod->extensionNameToken.getContent());
+        }
+        for (auto versionMod : decl->getModifiersOfType<RequiredGLSLVersionModifier>())
+        {
+            getBuilder()->addRequireGLSLVersionDecoration(
+                inst,
+                Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+        }
+        for (auto versionMod : decl->getModifiersOfType<RequiredSPIRVVersionModifier>())
+        {
+            getBuilder()->addRequireSPIRVVersionDecoration(inst, versionMod->version);
+        }
+        for (auto versionMod : decl->getModifiersOfType<RequiredCUDASMVersionModifier>())
+        {
+            getBuilder()->addRequireCUDASMVersionDecoration(inst, versionMod->version);
+        }
+    }
+
     void addBitFieldAccessorDecorations(IRInst* irFunc, Decl* decl)
     {
         // If this is an accessor and the parent is describing some bitfield,
@@ -10339,6 +10370,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addTargetIntrinsicDecorations(subContext, irFunc, decl);
 
         addCatchAllIntrinsicDecorationIfNeeded(irFunc, decl);
+
+        addTargetRequirementDecorations(irFunc, decl);
 
         bool isInline = false;
 

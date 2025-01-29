@@ -324,13 +324,17 @@ struct SemanticsDeclBodyVisitor : public SemanticsDeclVisitorBase,
         StructDecl* parent = nullptr;
         ConstructorDecl* defaultCtor = nullptr;
         List<ConstructorDecl*> ctorList;
+        Type* type = nullptr;
         DeclAndCtorInfo() {}
         DeclAndCtorInfo(
             ASTBuilder* m_astBuilder,
             SemanticsVisitor* visitor,
-            StructDecl* parent,
+            StructDecl* inParent,
+            Type* inType,
             const bool getOnlyDefault)
         {
+            parent = inParent;
+            type = inType;
             if (getOnlyDefault)
                 defaultCtor = _getDefaultCtor(parent);
             else
@@ -4621,6 +4625,25 @@ static bool matchParamDirection(ParameterDirection implDir, ParameterDirection r
     return false;
 }
 
+static void removeNonStaticLookupItems(LookupResult& lookupResult)
+{
+    List<LookupResultItem> newItems;
+    for (auto item : lookupResult)
+    {
+        if (item.declRef.getDecl()->hasModifier<HLSLStaticModifier>())
+        {
+            newItems.add(item);
+        }
+    }
+
+    lookupResult.items = newItems;
+    lookupResult.item = LookupResultItem();
+    if (lookupResult.items.getCount() > 0)
+    {
+        lookupResult.item = lookupResult.items[0];
+    }
+}
+
 bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     ConformanceCheckingContext* context,
     LookupResult const& lookupResult,
@@ -4722,6 +4745,12 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     else
     {
         baseOverloadedExpr->lookupResult2 = lookupResult;
+    }
+
+    // Non-static methods cannot implement static methods, remove them.
+    if (requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
+    {
+        removeNonStaticLookupItems(baseOverloadedExpr->lookupResult2);
     }
 
     // If `synThis` is non-null, then we will use it as the base of
@@ -9048,19 +9077,22 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(
         if (!declInfo.defaultCtor)
             continue;
 
+        auto declRefType = as<DeclRefType>(declInfo.type);
+
         auto ctorToInvoke = m_astBuilder->create<VarExpr>();
-        ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
+        ctorToInvoke->declRef = declRefType->getDeclRef();
         ctorToInvoke->name = declInfo.defaultCtor->getName();
         ctorToInvoke->loc = declInfo.defaultCtor->loc;
-        ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), ctor->returnType.type);
+        ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), declRefType);
 
         auto invoke = m_astBuilder->create<InvokeExpr>();
         invoke->functionExpr = ctorToInvoke;
 
         auto assign = m_astBuilder->create<AssignExpr>();
-        assign->left =
-            coerce(CoercionSite::Initializer, declInfo.defaultCtor->returnType.type, thisExpr);
+
+        assign->left = coerce(CoercionSite::Initializer, declRefType, thisExpr);
         assign->right = invoke;
+
         auto stmt = m_astBuilder->create<ExpressionStmt>();
         stmt->expression = assign;
         stmt->loc = ctor->loc;
@@ -9170,9 +9202,14 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
         if (!structOfInheritance)
             continue;
         inheritanceDefaultCtorList.add(
-            DeclAndCtorInfo(m_astBuilder, this, structOfInheritance, true));
+            DeclAndCtorInfo(m_astBuilder, this, structOfInheritance, declRefType, true));
     }
-    DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, false);
+    DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(
+        m_astBuilder,
+        this,
+        structDecl,
+        calcThisType(makeDeclRef(structDecl)),
+        false);
 
     // ensure all varDecl members are processed up to SemanticsBodyVisitor so we can be sure that if
     // init expressions of members are to be synthisised, they are.
