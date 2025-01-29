@@ -7491,22 +7491,36 @@ __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 public T subgroupBroadcast(T value, uint id)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, id);
+    __target_switch
+    {
+    case wgsl:
+        // WGSL's intrinsic does not accept non-const ids, do shuffle instead.
+        __intrinsic_asm "subgroupShuffle";
+    default:
+        return WaveBroadcastLaneAt(value, id);
+    }
 }
 
 __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 public vector<T,N> subgroupBroadcast(vector<T,N> value, uint id)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskBroadcastLaneAt(WaveGetActiveMask(), value, id);
+    __target_switch
+    {
+    case wgsl:
+        // WGSL's intrinsic does not accept non-const ids, do shuffle instead.
+        __intrinsic_asm "subgroupShuffle";
+    default:
+        return WaveBroadcastLaneAt(value, id);
+    }
 }
 
 __generic<T : __BuiltinType>
