@@ -1092,10 +1092,15 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
             }
         }
 
+        UnownedStringSlice registerClassName;
+        UnownedStringSlice registerIndexDigits;
+        splitNameAndIndex(registerModifier->registerName.getContent(), registerClassName, registerIndexDigits);
+
         getSink(context)->diagnose(
             registerModifier,
             Diagnostics::registerModifierButNoVkBindingNorShift,
-            varDecl.getName());
+            varDecl.getName(),
+            registerClassName);
     }
 }
 

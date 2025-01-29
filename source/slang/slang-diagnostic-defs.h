@@ -2024,7 +2024,7 @@ DIAGNOSTIC(
     Warning,
     registerModifierButNoVkBindingNorShift,
     "shader parameter '$0' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` "
-    "specified for Vulkan, nor is `-fvk-xxx-shift` used.")
+    "specified for Vulkan, nor is `-fvk-$1-shift` used.")
 
 //
 
