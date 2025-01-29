@@ -385,12 +385,12 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
             processedUses.add(use);
 
             HoistResult result = HoistResult::none();
-            
+
             // Sometimes, we already have a decision for this val.
             //
             // This is a workaround to some of the problems
             // with the multi-pass approach where we can see an
-            // inst that was already classified, but through a 
+            // inst that was already classified, but through a
             // different use.
             //
             if (checkpointInfo->recomputeSet.contains(use.usedVal))
