@@ -842,6 +842,16 @@ Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSe
         }
     }
 
+    // If any target requires debug info, then we will need to enable debug info when lowering to
+    // target-agnostic IR. The target-agnostic IR will only include debug info if the linkage IR
+    // options specify that it should, so make sure the linkage debug info level is greater than or
+    // equal to that of any target.
+    DebugInfoLevel linkageDebugInfoLevel = linkage->m_optionSet.getDebugInfoLevel();
+    for (auto target : linkage->targets)
+        linkageDebugInfoLevel =
+            Math::Max(linkageDebugInfoLevel, target->getOptionSet().getDebugInfoLevel());
+    linkage->m_optionSet.set(CompilerOptionName::DebugInformation, linkageDebugInfoLevel);
+
     *outSession = asExternal(linkage.detach());
     return SLANG_OK;
 }
