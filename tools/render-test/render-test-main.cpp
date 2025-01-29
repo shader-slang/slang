@@ -1408,6 +1408,7 @@ static SlangResult _innerMain(
         desc.slang.slangGlobalSession = session;
         desc.slang.targetProfile = options.profileName.getBuffer();
         {
+            getRHI()->enableDebugLayers();
             SlangResult res = getRHI()->createDevice(desc, device.writeRef());
             if (SLANG_FAILED(res))
             {
