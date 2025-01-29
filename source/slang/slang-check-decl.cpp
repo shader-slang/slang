@@ -9259,15 +9259,15 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(
 
         auto ctorToInvoke = m_astBuilder->create<VarExpr>();
         ctorToInvoke->declRef = declRefType->getDeclRef();
-        ctorToInvoke->name = declInfo.defaultCtor->getName();
-        ctorToInvoke->loc = declInfo.defaultCtor->loc;
+        ctorToInvoke->name = baseCtor->getName();
+        ctorToInvoke->loc = baseCtor->loc;
         ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), declRefType);
 
         auto invoke = m_astBuilder->create<InvokeExpr>();
         invoke->functionExpr = ctorToInvoke;
+        invoke->arguments.addRange(argumentList);
 
         auto assign = m_astBuilder->create<AssignExpr>();
-
         assign->left = coerce(CoercionSite::Initializer, declRefType, thisExpr);
         assign->right = invoke;
 
