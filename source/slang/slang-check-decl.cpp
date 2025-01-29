@@ -4621,6 +4621,25 @@ static bool matchParamDirection(ParameterDirection implDir, ParameterDirection r
     return false;
 }
 
+static void removeNonStaticLookupItems(LookupResult& lookupResult)
+{
+    List<LookupResultItem> newItems;
+    for (auto item : lookupResult)
+    {
+        if (item.declRef.getDecl()->hasModifier<HLSLStaticModifier>())
+        {
+            newItems.add(item);
+        }
+    }
+
+    lookupResult.items = newItems;
+    lookupResult.item = LookupResultItem();
+    if (lookupResult.items.getCount() > 0)
+    {
+        lookupResult.item = lookupResult.items[0];
+    }
+}
+
 bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     ConformanceCheckingContext* context,
     LookupResult const& lookupResult,
@@ -4722,6 +4741,12 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     else
     {
         baseOverloadedExpr->lookupResult2 = lookupResult;
+    }
+
+    // Non-static methods cannot implement static methods, remove them.
+    if (requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
+    {
+        removeNonStaticLookupItems(baseOverloadedExpr->lookupResult2);
     }
 
     // If `synThis` is non-null, then we will use it as the base of
