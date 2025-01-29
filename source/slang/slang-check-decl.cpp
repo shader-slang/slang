@@ -9090,8 +9090,7 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(
 
         auto assign = m_astBuilder->create<AssignExpr>();
 
-        assign->left =
-            coerce(CoercionSite::Initializer, declRefType, thisExpr);
+        assign->left = coerce(CoercionSite::Initializer, declRefType, thisExpr);
         assign->right = invoke;
 
         auto stmt = m_astBuilder->create<ExpressionStmt>();
@@ -9206,7 +9205,12 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
             DeclAndCtorInfo(m_astBuilder, this, structOfInheritance, declRefType, true));
     }
     calcThisType(makeDeclRef(structDecl));
-    DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, calcThisType(makeDeclRef(structDecl)), false);
+    DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(
+        m_astBuilder,
+        this,
+        structDecl,
+        calcThisType(makeDeclRef(structDecl)),
+        false);
 
     // ensure all varDecl members are processed up to SemanticsBodyVisitor so we can be sure that if
     // init expressions of members are to be synthisised, they are.
