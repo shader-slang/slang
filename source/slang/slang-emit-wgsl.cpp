@@ -49,6 +49,14 @@ fn _slang_getNan() -> f32
 }
 )";
 
+WGSLSourceEmitter::WGSLSourceEmitter(const Desc& desc)
+    : CLikeSourceEmitter(desc)
+{
+    m_extensionTracker =
+        dynamicCast<ShaderExtensionTracker>(desc.codeGenContext->getExtensionTracker());
+    SLANG_ASSERT(m_extensionTracker);
+}
+
 void WGSLSourceEmitter::emitSwitchCaseSelectorsImpl(
     const SwitchRegion::Case* const currentCase,
     const bool isDefault)
@@ -1556,6 +1564,10 @@ void WGSLSourceEmitter::emitFrontMatterImpl(TargetRequest* /* targetReq */)
         m_writer->emit("enable f16;\n");
         m_writer->emit("\n");
     }
+
+    StringBuilder builder;
+    m_extensionTracker->appendExtensionRequireLinesForWGSL(builder);
+    m_writer->emit(builder.getUnownedSlice());
 }
 
 void WGSLSourceEmitter::emitIntrinsicCallExprImpl(
@@ -1624,6 +1636,22 @@ void WGSLSourceEmitter::emitInterpolationModifiersImpl(
     // "User-defined vertex outputs and fragment inputs of scalar or vector
     //  integer type must always be specified with interpolation type flat."
     // https://www.w3.org/TR/WGSL/#interpolation
+}
+
+void WGSLSourceEmitter::_requireExtension(const UnownedStringSlice& name)
+{
+    m_extensionTracker->requireExtension(name);
+}
+
+void WGSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
+{
+    for (auto decoration : inst->getDecorations())
+    {
+        if (const auto extensionDecoration = as<IRRequireWGSLExtensionDecoration>(decoration))
+        {
+            _requireExtension(extensionDecoration->getExtensionName());
+        }
+    }
 }
 
 } // namespace Slang

@@ -9799,6 +9799,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             getBuilder()->addRequireSPIRVVersionDecoration(inst, versionMod->version);
         }
+        for (auto extensionMod : decl->getModifiersOfType<RequiredWGSLExtensionModifier>())
+        {
+            getBuilder()->addRequireWGSLExtensionDecoration(
+                inst,
+                extensionMod->extensionNameToken.getContent());
+        }
         for (auto versionMod : decl->getModifiersOfType<RequiredCUDASMVersionModifier>())
         {
             getBuilder()->addRequireCUDASMVersionDecoration(inst, versionMod->version);
@@ -10611,6 +10617,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
             else if (auto spvVersion = as<RequiredSPIRVVersionModifier>(modifier))
                 getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
+            else if (auto extensionMod = as<RequiredWGSLExtensionModifier>(modifier))
+                getBuilder()->addRequireWGSLExtensionDecoration(
+                    irFunc,
+                    extensionMod->extensionNameToken.getContent());
             else if (auto cudasmVersion = as<RequiredCUDASMVersionModifier>(modifier))
                 getBuilder()->addRequireCUDASMVersionDecoration(irFunc, cudasmVersion->version);
             else if (as<NonDynamicUniformAttribute>(modifier))

@@ -14687,6 +14687,7 @@ for (auto opName : kWaveActivProductSumNames) {
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 T WaveActive$(opName.hlslName)(T expr)
 {

@@ -434,6 +434,8 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
                     continue;
                 if (as<RequiredGLSLExtensionModifier>(modifier))
                     continue;
+                if (as<RequiredWGSLExtensionModifier>(modifier))
+                    continue;
                 if (as<GLSLLayoutModifierGroupMarker>(modifier))
                     continue;
                 if (as<HLSLLayoutSemantic>(modifier))
