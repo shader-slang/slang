@@ -251,7 +251,7 @@ public:
 
         bool isSynthesizeConstructor = false;
 
-        if(auto constructor = funcInst->findDecoration<IRConstructorDecorartion>())
+        if (auto constructor = funcInst->findDecoration<IRConstructorDecorartion>())
             isSynthesizeConstructor = constructor->getSynthesizedStatus();
 
         // This is a kernel function, we don't allow using TorchTensor type here.
