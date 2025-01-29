@@ -324,13 +324,17 @@ struct SemanticsDeclBodyVisitor : public SemanticsDeclVisitorBase,
         StructDecl* parent = nullptr;
         ConstructorDecl* defaultCtor = nullptr;
         List<ConstructorDecl*> ctorList;
+        Type* type = nullptr;
         DeclAndCtorInfo() {}
         DeclAndCtorInfo(
             ASTBuilder* m_astBuilder,
             SemanticsVisitor* visitor,
             StructDecl* parent,
+            Type* type,
             const bool getOnlyDefault)
         {
+            this->parent = parent;
+            this->type = type;
             if (getOnlyDefault)
                 defaultCtor = _getDefaultCtor(parent);
             else
@@ -9073,19 +9077,23 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(
         if (!declInfo.defaultCtor)
             continue;
 
+        auto declRefType = as<DeclRefType>(declInfo.type);
+
         auto ctorToInvoke = m_astBuilder->create<VarExpr>();
-        ctorToInvoke->declRef = declInfo.defaultCtor->getDefaultDeclRef();
+        ctorToInvoke->declRef = declRefType->getDeclRef();
         ctorToInvoke->name = declInfo.defaultCtor->getName();
         ctorToInvoke->loc = declInfo.defaultCtor->loc;
-        ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), ctor->returnType.type);
+        ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), declRefType);
 
         auto invoke = m_astBuilder->create<InvokeExpr>();
         invoke->functionExpr = ctorToInvoke;
 
         auto assign = m_astBuilder->create<AssignExpr>();
+
         assign->left =
-            coerce(CoercionSite::Initializer, declInfo.defaultCtor->returnType.type, thisExpr);
+            coerce(CoercionSite::Initializer, declRefType, thisExpr);
         assign->right = invoke;
+
         auto stmt = m_astBuilder->create<ExpressionStmt>();
         stmt->expression = assign;
         stmt->loc = ctor->loc;
@@ -9195,9 +9203,10 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
         if (!structOfInheritance)
             continue;
         inheritanceDefaultCtorList.add(
-            DeclAndCtorInfo(m_astBuilder, this, structOfInheritance, true));
+            DeclAndCtorInfo(m_astBuilder, this, structOfInheritance, declRefType, true));
     }
-    DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, false);
+    calcThisType(makeDeclRef(structDecl));
+    DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(m_astBuilder, this, structDecl, calcThisType(makeDeclRef(structDecl)), false);
 
     // ensure all varDecl members are processed up to SemanticsBodyVisitor so we can be sure that if
     // init expressions of members are to be synthisised, they are.
