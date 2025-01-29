@@ -9177,64 +9177,6 @@ static SeqStmt* _ensureCtorBodyIsSeqStmt(ASTBuilder* m_astBuilder, ConstructorDe
     return as<SeqStmt>(stmt->body);
 }
 
-void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(
-    ConstructorDecl* ctor,
-    List<DeclAndCtorInfo>& inheritanceDefaultCtorList,
-    ThisExpr* thisExpr,
-    SeqStmt* seqStmtChild,
-    bool isMemberInitCtor,
-    Index& paramIndex)
-{
-    // e.g. this->base = BaseType();
-    for (auto& declInfo : inheritanceDefaultCtorList)
-    {
-        ConstructorDecl* baseCtor = nullptr;
-
-        if (!isMemberInitCtor)
-        {
-            // This is easiest case: this->base = BaseType();
-            // If the base type has no default constructor, it means that it's not default
-            // initializable, e.g. unsized array, resource type, etc. We will not synthesize code to
-            // initialize it.
-            if (!declInfo.defaultCtor)
-                continue;
-            baseCtor = declInfo.defaultCtor;
-        }
-        else
-        {
-            // Handle the case: this->base = BaseType(Type1 param1, Type2 param2, ...);
-            // TODO: read parameters for the baseCtor
-            // 1. get baseCtor's parameters list
-            // 2. for loop on `createCtorParamExpr()` to get each parameter
-            // 3. fill the argument list for the baseCtor
-            (void)paramIndex;
-            continue;
-        }
-
-        auto declRefType = as<DeclRefType>(declInfo.type);
-
-        auto ctorToInvoke = m_astBuilder->create<VarExpr>();
-        ctorToInvoke->declRef = declRefType->getDeclRef();
-        ctorToInvoke->name = declInfo.defaultCtor->getName();
-        ctorToInvoke->loc = declInfo.defaultCtor->loc;
-        ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), declRefType);
-
-        auto invoke = m_astBuilder->create<InvokeExpr>();
-        invoke->functionExpr = ctorToInvoke;
-
-        auto assign = m_astBuilder->create<AssignExpr>();
-
-        assign->left = coerce(CoercionSite::Initializer, declRefType, thisExpr);
-        assign->right = invoke;
-
-        auto stmt = m_astBuilder->create<ExpressionStmt>();
-        stmt->expression = assign;
-        stmt->loc = ctor->loc;
-
-        seqStmtChild->stmts.add(stmt);
-    }
-}
-
 MemberExpr* SemanticsDeclBodyVisitor::createMemberExpr(
     ThisExpr* thisExpr,
     Scope* scope,
@@ -9313,18 +9255,20 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(
             baseCtor = declInfo.defaultCtor;
         }
 
+        auto declRefType = as<DeclRefType>(declInfo.type);
+
         auto ctorToInvoke = m_astBuilder->create<VarExpr>();
-        ctorToInvoke->declRef = baseCtor->getDefaultDeclRef();
-        ctorToInvoke->name = baseCtor->getName();
-        ctorToInvoke->loc = baseCtor->loc;
-        ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), ctor->returnType.type);
+        ctorToInvoke->declRef = declRefType->getDeclRef();
+        ctorToInvoke->name = declInfo.defaultCtor->getName();
+        ctorToInvoke->loc = declInfo.defaultCtor->loc;
+        ctorToInvoke->type = m_astBuilder->getFuncType(ArrayView<Type*>(), declRefType);
 
         auto invoke = m_astBuilder->create<InvokeExpr>();
         invoke->functionExpr = ctorToInvoke;
-        invoke->arguments.addRange(argumentList);
 
         auto assign = m_astBuilder->create<AssignExpr>();
-        assign->left = coerce(CoercionSite::Initializer, baseCtor->returnType.type, thisExpr);
+
+        assign->left = coerce(CoercionSite::Initializer, declRefType, thisExpr);
         assign->right = invoke;
 
         auto stmt = m_astBuilder->create<ExpressionStmt>();
