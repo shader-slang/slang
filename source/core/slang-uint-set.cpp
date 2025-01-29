@@ -156,11 +156,23 @@ void UIntSet::subtractWith(const UIntSet& set)
 
 /* static */ void UIntSet::calcSubtract(UIntSet& outRs, const UIntSet& set1, const UIntSet& set2)
 {
-    outRs.resizeBackingBufferDirectly(set1.m_buffer.getCount());
+    const auto set1Count = set1.m_buffer.getCount();
+    const auto set2Count = set2.m_buffer.getCount();
 
-    const Index minCount = Math::Min(set1.m_buffer.getCount(), set2.m_buffer.getCount());
-    for (Index i = 0; i < minCount; i++)
-        outRs.m_buffer[i] = set1.m_buffer[i] & (~set2.m_buffer[i]);
+    outRs.resizeBackingBufferDirectly(set1Count);
+
+    for (Index i = 0; i < set1Count; i++)
+    {
+        if (i < set2Count)
+        {
+            outRs.m_buffer[i] = set1.m_buffer[i] & (~set2.m_buffer[i]);
+        }
+        else
+        {
+            // If `set2` is smaller, copy the remaining values from `set1`
+            outRs.m_buffer[i] = set1.m_buffer[i];
+        }
+    }
 }
 
 /* static */ bool UIntSet::hasIntersection(const UIntSet& set1, const UIntSet& set2)

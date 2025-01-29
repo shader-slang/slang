@@ -842,26 +842,29 @@ bool isGlobalShaderParameter(VarDeclBase* decl)
     if (!isGlobalDecl(decl))
         return false;
 
-    // A global variable marked `static` indicates a traditional
-    // global variable (albeit one that is implicitly local to
-    // the translation unit)
-    //
-    if (decl->hasModifier<HLSLStaticModifier>())
-        return false;
+    for (auto modifier : decl->modifiers)
+    {
+        // A global variable marked `static` indicates a traditional
+        // global variable (albeit one that is implicitly local to
+        // the translation unit)
+        //
+        if (as<HLSLStaticModifier>(modifier))
+            return false;
 
-    // While not normally allowed, out variables are not constant
-    // parameters, this can happen for example in GLSL mode
-    if (decl->hasModifier<OutModifier>())
-        return false;
-    if (decl->hasModifier<InModifier>())
-        return false;
+        // While not normally allowed, out variables are not constant
+        // parameters, this can happen for example in GLSL mode
+        if (as<OutModifier>(modifier))
+            return false;
+        if (as<InModifier>(modifier))
+            return false;
 
-    // The `groupshared` modifier indicates that a variable cannot
-    // be a shader parameters, but is instead transient storage
-    // allocated for the duration of a thread-group's execution.
-    //
-    if (decl->hasModifier<HLSLGroupSharedModifier>())
-        return false;
+        // The `groupshared` modifier indicates that a variable cannot
+        // be a shader parameters, but is instead transient storage
+        // allocated for the duration of a thread-group's execution.
+        //
+        if (as<HLSLGroupSharedModifier>(modifier))
+            return false;
+    }
 
     return true;
 }
@@ -4618,6 +4621,25 @@ static bool matchParamDirection(ParameterDirection implDir, ParameterDirection r
     return false;
 }
 
+static void removeNonStaticLookupItems(LookupResult& lookupResult)
+{
+    List<LookupResultItem> newItems;
+    for (auto item : lookupResult)
+    {
+        if (item.declRef.getDecl()->hasModifier<HLSLStaticModifier>())
+        {
+            newItems.add(item);
+        }
+    }
+
+    lookupResult.items = newItems;
+    lookupResult.item = LookupResultItem();
+    if (lookupResult.items.getCount() > 0)
+    {
+        lookupResult.item = lookupResult.items[0];
+    }
+}
+
 bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     ConformanceCheckingContext* context,
     LookupResult const& lookupResult,
@@ -4719,6 +4741,12 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     else
     {
         baseOverloadedExpr->lookupResult2 = lookupResult;
+    }
+
+    // Non-static methods cannot implement static methods, remove them.
+    if (requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
+    {
+        removeNonStaticLookupItems(baseOverloadedExpr->lookupResult2);
     }
 
     // If `synThis` is non-null, then we will use it as the base of
