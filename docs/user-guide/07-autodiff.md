@@ -284,7 +284,7 @@ an `IDifferentiable` type whose derivative portion is an _output_ under `bwd_dif
 #### DifferentiablePtrPair<T>: Pairs of differentiable ptr types
 For types conforming to `IDifferentiablePtrType`, the corresponding pair to use for passing the derivative counterpart is `DifferentiablePtrType<T>`, which represents a pair of `T` and `T.Differential`. Objects of this type can be created using a constructor.
 
-#### Example of defining and using an type of `IDifferentiablePtrType`
+#### Example of defining and using an `IDifferentiablePtrType` object.
 Here is a full example of create a differentiable buffer pointer type, and using it within a differentiable function.
 ```hlsl
 struct MyBufferPointer : IDifferentiablePtrType
