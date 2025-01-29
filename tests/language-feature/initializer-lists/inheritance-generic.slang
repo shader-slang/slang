@@ -19,7 +19,10 @@ RWStructuredBuffer<int> result;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    Derived<3> d;
+    // Previously, this test is just test we can handle the base constructor invoke correctly,
+    // so we don't construct the Derived object, since #6058, there will not be implicit constructor
+    // to construct the struct, we will have to invoke the constructor explicitly.
+    Derived<3> d = {1,1,1};
 
     // BUFFER: 1
     result[0] = d.a;
