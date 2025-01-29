@@ -1669,11 +1669,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         &sizeAndAlignment);
                     stride = (int)sizeAndAlignment.getStride();
                 }
-                emitOpDecorateArrayStride(
-                    getSection(SpvLogicalSectionID::Annotations),
-                    nullptr,
-                    arrayType,
-                    SpvLiteralInteger::from32(stride));
+
+                // Avoid validation error: Array containing a Block or BufferBlock must not be
+                // decorated with ArrayStride
+                if (!elementType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration) &&
+                    !elementType->findDecorationImpl(kIROp_SPIRVBlockDecoration))
+                {
+                    emitOpDecorateArrayStride(
+                        getSection(SpvLogicalSectionID::Annotations),
+                        nullptr,
+                        arrayType,
+                        SpvLiteralInteger::from32(stride));
+                }
+
                 return arrayType;
             }
         case kIROp_AtomicType:
