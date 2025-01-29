@@ -810,6 +810,9 @@ Compound Capabilities
 `glsl_spirv`
 > GLSL, and SPIRV code-gen targets
 
+`glsl_spirv_wgsl`
+> GLSL, SPIRV, and WGSL code-gen targets
+
 `hlsl_spirv`
 > HLSL, and SPIRV code-gen targets
 

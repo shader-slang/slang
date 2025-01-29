@@ -390,6 +390,10 @@ alias glsl_metal_spirv_wgsl = glsl | metal | spirv | wgsl;
 /// [Compound]
 alias glsl_spirv = glsl | spirv;
 
+/// GLSL, SPIRV, and WGSL code-gen targets
+/// [Compound]
+alias glsl_spirv_wgsl = glsl | spirv | wgsl;
+
 /// HLSL, and SPIRV code-gen targets
 /// [Compound]
 alias hlsl_spirv = hlsl | spirv;
@@ -1938,7 +1942,11 @@ alias subgroup_shuffle = GL_KHR_shader_subgroup_shuffle
                        ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_shuffle_relative'
 /// [Compound]
-alias subgroup_shufflerelative = GL_KHR_shader_subgroup_shuffle_relative | _sm_6_0 | _cuda_sm_7_0;
+alias subgroup_shufflerelative = GL_KHR_shader_subgroup_shuffle_relative
+                               | _sm_6_0
+                               | _cuda_sm_7_0
+                               | wgsl
+                               ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_clustered'
 /// [Compound]
 alias subgroup_clustered = GL_KHR_shader_subgroup_clustered | _sm_6_0 | _cuda_sm_7_0;

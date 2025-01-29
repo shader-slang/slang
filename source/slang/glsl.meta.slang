@@ -7754,13 +7754,14 @@ __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 [ForceInline]
-[require(glsl_spirv, subgroup_shuffle)]
+[require(glsl_spirv_wgsl, subgroup_shuffle)]
 public vector<T,N> subgroupShuffleXor(vector<T,N> value, uint mask)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
     case glsl:
+    case wgsl:
         __intrinsic_asm "subgroupShuffleXor($0,$1)";
     case spirv:
         return spirv_asm {
@@ -7777,13 +7778,14 @@ __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle_relative)
 [ForceInline]
-[require(glsl_spirv, subgroup_shufflerelative)]
+[require(glsl_spirv_wgsl, subgroup_shufflerelative)]
 public T subgroupShuffleUp(T value, uint delta)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
     case glsl:
+    case wgsl:
         __intrinsic_asm "subgroupShuffleUp($0, $1)";
     case spirv:
         return spirv_asm {
@@ -7797,13 +7799,14 @@ __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle_relative)
 [ForceInline]
-[require(glsl_spirv, subgroup_shufflerelative)]
+[require(glsl_spirv_wgsl, subgroup_shufflerelative)]
 public T subgroupShuffleDown(T value, uint delta)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
     case glsl:
+    case wgsl:
         __intrinsic_asm "subgroupShuffleDown($0, $1)";
     case spirv:
         return spirv_asm {
@@ -7818,13 +7821,14 @@ __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle_relative)
 [ForceInline]
-[require(glsl_spirv, subgroup_shufflerelative)]
+[require(glsl_spirv_wgsl, subgroup_shufflerelative)]
 public vector<T,N> subgroupShuffleUp(vector<T,N> value, uint delta)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
     case glsl:
+    case wgsl:
         __intrinsic_asm "subgroupShuffleUp($0, $1)";
     case spirv:
         return spirv_asm {
@@ -7838,13 +7842,14 @@ __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle_relative)
 [ForceInline]
-[require(glsl_spirv, subgroup_shufflerelative)]
+[require(glsl_spirv_wgsl, subgroup_shufflerelative)]
 public vector<T,N> subgroupShuffleDown(vector<T,N> value, uint delta)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
     case glsl:
+    case wgsl:
         __intrinsic_asm "subgroupShuffleDown($0, $1)";
     case spirv:
         return spirv_asm {
