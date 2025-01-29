@@ -2019,6 +2019,13 @@ DIAGNOSTIC(
     notValidVaryingParameter,
     "parameter '$0' is not a valid varying parameter.")
 
+DIAGNOSTIC(
+    39029,
+    Warning,
+    registerModifierButNoVkBindingNorShift,
+    "shader parameter '$0' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` "
+    "specified for Vulkan, nor is `-fvk-$1-shift` used.")
+
 //
 
 // 4xxxx - IL code generation.
