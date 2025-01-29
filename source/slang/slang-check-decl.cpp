@@ -9204,7 +9204,6 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
         inheritanceDefaultCtorList.add(
             DeclAndCtorInfo(m_astBuilder, this, structOfInheritance, declRefType, true));
     }
-    calcThisType(makeDeclRef(structDecl));
     DeclAndCtorInfo structDeclInfo = DeclAndCtorInfo(
         m_astBuilder,
         this,
