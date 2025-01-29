@@ -330,6 +330,10 @@ alias cuda_hlsl_metal_spirv = cuda | hlsl | metal | spirv;
 /// [Compound]
 alias cuda_glsl_hlsl_spirv = cuda | glsl | hlsl | spirv;
 
+/// CUDA, GLSL, HLSL, SPIRV, and WGSL code-gen targets
+/// [Compound]
+alias cuda_glsl_hlsl_spirv_wgsl = cuda | glsl | hlsl | spirv | wgsl;
+
 /// CUDA, GLSL, HLSL, Metal, and SPIRV code-gen targets
 /// [Compound]
 alias cuda_glsl_hlsl_metal_spirv = cuda | glsl | hlsl | metal | spirv;
@@ -1879,13 +1883,18 @@ alias shader5_sm_5_0 = GL_ARB_gpu_shader5 | sm_5_0_version;
 
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_basic'
 /// [Compound]
-alias subgroup_basic = GL_KHR_shader_subgroup_basic | _sm_6_0 | _cuda_sm_7_0;
+alias subgroup_basic = GL_KHR_shader_subgroup_basic 
+                     | _sm_6_0
+                     | _cuda_sm_7_0
+                     | wgsl
+                     ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_ballot'
 /// [Compound]
 alias subgroup_ballot = spirv_1_0 + GL_KHR_shader_subgroup_ballot
                       | glsl + GL_KHR_shader_subgroup_ballot + shader5_sm_5_0 
                       | _sm_6_0  + shader5_sm_5_0 
                       | _cuda_sm_7_0 + shader5_sm_5_0
+                      | wgsl
                       ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_ballot_activemask'
 /// [Compound]
@@ -1900,19 +1909,33 @@ alias subgroup_basic_ballot = glsl + GL_KHR_shader_subgroup_basic + subgroup_bal
                             | spirv + GL_KHR_shader_subgroup_basic + subgroup_ballot
                             | hlsl + subgroup_ballot
                             | cuda + subgroup_ballot
+                            | wgsl
                             ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_vote'
 /// [Compound]
-alias subgroup_vote = GL_KHR_shader_subgroup_vote | _sm_6_0 | _cuda_sm_7_0;
+alias subgroup_vote = GL_KHR_shader_subgroup_vote 
+                    | _sm_6_0
+                    | _cuda_sm_7_0
+                    | wgsl
+                    ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_vote'
 /// [Compound]
 alias shaderinvocationgroup = subgroup_vote;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_arithmetic'
 /// [Compound]
-alias subgroup_arithmetic = GL_KHR_shader_subgroup_arithmetic | _sm_6_0 | _cuda_sm_7_0;
+alias subgroup_arithmetic = GL_KHR_shader_subgroup_arithmetic 
+                          | _sm_6_0
+                          | _cuda_sm_7_0
+                          | wgsl
+                          ;
+
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_shuffle'
 /// [Compound]
-alias subgroup_shuffle = GL_KHR_shader_subgroup_shuffle | _sm_6_0 | _cuda_sm_7_0;
+alias subgroup_shuffle = GL_KHR_shader_subgroup_shuffle 
+                       | _sm_6_0
+                       | _cuda_sm_7_0
+                       | wgsl
+                       ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_shuffle_relative'
 /// [Compound]
 alias subgroup_shufflerelative = GL_KHR_shader_subgroup_shuffle_relative | _sm_6_0 | _cuda_sm_7_0;
@@ -1921,7 +1944,11 @@ alias subgroup_shufflerelative = GL_KHR_shader_subgroup_shuffle_relative | _sm_6
 alias subgroup_clustered = GL_KHR_shader_subgroup_clustered | _sm_6_0 | _cuda_sm_7_0;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_quad'
 /// [Compound]
-alias subgroup_quad = GL_KHR_shader_subgroup_quad | _sm_6_0 | _cuda_sm_7_0;
+alias subgroup_quad = GL_KHR_shader_subgroup_quad
+                    | _sm_6_0
+                    | _cuda_sm_7_0
+                    | wgsl
+                    ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_partitioned'
 /// [Compound]
 alias subgroup_partitioned = GL_NV_shader_subgroup_partitioned + subgroup_ballot_activemask | _sm_6_5 | _cuda_sm_7_0;
