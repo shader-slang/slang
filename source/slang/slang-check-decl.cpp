@@ -329,12 +329,12 @@ struct SemanticsDeclBodyVisitor : public SemanticsDeclVisitorBase,
         DeclAndCtorInfo(
             ASTBuilder* m_astBuilder,
             SemanticsVisitor* visitor,
-            StructDecl* parent,
-            Type* type,
+            StructDecl* inParent,
+            Type* inType,
             const bool getOnlyDefault)
         {
-            this->parent = parent;
-            this->type = type;
+            parent = inParent;
+            type = inType;
             if (getOnlyDefault)
                 defaultCtor = _getDefaultCtor(parent);
             else
