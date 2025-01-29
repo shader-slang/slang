@@ -14506,7 +14506,7 @@ T QuadReadAcrossDiagonal(T localValue)
             OpCapability GroupNonUniformQuad;
             result:$$T = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
         };
-    case wgsl: __intrinsic_asm "quadSwapY";
+    case wgsl: __intrinsic_asm "quadSwapDiagonal";
     }
 }
 __generic<T : __BuiltinType, let N : int>
@@ -14526,7 +14526,7 @@ vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
             OpCapability GroupNonUniformQuad;
             result:$$vector<T,N> = OpGroupNonUniformQuadSwap Subgroup $localValue $direction;
         };
-    case wgsl: __intrinsic_asm "quadSwapY";
+    case wgsl: __intrinsic_asm "quadSwapDiagonal";
     }
 }
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossDiagonal(matrix<T,N,M> localValue);
@@ -14571,7 +14571,6 @@ vector<T, N> WaveActive$(opName.hlslName)(vector<T, N> expr)
     case hlsl: __intrinsic_asm "WaveActive$(opName.hlslName)";
     case spirv:
         return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniform$(opName.spirvName) $$vector<T, N> result Subgroup Reduce $expr};
-    case wgsl: __intrinsic_asm "subgroup$(opName.glslName)";
     case cuda:
         return WaveMask$(opName.hlslName)(WaveGetActiveMask(), expr);
     }

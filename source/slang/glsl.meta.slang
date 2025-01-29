@@ -6305,7 +6305,7 @@ void shader_subgroup_preamble() {
 
 // GL_KHR_shader_subgroup_basic Built-in Variables
 
-[require(cpp_cuda_glsl_hlsl_spirv, subgroup_basic)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
 void requireGLSLExtForSubgroupBasicBuiltin() {
     __target_switch
     {
@@ -6317,7 +6317,7 @@ void requireGLSLExtForSubgroupBasicBuiltin() {
     }
 }
 
-[require(cpp_cuda_glsl_hlsl_spirv, subgroup_basic)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
 void setupExtForSubgroupBasicBuiltIn() {
     __target_switch
     {
@@ -6329,7 +6329,7 @@ void setupExtForSubgroupBasicBuiltIn() {
 }
 
 __spirv_version(1.3)
-[require(cpp_cuda_glsl_hlsl_spirv, subgroup_ballot)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 void requireGLSLExtForSubgroupBallotBuiltin() {
     __target_switch
     {
@@ -6342,7 +6342,7 @@ void requireGLSLExtForSubgroupBallotBuiltin() {
 }
 
 __spirv_version(1.3)
-[require(cpp_cuda_glsl_hlsl_spirv, subgroup_ballot)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 void setupExtForSubgroupBallotBuiltIn() {
     __target_switch
     {
@@ -6392,7 +6392,7 @@ public property uint gl_SubgroupID
 
 public property uint gl_SubgroupSize
 {
-    [require(cpp_cuda_glsl_hlsl_spirv, subgroup_basic)]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
     get {
         setupExtForSubgroupBasicBuiltIn();
         return WaveGetLaneCount();
@@ -6401,7 +6401,7 @@ public property uint gl_SubgroupSize
 
 public property uint gl_SubgroupInvocationID
 {
-    [require(cpp_cuda_glsl_hlsl_spirv, subgroup_basic)]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
     get {
         setupExtForSubgroupBasicBuiltIn();
         return WaveGetLaneIndex();
@@ -6625,7 +6625,7 @@ public void subgroupMemoryBarrierShared()
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_basic) 
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
 public bool subgroupElect()
 {
     __target_switch
@@ -6635,6 +6635,7 @@ public bool subgroupElect()
     case glsl:
     case spirv:
     case hlsl:
+    case wgsl:
         return WaveIsFirstLane();
 
     }
@@ -6645,7 +6646,7 @@ public bool subgroupElect()
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_vote)]
 public bool subgroupAll(bool value)
 {
     return WaveActiveAllTrue(value);
@@ -6654,7 +6655,7 @@ public bool subgroupAll(bool value)
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_vote)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_vote)]
 public bool subgroupAny(bool value)
 {
     return WaveActiveAnyTrue(value);
@@ -6688,7 +6689,7 @@ __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 public T subgroupAdd(T value)
 {
     shader_subgroup_preamble<T>();
@@ -6699,7 +6700,7 @@ __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 public T subgroupMul(T value)
 {
     shader_subgroup_preamble<T>();
@@ -6710,7 +6711,7 @@ __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 public T subgroupMin(T value)
 {
     shader_subgroup_preamble<T>();
@@ -6721,7 +6722,7 @@ __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 public T subgroupMax(T value)
 {
     shader_subgroup_preamble<T>();
@@ -6813,13 +6814,14 @@ __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(glsl_spirv, subgroup_arithmetic)]
+[require(glsl_spirv_wgsl, subgroup_arithmetic)]
 public T subgroupInclusiveAdd(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
     case glsl:
+    case wgsl:
         __intrinsic_asm "subgroupInclusiveAdd($0)";
     case spirv:
         if (__isFloat<T>())
@@ -6834,13 +6836,14 @@ __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(glsl_spirv, subgroup_arithmetic)]
+[require(glsl_spirv_wgsl, subgroup_arithmetic)]
 public T subgroupInclusiveMul(T value)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
     case glsl:
+    case wgsl:
         __intrinsic_asm "subgroupInclusiveMul($0)";
     case spirv:
         if (__isFloat<T>())
@@ -6974,7 +6977,7 @@ __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 public T subgroupExclusiveAdd(T value)
 {
     shader_subgroup_preamble<T>();
@@ -6986,7 +6989,7 @@ __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 public T subgroupExclusiveMul(T value)
 {
     shader_subgroup_preamble<T>();
@@ -7097,7 +7100,7 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 public vector<T,N> subgroupAdd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
@@ -7108,7 +7111,7 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 public vector<T,N> subgroupMul(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
@@ -7119,7 +7122,7 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 public vector<T,N> subgroupMin(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
@@ -7130,7 +7133,7 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 public vector<T,N> subgroupMax(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
@@ -7366,7 +7369,7 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 public vector<T,N> subgroupExclusiveAdd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
@@ -7378,7 +7381,7 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 public vector<T,N> subgroupExclusiveMul(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
@@ -7510,29 +7513,29 @@ __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 public T subgroupBroadcastFirst(T value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskReadLaneFirst(WaveGetActiveMask(), value);
+    return WaveReadLaneFirst(value);
 }
 
 __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 public vector<T,N> subgroupBroadcastFirst(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    return WaveMaskReadLaneFirst(WaveGetActiveMask(), value);
+    return WaveReadLaneFirst(value);
 }
 
 // WaveMaskBallot is not the same; it force trunc's
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 public uvec4 subgroupBallot(bool value)
 {
     return WaveActiveBallot(value);
@@ -7551,7 +7554,7 @@ public uvec4 subgroupBallot(bool value)
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 public bool subgroupInverseBallot(uvec4 value)
 {
     __target_switch
@@ -7560,6 +7563,7 @@ public bool subgroupInverseBallot(uvec4 value)
         // only has 32 warps
         __intrinsic_asm "(($0).x >> (_getLaneId()) & 1)";
     case hlsl:
+    case wgsl:
         // much like _WaveCountBits, but here we hope that we hit case 0; we can then avoid the expensive logic
         const uint waveLaneCount = WaveGetLaneCount();
         switch ((waveLaneCount - 1) / 32)
@@ -7586,7 +7590,7 @@ public bool subgroupInverseBallot(uvec4 value)
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_ballot)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 public bool subgroupBallotBitExtract(uvec4 value, uint index)
 {
     __target_switch
@@ -7594,6 +7598,7 @@ public bool subgroupBallotBitExtract(uvec4 value, uint index)
     case cuda:
         __intrinsic_asm "($1 & ($0).x) != 0";
     case hlsl:
+    case wgsl:
         const uint waveLaneCount = WaveGetLaneCount();
         switch ((waveLaneCount - 1) / 32)
         {
@@ -7713,7 +7718,7 @@ __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_shuffle)]
 public T subgroupShuffle(T value, uint index)
 {
     shader_subgroup_preamble<T>();
@@ -7723,13 +7728,14 @@ public T subgroupShuffle(T value, uint index)
 __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
-[require(glsl_spirv, subgroup_shuffle)]
+[require(glsl_spirv_wgsl, subgroup_shuffle)]
 [ForceInline] public T subgroupShuffleXor(T value, uint mask)
 {
     shader_subgroup_preamble<T>();
     __target_switch
     {
     case glsl:
+    case wgsl:
         __intrinsic_asm "subgroupShuffleXor($0,$1)";
     case spirv:
         return spirv_asm {
@@ -7743,7 +7749,7 @@ __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_shuffle)]
+[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_shuffle)]
 public vector<T,N> subgroupShuffle(vector<T,N> value, uint index)
 {
     shader_subgroup_preamble<T>();
@@ -8166,7 +8172,7 @@ __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 [ForceInline]
-[require(glsl_hlsl_spirv, subgroup_quad)]
+[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
 public T subgroupQuadSwapHorizontal(T value)
 {
     shader_subgroup_preamble<T>();
@@ -8177,7 +8183,7 @@ __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 [ForceInline]
-[require(glsl_hlsl_spirv, subgroup_quad)]
+[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
 public T subgroupQuadSwapVertical(T value)
 {
     shader_subgroup_preamble<T>();
@@ -8188,7 +8194,7 @@ __generic<T : __BuiltinType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 [ForceInline]
-[require(glsl_hlsl_spirv, subgroup_quad)]
+[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
 public T subgroupQuadSwapDiagonal(T value)
 {
     shader_subgroup_preamble<T>();
@@ -8211,7 +8217,7 @@ __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 [ForceInline]
-[require(glsl_hlsl_spirv, subgroup_quad)]
+[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
 public vector<T,N> subgroupQuadSwapHorizontal(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
@@ -8222,7 +8228,7 @@ __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 [ForceInline]
-[require(glsl_hlsl_spirv, subgroup_quad)]
+[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
 public vector<T,N> subgroupQuadSwapVertical(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
@@ -8233,7 +8239,7 @@ __generic<T : __BuiltinType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 [ForceInline]
-[require(glsl_hlsl_spirv, subgroup_quad)]
+[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
 public vector<T,N> subgroupQuadSwapDiagonal(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
