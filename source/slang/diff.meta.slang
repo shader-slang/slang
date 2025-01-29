@@ -1,21 +1,25 @@
 
 /// `[ForwardDerivative(fwdFn)]` attribute can be used to provide a forward-mode
-/// derivative implementation. 
+/// derivative implementation.
 /// Invoking `fwd_diff(decoratedFn)` will place a call to `fwdFn` instead of synthesizing
-/// a derivative implementation.  
+/// a derivative implementation.
 /// The same behavior holds if `decoratedFn` is used in a differentiable context.
 ///
-/// @remarks
-/// The signature of `fwdFn` must match the expected signature of `fwd_diff(decoratedFn)`. 
-/// See the reference for `fwd_diff` for a full list of signature rules (TODO: Link reference)
-///
-/// @remarks 
-/// See the user guide's section on custom derivatives for an introduction to this approach. (TODO: Link guide)
 ///
 /// @remarks
-/// This attribute can be used on generic functions, member functions and accessors.
-/// For generic functions, the generic signatures (parameters + constraints) of both functions
-/// must match exactly.
+/// - The signature of `fwdFn` must match the expected signature of `fwd_diff(decoratedFn)`.
+/// - See the reference for `fwd_diff` for a full list of signature rules (https://shader-slang.org/slang/user-guide/autodiff.html#fwd_difff--slang_function---slang_function)
+/// - See the user guide's section on custom derivatives for an introduction to this approach. (https://shader-slang.org/slang/user-guide/autodiff.html#user-defined-derivative-functions)
+///
+/// - This attribute can be used on generic functions, member functions and accessors.
+/// - For generic functions, the generic signatures (parameters + constraints) of both functions must match exactly.
+///
+/// @remarks
+/// - The decorated function will be considered forward-differentiable. There is no need for a `[Differentiable]` tag. 
+/// If the `[Differentiable]` tag is present, 
+/// and no custom backward derivative is specified with `[BackwardDerivative]`, then the
+/// Slang will use auto-diff to generate the backward=mode derivative, but will use the provided
+/// derivative for forward-mode.
 /// 
 /// Example:
 /// ```csharp
@@ -41,12 +45,51 @@
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForwardDerivative(function)] : ForwardDerivativeAttribute;
 
+/// `[BackwardDerivative(bwdFn)]` attribute can be used to provide a forward-mode
+/// derivative implementation.
+/// Invoking `bwd_diff(decoratedFn)` will place a call to `bwdFn` instead of synthesizing
+/// a derivative implementation.
+/// The same behavior holds if `decoratedFn` is used in a differentiable context.
+///
+/// @remarks
+/// The signature of `bwdFn` must match the expected signature of `bwd_diff(decoratedFn)`.
+/// See the reference for `bwd_diff` for a full list of signature rules (https://shader-slang.org/slang/user-guide/autodiff.html#bwd_difff--slang_function---slang_function)
+///
+/// See the user guide's section on custom derivatives for an introduction to custom
+/// derivatives. (https://shader-slang.org/slang/user-guide/autodiff.html#user-defined-derivative-functions)
+///
+/// This attribute can be used on generic functions, member functions and accessors.
+/// For generic functions, the generic signatures (parameters + constraints) of both functions
+/// must match exactly. 
+/// Overloaded functions are also supported. The compiler will attempt to resolve the overload
+/// from the expected derivative signature. If it is unable to do so, it will issue a 
+/// diagnostic error.
+///
+/// The decorated function will be considered differentiable.
+/// There is no need for a `[Differentiable]` tag.
+///
+/// Example:
+/// ```csharp
+/// [BackwardDerivative(foo_bwd)]
+/// T foo<T : IFloat, P : IArray<T>>(T x, P xarr) { /* ... */ }
+///
+/// void foo_bwd<T : IFloat, P : IArray<T>>( // Use the same generic signature for a match.
+///     inout DifferentialPair<T> x, P dp_xarr, T.Differential dresult) { /* ... */ }
+/// ```
+///
+/// For member functions, or functions nested inside namespaces, `bwdFn` may need to be a fully qualified 
+/// name.
+///
+/// ```
+///
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [BackwardDerivative(function)] : BackwardDerivativeAttribute;
 
-/// `[PrimalSubstitute(substFn)]` attribute denotes a substitute `substFn` that should be used for 
+/// `[PrimalSubstitute(substFn)]` attribute denotes a substitute `substFn` that should be used for
 /// differentiation instead of the original function. This serves as a sort of 'reference' implementation
-/// where the original function cannot be differentiated (for whatever reason).
+ where the original function cannot be differentiated (for whatever reason).
+///
+/// See the auto-diff user guide for more: https://shader-slang.org/slang/user-guide/autodiff.html#primal-substitute-functions
 ///
 /// @example The following example shows in more detail on how primal substitute affects derivative computation.
 /// ```csharp
@@ -66,7 +109,6 @@ attribute_syntax [BackwardDerivative(function)] : BackwardDerivativeAttribute;
 /// @remarks
 /// `substFn` must have a function definition (i.e. a body).
 /// 
-/// @remarks
 /// In case that a function has both custom defined derivatives and a differentiable 
 /// primal substitute, the primal substitute overrides the custom defined derivative 
 /// on the original function. All calls to the original function will be translated 
@@ -74,7 +116,6 @@ attribute_syntax [BackwardDerivative(function)] : BackwardDerivativeAttribute;
 /// This means that the derivatives of the primal substitute function will be used instead 
 /// of the derivatives defined on the original function.
 ///
-/// @remarks
 /// This attribute can be used on generic functions and member functions. 
 /// For generic functions, the generic signatures (parameters + constraints) of both functions
 /// must match exactly.
@@ -95,14 +136,23 @@ attribute_syntax [PrimalSubstitute(function)] : PrimalSubstituteAttribute;
 
 /// `[ForwardDerivativeOf(fn)]` is the back-reference version of `[ForwardDerivative(derivFn)]`
 ///
-/// When used to decorate a function, that function is considered the substitute for the 
-/// referenced `fn`. 
-/// Apart from this difference, the semantics of the substitution are the same as for 
+/// When used to decorate a function, the decorated function is considered the forward-derivative
+/// implementation of the referenced function `fn`.
+///
+/// Apart from this, the semantics of the custom derivative are the same as for 
 /// `[ForwardDerivative(derivFn)]`
 ///
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForwardDerivativeOf(function)] : ForwardDerivativeOfAttribute;
 
+/// `[BackwardDerivativeOf(fn)]` is the back-reference version of `[BackwardDerivative(derivFn)]`
+///
+/// When used to decorate a function, the decorated function is considered the backward-derivative
+/// implementation of the referenced function `fn`.
+///
+/// Apart from this, the semantics of the custom derivative are the same as for
+/// `[BackwardDerivative(derivFn)]`
+///
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [BackwardDerivativeOf(function)] : BackwardDerivativeOfAttribute;
 
@@ -119,11 +169,15 @@ attribute_syntax [PrimalSubstituteOf(function)] : PrimalSubstituteOfAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
 
-// Exclude "this" parameter from differentiation.
+// Exclude "this" parameter from differentiation. Effectively like putting a 'no_diff' on the 
+// "this" parameter.
+//
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [NoDiffThis] : NoDiffThisAttribute;
 
-// A 'none-type' that acts as a run-time sentinel for zero differentials.
+// A 'none-type' that acts as a run-time sentinel for zero differentials. This is primarily
+// for internal use.
+//
 [__AutoDiffBuiltin]
 export struct NullDifferential : IDifferentiable
 { 

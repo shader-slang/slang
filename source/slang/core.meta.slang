@@ -418,8 +418,11 @@ void __requireGLSLExtension(constexpr String preludeText);
 __intrinsic_op($(kIROp_StaticAssert))
 void static_assert(constexpr bool condition, NativeString errorMessage);
 
-/// Represents a type that is differentiable for the purposes of automatic differentiation.
-/// 
+/// Represents a 'value' type that is differentiable for the purposes of automatic differentiation.
+///
+/// See the auto-diff user guide section for an introduction to 
+/// differentiable value types (https://shader-slang.org/slang/user-guide/autodiff.html#differentiable-value-types)
+///
 /// #### Builtin Differentiable Value Types
 /// The following built-in types are differentiable: 
 /// - Scalars: `float`, `double` and `half`.
@@ -604,8 +607,8 @@ interface IDifferentiable
 ///
 /// Types that conform to this interface can be used with `DifferentiablePtrPair<T>`
 /// to pass the derivative components to calls to `fwd_diff(fn)` or `bwd_diff(fn)`
-/// 
-/// See the auto-diff user guide for more details ([TODO: Link])
+///
+/// See the auto-diff user guide for more details (https://shader-slang.org/slang/user-guide/autodiff.html#differentiable-ptr-types)
 ///
 /// @remarks Support for this interface is still experimental and subject to change.
 ///

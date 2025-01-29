@@ -232,15 +232,8 @@ struct syn_MyPartialDiffType_Differential
 };
 ```
 
-To exclude differentiable fields from the derived type, you can use the `no_diff` modifier
-```hlsl
-struct MyType : IDifferentiable
-{
-    float a;
-    // Differential will not contain a field for carrying derivative of 'b'
-    no_diff float b;
-}
-```
+You can make existing types differentiable through Slang's extension mechanism.
+For instance, `extension MyType : IDifferentiable { }` will make `MyType` differentiable retroactively.
 
 See the `IDifferentiable` [reference documentation](https://shader-slang.org/stdlib-reference/interfaces/idifferentiable-01/index) for more information on how to override the default behavior.
 
@@ -409,8 +402,7 @@ void sin_bwd(inout DifferentialPair<float> dpx, float dresult) { /* ... */ }
 ```
 
 User-defined derivatives also work for generic functions, member functions, accessors, and more. 
-See the reference section for the `[ForwardDerivative(fn)]` and `[BackwardDerivative(fn)]` attributes for more.
-(TODO: Links)
+See the reference section for the [`[ForwardDerivative(fn)]`](https://shader-slang.org/stdlib-reference/attributes/forwardderivative-07.html) and [`[BackwardDerivative(fn)]`](https://shader-slang.org/stdlib-reference/attributes/backwardderivative-08) attributes for more. 
 
 ## Using Auto-diff with Generics
 Automatic differentiation works seamlessly with generically-defined types and methods.
@@ -499,19 +491,20 @@ void compute(float x, uint obj_id)
     // Create an instance of either FooImpl1 or FooImpl2
     IFoo foo = createDynamicObject<IFoo>(obj_id); 
     
-    // Dynamic dispatch to appropriate 'calc'
+    // Dynamic dispatch to appropriate 'calc'.
+    //
     // Note that foo itself is non-differentiable, and 
     // has no differential data, but 'x' and 'result'
-    // are.
+    // will carry derivatives.s
     //
     var result = foo.calc(x);
 }
 ```
 
-### Differentiable Interfaces and Associated Types
+### Differentiable Interface (and Associated) Types
 > Note: This is an advanced use-case and support is currently experimental.
-You can have an interface or an interface associated type extend `IDifferentiable` and use that to define
-differentiable types or carry differentiable information for the abstract type.
+
+You can have an interface or an interface associated type extend `IDifferentiable` and use that in differentiable interface requirement functions. This is often important in large code-bases with modular components that are all differentiable (one example is the material system in large production renderers)
 
 ```csharp
 interface IFoo : IDifferentiable
@@ -547,7 +540,7 @@ IFoo makeObj(uint id, float val)
 {
     if (id == 1)
         return FooImpl1((double)val);
-    else if (id == 2)
+    else
         return FooImpl2((half)val);
 }
 
@@ -836,7 +829,7 @@ This forward propagation function takes the initial primal value of `p0` in `p0.
 
 A backward derivative propagation function propagates the derivative of the function output to all the input parameters simultaneously.
 
-Given an original function `f`, the general rule for determining the signature of its backward propagation function is that a differentiable output `o` becomes an input parameter holding the partial derivative of a downstream output with regard to the differentiable output, i.e. $$\partial y/\partial o$$); an input differentiable parameter `i` in the original function will become an output in the backward propagation function, holding the propagated partial derivative $$\partial y/\partial i$$; and any non-differentiable outputs are dropped from the backward propagation function. This means that the backward propagation function never returns any values computed in the original function.
+Given an original function `f`, the general rule for determining the signature of its backward propagation function is that a differentiable output `o` becomes an input parameter holding the partial derivative of a downstream output with regard to the differentiable output, i.e. $\partial y/\partial o$; an input differentiable parameter `i` in the original function will become an output in the backward propagation function, holding the propagated partial derivative $\partial y/\partial i$; and any non-differentiable outputs are dropped from the backward propagation function. This means that the backward propagation function never returns any values computed in the original function.
 
 More specifically, the signature of its backward propagation function is determined using the following rules:
 - A backward propagation function always returns `void`.
