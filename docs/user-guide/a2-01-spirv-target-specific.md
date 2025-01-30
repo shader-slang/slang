@@ -20,7 +20,14 @@ Combined texture sampler
 Slang supports Combined texture sampler such as `Sampler2D`.
 Slang emits SPIR-V code with `OpTypeSampledImage` instruction.
 
-You can specify two different register numbers for each: one for the texture register and another for the sampler register.
+For SPIR-V targets, explicit bindings may be provided through a single `vk::binding` decoration.
+```
+[[vk::binding(1,2)]]
+Sampler2D explicitBindingSampler;
+```
+
+For other targets (HLSL or others) where combined texture samplers are _not_ supported intrinsicly, they are emulated by Slang using separate objects for Texture and Sampler.
+For explicit binding on such targets, you can specify two different register numbers for each: one for the texture register and another for the sampler register.
 ```
 Sampler2D explicitBindingSampler : register(t4): register(s3);
 ```

@@ -3234,6 +3234,18 @@ int __alignOf_intrinsic<T>()
     return __alignOf_intrinsic_impl<T>(__default<T>());
 }
 
+[__unsafeForceInlineEarly]
+int32_t __elemToByteOffset<T>(int32_t elemOffset)
+{
+    return elemOffset * __naturalStrideOf<T>();
+}
+
+[__unsafeForceInlineEarly]
+int32_t __byteToElemOffset<T>(int32_t byteOffset)
+{
+    return byteOffset / __naturalStrideOf<T>();
+}
+
 __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);
 
