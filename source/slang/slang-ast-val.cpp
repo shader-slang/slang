@@ -149,6 +149,30 @@ void Val::_toTextOverride(StringBuilder& out)
 
 void ConstantIntVal::_toTextOverride(StringBuilder& out)
 {
+    if (auto enumTypeDecl = isDeclRefTypeOf<EnumDecl>(getType()))
+    {
+        // If this is an enum type, then we want to print the name of the
+        // corresponding enum case, instead of the raw integer value, if possible.
+        //
+        // We will look up the enum case that corresponds to the value, and
+        // print its name if we can find one.
+        //
+        for (auto enumCase : enumTypeDecl.getDecl()->getMembersOfType<EnumCaseDecl>())
+        {
+            if (auto constVal = as<ConstantIntVal>(enumCase->tagVal))
+            {
+                if (constVal->getValue() == getValue())
+                {
+                    out << DeclRef(enumCase);
+                    return;
+                }
+            }
+        }
+
+        // Fallback to explicit cast to the enum type.
+        out << getType() << "(" << getValue() << ")";
+        return;
+    }
     out << getValue();
 }
 

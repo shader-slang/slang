@@ -7969,7 +7969,7 @@ void SemanticsDeclBodyVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
         // We want to enforce that this is an integer constant
         // expression, but we don't actually care to retain
         // the value.
-        CheckIntegerConstantExpression(
+        decl->tagVal = CheckIntegerConstantExpression(
             initExpr,
             IntegerConstantExpressionCoercionType::AnyInteger,
             nullptr,

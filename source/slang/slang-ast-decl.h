@@ -210,6 +210,8 @@ class EnumCaseDecl : public Decl
 
     // Tag value
     Expr* tagExpr = nullptr;
+
+    IntVal* tagVal = nullptr;
 };
 
 // A member of InterfaceDecl representing the abstract ThisType.
