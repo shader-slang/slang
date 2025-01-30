@@ -307,8 +307,7 @@ struct VulkanExtendedFeatureProperties
 
     // Cooperative vector features
     VkPhysicalDeviceCooperativeVectorFeaturesNV cooperativeVectorFeatures = {
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_VECTOR_FEATURES_NV
-    };
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_VECTOR_FEATURES_NV};
 
     // Ray tracing validation features
     VkPhysicalDeviceRayTracingValidationFeaturesNV rayTracingValidationFeatures = {

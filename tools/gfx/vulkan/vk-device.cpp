@@ -752,7 +752,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             deviceCreateInfo.pNext = &extendedFeatures.vulkan12Features;
         }
 
-        if(extendedFeatures.cooperativeVectorFeatures.cooperativeVector)
+        if (extendedFeatures.cooperativeVectorFeatures.cooperativeVector)
         {
             deviceExtensions.add(VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME);
 
