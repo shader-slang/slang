@@ -485,77 +485,77 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 /// and how to add two derivative values together. These function are used during reverse-mode 
 /// auto-diff, to initialize and accumulate derivatives of the given type.
 ///
-// #### Automatic Fulfillment of `IDifferentiable` Requirements
-// Assume the user has defined the following type:
-//
-// ```csharp
-// struct MyRay
-// {
-//     float3 origin;
-//     float3 dir;
-//     int nonDifferentiablePayload;
-// }
-// ```
-//
-// The type can be made differentiable by adding `IDifferentiable` conformance:
-// ```csharp
-// struct MyRay : IDifferentiable
-// {
-//     float3 origin;
-//     float3 dir;
-//     int nonDifferentiablePayload;
-// }
-// ```
-//
+/// #### Automatic Fulfillment of `IDifferentiable` Requirements
+/// Assume the user has defined the following type:
+///
+/// ```csharp
+/// struct MyRay
+/// {
+///     float3 origin;
+///     float3 dir;
+///     int nonDifferentiablePayload;
+/// }
+/// ```
+///
+/// The type can be made differentiable by adding `IDifferentiable` conformance:
+/// ```csharp
+/// struct MyRay : IDifferentiable
+/// {
+///     float3 origin;
+///     float3 dir;
+///     int nonDifferentiablePayload;
+/// }
+/// ```
+///
 /// Note that this code does not provide any explicit implementation of the `IDifferentiable` requirements. In this case the compiler will automatically synthesize all the requirements. This should provide the desired behavior most of the time. The procedure for synthesizing the interface implementation is as follows:
-// 1. A new type is generated that stores the `Differential` of all differentiable fields. This new type itself will conform to the `IDifferentiable` interface, and it will be used to satisfy the `Differential` associated type requirement.
-// 2. Each differential field will be associated to its corresponding field in the newly synthesized `Differential` type.
-// 3. The `zero` value of the differential type is made from the `zero` value of each field in the differential type.
-// 4. The `dadd` method invokes the `dadd` operations for each field whose type conforms to `IDifferentiable`.
-// 5. If the synthesized `Differential` type contains exactly the same fields as the original type, and the type of each field is the same as the original field type, then the original type itself will be used as the `Differential` type instead of creating a new type to satisfy the `Differential` associated type requirement. This means that all the synthesized `Differential` type use itself to meet its own `IDifferentiable` requirements.
+/// 1. A new type is generated that stores the `Differential` of all differentiable fields. This new type itself will conform to the `IDifferentiable` interface, and it will be used to satisfy the `Differential` associated type requirement.
+/// 2. Each differential field will be associated to its corresponding field in the newly synthesized `Differential` type.
+/// 3. The `zero` value of the differential type is made from the `zero` value of each field in the differential type.
+/// 4. The `dadd` method invokes the `dadd` operations for each field whose type conforms to `IDifferentiable`.
+/// 5. If the synthesized `Differential` type contains exactly the same fields as the original type, and the type of each field is the same as the original field type, then the original type itself will be used as the `Differential` type instead of creating a new type to satisfy the `Differential` associated type requirement. This means that all the synthesized `Differential` type use itself to meet its own `IDifferentiable` requirements.
 ///
 /// #### Manual fulfilment of `IDifferentiable` requirements
 /// In rare cases where more control is desired, the user can manually provide the implementation. 
 /// To do so, we will first define the `Differential` type for `MyRay`, and use it to fulfill 
 /// the `Differential` requirement in `MyRay`:
-// ```csharp
-// struct MyRayDifferential
-// {
-//     float3 d_origin;
-//     float3 d_dir;
-// }
-//
-// struct MyRay : IDifferentiable
-// {
-//     // Specify that `MyRay.Differential` is `MyRayDifferential`.
-//     typealias Differential = MyRayDifferential;
-//
-//     // Specify that the derivative for `origin` will be stored in `MayRayDifferential.d_origin`.
-//     [DerivativeMember(MayRayDifferential.d_origin)]
-//     float3 origin;
-//
-//     // Specify that the derivative for `dir` will be stored in `MayRayDifferential.d_dir`.
-//     [DerivativeMember(MayRayDifferential.d_dir)]
-//     float3 dir;
-//
-//     // This is a non-differentiable field so we don't put any attributes on it.
-//     int nonDifferentiablePayload;
-//
-//     // Define zero derivative.
-//     static MyRayDifferential dzero()
-//     {
-//         return {float3(0.0), float3(0.0)};
-//     }
-//
-//     // Define the add operation of two derivatives.
-//     static MyRayDifferential dadd(MyRayDifferential v1, MyRayDifferential v2)
-//     {
-//         MyRayDifferential result;
-//         result.d_origin = v1.d_origin + v2.d_origin;
-//         result.d_dir = v1.d_dir + v2.d_dir;
-//         return result;
-//     }
-// }
+/// ```csharp
+/// struct MyRayDifferential
+/// {
+///     float3 d_origin;
+///     float3 d_dir;
+/// }
+///
+/// struct MyRay : IDifferentiable
+/// {
+///     // Specify that `MyRay.Differential` is `MyRayDifferential`.
+///     typealias Differential = MyRayDifferential;
+///
+///     // Specify that the derivative for `origin` will be stored in `MayRayDifferential.d_origin`.
+///     [DerivativeMember(MayRayDifferential.d_origin)]
+///     float3 origin;
+///
+///     // Specify that the derivative for `dir` will be stored in `MayRayDifferential.d_dir`.
+///     [DerivativeMember(MayRayDifferential.d_dir)]
+///     float3 dir;
+///
+///     // This is a non-differentiable field so we don't put any attributes on it.
+///     int nonDifferentiablePayload;
+///
+///     // Define zero derivative.
+///     static MyRayDifferential dzero()
+///     {
+///         return {float3(0.0), float3(0.0)};
+///     }
+///
+///     // Define the add operation of two derivatives.
+///     static MyRayDifferential dadd(MyRayDifferential v1, MyRayDifferential v2)
+///     {
+///         MyRayDifferential result;
+///         result.d_origin = v1.d_origin + v2.d_origin;
+///         result.d_dir = v1.d_dir + v2.d_dir;
+///         return result;
+///     }
+/// }
 /// ```
 /// 
 /// Note that for each struct field that is differentiable, we need to use the `[DerivativeMember]` attribute to associate it with the
