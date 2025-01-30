@@ -276,7 +276,8 @@ an `IDifferentiable` type whose derivative portion is an _output_ under `bwd_dif
 For types conforming to `IDifferentiablePtrType`, the corresponding pair to use for passing the derivative counterpart is `DifferentialPtrPair<T>`, which represents a pair of `T` and `T.Differential`. Objects of this type can be created using a constructor.
 
 #### Example of defining and using an `IDifferentiablePtrType` object.
-Here is a full example of create a differentiable buffer pointer type, and using it within a differentiable function.
+Here is an example of create a differentiable buffer pointer type, and using it within a differentiable function.
+You can find an interactive sample on the Slang playground [here](https://shader-slang.org/slang-playground/?target=WGSL&code=eJy1VF1v2kAQfPevWEWKYhfkmFdMkBrRSpHKhyBSpdIIHfgcTjFn9z4gEeK_d-_ONsZp1L6UF8MxOzszuz62K3KhoMjI27PINU9iTyqhNwrGb_c6TamY5YwrKqAPDyNmDihXjKwzOlPi8a2g3tED_NzewuOWQnKGZFAQpGYSCM_VFikYl4rwDYU8bdOHlkQhH8kYkTBq8ty10bFn4fPvC6tVC5q4_wdplhM1hLVOYwvRiMd2qaQq9k5Yhzq_Mf4CBDZaqnwHCRVsTxTbU295TzYvByKSUX3mI1-yWh-S4Mmz3GAO_HY4Rdd1Yjyhr0EZiaCojEMRopplEToV0HGgJ5Rj1UxyRUFtkRkzgnWpoCELJHvmxJg0WUrFsgwThRvGb9pxM8xxn7MEKtV-M0cc2Awhg5b44aX6LjifyVSryknbrmm7KpTAyRRh4pKuzqzb-kfLNHTuLLE1v7zcpypgqXfTdPFLE0HlIMPiCe4e9h2-T73SVxbmEgVFYVqux3JMXh8QJ_0JTs_icgG-s2qQMT4GMMFHpxNYgKM7U-5JtjJQO3SMiQVxjTDt0I6DfHJP9-_Ja84fcc7u-SXr9-efJyO_F6Guj5eY8UIrrL2s_PFlPl38rdRujym121AItDwmjPsfDdTN8ug6diE6OSO20L_6yoRU0IuMR01lH37yqzKIPybaixqRNniukz5cp1iMQXbLTJUwqQblyErgQu_MHSHdEpivaVtCyXOxLL1oaAhrtndra1Ip9_boInJeqxtsRiTeVvZFMk0LV4dH0g3D3VL4Xq3Mgvvt5oFfO_6X986Zr0UF3bq6F0Zlvs1UzreSEYc9dabgEIrQXR3_ZT61unJKp98JDfhi).
 ```csharp
 struct MyBufferPointer : IDifferentiablePtrType
 {
@@ -298,7 +299,7 @@ float load(MyBufferPointer p, uint index)
 void load_bwd(DifferentialPtrPair<MyBufferPointer> p, uint index, float dOut)
 {
     MyBufferPointer diff_ptr = p.d;
-    InterlockedAdd(diff_ptr.buf[diff_ptr.offset + index], dOut);
+    diff_ptr.buf[diff_ptr.offset + index] += dOut;
 }
 
 [Differentiable]
@@ -510,6 +511,9 @@ float compute(float x, uint obj_id)
 
 You can have an interface or an interface associated type extend `IDifferentiable` and use that in differentiable interface requirement functions. This is often important in large code-bases with modular components that are all differentiable (one example is the material system in large production renderers)
 
+Here is a snippet of how to make an interface and associated type (and by consequence all its implementations) differentiable. 
+For a full working sample, check out the Slang playground [here](https://shader-slang.org/slang-playground/?target=WGSL&code=eJylVVFvmzAQfudXnCpVgoXRhK4vpdnLuodIq9pqe9umygGzuXPANaYjqvLfd8bgmIR0a-eHcHfcnT9_38WwlSilAsHJ-ocs6yJLPI8VisqcpBQWHwhPa04UKws4h8Uly3MqaaEYWXLqPXmA6-sw-r0N5rwkCogQfO0buw4SbzPs_kWSospLuTrYm1RVmTKiaKbWgsIOHMfFxgexuFUr8ov6HZJKyTpV8IkVlMibkq-LcsUI3-ncIekOlDjO0jgvIaEJ4AkkVbUsgMAbaGCCbWDjbSyc25pkEndOX4_IOOlznDwPzbfYgs5IhyANZwstpSi3glhBO4haNMIZqQYazPcod2ELNRu68cu0bcNme7321CUpAnjy1U9WRdgc3kJnzoLQmpvENujVSk1oVKpXEzEitjNUhwnZuiuW3Qn1XxSNTdxDy5JN0SvGUdCETeBda82QOm0ZBOEgdxvHpDObjuXDPAxbf5_zB5fzvbM514c-1vXy3q_xcgGWhR03j4TPHDsOOjVYDj7LYD6H6fi4DPXkTHNhmuk2-0A564HqX8oreojiYeeHnc4h-JplHUCaW8hwAqdRPsINe46b7gZA5Q0nev56JoTlRMS91fTUOKSWy3tE11NrOuhaEQfduA0-D3pgsCTqb1gHaxqZi6bRF6_nPZZIvpCI64qwwu-3boFeXV9-_Iyd-hkvJXSqYnCa4OPC5KA5meyqZw7TfmHEDU4clkRxcuB1jK9P3dctJP9oKNFVmVE4zsBv5tPoLDiH4_xbcRQCCw29-LT7bU0kVmf3ROnlSMRvCJMXLZr3kIkGgWT4Vkd9XZb8Q9HCOaQttkhe1CIeaxE7LZa_szud4OsTB_rIzv6uE2unCWEWTd2jd8RmvqRVzVVwkuEoWCaxIsqCPRncbH05O_l277_XxWN1sa3Df88fIn-viQ)
+
 ```csharp
 interface IFoo : IDifferentiable
 {
@@ -519,47 +523,16 @@ interface IFoo : IDifferentiable
     BaseType foo(BaseType x);
 };
 
-struct FooImpl1 : IFoo
-{
-    typealias BaseType = double;
-    
-    double factor;
-
-    [Differentiable]
-    double foo(double x) { return factor * x; }
-}
-
-struct FooImpl2 : IFoo
-{
-    typealias BaseType = half;
-
-    half factor;
-
-    [Differentiable]
-    half foo(half x) { return factor * x; }
-}
-
 [Differentiable]
-IFoo makeObj(uint id, float val)
+float calc(float x)
 {
-    if (id == 1)
-        return FooImpl1((double)val);
-    else
-        return FooImpl2((half)val);
-}
-
-[Differentiable]
-float calc(uint precision, float mul, float x)
-{
-    // Note that since IFoo is differentiable, the 'factor' member
-    // does have a correponding differential.
+    // Note that since IFoo is differentiable, 
+    // any data in the IFoo implementation is differentiable
+    // and will carry derivatives.
     //
-    IFoo obj = makeObj(precision, mul);
+    IFoo obj = makeObj(/* ... */);
     return obj.foo(x);
 }
-
-// 'calc' provides derivatives for both mul and x and can select its implementation dynamically
-// with 'id'.
 ```
 
 Under the hood, Slang will automatically construct an anonymous abstract type to represent the differentials. 
