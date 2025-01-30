@@ -765,6 +765,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit("GroupMemoryBatrierWithGroupSync();\n");
             return true;
         }
+    case kIROp_MakeCoopVector:
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
         {
@@ -1357,6 +1358,16 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_AtomicType:
         {
             emitSimpleTypeImpl(cast<IRAtomicType>(type)->getElementType());
+            return;
+        }
+    case kIROp_CoopVectorType:
+        {
+            auto coopVecType = (IRCoopVectorType*)type;
+            m_writer->emit("CoopVector<");
+            emitType(coopVecType->getElementType());
+            m_writer->emit(",");
+            m_writer->emit(getIntVal(coopVecType->getElementCount()));
+            m_writer->emit(">");
             return;
         }
     case kIROp_ConstRefType:

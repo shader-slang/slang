@@ -1862,6 +1862,14 @@ struct IRHitObjectType : IRType
     IR_LEAF_ISA(HitObjectType)
 };
 
+struct IRCoopVectorType : IRType
+{
+    IRType* getElementType() { return (IRType*)getOperand(0); }
+    IRInst* getElementCount() { return getOperand(1); }
+
+    IR_LEAF_ISA(CoopVectorType)
+};
+
 bool isDefinition(IRInst* inVal);
 
 // A structure type is represented as a parent instruction,

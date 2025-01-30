@@ -1469,6 +1469,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_MakeArray:
     case kIROp_swizzleSet:
     case kIROp_MakeArrayFromElement:
+    case kIROp_MakeCoopVector:
+
         return false;
     }
 
@@ -2362,6 +2364,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         emitSimpleValue(inst);
         break;
 
+    case kIROp_MakeCoopVector:
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
     case kIROp_VectorReshape:
@@ -3096,6 +3099,51 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         m_writer->advanceToSourceLocation(inst->sourceLoc);
     }
 
+    if (auto coopVecType = as<IRCoopVectorType>(inst->getDataType()))
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_MakeCoopVector:
+            {
+                emitType(coopVecType, getName(inst));
+                m_writer->emit(";\n");
+
+                auto elemCount = as<IRIntLit>(coopVecType->getOperand(1));
+                IRIntegerValue elemCountValue = elemCount->getValue();
+                for (IRIntegerValue i = 0; i < elemCountValue; ++i)
+                {
+                    m_writer->emit(getName(inst));
+                    m_writer->emit(".WriteToIndex(");
+                    m_writer->emit(i);
+                    m_writer->emit(", ");
+                    emitDereferenceOperand(inst->getOperand(i), getInfo(EmitOp::General));
+                    m_writer->emit(");\n");
+                }
+                return;
+            }
+        case kIROp_Call:
+            emitType(coopVecType, getName(inst));
+            m_writer->emit(";\n");
+
+            m_writer->emit(getName(inst));
+            m_writer->emit(".CopyFrom(");
+            emitCallExpr((IRCall*)inst, getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return;
+        case kIROp_Load:
+            emitType(coopVecType, getName(inst));
+            m_writer->emit(";\n");
+
+            m_writer->emit(getName(inst));
+            m_writer->emit(".CopyFrom(");
+            emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return;
+        default:
+            break;
+        }
+    }
+
     switch (inst->getOp())
     {
     default:
@@ -3342,11 +3390,21 @@ void CLikeSourceEmitter::_emitStoreImpl(IRStore* store)
 {
     auto srcVal = store->getVal();
     auto dstPtr = store->getPtr();
-    auto prec = getInfo(EmitOp::Assign);
-    emitDereferenceOperand(dstPtr, leftSide(getInfo(EmitOp::General), prec));
-    m_writer->emit(" = ");
-    emitOperand(srcVal, rightSide(prec, getInfo(EmitOp::General)));
-    m_writer->emit(";\n");
+    if (isPointerOfType(dstPtr->getDataType(), kIROp_CoopVectorType))
+    {
+        emitDereferenceOperand(dstPtr, getInfo(EmitOp::General));
+        m_writer->emit(".CopyFrom(");
+        emitDereferenceOperand(srcVal, getInfo(EmitOp::General));
+        m_writer->emit(");\n");
+    }
+    else
+    {
+        auto prec = getInfo(EmitOp::Assign);
+        emitDereferenceOperand(dstPtr, leftSide(getInfo(EmitOp::General), prec));
+        m_writer->emit(" = ");
+        emitOperand(srcVal, rightSide(prec, getInfo(EmitOp::General)));
+        m_writer->emit(";\n");
+    }
 }
 
 void CLikeSourceEmitter::_emitInstAsDefaultInitializedVar(IRInst* inst, IRType* type)
@@ -4627,7 +4685,45 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
     {
         if (store->getPtr() == varDecl)
         {
-            _emitInstAsVarInitializerImpl(store->getVal());
+            const bool isCoopVectorType = varType->getOp() == kIROp_CoopVectorType;
+            if (isCoopVectorType && store->getVal()->getOp() == kIROp_Load)
+            {
+                m_writer->emit(";\n");
+                m_writer->emit(getName(varDecl));
+                m_writer->emit(".CopyFrom(");
+                emitDereferenceOperand(store->getVal()->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(")");
+            }
+            else if (isCoopVectorType && store->getVal()->getOp() == kIROp_Call)
+            {
+                m_writer->emit(";\n");
+                m_writer->emit(getName(varDecl));
+                m_writer->emit(".CopyFrom(");
+                emitCallExpr((IRCall*)store->getVal(), getInfo(EmitOp::General));
+                m_writer->emit(")");
+            }
+            else if (isCoopVectorType && store->getVal()->getOp() == kIROp_MakeCoopVector)
+            {
+                auto coopVecType = as<IRCoopVectorType>(store->getVal()->getDataType());
+                auto elemCount = as<IRIntLit>(coopVecType->getOperand(1));
+                IRIntegerValue elemCountValue = elemCount->getValue();
+                for (IRIntegerValue i = 0; i < elemCountValue; ++i)
+                {
+                    m_writer->emit(";\n");
+                    m_writer->emit(getName(varDecl));
+                    m_writer->emit(".WriteToIndex(");
+                    m_writer->emit(i);
+                    m_writer->emit(", ");
+                    emitDereferenceOperand(
+                        store->getVal()->getOperand(i),
+                        getInfo(EmitOp::General));
+                    m_writer->emit(")");
+                }
+            }
+            else
+            {
+                _emitInstAsVarInitializerImpl(store->getVal());
+            }
         }
     }
 
