@@ -76,7 +76,7 @@ In Slang derivatives are computed using `fwd_diff`/`bwd_diff` which each corresp
 For forward-diff, to pass the vector $\mathbf{v}$ and receive the outputs, we use the `DifferentialPair<T>` type. We use pairs of inputs because every input element $x_i$ has a corresponding element $v_i$ in the vector, and each original output element has a corresponding output element in the product.
 
 Example of `fwd_diff`:
-```hlsl
+```csharp
 [Differentiable] // Auto-diff requires that functions are marked differentiable
 float2 foo(float a, float b) 
 { 
@@ -95,18 +95,18 @@ void main()
     // fwd_diff to compute output and d_output w.r.t 'a'.
     // Our output is also a differential pair.
     //
-    DifferentiaPair<float2> dp_output = fwd_diff(foo)(dp_a, dp_b);
+    DifferentialPair<float2> dp_output = fwd_diff(foo)(dp_a, dp_b);
 
     // Extract output's primal part, which is just the standard output when foo is called normally.
     // Can also use `.getPrimal()`
     //
-    float2 output_p = output.p;
+    float2 output_p = dp_output.p;
 
     // Extract output's derivative part. Can also use `.getDifferential()`
-    float2 output_d = output.d;
+    float2 output_d = dp_output.d;
 
-    print("foo(1.0, 2.4) = (%f %f)", output_p.x, output_p.y)
-    print("d(foo)/d(a) at (1.0, 2.4) = (%f, %f)", output_d.x, output_d.y);
+    printf("foo(1.0, 2.4) = (%f %f)\n", output_p.x, output_p.y);
+    printf("d(foo)/d(a) at (1.0, 2.4) = (%f, %f)\n", output_d.x, output_d.y);
 }
 ```
 
@@ -120,7 +120,7 @@ For reverse-mode, the example proceeds in a similar way, and we still use `Diffe
 The one extra rule is that the derivative corresponding to the return value of the function is accepted as the last argument (an extra input). This value does not need to be a pair.
 
 Example:
-```hlsl
+```csharp
 [Differentiable] // Auto-diff requires that functions are marked differentiable
 float2 foo(float a, float b) 
 { 
@@ -145,10 +145,10 @@ void main()
     bwd_diff(foo)(dp_a, dp_b, dL_doutput);
 
     // Extract the derivatives of L w.r.t input
-    dL_da = dp_a.d;
-    dL_db = dp_b.d;
+    float dL_da = dp_a.d;
+    float dL_db = dp_b.d;
 
-    print("If dL/dOutput = (1.0, 0.0), then (dL/da, dL/db) at (1.0, 2.4) = (%f, %f)", dL_da, dL_db);
+    printf("If dL/dOutput = (1.0, 0.0), then (dL/da, dL/db) at (1.0, 2.4) = (%f, %f)", dL_da, dL_db);
 }
 ```
 
@@ -177,12 +177,12 @@ The following built-in types are differentiable:
 However, it is easy to define your own differentiable types.
 Typically, all you need is to implement the `IDifferentiable` interface. 
 
-```hlsl
+```csharp
 struct MyType : IDifferentiable
 {
     float x;
     float y;
-}
+};
 ```
 
 The main requirement of a type implementing `IDifferentiable` is the `Differential` associated type that the compiler uses to carry the corresponding derivative.
@@ -190,7 +190,7 @@ In most cases the `Differential` of a type can be itself, though it can be diffe
 You can access the differential of any differentiable type through `Type.Differential`
 
 Example:
-```hlsl
+```csharp
 MyType obj;
 obj.x = 1.f;
 
@@ -201,7 +201,7 @@ d_obj.x = 1.f;
 
 Slang can automatically derive the `Differential` type in the majority of cases.
 For instance, for `MyType`, Slang can infer the differential trivially:
-```hlsl
+```csharp
 struct MyType : IDifferentiable
 {
     // Automatically inserted by Slang from the fact that 
@@ -214,7 +214,7 @@ struct MyType : IDifferentiable
 
 For more complex types that aren't fully differentiable, a new type is synthesized automatically:
 
-```hlsl
+```csharp
 struct MyPartialDiffType : IDifferentiable
 {
     // Automatically inserted by Slang based on which fields are differentiable.
@@ -237,21 +237,21 @@ For instance, `extension MyType : IDifferentiable { }` will make `MyType` differ
 
 See the `IDifferentiable` [reference documentation](https://shader-slang.org/stdlib-reference/interfaces/idifferentiable-01/index) for more information on how to override the default behavior.
 
-#### DifferentiablePair<T>: Pairs of differentiable value types
+#### DifferentialPair<T>: Pairs of differentiable value types
 
-The `DifferentiablePair<T>` type is used to pass derivatives to a derivative call by representing a pair of values of type `T` and `T.Differential`. Note that `T` must conform to `IDifferentiable`.
+The `DifferentialPair<T>` type is used to pass derivatives to a derivative call by representing a pair of values of type `T` and `T.Differential`. Note that `T` must conform to `IDifferentiable`.
 
-`DifferentiablePair<T>` can either be created via constructor calls or the `diffPair` utility method.
+`DifferentialPair<T>` can either be created via constructor calls or the `diffPair` utility method.
 
 Example:
 
-```hlsl
+```csharp
 MyType obj = {1.f, 2.f};
 
 MyType.Differential d_obj = {0.4f, 3.f};
 
 // The differential part of a differentiable-pair is of the diff type.
-DifferentiablePair<MyType> dp_obj = diffPair(obj, d_obj);
+DifferentialPair<MyType> dp_obj = diffPair(obj, d_obj);
 
 // Use .p to extract the primal part
 MyType new_p_obj = dp_obj.p;
@@ -259,8 +259,6 @@ MyType new_p_obj = dp_obj.p;
 // Use .d to extract the differential part
 MyType.Differential new_d_obj = dp_obj.d;
 ```
-
-See the [`DifferentiablePair<T>` reference documentation](?) for more details and supported operations.
 
 ### Differentiable Ptr types
 Pointer types are any type that represents a location or reference to a value rather than the value itself.
@@ -274,12 +272,12 @@ an `IDifferentiable` type whose derivative portion is an _output_ under `bwd_dif
 
 `IDifferentiablePtrType` only requires a `Differential` associated type to be specified.
 
-#### DifferentiablePtrPair<T>: Pairs of differentiable ptr types
+#### DifferentialPtrPair<T>: Pairs of differentiable ptr types
 For types conforming to `IDifferentiablePtrType`, the corresponding pair to use for passing the derivative counterpart is `DifferentiablePtrType<T>`, which represents a pair of `T` and `T.Differential`. Objects of this type can be created using a constructor.
 
 #### Example of defining and using an `IDifferentiablePtrType` object.
 Here is a full example of create a differentiable buffer pointer type, and using it within a differentiable function.
-```hlsl
+```csharp
 struct MyBufferPointer : IDifferentiablePtrType
 {
     // The differential part is another instance of MyBufferPointer.
@@ -297,17 +295,19 @@ float load(MyBufferPointer p, uint index)
 }
 
 // Note that the backward derivative signature is still an 'in' differential pair.
-void load_bwd(DifferentiablePtrPair<MyBufferPointer> p, uint index, float dOut)
+void load_bwd(DifferentialPtrPair<MyBufferPointer> p, uint index, float dOut)
 {
     MyBufferPointer diff_ptr = p.d;
-    atomicAdd(diff_ptr[offset + index], dOut);
+    InterlockedAdd(diff_ptr.buf[diff_ptr.offset + index], dOut);
 }
 
 [Differentiable]
-float sumOfSquares(MyBufferPointer p, uint n)
+float sumOfSquares<let N : int>(MyBufferPointer p)
 {
     float sos = 0.f;
-    for (uint i = 0; i < n; i++)
+
+    [MaxIters(N)]
+    for (uint i = 0; i < N; i++)
     {
         float val_i = load(p, i);
         sos += val_i * val_i;
@@ -322,17 +322,18 @@ RWStructuredBuffer<float> derivs;
 void main()
 {
     MyBufferPointer ptr = {inputs, 0};
-    print("Sum of squares of first 10 values: ", sumOfSquares(ptr, 10));
+    print("Sum of squares of first 10 values: ", sumOfSquares<10>(ptr));
+
+    MyBufferPointer deriv_ptr = {derivs, 0};
 
     // Pass a pair of pointers as input.
-    bwd_diff(sumOfSquares)(
-        DifferentiablePtrPair<MyBufferPointer>(ptr, {derivs, 0}),
-        10,
+    bwd_diff(sumOfSquares<10>)(
+        DifferentialPtrPair<MyBufferPointer>(ptr, deriv_ptr),
         1.0);
     
     print("Derivative of result w.r.t the 10 values: \n");
-    for (uint i = 0; i < n; i++)
-        print("%d: %f\n", i, load(derivs, i));
+    for (uint i = 0; i < 10; i++)
+        print("%d: %f\n", i, load(deriv_ptr, i));
 }
 ```
 
@@ -433,7 +434,7 @@ void main()
     // x is differentiable for calcBar because 
     // __BuiltinFloatingPointType : IDifferentiable
     //
-    DifferentiablePair<double> dpb = /* .. */;
+    DifferentialPair<double> dpb = /* .. */;
     bwd_diff(calcBar)(dpb, 1.0);
 }
 ```
@@ -455,6 +456,8 @@ struct Foo<T : IDifferentiable, U> : IDifferentiable
 ## Using Auto-diff with Interface Requirements and Interface Types
 For interface requirements, using `[Differentiable]` attribute enforces that any implementation of that method must also be
 differentiable. You can, of course, provide a manual derivative implementation to satisfy the requirement.
+
+The following is a sample snippet. You can run the full sample on the playground [here](https://shader-slang.org/slang-playground/?target=HLSL&code=eJyVVMtu2zAQvOsrFgEKy4Wq1C7QQ1330AYBcujjnhbBWiRjphQpUJQjI8i_d0mRquLYASLYtLwc7sySs5R1Y6yDRuH-1ppOs1UmteNWYMXh6tKY7CEDeq4vpBDccu0kbhT_E4JCGXRQoary4bWfr7LHLGud7SoHtPqqbhR8miYagJTeGbvKQuj8HDyO15QdnTQadhIBO2dq-lsB-0_tZ8tXCQrxgdo_lrvOaujhLXwoBY1RCQTE43P1y5fk-8gLJdSoO1RqD401O8mkvgXGrdwRYseh5m5rWBvLuTT2Hi27GOdzX8aNuGfzobbrr1j9PQbZjJBXlb-clh-rDz-TjVW_UNrPIdcXSHryU4BTbP78PC7vy2YgLiJ7X7JRw_yJiJ2RDFJ5udSmcyeF9UWsnFnedsodyuhhfWqtl1SkdQebMgoiSd4BcMvdz81d3lGDgNnc3Ug2j66QAvIhAus1LA4FpEaQfljDw6L8KB5Xh9vkZxOlH7lq-fFEyzET6X05EWl_1inRJqZuOseTUwo4UtfxZv1mOToOSEy6dajppjACuHRbbpPEBZjxfRkWhi0U9F2njYxcsfdS9ou9xjp0fdugq7bgDGBDHdRY6Wln3hWzMsLTqh-GptzWqyUK6VquBMgWtNHv2JP6CxLORrYtesz0ilHA0GEBG3LcrJ8F9GwwyCytupdKkTut3U8aui3bqagdWoi-WntRZehLf0Nmk7MaEOHWDJanIrX7jlLn6QxOuZ41SInH3lqW76NhqWFufDiPJzzPCVrAgj6lSPSBJz97I37rs8LnKpm_u_8BU5nW2Q). 
 ```csharp
 interface IFoo
 {
@@ -473,8 +476,8 @@ struct FooImpl : IFoo
 struct FooImpl2 : IFoo
 {
     // Implementation via manually providing derivative methods.
-    [ForwardDerivative(FooImpl2.calc_fwd)]
-    [BackwardDerivative(FooImpl2.calc_bwd)]
+    [ForwardDerivative(calc_fwd)]
+    [BackwardDerivative(calc_bwd)]
     float calc(float x)
     { /* ... */ }
 
@@ -486,7 +489,7 @@ struct FooImpl2 : IFoo
 }
 
 [Differentiable]
-void compute(float x, uint obj_id)
+float compute(float x, uint obj_id)
 {
     // Create an instance of either FooImpl1 or FooImpl2
     IFoo foo = createDynamicObject<IFoo>(obj_id); 
@@ -498,6 +501,7 @@ void compute(float x, uint obj_id)
     // will carry derivatives.s
     //
     var result = foo.calc(x);
+    return result;
 }
 ```
 
