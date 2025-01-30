@@ -2619,6 +2619,7 @@ bool canTypeBeStored(IRInst* type)
     case kIROp_ClassType:
     case kIROp_FloatType:
     case kIROp_VectorType:
+    case kIROp_CoopVectorType:
     case kIROp_MatrixType:
     case kIROp_BackwardDiffIntermediateContextType:
         return true;

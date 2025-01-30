@@ -1,6 +1,6 @@
 result code = -1
 standard error = {
-tests/diagnostics/vk-bindings.slang(6): warning 39013: shader parameter 't' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` specified for Vulkan
+tests/diagnostics/vk-bindings.slang(6): warning 39029: shader parameter 't' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` specified for Vulkan, nor is `-fvk-t-shift` used.
 Texture2D t : register(t0);
               ^~~~~~~~
 tests/diagnostics/vk-bindings.slang(14): error 39015: shader parameter 'b' consumes whole descriptor sets, so the binding must be in the form '[[vk::binding(0, ...)]]'; the non-zero binding '2' is not allowed

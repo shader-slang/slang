@@ -5,13 +5,13 @@
 // CHECK_IGNORE_CAPS-NOT: error 36107
 
 // CHECK: error 36107: entrypoint 'computeMain' does not support compilation target 'glsl' with stage 'compute'
-// CHECK: capabilitySimplification3.slang(16): note: see using of 'WaveMultiPrefixProduct'
-// CHECK-NOT: see using of 'WaveMultiPrefixProduct'
-// CHECK: {{.*}}.meta.slang({{.*}}): note: see definition of 'WaveMultiPrefixProduct'
+// CHECK: capabilitySimplification3.slang(16): note: see using of 'WaveMultiPrefixCountBits'
+// CHECK-NOT: see using of 'WaveMultiPrefixCountBits'
+// CHECK: {{.*}}.meta.slang({{.*}}): note: see definition of 'WaveMultiPrefixCountBits'
 // CHECK: {{.*}}.meta.slang({{.*}}): note: see declaration of 'require'
 
 [numthreads(1,1,1)]
 void computeMain()
 {
-    WaveMultiPrefixProduct(1, 0);
+    WaveMultiPrefixCountBits(true, 0);
 }
