@@ -741,7 +741,19 @@ void Module::_collectShaderParams()
                 // things like `static` globals and `groupshared` variables.
                 //
                 if (!isGlobalShaderParameter(globalVar))
-                    continue;
+                {
+                    bool isVarying = false;
+                    for (auto m : globalVar->modifiers)
+                    {
+                        if (as<InModifier>(m) || as<OutModifier>(m))
+                        {
+                            isVarying = true;
+                            break;
+                        }
+                    }
+                    if (!isVarying)
+                        continue;
+                }
 
                 // At this point we know we have a global shader parameter.
 

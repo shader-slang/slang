@@ -21,6 +21,8 @@ IRType* getVectorElementType(IRType* type)
 {
     if (auto vectorType = as<IRVectorType>(type))
         return vectorType->getElementType();
+    if (auto coopVecType = as<IRCoopVectorType>(type))
+        return coopVecType->getElementType();
     return type;
 }
 
@@ -1388,6 +1390,7 @@ bool isZero(IRInst* inst)
         return as<IRFloatLit>(inst)->getValue() == 0.0;
     case kIROp_BoolLit:
         return as<IRBoolLit>(inst)->getValue() == false;
+    case kIROp_MakeCoopVector:
     case kIROp_MakeVector:
     case kIROp_MakeVectorFromScalar:
     case kIROp_MakeMatrix:
@@ -1422,6 +1425,7 @@ bool isOne(IRInst* inst)
         return as<IRFloatLit>(inst)->getValue() == 1.0;
     case kIROp_BoolLit:
         return as<IRBoolLit>(inst)->getValue();
+    case kIROp_MakeCoopVector:
     case kIROp_MakeVector:
     case kIROp_MakeVectorFromScalar:
     case kIROp_MakeMatrix:

@@ -9,8 +9,18 @@ using namespace Slang;
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VulkanApi !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-#define VK_API_CHECK_FUNCTION(x) &&(x != nullptr)
+#define VK_API_CHECK_FUNCTION(x) &&hasFunction(#x, (void*)x)
 #define VK_API_CHECK_FUNCTIONS(FUNCTION_LIST) true FUNCTION_LIST(VK_API_CHECK_FUNCTION)
+
+static bool hasFunction(const char* name, void* ptr)
+{
+    if (ptr)
+        return true;
+#if 0
+    fprintf(stderr, "Missing required Vulkan function: %s\n", name);
+#endif
+    return false;
+}
 
 bool VulkanApi::areDefined(ProcType type) const
 {
@@ -19,7 +29,8 @@ bool VulkanApi::areDefined(ProcType type) const
     case ProcType::Global:
         return VK_API_CHECK_FUNCTIONS(VK_API_ALL_GLOBAL_PROCS);
     case ProcType::Instance:
-        return VK_API_CHECK_FUNCTIONS(VK_API_ALL_INSTANCE_PROCS);
+        return VK_API_CHECK_FUNCTIONS(VK_API_ALL_INSTANCE_PROCS) &&
+               VK_API_CHECK_FUNCTIONS(VK_API_INSTANCE_KHR_PROCS);
     case ProcType::Device:
         return VK_API_CHECK_FUNCTIONS(VK_API_DEVICE_PROCS);
     default:

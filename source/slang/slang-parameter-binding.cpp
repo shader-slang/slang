@@ -712,6 +712,15 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
         return createTypeLayoutWith(layoutContext, specializationConstantRule, type);
     }
 
+    if (varDecl->hasModifier<InModifier>())
+    {
+        return createTypeLayoutWith(layoutContext, rules->getVaryingInputRules(), type);
+    }
+    else if (varDecl->hasModifier<OutModifier>())
+    {
+        return createTypeLayoutWith(layoutContext, rules->getVaryingOutputRules(), type);
+    }
+
     // TODO(tfoley): there may be other cases that we need to handle here
 
     // An "ordinary" global variable is implicitly a uniform
@@ -1069,10 +1078,32 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
     // oversight on their part.
     if (auto registerModifier = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>())
     {
+        auto varType = getType(context->getASTBuilder(), varDecl.as<VarDeclBase>());
+        if (auto textureType = as<TextureType>(varType))
+        {
+            if (textureType->isCombined())
+            {
+                // Recommend [[vk::binding]] but not '-fvk-xxx-shift` for combined texture samplers
+                getSink(context)->diagnose(
+                    registerModifier,
+                    Diagnostics::registerModifierButNoVulkanLayout,
+                    varDecl.getName());
+                return;
+            }
+        }
+
+        UnownedStringSlice registerClassName;
+        UnownedStringSlice registerIndexDigits;
+        splitNameAndIndex(
+            registerModifier->registerName.getContent(),
+            registerClassName,
+            registerIndexDigits);
+
         getSink(context)->diagnose(
             registerModifier,
-            Diagnostics::registerModifierButNoVulkanLayout,
-            varDecl.getName());
+            Diagnostics::registerModifierButNoVkBindingNorShift,
+            varDecl.getName(),
+            registerClassName);
     }
 }
 
@@ -1116,6 +1147,25 @@ static void addExplicitParameterBindings_GLSL(
 
         if (auto layoutAttr = varDecl.getDecl()->findModifier<VkConstantIdAttribute>())
             info[kResInfo].semanticInfo.index = layoutAttr->location;
+        else
+            return;
+    }
+
+    if (auto foundVaryingInput = typeLayout->FindResourceInfo(LayoutResourceKind::VaryingInput))
+    {
+        info[kResInfo].resInfo = foundVaryingInput;
+
+        if (auto layoutAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
+            info[kResInfo].semanticInfo.index = layoutAttr->value;
+        else
+            return;
+    }
+    if (auto foundVaryingOutput = typeLayout->FindResourceInfo(LayoutResourceKind::VaryingOutput))
+    {
+        info[kResInfo].resInfo = foundVaryingOutput;
+
+        if (auto layoutAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
+            info[kResInfo].semanticInfo.index = layoutAttr->value;
         else
             return;
     }
@@ -1228,7 +1278,6 @@ static void addExplicitParameterBindings_GLSL(
         return;
     }
 
-
     const auto hlslInfo = _extractLayoutSemanticInfo(context, hlslRegSemantic);
     if (hlslInfo.kind == LayoutResourceKind::None)
     {
@@ -1242,7 +1291,14 @@ static void addExplicitParameterBindings_GLSL(
     if (auto textureType = as<TextureType>(varType))
     {
         if (textureType->isCombined())
+        {
+            if (!warnedMissingVulkanLayoutModifier)
+            {
+                _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
+                warnedMissingVulkanLayoutModifier = true;
+            }
             return;
+        }
     }
 
     // Can we map to a Vulkan kind in principal?

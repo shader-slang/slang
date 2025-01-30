@@ -104,6 +104,7 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_MakeMatrix:
     case kIROp_MakeMatrixFromScalar:
     case kIROp_MatrixReshape:
+    case kIROp_MakeCoopVector:
     case kIROp_VectorReshape:
     case kIROp_CastFloatToInt:
     case kIROp_CastIntToFloat:
