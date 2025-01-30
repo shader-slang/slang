@@ -15,3 +15,4 @@ tests/compute/interface-shader-param.slang.5 syn (wgpu)
 tests/language-feature/shader-params/interface-shader-param-ordinary.slang.4 syn (wgpu)
 gfx-unit-test-tool/RayTracingTestAD3D12.internal
 gfx-unit-test-tool/RayTracingTestBD3D12.internal
+gfx-unit-test-tool/precompiledTargetModule2Vulkan.internal
