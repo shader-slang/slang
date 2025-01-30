@@ -8,13 +8,12 @@
 ///
 /// @remarks
 /// - The signature of `fwdFn` must match the expected signature of `fwd_diff(decoratedFn)`.
-/// - See the reference for `fwd_diff` for a full list of signature rules (https://shader-slang.org/slang/user-guide/autodiff.html#fwd_difff--slang_function---slang_function)
-/// - See the user guide's section on custom derivatives for an introduction to this approach. (https://shader-slang.org/slang/user-guide/autodiff.html#user-defined-derivative-functions)
+/// - See the [reference](https://shader-slang.org/slang/user-guide/autodiff.html#fwd_difff--slang_function---slang_function) for `fwd_diff` for a full list of signature rules.
+/// - See the [user guide's section](https://shader-slang.org/slang/user-guide/autodiff.html#user-defined-derivative-functions) on custom derivatives for an introduction to this approach. 
 ///
 /// - This attribute can be used on generic functions, member functions and accessors.
 /// - For generic functions, the generic signatures (parameters + constraints) of both functions must match exactly.
 ///
-/// @remarks
 /// - The decorated function will be considered forward-differentiable. There is no need for a `[Differentiable]` tag. 
 /// If the `[Differentiable]` tag is present, 
 /// and no custom backward derivative is specified with `[BackwardDerivative]`, then the
@@ -53,10 +52,11 @@ attribute_syntax [ForwardDerivative(function)] : ForwardDerivativeAttribute;
 ///
 /// @remarks
 /// The signature of `bwdFn` must match the expected signature of `bwd_diff(decoratedFn)`.
-/// See the reference for `bwd_diff` for a full list of signature rules (https://shader-slang.org/slang/user-guide/autodiff.html#bwd_difff--slang_function---slang_function)
+/// See the [reference](https://shader-slang.org/slang/user-guide/autodiff.html#bwd_difff--slang_function---slang_function)
+/// for `bwd_diff` for a full list of signature rules.
 ///
-/// See the user guide's section on custom derivatives for an introduction to custom
-/// derivatives. (https://shader-slang.org/slang/user-guide/autodiff.html#user-defined-derivative-functions)
+/// See the [user guide's section](https://shader-slang.org/slang/user-guide/autodiff.html#user-defined-derivative-functions) on custom derivatives for an introduction to custom
+/// derivatives.
 ///
 /// This attribute can be used on generic functions, member functions and accessors.
 /// For generic functions, the generic signatures (parameters + constraints) of both functions
@@ -80,14 +80,13 @@ attribute_syntax [ForwardDerivative(function)] : ForwardDerivativeAttribute;
 /// For member functions, or functions nested inside namespaces, `bwdFn` may need to be a fully qualified 
 /// name.
 ///
-/// ```
 ///
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [BackwardDerivative(function)] : BackwardDerivativeAttribute;
 
 /// `[PrimalSubstitute(substFn)]` attribute denotes a substitute `substFn` that should be used for
 /// differentiation instead of the original function. This serves as a sort of 'reference' implementation
- where the original function cannot be differentiated (for whatever reason).
+/// where the original function cannot be differentiated (for whatever reason).
 ///
 /// See the auto-diff user guide for more: https://shader-slang.org/slang/user-guide/autodiff.html#primal-substitute-functions
 ///

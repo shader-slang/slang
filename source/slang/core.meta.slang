@@ -393,15 +393,47 @@ attribute_syntax [__NonCopyableType] : NonCopyableTypeAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__NoSideEffect] : NoSideEffectAttribute;
 
-/// Marks a function for forward-mode differentiation.
-/// i.e. the compiler will automatically generate a new function
-/// that computes the jacobian-vector product of the original.
+/// Marks a function as being differentiable in forward-mode.
+///
+/// See the user guide [section on forward-mode differentiation](https://shader-slang.org/slang/user-guide/autodiff.html#invoking-auto-diff-in-slang) for more
+///
+/// If used on a function that has a definition (i.e. a function body),Slang will use
+/// automatic-differentiation to generate a forward-mode derivative of this function,
+/// unless an implementation is provided by the user via `[ForwardDerivative(fn)]`
+///
+/// If used on an interface requirement, the signature of the requirement is modified to
+/// include forward-differentiability. Any satisfying method must also be forward-differentiable,
+/// or provide an appropriate derivative implementation.
+/// See the user guide [section on auto-diff for interfaces](https://shader-slang.org/slang/user-guide/autodiff.html##using-auto-diff-with-interface-requirements-and-interface-types) for more 
+/// 
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForwardDifferentiable] : ForwardDifferentiableAttribute;
 
-/// Marks a function for backward-mode differentiation.
+/// Marks a function as being differentiable for backward-mode auto-diff.
+/// Note that in the current implementation, this implies that the method
+/// is also forward differentiable.
+/// 
+/// This attribute is equivalent to using `[Differentiable]`
+///
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [BackwardDifferentiable(order:int = 0)] : BackwardDifferentiableAttribute;
+
+/// Marks a function as being differentiable for both
+/// forward and backward mode auto-diff.
+///
+/// This attribute is equivalent to using `[Differentiable]`
+///
+/// See the user guide [section on auto-diff invocation](https://shader-slang.org/slang/user-guide/autodiff.html#invoking-auto-diff-in-slang) for more.
+///
+/// If used on a function that has a definition (i.e. a function body), Slang will use
+/// automatic-differentiation to generate the derivative implementations for this function,
+/// unless an implementation is provided by the user via `[ForwardDerivative(fn)]` and/or `[BackwardDerivative(fn)]`
+///
+/// If used on an interface requirement, the signature of the requirement is modified to
+/// include differentiability. Any satisfying method must also be differentiable,
+/// or provide appropriate derivative implementations.
+/// See the user guide [section on auto-diff for interfaces](https://shader-slang.org/slang/user-guide/autodiff.html##using-auto-diff-with-interface-requirements-and-interface-types) for more
+///
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [Differentiable(order:int = 0)] : BackwardDifferentiableAttribute;
 
