@@ -14404,6 +14404,7 @@ __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadLan
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
 T QuadReadAcrossX(T localValue)
 {
@@ -14425,6 +14426,7 @@ T QuadReadAcrossX(T localValue)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
 vector<T,N> QuadReadAcrossX(vector<T,N> localValue)
 {
@@ -14448,6 +14450,7 @@ __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcr
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
 T QuadReadAcrossY(T localValue)
 {
@@ -14468,6 +14471,7 @@ T QuadReadAcrossY(T localValue)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
 vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
 {
@@ -14485,13 +14489,13 @@ vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
     case wgsl: __intrinsic_asm "quadSwapY";
     }
 }
-
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossY(matrix<T,N,M> localValue);
 
 /// @category wave
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
 T QuadReadAcrossDiagonal(T localValue)
 {
@@ -14512,6 +14516,7 @@ T QuadReadAcrossDiagonal(T localValue)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
 vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
 {
@@ -14541,6 +14546,7 @@ for (auto opName : kWaveActiveBitOpEntries) {
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 T WaveActive$(opName.hlslName)(T expr)
 {
@@ -14560,6 +14566,7 @@ T WaveActive$(opName.hlslName)(T expr)
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 vector<T, N> WaveActive$(opName.hlslName)(vector<T, N> expr)
 {
@@ -14608,6 +14615,7 @@ for (const char* opName : kWaveActiveMinMaxNames) {
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 T WaveActive$(opName)(T expr)
 {
@@ -14632,6 +14640,7 @@ T WaveActive$(opName)(T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 vector<T, N> WaveActive$(opName)(vector<T, N> expr)
 {
@@ -14721,6 +14730,7 @@ T WaveActive$(opName.hlslName)(T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 vector<T,N> WaveActive$(opName.hlslName)(vector<T,N> expr)
 {
@@ -14835,6 +14845,7 @@ bool WaveActiveAllEqual(matrix<T, N, M> value)
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_vote)]
 bool WaveActiveAllTrue(bool condition)
 {
@@ -14858,6 +14869,7 @@ bool WaveActiveAllTrue(bool condition)
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_vote)]
 bool WaveActiveAnyTrue(bool condition)
 {
@@ -14882,6 +14894,7 @@ bool WaveActiveAnyTrue(bool condition)
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 uint4 WaveActiveBallot(bool condition)
@@ -14923,7 +14936,7 @@ uint WaveActiveCountBits(bool value)
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
-[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
+[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
 uint WaveGetLaneCount()
 {
     __target_switch
@@ -14937,7 +14950,6 @@ uint WaveGetLaneCount()
             OpCapability GroupNonUniform;
             result:$$uint = OpLoad builtin(SubgroupSize:uint)
         };
-    case wgsl: __intrinsic_asm "(subgroup_size)";
     }
 }
 
@@ -14945,7 +14957,7 @@ uint WaveGetLaneCount()
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
-[require(cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
+[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
 uint WaveGetLaneIndex()
 {
     __target_switch
@@ -14959,13 +14971,13 @@ uint WaveGetLaneIndex()
             OpCapability GroupNonUniform;
             result:$$uint = OpLoad builtin(SubgroupLocalInvocationId:uint)
         };
-    case wgsl: __intrinsic_asm "(subgroup_invocation_id)";
     }
 }
 
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [NonUniformReturn]
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
 bool WaveIsFirstLane()
@@ -15020,6 +15032,7 @@ uint _WaveCountBits(uint4 value)
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 T WavePrefixProduct(T expr)
 {
@@ -15054,6 +15067,7 @@ T WavePrefixProduct(T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 vector<T,N> WavePrefixProduct(vector<T,N> expr)
 {
@@ -15104,6 +15118,7 @@ matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 T WavePrefixSum(T expr)
 {
@@ -15134,6 +15149,7 @@ T WavePrefixSum(T expr)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_arithmetic)]
 vector<T,N> WavePrefixSum(vector<T,N> expr)
 {
@@ -15184,6 +15200,7 @@ matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 T WaveReadLaneFirst(T expr)
 {
@@ -15204,6 +15221,7 @@ T WaveReadLaneFirst(T expr)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
 {
@@ -15250,6 +15268,7 @@ matrix<T,N,M> WaveReadLaneFirst(matrix<T,N,M> expr)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 T WaveBroadcastLaneAt(T value, constexpr int lane)
 {
@@ -15272,6 +15291,7 @@ T WaveBroadcastLaneAt(T value, constexpr int lane)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 vector<T,N> WaveBroadcastLaneAt(vector<T,N> value, constexpr int lane)
 {
@@ -15316,6 +15336,7 @@ matrix<T, N, M> WaveBroadcastLaneAt(matrix<T, N, M> value, constexpr int lane)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_shuffle)]
 T WaveReadLaneAt(T value, int lane)
 {
@@ -15335,8 +15356,9 @@ T WaveReadLaneAt(T value, int lane)
 }
 
 __generic<T : __BuiltinType, let N : int>
-__spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
+__spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_shuffle)]
 vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane)
 {
@@ -15382,6 +15404,7 @@ matrix<T, N, M> WaveReadLaneAt(matrix<T, N, M> value, int lane)
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_shuffle)]
 T WaveShuffle(T value, int lane)
 {
@@ -15404,6 +15427,7 @@ T WaveShuffle(T value, int lane)
 __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_shuffle)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_shuffle)]
 vector<T,N> WaveShuffle(vector<T,N> value, int lane)
 {
@@ -15417,7 +15441,7 @@ vector<T,N> WaveShuffle(vector<T,N> value, int lane)
         let ulane = uint(lane);
         return spirv_asm {OpCapability GroupNonUniformShuffle; OpGroupNonUniformShuffle $$vector<T,N> result Subgroup $value $ulane};
     case wgsl: __intrinsic_asm "subgroupShuffle";
-    default:
+    case cuda:
         return WaveMaskShuffle(WaveGetActiveMask(), value, lane);
     }
 }
@@ -15460,6 +15484,7 @@ uint WavePrefixCountBits(bool value)
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
+__wgsl_extension(subgroups)
 [require(cuda_glsl_hlsl_spirv_wgsl, subgroup_ballot)]
 uint4 WaveGetConvergedMulti()
 {
