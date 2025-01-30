@@ -7967,8 +7967,7 @@ void SemanticsDeclBodyVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
         initExpr = coerce(CoercionSite::General, tagType, initExpr);
 
         // We want to enforce that this is an integer constant
-        // expression, but we don't actually care to retain
-        // the value.
+        // expression.
         decl->tagVal = CheckIntegerConstantExpression(
             initExpr,
             IntegerConstantExpressionCoercionType::AnyInteger,
