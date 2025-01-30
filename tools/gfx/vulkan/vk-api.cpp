@@ -86,6 +86,17 @@ Slang::Result VulkanApi::initPhysicalDevice(VkPhysicalDevice physicalDevice)
     vkGetPhysicalDeviceFeatures(m_physicalDevice, &m_deviceFeatures);
     vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &m_deviceMemoryProperties);
 
+    if (vkGetPhysicalDeviceCooperativeVectorPropertiesNV)
+    {
+        uint32_t nProps = 0;
+        vkGetPhysicalDeviceCooperativeVectorPropertiesNV(m_physicalDevice, &nProps, nullptr);
+        m_cooperativeVectorProperties.setCount(nProps);
+        vkGetPhysicalDeviceCooperativeVectorPropertiesNV(
+            m_physicalDevice,
+            &nProps,
+            m_cooperativeVectorProperties.getBuffer());
+    }
+
     return SLANG_OK;
 }
 
