@@ -12432,7 +12432,7 @@ T __int_cast(U val);
 
 __generic<T:__BuiltinArithmeticType, U:__BuiltinArithmeticType>
 __intrinsic_op($(kIROp_FloatCast))
-T __float_cast(U val);
+T __real_cast(U val);
 
 __generic<T:__BuiltinArithmeticType, U:__BuiltinArithmeticType>
 __intrinsic_op($(kIROp_CastIntToFloat))
@@ -12451,7 +12451,7 @@ T __arithmetic_cast(U val)
     else if (__isInt<T>() && __isFloat<U>())
         return __float_to_int_cast<T>(val);
     else if (__isFloat<T>() && __isFloat<U>())
-        return __float_cast<T>(val);
+        return __real_cast<T>(val);
     else if (__isInt<T>() && __isInt<U>())
         return __int_cast<T>(val);
     return T(0);
@@ -12463,7 +12463,7 @@ vector<T,N> __int_cast(vector<U,N> val);
 
 __generic<T:__BuiltinArithmeticType, U:__BuiltinArithmeticType, let N : int>
 __intrinsic_op($(kIROp_FloatCast))
-vector<T,N> __float_cast(vector<U,N> val);
+vector<T,N> __real_cast(vector<U,N> val);
 
 __generic<T:__BuiltinArithmeticType, U:__BuiltinArithmeticType, let N : int>
 __intrinsic_op($(kIROp_CastIntToFloat))
@@ -21756,7 +21756,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             else if (__isInt<T>() && __isFloat<U>())
                 this = __float_to_int_cast<T>(other);
             else if (__isFloat<T>() && __isFloat<U>())
-                this = __float_cast<T>(other);
+                this = __real_cast<T>(other);
             else if (__isInt<T>() && __isInt<U>())
                 this = __int_cast<T>(other);
         } 
@@ -22552,7 +22552,7 @@ CoopVec<T,N> __int_cast(CoopVec<U,N> val);
 __generic<T:__BuiltinArithmeticType, U:__BuiltinArithmeticType, let N : int>
 __intrinsic_op($(kIROp_FloatCast))
 [require(cooperative_vector)]
-CoopVec<T,N> __float_cast(CoopVec<U,N> val);
+CoopVec<T,N> __real_cast(CoopVec<U,N> val);
 
 __generic<T:__BuiltinArithmeticType, U:__BuiltinArithmeticType, let N : int>
 __intrinsic_op($(kIROp_CastIntToFloat))
