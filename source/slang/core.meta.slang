@@ -637,7 +637,7 @@ interface IDifferentiable
 /// }
 /// ```
 ///
-/// Types that conform to this interface can be used with `DifferentiablePtrPair<T>`
+/// Types that conform to this interface can be used with `DifferentialPtrPair<T>`
 /// to pass the derivative components to calls to `fwd_diff(fn)` or `bwd_diff(fn)`
 ///
 /// See the auto-diff user guide for more details (https://shader-slang.org/slang/user-guide/autodiff.html#differentiable-ptr-types)
