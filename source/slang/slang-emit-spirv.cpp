@@ -5647,6 +5647,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitPhi(SpvInstParent* parent, IRParam* inst)
     {
+        requireVariableBufferCapabilityIfNeeded(inst->getDataType());
+
         // An `IRParam` in an ordinary `IRBlock` represents a phi value.
         // We can translate them directly to SPIRV's `Phi` instruction.
         // In order to do that, we need to figure out the source values
@@ -5721,6 +5723,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         // Does this function declare any requirements.
         handleRequiredCapabilities(funcValue);
+        requireVariableBufferCapabilityIfNeeded(inst->getDataType());
 
         // We want to detect any call to an intrinsic operation, and inline
         // the SPIRV snippet directly at the call site.
@@ -6113,6 +6116,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitGetElement(SpvInstParent* parent, IRGetElement* inst)
     {
+        requireVariableBufferCapabilityIfNeeded(inst->getDataType());
+
         // Note: SPIRV only supports the case where `index` is constant.
         auto base = inst->getBase();
         const auto baseTy = base->getDataType();
@@ -6149,6 +6154,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitLoad(SpvInstParent* parent, IRLoad* inst)
     {
+        requireVariableBufferCapabilityIfNeeded(inst->getDataType());
+
         auto ptrType = as<IRPtrTypeBase>(inst->getPtr()->getDataType());
         if (ptrType && addressSpaceToStorageClass(ptrType->getAddressSpace()) ==
                            SpvStorageClassPhysicalStorageBuffer)
@@ -8097,6 +8104,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (m_capabilities.add(capability))
         {
             emitOpCapability(getSection(SpvLogicalSectionID::Capabilities), nullptr, capability);
+        }
+    }
+
+    void requireVariableBufferCapabilityIfNeeded(IRInst* type)
+    {
+        if (auto ptrType = as<IRPtrTypeBase>(type))
+        {
+            if (ptrType->getAddressSpace() == AddressSpace::StorageBuffer)
+            {
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_variable_pointers"));
+                requireSPIRVCapability(SpvCapabilityVariablePointers);
+            }
         }
     }
 

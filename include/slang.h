@@ -1007,6 +1007,7 @@ typedef uint32_t SlangSizeT;
         EmitSpirvMethod, // enum SlangEmitSpirvMethod
 
         EmitReflectionJSON, // bool
+        SaveGLSLModuleBinSource,
         CountOf,
     };
 

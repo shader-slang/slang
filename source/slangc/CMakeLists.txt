@@ -5,6 +5,7 @@ if(SLANG_ENABLE_SLANGC)
         USE_FEWER_WARNINGS
         DEBUG_DIR ${slang_SOURCE_DIR}
         LINK_WITH_PRIVATE core slang Threads::Threads
+        REQUIRES slang-glsl-module
         INSTALL
         EXPORT_SET_NAME SlangTargets
     )

@@ -334,6 +334,7 @@ add_subdirectory(source/slang-glslang)
 add_subdirectory(tools)
 add_subdirectory(prelude)
 add_subdirectory(source/slang-core-module)
+add_subdirectory(source/slang-glsl-module)
 add_subdirectory(source/slang)
 add_subdirectory(source/slangc)
 add_subdirectory(examples)
@@ -360,7 +361,6 @@ install(
     DESTINATION .
     PATTERN ".*" EXCLUDE
 )
-
 include(CPack)
 
 # Write basic package config version file using standard CMakePackageConfigHelpers utility
