@@ -1038,6 +1038,8 @@ static RefPtr<ExtensionTracker> _newExtensionTracker(CodeGenTarget target)
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::GLSL:
     case CodeGenTarget::WGSL:
+    case CodeGenTarget::WGSLSPIRV:
+    case CodeGenTarget::WGSLSPIRVAssembly:
         {
             return new ShaderExtensionTracker;
         }
