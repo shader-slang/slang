@@ -16,7 +16,7 @@ Reviewer: Yong He.
 ## Background
 
 Data packing/unpacking intrinsics provide great utility. Slang's core module, which derives from HLSL, already defines integer pack/unpack intrinsics which were
-introduced in SM 6.6. Floatin-point variants however are undefined. Floating-point pack/unpacking intrinsics exist as built-in intrinsics on GLSL, SPIRV, Metal
+introduced in SM 6.6. Floating-point variants however are undefined. Floating-point pack/unpacking intrinsics exist as built-in intrinsics on GLSL, SPIRV, Metal
 and WGSL but not on HLSL and Slang, and there is no way to access the intrinsics provided by the other shader language targets.
 
 ## Proposed Approach
