@@ -509,7 +509,7 @@ static SlangResult _parseGCCFamilyLine(
 
     if (targetDesc.payload == ArtifactDesc::Payload::MetalAIR)
     {
-        cmdLine.addArg("-std=metal3.1");
+        cmdLine.addArg("-std=metal3.0");
     }
 
     // Our generated code very often casts between dissimilar types with the
