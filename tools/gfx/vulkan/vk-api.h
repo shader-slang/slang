@@ -1,6 +1,7 @@
 // vk-api.h
 #pragma once
 
+#include "core/slang-basic.h"
 #include "vk-module.h"
 
 namespace gfx
@@ -21,6 +22,7 @@ namespace gfx
     x(vkCreateDebugReportCallbackEXT) \
     x(vkDestroyDebugReportCallbackEXT) \
     x(vkDebugReportMessageEXT) \
+    x(vkGetPhysicalDeviceCooperativeVectorPropertiesNV) \
     /* */
 
 #define VK_API_INSTANCE_PROCS(x) \
@@ -303,6 +305,10 @@ struct VulkanExtendedFeatureProperties
     VkPhysicalDeviceVulkan12Features vulkan12Features = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
 
+    // Cooperative vector features
+    VkPhysicalDeviceCooperativeVectorFeaturesNV cooperativeVectorFeatures = {
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COOPERATIVE_VECTOR_FEATURES_NV};
+
     // Ray tracing validation features
     VkPhysicalDeviceRayTracingValidationFeaturesNV rayTracingValidationFeatures = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_VALIDATION_FEATURES_NV};
@@ -351,6 +357,8 @@ struct VulkanApi
     VkPhysicalDeviceFeatures m_deviceFeatures;
     VkPhysicalDeviceMemoryProperties m_deviceMemoryProperties;
     VulkanExtendedFeatureProperties m_extendedFeatures;
+
+    Slang::List<VkCooperativeVectorPropertiesNV> m_cooperativeVectorProperties;
 };
 
 } // namespace gfx

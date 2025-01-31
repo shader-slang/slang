@@ -66,6 +66,7 @@
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-lower-combined-texture-sampler.h"
+#include "slang-ir-lower-coopvec.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-glsl-ssbo-types.h"
@@ -1033,6 +1034,16 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    switch (target)
+    {
+    case CodeGenTarget::SPIRV:
+    case CodeGenTarget::SPIRVAssembly:
+    case CodeGenTarget::HLSL:
+        break;
+    default:
+        lowerCooperativeVectors(irModule, sink);
+    }
+
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     performForceInlining(irModule);
 
@@ -1493,14 +1504,15 @@ Result linkAndOptimizeIR(
     {
     default:
         break;
+    case CodeGenTarget::HLSL:
     case CodeGenTarget::GLSL:
     case CodeGenTarget::WGSL:
-        moveGlobalVarInitializationToEntryPoints(irModule);
+        moveGlobalVarInitializationToEntryPoints(irModule, targetProgram);
         break;
     // For SPIR-V to SROA across 2 entry-points a value must not be a global
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
-        moveGlobalVarInitializationToEntryPoints(irModule);
+        moveGlobalVarInitializationToEntryPoints(irModule, targetProgram);
         if (targetProgram->getOptionSet().getBoolOption(
                 CompilerOptionName::EnableExperimentalPasses))
             introduceExplicitGlobalContext(irModule, target);
@@ -1511,7 +1523,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
-        moveGlobalVarInitializationToEntryPoints(irModule);
+        moveGlobalVarInitializationToEntryPoints(irModule, targetProgram);
         introduceExplicitGlobalContext(irModule, target);
         if (target == CodeGenTarget::CPPSource)
         {

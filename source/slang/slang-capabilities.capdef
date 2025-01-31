@@ -208,6 +208,7 @@ def _sm_6_4 : _sm_6_3;
 def _sm_6_5 : _sm_6_4;
 def _sm_6_6 : _sm_6_5;
 def _sm_6_7 : _sm_6_6;
+def _sm_6_8 : _sm_6_7;
 
 /// Represents HLSL NVAPI support.
 /// [Version]
@@ -524,6 +525,14 @@ def SPV_NV_compute_shader_derivatives : _spirv_1_0;
 /// [EXT]
 def SPV_GOOGLE_user_type : _spirv_1_0;
 
+/// Represents the SPIR-V extension for SPV_EXT_replicated_composites.
+/// [EXT]
+def SPV_EXT_replicated_composites : _spirv_1_0;
+
+/// Represents the SPIR-V extension for SPV_NV_cooperative_vector.
+/// [EXT]
+def SPV_NV_cooperative_vector : _spirv_1_6 + SPV_EXT_replicated_composites;
+
 // SPIRV Capabilities.
 
 /// Represents the SPIR-V capability for atomic float 32 add operations.
@@ -661,6 +670,18 @@ def spvDemoteToHelperInvocationEXT : SPV_EXT_demote_to_helper_invocation;
 /// Represents the SPIR-V capability for demoting to helper invocation.
 /// [EXT]
 def spvDemoteToHelperInvocation : spvDemoteToHelperInvocationEXT;
+
+/// Represents the SPIR-V capability for replicated composites
+/// [EXT]
+def spvReplicatedCompositesEXT : SPV_EXT_replicated_composites;
+
+/// Represents the SPIR-V capability for cooperative vectors
+/// [EXT]
+def spvCooperativeVectorNV : SPV_NV_cooperative_vector;
+
+/// Represents the SPIR-V capability for cooperative vector training
+/// [EXT]
+def spvCooperativeVectorTrainingNV : SPV_NV_cooperative_vector;
 
 /// Represents the SPIR-V capability for maximal reconvergence.
 /// [EXT]
@@ -1033,6 +1054,14 @@ alias bufferreference = GL_EXT_buffer_reference;
 /// Capabilities needed to use GLSL buffer-reference's with int64
 /// [Compound]
 alias bufferreference_int64 = bufferreference + GL_EXT_shader_explicit_arithmetic_types_int64;
+/// Capabilities needed to use cooperative vectors
+/// Note that cpp and cuda are supported via a fallback non-cooperative implementation
+/// No HLSL shader model bound yet
+/// [Compound]
+alias cooperative_vector = _sm_6_8 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV;
+/// Capabilities needed to train cooperative vectors
+/// [Compound]
+alias cooperative_vector_training = spvCooperativeVectorTrainingNV;
 
 // Non-internal shader stages
 //
@@ -1479,6 +1508,25 @@ alias sm_6_7 = sm_6_7_version
              | sm_6_6
              ;
 
+/// HLSL shader model 6.8 and related capabilities of other targets.
+/// Does not include related GLSL/SPIRV extensions.
+/// [Version]
+alias sm_6_8_version = _sm_6_8
+             | _GLSL_460
+             | spirv_1_5
+             | _cuda_sm_9_0
+             | metal
+             | cpp
+             ;
+
+/// HLSL shader model 6.8 and related capabilities of other targets.
+/// Includes related GLSL/SPIRV extensions.
+/// [Version]
+alias sm_6_8 = sm_6_8_version
+             | sm_6_7
+             ;
+
+// Profiles
 /// Use `sm_4_0` instead
 /// [Other]
 alias DX_4_0 = sm_4_0;
@@ -1526,6 +1574,10 @@ alias DX_6_6 = sm_6_6;
 /// Use `sm_6_7` instead
 /// [Other]
 alias DX_6_7 = sm_6_7;
+
+/// Use `sm_6_8` instead
+/// [Other]
+alias DX_6_8 = sm_6_8;
 
 // GLSL profile capabilities
 //
@@ -2042,10 +2094,10 @@ alias ser_motion_raygen = raygen + ser_motion;
 
 /// User should not use this capability
 /// [Other]
-alias all = _sm_6_7 + hlsl_nvapi
-          | sm_6_7
+alias all = _sm_6_8 + hlsl_nvapi
+          | glsl_spirv_1_5 + sm_6_8
              + ser + shaderclock + texturefootprint + fragmentshaderinterlock + _GL_NV_shader_subgroup_partitioned
              + _GL_NV_ray_tracing_motion_blur + _GL_NV_shader_texture_footprint
-          | spirv_1_5 + sm_6_7
+          | spirv_1_5 + sm_6_8
              + ser + shaderclock + texturefootprint + fragmentshaderinterlock + spvGroupNonUniformPartitionedNV
              + spvRayTracingMotionBlurNV + spvRayTracingMotionBlurNV;
