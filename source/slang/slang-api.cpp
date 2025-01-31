@@ -1,6 +1,7 @@
 // slang-api.cpp
 
 #include "../core/slang-performance-profiler.h"
+#include "../core/slang-platform.h"
 #include "../core/slang-rtti-info.h"
 #include "../core/slang-shared-library.h"
 #include "../core/slang-signal.h"
@@ -60,6 +61,32 @@ SlangResult tryLoadBuiltinModuleFromCache(
         builtinModuleName,
         (uint8_t*)cacheData.getData() + sizeof(uint64_t),
         cacheData.getSizeInBytes() - sizeof(uint64_t)));
+    return SLANG_OK;
+}
+
+// Attempt to load a precompiled builtin module from slang-xxx-module.dll.
+SlangResult tryLoadBuiltinModuleFromDLL(
+    slang::IGlobalSession* globalSession,
+    slang::BuiltinModuleName builtinModuleName)
+{
+    Slang::String moduleFileName =
+        Slang::String("slang-") + Slang::getBuiltinModuleNameStr(builtinModuleName) + "-module";
+
+    Slang::SharedLibrary::Handle libHandle = nullptr;
+
+    SLANG_RETURN_ON_FAIL(Slang::SharedLibrary::load(moduleFileName.getBuffer(), libHandle));
+    if (!libHandle)
+        return SLANG_FAIL;
+    void* ptr = Slang::SharedLibrary::findSymbolAddressByName(libHandle, "slang_getEmbeddedModule");
+    if (!ptr)
+        return SLANG_FAIL;
+    typedef ISlangBlob*(GetEmbeddedModuleFunc)();
+    auto getEmbeddedModule = (GetEmbeddedModuleFunc*)ptr;
+    auto blob = getEmbeddedModule();
+    SLANG_RETURN_ON_FAIL(globalSession->loadBuiltinModule(
+        builtinModuleName,
+        (uint8_t*)blob->getBufferPointer(),
+        blob->getBufferSize()));
     return SLANG_OK;
 }
 
@@ -155,11 +182,18 @@ SLANG_API SlangResult slang_createGlobalSession2(
     {
         Slang::String cacheFilename;
         uint64_t dllTimestamp = 0;
-        if (tryLoadBuiltinModuleFromCache(
-                globalSession,
-                slang::BuiltinModuleName::GLSL,
-                cacheFilename,
-                dllTimestamp) != SLANG_OK)
+        if (SLANG_SUCCEEDED(
+                tryLoadBuiltinModuleFromDLL(globalSession, slang::BuiltinModuleName::GLSL)))
+        {
+        }
+        else if (SLANG_SUCCEEDED(tryLoadBuiltinModuleFromCache(
+                     globalSession,
+                     slang::BuiltinModuleName::GLSL,
+                     cacheFilename,
+                     dllTimestamp)))
+        {
+        }
+        else
         {
             SLANG_RETURN_ON_FAIL(
                 globalSession->compileBuiltinModule(slang::BuiltinModuleName::GLSL, 0));
