@@ -158,6 +158,7 @@ if(SLANG_ENABLE_GFX)
         EXPORT_SET_NAME SlangTargets
         FOLDER gfx
     )
+    target_link_libraries(gfx PUBLIC SPIRV-Tools-link)
     set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
     add_custom_target(
         copy-gfx-slang-modules
