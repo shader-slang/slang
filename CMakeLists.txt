@@ -362,16 +362,18 @@ install(
 )
 
 # Install slang-glsl-module.bin if it exists.
-get_target_property(SLANG_BOOTSTRAP_PATH slang-bootstrap RUNTIME_OUTPUT_DIRECTORY)
-set(GLSL_MODULE_PATH ${SLANG_BOOTSTRAP_PATH}/slang-glsl-module.bin)
+if(SLANG_GENERATORS_PATH)
+    set(GLSL_MODULE_PATH ${SLANG_GENERATORS_PATH}/slang-glsl-module.bin)
+else()
+    get_target_property(SLANG_BOOTSTRAP_PATH slang-bootstrap RUNTIME_OUTPUT_DIRECTORY)
+    set(GLSL_MODULE_PATH ${SLANG_BOOTSTRAP_PATH}/slang-glsl-module.bin)
+end()
 
-#if(EXISTS ${GLSL_MODULE_PATH})
 message(STATUS "glsl module path: " ${GLSL_MODULE_PATH})
 install(
     FILES ${GLSL_MODULE_PATH}
     DESTINATION bin
 )
-#endif()
 
 include(CPack)
 
