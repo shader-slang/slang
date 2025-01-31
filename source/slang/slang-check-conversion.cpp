@@ -34,6 +34,8 @@ BuiltinConversionKind SemanticsVisitor::getImplicitConversionBuiltinKind(Decl* d
 
 bool SemanticsVisitor::isEffectivelyScalarForInitializerLists(Type* type)
 {
+    if (as<CoopVectorExpressionType>(type))
+        return false;
     if (as<ArrayExpressionType>(type))
         return false;
     if (as<VectorExpressionType>(type))
@@ -258,6 +260,50 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 getSink()->diagnose(
                     fromInitializerListExpr,
                     Diagnostics::cannotUseInitializerListForVectorOfUnknownSize,
+                    toElementCount);
+            }
+            return false;
+        }
+
+        for (UInt ee = 0; ee < elementCount; ++ee)
+        {
+            Expr* coercedArg = nullptr;
+            bool argResult = _readValueFromInitializerList(
+                toElementType,
+                outToExpr ? &coercedArg : nullptr,
+                fromInitializerListExpr,
+                ioArgIndex);
+
+            // No point in trying further if any argument fails
+            if (!argResult)
+                return false;
+
+            if (coercedArg)
+            {
+                coercedArgs.add(coercedArg);
+            }
+        }
+    }
+    else if (auto toCoopVectorType = as<CoopVectorExpressionType>(toType))
+    {
+        auto toElementCount = toCoopVectorType->getElementCount();
+        auto toElementType = toCoopVectorType->getElementType();
+
+        UInt elementCount = 0;
+        if (auto constElementCount = as<ConstantIntVal>(toElementCount))
+        {
+            elementCount = (UInt)constElementCount->getValue();
+        }
+        else
+        {
+            // We don't know the element count statically,
+            // so what are we supposed to be doing?
+            //
+            if (outToExpr)
+            {
+                getSink()->diagnose(
+                    fromInitializerListExpr,
+                    Diagnostics::cannotUseInitializerListForCoopVectorOfUnknownSize,
                     toElementCount);
             }
             return false;

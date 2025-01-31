@@ -3018,6 +3018,11 @@ struct IRMakeVectorFromScalar : IRInst
     IR_LEAF_ISA(MakeVectorFromScalar)
 };
 
+struct IRMakeCoopVector : IRInst
+{
+    IR_LEAF_ISA(MakeCoopVector)
+};
+
 // An Instruction that creates a differential pair value from a
 // primal and differential.
 
@@ -3735,6 +3740,8 @@ public:
 
     IRVectorType* getVectorType(IRType* elementType, IRIntegerValue elementCount);
 
+    IRCoopVectorType* getCoopVectorType(IRType* elementType, IRInst* elementCount);
+
     IRMatrixType* getMatrixType(
         IRType* elementType,
         IRInst* rowCount,
@@ -4056,6 +4063,9 @@ public:
     IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, UInt element);
     IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, IRInst* element);
 
+    IRInst* emitGetElement(IRType* type, IRInst* arrayLikeType, IRIntegerValue element);
+    IRInst* emitGetElementPtr(IRType* type, IRInst* arrayLikeType, IRIntegerValue element);
+
     IRInst* emitMakeResultError(IRType* resultType, IRInst* errorVal);
     IRInst* emitMakeResultValue(IRType* resultType, IRInst* val);
     IRInst* emitIsResultError(IRInst* result);
@@ -4093,6 +4103,8 @@ public:
     IRInst* emitMakeMatrix(IRType* type, UInt argCount, IRInst* const* args);
 
     IRInst* emitMakeMatrixFromScalar(IRType* type, IRInst* scalarValue);
+
+    IRInst* emitMakeCoopVector(IRType* type, UInt argCount, IRInst* const* args);
 
     IRInst* emitMakeArray(IRType* type, UInt argCount, IRInst* const* args);
 

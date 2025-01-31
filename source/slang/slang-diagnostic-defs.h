@@ -1415,6 +1415,11 @@ DIAGNOSTIC(
     Error,
     cannotUseInitializerListForType,
     "cannot use initializer list for type '$0'")
+DIAGNOSTIC(
+    30505,
+    Error,
+    cannotUseInitializerListForCoopVectorOfUnknownSize,
+    "cannot use initializer list for CoopVector of statically unknown size '$0'")
 
 // 3062x: variables
 DIAGNOSTIC(
@@ -2018,6 +2023,13 @@ DIAGNOSTIC(
     Error,
     notValidVaryingParameter,
     "parameter '$0' is not a valid varying parameter.")
+
+DIAGNOSTIC(
+    39029,
+    Warning,
+    registerModifierButNoVkBindingNorShift,
+    "shader parameter '$0' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` "
+    "specified for Vulkan, nor is `-fvk-$1-shift` used.")
 
 //
 

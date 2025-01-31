@@ -1628,6 +1628,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     static_cast<IRIntLit*>(vectorType->getElementCount())->getValue(),
                     vectorType);
             }
+        case kIROp_CoopVectorType:
+            {
+                auto coopVecType = static_cast<IRCoopVectorType*>(inst);
+                requireSPIRVCapability(SpvCapabilityCooperativeVectorNV);
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_cooperative_vector"));
+                return ensureCoopVecType(
+                    static_cast<IRBasicType*>(coopVecType->getElementType())->getBaseType(),
+                    static_cast<IRIntLit*>(coopVecType->getElementCount())->getValue(),
+                    coopVecType);
+            }
         case kIROp_MatrixType:
             {
                 auto matrixType = static_cast<IRMatrixType*>(inst);
@@ -1669,11 +1679,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         &sizeAndAlignment);
                     stride = (int)sizeAndAlignment.getStride();
                 }
-                emitOpDecorateArrayStride(
-                    getSection(SpvLogicalSectionID::Annotations),
-                    nullptr,
-                    arrayType,
-                    SpvLiteralInteger::from32(stride));
+
+                // Avoid validation error: Array containing a Block or BufferBlock must not be
+                // decorated with ArrayStride
+                if (!elementType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration) &&
+                    !elementType->findDecorationImpl(kIROp_SPIRVBlockDecoration))
+                {
+                    emitOpDecorateArrayStride(
+                        getSection(SpvLogicalSectionID::Annotations),
+                        nullptr,
+                        arrayType,
+                        SpvLiteralInteger::from32(stride));
+                }
+
                 return arrayType;
             }
         case kIROp_AtomicType:
@@ -1770,6 +1788,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     numElems->getValue());
             }
         case kIROp_MakeVector:
+        case kIROp_MakeCoopVector:
         case kIROp_MakeArray:
         case kIROp_MakeStruct:
             return emitCompositeConstruct(getSection(SpvLogicalSectionID::ConstantsAndTypes), inst);
@@ -2350,6 +2369,27 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             inst,
             inst->getElementType(),
             SpvLiteralInteger::from32(int32_t(elementCount)));
+        return result;
+    }
+
+    /// Similar to ensureVectorType but for CoopVecType
+    SpvInst* ensureCoopVecType(
+        BaseType baseType,
+        IRIntegerValue elementCount,
+        IRCoopVectorType* inst)
+    {
+        IRBuilder builder(m_irModule);
+        if (!inst)
+        {
+            builder.setInsertInto(m_irModule->getModuleInst());
+            inst = builder.getCoopVectorType(
+                builder.getBasicType(baseType),
+                builder.getIntValue(builder.getIntType(), elementCount));
+        }
+        auto result = emitOpTypeCoopVec(
+            inst,
+            inst->getElementType(),
+            emitIntConstant(elementCount, builder.getIntType()));
         return result;
     }
 
@@ -3409,6 +3449,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_StructuredBufferGetDimensions:
             result = emitStructuredBufferGetDimensions(parent, inst);
             break;
+        case kIROp_GetStructuredBufferPtr:
+        case kIROp_GetUntypedBufferPtr:
+            result = emitGetBufferPtr(parent, inst);
+            break;
         case kIROp_swizzle:
             result = emitSwizzle(parent, as<IRSwizzle>(inst));
             break;
@@ -3702,6 +3746,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 SLANG_ASSERT(numElems);
                 result = emitSplat(parent, inst, scalar, numElems->getValue());
             }
+            break;
+        case kIROp_MakeCoopVector:
+            result = emitConstruct(parent, inst);
             break;
         case kIROp_MakeArray:
             result = emitConstruct(parent, inst);
@@ -5600,6 +5647,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitPhi(SpvInstParent* parent, IRParam* inst)
     {
+        requireVariableBufferCapabilityIfNeeded(inst->getDataType());
+
         // An `IRParam` in an ordinary `IRBlock` represents a phi value.
         // We can translate them directly to SPIRV's `Phi` instruction.
         // In order to do that, we need to figure out the source values
@@ -5674,6 +5723,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         // Does this function declare any requirements.
         handleRequiredCapabilities(funcValue);
+        requireVariableBufferCapabilityIfNeeded(inst->getDataType());
 
         // We want to detect any call to an intrinsic operation, and inline
         // the SPIRV snippet directly at the call site.
@@ -6066,12 +6116,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitGetElement(SpvInstParent* parent, IRGetElement* inst)
     {
+        requireVariableBufferCapabilityIfNeeded(inst->getDataType());
+
         // Note: SPIRV only supports the case where `index` is constant.
         auto base = inst->getBase();
         const auto baseTy = base->getDataType();
         SLANG_ASSERT(
             as<IRPointerLikeType>(baseTy) || as<IRArrayType>(baseTy) || as<IRVectorType>(baseTy) ||
-            as<IRMatrixType>(baseTy));
+            as<IRCoopVectorType>(baseTy) || as<IRMatrixType>(baseTy));
 
         IRBuilder builder(m_irModule);
         builder.setInsertBefore(inst);
@@ -6089,7 +6141,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         else
         {
-            SLANG_ASSERT(as<IRVectorType>(baseTy));
+            SLANG_ASSERT(as<IRVectorType>(baseTy) || as<IRCoopVectorType>(baseTy));
             // SPIRV Only allows dynamic element extract on vector types.
             return emitOpVectorExtractDynamic(
                 parent,
@@ -6102,6 +6154,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitLoad(SpvInstParent* parent, IRLoad* inst)
     {
+        requireVariableBufferCapabilityIfNeeded(inst->getDataType());
+
         auto ptrType = as<IRPtrTypeBase>(inst->getPtr()->getDataType());
         if (ptrType && addressSpaceToStorageClass(ptrType->getAddressSpace()) ==
                            SpvStorageClassPhysicalStorageBuffer)
@@ -6299,6 +6353,27 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
+    SpvInst* emitGetBufferPtr(SpvInstParent* parent, IRInst* inst)
+    {
+        IRBuilder builder(inst);
+        auto addressSpace =
+            isSpirv14OrLater() ? AddressSpace::StorageBuffer : AddressSpace::Uniform;
+        // The buffer is a global parameter, so it's a pointer
+        IRPtrTypeBase* bufPtrType = cast<IRPtrTypeBase>(inst->getOperand(0)->getDataType());
+        // It's lowered to a struct type..
+        IRStructType* bufType = cast<IRStructType>(bufPtrType->getValueType());
+        // containing an unsized array, specifically one with an explicit
+        // stride, which is not expressible in spirv_asm blocks
+        IRArrayTypeBase* arrayType =
+            cast<IRArrayTypeBase>(bufType->getFields().getFirst()->getFieldType());
+        return emitOpAccessChain(
+            parent,
+            inst,
+            builder.getPtrType(arrayType, addressSpace),
+            inst->getOperand(0),
+            makeArray(emitIntConstant(0, builder.getIntType())));
+    }
+
     SpvInst* emitSwizzle(SpvInstParent* parent, IRSwizzle* inst)
     {
         if (inst->getElementCount() == 1)
@@ -6470,7 +6545,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRType* toType = nullptr;
 
         bool isMatrixCast = false;
-        if (as<IRVectorType>(fromTypeV) || as<IRVectorType>(toTypeV))
+        if (as<IRVectorType>(fromTypeV) || as<IRVectorType>(toTypeV) ||
+            as<IRCoopVectorType>(fromTypeV) || as<IRCoopVectorType>(toTypeV))
         {
             fromType = getVectorElementType(fromTypeV);
             toType = getVectorElementType(toTypeV);
@@ -8028,6 +8104,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (m_capabilities.add(capability))
         {
             emitOpCapability(getSection(SpvLogicalSectionID::Capabilities), nullptr, capability);
+        }
+    }
+
+    void requireVariableBufferCapabilityIfNeeded(IRInst* type)
+    {
+        if (auto ptrType = as<IRPtrTypeBase>(type))
+        {
+            if (ptrType->getAddressSpace() == AddressSpace::StorageBuffer)
+            {
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_variable_pointers"));
+                requireSPIRVCapability(SpvCapabilityVariablePointers);
+            }
         }
     }
 
