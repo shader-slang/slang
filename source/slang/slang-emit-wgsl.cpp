@@ -1650,7 +1650,7 @@ void WGSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
         if (const auto extensionDecoration = as<IRRequireWGSLExtensionDecoration>(decoration))
         {
             _requireExtension(extensionDecoration->getExtensionName());
-            
+
             // TODO: Make this cleaner and only enable this extension if f16 is actually used on the
             // subgroup intrinsic. Check float type in meta file.
             if (m_f16ExtensionEnabled && extensionDecoration->getExtensionName() == "subgroups")
