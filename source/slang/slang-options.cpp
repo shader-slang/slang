@@ -888,6 +888,11 @@ void initCommandOptions(CommandOptions& options)
          "-save-core-module-bin-source <filename>",
          "Same as -save-core-module but output "
          "the data as a C array.\n"},
+        {OptionKind::SaveGLSLModuleBinSource,
+         "-save-glsl-module-bin-source",
+         "-save-glsl-module-bin-source <filename>",
+         "Save the serialized glsl module "
+         "as a C array.\n"},
         {OptionKind::TrackLiveness,
          "-track-liveness",
          nullptr,
@@ -2203,14 +2208,24 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 break;
             }
         case OptionKind::SaveCoreModuleBinSource:
+        case OptionKind::SaveGLSLModuleBinSource:
             {
                 CommandLineArg fileName;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));
 
                 ComPtr<ISlangBlob> blob;
 
-                SLANG_RETURN_ON_FAIL(m_session->saveCoreModule(m_archiveType, blob.writeRef()));
-
+                if (optionKind == OptionKind::SaveCoreModuleBinSource)
+                {
+                    SLANG_RETURN_ON_FAIL(m_session->saveCoreModule(m_archiveType, blob.writeRef()));
+                }
+                else
+                {
+                    SLANG_RETURN_ON_FAIL(m_session->saveBuiltinModule(
+                        slang::BuiltinModuleName::GLSL,
+                        m_archiveType,
+                        blob.writeRef()));
+                }
                 StringBuilder builder;
                 StringWriter writer(&builder, 0);
 

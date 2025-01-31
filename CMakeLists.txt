@@ -334,6 +334,7 @@ add_subdirectory(source/slang-glslang)
 add_subdirectory(tools)
 add_subdirectory(prelude)
 add_subdirectory(source/slang-core-module)
+add_subdirectory(source/slang-glsl-module)
 add_subdirectory(source/slang)
 add_subdirectory(source/slangc)
 add_subdirectory(examples)
@@ -360,21 +361,6 @@ install(
     DESTINATION .
     PATTERN ".*" EXCLUDE
 )
-
-# Install slang-glsl-module.bin if it exists.
-if(SLANG_GENERATORS_PATH)
-    set(GLSL_MODULE_PATH ${SLANG_GENERATORS_PATH}/slang-glsl-module.bin)
-else()
-    get_target_property(SLANG_BOOTSTRAP_PATH slang-bootstrap RUNTIME_OUTPUT_DIRECTORY)
-    set(GLSL_MODULE_PATH ${SLANG_BOOTSTRAP_PATH}/slang-glsl-module.bin)
-endif()
-
-message(STATUS "glsl module path: " ${GLSL_MODULE_PATH})
-install(
-    FILES ${GLSL_MODULE_PATH}
-    DESTINATION bin
-)
-
 include(CPack)
 
 # Write basic package config version file using standard CMakePackageConfigHelpers utility
