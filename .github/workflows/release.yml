@@ -127,6 +127,7 @@ jobs:
             "${lib_dir}/libslang.dylib"
             "${lib_dir}/libslang-rt.dylib"
             "${lib_dir}/libslang-glslang.dylib"
+            "${lib_dir}/libslang-glsl-module.dylib"
             "${lib_dir}/libslang-llvm.dylib"
             "${lib_dir}/libgfx.dylib"
             "${bin_dir}/slangd"
