@@ -226,6 +226,7 @@ static Slang::String CompilerOptionNameToString(const slang::CompilerOptionName 
         CASE(ReferenceModule);
         CASE(SaveCoreModule);
         CASE(SaveCoreModuleBinSource);
+        CASE(SaveGLSLModuleBinSource);
         CASE(TrackLiveness);
         CASE(LoopInversion);
         CASE(CountOfParsableOptions);
