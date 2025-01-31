@@ -2763,9 +2763,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::Help:
             {
                 SLANG_RETURN_ON_FAIL(_parseHelp(arg));
-
-                // We retun an error so after this has successfully passed, we quit
-                return SLANG_FAIL;
+                return SLANG_OK;
             }
         case OptionKind::EmitSpirvViaGLSL:
         case OptionKind::EmitSpirvDirectly:
