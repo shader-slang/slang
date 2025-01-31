@@ -355,7 +355,7 @@ struct AssignValsFromLayoutContext
             if (field.name.getLength() == 0)
             {
                 // If no name was given, assume by-indexing matching is requested
-                auto fieldCursor = dstCursor.getElement((GfxIndex)fieldIndex);
+                auto fieldCursor = dstCursor.getElement((uint32_t)fieldIndex);
                 if (!fieldCursor.isValid())
                 {
                     StdWriters::getError().print(
@@ -638,7 +638,7 @@ SlangResult RenderTestApp::initialize(
                 SLANG_RETURN_ON_FAIL(
                     device->createBuffer(vertexBufferDesc, kVertexData, m_vertexBuffer.writeRef()));
 
-                ColorTargetState colorTarget;
+                ColorTargetDesc colorTarget;
                 colorTarget.format = Format::R8G8B8A8_UNORM;
                 RenderPipelineDesc desc;
                 desc.program = m_shaderProgram;
@@ -653,7 +653,7 @@ SlangResult RenderTestApp::initialize(
         case Options::ShaderProgramType::GraphicsMeshCompute:
         case Options::ShaderProgramType::GraphicsTaskMeshCompute:
             {
-                ColorTargetState colorTarget;
+                ColorTargetDesc colorTarget;
                 colorTarget.format = Format::R8G8B8A8_UNORM;
                 RenderPipelineDesc desc;
                 desc.program = m_shaderProgram;
@@ -986,15 +986,10 @@ Result RenderTestApp::update()
     auto encoder = m_queue->createCommandEncoder();
     if (m_options.shaderType == Options::ShaderProgramType::Compute)
     {
-        auto rootObject = m_device->createRootShaderObject(m_pipeline);
-        applyBinding(rootObject);
-        rootObject->finalize();
-
         auto passEncoder = encoder->beginComputePass();
-        ComputeState state;
-        state.pipeline = static_cast<IComputePipeline*>(m_pipeline.get());
-        state.rootObject = rootObject;
-        passEncoder->setComputeState(state);
+        auto rootObject =
+            passEncoder->bindPipeline(static_cast<IComputePipeline*>(m_pipeline.get()));
+        applyBinding(rootObject);
         passEncoder->dispatchCompute(
             m_options.computeDispatchSize[0],
             m_options.computeDispatchSize[1],
@@ -1003,16 +998,11 @@ Result RenderTestApp::update()
     }
     else if (m_options.shaderType == Options::ShaderProgramType::RayTracing)
     {
-        auto rootObject = m_device->createRootShaderObject(m_pipeline);
-        applyBinding(rootObject);
-        rootObject->finalize();
-
         auto passEncoder = encoder->beginRayTracingPass();
-        RayTracingState state;
-        state.pipeline = static_cast<IRayTracingPipeline*>(m_pipeline.get());
-        state.rootObject = rootObject;
-        state.shaderTable = m_shaderTable;
-        passEncoder->setRayTracingState(state);
+        auto rootObject = passEncoder->bindPipeline(
+            static_cast<IRayTracingPipeline*>(m_pipeline.get()),
+            m_shaderTable);
+        applyBinding(rootObject);
         passEncoder->dispatchRays(
             0,
             m_options.computeDispatchSize[0],
@@ -1022,11 +1012,6 @@ Result RenderTestApp::update()
     }
     else
     {
-        auto rootObject = m_device->createRootShaderObject(m_pipeline);
-        applyBinding(rootObject);
-        setProjectionMatrix(rootObject);
-        rootObject->finalize();
-
         RenderPassColorAttachment colorAttachment = {};
         colorAttachment.view = m_colorBufferView;
         colorAttachment.loadOp = LoadOp::Clear;
@@ -1041,13 +1026,15 @@ Result RenderTestApp::update()
         renderPass.depthStencilAttachment = &depthStencilAttachment;
 
         auto passEncoder = encoder->beginRenderPass(renderPass);
+        auto rootObject =
+            passEncoder->bindPipeline(static_cast<IRenderPipeline*>(m_pipeline.get()));
+        applyBinding(rootObject);
+        setProjectionMatrix(rootObject);
 
         RenderState state;
-        state.pipeline = static_cast<IRenderPipeline*>(m_pipeline.get());
-        state.rootObject = rootObject;
-        state.viewports[0] = Viewport((float)gWindowWidth, (float)gWindowHeight);
+        state.viewports[0] = Viewport::fromSize(gWindowWidth, gWindowHeight);
         state.viewportCount = 1;
-        state.scissorRects[0] = ScissorRect(gWindowWidth, gWindowHeight);
+        state.scissorRects[0] = ScissorRect::fromSize(gWindowWidth, gWindowHeight);
         state.scissorRectCount = 1;
 
         if (m_options.shaderType == Options::ShaderProgramType::GraphicsMeshCompute ||
@@ -1413,9 +1400,6 @@ static SlangResult _innerMain(
         desc.debugCallback = &debugCallback;
 #endif
 
-        if (options.enableBackendValidation)
-            desc.enableBackendValidation = true;
-
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)
             desc.slang.targetFlags = SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
@@ -1460,7 +1444,10 @@ static SlangResult _innerMain(
         desc.slang.slangGlobalSession = session;
         desc.slang.targetProfile = options.profileName.getBuffer();
         {
-            getRHI()->enableDebugLayers();
+            if (options.enableDebugLayers)
+            {
+                getRHI()->enableDebugLayers();
+            }
             SlangResult res = getRHI()->createDevice(desc, device.writeRef());
             if (SLANG_FAILED(res))
             {
