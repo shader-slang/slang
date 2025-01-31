@@ -1404,7 +1404,7 @@ static SlangResult _innerMain(
             }
         }
 
-        desc.nvapiExtnSlot = int(nvapiExtnSlot);
+        desc.nvapiExtUavSlot = uint32_t(nvapiExtnSlot);
         desc.slang.slangGlobalSession = session;
         desc.slang.targetProfile = options.profileName.getBuffer();
         {
