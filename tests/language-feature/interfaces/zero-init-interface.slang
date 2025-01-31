@@ -1,6 +1,7 @@
 // Test that we can zero-init a struct with interface typed member.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER): -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER): -vk -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

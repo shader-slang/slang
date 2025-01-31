@@ -165,6 +165,10 @@ class AggTypeDecl : public AggTypeDeclBase
 class StructDecl : public AggTypeDecl
 {
     SLANG_AST_CLASS(StructDecl);
+
+    SLANG_UNREFLECTED
+    // We will use these auxiliary to help in synthesizing the member initialize constructor.
+    Slang::HashSet<VarDeclBase*> m_membersVisibleInCtor;
 };
 
 class ClassDecl : public AggTypeDecl
@@ -374,9 +378,20 @@ class ConstructorDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(ConstructorDecl)
 
-    // Indicates whether the declaration was synthesized by
-    // slang and not actually provided by the user
-    bool isSynthesized = false;
+    enum class ConstructorFlavor : int
+    {
+        UserDefined = 0x00,
+        // Indicates whether the declaration was synthesized by
+        // Slang and not explicitly provided by the user
+        SynthesizedDefault = 0x01,
+        // Member initialize constructor is a synthesized ctor,
+        // but it takes parameters.
+        SynthesizedMemberInit = 0x02
+    };
+
+    int m_flavor = (int)ConstructorFlavor::UserDefined;
+    void addFlavor(ConstructorFlavor flavor) { m_flavor |= (int)flavor; }
+    bool containsFlavor(ConstructorFlavor flavor) { return m_flavor & (int)flavor; }
 };
 
 // A subscript operation used to index instances of a type

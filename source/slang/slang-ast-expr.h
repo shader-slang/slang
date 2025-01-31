@@ -135,6 +135,8 @@ class InitializerListExpr : public Expr
 {
     SLANG_AST_CLASS(InitializerListExpr)
     List<Expr*> args;
+
+    bool useCStyleInitialization = true;
 };
 
 class GetArrayLengthExpr : public Expr
@@ -191,6 +193,11 @@ class AppExprBase : public ExprWithArgsBase
 class InvokeExpr : public AppExprBase
 {
     SLANG_AST_CLASS(InvokeExpr)
+};
+
+class ExplicitCtorInvokeExpr : public InvokeExpr
+{
+    SLANG_AST_CLASS(ExplicitCtorInvokeExpr)
 };
 
 enum class TryClauseType

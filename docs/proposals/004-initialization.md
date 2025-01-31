@@ -129,6 +129,39 @@ MyType x = MyType(y); // equivalent to `x = y`.
 
 The compiler will attempt to resolve all type casts using type coercion rules, if that failed, will fall back to resolve it as a constructor call.
 
+### Inheritance Initialization
+For derived structs, slang will synthesized the constructor by bringing the parameters from the base struct's constructor if the base struct also has a synthesized constructor. For example:
+```csharp
+struct Base
+{
+  int x;
+  // compiler synthesizes:
+  // __init(int x) { ... }
+}
+struct Derived : Base
+{
+  int y;
+  // compiler synthesizes:
+  // __init(int x, int y) { ... }
+}
+```
+
+However, if the base struct has explicit ctors, the compiler will not synthesize a constructor for the derived struct.
+For example, given
+```csharp
+struct Base { int x; __init(int x) { this.x = x; } }
+struct Derived : Base { int y;}
+```
+The compiler will not synthesize a constructor for `Derived`, and the following code will fail to compile:
+```csharp
+
+Derived d = {1};            // error, no matching ctor.
+Derived d = {1, 2};         // error, no matching ctor.
+Derived d = Derived(1);     // error, no matching ctor.
+Derived d = Derived(1, 2);  // error, no matching ctor.
+```
+
+
 ### Initialization List
 
 Slang allows initialization of a variable by assigning it with an initialization list. 
@@ -167,7 +200,8 @@ If the above code passes type check, then it will be used as the way to initiali
 
 If the above code does not pass type check, and if there is only one constructor for`MyType` that is synthesized as described in the previous section (and therefore marked as `[Synthesized]`, Slang continues to check if `S` meets the standard of a "legacy C-style struct` type.
 A type is a "legacy C-Style struct" if all of the following conditions are met:
-- It is a user-defined struct type or a basic scalar, vector or matrix type, e.g. `int`, `float4x4`.
+- It is a user-defined struct type or an enum, a basic scalar, vector or matrix type, e.g. `int`, `float4x4`.
+- It does not inherit from any other types.
 - It does not contain any explicit constructors defined by the user.
 - All its members have the same visibility as the type itself.
 - All its members are legacy C-Style structs or arrays of legacy C-style structs.

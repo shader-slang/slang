@@ -29,10 +29,10 @@ struct DefaultStruct_top : DefaultStruct_middle2
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    DefaultStruct_bottom s1;
-    DefaultStruct_middle1 s2;
-    DefaultStruct_middle2 s3;
-    DefaultStruct_top s4;
+    DefaultStruct_bottom s1 = {};
+    DefaultStruct_middle1 s2 = {};
+    DefaultStruct_middle2 s3 = {};
+    DefaultStruct_top s4 = {};
 
     // BUF: 1
     outputBuffer[0] = true

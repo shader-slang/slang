@@ -23,7 +23,7 @@ struct DefaultStructNoInit : DefaultStructNoInit_base
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     DefaultStructNoInit::data4 = 0;
-    DefaultStructNoInit noInit;
+    DefaultStructNoInit noInit = {};
     // BUF: 1
     outputBuffer[0] = true
         && noInit.data0 == 2

@@ -21047,11 +21047,12 @@ ${
 
         case hlsl:
             uint isSingleLod = 0;
-            Footprint footprint =  {__queryFootprint$(CoarseOrFine)NVAPI(
+            __queryFootprint$(CoarseOrFine)NVAPI(
                 Shape.dimensions,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),
-                __vectorReshape<3>(coords), granularity, /* out */isSingleLod), false};
+                __vectorReshape<3>(coords), granularity, /* out */isSingleLod);
+            Footprint footprint = {false};
             footprint._isSingleLevel = (isSingleLod != 0);
             return footprint;
         }
@@ -21080,12 +21081,12 @@ ${
             return footprint;
         case hlsl:
             uint isSingleLod = 0;
-            Footprint footprint = {__queryFootprint$(CoarseOrFine)BiasNVAPI(
+            __queryFootprint$(CoarseOrFine)BiasNVAPI(
                 Shape.dimensions,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),
-                __vectorReshape<3>(coords), granularity, lodBias, /* out */isSingleLod), false}; 
-            
+                __vectorReshape<3>(coords), granularity, lodBias, /* out */isSingleLod);
+            Footprint footprint = {false};
             footprint._isSingleLevel = (isSingleLod != 0);
             return footprint;
         }
@@ -21163,12 +21164,12 @@ ${
             return footprint;
         case hlsl:
             uint isSingleLod = 0;
-            Footprint footprint = {__queryFootprint$(CoarseOrFine)LevelNVAPI(
+            __queryFootprint$(CoarseOrFine)LevelNVAPI(
                 Shape.dimensions,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),
-                __vectorReshape<3>(coords), granularity, lod, /* out */isSingleLod), false};
-            
+                __vectorReshape<3>(coords), granularity, lod, /* out */isSingleLod);
+            Footprint footprint = {false};
             footprint._isSingleLevel = (isSingleLod != 0);
             return footprint;
         }
@@ -21202,12 +21203,12 @@ ${{{
             return footprint;
         case hlsl:
             uint isSingleLod = 0;
-            Footprint footprint = {__queryFootprint$(CoarseOrFine)GradNVAPI(
+            __queryFootprint$(CoarseOrFine)GradNVAPI(
                 Shape.dimensions,
                 __getRegisterSpace(this), __getRegisterIndex(this),
                 __getRegisterSpace(sampler), __getRegisterIndex(sampler),
-                __vectorReshape<3>(coords), granularity, __vectorReshape<3>(dx), __vectorReshape<3>(dy), /* out */isSingleLod), false};
-
+                __vectorReshape<3>(coords), granularity, __vectorReshape<3>(dx), __vectorReshape<3>(dy), /* out */isSingleLod);
+            Footprint footprint = {false};
             footprint._isSingleLevel = (isSingleLod != 0);
             return footprint;
         }

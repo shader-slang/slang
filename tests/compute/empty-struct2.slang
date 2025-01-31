@@ -48,7 +48,7 @@ void test<Obj : IInterface>(Obj obj)
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    Empty<EmptyS> obj;
+    Empty<EmptyS> obj = {};
     test(obj);
     outputBuffer[dispatchThreadID.x] = dispatchThreadID.x;
 }
