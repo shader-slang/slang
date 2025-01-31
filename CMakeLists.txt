@@ -367,7 +367,7 @@ if(SLANG_GENERATORS_PATH)
 else()
     get_target_property(SLANG_BOOTSTRAP_PATH slang-bootstrap RUNTIME_OUTPUT_DIRECTORY)
     set(GLSL_MODULE_PATH ${SLANG_BOOTSTRAP_PATH}/slang-glsl-module.bin)
-end()
+endif()
 
 message(STATUS "glsl module path: " ${GLSL_MODULE_PATH})
 install(
