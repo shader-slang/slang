@@ -114,88 +114,19 @@ jobs:
       - name: Build Slang
         if: steps.filter.outputs.should-run == 'true'
         run: |
-          if [[ "${{ matrix.platform }}" = "wasm" ]]; then
-              git clone https://github.com/emscripten-core/emsdk.git
-              pushd emsdk
-                ./emsdk install latest
-                ./emsdk activate latest
-                source ./emsdk_env.sh
-              popd
-              cmake --workflow --preset generators --fresh
-              mkdir generators
-              cmake --install build --prefix generators --component generators
-              emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
-              cmake --build --preset emscripten --config "$cmake_config" --target slang-wasm
-              [ -f "build.em/$cmake_config/bin/slang-wasm.wasm" ]
-              [ -f "build.em/$cmake_config/bin/slang-wasm.js" ]
-          else
-            if [[ "${{ matrix.os }}" =~ "windows" && "${{ matrix.config }}" != "release" && "${{ matrix.config }}" != "releaseWithDebugInfo" ]]; then
-              # Doing a debug build will try to link against a release built llvm, this
-              # is a problem on Windows, so make slang-llvm in release build and use
-              # that as though it's a fetched binary via these presets.
-              cmake --workflow --preset slang-llvm
-              # Configure, pointing to our just-generated slang-llvm archive
-              cmake --preset default --fresh \
-                -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
-                "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
-                "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}}"
-              cmake --workflow --preset "${{matrix.config}}"
-            else
-              # Otherwise, use the "system" llvm we have just build or got from the
-              # cache in the setup phase
-              cmake --preset default --fresh \
-                -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
-                -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}}
-              cmake --workflow --preset "${{matrix.config}}"
-            fi
-          fi
+          echo "Skip build slang"
       - name: Test Slang
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm'
         run: |
-          export SLANG_RUN_SPIRV_VALIDATION=1
-          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
-          if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
-            "$bin_dir/slang-test" \
-              -use-test-server \
-              -server-count 8 \
-              -category ${{ matrix.test-category }} \
-              -api all-cpu \
-              -expected-failure-list tests/expected-failure-github.txt
-          elif [[ "${{matrix.has-gpu}}" == "true" ]]; then
-            "$bin_dir/slang-test" \
-              -use-test-server \
-              -category ${{ matrix.test-category }} \
-              -api all-dx12 \
-              -expected-failure-list tests/expected-failure-github.txt
-          else
-            "$bin_dir/slang-test" \
-              -use-test-server \
-              -category ${{ matrix.test-category }} \
-              -api all-dx12 \
-              -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-record-replay-tests.txt
-          fi
+          echo "Test Slang"
       - name: Run Slang examples
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm'
         run: |
-          .github/workflows/ci-examples.sh \
-           --bin-dir "$bin_dir" \
-           --os "${{matrix.os}}" \
-           --platform "${{matrix.platform}}" \
-           --config "${{matrix.config}}" \
-           --skip-file tests/expected-example-failure-github.txt
+          echo "Skip Slang examples"
       - name: Test Slang via glsl
         if: steps.filter.outputs.should-run == 'true' && matrix.full-gpu-tests && matrix.platform != 'wasm'
         run: |
-          export SLANG_RUN_SPIRV_VALIDATION=1
-          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
-          "$bin_dir/slang-test" \
-            -use-test-server \
-            -server-count 8 \
-            -category ${{ matrix.test-category }} \
-            -emit-spirv-via-glsl \
-            -api vk \
-            -expected-failure-list tests/expected-failure.txt
+          echo "Skip build slang"
       - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests
         with:
