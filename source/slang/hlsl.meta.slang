@@ -22329,6 +22329,7 @@ static const struct {
 for(auto buffer : kByteAddressBufferCases) {
 }}}}
     [mutating]
+    [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
     void __mutMatMul<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input, uint inputInterpretationHLSL,
@@ -22342,6 +22343,7 @@ for(auto buffer : kByteAddressBufferCases) {
     }
 
     [mutating]
+    [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
     void __mutMatMulAdd<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input, uint inputInterpretationHLSL,
@@ -22539,6 +22541,52 @@ for(auto buffer : kByteAddressBufferCases) {
 ${{{{
 }
 }}}}
+
+${{{{
+static const struct {
+    bool isRW;
+    char const* type;
+} kStructuredBufferCases[] =
+{
+    {true, "RWStructuredBuffer<IgnoredBufferElementType>"},
+    {false, "StructuredBuffer<IgnoredBufferElementType>"},
+};
+for(auto buffer : kStructuredBufferCases) {
+}}}}
+
+    [mutating]
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer_rw)]
+    void __mutMatMul<U : __BuiltinArithmeticType,IgnoredBufferElementType, let K : int>(
+        CoopVec<U, K> input, uint inputInterpretationHLSL,
+        $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
+        uint m, uint k, uint memoryLayoutHLSL, bool transpose, uint matrixStride)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".MatMul";
+        }
+    }
+
+    [mutating]
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer_rw)]
+    void __mutMatMulAdd<U : __BuiltinArithmeticType,IgnoredBufferElementType, let K : int>(
+        CoopVec<U, K> input, uint inputInterpretationHLSL,
+        $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
+        $(buffer.type) bias, uint biasOffset, uint biasInterpretationHLSL,
+        uint m, uint k, uint memoryLayoutHLSL, bool transpose, uint matrixStride)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".MatMulAdd";
+        }
+    }
+
+${{{{
+} // for(auto buffer : kByteAddressBufferCases) {
+}}}}
+
 }
 
 __intrinsic_op($(kIROp_MakeCoopVectorFromValuePack))
@@ -23663,7 +23711,7 @@ static const struct {
 for(auto buffer : kStructuredBufferCases_) {
 }}}}
 
-[require(spirv, cooperative_vector)]
+[require(hlsl_spirv, cooperative_vector)]
 __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
 CoopVec<T, M> coopVecMatMulPacked(
     CoopVec<U, PackedK> input,
@@ -23694,11 +23742,30 @@ CoopVec<T, M> coopVecMatMulPacked(
         {
             result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride;
         };
+
+    case hlsl:
+        var ret = CoopVec<T, M>(0);
+        let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
+        let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
+        let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
+        ret.__mutMatMul(
+             input,
+             inputInterpretationHLSL,
+             matrix,
+             matrixOffset,
+             matrixInterpretationHLSL,
+             M,
+             k,
+             memoryLayoutHLSL,
+             transpose,
+             matrixStride
+        );
+        return ret;
     }
 }
 
 // specialized coopVecMatMul for non-packed inputs
-[require(spirv, cooperative_vector)]
+[require(hlsl_spirv, cooperative_vector)]
 __generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
 CoopVec<T, M> coopVecMatMul(
     CoopVec<U, K> input,
@@ -23726,7 +23793,7 @@ CoopVec<T, M> coopVecMatMul(
         matrixStride);
 }
 
-[require(spirv, cooperative_vector)]
+[require(hlsl_spirv, cooperative_vector)]
 CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
@@ -23762,10 +23829,33 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
         {
             result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $biasPtr $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride;
         };
+
+    case hlsl:
+        var ret = CoopVec<T, M>(0);
+        let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
+        let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
+        let biasInterpretationHLSL = __getHLSLCoopVecComponentType(biasInterpretation);
+        let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
+        ret.__mutMatMulAdd(
+             input,
+             inputInterpretationHLSL,
+             matrix,
+             matrixOffset,
+             matrixInterpretationHLSL,
+             bias,
+             biasOffset,
+             biasInterpretationHLSL,
+             M,
+             k,
+             memoryLayoutHLSL,
+             transpose,
+             matrixStride
+        );
+        return ret;
     }
 }
 
-[require(spirv, cooperative_vector)]
+[require(hlsl_spirv, cooperative_vector)]
 CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
     CoopVec<U, K> input,
     constexpr CoopVecComponentType inputInterpretation,
