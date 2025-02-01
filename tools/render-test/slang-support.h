@@ -36,7 +36,7 @@ struct ShaderCompileRequest
     public:
         Slang::String derivedTypeName;
         Slang::String baseTypeName;
-        Int idOverride;
+        Slang::Int idOverride;
     };
 
     SourceInfo source;
