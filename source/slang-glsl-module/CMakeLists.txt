@@ -1,6 +1,7 @@
 #
 # Generate an embeddable glsl module
 #
+if (${SLANG_EMBED_CORE_MODULE})
 
 set(glsl_module_generated_header_dir ${CMAKE_CURRENT_BINARY_DIR})
 set(glsl_module_generated_header
@@ -37,3 +38,5 @@ slang_add_target(
     INCLUDE_DIRECTORIES_PRIVATE ${glsl_module_generated_header_dir}
     INSTALL
 )
+
+endif()
