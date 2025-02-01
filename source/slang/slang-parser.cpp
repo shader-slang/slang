@@ -8294,6 +8294,17 @@ static NodeBase* parseGLSLVersionModifier(Parser* parser, void* /*userData*/)
     return modifier;
 }
 
+static NodeBase* parseWGSLExtensionModifier(Parser* parser, void* /*userData*/)
+{
+    auto modifier = parser->astBuilder->create<RequiredWGSLExtensionModifier>();
+
+    parser->ReadToken(TokenType::LParent);
+    modifier->extensionNameToken = parser->ReadToken(TokenType::Identifier);
+    parser->ReadToken(TokenType::RParent);
+
+    return modifier;
+}
+
 static SlangResult parseSemanticVersion(
     Parser* parser,
     Token& outToken,
@@ -8854,6 +8865,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("__glsl_extension", parseGLSLExtensionModifier),
     _makeParseModifier("__glsl_version", parseGLSLVersionModifier),
     _makeParseModifier("__spirv_version", parseSPIRVVersionModifier),
+    _makeParseModifier("__wgsl_extension", parseWGSLExtensionModifier),
     _makeParseModifier("__cuda_sm_version", parseCUDASMVersionModifier),
 
     _makeParseModifier("__builtin_type", parseBuiltinTypeModifier),

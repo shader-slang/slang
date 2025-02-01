@@ -1,7 +1,7 @@
 // slang-ir-glsl-legalize.cpp
 #include "slang-ir-glsl-legalize.h"
 
-#include "slang-glsl-extension-tracker.h"
+#include "slang-extension-tracker.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
@@ -279,7 +279,7 @@ List<IRInst*> ScalarizedVal::leafAddresses()
 struct GLSLLegalizationContext
 {
     Session* session;
-    GLSLExtensionTracker* glslExtensionTracker;
+    ShaderExtensionTracker* glslExtensionTracker;
     DiagnosticSink* sink;
     Stage stage;
     IRFunc* entryPointFunc;
@@ -3654,7 +3654,7 @@ void legalizeEntryPointForGLSL(
     IRModule* module,
     IRFunc* func,
     CodeGenContext* codeGenContext,
-    GLSLExtensionTracker* glslExtensionTracker)
+    ShaderExtensionTracker* glslExtensionTracker)
 {
     auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
     SLANG_ASSERT(entryPointDecor);
@@ -3885,7 +3885,7 @@ void legalizeEntryPointsForGLSL(
     IRModule* module,
     const List<IRFunc*>& funcs,
     CodeGenContext* context,
-    GLSLExtensionTracker* glslExtensionTracker)
+    ShaderExtensionTracker* glslExtensionTracker)
 {
     for (auto func : funcs)
     {

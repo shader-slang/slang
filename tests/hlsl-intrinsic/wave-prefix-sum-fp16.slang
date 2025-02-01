@@ -1,5 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK):-target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_SPV):-target spirv -entry computeMain -stage compute -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK_SPV):-target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK_WGSL):-target wgsl -entry computeMain -stage compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -11,7 +12,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     half2 v1 = half2(1.0h, half(1 << idx));
     
-    // CHECK: OpGroupNonUniformFAdd
+    // CHECK_SPV: OpGroupNonUniformFAdd
+    // CHECK_WGSL: subgroupExclusiveAdd
     float2 r1 = WavePrefixSum(v1);
     
     outputBuffer[idx] = (int)r1.x;

@@ -9,6 +9,8 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
+
 #version 430
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
@@ -25,7 +27,10 @@ bool test1QuadX() {
         & subgroupQuadSwapHorizontal(T(2)) == T(2)
         & subgroupQuadSwapVertical(T(2)) == T(2)
         & subgroupQuadSwapDiagonal(T(3)) == T(3)
+        // subgroupQuadBroadcast is not implemented for WGSL as the WGSL intrinsic only accepts const integers expressions, as of time of writing.
+#if !defined(WGPU)
         & subgroupQuadBroadcast(T(1), 1) == T(1)
+#endif
         ;
 }
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -36,7 +41,10 @@ bool testVQuadX() {
         & subgroupQuadSwapHorizontal(gvec(T(2))) == gvec(T(2))
         & subgroupQuadSwapVertical(gvec(T(2))) == gvec(T(2))
         & subgroupQuadSwapDiagonal(gvec(T(3))) == gvec(T(3))
+        // subgroupQuadBroadcast is not implemented for WGSL as the WGSL intrinsic only accepts const integers expressions, as of time of writing.
+#if !defined(WGPU)
         & subgroupQuadBroadcast(gvec(T(1)), 1) == gvec(T(1))
+#endif
         ;
 }
 
@@ -46,7 +54,10 @@ bool test1QuadX() {
         & subgroupQuadSwapHorizontal(T(2)) == T(2)
         & subgroupQuadSwapVertical(T(2)) == T(2)
         & subgroupQuadSwapDiagonal(T(3)) == T(3)
+        // subgroupQuadBroadcast is not implemented for WGSL as the WGSL intrinsic only accepts const integers expressions, as of time of writing.
+#if !defined(WGPU)
         & subgroupQuadBroadcast(T(1), 1) == T(1)
+#endif
         ;
 }
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -57,7 +68,10 @@ bool testVQuadX() {
         & subgroupQuadSwapHorizontal(gvec(T(2))) == gvec(T(2))
         & subgroupQuadSwapVertical(gvec(T(2))) == gvec(T(2))
         & subgroupQuadSwapDiagonal(gvec(T(3))) == gvec(T(3))
+        // subgroupQuadBroadcast is not implemented for WGSL as the WGSL intrinsic only accepts const integers expressions, as of time of writing.
+#if !defined(WGPU)
         & subgroupQuadBroadcast(gvec(T(1)), 1) == gvec(T(1))
+#endif
         ;
 }
 bool testQuadSwapX() {
@@ -66,10 +80,6 @@ bool testQuadSwapX() {
         & testVQuadX<float, 2>()
         & testVQuadX<float, 3>()
         & testVQuadX<float, 4>()
-        & test1QuadX<double>() // WARNING: intel GPU's lack FP64 support
-        & testVQuadX<double, 2>()
-        & testVQuadX<double, 3>()
-        & testVQuadX<double, 4>()
         & test1QuadX<half>() 
         & testVQuadX<half, 2>()
         & testVQuadX<half, 3>()
@@ -78,6 +88,17 @@ bool testQuadSwapX() {
         & testVQuadX<int, 2>()
         & testVQuadX<int, 3>()
         & testVQuadX<int, 4>()
+        & test1QuadX<uint>()
+        & testVQuadX<uint, 2>()
+        & testVQuadX<uint, 3>()
+        & testVQuadX<uint, 4>()
+
+        // Disabled on WGPU as these built-in types are not supported as of time of writing.
+#if !defined (WGPU)
+        & test1QuadX<double>() // WARNING: intel GPU's lack FP64 support
+        & testVQuadX<double, 2>()
+        & testVQuadX<double, 3>()
+        & testVQuadX<double, 4>()
         & test1QuadX<int8_t>() 
         & testVQuadX<int8_t, 2>()
         & testVQuadX<int8_t, 3>()
@@ -90,10 +111,6 @@ bool testQuadSwapX() {
         & testVQuadX<int64_t, 2>()
         & testVQuadX<int64_t, 3>()
         & testVQuadX<int64_t, 4>()
-        & test1QuadX<uint>()
-        & testVQuadX<uint, 2>()
-        & testVQuadX<uint, 3>()
-        & testVQuadX<uint, 4>()
         & test1QuadX<uint8_t>() 
         & testVQuadX<uint8_t, 2>()
         & testVQuadX<uint8_t, 3>()
@@ -110,6 +127,7 @@ bool testQuadSwapX() {
         & testVQuadX<bool, 2>()
         & testVQuadX<bool, 3>()
         & testVQuadX<bool, 4>()
+#endif
         ;
 }
 

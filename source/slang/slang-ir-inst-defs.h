@@ -828,6 +828,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(RequireSPIRVVersionDecoration,     requireSPIRVVersion,    1, 0)
     INST(RequireGLSLVersionDecoration,      requireGLSLVersion,     1, 0)
     INST(RequireGLSLExtensionDecoration,    requireGLSLExtension,   1, 0)
+    INST(RequireWGSLExtensionDecoration,    requireWGSLExtension,   1, 0)
     INST(RequireCUDASMVersionDecoration,    requireCUDASMVersion,   1, 0)
     INST(RequireCapabilityAtomDecoration,   requireCapabilityAtom, 1, 0)
 

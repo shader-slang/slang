@@ -1400,10 +1400,10 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::SPIRVAssembly:
         {
-            GLSLExtensionTracker glslExtensionTracker;
-            GLSLExtensionTracker* glslExtensionTrackerPtr =
+            ShaderExtensionTracker glslExtensionTracker;
+            ShaderExtensionTracker* glslExtensionTrackerPtr =
                 options.sourceEmitter
-                    ? as<GLSLExtensionTracker>(options.sourceEmitter->getExtensionTracker())
+                    ? as<ShaderExtensionTracker>(options.sourceEmitter->getExtensionTracker())
                     : &glslExtensionTracker;
 
 #if 0
