@@ -76,7 +76,7 @@ static bool printStack(FILE* file, HANDLE process, HANDLE thread, CONTEXT const&
     DWORD constexpr machineType = IMAGE_FILE_MACHINE_AMD64;
 #elif defined(_M_ARM64)
     DWORD constexpr machineType = IMAGE_FILE_MACHINE_ARM64;
-#else,
+#else
 #error Unsupported machine type
 #endif
 
