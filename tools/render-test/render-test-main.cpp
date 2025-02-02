@@ -1404,10 +1404,11 @@ static SlangResult _innerMain(
             }
         }
 
-        desc.nvapiExtnSlot = int(nvapiExtnSlot);
+        desc.nvapiExtUavSlot = uint32_t(nvapiExtnSlot);
         desc.slang.slangGlobalSession = session;
         desc.slang.targetProfile = options.profileName.getBuffer();
         {
+            getRHI()->enableDebugLayers();
             SlangResult res = getRHI()->createDevice(desc, device.writeRef());
             if (SLANG_FAILED(res))
             {
