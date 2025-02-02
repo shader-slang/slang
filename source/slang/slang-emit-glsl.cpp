@@ -15,13 +15,13 @@
 namespace Slang
 {
 
-void trackGLSLTargetCaps(GLSLExtensionTracker* extensionTracker, CapabilitySet const& caps);
+void trackGLSLTargetCaps(ShaderExtensionTracker* extensionTracker, CapabilitySet const& caps);
 
 GLSLSourceEmitter::GLSLSourceEmitter(const Desc& desc)
     : Super(desc)
 {
     m_glslExtensionTracker =
-        dynamicCast<GLSLExtensionTracker>(desc.codeGenContext->getExtensionTracker());
+        dynamicCast<ShaderExtensionTracker>(desc.codeGenContext->getExtensionTracker());
     SLANG_ASSERT(m_glslExtensionTracker);
 }
 
@@ -2997,7 +2997,7 @@ void GLSLSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
         trackGLSLTargetCaps(m_glslExtensionTracker, targetReq->getTargetCaps());
 
         StringBuilder builder;
-        m_glslExtensionTracker->appendExtensionRequireLines(builder);
+        m_glslExtensionTracker->appendExtensionRequireLinesForGLSL(builder);
         m_writer->emit(builder.getUnownedSlice());
     }
 

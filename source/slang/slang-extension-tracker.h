@@ -1,8 +1,6 @@
-// slang-glsl-extension-tracker.h
-#ifndef SLANG_GLSL_EXTENSION_TRACKER_H
-#define SLANG_GLSL_EXTENSION_TRACKER_H
+// slang-extension-tracker.h
+#pragma once
 
-#include "../core/slang-basic.h"
 #include "../core/slang-semantic-version.h"
 #include "../core/slang-string-slice-pool.h"
 #include "slang-compiler.h"
@@ -10,7 +8,7 @@
 namespace Slang
 {
 
-class GLSLExtensionTracker : public ExtensionTracker
+class ShaderExtensionTracker : public ExtensionTracker
 {
 public:
     /// Return the list of extensionsspecified. NOTE that they are specified in the order requested,
@@ -23,11 +21,12 @@ public:
     void requireSPIRVVersion(const SemanticVersion& version);
 
     ProfileVersion getRequiredProfileVersion() const { return m_profileVersion; }
-    void appendExtensionRequireLines(StringBuilder& builder) const;
+    void appendExtensionRequireLinesForGLSL(StringBuilder& builder) const;
+    void appendExtensionRequireLinesForWGSL(StringBuilder& builder) const;
 
     const SemanticVersion& getSPIRVVersion() const { return m_spirvVersion; }
 
-    GLSLExtensionTracker()
+    ShaderExtensionTracker()
         : m_extensionPool(StringSlicePool::Style::Empty)
     {
     }
@@ -39,6 +38,7 @@ protected:
                                   _getFlag(BaseType::UInt) | _getFlag(BaseType::Void) |
                                   _getFlag(BaseType::Bool);
 
+    // Only valid for GLSL targets.
     ProfileVersion m_profileVersion = ProfileVersion::GLSL_150;
 
     StringSlicePool m_extensionPool;
@@ -47,4 +47,3 @@ protected:
 };
 
 } // namespace Slang
-#endif

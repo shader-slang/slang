@@ -28,7 +28,7 @@
 // Artifact output
 #include "slang-artifact-output-util.h"
 #include "slang-emit-cuda.h"
-#include "slang-glsl-extension-tracker.h"
+#include "slang-extension-tracker.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
 #include "slang-parameter-binding.h"
@@ -658,7 +658,7 @@ static void _appendCodeWithPath(
     outCodeBuilder << fileContent << "\n";
 }
 
-void trackGLSLTargetCaps(GLSLExtensionTracker* extensionTracker, CapabilitySet const& caps)
+void trackGLSLTargetCaps(ShaderExtensionTracker* extensionTracker, CapabilitySet const& caps)
 {
     for (auto& conjunctions : caps.getAtomSets())
     {
@@ -1037,8 +1037,11 @@ static RefPtr<ExtensionTracker> _newExtensionTracker(CodeGenTarget target)
         }
     case CodeGenTarget::SPIRV:
     case CodeGenTarget::GLSL:
+    case CodeGenTarget::WGSL:
+    case CodeGenTarget::WGSLSPIRV:
+    case CodeGenTarget::WGSLSPIRVAssembly:
         {
-            return new GLSLExtensionTracker;
+            return new ShaderExtensionTracker;
         }
     default:
         return nullptr;
@@ -1261,7 +1264,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     if (auto endToEndReq = isPassThroughEnabled())
     {
         // If we are pass through, we may need to set extension tracker state.
-        if (GLSLExtensionTracker* glslTracker = as<GLSLExtensionTracker>(extensionTracker))
+        if (ShaderExtensionTracker* glslTracker = as<ShaderExtensionTracker>(extensionTracker))
         {
             trackGLSLTargetCaps(glslTracker, getTargetCaps());
         }
@@ -1400,7 +1403,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
                 options.flags |= CompileOptions::Flag::EnableFloat16;
             }
         }
-        else if (GLSLExtensionTracker* glslTracker = as<GLSLExtensionTracker>(extensionTracker))
+        else if (ShaderExtensionTracker* glslTracker = as<ShaderExtensionTracker>(extensionTracker))
         {
             DownstreamCompileOptions::CapabilityVersion version;
             version.kind = DownstreamCompileOptions::CapabilityVersion::Kind::SPIRV;

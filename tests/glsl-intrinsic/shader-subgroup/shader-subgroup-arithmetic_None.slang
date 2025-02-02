@@ -8,6 +8,8 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
+
 #version 430
 
 #if 1                        \
@@ -57,6 +59,13 @@ bool testLogical() {
         & testVLogical<int, 2>()
         & testVLogical<int, 3>()
         & testVLogical<int, 4>()
+        & test1Logical<uint>()
+        & testVLogical<uint, 2>()
+        & testVLogical<uint, 3>()
+        & testVLogical<uint, 4>()
+
+        // Disabled on WGPU as these built-in types are not supported as of time of writing.
+#if !defined (WGPU)
         & test1Logical<int8_t>()
         & testVLogical<int8_t, 2>()
         & testVLogical<int8_t, 3>()
@@ -69,10 +78,6 @@ bool testLogical() {
         & testVLogical<int64_t, 2>()
         & testVLogical<int64_t, 3>()
         & testVLogical<int64_t, 4>()
-        & test1Logical<uint>()
-        & testVLogical<uint, 2>()
-        & testVLogical<uint, 3>()
-        & testVLogical<uint, 4>()
         & test1Logical<uint8_t>()
         & testVLogical<uint8_t, 2>()
         & testVLogical<uint8_t, 3>()
@@ -89,6 +94,7 @@ bool testLogical() {
         & testVLogical<bool, 2>()
         & testVLogical<bool, 3>()
         & testVLogical<bool, 4>()
+#endif
         ;
 }
 
@@ -119,10 +125,6 @@ bool testArithmetic() {
         & testVArithmetic<float, 2>()
         & testVArithmetic<float, 3>()
         & testVArithmetic<float, 4>()
-        & test1Arithmetic<double>() // WARNING: intel GPU's lack FP64 support
-        & testVArithmetic<double, 2>()
-        & testVArithmetic<double, 3>()
-        & testVArithmetic<double, 4>()
         & test1Arithmetic<half>()
         & testVArithmetic<half, 2>()
         & testVArithmetic<half, 3>()
@@ -131,6 +133,17 @@ bool testArithmetic() {
         & testVArithmetic<int, 2>()
         & testVArithmetic<int, 3>()
         & testVArithmetic<int, 4>()
+        & test1Arithmetic<uint>()
+        & testVArithmetic<uint, 2>()
+        & testVArithmetic<uint, 3>()
+        & testVArithmetic<uint, 4>()
+
+        // Disabled on WGPU as these built-in types are not supported as of time of writing.
+#if !defined (WGPU)
+        & test1Arithmetic<double>() // WARNING: intel GPU's lack FP64 support
+        & testVArithmetic<double, 2>()
+        & testVArithmetic<double, 3>()
+        & testVArithmetic<double, 4>()
         & test1Arithmetic<int8_t>() 
         & testVArithmetic<int8_t, 2>()
         & testVArithmetic<int8_t, 3>()
@@ -143,10 +156,6 @@ bool testArithmetic() {
         & testVArithmetic<int64_t, 2>()
         & testVArithmetic<int64_t, 3>()
         & testVArithmetic<int64_t, 4>()
-        & test1Arithmetic<uint>()
-        & testVArithmetic<uint, 2>()
-        & testVArithmetic<uint, 3>()
-        & testVArithmetic<uint, 4>()
         & test1Arithmetic<uint8_t>() 
         & testVArithmetic<uint8_t, 2>()
         & testVArithmetic<uint8_t, 3>()
@@ -159,6 +168,7 @@ bool testArithmetic() {
         & testVArithmetic<uint64_t, 2>()
         & testVArithmetic<uint64_t, 3>()
         & testVArithmetic<uint64_t, 4>()
+#endif
         ;
 }
 
