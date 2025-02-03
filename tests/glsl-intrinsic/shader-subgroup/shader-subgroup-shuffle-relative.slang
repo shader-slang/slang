@@ -10,6 +10,8 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
+
 #version 430
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
@@ -59,10 +61,6 @@ bool testShuffleX() {
         & testVShuffleX<float, 2>()
         & testVShuffleX<float, 3>()
         & testVShuffleX<float, 4>()
-        & test1ShuffleX<double>() // WARNING: intel GPU's lack FP64 support
-        & testVShuffleX<double, 2>()
-        & testVShuffleX<double, 3>()
-        & testVShuffleX<double, 4>()
         & test1ShuffleX<half>() 
         & testVShuffleX<half, 2>()
         & testVShuffleX<half, 3>()
@@ -71,6 +69,17 @@ bool testShuffleX() {
         & testVShuffleX<int, 2>()
         & testVShuffleX<int, 3>()
         & testVShuffleX<int, 4>()
+        & test1ShuffleX<uint>()
+        & testVShuffleX<uint, 2>()
+        & testVShuffleX<uint, 3>()
+        & testVShuffleX<uint, 4>()
+
+        // Disabled on WGPU as these built-in types are not supported as of time of writing.
+#if !defined(WGPU)
+        & test1ShuffleX<double>() // WARNING: intel GPU's lack FP64 support
+        & testVShuffleX<double, 2>()
+        & testVShuffleX<double, 3>()
+        & testVShuffleX<double, 4>()
         & test1ShuffleX<int8_t>() 
         & testVShuffleX<int8_t, 2>()
         & testVShuffleX<int8_t, 3>()
@@ -83,10 +92,6 @@ bool testShuffleX() {
         & testVShuffleX<int64_t, 2>()
         & testVShuffleX<int64_t, 3>()
         & testVShuffleX<int64_t, 4>()
-        & test1ShuffleX<uint>()
-        & testVShuffleX<uint, 2>()
-        & testVShuffleX<uint, 3>()
-        & testVShuffleX<uint, 4>()
         & test1ShuffleX<uint8_t>() 
         & testVShuffleX<uint8_t, 2>()
         & testVShuffleX<uint8_t, 3>()
@@ -103,6 +108,7 @@ bool testShuffleX() {
         & testVShuffleX<bool, 2>()
         & testVShuffleX<bool, 3>()
         & testVShuffleX<bool, 4>()
+#endif
         ;
 }
 
