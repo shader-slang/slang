@@ -8086,7 +8086,6 @@ Expr* parseTermFromSourceFile(
 {
     ParserOptions options;
     options.allowGLSLInput = sourceLanguage == SourceLanguage::GLSL;
-
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.currentScope = outerScope;
     parser.namePool = namePool;
