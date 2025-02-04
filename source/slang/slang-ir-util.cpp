@@ -1218,8 +1218,14 @@ bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions opti
 // Enumerate any associated functions of 'func'
 // that might be used by a pass (e.g. auto-diff)
 //
-List<IRGlobalValueWithCode*> getAssociatedFunctions(IRInst* func)
+template<typename TFunc>
+void forEachAssociatedFunction(IRInst* func, TFunc callback)
 {
+    // Resolve the function to get all its decorations
+    auto resolvedFunc = getResolvedInstForDecorations(func);
+    if (!resolvedFunc)
+        return;
+
     // We'll scan for appropriate decorations and return
     // the function references.
     //
@@ -1227,28 +1233,42 @@ List<IRGlobalValueWithCode*> getAssociatedFunctions(IRInst* func)
     // passes, we might want to create a parent class for such
     // decorations that associate functions with each other.
     //
-    List<IRGlobalValueWithCode*> result;
-    for (auto decor : getResolvedInstForDecorations(func)->getDecorations())
+    for (auto decor : resolvedFunc->getDecorations())
     {
         switch (decor->getOp())
         {
         case kIROp_UserDefinedBackwardDerivativeDecoration:
-            result.add(as<IRGlobalValueWithCode>(
-                as<IRUserDefinedBackwardDerivativeDecoration>(decor)->getBackwardDerivativeFunc()));
+            if (as<IRUserDefinedBackwardDerivativeDecoration>(decor))
+            {
+                auto associatedFunc =
+                    as<IRGlobalValueWithCode>(as<IRUserDefinedBackwardDerivativeDecoration>(decor)
+                                                  ->getBackwardDerivativeFunc());
+                callback(associatedFunc);
+            }
             break;
+
         case kIROp_ForwardDerivativeDecoration:
-            result.add(as<IRGlobalValueWithCode>(
-                as<IRForwardDerivativeDecoration>(decor)->getForwardDerivativeFunc()));
+            if (as<IRForwardDerivativeDecoration>(decor))
+            {
+                auto associatedFunc = as<IRGlobalValueWithCode>(
+                    as<IRForwardDerivativeDecoration>(decor)->getForwardDerivativeFunc());
+                callback(associatedFunc);
+            }
             break;
+
         case kIROp_PrimalSubstituteDecoration:
-            result.add(as<IRGlobalValueWithCode>(
-                as<IRPrimalSubstituteDecoration>(decor)->getPrimalSubstituteFunc()));
+            if (as<IRPrimalSubstituteDecoration>(decor))
+            {
+                auto associatedFunc = as<IRGlobalValueWithCode>(
+                    as<IRPrimalSubstituteDecoration>(decor)->getPrimalSubstituteFunc());
+                callback(associatedFunc);
+            }
+            break;
+
         default:
             break;
         }
     }
-
-    return result;
 }
 
 bool doesCalleeHaveSideEffect(IRInst* callee)
@@ -1277,14 +1297,13 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
     //
     if (!sideEffect)
     {
-        for (auto funcs : getAssociatedFunctions(callee))
-        {
-            if (doesCalleeHaveSideEffect(funcs))
+        forEachAssociatedFunction(
+            callee,
+            [&](IRGlobalValueWithCode* associatedFunc)
             {
-                sideEffect = true;
-                break;
-            }
-        }
+                sideEffect |= doesCalleeHaveSideEffect(associatedFunc);
+                return;
+            });
     }
 
     return sideEffect;
