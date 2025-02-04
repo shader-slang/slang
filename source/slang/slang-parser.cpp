@@ -2352,6 +2352,7 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
         case TokenType::OpEql:
         case TokenType::OpNeq:
         case TokenType::OpGreater:
+        case TokenType::OpRsh:
         case TokenType::EndOfFile:
             {
                 return parseGenericApp(parser, base);
