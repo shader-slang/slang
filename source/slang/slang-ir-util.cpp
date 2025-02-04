@@ -1240,28 +1240,27 @@ void forEachAssociatedFunction(IRInst* func, TFunc callback)
         case kIROp_UserDefinedBackwardDerivativeDecoration:
             if (as<IRUserDefinedBackwardDerivativeDecoration>(decor))
             {
-                auto associatedFunc =
-                    as<IRGlobalValueWithCode>(as<IRUserDefinedBackwardDerivativeDecoration>(decor)
-                                                  ->getBackwardDerivativeFunc());
-                callback(associatedFunc);
+                auto associatedCallee = as<IRUserDefinedBackwardDerivativeDecoration>(decor)
+                                            ->getBackwardDerivativeFunc();
+                callback(associatedCallee);
             }
             break;
 
         case kIROp_ForwardDerivativeDecoration:
             if (as<IRForwardDerivativeDecoration>(decor))
             {
-                auto associatedFunc = as<IRGlobalValueWithCode>(
-                    as<IRForwardDerivativeDecoration>(decor)->getForwardDerivativeFunc());
-                callback(associatedFunc);
+                auto associatedCallee =
+                    as<IRForwardDerivativeDecoration>(decor)->getForwardDerivativeFunc();
+                callback(associatedCallee);
             }
             break;
 
         case kIROp_PrimalSubstituteDecoration:
             if (as<IRPrimalSubstituteDecoration>(decor))
             {
-                auto associatedFunc = as<IRGlobalValueWithCode>(
-                    as<IRPrimalSubstituteDecoration>(decor)->getPrimalSubstituteFunc());
-                callback(associatedFunc);
+                auto associatedCallee =
+                    as<IRPrimalSubstituteDecoration>(decor)->getPrimalSubstituteFunc();
+                callback(associatedCallee);
             }
             break;
 
@@ -1299,9 +1298,9 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
     {
         forEachAssociatedFunction(
             callee,
-            [&](IRGlobalValueWithCode* associatedFunc)
+            [&](IRInst* associatedCallee)
             {
-                sideEffect |= doesCalleeHaveSideEffect(associatedFunc);
+                sideEffect |= doesCalleeHaveSideEffect(associatedCallee);
                 return;
             });
     }
