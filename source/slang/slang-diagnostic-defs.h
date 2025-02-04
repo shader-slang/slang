@@ -456,6 +456,11 @@ DIAGNOSTIC(
     Error,
     unexpectedTokenExpectedComponentDefinition,
     "unexpected token '$0', only component definitions are allowed in a shader scope.")
+DIAGNOSTIC(
+    20005,
+    Error,
+    invalidEmptyParenthesisExpr,
+    "empty parenthesis '()' is not a valid expression.")
 DIAGNOSTIC(20008, Error, invalidOperator, "invalid operator '$0'.")
 DIAGNOSTIC(20011, Error, unexpectedColon, "unexpected ':'.")
 DIAGNOSTIC(

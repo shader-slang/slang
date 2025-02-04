@@ -16,6 +16,7 @@
 #include "slang-ast-reflect.h"
 #include "slang-ast-synthesis.h"
 #include "slang-lookup.h"
+#include "slang-parser.h"
 #include "slang-syntax.h"
 
 #include <limits>
@@ -4482,6 +4483,7 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
                 synMemberExpr->elementIndices.add((uint32_t)i);
                 synMemberExpr->type = elementType;
                 synMemberExpr->type.isLeftValue = paramType.isLeftValue;
+                synMemberExpr->checked = true;
                 synArgs.add(synMemberExpr);
             }
         }
@@ -8052,6 +8054,7 @@ SemanticsContext SemanticsDeclBodyVisitor::registerDifferentiableTypesForFunc(
 void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
 {
     auto newContext = registerDifferentiableTypesForFunc(decl);
+    decl->body = maybeParseStmt(decl->body, newContext);
     if (const auto body = decl->body)
     {
         checkStmt(decl->body, newContext);
@@ -9239,6 +9242,28 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
             structDecl->buildMemberDictionary();
         }
     }
+}
+
+Stmt* SemanticsVisitor::maybeParseStmt(Stmt* stmt, const SemanticsContext& context)
+{
+    if (auto unparsedStmt = as<UnparsedStmt>(stmt))
+    {
+        // Parse the statement now, and check it.
+        SemanticsVisitor subVisitor(context);
+        TokenList tokenList;
+        tokenList.m_tokens = _Move(unparsedStmt->tokens);
+        return parseUnparsedStmt(
+            m_astBuilder,
+            &subVisitor,
+            getShared()->getTranslationUnitRequest(),
+            unparsedStmt->sourceLanguage,
+            unparsedStmt->isInVariadicGenerics,
+            tokenList,
+            getShared()->getSink(),
+            unparsedStmt->currentScope,
+            unparsedStmt->outerScope);
+    }
+    return stmt;
 }
 
 void SemanticsDeclHeaderVisitor::cloneModifiers(Decl* dest, Decl* src)
@@ -10951,6 +10976,9 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
 {
     switch (state)
     {
+    case DeclCheckState::ReadyForParserLookup:
+        // We don't need to do anything to make a decl ready for parser lookup.
+        break;
     case DeclCheckState::ModifiersChecked:
         SemanticsDeclModifiersVisitor(shared).dispatch(decl);
         break;
