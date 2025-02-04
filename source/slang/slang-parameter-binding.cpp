@@ -1074,8 +1074,8 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
     DeclRef<VarDeclBase> const& varDecl)
 {
     // Don't warn if the declaration is a vk::push_constant or shaderRecordEXT
-    if (varDecl.getDecl()->hasModifier<PushConstantAttribute>()
-        || varDecl.getDecl()->hasModifier<ShaderRecordAttribute>())
+    if (varDecl.getDecl()->hasModifier<PushConstantAttribute>() ||
+        varDecl.getDecl()->hasModifier<ShaderRecordAttribute>())
     {
         return;
     }
