@@ -1,6 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 import "generic-disambiguate-module";
 
+// CHECK: OpEntryPoint
+
 [numthreads(1,1,1)]
 void main()
 {
