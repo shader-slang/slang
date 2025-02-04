@@ -1215,8 +1215,46 @@ bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions opti
     return false;
 }
 
+// Enumerate any associated functions of 'func'
+// that might be used by a pass (e.g. auto-diff)
+//
+List<IRGlobalValueWithCode*> getAssociatedFunctions(IRInst* func)
+{
+    // We'll scan for appropriate decorations and return
+    // the function references.
+    //
+    // TODO: In the future, as we get more function transformation
+    // passes, we might want to create a parent class for such
+    // decorations that associate functions with each other.
+    //
+    List<IRGlobalValueWithCode*> result;
+    for (auto decor : getResolvedInstForDecorations(func)->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+            result.add(as<IRGlobalValueWithCode>(
+                as<IRUserDefinedBackwardDerivativeDecoration>(decor)->getBackwardDerivativeFunc()));
+            break;
+        case kIROp_ForwardDerivativeDecoration:
+            result.add(as<IRGlobalValueWithCode>(
+                as<IRForwardDerivativeDecoration>(decor)->getForwardDerivativeFunc()));
+            break;
+        case kIROp_PrimalSubstituteDecoration:
+            result.add(as<IRGlobalValueWithCode>(
+                as<IRPrimalSubstituteDecoration>(decor)->getPrimalSubstituteFunc()));
+        default:
+            break;
+        }
+    }
+
+    return result;
+}
+
 bool doesCalleeHaveSideEffect(IRInst* callee)
 {
+    bool sideEffect = true;
+
     for (auto decor : getResolvedInstForDecorations(callee)->getDecorations())
     {
         switch (decor->getOp())
@@ -1224,10 +1262,32 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
         case kIROp_NoSideEffectDecoration:
         case kIROp_ReadNoneDecoration:
         case kIROp_IgnoreSideEffectsDecoration:
-            return false;
+            sideEffect = false;
+            break;
+        default:
+            break;
         }
     }
-    return true;
+
+    // If the callee has no side effect, check if any of its associated functions have side effect.
+    // If so, we want to keep the callee around.
+    //
+    // Typically, once the relevant pass has completed, the association is removed,
+    // and at that point we can remove the function.
+    //
+    if (!sideEffect)
+    {
+        for (auto funcs : getAssociatedFunctions(callee))
+        {
+            if (doesCalleeHaveSideEffect(funcs))
+            {
+                sideEffect = true;
+                break;
+            }
+        }
+    }
+
+    return sideEffect;
 }
 
 IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key)
