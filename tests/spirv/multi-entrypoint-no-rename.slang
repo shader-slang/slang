@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -entry main1 -entry main2 -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -entry missShader -entry missShader2 -target spirv
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 // CHECK: OpEntryPoint MissKHR %missShader "missShader"
