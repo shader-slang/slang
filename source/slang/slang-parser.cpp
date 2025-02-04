@@ -124,6 +124,8 @@ public:
     // a token that we expected, when we exit recovery.
     bool isRecovering = false;
 
+    ParsingStage getStage() const { return options.parsingStage; }
+
     void FillPosition(SyntaxNode* node) { node->loc = tokenReader.peekLoc(); }
 
     void resetLookupScope() { currentLookupScope = currentScope; }
@@ -2352,6 +2354,7 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
         case TokenType::OpEql:
         case TokenType::OpNeq:
         case TokenType::OpGreater:
+        case TokenType::OpRsh:
         case TokenType::EndOfFile:
             {
                 return parseGenericApp(parser, base);
@@ -8085,6 +8088,8 @@ Expr* parseTermFromSourceFile(
 {
     ParserOptions options;
     options.allowGLSLInput = sourceLanguage == SourceLanguage::GLSL;
+    options.parsingStage = ParsingStage::Body;
+
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.currentScope = outerScope;
     parser.namePool = namePool;
