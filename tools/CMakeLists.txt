@@ -139,6 +139,7 @@ if(SLANG_ENABLE_GFX)
             stb
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
+            $<$<BOOL:${SLANG_ENABLE_NVAPI}>:${NVAPI_LIBRARIES}>
         LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore Metal
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:GFX_ENABLE_CUDA>
@@ -153,6 +154,7 @@ if(SLANG_ENABLE_GFX)
         INCLUDE_DIRECTORIES_PUBLIC
             ${slang_SOURCE_DIR}
             ${slang_SOURCE_DIR}/include
+        INCLUDE_DIRECTORIES_PRIVATE ${NVAPI_INCLUDE_DIRS}
         REQUIRES copy-gfx-slang-modules
         INSTALL
         EXPORT_SET_NAME SlangTargets
