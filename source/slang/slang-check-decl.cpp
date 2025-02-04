@@ -11855,6 +11855,27 @@ static void checkDerivativeAttribute(
         imaginaryArguments.directions,
         imaginaryArguments.thisArg,
         imaginaryArguments.thisArgDirection);
+
+    // For primal-substitute we'd also want to make sure that the differentiability
+    // level of the target is as high as the funcDecl itself
+    //
+    if (auto declRefExpr = as<DeclRefExpr>(attr->funcExpr))
+    {
+        if (auto declRef = declRefExpr->declRef)
+        {
+            auto targetDiffLevel = visitor->getShared()->getFuncDifferentiableLevel(
+                declRef.as<FunctionDeclBase>().getDecl());
+            auto currDiffLevel = visitor->getShared()->getFuncDifferentiableLevel(funcDecl);
+            if (targetDiffLevel < currDiffLevel)
+            {
+                visitor->getSink()->diagnose(
+                    attr->loc,
+                    Diagnostics::primalSubstituteTargetMustHaveHigherDifferentiabilityLevel,
+                    declRefExpr->declRef.getDecl(),
+                    funcDecl);
+            }
+        }
+    }
 }
 
 static void checkCudaKernelAttribute(
