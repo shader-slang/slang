@@ -1073,6 +1073,13 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
     ParameterBindingContext* context,
     DeclRef<VarDeclBase> const& varDecl)
 {
+    // Don't warn if the declaration is a vk::push_constant or shaderRecordEXT
+    if (varDecl.getDecl()->hasModifier<PushConstantAttribute>()
+        || varDecl.getDecl()->hasModifier<ShaderRecordAttribute>())
+    {
+        return;
+    }
+
     // If the user didn't specify a `binding` (and optional `set`) for Vulkan,
     // but they *did* specify a `register` for D3D, then that is probably an
     // oversight on their part.
