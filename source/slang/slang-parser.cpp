@@ -124,8 +124,6 @@ public:
     // a token that we expected, when we exit recovery.
     bool isRecovering = false;
 
-    ParsingStage getStage() const { return options.parsingStage; }
-
     void FillPosition(SyntaxNode* node) { node->loc = tokenReader.peekLoc(); }
 
     void resetLookupScope() { currentLookupScope = currentScope; }
@@ -8088,7 +8086,6 @@ Expr* parseTermFromSourceFile(
 {
     ParserOptions options;
     options.allowGLSLInput = sourceLanguage == SourceLanguage::GLSL;
-    options.parsingStage = ParsingStage::Body;
 
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.currentScope = outerScope;
