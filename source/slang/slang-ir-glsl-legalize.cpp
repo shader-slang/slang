@@ -3722,7 +3722,8 @@ void legalizeEntryPointForGLSL(
 
     // Rename the entrypoint to "main" to conform to GLSL standard,
     // if the compile options require us to do it.
-    if (!shouldUseOriginalEntryPointName(codeGenContext))
+    if (!shouldUseOriginalEntryPointName(codeGenContext) &&
+        codeGenContext->getEntryPointCount() == 1)
     {
         entryPointDecor->setName(builder.getStringValue(UnownedStringSlice("main")));
     }
