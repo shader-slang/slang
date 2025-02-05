@@ -14,6 +14,11 @@ struct S { float4 a; };
 [[vk::binding(2,1)]]
 ParameterBlock<S> b;
 
+[[vk::push_constant]] \
+ConstantBuffer<int> gint : register(b0, space0);
+
+layout(shaderRecordEXT) ConstantBuffer<int> GeometrySBT : register(b0, space99999);
+
 [shader("compute")]
 void main()
 {}
