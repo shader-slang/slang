@@ -2054,8 +2054,8 @@ extension matrix<T,N,M,L> : IFloat
     __init(float v) { this = matrix<T,N,M>(T(v)); }
 }
 
-__generic<T:__BuiltinFloatingPointType, let N : int, let M : int, let L : int>
-extension matrix<T,N,M,L> : IFloat
+__generic<T:IDifferentiable, let N : int, let M : int, let L : int>
+extension matrix<T,N,M,L> : IDifferentiable
 {
     // IDifferentiable.
     typedef matrix<T, N,M,L> Differential;
