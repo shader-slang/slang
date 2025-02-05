@@ -1749,6 +1749,8 @@ struct NativeString
     __implicit_conversion($(kConversionCost_None))
     __intrinsic_op($(kIROp_getNativeStr))
     __init(String value);
+
+    __init() { this = NativeString(""); }
 };
 
 extension Ptr<void>
