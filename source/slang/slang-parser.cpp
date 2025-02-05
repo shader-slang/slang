@@ -4975,7 +4975,11 @@ void Parser::parseSourceFile(ContainerDecl* program)
 
     currentModule = getModuleDecl(program);
 
-    PushScope(program);
+    // If the program already has a scope, then reuse it instead of overwriting it!
+    if (program->ownedScope)
+        PushScope(program->ownedScope);
+    else
+        PushScope(program);
 
     // A single `ModuleDecl` might span multiple source files, so it
     // is possible that we are parsing a new source file into a module
