@@ -1040,7 +1040,11 @@ DIAGNOSTIC(
     attributeExpectedStringArg,
     "attribute '$0' expects argument $1 to be string")
 
-DIAGNOSTIC(31009, Error, expectedSingleFloatArg, "attribute '$0' expects a single floating point argument")
+DIAGNOSTIC(
+    31009,
+    Error,
+    expectedSingleFloatArg,
+    "attribute '$0' expects a single floating point argument")
 
 DIAGNOSTIC(31100, Error, unknownStageName, "unknown stage name '$0'")
 DIAGNOSTIC(31101, Error, unknownImageFormatName, "unknown image format '$0'")

@@ -540,10 +540,7 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
             /* [maxtessfactor(16.0)] */
             if (auto decor = irFunc->findDecoration<IRMaxTessFactorDecoration>())
             {
-                _emitHLSLDecorationSingleFloat(
-                    "maxtessfactor",
-                    irFunc,
-                    decor->getMaxTessFactor());
+                _emitHLSLDecorationSingleFloat("maxtessfactor", irFunc, decor->getMaxTessFactor());
             }
 
             /* [outputcontrolpoints(4)] */
