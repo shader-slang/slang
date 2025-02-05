@@ -9990,9 +9990,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         SLANG_ASSERT(attrib->args.getCount() > index);
         Expr* expr = attrib->args[index];
-        auto floatLitExpr = as<FloatingPointLiteralExpr>(expr);
-        SLANG_ASSERT(floatLitExpr);
-        return as<IRFloatLit>(builder->getFloatValue(builder->getFloatType(), floatLitExpr->value));
+
+        if (auto floatLitExpr = as<FloatingPointLiteralExpr>(expr))
+        {
+            return as<IRFloatLit>(
+                builder->getFloatValue(builder->getFloatType(), floatLitExpr->value));
+        }
+
+        auto intLitExpr = as<IntegerLiteralExpr>(expr);
+        SLANG_ASSERT(intLitExpr);
+        return as<IRFloatLit>(builder->getFloatValue(builder->getFloatType(), (IRFloatingPointValue)(intLitExpr->value)));
     }
 
     IRIntLit* _getIntLitFromAttribute(IRBuilder* builder, Attribute* attrib, Index index = 0)
