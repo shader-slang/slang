@@ -9770,7 +9770,7 @@ void GroupMemoryBarrier()
     }
 }
 
-[require(cuda_glsl_hlsl_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
 void __subgroupBarrier()
 {
     __target_switch
@@ -9778,6 +9778,7 @@ void __subgroupBarrier()
     case glsl: __intrinsic_asm "subgroupBarrier";
     case hlsl: __intrinsic_asm "GroupMemoryBarrierWithGroupSync";
     case cuda: __intrinsic_asm "__syncthreads()";
+    case metal: __intrinsic_asm "simdgroup_barrier(mem_flags::none)";
     case spirv:
         spirv_asm
         {
@@ -14971,11 +14972,13 @@ bool WaveActiveAnyTrue(bool condition)
 
 
 //@hidden:
+[ForceInline]
 uint64_t __metal_simd_ballot(bool expr)
 {
     __intrinsic_asm "uint64_t(simd_ballot($0))";
 }
 
+[ForceInline]
 uint4 __metal_simd_vote_mask_to_uint4(uint64_t mask)
 {
     return uint4(uint(mask & 0xFFFFFFFF), uint(mask >> 32), 0, 0);
