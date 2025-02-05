@@ -83,8 +83,39 @@ struct GlobalVarTranslationContext
                 auto key = builder.createStructKey();
                 inputKeys.add(key);
                 builder.createStructField(inputStructType, key, inputType);
-                IRTypeLayout::Builder fieldTypeLayout(&builder);
-                IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout.build());
+
+                IRTypeLayout::Builder* fieldTypeLayout;             
+                IRStructTypeLayout::Builder structTypeLayoutBuilder(&builder);
+                IRTypeLayout::Builder basicTypeLayoutBuilder(&builder);
+                if (auto structType = as<IRStructType>(inputType))
+                {
+                    fieldTypeLayout = &structTypeLayoutBuilder;
+
+                    // If the input is a struct, we need to add all the fields to the input
+                    // struct type.
+                    int i = 0;
+                    
+                    for (auto field : structType->getFields())
+                    {
+                        i++;
+                        printf("iteration %d\n", i);
+                        
+                        IRTypeLayout::Builder nestedFieldTypeLayout(&builder);
+                        IRVarLayout::Builder nestedVarLayoutBuilder(&builder, nestedFieldTypeLayout.build());
+                        nestedFieldTypeLayout.addResourceUsage(
+                            LayoutResourceKind::VaryingInput,
+                            LayoutSize(1));
+                        auto fieldKey = builder.createStructKey();
+                        //builder.createStructField(structType, fieldKey, field->getFieldType());                        
+                        structTypeLayoutBuilder.addField(fieldKey, nestedVarLayoutBuilder.build());                        
+                    }
+                }
+                else
+                {
+                    fieldTypeLayout = &basicTypeLayoutBuilder;
+                }                
+
+                IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout->build());
                 varLayoutBuilder.setStage(entryPointDecor->getProfile().getStage());
                 if (auto semanticDecor = input->findDecoration<IRSemanticDecoration>())
                 {
@@ -94,7 +125,7 @@ struct GlobalVarTranslationContext
                 }
                 else
                 {
-                    fieldTypeLayout.addResourceUsage(
+                    fieldTypeLayout->addResourceUsage(
                         LayoutResourceKind::VaryingInput,
                         LayoutSize(1));
                     if (auto layoutDecor = findVarLayout(input))

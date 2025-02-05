@@ -635,6 +635,8 @@ Result linkAndOptimizeIR(
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
         lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(irModule, sink);
 
+    printf("Pre GLSL Translate\n");
+    irModule->getModuleInst()->dump();
     if (requiredLoweringPassSet.glslGlobalVar)
         translateGLSLGlobalVar(codeGenContext, irModule);
 
@@ -643,6 +645,8 @@ Result linkAndOptimizeIR(
 
     fixEntryPointCallsites(irModule);
 
+    printf("Post GLSL Translate\n");
+    irModule->getModuleInst()->dump();
     // Replace any global constants with their values.
     //
     replaceGlobalConstants(irModule);
