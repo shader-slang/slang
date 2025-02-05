@@ -1313,6 +1313,21 @@ int SemanticsVisitor::CompareLookupResultItems(
     bool rightIsExtension = as<ExtensionDecl>(rightDeclRefParent.getDecl()) != nullptr;
     if (leftIsExtension != rightIsExtension)
     {
+        // Add a special case for constructors, where we prefer the one that is not synthesized,
+        if (auto leftCtor = as<ConstructorDecl>(left.declRef.getDecl()))
+        {
+            auto rightCtor = as<ConstructorDecl>(right.declRef.getDecl());
+            bool leftIsSynthesized =
+                leftCtor->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
+            bool rightIsSynthesized =
+                rightCtor->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
+
+            if (leftIsSynthesized != rightIsSynthesized)
+            {
+                return int(leftIsSynthesized) - int(rightIsSynthesized);
+            }
+        }
+
         return int(leftIsExtension) - int(rightIsExtension);
     }
     else if (leftIsExtension)
@@ -2177,7 +2192,6 @@ void SemanticsVisitor::AddTypeOverloadCandidates(Type* type, OverloadResolveCont
         context.sourceScope,
         LookupMask::Default,
         options);
-
     AddOverloadCandidates(initializers, context);
 }
 
@@ -2546,7 +2560,6 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     context.loc = expr->loc;
     context.sourceScope = m_outerScope;
     context.baseExpr = GetBaseExpr(funcExpr);
-
     // We run a special case here where an `InvokeExpr`
     // with a single argument where the base/func expression names
     // a type should always be treated as an explicit type coercion
@@ -2565,7 +2578,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     // type coercion.
     bool typeOverloadChecked = false;
 
-    if (expr->arguments.getCount() == 1)
+    if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr))
     {
         if (const auto typeType = as<TypeType>(funcExpr->type))
         {

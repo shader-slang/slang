@@ -25,6 +25,19 @@ Expr* parseTermFromSourceFile(
     NamePool* namePool,
     SourceLanguage sourceLanguage);
 
+struct SemanticsVisitor;
+
+Stmt* parseUnparsedStmt(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* semantics,
+    TranslationUnitRequest* translationUnit,
+    SourceLanguage sourceLanguage,
+    bool isInVariadicGenerics,
+    TokenSpan const& tokens,
+    DiagnosticSink* sink,
+    Scope* currentScope,
+    Scope* outerScope);
+
 ModuleDecl* populateBaseLanguageModule(ASTBuilder* astBuilder, Scope* scope);
 
 /// Information used to set up SyntaxDecl. Such decls

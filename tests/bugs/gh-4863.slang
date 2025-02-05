@@ -29,7 +29,7 @@ void doThing(inout Foo foo, uint2 ipos)
 [numthreads(1, 1, 1)]
 void computeMain(uint2 ipos : SV_DispatchThreadID)
 {
-  Foo foo;
+  Foo foo = {};
   doThing(foo, ipos);
   // BUFFER: 3
   outputBuffer[0] = (int)foo.bar1;

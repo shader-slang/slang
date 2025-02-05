@@ -760,6 +760,12 @@ public:
         m_mapTypePairToImplicitCastMethod[key] = candidate;
     }
 
+    bool* isCStyleType(Type* type) { return m_isCStyleTypeCache.tryGetValue(type); }
+
+    void cacheCStyleType(Type* type, bool isCStyle)
+    {
+        m_isCStyleTypeCache.addIfNotExists(type, isCStyle);
+    }
     // Get the inner most generic decl that a decl-ref is dependent on.
     // For example, `Foo<T>` depends on the generic decl that defines `T`.
     //
@@ -889,6 +895,7 @@ private:
     Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
     Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;
     Dictionary<ImplicitCastMethodKey, ImplicitCastMethod> m_mapTypePairToImplicitCastMethod;
+    Dictionary<Type*, bool> m_isCStyleTypeCache;
 };
 
 /// Local/scoped state of the semantic-checking system
@@ -2028,6 +2035,8 @@ public:
 
     void checkStmt(Stmt* stmt, SemanticsContext const& context);
 
+    Stmt* maybeParseStmt(Stmt* stmt, const SemanticsContext& context);
+
     void getGenericParams(
         GenericDecl* decl,
         List<Decl*>& outParams,
@@ -2780,6 +2789,25 @@ public:
     void suggestCompletionItems(
         CompletionSuggestions::ScopeKind scopeKind,
         LookupResult const& lookupResult);
+
+    bool createInvokeExprForExplicitCtor(
+        Type* toType,
+        InitializerListExpr* fromInitializerListExpr,
+        Expr** outExpr);
+
+    bool createInvokeExprForSynthesizedCtor(
+        Type* toType,
+        InitializerListExpr* fromInitializerListExpr,
+        Expr** outExpr);
+
+    Expr* _createCtorInvokeExpr(Type* toType, const SourceLoc& loc, const List<Expr*>& coercedArgs);
+    bool _hasExplicitConstructor(StructDecl* structDecl, bool checkBaseType);
+    ConstructorDecl* _getSynthesizedConstructor(
+        StructDecl* structDecl,
+        ConstructorDecl::ConstructorFlavor flavor);
+    bool isCStyleType(Type* type, HashSet<Type*>& isVisit);
+
+    void addVisibilityModifier(Decl* decl, DeclVisibility vis);
 };
 
 
@@ -2851,14 +2879,8 @@ public:
     // deal with this cases here, even if they are no-ops.
     //
 
-#define CASE(NAME)                                                                           \
-    Expr* visit##NAME(NAME* expr)                                                            \
-    {                                                                                        \
-        if (!getShared()->isInLanguageServer())                                              \
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "should not appear in input syntax"); \
-        expr->type = m_astBuilder->getErrorType();                                           \
-        return expr;                                                                         \
-    }
+#define CASE(NAME) \
+    Expr* visit##NAME(NAME* expr) { return expr; }
 
     CASE(DerefExpr)
     CASE(MakeRefExpr)
@@ -2999,6 +3021,8 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
     }
 
     void checkModule(ModuleDecl* programNode);
+
+    ConstructorDecl* createCtor(AggTypeDecl* decl, DeclVisibility ctorVisibility);
 };
 
 bool isUnsizedArrayType(Type* type);

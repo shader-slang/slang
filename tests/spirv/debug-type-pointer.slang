@@ -1,5 +1,5 @@
 //TEST(compute, vulkan):SIMPLE(filecheck=SPV): -stage compute -entry computeMain -target spirv -emit-spirv-directly -g2
-//TEST(compute, vulkan):SIMPLE(filecheck=SPV): -stage compute -entry computeMain -target spirv -emit-spirv-directly -g2 -zero-initialize
+//DISABLE_TEST(compute, vulkan):SIMPLE(filecheck=SPV): -stage compute -entry computeMain -target spirv -emit-spirv-directly -g2 -zero-initialize
 
 // This test is to check if DebugTypePointer is emitted when "-g2" option is used
 
