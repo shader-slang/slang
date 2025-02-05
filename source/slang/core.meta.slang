@@ -1749,6 +1749,8 @@ struct NativeString
     __implicit_conversion($(kConversionCost_None))
     __intrinsic_op($(kIROp_getNativeStr))
     __init(String value);
+
+    __init() { this = NativeString(""); }
 };
 
 extension Ptr<void>
@@ -1988,8 +1990,18 @@ extension vector<T,N> : IFloat
     [OverloadRank(-1)]
     [__unsafeForceInlineEarly] __init(float v) { this = vector<T,N>(T(v)); }
 
-    // IDifferentiable
+}
 
+__intrinsic_op($(kIROp_Add))
+T __internal_add<T>(T a, T b);
+
+__intrinsic_op($(kIROp_Mul))
+T __internal_mul<T, U>(U a, T b);
+
+__generic<T:IDifferentiable, let N : int>
+extension vector<T,N> : IDifferentiable
+{
+    // IDifferentiable
     typedef vector<T, N> Differential;
 
     [__unsafeForceInlineEarly]
@@ -2003,7 +2015,7 @@ extension vector<T,N> : IFloat
     [BackwardDifferentiable]
     static Differential dadd(Differential a, Differential b)
     {
-        return a + b;
+        return __internal_add(a, b);
     }
 
     __generic<U : __BuiltinRealType>
@@ -2011,7 +2023,7 @@ extension vector<T,N> : IFloat
     [BackwardDifferentiable]
     static Differential dmul(U a, Differential b)
     {
-        return __realCast<T, U>(a) * b;
+        return __internal_mul(__realCast<float>(a), b);
     }
 }
 
@@ -2042,7 +2054,11 @@ extension matrix<T,N,M,L> : IFloat
     [__unsafeForceInlineEarly]
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
     __init(float v) { this = matrix<T,N,M>(T(v)); }
+}
 
+__generic<T:IDifferentiable, let N : int, let M : int, let L : int>
+extension matrix<T,N,M,L> : IDifferentiable
+{
     // IDifferentiable.
     typedef matrix<T, N,M,L> Differential;
 
@@ -2057,15 +2073,15 @@ extension matrix<T,N,M,L> : IFloat
     [BackwardDifferentiable]
     static Differential dadd(Differential a, Differential b)
     {
-        return a + b;
+        return __internal_add(a, b);
     }
-    
+
     __generic<U : __BuiltinRealType>
     [__unsafeForceInlineEarly]
     [BackwardDifferentiable]
     static Differential dmul(U a, Differential b)
     {
-        return __realCast<T, U>(a) * b;
+        return __internal_mul(__realCast<float>(a), b);
     }
 }
 

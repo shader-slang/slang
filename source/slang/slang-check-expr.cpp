@@ -167,7 +167,7 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
             openedValue->declRef = varDeclRef;
             openedValue->type = QualType(openedType);
             openedValue->originalExpr = expr;
-
+            openedValue->checked = true;
             // The result of opening an existential is an l-value
             // if the original existential is an l-value.
             //
@@ -226,6 +226,7 @@ Expr* SemanticsVisitor::maybeOpenRef(Expr* expr)
         openRef->innerExpr = expr;
         openRef->type.isLeftValue = (as<RefType>(exprType) != nullptr);
         openRef->type.type = refType->getValueType();
+        openRef->checked = true;
         return openRef;
     }
     return expr;
@@ -522,6 +523,7 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
     derefExpr->loc = loc;
     derefExpr->base = base;
     derefExpr->type = QualType(elementType);
+    derefExpr->checked = true;
 
     if (as<PtrType>(base->type) || as<RefType>(base->type))
     {
@@ -2909,7 +2911,7 @@ Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
 
     if (auto varExpr = as<VarExpr>(expr->functionExpr))
     {
-        if ((varExpr->name->text == "&&") || (varExpr->name->text == "||"))
+        if ((getText(varExpr->name) == "&&") || (getText(varExpr->name) == "||"))
         {
             // We only use short-circuiting in scalar input, will fall back
             // to non-short-circuiting in vector input.
@@ -3790,7 +3792,9 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                         InitializerListExpr* initListExpr =
                             m_astBuilder->create<InitializerListExpr>();
                         initListExpr->loc = expr->loc;
+                        initListExpr->useCStyleInitialization = false;
                         auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
+
 
                         return coerce(CoercionSite::General, typeExp.type, checkedInitListExpr);
                     }
@@ -3916,6 +3920,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
         makeOptional->type = optType;
         makeOptional->value = castToSuperType;
         makeOptional->typeExpr = typeExpr.exp;
+        makeOptional->checked = true;
         return makeOptional;
     }
 
@@ -4123,6 +4128,7 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
     swizExpr->loc = memberRefExpr->loc;
     swizExpr->base = memberRefExpr->baseExpression;
     swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
+    swizExpr->checked = true;
 
     // We can have up to 4 swizzles of two elements each
     MatrixCoord elementCoords[4];

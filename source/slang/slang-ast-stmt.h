@@ -52,6 +52,10 @@ class UnparsedStmt : public Stmt
 
     // The tokens that were contained between `{` and `}`
     List<Token> tokens;
+    Scope* currentScope = nullptr;
+    Scope* outerScope = nullptr;
+    SourceLanguage sourceLanguage;
+    bool isInVariadicGenerics = false;
 };
 
 class EmptyStmt : public Stmt
