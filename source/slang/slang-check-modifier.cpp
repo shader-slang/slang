@@ -320,8 +320,7 @@ bool SemanticsVisitor::hasFloatArgs(Attribute* attr, int numArgs)
     }
     for (int i = 0; i < numArgs; ++i)
     {
-        if (!as<FloatingPointLiteralExpr>(attr->args[i]) &&
-            !as<IntegerLiteralExpr>(attr->args[i]))
+        if (!as<FloatingPointLiteralExpr>(attr->args[i]) && !as<IntegerLiteralExpr>(attr->args[i]))
         {
             return false;
         }
