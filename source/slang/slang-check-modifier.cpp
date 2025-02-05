@@ -312,6 +312,22 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope*
     return attrDecl;
 }
 
+bool SemanticsVisitor::hasFloatArgs(Attribute* attr, int numArgs)
+{
+    if (int(attr->args.getCount()) != numArgs)
+    {
+        return false;
+    }
+    for (int i = 0; i < numArgs; ++i)
+    {
+        if (!as<FloatingPointLiteralExpr>(attr->args[i]))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool SemanticsVisitor::hasIntArgs(Attribute* attr, int numArgs)
 {
     if (int(attr->args.getCount()) != numArgs)
@@ -692,9 +708,8 @@ Modifier* SemanticsVisitor::validateAttribute(
         }
     }
     else if (
-        (as<DomainAttribute>(attr)) || (as<MaxTessFactorAttribute>(attr)) ||
-        (as<OutputTopologyAttribute>(attr)) || (as<PartitioningAttribute>(attr)) ||
-        (as<PatchConstantFuncAttribute>(attr)))
+        (as<DomainAttribute>(attr)) || (as<OutputTopologyAttribute>(attr)) ||
+        (as<PartitioningAttribute>(attr)) || (as<PatchConstantFuncAttribute>(attr)))
     {
         // Let it go thru iff single string attribute
         if (!hasStringArgs(attr, 1))
@@ -722,6 +737,13 @@ Modifier* SemanticsVisitor::validateAttribute(
         else if (argsCount > 1 && !as<StringLiteralExpr>(opAttr->args[1]))
         {
             sink->diagnose(attr, Diagnostics::attributeExpectedStringArg, attr->keywordName, 1);
+        }
+    }
+    else if (as<MaxTessFactorAttribute>(attr))
+    {
+        if (!hasFloatArgs(attr, 1))
+        {
+            getSink()->diagnose(attr, Diagnostics::expectedSingleFloatArg, attr->keywordName);
         }
     }
     else if (as<OutputControlPointsAttribute>(attr))

@@ -9986,6 +9986,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
     }
 
+    IRFloatLit* _getFloatFromAttribute(IRBuilder* builder, Attribute* attrib, Index index = 0)
+    {
+        SLANG_ASSERT(attrib->args.getCount() > index);
+        Expr* expr = attrib->args[index];
+        auto floatLitExpr = as<FloatingPointLiteralExpr>(expr);
+        SLANG_ASSERT(floatLitExpr);
+        return as<IRFloatLit>(builder->getFloatValue(builder->getFloatType(), floatLitExpr->value));
+    }
+
     IRIntLit* _getIntLitFromAttribute(IRBuilder* builder, Attribute* attrib, Index index = 0)
     {
         SLANG_ASSERT(attrib->args.getCount() > index);
@@ -10516,6 +10525,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), outputTopAttr);
                 getBuilder()->addDecoration(irFunc, kIROp_OutputTopologyDecoration, stringLit);
+            }
+            else if (auto maxTessFactortAttr = as<MaxTessFactorAttribute>(modifier))
+            {
+                IRFloatLit* floatLit = _getFloatFromAttribute(getBuilder(), maxTessFactortAttr);
+                getBuilder()->addDecoration(irFunc, kIROp_MaxTessFactorDecoration, floatLit);
             }
             else if (auto outputCtrlPtAttr = as<OutputControlPointsAttribute>(modifier))
             {

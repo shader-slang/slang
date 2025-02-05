@@ -60,6 +60,32 @@ void HLSLSourceEmitter::_emitHLSLDecorationSingleInt(
     m_writer->emit(")]\n");
 }
 
+void HLSLSourceEmitter::_emitHLSLDecorationSingleFloat(
+    const char* name,
+    IRFunc* entryPoint,
+    IRFloatLit* val)
+{
+    SLANG_UNUSED(entryPoint);
+    SLANG_ASSERT(val);
+
+    m_writer->emit("[");
+    m_writer->emit(name);
+    m_writer->emit("(");
+
+    switch (val->getOp())
+    {
+    default:
+        SLANG_UNEXPECTED("needed a known floating point value");
+        UNREACHABLE_RETURN(0);
+
+    case kIROp_FloatLit:
+        m_writer->emit(static_cast<IRConstant*>(val)->value.floatVal);
+        break;
+    }
+
+    m_writer->emit(")]\n");
+}
+
 void HLSLSourceEmitter::_emitHLSLRegisterSemantic(
     LayoutResourceKind kind,
     EmitVarChain* chain,
@@ -509,6 +535,15 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
             if (auto decor = irFunc->findDecoration<IROutputTopologyDecoration>())
             {
                 _emitHLSLDecorationSingleString("outputtopology", irFunc, decor->getTopology());
+            }
+
+            /* [maxtessfactor(16.0)] */
+            if (auto decor = irFunc->findDecoration<IRMaxTessFactorDecoration>())
+            {
+                _emitHLSLDecorationSingleFloat(
+                    "maxtessfactor",
+                    irFunc,
+                    decor->getMaxTessFactor());
             }
 
             /* [outputcontrolpoints(4)] */
