@@ -15,8 +15,8 @@ void modifyOut(out DefaultStructNoInit2 noInit2)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    DefaultStructNoInit noInit;
-    DefaultStructNoInit2 noInit2;
+    DefaultStructNoInit noInit = {};
+    DefaultStructNoInit2 noInit2 = {};
     modifyOut(noInit2);
     // BUF: 1
     outputBuffer[0] = true

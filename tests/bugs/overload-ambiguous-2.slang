@@ -57,7 +57,7 @@ void computeMain(uint3 threadID: SV_DispatchThreadID)
 {
     using namespace A;
 
-    Struct2<10> input = {threadID.x};
+    Struct2<10> input = {{threadID.x}};
 
     Struct2<20> output;
     output = myFunc<10, 20>(input);

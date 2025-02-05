@@ -2911,7 +2911,7 @@ Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
 
     if (auto varExpr = as<VarExpr>(expr->functionExpr))
     {
-        if ((varExpr->name->text == "&&") || (varExpr->name->text == "||"))
+        if ((getText(varExpr->name) == "&&") || (getText(varExpr->name) == "||"))
         {
             // We only use short-circuiting in scalar input, will fall back
             // to non-short-circuiting in vector input.
@@ -3792,7 +3792,9 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                         InitializerListExpr* initListExpr =
                             m_astBuilder->create<InitializerListExpr>();
                         initListExpr->loc = expr->loc;
+                        initListExpr->useCStyleInitialization = false;
                         auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
+
 
                         return coerce(CoercionSite::General, typeExp.type, checkedInitListExpr);
                     }
