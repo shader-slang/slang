@@ -1812,8 +1812,8 @@ struct DiffTransposePass
     {
         List<RevGradient> gradients;
         auto matrixType = as<IRMatrixType>(fwdMakeMatrix->getDataType());
-        auto row = as<IRIntLit>(matrixType->getRowCount());
         auto colCount = matrixType->getColumnCount();
+        auto colCountVal = as<IRIntLit>(matrixType->getColumnCount())->getValue();
         IRType* rowVectorType = nullptr;
         for (UIndex ii = 0; ii < fwdMakeMatrix->getOperandCount(); ii++)
         {
@@ -1828,9 +1828,8 @@ struct DiffTransposePass
             }
             else
             {
-                SLANG_RELEASE_ASSERT(row);
-                UInt rowIndex = ii / (UInt)row->getValue();
-                UInt colIndex = ii % (UInt)row->getValue();
+                UInt rowIndex = ii / (UInt)colCountVal;
+                UInt colIndex = ii % (UInt)colCountVal;
                 if (!rowVectorType)
                     rowVectorType = builder->getVectorType(matrixType->getElementType(), colCount);
                 auto revRow = builder->emitElementExtract(
