@@ -76,7 +76,7 @@ void HLSLSourceEmitter::_emitHLSLDecorationSingleFloat(
     {
     default:
         SLANG_UNEXPECTED("needed a known floating point value");
-        UNREACHABLE_RETURN(0);
+        break;
 
     case kIROp_FloatLit:
         m_writer->emit(static_cast<IRConstant*>(val)->value.floatVal);
