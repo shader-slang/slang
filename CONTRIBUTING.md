@@ -93,6 +93,15 @@ Or you can build with the following command:
 C:\git\slang> cmake.exe --build --preset release
 ```
 
+On Windows ARM64, prebuilt binaries for LLVM isn't available.
+Please build Slang without LLVM dependency by running:
+
+```
+cmake.exe --preset vs2022 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+```
+
+during configuration step.
+
 #### Linux
 Install CMake and Ninja.
 ```
@@ -135,6 +144,8 @@ Follow the instructions below if you wish to build `slang-llvm` locally.
 ```
 $ external/build-llvm.sh --source-dir build/slang-llvm_src --install-prefix build/slang-llvm_install
 ```
+
+> Note: On Windows you can use `external/build-llvm.ps1` in Powershell.
 
 You need to use the following command to regenerate the Makefile:
 ```
