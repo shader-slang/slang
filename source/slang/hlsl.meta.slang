@@ -9770,7 +9770,7 @@ void GroupMemoryBarrier()
     }
 }
 
-[require(cuda_glsl_hlsl_metal_spirv, memorybarrier)]
+[require(cuda_glsl_hlsl_spirv, memorybarrier)]
 void __subgroupBarrier()
 {
     __target_switch
@@ -9778,7 +9778,6 @@ void __subgroupBarrier()
     case glsl: __intrinsic_asm "subgroupBarrier";
     case hlsl: __intrinsic_asm "GroupMemoryBarrierWithGroupSync";
     case cuda: __intrinsic_asm "__syncthreads()";
-    case metal: __intrinsic_asm "subgroup_barrier(mem_flags::mem_threadgroup)";
     case spirv:
         spirv_asm
         {

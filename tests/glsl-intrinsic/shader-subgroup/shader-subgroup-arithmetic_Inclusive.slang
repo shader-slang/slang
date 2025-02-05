@@ -9,6 +9,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DMETAL
 
 #version 430
 
@@ -100,8 +101,8 @@ bool test1Arithmetic() {
         & subgroupInclusiveAdd(T(1)) == T(4)
         & subgroupInclusiveMul(T(1)) == T(1)
     
-        // WGSL does not support inclusive min/max
-#if !defined(WGPU)
+        // WGSL and Metal does not support inclusive min/max
+#if !defined(WGPU) && !defined(METAL)
         & subgroupInclusiveMin(T(1)) == T(1)
         & subgroupInclusiveMax(T(1)) == T(1)
 #endif
@@ -115,8 +116,8 @@ bool testVArithmetic() {
         & subgroupInclusiveAdd(gvec(T(1))) == gvec(T(4)) 
         // & subgroupInclusiveMul(gvec(T(1))) == gvec(T(1))
 
-        // WGSL does not support inclusive min/max
-#if !defined(WGPU)
+        // WGSL and Metal does not support inclusive min/max
+#if !defined(WGPU) && !defined(METAL)
         & subgroupInclusiveMin(gvec(T(1))) == gvec(T(1))
         & subgroupInclusiveMax(gvec(T(1))) == gvec(T(1))
 #endif
@@ -142,20 +143,16 @@ bool testArithmetic() {
         // & testVArithmetic<uint, 3>()
         // & testVArithmetic<uint, 4>()
 
-        // Disabled on WGPU as these built-in types are not supported as of time of writing.
-#if !defined (WGPU)
+        // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
+#if !defined(WGPU) && !defined(METAL)
         & test1Arithmetic<double>() // WARNING: intel GPU's lack FP64 support
         & testVArithmetic<double, 2>()
         & testVArithmetic<double, 3>()
         & testVArithmetic<double, 4>()
-        & test1Arithmetic<uint8_t>() 
+        & test1Arithmetic<uint8_t>()
         & testVArithmetic<uint8_t, 2>()
         & testVArithmetic<uint8_t, 3>()
         & testVArithmetic<uint8_t, 4>()
-        & test1Arithmetic<uint16_t>() 
-        & testVArithmetic<uint16_t, 2>()
-        & testVArithmetic<uint16_t, 3>()
-        & testVArithmetic<uint16_t, 4>()
         & test1Arithmetic<uint64_t>() 
         & testVArithmetic<uint64_t, 2>()
         & testVArithmetic<uint64_t, 3>()
@@ -164,16 +161,23 @@ bool testArithmetic() {
         & testVArithmetic<int8_t, 2>()
         & testVArithmetic<int8_t, 3>()
         & testVArithmetic<int8_t, 4>()
-        & test1Arithmetic<int16_t>() 
-        & testVArithmetic<int16_t, 2>()
-        & testVArithmetic<int16_t, 3>()
-        & testVArithmetic<int16_t, 4>()
         & test1Arithmetic<int64_t>() 
         & testVArithmetic<int64_t, 2>()
         & testVArithmetic<int64_t, 3>()
         & testVArithmetic<int64_t, 4>()
 #endif
 
+        // Disabled on WGPU as these built-in types are not supported as of time of writing.
+#if !defined (WGPU)
+        & test1Arithmetic<uint16_t>() 
+        & testVArithmetic<uint16_t, 2>()
+        & testVArithmetic<uint16_t, 3>()
+        & testVArithmetic<uint16_t, 4>()
+        & test1Arithmetic<int16_t>() 
+        & testVArithmetic<int16_t, 2>()
+        & testVArithmetic<int16_t, 3>()
+        & testVArithmetic<int16_t, 4>()
+#endif
         ;
 }
 
@@ -181,8 +185,8 @@ void computeMain()
 {
 
     bool res0 = true
-    // WGSL does not support bitwise inclusive intrinsics.
-#if !defined(WGPU)
+    // WGSL and Metal does not support bitwise inclusive intrinsics.
+#if !defined(WGPU) && !defined(METAL)
             & testLogical()
 #endif
             ;

@@ -9,6 +9,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DMETAL
 
 #version 430
 
@@ -64,16 +65,12 @@ bool testLogical() {
         & testVLogical<uint, 3>()
         & testVLogical<uint, 4>()
 
-        // Disabled on WGPU as these built-in types are not supported as of time of writing.
-#if !defined (WGPU)
+        // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
+#if !defined(WGPU) && !defined(METAL)
         & test1Logical<int8_t>()
         & testVLogical<int8_t, 2>()
         & testVLogical<int8_t, 3>()
         & testVLogical<int8_t, 4>()
-        & test1Logical<int16_t>()
-        & testVLogical<int16_t, 2>()
-        & testVLogical<int16_t, 3>()
-        & testVLogical<int16_t, 4>()
         & test1Logical<int64_t>()
         & testVLogical<int64_t, 2>()
         & testVLogical<int64_t, 3>()
@@ -82,10 +79,6 @@ bool testLogical() {
         & testVLogical<uint8_t, 2>()
         & testVLogical<uint8_t, 3>()
         & testVLogical<uint8_t, 4>()
-        & test1Logical<uint16_t>()
-        & testVLogical<uint16_t, 2>()
-        & testVLogical<uint16_t, 3>()
-        & testVLogical<uint16_t, 4>()
         & test1Logical<uint64_t>()
         & testVLogical<uint64_t, 2>()
         & testVLogical<uint64_t, 3>()
@@ -94,6 +87,18 @@ bool testLogical() {
         & testVLogical<bool, 2>()
         & testVLogical<bool, 3>()
         & testVLogical<bool, 4>()
+#endif
+
+        // Disabled on WGPU as these built-in types are not supported as of time of writing.
+#if !defined (WGPU)
+        & test1Logical<int16_t>()
+        & testVLogical<int16_t, 2>()
+        & testVLogical<int16_t, 3>()
+        & testVLogical<int16_t, 4>()
+        & test1Logical<uint16_t>()
+        & testVLogical<uint16_t, 2>()
+        & testVLogical<uint16_t, 3>()
+        & testVLogical<uint16_t, 4>()
 #endif
         ;
 }
@@ -138,8 +143,8 @@ bool testArithmetic() {
         & testVArithmetic<uint, 3>()
         & testVArithmetic<uint, 4>()
 
-        // Disabled on WGPU as these built-in types are not supported as of time of writing.
-#if !defined (WGPU)
+        // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
+#if !defined(WGPU) && !defined(METAL)
         & test1Arithmetic<double>() // WARNING: intel GPU's lack FP64 support
         & testVArithmetic<double, 2>()
         & testVArithmetic<double, 3>()
@@ -148,10 +153,6 @@ bool testArithmetic() {
         & testVArithmetic<int8_t, 2>()
         & testVArithmetic<int8_t, 3>()
         & testVArithmetic<int8_t, 4>()
-        & test1Arithmetic<int16_t>() 
-        & testVArithmetic<int16_t, 2>()
-        & testVArithmetic<int16_t, 3>()
-        & testVArithmetic<int16_t, 4>()
         & test1Arithmetic<int64_t>() 
         & testVArithmetic<int64_t, 2>()
         & testVArithmetic<int64_t, 3>()
@@ -160,14 +161,21 @@ bool testArithmetic() {
         & testVArithmetic<uint8_t, 2>()
         & testVArithmetic<uint8_t, 3>()
         & testVArithmetic<uint8_t, 4>()
+        & test1Arithmetic<uint64_t>()
+        & testVArithmetic<uint64_t, 2>()
+        & testVArithmetic<uint64_t, 3>()
+        & testVArithmetic<uint64_t, 4>()
+#endif
+        // Disabled on WGPU as these built-in types are not supported as of time of writing.
+#if !defined (WGPU)
+        & test1Arithmetic<int16_t>() 
+        & testVArithmetic<int16_t, 2>()
+        & testVArithmetic<int16_t, 3>()
+        & testVArithmetic<int16_t, 4>()
         & test1Arithmetic<uint16_t>() 
         & testVArithmetic<uint16_t, 2>()
         & testVArithmetic<uint16_t, 3>()
         & testVArithmetic<uint16_t, 4>()
-        & test1Arithmetic<uint64_t>() 
-        & testVArithmetic<uint64_t, 2>()
-        & testVArithmetic<uint64_t, 3>()
-        & testVArithmetic<uint64_t, 4>()
 #endif
         ;
 }

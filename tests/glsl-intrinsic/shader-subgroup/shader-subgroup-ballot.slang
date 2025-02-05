@@ -10,6 +10,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DMETAL
 
 #version 430
 
@@ -76,8 +77,8 @@ bool testBroadcastX() {
         & testVBroadcastX<uint, 3>()
         & testVBroadcastX<uint, 4>()
 
-        // Disabled on WGPU as these built-in types are not supported as of time of writing.
-#if !defined(WGPU)
+        // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
+#if !defined(WGPU) && !defined(METAL)
         & test1BroadcastX<double>() // WARNING: intel GPU's lack FP64 support
         & testVBroadcastX<double, 2>()
         & testVBroadcastX<double, 3>()
@@ -86,10 +87,6 @@ bool testBroadcastX() {
         & testVBroadcastX<int8_t, 2>()
         & testVBroadcastX<int8_t, 3>()
         & testVBroadcastX<int8_t, 4>()
-        & test1BroadcastX<int16_t>() 
-        & testVBroadcastX<int16_t, 2>()
-        & testVBroadcastX<int16_t, 3>()
-        & testVBroadcastX<int16_t, 4>()
         & test1BroadcastX<int64_t>() 
         & testVBroadcastX<int64_t, 2>()
         & testVBroadcastX<int64_t, 3>()
@@ -98,10 +95,6 @@ bool testBroadcastX() {
         & testVBroadcastX<uint8_t, 2>()
         & testVBroadcastX<uint8_t, 3>()
         & testVBroadcastX<uint8_t, 4>()
-        & test1BroadcastX<uint16_t>() 
-        & testVBroadcastX<uint16_t, 2>()
-        & testVBroadcastX<uint16_t, 3>()
-        & testVBroadcastX<uint16_t, 4>()
         & test1BroadcastX<uint64_t>() 
         & testVBroadcastX<uint64_t, 2>()
         & testVBroadcastX<uint64_t, 3>()
@@ -111,6 +104,18 @@ bool testBroadcastX() {
         & testVBroadcastX<bool, 3>()
         & testVBroadcastX<bool, 4>()
 #endif
+
+        // Disabled on WGPU as these built-in types are not supported as of time of writing.
+#if !defined(WGPU)
+        & test1BroadcastX<int16_t>() 
+        & testVBroadcastX<int16_t, 2>()
+        & testVBroadcastX<int16_t, 3>()
+        & testVBroadcastX<int16_t, 4>()
+        & test1BroadcastX<uint16_t>() 
+        & testVBroadcastX<uint16_t, 2>()
+        & testVBroadcastX<uint16_t, 3>()
+        & testVBroadcastX<uint16_t, 4>()
+#endif
         ;
 }
 
@@ -118,7 +123,7 @@ bool testBallot() {
     return true 
         & (subgroupBallot(true).x == 0xFFFFFFFF)
 
-#if !defined(WGPU)
+#if !defined(WGPU) && !defined(METAL)
         & (subgroupInverseBallot(uvec4(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)) == true)
         & (subgroupBallotBitExtract(uvec4(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF), 0) == true)
         & (subgroupBallotBitCount(uvec4(0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF)) == 32)

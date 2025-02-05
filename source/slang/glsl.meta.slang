@@ -6508,7 +6508,7 @@ public property uvec4 gl_SubgroupLtMask
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+[require(cuda_glsl_hlsl_metal_spirv, subgroup_basic)]
 public void subgroupBarrier()
 {
     __target_switch
@@ -6519,6 +6519,8 @@ public void subgroupBarrier()
         __intrinsic_asm "AllMemoryBarrierWithGroupSync()";
     case glsl:
         __intrinsic_asm "subgroupBarrier()";
+    case metal:
+        __intrinsic_asm "simdgroup_barrier(mem_flags::mem_none)";
     case spirv:
         spirv_asm {
             OpCapability Shader;
@@ -6531,7 +6533,7 @@ public void subgroupBarrier()
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+[require(cuda_glsl_hlsl_metal_spirv, subgroup_basic)]
 public void subgroupMemoryBarrier()
 {
     __target_switch
@@ -6542,6 +6544,8 @@ public void subgroupMemoryBarrier()
         __intrinsic_asm "AllMemoryBarrier()";
     case glsl:
         __intrinsic_asm "subgroupMemoryBarrier()";
+    case metal:
+        __intrinsic_asm "simdgroup_barrier(mem_flags::mem_device)";
     case spirv:
         spirv_asm {
             OpCapability Shader;
@@ -6554,7 +6558,7 @@ public void subgroupMemoryBarrier()
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+[require(cuda_glsl_hlsl_metal_spirv, subgroup_basic)]
 public void subgroupMemoryBarrierBuffer()
 {
     // the following implementation is NOT the same as DeviceMemoryBarrier
@@ -6567,6 +6571,8 @@ public void subgroupMemoryBarrierBuffer()
         __intrinsic_asm "DeviceMemoryBarrier()";
     case glsl:
         __intrinsic_asm "subgroupMemoryBarrierBuffer()";
+    case metal:
+        __intrinsic_asm "simdgroup_barrier(mem_flags::mem_device)";
     case spirv:
         spirv_asm {
             OpCapability Shader;
@@ -6579,7 +6585,7 @@ public void subgroupMemoryBarrierBuffer()
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+[require(cuda_glsl_hlsl_metal_spirv, subgroup_basic)]
 public void subgroupMemoryBarrierImage()
 {
     __target_switch
@@ -6590,6 +6596,8 @@ public void subgroupMemoryBarrierImage()
         __intrinsic_asm "DeviceMemoryBarrier()";
     case glsl:
         __intrinsic_asm "subgroupMemoryBarrierImage()";
+    case metal:
+        __intrinsic_asm "simdgroup_barrier(mem_flags::mem_texture)";
     case spirv:
         spirv_asm {
             OpMemoryBarrier Subgroup AcquireRelease|ImageMemory
@@ -6601,7 +6609,7 @@ public void subgroupMemoryBarrierImage()
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 [ForceInline]
-[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+[require(cuda_glsl_hlsl_metal_spirv, subgroup_basic)]
 public void subgroupMemoryBarrierShared()
 {
     __target_switch
@@ -6612,6 +6620,8 @@ public void subgroupMemoryBarrierShared()
         __intrinsic_asm "GroupMemoryBarrier()";
     case glsl:
         __intrinsic_asm "subgroupMemoryBarrierShared()";
+    case metal:
+        __intrinsic_asm "simdgroup_barrier(mem_flags::mem_threadgroup)";
     case spirv:
         spirv_asm {
             // SubgroupMemory triggers vulkan validation layer error; 
