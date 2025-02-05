@@ -10178,7 +10178,12 @@ void SemanticsDeclHeaderVisitor::visitImportDecl(ImportDecl* decl)
     // the module's scope.
 
     auto name = decl->moduleNameAndLoc.name;
-    auto scope = getModuleDecl(decl)->ownedScope;
+
+    // We should import the module into the same scope as the decl.
+    // Note that if the module consists of multiple source files, the scope of the module may not
+    // correspond to the scope of this import declaration, since the module scope gets overwritten
+    // each time a new source file is parsed into it.
+    auto scope = decl->scope;
 
     // Try to load a module matching the name
     auto importedModule = findOrImportModule(
