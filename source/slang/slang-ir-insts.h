@@ -515,6 +515,17 @@ struct IRNVAPISlotDecoration : IRDecoration
     UnownedStringSlice getSpaceName() { return getSpaceNameOperand()->getStringSlice(); }
 };
 
+struct IRMaxTessFactorDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_MaxTessFactorDecoration
+    };
+    IR_LEAF_ISA(MaxTessFactorDecoration)
+
+    IRFloatLit* getMaxTessFactor() { return cast<IRFloatLit>(getOperand(0)); }
+};
+
 struct IROutputControlPointsDecoration : IRDecoration
 {
     enum
@@ -3656,6 +3667,7 @@ public:
     IRBasicType* getUInt64Type();
     IRBasicType* getUInt16Type();
     IRBasicType* getUInt8Type();
+    IRBasicType* getFloatType();
     IRBasicType* getCharType();
     IRStringType* getStringType();
     IRNativeStringType* getNativeStringType();

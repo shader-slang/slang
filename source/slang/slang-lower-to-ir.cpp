@@ -4701,6 +4701,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             return LoweredValInfo::simple(getBuilder()->getNullPtrValue(irType));
         }
+        else if (auto tupleType = as<TupleType>(type))
+        {
+            List<IRInst*> args;
+            for (Index i = 0; i < tupleType->getMemberCount(); i++)
+            {
+                args.add(getSimpleVal(context, getDefaultVal(tupleType->getMember(i))));
+            }
+            return LoweredValInfo::simple(
+                getBuilder()->emitMakeTuple(irType, args.getCount(), args.getBuffer()));
+        }
         else if (auto declRefType = as<DeclRefType>(type))
         {
             DeclRef<Decl> declRef = declRefType->getDeclRef();
@@ -4925,9 +4935,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                         args.add(irDefaultValue);
                     }
                 }
-
-                return LoweredValInfo::simple(
-                    getBuilder()->emitMakeStruct(irType, args.getCount(), args.getBuffer()));
+                if (as<TupleType>(type))
+                {
+                    return LoweredValInfo::simple(
+                        getBuilder()->emitMakeTuple(irType, args.getCount(), args.getBuffer()));
+                }
+                else
+                {
+                    return LoweredValInfo::simple(
+                        getBuilder()->emitMakeStruct(irType, args.getCount(), args.getBuffer()));
+                }
             }
         }
 
@@ -9986,6 +10003,24 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
     }
 
+    IRFloatLit* _getFloatFromAttribute(IRBuilder* builder, Attribute* attrib, Index index = 0)
+    {
+        SLANG_ASSERT(attrib->args.getCount() > index);
+        Expr* expr = attrib->args[index];
+
+        if (auto floatLitExpr = as<FloatingPointLiteralExpr>(expr))
+        {
+            return as<IRFloatLit>(
+                builder->getFloatValue(builder->getFloatType(), floatLitExpr->value));
+        }
+
+        auto intLitExpr = as<IntegerLiteralExpr>(expr);
+        SLANG_ASSERT(intLitExpr);
+        return as<IRFloatLit>(builder->getFloatValue(
+            builder->getFloatType(),
+            (IRFloatingPointValue)(intLitExpr->value)));
+    }
+
     IRIntLit* _getIntLitFromAttribute(IRBuilder* builder, Attribute* attrib, Index index = 0)
     {
         SLANG_ASSERT(attrib->args.getCount() > index);
@@ -10330,7 +10365,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 }
 
                 // Used for diagnostics
-                getBuilder()->addConstructorDecoration(irFunc, constructorDecl->isSynthesized);
+                getBuilder()->addConstructorDecoration(
+                    irFunc,
+                    constructorDecl->containsFlavor(
+                        ConstructorDecl::ConstructorFlavor::SynthesizedDefault));
             }
 
             // We lower whatever statement was stored on the declaration
@@ -10516,6 +10554,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), outputTopAttr);
                 getBuilder()->addDecoration(irFunc, kIROp_OutputTopologyDecoration, stringLit);
+            }
+            else if (auto maxTessFactortAttr = as<MaxTessFactorAttribute>(modifier))
+            {
+                IRFloatLit* floatLit = _getFloatFromAttribute(getBuilder(), maxTessFactortAttr);
+                getBuilder()->addDecoration(irFunc, kIROp_MaxTessFactorDecoration, floatLit);
             }
             else if (auto outputCtrlPtAttr = as<OutputControlPointsAttribute>(modifier))
             {

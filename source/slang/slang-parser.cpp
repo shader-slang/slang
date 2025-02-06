@@ -1,6 +1,7 @@
 #include "slang-parser.h"
 
 #include "../core/slang-semantic-version.h"
+#include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
@@ -75,11 +76,18 @@ enum Precedence : int
     Postfix,
 };
 
+enum class ParsingStage
+{
+    Decl,
+    Body,
+};
+
 struct ParserOptions
 {
     bool enableEffectAnnotations = false;
     bool allowGLSLInput = false;
     bool isInLanguageServer = false;
+    ParsingStage stage = ParsingStage::Body;
     CompilerOptionSet optionSet;
 };
 
@@ -91,6 +99,7 @@ public:
     NamePool* namePool;
     SourceLanguage sourceLanguage;
     ASTBuilder* astBuilder;
+    SemanticsVisitor* semanticsVisitor = nullptr;
 
     NamePool* getNamePool() { return namePool; }
     SourceLanguage getSourceLanguage() { return sourceLanguage; }
@@ -155,6 +164,8 @@ public:
         currentScope = currentScope->parent;
         resetLookupScope();
     }
+
+    ParsingStage getStage() { return options.stage; }
 
     ModuleDecl* getCurrentModuleDecl() { return currentModule; }
 
@@ -1811,14 +1822,62 @@ static Stmt* parseOptBody(Parser* parser)
         if (peekTokenType(parser) == TokenType::LBrace)
         {
             parser->sink->diagnose(semiColonToken.loc, Diagnostics::unexpectedBodyAfterSemicolon);
+
+            // Fall through to parse the block stmt.
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+
+    if (parser->getStage() == ParsingStage::Decl)
+    {
+        // If we are at the initial parsing stage, just collect the tokens
+        // without actually parsing them.
+        if (peekTokenType(parser) != TokenType::LBrace)
+        {
             return parser->parseBlockStatement();
         }
-        return nullptr;
+        auto unparsedStmt = parser->astBuilder->create<UnparsedStmt>();
+        unparsedStmt->currentScope = parser->currentScope;
+        unparsedStmt->outerScope = parser->outerScope;
+        unparsedStmt->sourceLanguage = parser->getSourceLanguage();
+        unparsedStmt->isInVariadicGenerics = parser->isInVariadicGenerics;
+        parser->FillPosition(unparsedStmt);
+        List<Token>& tokens = unparsedStmt->tokens;
+        int braceDepth = 0;
+        for (;;)
+        {
+            auto token = parser->ReadToken();
+            if (token.type == TokenType::EndOfFile)
+            {
+                break;
+            }
+            if (token.type == TokenType::LBrace)
+            {
+                braceDepth++;
+            }
+            else if (token.type == TokenType::RBrace)
+            {
+                braceDepth--;
+            }
+            tokens.add(token);
+            if (braceDepth == 0)
+            {
+                break;
+            }
+        }
+        Token eofToken;
+        eofToken.type = TokenType::EndOfFile;
+        eofToken.loc = parser->tokenReader.peekLoc();
+        tokens.add(eofToken);
+        return unparsedStmt;
     }
-    else
-    {
-        return parser->parseBlockStatement();
-    }
+
+    // If we are in the second stage of parsing, then we need to actually
+    // parse the block statement for real.
+    return parser->parseBlockStatement();
 }
 
 /// Complete parsing of a function using traditional (C-like) declarator syntax
@@ -1867,9 +1926,12 @@ static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& decl
             parser->PushScope(funcScope);
 
             decl->body = parseOptBody(parser);
-            if (auto block = as<BlockStmt>(decl->body))
+            if (auto blockStmt = as<BlockStmt>(decl->body))
+                decl->closingSourceLoc = blockStmt->closingSourceLoc;
+            else if (auto unparsedStmt = as<UnparsedStmt>(decl->body))
             {
-                decl->closingSourceLoc = block->closingSourceLoc;
+                if (unparsedStmt->tokens.getCount())
+                    decl->closingSourceLoc = unparsedStmt->tokens.getLast().getLoc();
             }
             parser->PopScope();
 
@@ -2311,14 +2373,78 @@ static bool isGenericName(Parser* parser, Name* name)
     return lookupResult.item.declRef.is<GenericDecl>();
 }
 
+enum class BaseGenericKind
+{
+    Unknown,
+    Generic,
+    NonGeneric,
+};
+
 static Expr* tryParseGenericApp(Parser* parser, Expr* base)
 {
     Name* baseName = nullptr;
-    if (auto varExpr = as<VarExpr>(base))
-        baseName = varExpr->name;
-    // if base is a known generics, parse as generics
-    if (baseName && isGenericName(parser, baseName))
+    BaseGenericKind baseKind = BaseGenericKind::Unknown;
+    if (parser->semanticsVisitor)
+    {
+        // If we have access to a semantic visitor, we can check the base
+        // and see if it refers to a generic.
+        auto checkedBase = parser->semanticsVisitor->CheckTerm(base);
+        if (auto declRefExpr = as<DeclRefExpr>(checkedBase))
+        {
+            if (declRefExpr->declRef.is<GenericDecl>())
+            {
+                baseKind = BaseGenericKind::Generic;
+            }
+            else if (
+                declRefExpr->declRef.is<FunctionDeclBase>() ||
+                declRefExpr->declRef.is<AggTypeDeclBase>())
+            {
+                // If declref is a function or type, even if it is not a generic,
+                // we should parse the `<` as a generic application for better error
+                // messages. This is because functions or types can never precede a
+                // `<` in valid Slang code, and it is more likely that the user assumed
+                // the function or type is generic by mistake.
+                //
+                baseKind = BaseGenericKind::Generic;
+            }
+            else
+            {
+                baseKind = BaseGenericKind::NonGeneric;
+            }
+        }
+        else if (auto overloadedExpr = as<OverloadedExpr>(checkedBase))
+        {
+            baseKind = BaseGenericKind::NonGeneric;
+            for (auto candidate : overloadedExpr->lookupResult2)
+            {
+                if (candidate.declRef.is<GenericDecl>() ||
+                    declRefExpr->declRef.is<FunctionDeclBase>() ||
+                    declRefExpr->declRef.is<AggTypeDeclBase>())
+                {
+                    baseKind = BaseGenericKind::Generic;
+                    break;
+                }
+            }
+        }
+    }
+    else
+    {
+        // Without a semantic visitor, we fallback to a more simplistic lookup
+        // and guessing.
+        if (auto varExpr = as<VarExpr>(base))
+            baseName = varExpr->name;
+        // if base is a known generics, parse as generics
+        if (baseName && isGenericName(parser, baseName))
+            baseKind = BaseGenericKind::Generic;
+    }
+
+    // If base is known to be a generic, just parse as generic app.
+    if (baseKind == BaseGenericKind::Generic)
         return parseGenericApp(parser, base);
+
+    // If base is known to be non-generic, just return base.
+    if (baseKind == BaseGenericKind::NonGeneric)
+        return base;
 
     // otherwise, we speculate as generics, and fallback to comparison when parsing failed
     TokenSpan tokenSpan;
@@ -3844,8 +3970,13 @@ static NodeBase* parseConstructorDecl(Parser* parser, void* /*userData*/)
 
             decl->body = parseOptBody(parser);
 
-            if (auto block = as<BlockStmt>(decl->body))
-                decl->closingSourceLoc = block->closingSourceLoc;
+            if (auto blockStmt = as<BlockStmt>(decl->body))
+                decl->closingSourceLoc = blockStmt->closingSourceLoc;
+            else if (auto unparsedStmt = as<UnparsedStmt>(decl->body))
+            {
+                if (unparsedStmt->tokens.getCount())
+                    decl->closingSourceLoc = unparsedStmt->tokens.getLast().getLoc();
+            }
 
             parser->PopScope();
             return decl;
@@ -3898,10 +4029,13 @@ static AccessorDecl* parseAccessorDecl(Parser* parser)
 
     if (parser->tokenReader.peekTokenType() == TokenType::LBrace)
     {
-        decl->body = parser->parseBlockStatement();
-        if (auto block = as<BlockStmt>(decl->body))
+        decl->body = parseOptBody(parser);
+        if (auto blockStmt = as<BlockStmt>(decl->body))
+            decl->closingSourceLoc = blockStmt->closingSourceLoc;
+        else if (auto unparsedStmt = as<UnparsedStmt>(decl->body))
         {
-            decl->closingSourceLoc = block->closingSourceLoc;
+            if (unparsedStmt->tokens.getCount())
+                decl->closingSourceLoc = unparsedStmt->tokens.getLast().getLoc();
         }
     }
     else
@@ -4184,6 +4318,11 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
             decl->body = parseOptBody(parser);
             if (auto blockStmt = as<BlockStmt>(decl->body))
                 decl->closingSourceLoc = blockStmt->closingSourceLoc;
+            else if (auto unparsedStmt = as<UnparsedStmt>(decl->body))
+            {
+                if (unparsedStmt->tokens.getCount())
+                    decl->closingSourceLoc = unparsedStmt->tokens.getLast().getLoc();
+            }
             parser->PopScope();
             return decl;
         });
@@ -4733,6 +4872,19 @@ static void CompleteDecl(
             // Make sure the decl is properly nested inside its lexical parent
             AddMember(containerDecl, decl);
         }
+    }
+
+    if (parser->semanticsVisitor && parser->getStage() == ParsingStage::Body)
+    {
+        // When we are in a deferred parsing stage for function bodies,
+        // we will mark all local var decls as `ReadyForParserLookup` so they can
+        // be returned via lookup.
+        // Note that our lookup logic will ignore all unchecked decls, but during
+        // parsing we don't want to ignore them, so we mark them as `ReadyForParserLookup`
+        // here, which is a pseudo state that is only used during parsing.
+        // Before checking the decl in semantic checking, we will mark them back as
+        // `Unchecked`.
+        decl->checkState = DeclCheckState::ReadyForParserLookup;
     }
 }
 
@@ -5486,6 +5638,7 @@ Stmt* parseCompileTimeForStmt(Parser* parser)
     VarDecl* varDecl = parser->astBuilder->create<VarDecl>();
     varDecl->nameAndLoc = varNameAndLoc;
     varDecl->loc = varNameAndLoc.loc;
+    varDecl->checkState = DeclCheckState::ReadyForParserLookup;
 
     stmt->varDecl = varDecl;
 
@@ -5867,7 +6020,6 @@ DeclStmt* Parser::parseVarDeclrStatement(Modifiers modifiers)
     {
         sink->diagnose(decl->loc, Diagnostics::declNotAllowed, decl->astNodeType);
     }
-
     return varDeclrStatement;
 }
 
@@ -5906,6 +6058,11 @@ Stmt* Parser::parseIfLetStatement()
     tempVarDecl->nameAndLoc = NameLoc(getName(this, "$OptVar"), identifierToken.loc);
     tempVarDecl->initExpr = initExpr;
     AddMember(currentScope->containerDecl, tempVarDecl);
+    if (semanticsVisitor)
+        semanticsVisitor->ensureDecl(
+            (Decl*)tempVarDecl,
+            DeclCheckState::DefinitionChecked,
+            nullptr);
 
     DeclStmt* tmpVarDeclStmt = astBuilder->create<DeclStmt>();
     FillPosition(tmpVarDeclStmt);
@@ -6995,9 +7152,19 @@ static Expr* parseAtomicExpr(Parser* parser)
                 // as an expression.
 
                 Expr* base = nullptr;
-                if (!tryParseExpression(parser, base, TokenType::RParent))
+                if (parser->LookAheadToken(TokenType::RParent))
                 {
-                    base = parser->ParseType();
+                    // We don't support empty parentheses `()` as a valid expression.
+                    parser->diagnose(openParen, Diagnostics::invalidEmptyParenthesisExpr);
+                    base = parser->astBuilder->create<IncompleteExpr>();
+                    base->type = parser->astBuilder->getErrorType();
+                }
+                else
+                {
+                    if (!tryParseExpression(parser, base, TokenType::RParent))
+                    {
+                        base = parser->ParseType();
+                    }
                 }
 
                 parser->ReadToken(TokenType::RParent);
@@ -8090,11 +8257,45 @@ Expr* parseTermFromSourceFile(
 {
     ParserOptions options;
     options.allowGLSLInput = sourceLanguage == SourceLanguage::GLSL;
+    options.stage = ParsingStage::Body;
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.currentScope = outerScope;
     parser.namePool = namePool;
     parser.sourceLanguage = sourceLanguage;
     return parser.ParseExpression();
+}
+
+Stmt* parseUnparsedStmt(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* semanticsVisitor,
+    TranslationUnitRequest* translationUnit,
+    SourceLanguage sourceLanguage,
+    bool isInVariadicGenerics,
+    TokenSpan const& tokens,
+    DiagnosticSink* sink,
+    Scope* currentScope,
+    Scope* outerScope)
+{
+    ParserOptions options = {};
+    options.stage = ParsingStage::Body;
+    options.enableEffectAnnotations = translationUnit->compileRequest->optionSet.getBoolOption(
+        CompilerOptionName::EnableEffectAnnotations);
+    options.allowGLSLInput =
+        translationUnit->compileRequest->optionSet.getBoolOption(CompilerOptionName::AllowGLSL) ||
+        sourceLanguage == SourceLanguage::GLSL;
+    options.isInLanguageServer =
+        translationUnit->compileRequest->getLinkage()->isInLanguageServer();
+    options.optionSet = translationUnit->compileRequest->optionSet;
+
+    Parser parser(astBuilder, tokens, sink, outerScope, options);
+    parser.currentScope = outerScope;
+    parser.namePool = translationUnit->getNamePool();
+    parser.sourceLanguage = sourceLanguage;
+    parser.semanticsVisitor = semanticsVisitor;
+    parser.currentScope = parser.currentLookupScope = currentScope;
+    parser.currentModule = semanticsVisitor->getShared()->getModule()->getModuleDecl();
+    parser.isInVariadicGenerics = isInVariadicGenerics;
+    return parser.parseBlockStatement();
 }
 
 // Parse a source file into an existing translation unit
@@ -8108,6 +8309,7 @@ void parseSourceFile(
     ContainerDecl* parentDecl)
 {
     ParserOptions options = {};
+    options.stage = ParsingStage::Decl;
     options.enableEffectAnnotations = translationUnit->compileRequest->optionSet.getBoolOption(
         CompilerOptionName::EnableEffectAnnotations);
     options.allowGLSLInput =
