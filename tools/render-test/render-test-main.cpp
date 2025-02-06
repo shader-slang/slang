@@ -1396,8 +1396,8 @@ static SlangResult _innerMain(
         desc.requiredFeatureCount = (int)requiredFeatureList.getCount();
 
 #if defined(_WIN32)
-	// When the experimental feature is enabled, things become unstable.
-	// It is enabled only when requested.
+        // When the experimental feature is enabled, things become unstable.
+        // It is enabled only when requested.
         D3D12ExperimentalFeaturesDesc experimentalFD = {};
         UUID features[1] = {D3D12ExperimentalShaderModels};
         experimentalFD.featureCount = 1;
