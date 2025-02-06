@@ -16,3 +16,6 @@ tests/language-feature/shader-params/interface-shader-param-ordinary.slang.4 syn
 gfx-unit-test-tool/RayTracingTestAD3D12.internal
 gfx-unit-test-tool/RayTracingTestBD3D12.internal
 gfx-unit-test-tool/precompiledTargetModule2Vulkan.internal
+tests/hlsl-intrinsic/ray-tracing/rt-pipeline-intrinsics-ahit.slang.2
+tests/hlsl-intrinsic/ray-tracing/rt-pipeline-intrinsics-int.slang.2
+tests/metal/texture.slang.4 (dx12)
