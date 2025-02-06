@@ -745,8 +745,7 @@ void computeMain()
     nb = input[463];
     nc = input[464];
     output[208] = uint(na >> nb < nc);
-    // error 39999: expected a generic when using '<...>' (found: 'uint')
-    // output[209] = uint(na < nb >> nc);
+    output[209] = uint(na < nb >> nc);
     na = input[465];
     nb = input[466];
     nc = input[467];
