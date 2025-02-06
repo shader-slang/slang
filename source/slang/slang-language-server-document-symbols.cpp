@@ -90,6 +90,11 @@ static SourceLoc _findClosingSourceLoc(Decl* decl)
         {
             return block->closingSourceLoc;
         }
+        else if (auto unparsedStmt = as<UnparsedStmt>(func->body))
+        {
+            if (unparsedStmt->tokens.getCount())
+                return unparsedStmt->tokens.getLast().getLoc();
+        }
         else if (func->body)
         {
             return func->body->loc;

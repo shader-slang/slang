@@ -1254,6 +1254,7 @@ bool SemanticsVisitor::_coerce(
             auto resultExpr = getASTBuilder()->create<MakeOptionalExpr>();
             resultExpr->loc = fromExpr->loc;
             resultExpr->type = toType;
+            resultExpr->checked = true;
             *outToExpr = resultExpr;
         }
         return true;
@@ -1379,6 +1380,7 @@ bool SemanticsVisitor::_coerce(
             derefExpr = m_astBuilder->create<DerefExpr>();
             derefExpr->base = fromExpr;
             derefExpr->type = QualType(fromElementType);
+            derefExpr->checked = true;
         }
 
         if (!_coerce(site, toType, outToExpr, fromElementType, derefExpr, &subCost))
@@ -1407,6 +1409,7 @@ bool SemanticsVisitor::_coerce(
             refExpr->base = fromExpr;
             refExpr->type = QualType(refType);
             refExpr->type.isLeftValue = false;
+            refExpr->checked = true;
             *outToExpr = refExpr;
         }
         if (outCost)
