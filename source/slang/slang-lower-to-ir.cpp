@@ -4701,6 +4701,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             return LoweredValInfo::simple(getBuilder()->getNullPtrValue(irType));
         }
+        else if (auto tupleType = as<TupleType>(type))
+        {
+            List<IRInst*> args;
+            for (Index i = 0; i < tupleType->getMemberCount(); i++)
+            {
+                args.add(getSimpleVal(context, getDefaultVal(tupleType->getMember(i))));
+            }
+            return LoweredValInfo::simple(
+                getBuilder()->emitMakeTuple(irType, args.getCount(), args.getBuffer()));
+        }
         else if (auto declRefType = as<DeclRefType>(type))
         {
             DeclRef<Decl> declRef = declRefType->getDeclRef();
@@ -4925,9 +4935,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                         args.add(irDefaultValue);
                     }
                 }
-
-                return LoweredValInfo::simple(
-                    getBuilder()->emitMakeStruct(irType, args.getCount(), args.getBuffer()));
+                if (as<TupleType>(type))
+                {
+                    return LoweredValInfo::simple(
+                        getBuilder()->emitMakeTuple(irType, args.getCount(), args.getBuffer()));
+                }
+                else
+                {
+                    return LoweredValInfo::simple(
+                        getBuilder()->emitMakeStruct(irType, args.getCount(), args.getBuffer()));
+                }
             }
         }
 
