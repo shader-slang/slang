@@ -253,6 +253,10 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             outOptions.enableBackendValidation = true;
         }
+        else if (argValue == "-dx12-experimental")
+        {
+            outOptions.dx12Experimental = true;
+        }
         else
         {
             // Lookup

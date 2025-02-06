@@ -1678,6 +1678,7 @@ public:
 
     AttributeDecl* lookUpAttributeDecl(Name* attributeName, Scope* scope);
 
+    bool hasFloatArgs(Attribute* attr, int numArgs);
     bool hasIntArgs(Attribute* attr, int numArgs);
     bool hasStringArgs(Attribute* attr, int numArgs);
 
@@ -2034,6 +2035,8 @@ public:
     void validateEnumTagType(Type* type, SourceLoc const& loc);
 
     void checkStmt(Stmt* stmt, SemanticsContext const& context);
+
+    Stmt* maybeParseStmt(Stmt* stmt, const SemanticsContext& context);
 
     void getGenericParams(
         GenericDecl* decl,
@@ -2877,14 +2880,8 @@ public:
     // deal with this cases here, even if they are no-ops.
     //
 
-#define CASE(NAME)                                                                           \
-    Expr* visit##NAME(NAME* expr)                                                            \
-    {                                                                                        \
-        if (!getShared()->isInLanguageServer())                                              \
-            SLANG_DIAGNOSE_UNEXPECTED(getSink(), expr, "should not appear in input syntax"); \
-        expr->type = m_astBuilder->getErrorType();                                           \
-        return expr;                                                                         \
-    }
+#define CASE(NAME) \
+    Expr* visit##NAME(NAME* expr) { return expr; }
 
     CASE(DerefExpr)
     CASE(MakeRefExpr)

@@ -456,6 +456,11 @@ DIAGNOSTIC(
     Error,
     unexpectedTokenExpectedComponentDefinition,
     "unexpected token '$0', only component definitions are allowed in a shader scope.")
+DIAGNOSTIC(
+    20005,
+    Error,
+    invalidEmptyParenthesisExpr,
+    "empty parenthesis '()' is not a valid expression.")
 DIAGNOSTIC(20008, Error, invalidOperator, "invalid operator '$0'.")
 DIAGNOSTIC(20011, Error, unexpectedColon, "unexpected ':'.")
 DIAGNOSTIC(
@@ -1039,6 +1044,12 @@ DIAGNOSTIC(
     Error,
     attributeExpectedStringArg,
     "attribute '$0' expects argument $1 to be string")
+
+DIAGNOSTIC(
+    31009,
+    Error,
+    expectedSingleFloatArg,
+    "attribute '$0' expects a single floating point argument")
 
 DIAGNOSTIC(31100, Error, unknownStageName, "unknown stage name '$0'")
 DIAGNOSTIC(31101, Error, unknownImageFormatName, "unknown image format '$0'")
