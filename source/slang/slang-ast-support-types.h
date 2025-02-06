@@ -419,6 +419,10 @@ enum class DeclCheckState : uint8_t
     ///
     Unchecked,
 
+    /// The declaration is parsed and inserted into the initial scope,
+    /// ready for future lookups from within the parser for disambiguation purposes.
+    ReadyForParserLookup,
+
     /// Basic checks on the modifiers of the declaration have been applied.
     ///
     /// For example, when a declaration has attributes, the transformation
