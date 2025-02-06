@@ -21,7 +21,7 @@ In Slang, `fwd_diff` and `bwd_diff` are higher-order functions used to transform
 Forward and backward derivative methods are two different ways of computing a dot product with the Jacobian of a given function.
 Parts of this overview are based on JAX's excellent auto-diff cookbook [here](https://jax.readthedocs.io/en/latest/notebooks/autodiff_cookbook.html#how-it-s-made-two-foundational-autodiff-functions). The relevant [wikipedia article](https://en.wikipedia.org/wiki/Automatic_differentiation) is also a great resource for understanding auto-diff.
  
-The [Jacobian](https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant) (also called the total derivative) of a function $\mathbf{f}(\mathbf{x})$ is represented by $$D\mathbf{f}(\mathbf{x})$$. 
+The [Jacobian](https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant) (also called the total derivative) of a function $$\mathbf{f}(\mathbf{x})$$ is represented by $$D\mathbf{f}(\mathbf{x})$$. 
 
 For a general function with multiple scalar inputs and multiple scalar outputs, the Jacobian is a _matrix_ where $$D\mathbf{f}_{ij}$$ represents the [partial derivative](https://en.wikipedia.org/wiki/Partial_derivative) of the $$i^{th}$$ output element w.r.t the $$j^{th}$$ input element $$\frac{\partial f_i}{\partial x_j}$$
 
@@ -33,11 +33,11 @@ Here, $$f$$ here has 1 output and 2 inputs. $$Df$$ is therefore the row matrix:
 
 $$ Df(x, y) = [\frac{\partial f}{\partial x}, \frac{\partial f}{\partial y}] = [3x^2 + 2x, -1] $$
 
-Another, more complex example with a function that has multiple outputs (for clarity, denoted by $f_1$, $f_2$, etc..)
+Another, more complex example with a function that has multiple outputs (for clarity, denoted by $$f_1$$, $$f_2$$, etc..)
 
 $$ \mathbf{f}(x, y) = \begin{bmatrix} f_0(x, y) & f_1(x, y) & f_2(x, y) \end{bmatrix} = \begin{bmatrix} x^3 & y^2x & y^3 \end{bmatrix} $$
 
-Here, $Df$ is a 3x2 matrix with each element containing a partial derivative:
+Here, $$D\mathbf{f}$$ is a 3x2 matrix with each element containing a partial derivative:
 
 $$ D\mathbf{f}(x, y) = \begin{bmatrix} 
 \partial f_0 / \partial x & \partial f_0 / \partial y \\  
@@ -52,8 +52,8 @@ y^2   & 2yx \\
 
 Computing full Jacobians is often unnecessary and expensive. Instead, auto-diff offers ways to compute _products_ of the Jacobian with a vector, which is a much faster operation.
 There are two basic ways to compute this product: 
- 1. the Jacobian-vector product $$\langle D\mathbf{f}(\mathbf{x}), \mathbf{v} \rangle$$, also called forward-mode autodiff, and can be computed using `fwd_diff` operator in Slang, and
- 2. the vector-Jacobian product $$\langle \mathbf{v}^T, D\mathbf{f}(\mathbf{x}) \rangle$$, also called reverse-mode autodiff, and can be computed using `bwd_diff` operator in Slang. From a linear algebra perspective, this is the transpose of the forward-mode operator. 
+ 1. the Jacobian-vector product $$ \langle D\mathbf{f}(\mathbf{x}), \mathbf{v} \rangle $$, also called forward-mode autodiff, and can be computed using `fwd_diff` operator in Slang, and
+ 2. the vector-Jacobian product $$ \langle \mathbf{v}^T, D\mathbf{f}(\mathbf{x}) \rangle $$, also called reverse-mode autodiff, and can be computed using `bwd_diff` operator in Slang. From a linear algebra perspective, this is the transpose of the forward-mode operator. 
 
 #### Propagating derivatives with forward-mode auto-diff
 The products described above allow the _propagation_ of derivatives forward and backward through the function $f$
