@@ -3,6 +3,7 @@
 // Test that an `This` type works correctly when there is an extension.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -vk
 
 interface IFoo
 {
@@ -31,7 +32,7 @@ RWStructuredBuffer<int> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
-    FooImpl foo;
+    FooImpl foo = {};
     var ident = foo.getIdentity();
     // CHECK: 1
     outputBuffer[0] = ident.v;

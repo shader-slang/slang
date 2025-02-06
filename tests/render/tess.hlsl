@@ -50,6 +50,7 @@ HS_CONSTANT_OUTPUT HSConst()
 [partitioning("integer")]
 [outputtopology("line")]
 [outputcontrolpoints(4)]
+[maxtessfactor(16.0)]
 [patchconstantfunc("HSConst")]
 HS_OUTPUT HS(InputPatch<VS_OUTPUT, 4> ip, uint id : SV_OutputControlPointID)
 {

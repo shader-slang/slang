@@ -205,6 +205,234 @@ DeclRef<StructDecl> findBaseStructDeclRef(
     return baseStructDeclRef;
 }
 
+ConstructorDecl* SemanticsVisitor::_getSynthesizedConstructor(
+    StructDecl* structDecl,
+    ConstructorDecl::ConstructorFlavor flavor)
+{
+    for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
+    {
+        if (ctor->containsFlavor(flavor))
+            return ctor;
+    }
+    return nullptr;
+}
+
+bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
+{
+    isVisit.add(type);
+    auto cacheResult = [&](bool result)
+    {
+        getShared()->cacheCStyleType(type, result);
+        return result;
+    };
+
+    // Check cache first
+    if (bool* isCStyle = getShared()->isCStyleType(type))
+    {
+        return *isCStyle;
+    }
+
+    // 1. It has to be basic scalar, vector or matrix type, or user-defined struct.
+    if (as<VectorExpressionType>(type) || as<MatrixExpressionType>(type) ||
+        as<BasicExpressionType>(type) || isDeclRefTypeOf<EnumDecl>(type).getDecl())
+        return cacheResult(true);
+
+
+    if (auto structDecl = isDeclRefTypeOf<StructDecl>(type).getDecl())
+    {
+        // 2. It cannot have inheritance, but inherit from interface is fine.
+        for (auto inheritanceDecl : structDecl->getMembersOfType<InheritanceDecl>())
+        {
+            if (!isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type))
+            {
+                return cacheResult(false);
+            }
+        }
+
+        // 3. It cannot have explicit constructor
+        if (_hasExplicitConstructor(structDecl, true))
+            return cacheResult(false);
+
+        // 4. All of its members have to have the same visibility as the struct itself.
+        DeclVisibility structVisibility = getDeclVisibility(structDecl);
+        for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
+        {
+            if (getDeclVisibility(varDecl) != structVisibility)
+            {
+                return cacheResult(false);
+            }
+        }
+
+        for (auto varDecl : structDecl->getMembersOfType<VarDeclBase>())
+        {
+            Type* varType = varDecl->getType();
+
+            if (isDeclRefTypeOf<StructDecl>(varType))
+            {
+                // Avoid infinite loop in case of circular reference.
+                if (isVisit.contains(varType))
+                    continue;
+            }
+
+            // Recursively check the type of the member.
+            if (!isCStyleType(varType, isVisit))
+                return cacheResult(false);
+        }
+    }
+
+    // 5. All its members are legacy C-Style structs or arrays of legacy C-style structs
+    if (auto arrayType = as<ArrayExpressionType>(type))
+    {
+        if (arrayType->isUnsized())
+        {
+            return cacheResult(false);
+        }
+
+        auto elementType = arrayType->getElementType();
+        if (isDeclRefTypeOf<StructDecl>(elementType))
+        {
+            // Avoid infinite loop in case of circular reference.
+            if (isVisit.contains(elementType))
+                cacheResult(true);
+        }
+
+        if (!isCStyleType(elementType, isVisit))
+            return cacheResult(false);
+    }
+    return cacheResult(true);
+}
+
+Expr* SemanticsVisitor::_createCtorInvokeExpr(
+    Type* toType,
+    const SourceLoc& loc,
+    const List<Expr*>& coercedArgs)
+{
+    auto* varExpr = getASTBuilder()->create<VarExpr>();
+    varExpr->type = (QualType)getASTBuilder()->getTypeType(toType);
+    varExpr->declRef = isDeclRefTypeOf<Decl>(toType);
+
+    auto* constructorExpr = getASTBuilder()->create<ExplicitCtorInvokeExpr>();
+    constructorExpr->functionExpr = varExpr;
+    constructorExpr->arguments.addRange(coercedArgs);
+    constructorExpr->loc = loc;
+
+    return constructorExpr;
+}
+
+// translation from initializer list to constructor invocation if the struct has constructor.
+bool SemanticsVisitor::createInvokeExprForExplicitCtor(
+    Type* toType,
+    InitializerListExpr* fromInitializerListExpr,
+    Expr** outExpr)
+{
+    if (auto toStructDeclRef = isDeclRefTypeOf<StructDecl>(toType))
+    {
+        // TODO: This is just a special case for a backwards-compatibility feature
+        // for HLSL, this flag will imply that the initializer list is synthesized
+        // for a type cast from a literal zero to a 'struct'. In this case, we will fall
+        // back to legacy initializer list logic.
+        if (!fromInitializerListExpr->useCStyleInitialization)
+        {
+            HashSet<Type*> isVisit;
+            if (!isCStyleType(toType, isVisit))
+                return false;
+        }
+
+        if (_hasExplicitConstructor(toStructDeclRef.getDecl(), false))
+        {
+            auto ctorInvokeExpr = _createCtorInvokeExpr(
+                toType,
+                fromInitializerListExpr->loc,
+                fromInitializerListExpr->args);
+
+            DiagnosticSink tempSink(getSourceManager(), nullptr);
+            SemanticsVisitor subVisitor(withSink(&tempSink));
+            ctorInvokeExpr = subVisitor.CheckTerm(ctorInvokeExpr);
+
+            if (tempSink.getErrorCount())
+            {
+                HashSet<Type*> isVisit;
+                if (!isCStyleType(toType, isVisit))
+                {
+                    Slang::ComPtr<ISlangBlob> blob;
+                    tempSink.getBlobIfNeeded(blob.writeRef());
+                    getSink()->diagnoseRaw(
+                        Severity::Error,
+                        static_cast<char const*>(blob->getBufferPointer()));
+                }
+                return false;
+            }
+
+            if (outExpr)
+            {
+                *outExpr = ctorInvokeExpr;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
+    Type* toType,
+    InitializerListExpr* fromInitializerListExpr,
+    Expr** outExpr)
+{
+    StructDecl* structDecl = isDeclRefTypeOf<StructDecl>(toType).getDecl();
+
+    if (!structDecl || !_getSynthesizedConstructor(
+                           structDecl,
+                           ConstructorDecl::ConstructorFlavor::SynthesizedDefault))
+        return false;
+
+    HashSet<Type*> isVisit;
+    bool isCStyle = isCStyleType(toType, isVisit);
+
+    // TODO: This is just a special case for a backwards-compatibility feature
+    // for HLSL, this flag will imply that the initializer list is synthesized
+    // for a type cast from a literal zero to a 'struct'. In this case, we will fall
+    // back to legacy initializer list logic.
+    if (!fromInitializerListExpr->useCStyleInitialization)
+    {
+        if (isCStyle)
+            return false;
+    }
+
+    DiagnosticSink tempSink(getSourceManager(), nullptr);
+    SemanticsVisitor subVisitor(withSink(&tempSink));
+
+    // First make sure the struct is fully checked, otherwise the synthesized constructor may not be
+    // created yet.
+    subVisitor.ensureDecl(structDecl, DeclCheckState::DefinitionChecked);
+
+    List<Expr*> coercedArgs;
+    auto ctorInvokeExpr =
+        _createCtorInvokeExpr(toType, fromInitializerListExpr->loc, fromInitializerListExpr->args);
+
+    ctorInvokeExpr = subVisitor.CheckExpr(ctorInvokeExpr);
+
+    if (ctorInvokeExpr)
+    {
+        if (!tempSink.getErrorCount())
+        {
+            if (outExpr)
+                *outExpr = ctorInvokeExpr;
+
+            return true;
+        }
+        else if (!isCStyle)
+        {
+            Slang::ComPtr<ISlangBlob> blob;
+            tempSink.getBlobIfNeeded(blob.writeRef());
+            getSink()->diagnoseRaw(
+                Severity::Error,
+                static_cast<char const*>(blob->getBufferPointer()));
+            return false;
+        }
+    }
+    return false;
+}
+
 bool SemanticsVisitor::_readAggregateValueFromInitializerList(
     Type* inToType,
     Expr** outToExpr,
@@ -603,6 +831,21 @@ bool SemanticsVisitor::_coerceInitializerList(
         !canCoerce(toType, fromInitializerListExpr->type, nullptr))
         return _failedCoercion(toType, outToExpr, fromInitializerListExpr);
 
+    // Try to invoke the user-defined constructor if it exists. This call will
+    // report error diagnostics if the used-defined constructor exists but does not
+    // match the initialize list.
+    if (createInvokeExprForExplicitCtor(toType, fromInitializerListExpr, outToExpr))
+    {
+        return true;
+    }
+
+    // Try to invoke the synthesized constructor if it exists
+    if (createInvokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
+    {
+        return true;
+    }
+
+    // We will fall back to the legacy logic of initialize list.
     if (!_readAggregateValueFromInitializerList(
             toType,
             outToExpr,
@@ -1011,6 +1254,7 @@ bool SemanticsVisitor::_coerce(
             auto resultExpr = getASTBuilder()->create<MakeOptionalExpr>();
             resultExpr->loc = fromExpr->loc;
             resultExpr->type = toType;
+            resultExpr->checked = true;
             *outToExpr = resultExpr;
         }
         return true;
@@ -1136,6 +1380,7 @@ bool SemanticsVisitor::_coerce(
             derefExpr = m_astBuilder->create<DerefExpr>();
             derefExpr->base = fromExpr;
             derefExpr->type = QualType(fromElementType);
+            derefExpr->checked = true;
         }
 
         if (!_coerce(site, toType, outToExpr, fromElementType, derefExpr, &subCost))
@@ -1164,6 +1409,7 @@ bool SemanticsVisitor::_coerce(
             refExpr->base = fromExpr;
             refExpr->type = QualType(refType);
             refExpr->type.isLeftValue = false;
+            refExpr->checked = true;
             *outToExpr = refExpr;
         }
         if (outCost)

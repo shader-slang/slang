@@ -2678,6 +2678,11 @@ IRBasicType* IRBuilder::getUInt8Type()
     return (IRBasicType*)getType(kIROp_UInt8Type);
 }
 
+IRBasicType* IRBuilder::getFloatType()
+{
+    return (IRBasicType*)getType(kIROp_FloatType);
+}
+
 IRBasicType* IRBuilder::getCharType()
 {
     return (IRBasicType*)getType(kIROp_CharType);
