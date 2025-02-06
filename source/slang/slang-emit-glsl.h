@@ -3,7 +3,7 @@
 #define SLANG_EMIT_GLSL_H
 
 #include "slang-emit-c-like.h"
-#include "slang-glsl-extension-tracker.h"
+#include "slang-extension-tracker.h"
 
 namespace Slang
 {
@@ -180,7 +180,7 @@ protected:
 
     Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingEntryPoints;
 
-    RefPtr<GLSLExtensionTracker> m_glslExtensionTracker;
+    RefPtr<ShaderExtensionTracker> m_glslExtensionTracker;
 };
 
 } // namespace Slang

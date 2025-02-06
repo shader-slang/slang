@@ -33,6 +33,9 @@ cmake_policy(SET CMP0091 NEW)
 # tree relocatable
 set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
 
+# Export the compile datebase as a json file, this can be used by VIM language server
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Enable placing targets into a hierarchy for IDE generators
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -334,6 +337,7 @@ add_subdirectory(source/slang-glslang)
 add_subdirectory(tools)
 add_subdirectory(prelude)
 add_subdirectory(source/slang-core-module)
+add_subdirectory(source/slang-glsl-module)
 add_subdirectory(source/slang)
 add_subdirectory(source/slangc)
 add_subdirectory(examples)
@@ -360,7 +364,6 @@ install(
     DESTINATION .
     PATTERN ".*" EXCLUDE
 )
-
 include(CPack)
 
 # Write basic package config version file using standard CMakePackageConfigHelpers utility

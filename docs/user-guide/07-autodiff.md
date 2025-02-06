@@ -21,18 +21,24 @@ In Slang, `fwd_diff` and `bwd_diff` are higher-order functions used to transform
 Forward and backward derivative methods are two different ways of computing a dot product with the Jacobian of a given function.
 Parts of this overview are based on JAX's excellent auto-diff cookbook [here](https://jax.readthedocs.io/en/latest/notebooks/autodiff_cookbook.html#how-it-s-made-two-foundational-autodiff-functions). The relevant [wikipedia article](https://en.wikipedia.org/wiki/Automatic_differentiation) is also a great resource for understanding auto-diff.
  
-The [Jacobian](https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant) (also called the total derivative) of a function $\mathbf{f}(\mathbf{x})$ is represented by $D\mathbf{f}(\mathbf{x})$. 
+The [Jacobian](https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant) (also called the total derivative) of a function $$\mathbf{f}(\mathbf{x})$$ is represented by $$D\mathbf{f}(\mathbf{x})$$. 
 
-For a general function with multiple scalar inputs and multiple scalar outputs, the Jacobian is a _matrix_ where $D\mathbf{f}_{ij}$ represents the [partial derivative](https://en.wikipedia.org/wiki/Partial_derivative) of the $i^{th}$ output element w.r.t the $j^{th}$ input element $\frac{\partial f_i}{\partial x_j}$
+For a general function with multiple scalar inputs and multiple scalar outputs, the Jacobian is a _matrix_ where $$D\mathbf{f}_{ij}$$ represents the [partial derivative](https://en.wikipedia.org/wiki/Partial_derivative) of the $$i^{th}$$ output element w.r.t the $$j^{th}$$ input element $$\frac{\partial f_i}{\partial x_j}$$
 
 As an example, consider a polynomial function
+
 $$ f(x, y) = x^3 + x^2 - y $$
-Here, $f$ here has 1 output and 2 inputs. $Df$ is therefore the row matrix:
+
+Here, $$f$$ here has 1 output and 2 inputs. $$Df$$ is therefore the row matrix:
+
 $$ Df(x, y) = [\frac{\partial f}{\partial x}, \frac{\partial f}{\partial y}] = [3x^2 + 2x, -1] $$
 
-Another, more complex example with a function that has multiple outputs (for clarity, denoted by $f_1$, $f_2$, etc..)
+Another, more complex example with a function that has multiple outputs (for clarity, denoted by $$f_1$$, $$f_2$$, etc..)
+
 $$ \mathbf{f}(x, y) = \begin{bmatrix} f_0(x, y) & f_1(x, y) & f_2(x, y) \end{bmatrix} = \begin{bmatrix} x^3 & y^2x & y^3 \end{bmatrix} $$
-Here, $Df$ is a 3x2 matrix with each element containing a partial derivative:
+
+Here, $$D\mathbf{f}$$ is a 3x2 matrix with each element containing a partial derivative:
+
 $$ D\mathbf{f}(x, y) = \begin{bmatrix} 
 \partial f_0 / \partial x & \partial f_0 / \partial y \\  
 \partial f_1 / \partial x & \partial f_1 / \partial y \\
@@ -46,34 +52,36 @@ y^2   & 2yx \\
 
 Computing full Jacobians is often unnecessary and expensive. Instead, auto-diff offers ways to compute _products_ of the Jacobian with a vector, which is a much faster operation.
 There are two basic ways to compute this product: 
- 1. the Jacobian-vector product $\langle D\mathbf{f}(\mathbf{x}), \mathbf{v} \rangle$, also called forward-mode autodiff, and can be computed using `fwd_diff` operator in Slang, and
- 2. the vector-Jacobian product $\langle \mathbf{v}^T, D\mathbf{f}(\mathbf{x}) \rangle$, also called reverse-mode autodiff, and can be computed using `bwd_diff` operator in Slang. From a linear algebra perspective, this is the transpose of the forward-mode operator. 
+ 1. the Jacobian-vector product $$ \langle D\mathbf{f}(\mathbf{x}), \mathbf{v} \rangle $$, also called forward-mode autodiff, and can be computed using `fwd_diff` operator in Slang, and
+ 2. the vector-Jacobian product $$ \langle \mathbf{v}^T, D\mathbf{f}(\mathbf{x}) \rangle $$, also called reverse-mode autodiff, and can be computed using `bwd_diff` operator in Slang. From a linear algebra perspective, this is the transpose of the forward-mode operator. 
 
 #### Propagating derivatives with forward-mode auto-diff
 The products described above allow the _propagation_ of derivatives forward and backward through the function $f$
 
 The forward-mode derivative (Jacobian-vector product) can convert a derivative of the inputs to a derivative of the outputs. 
-For example, lets say inputs $\mathbf{x}$ depend on some scalar $\theta$, and $\frac{\partial \mathbf{x}}{\partial \theta}$ is a vector of partial derivatives describing that dependency.
+For example, lets say inputs $$\mathbf{x}$$ depend on some scalar $$\theta$$, and $$\frac{\partial \mathbf{x}}{\partial \theta}$$ is a vector of partial derivatives describing that dependency.
 
-Invoking forward-mode auto-diff with $\mathbf{v} = \frac{\partial \mathbf{x}}{\partial \theta}$ converts this into a derivative of the outputs w.r.t the same scalar $\theta$.
+Invoking forward-mode auto-diff with $$\mathbf{v} = \frac{\partial \mathbf{x}}{\partial \theta}$$ converts this into a derivative of the outputs w.r.t the same scalar $$\theta$$.
 This can be verified by expanding the Jacobian and applying the [chain rule](https://en.wikipedia.org/wiki/Chain_rule) of derivatives:
+
 $$\langle D\mathbf{f}(\mathbf{x}), \frac{\partial \mathbf{x}}{\partial \theta} \rangle = \langle \begin{bmatrix} \frac{\partial f_0}{\partial x_0} & \frac{\partial f_0}{\partial x_1} & \cdots \\ \frac{\partial f_1}{\partial x_0} & \frac{\partial f_1}{\partial x_1} & \cdots \\ \cdots & \cdots & \cdots \end{bmatrix}, \begin{bmatrix} \frac{\partial x_0}{\partial \theta} \\ \frac{\partial x_1}{\partial \theta} \\ \cdots \end{bmatrix} \rangle = \begin{bmatrix} \frac{\partial f_0}{\partial \theta} \\ \frac{\partial f_1}{\partial \theta} \\ \cdots \end{bmatrix} = \frac{\partial \mathbf{f}}{\partial \theta}$$
 
 #### Propagating derivatives with reverse-mode auto-diff
 The reverse-mode derivative (vector-Jacobian product) can convert a derivative w.r.t outputs into a derivative w.r.t inputs.
-For example, lets say we have some scalar $\mathcal{L}$ that depends on the outputs $\mathbf{f}$, and $\frac{\partial \mathcal{L}}{\partial \mathbf{f}}$ is a vector of partial derivatives describing that dependency.
+For example, lets say we have some scalar $$\mathcal{L}$$ that depends on the outputs $$\mathbf{f}$$, and $$\frac{\partial \mathcal{L}}{\partial \mathbf{f}}$$ is a vector of partial derivatives describing that dependency.
 
-Invoking forward-mode auto-diff with $\mathbf{v} = \frac{\partial \mathcal{L}}{\partial \mathbf{f}}$ converts this into a derivative of the same scalar $\mathcal{L}$ w.r.t the inputs $\mathbf{x}$.
+Invoking forward-mode auto-diff with $$\mathbf{v} = \frac{\partial \mathcal{L}}{\partial \mathbf{f}}$$ converts this into a derivative of the same scalar $$\mathcal{L}$$ w.r.t the inputs $$\mathbf{x}$$.
 To provide more intuition for this, we can expand the Jacobian in a same way we did above:
+
 $$\langle \frac{\partial \mathcal{L}}{\partial \mathbf{f}}^T, D\mathbf{f}(\mathbf{x}) \rangle = \langle \begin{bmatrix}\frac{\partial \mathcal{L}}{\partial f_0} & \frac{\partial \mathcal{L}}{\partial f_1} & \cdots \end{bmatrix}, \begin{bmatrix} \frac{\partial f_0}{\partial x_0} & \frac{\partial f_0}{\partial x_1} & \cdots \\ \frac{\partial f_1}{\partial x_0} & \frac{\partial f_1}{\partial x_1} & \cdots \\ \cdots & \cdots & \cdots \end{bmatrix} \rangle = \begin{bmatrix} \frac{\partial \mathcal{L}}{\partial x_0} & \frac{\partial \mathcal{L}}{\partial x_1} & \cdots \end{bmatrix} = \frac{\partial \mathcal{L}}{\partial \mathbf{x}}^T$$
 
-This mode is the most popular, since machine learning systems often construct their differentiable pipeline with multiple inputs (which can number in the millions or billions), and a single scalar output often referred to as the 'loss' denoted by $\mathcal{L}$. The desired derivative can be constructed with a single reverse-mode invocation.
+This mode is the most popular, since machine learning systems often construct their differentiable pipeline with multiple inputs (which can number in the millions or billions), and a single scalar output often referred to as the 'loss' denoted by $$\mathcal{L}$$. The desired derivative can be constructed with a single reverse-mode invocation.
 
 ### Invoking auto-diff in Slang
 With the mathematical foundations established, we can describe concretely how to compute derivatives using Slang.
 
 In Slang derivatives are computed using `fwd_diff`/`bwd_diff` which each correspond to Jacobian-vector and vector-Jacobian products.
-For forward-diff, to pass the vector $\mathbf{v}$ and receive the outputs, we use the `DifferentialPair<T>` type. We use pairs of inputs because every input element $x_i$ has a corresponding element $v_i$ in the vector, and each original output element has a corresponding output element in the product.
+For forward-diff, to pass the vector $$\mathbf{v}$$ and receive the outputs, we use the `DifferentialPair<T>` type. We use pairs of inputs because every input element $$x_i$$ has a corresponding element $$v_i$$ in the vector, and each original output element has a corresponding output element in the product.
 
 Example of `fwd_diff`:
 ```csharp
@@ -806,7 +814,7 @@ This forward propagation function takes the initial primal value of `p0` in `p0.
 
 A backward derivative propagation function propagates the derivative of the function output to all the input parameters simultaneously.
 
-Given an original function `f`, the general rule for determining the signature of its backward propagation function is that a differentiable output `o` becomes an input parameter holding the partial derivative of a downstream output with regard to the differentiable output, i.e. $\partial y/\partial o$; an input differentiable parameter `i` in the original function will become an output in the backward propagation function, holding the propagated partial derivative $\partial y/\partial i$; and any non-differentiable outputs are dropped from the backward propagation function. This means that the backward propagation function never returns any values computed in the original function.
+Given an original function `f`, the general rule for determining the signature of its backward propagation function is that a differentiable output `o` becomes an input parameter holding the partial derivative of a downstream output with regard to the differentiable output, i.e. $$\partial y/\partial o$$; an input differentiable parameter `i` in the original function will become an output in the backward propagation function, holding the propagated partial derivative $$\partial y/\partial i$$; and any non-differentiable outputs are dropped from the backward propagation function. This means that the backward propagation function never returns any values computed in the original function.
 
 More specifically, the signature of its backward propagation function is determined using the following rules:
 - A backward propagation function always returns `void`.

@@ -2,7 +2,6 @@
 #include "slang-ir-spirv-legalize.h"
 
 #include "slang-emit-base.h"
-#include "slang-glsl-extension-tracker.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-composite-reg-to-mem.h"

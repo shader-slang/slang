@@ -9,6 +9,8 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
+
 #version 430
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
@@ -21,32 +23,72 @@ layout(local_size_x = 32) in;
 
 shared uint shareMem;
 
+[[ForceInline]]
+void _barrier()
+{
+#if !defined(WGPU)
+    subgroupBarrier();
+#else
+    GroupMemoryBarrier();
+#endif
+}
+
+[[ForceInline]]
+void _memoryBarrier()
+{
+#if !defined(WGPU)
+    subgroupMemoryBarrier();
+#else
+    GroupMemoryBarrier();
+#endif
+}
+
+[[ForceInline]]
+void _memoryBarrierShared()
+{
+#if !defined(WGPU)
+    subgroupMemoryBarrierShared();
+#else
+    GroupMemoryBarrier();
+#endif
+}
+
+[[ForceInline]]
+void _memoryBarrierBuffer()
+{
+#if !defined(WGPU)
+    subgroupMemoryBarrierBuffer();
+#else
+    GroupMemoryBarrier();
+#endif
+}
+
 void computeMain()
 {
     // TODO: no test for image memory was done -- subgroupMemoryBarrierImage();
     // tests are seperate since concurrency testing
 
     shareMem = 100;
-    subgroupMemoryBarrierShared();
+    _memoryBarrierShared();
     outputBuffer.data[0] = 1;
-    subgroupBarrier();
+    _barrier();
     outputBuffer.data[0] = 2;
-    subgroupBarrier();
+    _barrier();
 
     outputBuffer.data[1] = 1;
-    subgroupMemoryBarrier();
+    _memoryBarrier();
     outputBuffer.data[1] = 2;
-    subgroupBarrier();
+    _barrier();
 
     outputBuffer.data[2] = 1;
-    subgroupMemoryBarrierBuffer();
+    _memoryBarrierBuffer();
     outputBuffer.data[2] = 2;
-    subgroupBarrier();
+    _barrier();
 
     shareMem = 2;
-    subgroupMemoryBarrierShared();
+    _memoryBarrierShared();
     outputBuffer.data[3] = shareMem;
-    subgroupBarrier();
+    _barrier();
 
     if (subgroupElect()) {
         outputBuffer.data[4] = gl_GlobalInvocationID.x + 2;

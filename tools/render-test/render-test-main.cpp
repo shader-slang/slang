@@ -13,6 +13,10 @@
 #include "slang-support.h"
 #include "window.h"
 
+#if defined(_WIN32)
+#include <d3d12.h>
+#endif
+
 #include <slang-rhi.h>
 #include <slang-rhi/acceleration-structure-utils.h>
 #include <slang-rhi/shader-cursor.h>
@@ -1391,6 +1395,20 @@ static SlangResult _innerMain(
         desc.requiredFeatures = requiredFeatureList.getBuffer();
         desc.requiredFeatureCount = (int)requiredFeatureList.getCount();
 
+#if defined(_WIN32)
+        // When the experimental feature is enabled, things become unstable.
+        // It is enabled only when requested.
+        D3D12ExperimentalFeaturesDesc experimentalFD = {};
+        UUID features[1] = {D3D12ExperimentalShaderModels};
+        experimentalFD.featureCount = 1;
+        experimentalFD.featureIIDs = features;
+        experimentalFD.configurationStructs = nullptr;
+        experimentalFD.configurationStructSizes = nullptr;
+
+        if (options.dx12Experimental)
+            desc.next = &experimentalFD;
+#endif
+
         // Look for args going to slang
         {
             const auto& args = options.downstreamArgs.getArgsByName("slang");
@@ -1404,10 +1422,11 @@ static SlangResult _innerMain(
             }
         }
 
-        desc.nvapiExtnSlot = int(nvapiExtnSlot);
+        desc.nvapiExtUavSlot = uint32_t(nvapiExtnSlot);
         desc.slang.slangGlobalSession = session;
         desc.slang.targetProfile = options.profileName.getBuffer();
         {
+            getRHI()->enableDebugLayers();
             SlangResult res = getRHI()->createDevice(desc, device.writeRef());
             if (SLANG_FAILED(res))
             {

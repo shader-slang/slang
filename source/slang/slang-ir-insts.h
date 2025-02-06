@@ -422,6 +422,15 @@ struct IRRequireGLSLExtensionDecoration : IRDecoration
     UnownedStringSlice getExtensionName() { return getExtensionNameOperand()->getStringSlice(); }
 };
 
+struct IRRequireWGSLExtensionDecoration : IRDecoration
+{
+    IR_LEAF_ISA(RequireWGSLExtensionDecoration)
+
+    IRStringLit* getExtensionNameOperand() { return cast<IRStringLit>(getOperand(0)); }
+
+    UnownedStringSlice getExtensionName() { return getExtensionNameOperand()->getStringSlice(); }
+};
+
 struct IRMemoryQualifierSetDecoration : IRDecoration
 {
     enum
@@ -504,6 +513,17 @@ struct IRNVAPISlotDecoration : IRDecoration
 
     IRStringLit* getSpaceNameOperand() { return cast<IRStringLit>(getOperand(1)); }
     UnownedStringSlice getSpaceName() { return getSpaceNameOperand()->getStringSlice(); }
+};
+
+struct IRMaxTessFactorDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_MaxTessFactorDecoration
+    };
+    IR_LEAF_ISA(MaxTessFactorDecoration)
+
+    IRFloatLit* getMaxTessFactor() { return cast<IRFloatLit>(getOperand(0)); }
 };
 
 struct IROutputControlPointsDecoration : IRDecoration
@@ -3647,6 +3667,7 @@ public:
     IRBasicType* getUInt64Type();
     IRBasicType* getUInt16Type();
     IRBasicType* getUInt8Type();
+    IRBasicType* getFloatType();
     IRBasicType* getCharType();
     IRStringType* getStringType();
     IRNativeStringType* getNativeStringType();
@@ -4790,6 +4811,11 @@ public:
             value,
             kIROp_RequireGLSLVersionDecoration,
             getIntValue(getIntType(), IRIntegerValue(version)));
+    }
+
+    void addRequireWGSLExtensionDecoration(IRInst* value, UnownedStringSlice const& extensionName)
+    {
+        addDecoration(value, kIROp_RequireWGSLExtensionDecoration, getStringValue(extensionName));
     }
 
     void addRequirePreludeDecoration(

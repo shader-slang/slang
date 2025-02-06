@@ -9,7 +9,7 @@ namespace Slang
 class DiagnosticSink;
 class Session;
 
-class GLSLExtensionTracker;
+class ShaderExtensionTracker;
 
 struct IRFunc;
 struct IRModule;
@@ -19,7 +19,7 @@ void legalizeEntryPointsForGLSL(
     IRModule* module,
     const List<IRFunc*>& func,
     CodeGenContext* context,
-    GLSLExtensionTracker* glslExtensionTracker);
+    ShaderExtensionTracker* glslExtensionTracker);
 
 void legalizeConstantBufferLoadForGLSL(IRModule* module);
 

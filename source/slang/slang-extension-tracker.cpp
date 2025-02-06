@@ -1,10 +1,10 @@
-// slang-glsl-extension-tracker.cpp
-#include "slang-glsl-extension-tracker.h"
+// slang-extension-tracker.cpp
+#include "slang-extension-tracker.h"
 
 namespace Slang
 {
 
-void GLSLExtensionTracker::appendExtensionRequireLines(StringBuilder& ioBuilder) const
+void ShaderExtensionTracker::appendExtensionRequireLinesForGLSL(StringBuilder& ioBuilder) const
 {
     for (const auto& extension : m_extensionPool.getSlices())
     {
@@ -14,7 +14,17 @@ void GLSLExtensionTracker::appendExtensionRequireLines(StringBuilder& ioBuilder)
     }
 }
 
-void GLSLExtensionTracker::requireSPIRVVersion(const SemanticVersion& version)
+void ShaderExtensionTracker::appendExtensionRequireLinesForWGSL(StringBuilder& ioBuilder) const
+{
+    for (const auto& extension : m_extensionPool.getSlices())
+    {
+        ioBuilder.append("enable ");
+        ioBuilder.append(extension);
+        ioBuilder.append(";\n");
+    }
+}
+
+void ShaderExtensionTracker::requireSPIRVVersion(const SemanticVersion& version)
 {
     if (version > m_spirvVersion)
     {
@@ -22,7 +32,7 @@ void GLSLExtensionTracker::requireSPIRVVersion(const SemanticVersion& version)
     }
 }
 
-void GLSLExtensionTracker::requireVersion(ProfileVersion version)
+void ShaderExtensionTracker::requireVersion(ProfileVersion version)
 {
     // Check if this profile is newer
     if ((UInt)version > (UInt)m_profileVersion)
@@ -31,7 +41,7 @@ void GLSLExtensionTracker::requireVersion(ProfileVersion version)
     }
 }
 
-void GLSLExtensionTracker::requireBaseTypeExtension(BaseType baseType)
+void ShaderExtensionTracker::requireBaseTypeExtension(BaseType baseType)
 {
     uint32_t bit = 1 << int(baseType);
     if (m_hasBaseTypeFlags & bit)

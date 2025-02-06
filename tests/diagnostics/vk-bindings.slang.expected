@@ -6,6 +6,12 @@ Texture2D t : register(t0);
 tests/diagnostics/vk-bindings.slang(14): error 39015: shader parameter 'b' consumes whole descriptor sets, so the binding must be in the form '[[vk::binding(0, ...)]]'; the non-zero binding '2' is not allowed
 [[vk::binding(2,1)]]
       ^~~~~~~
+tests/diagnostics/vk-bindings.slang(18): warning 39001: explicit binding for parameter 'gint' overlaps with parameter 't'
+ConstantBuffer<int> gint : register(b0, space0);
+                    ^~~~
+tests/diagnostics/vk-bindings.slang(6): note: see declaration of 't'
+Texture2D t : register(t0);
+          ^
 }
 standard output = {
 }

@@ -9822,6 +9822,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             getBuilder()->addRequireSPIRVVersionDecoration(inst, versionMod->version);
         }
+        for (auto extensionMod : decl->getModifiersOfType<RequiredWGSLExtensionModifier>())
+        {
+            getBuilder()->addRequireWGSLExtensionDecoration(
+                inst,
+                extensionMod->extensionNameToken.getContent());
+        }
         for (auto versionMod : decl->getModifiersOfType<RequiredCUDASMVersionModifier>())
         {
             getBuilder()->addRequireCUDASMVersionDecoration(inst, versionMod->version);
@@ -9978,6 +9984,24 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             addNameHint(context, inst, "this");
         }
+    }
+
+    IRFloatLit* _getFloatFromAttribute(IRBuilder* builder, Attribute* attrib, Index index = 0)
+    {
+        SLANG_ASSERT(attrib->args.getCount() > index);
+        Expr* expr = attrib->args[index];
+
+        if (auto floatLitExpr = as<FloatingPointLiteralExpr>(expr))
+        {
+            return as<IRFloatLit>(
+                builder->getFloatValue(builder->getFloatType(), floatLitExpr->value));
+        }
+
+        auto intLitExpr = as<IntegerLiteralExpr>(expr);
+        SLANG_ASSERT(intLitExpr);
+        return as<IRFloatLit>(builder->getFloatValue(
+            builder->getFloatType(),
+            (IRFloatingPointValue)(intLitExpr->value)));
     }
 
     IRIntLit* _getIntLitFromAttribute(IRBuilder* builder, Attribute* attrib, Index index = 0)
@@ -10324,7 +10348,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 }
 
                 // Used for diagnostics
-                getBuilder()->addConstructorDecoration(irFunc, constructorDecl->isSynthesized);
+                getBuilder()->addConstructorDecoration(
+                    irFunc,
+                    constructorDecl->containsFlavor(
+                        ConstructorDecl::ConstructorFlavor::SynthesizedDefault));
             }
 
             // We lower whatever statement was stored on the declaration
@@ -10511,6 +10538,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), outputTopAttr);
                 getBuilder()->addDecoration(irFunc, kIROp_OutputTopologyDecoration, stringLit);
             }
+            else if (auto maxTessFactortAttr = as<MaxTessFactorAttribute>(modifier))
+            {
+                IRFloatLit* floatLit = _getFloatFromAttribute(getBuilder(), maxTessFactortAttr);
+                getBuilder()->addDecoration(irFunc, kIROp_MaxTessFactorDecoration, floatLit);
+            }
             else if (auto outputCtrlPtAttr = as<OutputControlPointsAttribute>(modifier))
             {
                 IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), outputCtrlPtAttr);
@@ -10634,6 +10666,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
             else if (auto spvVersion = as<RequiredSPIRVVersionModifier>(modifier))
                 getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
+            else if (auto wgslExtensionMod = as<RequiredWGSLExtensionModifier>(modifier))
+                getBuilder()->addRequireWGSLExtensionDecoration(
+                    irFunc,
+                    wgslExtensionMod->extensionNameToken.getContent());
             else if (auto cudasmVersion = as<RequiredCUDASMVersionModifier>(modifier))
                 getBuilder()->addRequireCUDASMVersionDecoration(irFunc, cudasmVersion->version);
             else if (as<NonDynamicUniformAttribute>(modifier))
