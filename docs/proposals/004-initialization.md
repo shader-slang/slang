@@ -198,13 +198,18 @@ void test()
 
 If the above code passes type check, then it will be used as the way to initialize `obj`.
 
-If the above code does not pass type check, and if there is only one constructor for`MyType` that is synthesized as described in the previous section (and therefore marked as `[Synthesized]`, Slang continues to check if `S` meets the standard of a "legacy C-style struct` type.
-A type is a "legacy C-Style struct" if all of the following conditions are met:
-- It is a user-defined struct type or an enum, a basic scalar, vector or matrix type, e.g. `int`, `float4x4`.
+If the above code does not pass type check, and if there is only one constructor for`MyType` that is synthesized as described in the previous section (and therefore marked as `[Synthesized]`, Slang continues to check if `S` meets the standard of a "legacy C-style struct` type. A type is a "legacy C-Style" type if it is a:
+- Basic scalar type (e.g. `int`, `float`).
+- Enum type.
+- Sized array type where the element type is C-style type.
+- Tuple type where all member types are C-style types.
+- A "C-Style" struct.
+
+A struct is C-Style if all of the following conditions are met:
 - It does not inherit from any other types.
 - It does not contain any explicit constructors defined by the user.
 - All its members have the same visibility as the type itself.
-- All its members are legacy C-Style structs or arrays of legacy C-style structs.
+- All its members are legacy C-Style types.
 Note that C-Style structs are allowed to have member default values.
 In such case, we perform a legacy "read data" style consumption of the initializer list to synthesize the arguments to call the constructor, so that the following behavior is valid:
 
