@@ -3209,6 +3209,11 @@ void IRBuilder::setDataType(IRInst* inst, IRType* dataType)
     }
 }
 
+IRInst* IRBuilder::emitGetCurrentStage()
+{
+    return emitIntrinsicInst(getIntType(), kIROp_GetCurrentStage, 0, nullptr);
+}
+
 IRInst* IRBuilder::emitGetValueFromBoundInterface(IRType* type, IRInst* boundInterfaceValue)
 {
     auto inst =
@@ -8301,6 +8306,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ResolveVaryingInputRef:
     case kIROp_GetPerVertexInputArray:
     case kIROp_MetalCastToDepthTexture:
+    case kIROp_GetCurrentStage:
         return false;
 
     case kIROp_ForwardDifferentiate:
