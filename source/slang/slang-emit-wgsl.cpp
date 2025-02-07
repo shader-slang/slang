@@ -1325,9 +1325,9 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             if (inst->getOp() == kIROp_And)
             {
-                m_writer->emit(" select(");
+                m_writer->emit("select(");
                 emitType(inst->getDataType());
-                m_writer->emit("(false),");
+                m_writer->emit("(false), ");
                 emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
                 m_writer->emit(", ");
                 emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
@@ -1335,7 +1335,7 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             else
             {
-                m_writer->emit(" select(");
+                m_writer->emit("select(");
                 emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
                 m_writer->emit(", ");
                 emitType(inst->getDataType());

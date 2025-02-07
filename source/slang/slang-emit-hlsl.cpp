@@ -838,15 +838,35 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
             if (inst->getOp() == kIROp_And)
             {
-                m_writer->emit(" and(");
+                m_writer->emit("and(");
             }
             else
             {
-                m_writer->emit(" or(");
+                m_writer->emit("or(");
             }
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(", ");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
+    case kIROp_Select:
+        {
+            // SM6.0 requires to use `select()` instead of the ternary operator "?:" when the
+            // operands are non-scalar.
+            auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
+            if (targetProfile.getVersion() < ProfileVersion::DX_6_0)
+                return false;
+
+            if (as<IRBasicType>(inst->getDataType()))
+                return false;
+
+            m_writer->emit("select(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
             m_writer->emit(")");
             return true;
         }
