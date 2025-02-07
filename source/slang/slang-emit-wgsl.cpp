@@ -1312,6 +1312,40 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
         break;
 
+    case kIROp_And:
+    case kIROp_Or:
+        {
+            // WGSL doesn't have operator overloadings for `&&` and `||` when the operands are
+            // non-scalar. Unlike HLSL, WGSL doesn't have `and()` and `or()`.
+            if (as<IRBasicType>(inst->getDataType()))
+                return false;
+
+            const auto emitOp = getEmitOpForOp(inst->getOp());
+            const auto info = getInfo(emitOp);
+
+            if (inst->getOp() == kIROp_And)
+            {
+                m_writer->emit(" select(");
+                emitType(inst->getDataType());
+                m_writer->emit("(false),");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(", ");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+                m_writer->emit(")");
+            }
+            else
+            {
+                m_writer->emit(" select(");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(", ");
+                emitType(inst->getDataType());
+                m_writer->emit("(true), ");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+                m_writer->emit(")");
+            }
+            return true;
+        }
+
     case kIROp_BitCast:
         {
             // In WGSL there is a built-in bitcast function!
