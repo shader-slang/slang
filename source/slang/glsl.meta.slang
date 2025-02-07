@@ -4857,7 +4857,7 @@ public property int gl_InstanceID
             setupExtForRayTracingBuiltIn();
             return InstanceIndex();
         default:
-            return __gl_InstanceIndex;
+            return gl_InstanceIndex;
         }
     }
 }
