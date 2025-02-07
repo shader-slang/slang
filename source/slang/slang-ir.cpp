@@ -2678,6 +2678,11 @@ IRBasicType* IRBuilder::getUInt8Type()
     return (IRBasicType*)getType(kIROp_UInt8Type);
 }
 
+IRBasicType* IRBuilder::getFloatType()
+{
+    return (IRBasicType*)getType(kIROp_FloatType);
+}
+
 IRBasicType* IRBuilder::getCharType()
 {
     return (IRBasicType*)getType(kIROp_CharType);
@@ -3202,6 +3207,11 @@ void IRBuilder::setDataType(IRInst* inst, IRType* dataType)
         // No rate? Just clobber the data type.
         inst->setFullType(dataType);
     }
+}
+
+IRInst* IRBuilder::emitGetCurrentStage()
+{
+    return emitIntrinsicInst(getIntType(), kIROp_GetCurrentStage, 0, nullptr);
 }
 
 IRInst* IRBuilder::emitGetValueFromBoundInterface(IRType* type, IRInst* boundInterfaceValue)
@@ -8296,6 +8306,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ResolveVaryingInputRef:
     case kIROp_GetPerVertexInputArray:
     case kIROp_MetalCastToDepthTexture:
+    case kIROp_GetCurrentStage:
         return false;
 
     case kIROp_ForwardDifferentiate:

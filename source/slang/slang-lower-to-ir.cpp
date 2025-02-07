@@ -4701,6 +4701,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             return LoweredValInfo::simple(getBuilder()->getNullPtrValue(irType));
         }
+        else if (auto tupleType = as<TupleType>(type))
+        {
+            List<IRInst*> args;
+            for (Index i = 0; i < tupleType->getMemberCount(); i++)
+            {
+                args.add(getSimpleVal(context, getDefaultVal(tupleType->getMember(i))));
+            }
+            return LoweredValInfo::simple(
+                getBuilder()->emitMakeTuple(irType, args.getCount(), args.getBuffer()));
+        }
         else if (auto declRefType = as<DeclRefType>(type))
         {
             DeclRef<Decl> declRef = declRefType->getDeclRef();
@@ -4925,9 +4935,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                         args.add(irDefaultValue);
                     }
                 }
-
-                return LoweredValInfo::simple(
-                    getBuilder()->emitMakeStruct(irType, args.getCount(), args.getBuffer()));
+                if (as<TupleType>(type))
+                {
+                    return LoweredValInfo::simple(
+                        getBuilder()->emitMakeTuple(irType, args.getCount(), args.getBuffer()));
+                }
+                else
+                {
+                    return LoweredValInfo::simple(
+                        getBuilder()->emitMakeStruct(irType, args.getCount(), args.getBuffer()));
+                }
             }
         }
 
@@ -6700,6 +6717,102 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 info->anythingEmittedToCurrentCaseBlock = true;
             }
         }
+    }
+
+    void visitStageSwitchStmt(StageSwitchStmt* stmt)
+    {
+        if (!stmt->targetCases.getCount())
+            return;
+
+        // We will lower stage switch as a normal switch statement, so they can participate in all
+        // optimizations.
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+
+        // First emit code to get the current stage to switch on:
+        auto conditionVal = builder->emitGetCurrentStage();
+
+        // Remember the initial block so that we can add to it
+        // after we've collected all the `case`s
+        auto initialBlock = builder->getBlock();
+
+        // Next, create a block to use as the target for any `break` statements
+        auto breakLabel = createBlock();
+
+        // Register the `break` label so
+        // that we can find it for nested statements.
+        context->shared->breakLabels.add(stmt, breakLabel);
+
+        builder->setInsertInto(initialBlock->getParent());
+
+        // Iterate over the body of the statement, looking
+        // for `case` or `default` statements:
+        SwitchStmtInfo info;
+        info.initialBlock = initialBlock;
+        info.defaultLabel = nullptr;
+
+        Dictionary<Stmt*, IRBlock*> mapCaseStmtToBlock;
+        for (auto targetCase : stmt->targetCases)
+        {
+            IRBlock* caseBlock = nullptr;
+            if (!mapCaseStmtToBlock.tryGetValue(targetCase->body, caseBlock))
+            {
+                caseBlock = builder->emitBlock();
+                lowerStmt(context, targetCase->body);
+                mapCaseStmtToBlock.add(targetCase->body, caseBlock);
+                if (!builder->getBlock()->getTerminator())
+                    builder->emitBranch(breakLabel);
+            }
+            if (targetCase->capability == 0)
+            {
+                info.defaultLabel = caseBlock;
+            }
+            else
+            {
+                auto stage = getStageFromAtom((CapabilityAtom)targetCase->capability);
+                info.cases.add(builder->getIntValue(builder->getIntType(), (IRIntegerValue)stage));
+                info.cases.add(caseBlock);
+            }
+        }
+
+        // If the current block (the end of the last
+        // `case`) is not terminated, then terminate with a
+        // `break` operation.
+        //
+        // Double check that we aren't in the initial
+        // block, so we don't get tripped up on an
+        // empty `switch`.
+        auto curBlock = builder->getBlock();
+        if (curBlock != initialBlock)
+        {
+            // Is the block already terminated?
+            if (!curBlock->getTerminator())
+            {
+                // Not terminated, so add one.
+                builder->emitBreak(breakLabel);
+            }
+        }
+
+        // If there was no `default` statement, then the
+        // default case will just branch directly to the end.
+        auto defaultLabel = info.defaultLabel ? info.defaultLabel : breakLabel;
+
+        // Now that we've collected the cases, we are
+        // prepared to emit the `switch` instruction
+        // itself.
+        builder->setInsertInto(initialBlock);
+        builder->emitSwitch(
+            conditionVal,
+            breakLabel,
+            defaultLabel,
+            info.cases.getCount(),
+            info.cases.getBuffer());
+
+        // Finally we insert the label that a `break` will jump to
+        // (and that control flow will fall through to otherwise).
+        // This is the block that subsequent code will go into.
+        insertBlock(breakLabel);
+        context->shared->breakLabels.remove(stmt);
     }
 
     void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
@@ -9986,6 +10099,24 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
     }
 
+    IRFloatLit* _getFloatFromAttribute(IRBuilder* builder, Attribute* attrib, Index index = 0)
+    {
+        SLANG_ASSERT(attrib->args.getCount() > index);
+        Expr* expr = attrib->args[index];
+
+        if (auto floatLitExpr = as<FloatingPointLiteralExpr>(expr))
+        {
+            return as<IRFloatLit>(
+                builder->getFloatValue(builder->getFloatType(), floatLitExpr->value));
+        }
+
+        auto intLitExpr = as<IntegerLiteralExpr>(expr);
+        SLANG_ASSERT(intLitExpr);
+        return as<IRFloatLit>(builder->getFloatValue(
+            builder->getFloatType(),
+            (IRFloatingPointValue)(intLitExpr->value)));
+    }
+
     IRIntLit* _getIntLitFromAttribute(IRBuilder* builder, Attribute* attrib, Index index = 0)
     {
         SLANG_ASSERT(attrib->args.getCount() > index);
@@ -10519,6 +10650,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), outputTopAttr);
                 getBuilder()->addDecoration(irFunc, kIROp_OutputTopologyDecoration, stringLit);
+            }
+            else if (auto maxTessFactortAttr = as<MaxTessFactorAttribute>(modifier))
+            {
+                IRFloatLit* floatLit = _getFloatFromAttribute(getBuilder(), maxTessFactortAttr);
+                getBuilder()->addDecoration(irFunc, kIROp_MaxTessFactorDecoration, floatLit);
             }
             else if (auto outputCtrlPtAttr = as<OutputControlPointsAttribute>(modifier))
             {

@@ -1678,6 +1678,7 @@ public:
 
     AttributeDecl* lookUpAttributeDecl(Name* attributeName, Scope* scope);
 
+    bool hasFloatArgs(Attribute* attr, int numArgs);
     bool hasIntArgs(Attribute* attr, int numArgs);
     bool hasStringArgs(Attribute* attr, int numArgs);
 

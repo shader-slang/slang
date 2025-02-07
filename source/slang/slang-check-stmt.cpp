@@ -367,6 +367,40 @@ void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
     HashSet<Stmt*> checkedStmt;
     for (auto caseStmt : stmt->targetCases)
     {
+        CapabilitySet set((CapabilityName)caseStmt->capability);
+
+        CapabilityName canonicalStage = CapabilityName::Invalid;
+        bool isStage = isStageAtom((CapabilityName)caseStmt->capability, canonicalStage);
+        if (as<StageSwitchStmt>(stmt))
+        {
+            if (!isStage && caseStmt->capability != 0)
+            {
+                getSink()->diagnose(
+                    caseStmt->capabilityToken.loc,
+                    Diagnostics::unknownStageName,
+                    caseStmt->capabilityToken);
+            }
+            caseStmt->capability = (int)canonicalStage;
+        }
+        else
+        {
+            if (isStage)
+            {
+                getSink()->diagnose(
+                    caseStmt->capabilityToken.loc,
+                    Diagnostics::targetSwitchCaseCannotBeAStage);
+            }
+            else if (
+                caseStmt->capabilityToken.getContentLength() != 0 &&
+                (set.getCapabilityTargetSets().getCount() != 1 || set.isInvalid() || set.isEmpty()))
+            {
+                getSink()->diagnose(
+                    caseStmt->capabilityToken.loc,
+                    Diagnostics::invalidTargetSwitchCase,
+                    capabilityNameToString((CapabilityName)caseStmt->capability));
+            }
+        }
+
         if (checkedStmt.contains(caseStmt->body))
             continue;
         subContext.checkStmt(caseStmt);
@@ -377,22 +411,12 @@ void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
 void SemanticsStmtVisitor::visitTargetCaseStmt(TargetCaseStmt* stmt)
 {
     auto switchStmt = FindOuterStmt<TargetSwitchStmt>();
-    CapabilitySet set((CapabilityName)stmt->capability);
     if (getShared()->isInLanguageServer() &&
         getShared()->getSession()->getCompletionRequestTokenName() ==
             stmt->capabilityToken.getName())
     {
         getShared()->getLinkage()->contentAssistInfo.completionSuggestions.scopeKind =
             CompletionSuggestions::ScopeKind::Capabilities;
-    }
-
-    if (stmt->capabilityToken.getContentLength() != 0 &&
-        (set.getCapabilityTargetSets().getCount() != 1 || set.isInvalid() || set.isEmpty()))
-    {
-        getSink()->diagnose(
-            stmt->capabilityToken.loc,
-            Diagnostics::invalidTargetSwitchCase,
-            capabilityNameToString((CapabilityName)stmt->capability));
     }
     if (!switchStmt)
     {

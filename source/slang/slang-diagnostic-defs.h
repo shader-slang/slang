@@ -561,6 +561,13 @@ DIAGNOSTIC(
     Error,
     spirvUndefinedId,
     "SPIRV id '%$0' is not defined in the current assembly block location")
+
+DIAGNOSTIC(
+    29115,
+    Error,
+    targetSwitchCaseCannotBeAStage,
+    "cannot use a stage name in '__target_switch', use '__stage_switch' for stage-specific code.")
+
 //
 // 3xxxx - Semantic analysis
 //
@@ -1044,6 +1051,12 @@ DIAGNOSTIC(
     Error,
     attributeExpectedStringArg,
     "attribute '$0' expects argument $1 to be string")
+
+DIAGNOSTIC(
+    31009,
+    Error,
+    expectedSingleFloatArg,
+    "attribute '$0' expects a single floating point argument")
 
 DIAGNOSTIC(31100, Error, unknownStageName, "unknown stage name '$0'")
 DIAGNOSTIC(31101, Error, unknownImageFormatName, "unknown image format '$0'")
