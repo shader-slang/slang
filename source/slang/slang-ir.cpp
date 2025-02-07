@@ -6015,6 +6015,20 @@ IRInst* IRBuilder::emitShl(IRType* type, IRInst* left, IRInst* right)
     return inst;
 }
 
+IRInst* IRBuilder::emitAnd(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_And, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitOr(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_Or, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
 IRInst* IRBuilder::emitGetNativePtr(IRInst* value)
 {
     auto valueType = value->getDataType();

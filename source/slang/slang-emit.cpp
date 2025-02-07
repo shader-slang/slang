@@ -52,6 +52,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-legalize-array-return-type.h"
+#include "slang-ir-legalize-binary-operator.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-mesh-outputs.h"
@@ -1459,6 +1460,9 @@ Result linkAndOptimizeIR(
     {
         floatNonUniformResourceIndex(irModule, NonUniformResourceIndexFloatMode::Textual);
     }
+
+    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) || isWGPUTarget(targetRequest))
+        legalizeLogicalAndOr(irModule->getModuleInst());
 
     // Legalize non struct parameters that are expected to be structs for HLSL.
     if (isD3DTarget(targetRequest))

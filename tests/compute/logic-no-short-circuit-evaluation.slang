@@ -1,10 +1,11 @@
 //TEST(compute):SIMPLE(filecheck=SM5):-target hlsl -profile cs_5_1 -entry computeMain
 //TEST(compute):SIMPLE(filecheck=SM6):-target hlsl -profile cs_6_0 -entry computeMain
 //TEST(compute):SIMPLE(filecheck=WGSL):-target wgsl -stage compute -entry computeMain
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-slang -compute -shaderobj -xslang -Wno-30056
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-vk -compute  -shaderobj -xslang -Wno-30056
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cuda -compute -shaderobj -xslang -Wno-30056
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cpu -compute -shaderobj -xslang -Wno-30056
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-slang -compute -shaderobj -output-using-type -xslang -Wno-30056
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-vk -compute  -shaderobj -output-using-type -xslang -Wno-30056
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-mtl -compute  -shaderobj -output-using-type -xslang -Wno-30056
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cuda -compute -shaderobj -output-using-type -xslang -Wno-30056
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cpu -compute -shaderobj -output-using-type -xslang -Wno-30056
 
 // Testnig logical-AND, logical-OR and ternary operator with non-scalar operands
 
@@ -15,7 +16,7 @@ static int result = 0;
 
 bool2 assignFunc(int index)
 {
-    result++;
+    result += 10;
     return bool2(true);
 }
 
@@ -24,25 +25,29 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int index = dispatchThreadID.x;
 
+    // No short-circuiting for vector types
+
     //SM5:(all({{.*}}&&
     //SM6:(all(and(
-    //WGSL:(all(select(vec2<bool>(false),
+    //WGSL:(all( select(vec2<bool>(false),
     if (all(bool2(index >= 1) && assignFunc(index)))
     {
         result++;
     }
 
+    // Intentionally using non-boolean type for testing.
+
     //SM5:(all({{.*}}||
-    //SM6:(all(or(
-    //WGSL:(all(select({{.*}}vec2<bool>(true),
-    if (all(bool2(index >= 2) || !assignFunc(index)))
+    //SM6:(or(vector<bool,2>(
+    //WGSL:( select({{.*}}, vec2<bool>(true), vec2<bool>(
+    if (all(int2(index >= 2) || !assignFunc(index)))
     {
         result++;
     }
 
     //SM5:(all({{.*}}?{{.*}}:
-    //SM6:(all(select({{ *}}
-    //WGSL:(all(select(
+    //SM6:(all(select(
+    //WGSL:(all(select(vec2<bool>(false),
     if (all(bool2(index >= 3) ? assignFunc(index) : bool2(false)))
     {
         result++;
@@ -50,8 +55,8 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 
     outputBuffer[index] = result;
 
-    //CHK:3
-    //CHK-NEXT:4
-    //CHK-NEXT:5
-    //CHK-NEXT:6
+    //CHK:30
+    //CHK-NEXT:31
+    //CHK-NEXT:32
+    //CHK-NEXT:33
 }

@@ -4518,6 +4518,9 @@ public:
     IRInst* emitShr(IRType* type, IRInst* op0, IRInst* op1);
     IRInst* emitShl(IRType* type, IRInst* op0, IRInst* op1);
 
+    IRInst* emitAnd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitOr(IRType* type, IRInst* left, IRInst* right);
+
     IRSPIRVAsmOperand* emitSPIRVAsmOperandLiteral(IRInst* literal);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandInst(IRInst* inst);
     IRSPIRVAsmOperand* createSPIRVAsmOperandInst(IRInst* inst);
