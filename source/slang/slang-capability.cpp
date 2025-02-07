@@ -100,6 +100,45 @@ bool isDirectChildOfAbstractAtom(CapabilityAtom name)
     return _getInfo(name).abstractBase != CapabilityName::Invalid;
 }
 
+bool isStageAtom(CapabilityName name, CapabilityName& outCanonicalStage)
+{
+    auto& info = _getInfo(name);
+    if (info.abstractBase == CapabilityName::stage)
+    {
+        outCanonicalStage = name;
+        return true;
+    }
+    switch (name)
+    {
+    case CapabilityName::anyhit:
+        outCanonicalStage = CapabilityName::_anyhit;
+        return true;
+    case CapabilityName::closesthit:
+        outCanonicalStage = CapabilityName::_closesthit;
+        return true;
+    case CapabilityName::miss:
+        outCanonicalStage = CapabilityName::_miss;
+        return true;
+    case CapabilityName::intersection:
+        outCanonicalStage = CapabilityName::_intersection;
+        return true;
+    case CapabilityName::raygen:
+        outCanonicalStage = CapabilityName::_raygen;
+        return true;
+    case CapabilityName::callable:
+        outCanonicalStage = CapabilityName::_callable;
+        return true;
+    case CapabilityName::mesh:
+        outCanonicalStage = CapabilityName::_mesh;
+        return true;
+    case CapabilityName::amplification:
+        outCanonicalStage = CapabilityName::_amplification;
+        return true;
+    default:
+        return false;
+    }
+}
+
 bool isTargetVersionAtom(CapabilityAtom name)
 {
     if (name >= CapabilityAtom::_spirv_1_0 && name <= getLatestSpirvAtom())
@@ -620,7 +659,26 @@ CapabilitySet CapabilitySet::getTargetsThisHasButOtherDoesNot(const CapabilitySe
         if (other.m_targetSets.tryGetValue(i.first))
             continue;
 
-        newSet.m_targetSets[i.first] = this->m_targetSets[i.first];
+        newSet.m_targetSets[i.first] = i.second;
+    }
+    return newSet;
+}
+
+CapabilitySet CapabilitySet::getStagesThisHasButOtherDoesNot(const CapabilitySet& other)
+{
+    CapabilitySet newSet{};
+    for (auto& i : this->m_targetSets)
+    {
+        if (auto otherTarget = other.m_targetSets.tryGetValue(i.first))
+        {
+            auto& thisTarget = m_targetSets[i.first];
+            for (auto& stage : thisTarget.shaderStageSets)
+            {
+                if (otherTarget->shaderStageSets.containsKey(stage.first))
+                    continue;
+                newSet.m_targetSets[i.first].shaderStageSets[stage.first] = stage.second;
+            }
+        }
     }
     return newSet;
 }

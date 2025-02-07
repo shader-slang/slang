@@ -5380,9 +5380,8 @@ static Stmt* ParseDefaultStmt(Parser* parser)
     return stmt;
 }
 
-static Stmt* parseTargetSwitchStmt(Parser* parser)
+static Stmt* parseTargetSwitchStmtImpl(Parser* parser, TargetSwitchStmt* stmt)
 {
-    TargetSwitchStmt* stmt = parser->astBuilder->create<TargetSwitchStmt>();
     parser->FillPosition(stmt);
     parser->ReadToken();
     if (!beginMatch(parser, MatchedTokenType::CurlyBraces))
@@ -5477,6 +5476,18 @@ static Stmt* parseTargetSwitchStmt(Parser* parser)
         parser->PopScope();
     }
     return stmt;
+}
+
+static Stmt* parseTargetSwitchStmt(Parser* parser)
+{
+    auto stmt = parser->astBuilder->create<TargetSwitchStmt>();
+    return parseTargetSwitchStmtImpl(parser, stmt);
+}
+
+static Stmt* parseStageSwitchStmt(Parser* parser)
+{
+    auto stmt = parser->astBuilder->create<StageSwitchStmt>();
+    return parseTargetSwitchStmtImpl(parser, stmt);
 }
 
 static Stmt* parseIntrinsicAsmStmt(Parser* parser)
@@ -5725,6 +5736,8 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
         statement = ParseSwitchStmt(this);
     else if (LookAheadToken("__target_switch"))
         statement = parseTargetSwitchStmt(this);
+    else if (LookAheadToken("__stage_switch"))
+        statement = parseStageSwitchStmt(this);
     else if (LookAheadToken("__intrinsic_asm"))
         statement = parseIntrinsicAsmStmt(this);
     else if (LookAheadToken("case"))

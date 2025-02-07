@@ -2424,7 +2424,7 @@ struct IRCall : IRInst
     IR_LEAF_ISA(Call)
 
     IRInst* getCallee() { return getOperand(0); }
-
+    IRUse* getCalleeUse() { return getOperands(); }
     UInt getArgCount() { return getOperandCount() - 1; }
     IRUse* getArgs() { return getOperands() + 1; }
     IROperandList<IRInst> getArgsList()
@@ -3880,6 +3880,8 @@ public:
     // Set the data type of an instruction, while preserving
     // its rate, if any.
     void setDataType(IRInst* inst, IRType* dataType);
+
+    IRInst* emitGetCurrentStage();
 
     /// Extract the value wrapped inside an existential box.
     IRInst* emitGetValueFromBoundInterface(IRType* type, IRInst* boundInterfaceValue);
