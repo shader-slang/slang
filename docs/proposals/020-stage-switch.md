@@ -6,9 +6,9 @@ Author: Yong He
 
 Status: In Experiment
 
-Implementation: [PR]()
+Implementation: [PR 6311](https://github.com/shader-slang/slang/pull/6311)
 
-Reviewed by:
+Reviewed by: Jay Kwak
 
 ## Background
 
