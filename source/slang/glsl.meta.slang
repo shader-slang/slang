@@ -4844,8 +4844,6 @@ public property int gl_PrimitiveID
     }
 }
 
-internal in int __gl_InstanceIndex : SV_InstanceID;
-
 public property int gl_InstanceID 
 {
     [require(cuda_glsl_hlsl_spirv)]
@@ -4861,15 +4859,6 @@ public property int gl_InstanceID
         default:
             return __gl_InstanceIndex;
         }
-    }
-}
-
-public property int gl_InstanceIndex 
-{
-    [require(cuda_glsl_hlsl_spirv)]
-    get 
-    {
-        return gl_InstanceID;
     }
 }
 
