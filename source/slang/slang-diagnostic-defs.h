@@ -561,6 +561,13 @@ DIAGNOSTIC(
     Error,
     spirvUndefinedId,
     "SPIRV id '%$0' is not defined in the current assembly block location")
+
+DIAGNOSTIC(
+    29115,
+    Error,
+    targetSwitchCaseCannotBeAStage,
+    "cannot use a stage name in '__target_switch', use '__stage_switch' for stage-specific code.")
+
 //
 // 3xxxx - Semantic analysis
 //
