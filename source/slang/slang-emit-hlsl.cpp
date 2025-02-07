@@ -833,9 +833,6 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             if (as<IRBasicType>(inst->getDataType()))
                 return false;
 
-            const auto emitOp = getEmitOpForOp(inst->getOp());
-            const auto info = getInfo(emitOp);
-
             if (inst->getOp() == kIROp_And)
             {
                 m_writer->emit("and(");
