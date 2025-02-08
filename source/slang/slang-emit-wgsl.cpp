@@ -1325,23 +1325,23 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // @const @must_use fn select(f: T, t: T, cond: bool) -> T
             if (inst->getOp() == kIROp_And)
             {
-                m_writer->emit(" select(vec");
+                m_writer->emit("select(vec");
                 m_writer->emit(getIntVal(vecType->getElementCount()));
                 m_writer->emit("<bool>(false), ");
                 emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
                 m_writer->emit(", ");
                 emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-                m_writer->emit(") ");
+                m_writer->emit(")");
             }
             else
             {
-                m_writer->emit(" select(");
+                m_writer->emit("select(");
                 emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
                 m_writer->emit(", vec");
                 m_writer->emit(getIntVal(vecType->getElementCount()));
                 m_writer->emit("<bool>(true), ");
                 emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-                m_writer->emit(") ");
+                m_writer->emit(")");
             }
             return true;
         }
