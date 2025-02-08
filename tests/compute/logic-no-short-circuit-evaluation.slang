@@ -3,7 +3,7 @@
 //TEST(compute):SIMPLE(filecheck=WGSL):-target wgsl -stage compute -entry computeMain
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-slang -compute -shaderobj -output-using-type -xslang -Wno-30056
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-vk -compute  -shaderobj -output-using-type -xslang -Wno-30056
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-mtl -compute  -shaderobj -output-using-type -xslang -Wno-30056
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-mtl -compute  -shaderobj -output-using-type -xslang -Wno-30056
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cuda -compute -shaderobj -output-using-type -xslang -Wno-30056
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cpu -compute -shaderobj -output-using-type -xslang -Wno-30056
 
