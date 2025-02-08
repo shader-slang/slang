@@ -1470,7 +1470,8 @@ Result linkAndOptimizeIR(
         floatNonUniformResourceIndex(irModule, NonUniformResourceIndexFloatMode::Textual);
     }
 
-    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) || isWGPUTarget(targetRequest))
+    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
+        isWGPUTarget(targetRequest) || isMetalTarget(targetRequest))
         legalizeLogicalAndOr(irModule->getModuleInst());
 
     // Legalize non struct parameters that are expected to be structs for HLSL.
