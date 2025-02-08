@@ -121,7 +121,7 @@ static void legalizeSwitch(IRSwitch* switchInst)
     switchInst->removeAndDeallocate();
 }
 
-static void processInst(IRInst* inst)
+static void processInst(IRInst* inst, IRModule* module, const List<EntryPointInfo>& entryPoints)
 {
     switch (inst->getOp())
     {
@@ -157,13 +157,42 @@ static void processInst(IRInst* inst)
         legalizeBinaryOp(inst);
         break;
 
+    case kIROp_ImplicitSystemValue:
+        {
+            const auto implicitSysVal = as<IRImplicitSystemValue>(inst);
+            printf("Legalizing implicit sysval!\n");
+            printf("%s\n", implicitSysVal->getSystemValueName().begin());
+
+
+            for (const auto entryPoint : entryPoints)
+            {
+                // builder.addParam
+                // entryPoint.entryPointFunc->ad
+
+
+                IRBuilder builder(entryPoint.entryPointFunc);
+                builder.setInsertBefore(
+                    entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
+                auto param = builder.emitParam(builder.getUIntType());
+                builder.addSemanticDecoration(param, implicitSysVal->getSystemValueName());
+
+                inst->replaceUsesWith(param);
+                inst->removeAndDeallocate();
+            }
+            // param->add
+
+            break;
+        }
+
+
     case kIROp_Func:
         legalizeFunc(static_cast<IRFunc*>(inst));
         [[fallthrough]];
+
     default:
         for (auto child : inst->getModifiableChildren())
         {
-            processInst(child);
+            processInst(child, module, entryPoints);
         }
     }
 }
@@ -213,12 +242,15 @@ void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink)
         info.entryPointDecor = entryPointDecor;
         info.entryPointFunc = func;
         entryPoints.add(info);
+
+        // processInst(func);
     }
+
+    // Go through every instruction in the module and legalize them as needed.
+    processInst(module->getModuleInst(), module, entryPoints);
 
     legalizeEntryPointVaryingParamsForWGSL(module, sink, entryPoints);
 
-    // Go through every instruction in the module and legalize them as needed.
-    processInst(module->getModuleInst());
 
     // Some global insts are illegal, e.g. function calls.
     // We need to inline and remove those.

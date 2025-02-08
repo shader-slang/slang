@@ -3854,6 +3854,20 @@ protected:
                 break;
             }
 
+        case SystemValueSemanticName::WaveLaneCount:
+            {
+                result.systemValueName = toSlice("subgroup_size");
+                result.permittedTypes.add(builder.getUIntType());
+                break;
+            }
+
+        case SystemValueSemanticName::WaveLaneIndex:
+            {
+                result.systemValueName = toSlice("subgroup_invocation_id");
+                result.permittedTypes.add(builder.getUIntType());
+                break;
+            }
+
         default:
             {
                 m_sink->diagnose(

@@ -671,6 +671,11 @@ INST(RequireComputeDerivative, RequireComputeDerivative, 0, 0)
 INST(StaticAssert, StaticAssert, 2, 0)
 INST(Printf, Printf, 1, 0)
 
+// Built-in inputs/outputs(system values) that are implicitly added.
+// These must be passed in as entry function parameters for the target language(eg. WGSL and Metal), but
+// do not explicitly originate from decorated entry point function parameters in Slang.
+INST(ImplicitSystemValue, ImplicitSystemValue, 1, 0)
+
 // Quad control execution modes.
 INST(RequireMaximallyReconverges, RequireMaximallyReconverges, 0, 0)
 INST(RequireQuadDerivatives, RequireQuadDerivatives, 0, 0)

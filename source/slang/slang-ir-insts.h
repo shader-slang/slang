@@ -3499,6 +3499,15 @@ struct IRStaticAssert : IRInst
     IR_LEAF_ISA(StaticAssert)
 };
 
+struct IRImplicitSystemValue : IRInst
+{
+    IR_LEAF_ISA(ImplicitSystemValue)
+    UnownedStringSlice getSystemValueName()
+    {
+        return as<IRStringLit>(getOperand(0))->getStringSlice();
+    }
+};
+
 struct IREmbeddedDownstreamIR : IRInst
 {
     IR_LEAF_ISA(EmbeddedDownstreamIR)
