@@ -6228,7 +6228,9 @@ bool all(vector<T,N> x)
     case hlsl:
         __intrinsic_asm "all";
     case metal:
-        __intrinsic_asm "all";
+        if (__isBool<T>())
+            __intrinsic_asm "all";
+        __intrinsic_asm "all(bool$N0($0))";
     case glsl:
         __intrinsic_asm "all(bvec$N0($0))";
     case spirv:
@@ -6256,7 +6258,9 @@ bool all(vector<T,N> x)
             };
         }
     case wgsl:
-        __intrinsic_asm "all";
+        if (__isBool<T>())
+            __intrinsic_asm "all";
+        __intrinsic_asm "all(vec$N0<bool>($0))";
     default:
         bool result = true;
         for(int i = 0; i < N; ++i)
