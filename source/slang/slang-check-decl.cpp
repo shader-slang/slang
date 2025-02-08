@@ -12735,14 +12735,26 @@ struct CapabilityDeclReferenceVisitor
                         std::swap(stmt->targetCases[i], stmt->targetCases[i + 1]);
                     continue;
                 }
-
-                if (!maybeRequireCapability)
-                    targetCap = (CapabilitySet(CapabilityName::any_target)
-                                     .getTargetsThisHasButOtherDoesNot(set));
+                if (as<StageSwitchStmt>(stmt))
+                {
+                    if (!maybeRequireCapability)
+                        targetCap = (CapabilitySet(CapabilityName::any_target)
+                                         .getStagesThisHasButOtherDoesNot(set));
+                    else
+                        targetCap =
+                            (maybeRequireCapability->capabilitySet.getStagesThisHasButOtherDoesNot(
+                                set));
+                }
                 else
-                    targetCap =
-                        (maybeRequireCapability->capabilitySet.getTargetsThisHasButOtherDoesNot(
-                            set));
+                {
+                    if (!maybeRequireCapability)
+                        targetCap = (CapabilitySet(CapabilityName::any_target)
+                                         .getTargetsThisHasButOtherDoesNot(set));
+                    else
+                        targetCap =
+                            (maybeRequireCapability->capabilitySet.getTargetsThisHasButOtherDoesNot(
+                                set));
+                }
             }
             else
             {

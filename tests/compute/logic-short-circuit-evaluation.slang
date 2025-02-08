@@ -1,8 +1,9 @@
-//TEST(compute):COMPARE_COMPUTE:-dx12 -compute -shaderobj 
-//TEST(compute):COMPARE_COMPUTE:-vk -compute  -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -compile-arg -O3 -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-dx12 -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-vk -compute  -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-mtl -compute  -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cuda -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-cpu -compute -compile-arg -O3 -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -shaderobj
 
 // Test doing vector comparisons 
 
@@ -25,4 +26,8 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 
     // Only the last 4 elements will be 1.
     (index < 12) || assignFunc(index);
+
+    //CHK-COUNT-4: 1
+    //CHK-COUNT-8: 0
+    //CHK-COUNT-4: 1
 }

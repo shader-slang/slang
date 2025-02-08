@@ -2424,7 +2424,7 @@ struct IRCall : IRInst
     IR_LEAF_ISA(Call)
 
     IRInst* getCallee() { return getOperand(0); }
-
+    IRUse* getCalleeUse() { return getOperands(); }
     UInt getArgCount() { return getOperandCount() - 1; }
     IRUse* getArgs() { return getOperands() + 1; }
     IROperandList<IRInst> getArgsList()
@@ -3881,6 +3881,8 @@ public:
     // its rate, if any.
     void setDataType(IRInst* inst, IRType* dataType);
 
+    IRInst* emitGetCurrentStage();
+
     /// Extract the value wrapped inside an existential box.
     IRInst* emitGetValueFromBoundInterface(IRType* type, IRInst* boundInterfaceValue);
 
@@ -4517,6 +4519,9 @@ public:
 
     IRInst* emitShr(IRType* type, IRInst* op0, IRInst* op1);
     IRInst* emitShl(IRType* type, IRInst* op0, IRInst* op1);
+
+    IRInst* emitAnd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitOr(IRType* type, IRInst* left, IRInst* right);
 
     IRSPIRVAsmOperand* emitSPIRVAsmOperandLiteral(IRInst* literal);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandInst(IRInst* inst);

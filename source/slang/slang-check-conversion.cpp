@@ -238,6 +238,21 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
         return cacheResult(true);
 
 
+    // A tuple type is C-style if all of its members are C-style.
+    if (auto tupleType = as<TupleType>(type))
+    {
+        for (Index i = 0; i < tupleType->getMemberCount(); i++)
+        {
+            auto elementType = tupleType->getMember(i);
+            // Avoid infinite loop in case of circular reference.
+            if (isVisit.contains(elementType))
+                return cacheResult(false);
+            if (!isCStyleType(elementType, isVisit))
+                return cacheResult(false);
+        }
+        return cacheResult(true);
+    }
+
     if (auto structDecl = isDeclRefTypeOf<StructDecl>(type).getDecl())
     {
         // 2. It cannot have inheritance, but inherit from interface is fine.
@@ -299,6 +314,7 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
         if (!isCStyleType(elementType, isVisit))
             return cacheResult(false);
     }
+
     return cacheResult(true);
 }
 
@@ -686,6 +702,28 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             Expr* coercedArg = nullptr;
             bool argResult = _readValueFromInitializerList(
                 toRowType,
+                outToExpr ? &coercedArg : nullptr,
+                fromInitializerListExpr,
+                ioArgIndex);
+
+            // No point in trying further if any argument fails
+            if (!argResult)
+                return false;
+
+            if (coercedArg)
+            {
+                coercedArgs.add(coercedArg);
+            }
+        }
+    }
+    else if (auto tupleType = as<TupleType>(toType))
+    {
+        for (Index ee = 0; ee < tupleType->getMemberCount(); ++ee)
+        {
+            auto elementType = tupleType->getMember(ee);
+            Expr* coercedArg = nullptr;
+            bool argResult = _readValueFromInitializerList(
+                elementType,
                 outToExpr ? &coercedArg : nullptr,
                 fromInitializerListExpr,
                 ioArgIndex);

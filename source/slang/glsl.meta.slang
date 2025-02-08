@@ -4824,24 +4824,41 @@ public property uint3 gl_LaunchSizeEXT
     }
 }
 
+internal in int __gl_PrimitiveID : SV_PrimitiveID;
 
 public property int gl_PrimitiveID 
 {
-    [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+    [require(cuda_glsl_hlsl_spirv)]
     get 
     {
-        setupExtForRayTracingBuiltIn();
-        return PrimitiveIndex();
+        __stage_switch
+        {
+        case anyhit:
+        case closesthit:
+        case intersection:
+            setupExtForRayTracingBuiltIn();
+            return PrimitiveIndex();
+        default:
+            return __gl_PrimitiveID;   
+        }
     }
 }
 
 public property int gl_InstanceID 
 {
-    [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+    [require(cuda_glsl_hlsl_spirv)]
     get 
     {
-        setupExtForRayTracingBuiltIn();
-        return InstanceIndex();
+        __stage_switch
+        {
+        case anyhit:
+        case closesthit:
+        case intersection:
+            setupExtForRayTracingBuiltIn();
+            return InstanceIndex();
+        default:
+            return gl_InstanceIndex;
+        }
     }
 }
 

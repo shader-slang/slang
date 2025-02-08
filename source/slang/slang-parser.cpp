@@ -5127,7 +5127,11 @@ void Parser::parseSourceFile(ContainerDecl* program)
 
     currentModule = getModuleDecl(program);
 
-    PushScope(program);
+    // If the program already has a scope, then reuse it instead of overwriting it!
+    if (program->ownedScope)
+        PushScope(program->ownedScope);
+    else
+        PushScope(program);
 
     // A single `ModuleDecl` might span multiple source files, so it
     // is possible that we are parsing a new source file into a module
@@ -5376,9 +5380,8 @@ static Stmt* ParseDefaultStmt(Parser* parser)
     return stmt;
 }
 
-static Stmt* parseTargetSwitchStmt(Parser* parser)
+static Stmt* parseTargetSwitchStmtImpl(Parser* parser, TargetSwitchStmt* stmt)
 {
-    TargetSwitchStmt* stmt = parser->astBuilder->create<TargetSwitchStmt>();
     parser->FillPosition(stmt);
     parser->ReadToken();
     if (!beginMatch(parser, MatchedTokenType::CurlyBraces))
@@ -5473,6 +5476,18 @@ static Stmt* parseTargetSwitchStmt(Parser* parser)
         parser->PopScope();
     }
     return stmt;
+}
+
+static Stmt* parseTargetSwitchStmt(Parser* parser)
+{
+    auto stmt = parser->astBuilder->create<TargetSwitchStmt>();
+    return parseTargetSwitchStmtImpl(parser, stmt);
+}
+
+static Stmt* parseStageSwitchStmt(Parser* parser)
+{
+    auto stmt = parser->astBuilder->create<StageSwitchStmt>();
+    return parseTargetSwitchStmtImpl(parser, stmt);
 }
 
 static Stmt* parseIntrinsicAsmStmt(Parser* parser)
@@ -5721,6 +5736,8 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
         statement = ParseSwitchStmt(this);
     else if (LookAheadToken("__target_switch"))
         statement = parseTargetSwitchStmt(this);
+    else if (LookAheadToken("__stage_switch"))
+        statement = parseStageSwitchStmt(this);
     else if (LookAheadToken("__intrinsic_asm"))
         statement = parseIntrinsicAsmStmt(this);
     else if (LookAheadToken("case"))
