@@ -2,6 +2,7 @@
 
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -56,10 +57,13 @@ void buildEntryPointReferenceGraph(
         }
         switch (inst->getOp())
         {
+        // Only these instruction types are registered to the entry point reference graph.
         case kIROp_GlobalParam:
         case kIROp_SPIRVAsmOperandBuiltinVar:
+        case kIROp_ImplicitSystemValue:
             registerEntryPointReference(entryPoint, inst);
             break;
+
         case kIROp_Block:
         case kIROp_SPIRVAsm:
             for (auto child : inst->getChildren())

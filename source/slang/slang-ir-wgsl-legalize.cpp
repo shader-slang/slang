@@ -1,8 +1,10 @@
 #include "slang-ir-wgsl-legalize.h"
 
+#include "slang-ir-call-graph.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-legalize-binary-operator.h"
 #include "slang-ir-legalize-global-values.h"
+#include "slang-ir-legalize-system-values.h"
 #include "slang-ir-legalize-varying-params.h"
 #include "slang-ir.h"
 
@@ -121,81 +123,63 @@ static void legalizeSwitch(IRSwitch* switchInst)
     switchInst->removeAndDeallocate();
 }
 
-static void processInst(IRInst* inst, IRModule* module, const List<EntryPointInfo>& entryPoints)
+class InstructionLegalizationContext
 {
-    switch (inst->getOp())
+public:
+    void processInst(IRInst* inst)
     {
-    case kIROp_Call:
-        legalizeCall(static_cast<IRCall*>(inst));
-        break;
-
-    case kIROp_Switch:
-        legalizeSwitch(as<IRSwitch>(inst));
-        break;
-
-    // For all binary operators, make sure both side of the operator have the same type
-    // (vector-ness and matrix-ness).
-    case kIROp_Add:
-    case kIROp_Sub:
-    case kIROp_Mul:
-    case kIROp_Div:
-    case kIROp_FRem:
-    case kIROp_IRem:
-    case kIROp_And:
-    case kIROp_Or:
-    case kIROp_BitAnd:
-    case kIROp_BitOr:
-    case kIROp_BitXor:
-    case kIROp_Lsh:
-    case kIROp_Rsh:
-    case kIROp_Eql:
-    case kIROp_Neq:
-    case kIROp_Greater:
-    case kIROp_Less:
-    case kIROp_Geq:
-    case kIROp_Leq:
-        legalizeBinaryOp(inst);
-        break;
-
-    case kIROp_ImplicitSystemValue:
+        switch (inst->getOp())
         {
-            const auto implicitSysVal = as<IRImplicitSystemValue>(inst);
-            printf("Legalizing implicit sysval!\n");
-            printf("%s\n", implicitSysVal->getSystemValueName().begin());
-
-
-            for (const auto entryPoint : entryPoints)
-            {
-                // builder.addParam
-                // entryPoint.entryPointFunc->ad
-
-
-                IRBuilder builder(entryPoint.entryPointFunc);
-                builder.setInsertBefore(
-                    entryPoint.entryPointFunc->getFirstBlock()->getFirstOrdinaryInst());
-                auto param = builder.emitParam(builder.getUIntType());
-                builder.addSemanticDecoration(param, implicitSysVal->getSystemValueName());
-
-                inst->replaceUsesWith(param);
-                inst->removeAndDeallocate();
-            }
-            // param->add
-
+        case kIROp_Call:
+            legalizeCall(static_cast<IRCall*>(inst));
             break;
-        }
 
+        case kIROp_Switch:
+            legalizeSwitch(as<IRSwitch>(inst));
+            break;
 
-    case kIROp_Func:
-        legalizeFunc(static_cast<IRFunc*>(inst));
-        [[fallthrough]];
+        // For all binary operators, make sure both side of the operator have the same type
+        // (vector-ness and matrix-ness).
+        case kIROp_Add:
+        case kIROp_Sub:
+        case kIROp_Mul:
+        case kIROp_Div:
+        case kIROp_FRem:
+        case kIROp_IRem:
+        case kIROp_And:
+        case kIROp_Or:
+        case kIROp_BitAnd:
+        case kIROp_BitOr:
+        case kIROp_BitXor:
+        case kIROp_Lsh:
+        case kIROp_Rsh:
+        case kIROp_Eql:
+        case kIROp_Neq:
+        case kIROp_Greater:
+        case kIROp_Less:
+        case kIROp_Geq:
+        case kIROp_Leq:
+            legalizeBinaryOp(inst);
+            break;
 
-    default:
-        for (auto child : inst->getModifiableChildren())
-        {
-            processInst(child, module, entryPoints);
+        case kIROp_ImplicitSystemValue:
+            implicitSystemValueInstructions.add(as<IRImplicitSystemValue>(inst));
+            break;
+
+        case kIROp_Func:
+            legalizeFunc(static_cast<IRFunc*>(inst));
+            [[fallthrough]];
+
+        default:
+            for (auto child : inst->getModifiableChildren())
+            {
+                processInst(child);
+            }
         }
     }
-}
+
+    List<IRImplicitSystemValue*> implicitSystemValueInstructions;
+};
 
 struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
 {
@@ -242,15 +226,23 @@ void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink)
         info.entryPointDecor = entryPointDecor;
         info.entryPointFunc = func;
         entryPoints.add(info);
-
-        // processInst(func);
     }
 
     // Go through every instruction in the module and legalize them as needed.
-    processInst(module->getModuleInst(), module, entryPoints);
+    InstructionLegalizationContext instContext;
+    instContext.processInst(module->getModuleInst());
+
+    // Legalize implicit system values to entry point parameters.
+    if (instContext.implicitSystemValueInstructions.getCount() != 0)
+    {
+        Dictionary<IRInst*, HashSet<IRFunc*>> entryPointReferenceGraph;
+        buildEntryPointReferenceGraph(entryPointReferenceGraph, module);
+        legalizeImplicitSystemValues(
+            entryPointReferenceGraph,
+            instContext.implicitSystemValueInstructions);
+    }
 
     legalizeEntryPointVaryingParamsForWGSL(module, sink, entryPoints);
-
 
     // Some global insts are illegal, e.g. function calls.
     // We need to inline and remove those.
