@@ -18,7 +18,8 @@ enum class Severity
     Warning,
     Error,
     Fatal,
-    Internal
+    Internal,
+    OutputIncludes,
 };
 
 // Make sure that the slang.h severity constants match those defined here
@@ -48,6 +49,8 @@ inline const char* getSeverityName(Severity severity)
         return "fatal error";
     case Severity::Internal:
         return "internal error";
+    case Severity::OutputIncludes:
+        return "Note";
     default:
         return "unknown error";
     }

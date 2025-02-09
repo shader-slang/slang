@@ -3101,7 +3101,7 @@ static void _outputInclude(SourceFile* sourceFile, Index depth, DiagnosticSink* 
     // useful to output the full path for example
 
     const PathInfo& pathInfo = sourceFile->getPathInfo();
-    buf << "'" << pathInfo.foundPath << "'";
+    buf << pathInfo.uniqueIdentity;
 
     // TODO(JS)?
     // You might want to know where this include was from.

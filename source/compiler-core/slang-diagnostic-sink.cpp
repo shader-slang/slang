@@ -150,7 +150,7 @@ static void formatDiagnostic(
     DiagnosticSink::Flags flags,
     StringBuilder& outBuilder)
 {
-    if (flags & DiagnosticSink::Flag::HumaneLoc)
+    if (diagnostic.severity != Severity::OutputIncludes && (flags & DiagnosticSink::Flag::HumaneLoc))
     {
         outBuilder << humaneLoc.pathInfo.foundPath;
         outBuilder << "(";
@@ -584,7 +584,7 @@ bool DiagnosticSink::diagnoseImpl(
     DiagnosticInfo const& info,
     const UnownedStringSlice& formattedMessage)
 {
-    if (info.severity >= Severity::Error)
+    if (info.severity >= Severity::Error && info.severity != Severity::OutputIncludes)
     {
         m_errorCount++;
     }
@@ -603,7 +603,7 @@ bool DiagnosticSink::diagnoseImpl(
         m_parentSink->diagnoseImpl(info, formattedMessage);
     }
 
-    if (info.severity >= Severity::Fatal)
+    if (info.severity >= Severity::Fatal && info.severity != Severity::OutputIncludes)
     {
         // TODO: figure out a better policy for aborting compilation
         std::string message(formattedMessage.begin(), formattedMessage.end());
@@ -669,7 +669,7 @@ void DiagnosticSink::diagnoseRaw(Severity severity, char const* message)
 
 void DiagnosticSink::diagnoseRaw(Severity severity, const UnownedStringSlice& message)
 {
-    if (severity >= Severity::Error)
+    if (severity >= Severity::Error && severity != Severity::OutputIncludes )
     {
         m_errorCount++;
     }
@@ -692,7 +692,7 @@ void DiagnosticSink::diagnoseRaw(Severity severity, const UnownedStringSlice& me
         m_parentSink->diagnoseRaw(severity, message);
     }
 
-    if (severity >= Severity::Fatal)
+    if (severity >= Severity::Fatal && severity != Severity::OutputIncludes)
     {
         // TODO: figure out a better policy for aborting compilation
         SLANG_ABORT_COMPILATION("");

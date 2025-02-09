@@ -94,7 +94,7 @@ DIAGNOSTIC(
 DIAGNOSTIC(-1, Note, declaredHere, "declared here")
 DIAGNOSTIC(-1, Note, seeOtherDeclarationOf, "see other declaration of '$0'")
 DIAGNOSTIC(-1, Note, seePreviousDeclarationOf, "see previous declaration of '$0'")
-DIAGNOSTIC(-1, Note, includeOutput, "include $0")
+DIAGNOSTIC(-1, OutputIncludes, includeOutput, "including file: $0")
 DIAGNOSTIC(-1, Note, genericSignatureTried, "see declaration of $0")
 DIAGNOSTIC(-1, Note, entryPointCandidate, "see candidate declaration for entry point '$0'")
 
