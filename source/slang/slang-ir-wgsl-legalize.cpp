@@ -236,9 +236,18 @@ void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink)
     if (instContext.implicitSystemValueInstructions.getCount() != 0)
     {
         Dictionary<IRInst*, HashSet<IRFunc*>> entryPointReferenceGraph;
-        buildEntryPointReferenceGraph(entryPointReferenceGraph, module);
+        // Dictionary<IRInst*, HashSet<CallItem>> functionReferenceGraph;
+        Dictionary<IRInst*, HashSet<IRFunc*>> functionReferenceGraph;
+        Dictionary<IRFunc*, HashSet<IRCall*>> callReferenceGraph;
+        buildEntryPointReferenceGraph(
+            entryPointReferenceGraph,
+            module,
+            &functionReferenceGraph,
+            &callReferenceGraph);
         legalizeImplicitSystemValues(
             entryPointReferenceGraph,
+            functionReferenceGraph,
+            callReferenceGraph,
             instContext.implicitSystemValueInstructions);
     }
 

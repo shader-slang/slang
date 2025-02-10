@@ -6,7 +6,9 @@ namespace Slang
 
 void buildEntryPointReferenceGraph(
     Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints,
-    IRModule* module);
+    IRModule* module,
+    Dictionary<IRInst*, HashSet<IRFunc*>>* referencingFunctions = nullptr,
+    Dictionary<IRFunc*, HashSet<IRCall*>>* referencingCalls = nullptr);
 
 HashSet<IRFunc*>* getReferencingEntryPoints(
     Dictionary<IRInst*, HashSet<IRFunc*>>& m_referencingEntryPoints,
