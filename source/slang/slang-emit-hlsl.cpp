@@ -1669,17 +1669,14 @@ void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
     {
         m_writer->emit("[payload] ");
     }
-    if (const auto payloadDecoration = inst->findDecoration<IRRayPayloadDecoration>())
+    // This can be re-enabled when we add PAQs: https://github.com/shader-slang/slang/issues/3448
+    const bool enablePAQs = false;
+    if (enablePAQs)
     {
-        ensurePrelude(
-            R"(
-#if __DXC_VERSION_MAJOR > 1 || (__DXC_VERSION_MAJOR == 1 && __DXC_VERSION_MINOR >= 8)
-    #define SLANG_RAYPAYLOAD [raypayload]
-#else
-    #define SLANG_RAYPAYLOAD
-#endif
-)");
-        m_writer->emit("SLANG_RAYPAYLOAD ");
+        if (const auto payloadDecoration = inst->findDecoration<IRRayPayloadDecoration>())
+        {
+            m_writer->emit("[raypayload] ");
+        }
     }
 }
 

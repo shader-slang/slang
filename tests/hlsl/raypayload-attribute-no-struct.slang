@@ -1,6 +1,7 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage raygeneration -entry rayGenShaderA
+//enable when https://github.com/shader-slang/slang/issues/3448 is implemented
+//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage raygeneration -entry rayGenShaderA
 
-// CHECK: struct SLANG_RAYPAYLOAD
+// CHECK: struct [raypayload]
 
 uniform RWTexture2D resultTexture;
 uniform RaytracingAccelerationStructure sceneBVH;
