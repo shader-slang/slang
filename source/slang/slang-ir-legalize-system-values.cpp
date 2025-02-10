@@ -39,8 +39,8 @@ public:
 
 private:
     //
-    // A function (including entry points) must have at most one parameter for each system value
-    // semantic type.
+    // A function (including entry points) must have at most one parameter for each implicit system
+    // value semantic type.
     //
     // This map tracks the association between system value semantics and their corresponding
     // function parameters.
@@ -100,6 +100,12 @@ private:
         SystemValueSemanticName systemValueName,
         UnownedStringSlice systemValueString)
     {
+        // Implicit system values are currently only being used for subgroup size and
+        // subgroup invocation id.
+        SLANG_ASSERT(
+            (systemValueName == SystemValueSemanticName::WaveLaneCount) ||
+            (systemValueName == SystemValueSemanticName::WaveLaneIndex));
+
         List<IRFunc*> functionWorkList;
         List<ModifyCallWorkItem> modifyCallWorkList;
 
@@ -113,17 +119,11 @@ private:
                     // new parameter to pass in the system value variable to the callee.
                     functionWorkList.add(caller);
 
-                    // The call needs to be modified to add the new parameter.
+                    // The call needs to be modified to account for the new parameter.
                     modifyCallWorkList.add({call, caller});
                 }
             }
         };
-
-        // Implicit system values are currently only being used for subgroup size and
-        // subgroup invocation id.
-        SLANG_ASSERT(
-            (systemValueName == SystemValueSemanticName::WaveLaneCount) ||
-            (systemValueName == SystemValueSemanticName::WaveLaneIndex));
 
         const auto createParamWork = [&](IRFunc* func)
         {
@@ -140,8 +140,8 @@ private:
                     m_builder.addSemanticDecoration(param, systemValueString);
                 }
 
+                fixUpFuncType(func);
                 getParamMap(func).add(systemValueName, param);
-
                 if (auto calls = m_callReferenceGraph.tryGetValue(func))
                 {
                     addWorkItems(*calls);
