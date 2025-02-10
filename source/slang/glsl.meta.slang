@@ -6409,6 +6409,7 @@ public property uint gl_SubgroupID
 
 public property uint gl_SubgroupSize
 {
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
     get {
         setupExtForSubgroupBasicBuiltIn();
@@ -6418,6 +6419,7 @@ public property uint gl_SubgroupSize
 
 public property uint gl_SubgroupInvocationID
 {
+    [ForceInline]
     [require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
     get {
         setupExtForSubgroupBasicBuiltIn();

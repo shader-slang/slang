@@ -10,6 +10,7 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
 #version 430
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
@@ -24,15 +25,17 @@ void computeMain()
 {
     if (gl_GlobalInvocationID.x == 3) {
         outputBuffer.data[0] = true
-            && gl_NumSubgroups == 1
-            && gl_SubgroupID  == 0 //1 subgroup, 0 based indexing
             && gl_SubgroupSize == 32
             && gl_SubgroupInvocationID == 3
+#if !defined(WGPU)
+            && gl_SubgroupID  == 0 //1 subgroup, 0 based indexing
+            && gl_NumSubgroups == 1
             && gl_SubgroupEqMask == uvec4(0b1000,0,0,0)
             && gl_SubgroupGeMask == uvec4(0xFFFFFFF8,0,0,0)
             && gl_SubgroupGtMask == uvec4(0xFFFFFFF0,0,0,0)
             && gl_SubgroupLeMask == uvec4(0b1111,0,0,0)
             && gl_SubgroupLtMask == uvec4(0b111,0,0,0)
+#endif
             ;
     }
     // CHECK_GLSL: void main(
