@@ -9789,6 +9789,46 @@ void SemanticsVisitor::validateArraySizeForVariable(VarDeclBase* varDecl)
     }
 }
 
+bool getExtensionTargetDeclList(
+    ASTBuilder* astBuilder,
+    DeclRefType* targetDeclRefType,
+    ExtensionDecl* extDecl,
+    ShortList<AggTypeDecl*>& targetDecls)
+{
+    if (auto aggTypeDeclRef = targetDeclRefType->getDeclRef().as<AggTypeDecl>())
+    {
+        auto aggTypeDecl = aggTypeDeclRef.getDecl();
+
+        targetDecls.add(aggTypeDecl);
+        return true;
+    }
+
+    auto genericParamDeclRef = targetDeclRefType->getDeclRef().as<GenericTypeParamDeclBase>();
+    if (!genericParamDeclRef)
+        return false;
+
+    auto genericParent = as<GenericDecl>(genericParamDeclRef.getParent().getDecl());
+    if (!genericParent)
+        return false;
+
+    if (genericParent != extDecl->parentDecl)
+        return false;
+
+    for (auto member : getMembersOfType<GenericTypeConstraintDecl>(astBuilder, genericParent))
+    {
+        if (getSub(astBuilder, member) == targetDeclRefType)
+        {
+            auto baseType = getSup(astBuilder, member);
+            if (auto baseTypeDecl = isDeclRefTypeOf<AggTypeDecl>(baseType))
+            {
+                targetDecls.add(baseTypeDecl.getDecl());
+            }
+        }
+    }
+    return targetDecls.getCount() != 0;
+}
+
+
 void SemanticsDeclBasesVisitor::_validateExtensionDeclTargetType(ExtensionDecl* decl)
 {
     if (auto targetDeclRefType = as<DeclRefType>(decl->targetType))
@@ -11582,8 +11622,8 @@ void checkDerivativeAttributeImpl(
                 auto derivativeFuncThisType = getTypeForThisExpr(visitor, calleeFuncDeclRef);
 
                 // If the function is a member function, we need to check that the
-                // `this` type matches the expected type. This will ensure that after lowering to
-                // IR, the two functions are compatible.
+                // `this` type matches the expected type. This will ensure that after lowering
+                // to IR, the two functions are compatible.
                 //
                 if (!areTypesCompatibile(visitor, funcThisType, derivativeFuncThisType))
                 {
@@ -11971,8 +12011,9 @@ void checkDerivativeOfAttributeImpl(
 
             if (as<ErrorType>(resolved->type.type))
             {
-                // If we can't resolve a type, something went wrong. If we're working with a generic
-                // decl, the most likely cause is a failure of generic argument inference.
+                // If we can't resolve a type, something went wrong. If we're working with a
+                // generic decl, the most likely cause is a failure of generic argument
+                // inference.
                 //
                 visitor->getSink()->diagnose(
                     derivativeOfAttr,
@@ -12263,8 +12304,8 @@ bool SemanticsDeclAttributesVisitor::collectInitializableMembers(
     // Find the base type's members first
     for (auto inheritanceMember : structDecl->getMembersOfType<InheritanceDecl>())
     {
-        // For base types, we need to pick their parameters of the constructor to the derived type's
-        // constructor
+        // For base types, we need to pick their parameters of the constructor to the derived
+        // type's constructor
         if (auto baseTypeDeclRef = isDeclRefTypeOf<StructDecl>(inheritanceMember->base.type))
         {
             // We should only find the member initialization constructor because it is the
@@ -12273,15 +12314,15 @@ bool SemanticsDeclAttributesVisitor::collectInitializableMembers(
                 baseTypeDeclRef.getDecl(),
                 ConstructorDecl::ConstructorFlavor::SynthesizedMemberInit);
 
-            // The constructor has to have higher or equal visibility level than the struct itself,
-            // otherwise, it's not accessible so we will not pick up.
+            // The constructor has to have higher or equal visibility level than the struct
+            // itself, otherwise, it's not accessible so we will not pick up.
             if (ctor && getDeclVisibility(ctor) >= ctorVisibility)
             {
                 for (ParamDecl* param : ctor->getParameters())
                 {
-                    // Because the parameters in the ctor must have the higher or equal visibility
-                    // than the ctor itself, we don't need to check the visibility level of the
-                    // parameter.
+                    // Because the parameters in the ctor must have the higher or equal
+                    // visibility than the ctor itself, we don't need to check the visibility
+                    // level of the parameter.
                     resultMembers.add(param);
                 }
             }
@@ -12321,10 +12362,9 @@ static Expr* _getParamDefaultValue(SemanticsVisitor* visitor, VarDeclBase* varDe
 
 bool SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* structDecl)
 {
-    // If a type or its base type already defines any explicit constructors, do not synthesize any
-    // constructors.
-    // See
-    // https://github.com/shader-slang/spec/blob/main/proposals/004-initialization.md#inheritance-initialization
+    // If a type or its base type already defines any explicit constructors, do not synthesize
+    // any constructors. see:
+    // https://github.com/shader-slang/slang/blob/master/docs/proposals/004-initialization.md#inheritance-initialization
     if (_hasExplicitConstructor(structDecl, true))
         return false;
 
@@ -12376,9 +12416,9 @@ bool SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
         ctorParam->loc = ctor->loc;
         ctor->members.add(ctorParam);
 
-        // We need to ensure member is `no_diff` if it cannot be differentiated, `ctor` modifiers do
-        // not matter in this case since member-wise ctor is always differentiable or "treat as
-        // differentiable".
+        // We need to ensure member is `no_diff` if it cannot be differentiated, `ctor`
+        // modifiers do not matter in this case since member-wise ctor is always differentiable
+        // or "treat as differentiable".
         if (!isTypeDifferentiable(member->getType()) || member->hasModifier<NoDiffModifier>())
         {
             auto noDiffMod = m_astBuilder->create<NoDiffModifier>();
@@ -12538,7 +12578,8 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
         totalWidth += int(thisFieldWidth);
         groupInfo.add({memberIndex, int(thisFieldWidth), t, bfm});
     }
-    // If the struct ended with a bitpacked member, then make sure we don't forget the last group
+    // If the struct ended with a bitpacked member, then make sure we don't forget the last
+    // group
     dispatchSomeBitPackedMembers();
 }
 
@@ -12609,8 +12650,8 @@ static void _propagateRequirement(
     if (!isAnyInvalid && resultCaps.isInvalid())
     {
         // If joining the referenced decl's requirements results an invalid capability set,
-        // then the decl is using things that require conflicting set of capabilities, and we should
-        // diagnose an error.
+        // then the decl is using things that require conflicting set of capabilities, and we
+        // should diagnose an error.
         if (referencedDecl && decl)
         {
             maybeDiagnose(
@@ -12715,17 +12756,17 @@ struct CapabilityDeclReferenceVisitor
             // `calling_functions_targets`:
             //      ``` default_target = calling_functions_targets-{other_case_targets} ```
             //
-            // * `calling_functions_capability` = `requirement attribute` of the calling function;
-            // if missing
+            // * `calling_functions_capability` = `requirement attribute` of the calling
+            // function; if missing
             //    we can assume it is `any_target`
             //
-            // * `{other_case_targets}` = set of all capabilities all `case` statments target inside
-            // the `__target_switch`
+            // * `{other_case_targets}` = set of all capabilities all `case` statments target
+            // inside the `__target_switch`
 
-            // If we do not handle `default:`, the codegen will fail when trying to find a specific
-            // codegen target not handled explicitly by a `case` statment.
-            // We must also ensure the `default` case is last so we have priority to hit `case`
-            // statments and can preprocess `case` statments before the `default` case.
+            // If we do not handle `default:`, the codegen will fail when trying to find a
+            // specific codegen target not handled explicitly by a `case` statment. We must also
+            // ensure the `default` case is last so we have priority to hit `case` statments and
+            // can preprocess `case` statments before the `default` case.
             CapabilitySet targetCap;
             if (CapabilityName(stmt->targetCases[targetCaseIndex]->capability) ==
                 CapabilityName::Invalid)
@@ -12880,7 +12921,8 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
     // For every existing target, we want to join their requirements together.
     // If the the parent defines additional targets, we want to add them to the disjunction set.
     // For example:
-    //    [require(glsl)] struct Parent { [require(glsl, glsl_ext_1)] [require(spirv)] void foo(); }
+    //    [require(glsl)] struct Parent { [require(glsl, glsl_ext_1)] [require(spirv)] void
+    //    foo(); }
     // The requirement for `foo` should be glsl+glsl_ext_1 | spirv.
     //
     CapabilitySet declaredCaps;
@@ -12969,8 +13011,8 @@ static inline void _dispatchCapabilitiesVisitorOfFunctionDecl(
 
 void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* funcDecl)
 {
-    // If the function is an entrypoint and specifies a target stage, add the capabilities to our
-    // function capabilities.
+    // If the function is an entrypoint and specifies a target stage, add the capabilities to
+    // our function capabilities.
     _dispatchCapabilitiesVisitorOfFunctionDecl(
         this,
         funcDecl,
@@ -12991,8 +13033,8 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
 
     auto vis = getDeclVisibility(funcDecl);
 
-    // If 0 capabilities were annotated on a function, capabilities are inferred from the function
-    // body
+    // If 0 capabilities were annotated on a function, capabilities are inferred from the
+    // function body
     if (declaredCaps.isEmpty())
     {
         declaredCaps = funcDecl->inferredCapabilityRequirements;
@@ -13112,7 +13154,8 @@ DeclVisibility getDeclVisibility(Decl* decl)
                                                       : parentModule->defaultVisibility;
     }
 
-    // Members of other agg type decls will have their default visibility capped to the parents'.
+    // Members of other agg type decls will have their default visibility capped to the
+    // parents'.
     if (as<NamespaceDecl>(decl))
     {
         return DeclVisibility::Public;
@@ -13324,15 +13367,16 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
 
     // There are two causes for why type checking failed on failedAvailableSet.
     // The first scenario is that failedAvailableSet defines a set of capabilities on a
-    // compilation target (e.g. hlsl) that isn't defined by some callees, for example, if we have
-    // a function:
+    // compilation target (e.g. hlsl) that isn't defined by some callees, for example, if we
+    // have a function:
     //    [require(hlsl)]  // <-- failedAvailableSet
     //    [require(cpp)]
     //    void caller()
     //    {
     //        printf(); // assume this is defined for (cpp | cuda).
     //    }
-    // In this case we should diagnose error reporting printf isn't defined on a required target.
+    // In this case we should diagnose error reporting printf isn't defined on a required
+    // target.
     //
     // Now, we detect if we are case 1.
 
@@ -13349,8 +13393,8 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
                 decl,
                 outFailedAtom);
 
-            // Anything defined on a non-failed target atom may be the culprit to why we fail having
-            // a target capability. Print out all possible culprits.
+            // Anything defined on a non-failed target atom may be the culprit to why we fail
+            // having a target capability. Print out all possible culprits.
             CapabilityAtomSet failedAtomSet;
             failedAtomSet.add((UInt)outFailedAtom);
             CapabilityAtomSet targetsNotUsedSet;
@@ -13374,9 +13418,12 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
         }
     }
 
-    //// The second scenario is when the callee is using a capability that is not provided by the
-    /// requirement. / For example: /     [require(hlsl,b,c)] /     void caller() /     { / useD();
-    ///// require capability (hlsl,d) /     } / In this case we should report that useD() is using a
+    //// The second scenario is when the callee is using a capability that is not provided by
+    /// the
+    /// requirement. / For example: /     [require(hlsl,b,c)] /     void caller() /     { /
+    /// useD();
+    ///// require capability (hlsl,d) /     } / In this case we should report that useD() is
+    /// using a
     /// capability that is not declared by caller.
     ////
 
