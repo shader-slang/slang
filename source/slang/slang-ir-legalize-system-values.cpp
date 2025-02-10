@@ -28,7 +28,6 @@ public:
     {
         for (auto implicitSysVal : m_implicitSystemValueInstructions)
         {
-            // for (auto entryPoint : *m_entryPointReferenceGraph.tryGetValue(implicitSysVal))
             for (auto entryPoint : *m_functionReferenceGraph.tryGetValue(implicitSysVal))
             {
                 auto param = getOrCreateSystemValueVariable(entryPoint, implicitSysVal);

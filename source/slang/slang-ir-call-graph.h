@@ -14,4 +14,19 @@ HashSet<IRFunc*>* getReferencingEntryPoints(
     Dictionary<IRInst*, HashSet<IRFunc*>>& m_referencingEntryPoints,
     IRInst* inst);
 
+
+/*
+class FunctionCallGraph
+{
+public:
+    const HashSet<IRFunc*>* getReferencingFunctions(IRInst* inst) const;
+    const HashSet<IRCall*>* getFunctionCalls(IRFunc* func) const;
+
+private:
+    Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingFunctions;
+    Dictionary<IRFunc*, HashSet<IRCall*>> m_functionCalls;
+};
+*/
+
+
 } // namespace Slang
