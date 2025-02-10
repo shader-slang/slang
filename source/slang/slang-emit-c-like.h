@@ -414,18 +414,18 @@ public:
     /// Emit type attributes that should appear after, e.g., a `struct` keyword
     void emitPostKeywordTypeAttributes(IRInst* inst) { emitPostKeywordTypeAttributesImpl(inst); }
 
-    virtual void emitMemoryQualifiers(IRInst* /*varInst*/){};
+    virtual void emitMemoryQualifiers(IRInst* /*varInst*/) {};
     virtual void emitStructFieldAttributes(
         IRStructType* /* structType */,
         IRStructField* /* field */
-    ){};
+    ) {};
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
     void emitMeshShaderModifiers(IRInst* varInst);
     virtual void emitPackOffsetModifier(
         IRInst* /*varInst*/,
         IRType* /*valueType*/,
         IRPackOffsetDecoration* /*decoration*/
-    ){};
+    ) {};
 
 
     /// Emit modifiers that should apply even for a declaration of an SSA temporary.
@@ -677,6 +677,8 @@ protected:
     // Emit the argument list (including paranthesis) in a `CallInst`
     void _emitCallArgList(IRCall* call, int startingOperandIndex = 1);
     virtual void emitCallArg(IRInst* arg);
+
+    virtual void emitRequireExtension(IRInst* inst) { SLANG_UNUSED(inst); }
 
     String _generateUniqueName(const UnownedStringSlice& slice);
 

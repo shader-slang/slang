@@ -65,6 +65,8 @@ public:
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }
 
+    virtual void emitRequireExtension(IRInst* inst) SLANG_OVERRIDE;
+
 private:
     bool maybeEmitSystemSemantic(IRInst* inst);
 

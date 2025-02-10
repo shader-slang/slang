@@ -3479,6 +3479,16 @@ struct IRRequireGLSLExtension : IRInst
     }
 };
 
+struct IRRequireWGSLExtension : IRInst
+{
+    IR_LEAF_ISA(RequireWGSLExtension)
+    UnownedStringSlice getExtensionName()
+    {
+        return as<IRStringLit>(getOperand(0))->getStringSlice();
+    }
+};
+;
+
 struct IRRequireComputeDerivative : IRInst
 {
     IR_LEAF_ISA(RequireComputeDerivative)

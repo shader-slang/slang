@@ -6,6 +6,9 @@ typedef uint UINT;
 __intrinsic_op($(kIROp_RequireGLSLExtension))
 void __requireGLSLExtension(String extensionName);
 
+__intrinsic_op($(kIROp_RequireWGSLExtension))
+void __requireWGSLExtension(String extensionName);
+
 __intrinsic_op($(kIROp_ImplicitSystemValue))
 uint __implicitSystemValue(String systemValueName);
 
@@ -15055,6 +15058,7 @@ uint WaveGetLaneCount()
             result:$$uint = OpLoad builtin(SubgroupSize:uint)
         };
     case wgsl:
+        __requireWGSLExtension("subgroups");
         return __implicitSystemValue("SV_WaveLaneCount");
     }
 }
@@ -15079,6 +15083,7 @@ uint WaveGetLaneIndex()
             result:$$uint = OpLoad builtin(SubgroupLocalInvocationId:uint)
         };
     case wgsl:
+        __requireWGSLExtension("subgroups");
         return __implicitSystemValue("SV_WaveLaneIndex");
     }
 }
