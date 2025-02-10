@@ -245,7 +245,7 @@ void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink)
             &functionReferenceGraph,
             &callReferenceGraph);
         legalizeImplicitSystemValues(
-            entryPointReferenceGraph,
+            module,
             functionReferenceGraph,
             callReferenceGraph,
             instContext.implicitSystemValueInstructions);
