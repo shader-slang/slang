@@ -93,21 +93,15 @@ struct GlobalVarTranslationContext
 
                     // If the input is a struct, we need to add all the fields to the input
                     // struct type.
-                    int i = 0;
-                    
                     for (auto field : structType->getFields())
-                    {
-                        i++;
-                        printf("iteration %d\n", i);
-                        
+                    {   
                         IRTypeLayout::Builder nestedFieldTypeLayout(&builder);
                         IRVarLayout::Builder nestedVarLayoutBuilder(&builder, nestedFieldTypeLayout.build());
                         nestedFieldTypeLayout.addResourceUsage(
                             LayoutResourceKind::VaryingInput,
                             LayoutSize(1));
-                        auto fieldKey = builder.createStructKey();
-                        //builder.createStructField(structType, fieldKey, field->getFieldType());                        
-                        structTypeLayoutBuilder.addField(fieldKey, nestedVarLayoutBuilder.build());                        
+                        auto fieldKey = builder.createStructKey();                      
+                        structTypeLayoutBuilder.addField(fieldKey, nestedVarLayoutBuilder.build());
                     }
                 }
                 else
@@ -174,10 +168,26 @@ struct GlobalVarTranslationContext
                         .emitFieldExtract(inputType, builder.emitLoad(inputParam), inputKeys[i]));
                 // Relate "global variable" to a "global parameter" for use later in compilation
                 // to resolve a "global variable" shadowing a "global parameter" relationship.
-                builder.addGlobalVariableShadowingGlobalParameterDecoration(
-                    inputParam,
-                    input,
-                    inputKeys[i]);
+                
+                // Decorate either the input or nested fields with "shadowing".                
+                if (auto inputStructType = as<IRStructType>(inputType))
+                {
+                    // TODO: Recurse into nested fields, this works on only one level of nesting.
+                    for (auto field : inputStructType->getFields())
+                    {                        
+                        builder.addGlobalVariableShadowingGlobalParameterDecoration(
+                            inputParam,
+                            field,
+                            field->getKey());
+                    }
+                }
+                else
+                {
+                    builder.addGlobalVariableShadowingGlobalParameterDecoration(
+                        inputParam,
+                        input,
+                        inputKeys[i]);
+                }
             }
 
             // For each entry point, introduce a new parameter to represent each input parameter,

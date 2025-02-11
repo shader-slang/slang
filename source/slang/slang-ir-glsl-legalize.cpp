@@ -3275,6 +3275,9 @@ void legalizeEntryPointParameterForGLSL(
             ptrType->getAddressSpace() == AddressSpace::Input ||
             ptrType->getAddressSpace() == AddressSpace::BuiltinInput);
 
+//DEBUG
+// printf("Before global value for varying input:\n");
+pp->getModule()->getModuleInst()->dump();
         auto globalValue = createGLSLGlobalVaryings(
             context,
             codeGenContext,
@@ -3284,6 +3287,12 @@ void legalizeEntryPointParameterForGLSL(
             LayoutResourceKind::VaryingInput,
             stage,
             pp);
+
+// DEBUG
+// Dump IR
+printf("Created global value for varying input:\n");
+pp->getModule()->getModuleInst()->dump();
+                
         tryReplaceUsesOfStageInput(context, globalValue, pp);
         for (auto dec : pp->getDecorations())
         {
@@ -3298,13 +3307,35 @@ void legalizeEntryPointParameterForGLSL(
             {
                 for (auto elem : tupleVal->elements)
                 {
-                    if (elem.key == key)
+                    // check if elem is a tuple
+                    if (elem.val.flavor == ScalarizedVal::Flavor::tuple)
                     {
-                        realGlobalVar = elem.val.irValue;
-                        break;
+                        if (auto tupleVal = as<ScalarizedTupleValImpl>(elem.val.impl))
+                        {
+                            for (auto elem2 : tupleVal->elements)
+                            {
+                                if (elem2.key == key)
+                                {
+                                    realGlobalVar = elem2.val.irValue;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        if (elem.key == key)
+                        {
+                            realGlobalVar = elem.val.irValue;
+                            break;
+                        }
                     }
                 }
             }
+
+//DEBUG
+if (!realGlobalVar)
+    printf("Warning: Could not find real global var for shadowing decoration\n");
             SLANG_ASSERT(realGlobalVar);
 
             // Remove all stores into the global var introduced during
@@ -3331,6 +3362,12 @@ void legalizeEntryPointParameterForGLSL(
             globalVar->replaceUsesWith(realGlobalVar);
             globalVar->removeAndDeallocate();
         }
+
+// DEBUG
+// Dump IR
+printf("Replaced global accessed with shadow:\n");
+pp->getModule()->getModuleInst()->dump();
+printf("printed\n");
     }
     else
     {
