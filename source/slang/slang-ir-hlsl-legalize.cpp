@@ -33,7 +33,7 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
                         continue;
                     auto forceStructArg = arg->getOperand(0);
                     auto forceStructBaseType =
-                        as<IRType>(forceStructArg->getDataType()->getOperand(0));
+                        (IRType*)(forceStructArg->getDataType()->getOperand(0));
                     if (forceStructBaseType->getOp() == kIROp_StructType)
                     {
                         call->setArg(i, arg->getOperand(0));

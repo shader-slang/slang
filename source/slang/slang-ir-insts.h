@@ -1143,7 +1143,7 @@ struct IRMixedDifferentialInstDecoration : IRAutodiffInstDecoration
     IRUse pairType;
     IR_LEAF_ISA(MixedDifferentialInstDecoration)
 
-    IRType* getPairType() { return as<IRType>(getOperand(0)); }
+    IRType* getPairType() { return (IRType*)(getOperand(0)); }
 };
 
 struct IRRecomputeBlockDecoration : IRAutodiffInstDecoration
