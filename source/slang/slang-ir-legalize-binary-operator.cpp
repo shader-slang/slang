@@ -118,4 +118,101 @@ void legalizeBinaryOp(IRInst* inst)
     }
 }
 
+void legalizeLogicalAndOr(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_And:
+    case kIROp_Or:
+        {
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+
+            // Logical-AND and logical-OR takes boolean types as its operands.
+            // If they are not, legalize them by casting to boolean type.
+            //
+            SLANG_ASSERT(inst->getOperandCount() == 2);
+            for (UInt i = 0; i < 2; i++)
+            {
+                auto operand = inst->getOperand(i);
+                auto operandDataType = operand->getDataType();
+
+                if (auto vecType = as<IRVectorType>(operandDataType))
+                {
+                    if (!as<IRBoolType>(vecType->getElementType()))
+                    {
+                        // Cast operand to vector<bool,N>
+                        auto elemCount = vecType->getElementCount();
+                        auto vb = builder.getVectorType(builder.getBoolType(), elemCount);
+                        auto v = builder.emitCast(vb, operand);
+                        builder.replaceOperand(inst->getOperands() + i, v);
+                    }
+                }
+                else if (!as<IRBoolType>(operandDataType))
+                {
+                    // Cast operand to bool
+                    auto s = builder.emitCast(builder.getBoolType(), operand);
+                    builder.replaceOperand(inst->getOperands() + i, s);
+                }
+            }
+
+            // Legalize the return type; mostly for SPIRV.
+            // The return type of OpLogicalOr must be boolean type.
+            // If not, we need to recreate the instruction with boolean return type.
+            // Then, we have to cast it back to the original type so that other instrucitons that
+            // use have the matching types.
+            //
+            auto dataType = inst->getDataType();
+            auto lhs = inst->getOperand(0);
+            auto rhs = inst->getOperand(1);
+            IRInst* newInst = nullptr;
+
+            if (auto vecType = as<IRVectorType>(dataType))
+            {
+                if (!as<IRBoolType>(vecType->getElementType()))
+                {
+                    // Return type should be vector<bool,N>
+                    auto elemCount = vecType->getElementCount();
+                    auto vb = builder.getVectorType(builder.getBoolType(), elemCount);
+
+                    if (inst->getOp() == kIROp_And)
+                    {
+                        newInst = builder.emitAnd(vb, lhs, rhs);
+                    }
+                    else
+                    {
+                        newInst = builder.emitOr(vb, lhs, rhs);
+                    }
+                    newInst = builder.emitCast(dataType, newInst);
+                }
+            }
+            else if (!as<IRBoolType>(dataType))
+            {
+                // Return type should be bool
+                if (inst->getOp() == kIROp_And)
+                {
+                    newInst = builder.emitAnd(builder.getBoolType(), lhs, rhs);
+                }
+                else
+                {
+                    newInst = builder.emitOr(builder.getBoolType(), lhs, rhs);
+                }
+                newInst = builder.emitCast(dataType, newInst);
+            }
+
+            if (newInst && inst != newInst)
+            {
+                inst->replaceUsesWith(newInst);
+                inst->removeAndDeallocate();
+            }
+        }
+        break;
+    }
+
+    for (auto child : inst->getModifiableChildren())
+    {
+        legalizeLogicalAndOr(child);
+    }
+}
+
 } // namespace Slang

@@ -5,6 +5,7 @@
 #include "slang-io.h"
 #include "slang-process.h"
 
+#include <stdio.h>
 #include <thread>
 
 namespace Slang

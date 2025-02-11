@@ -13,4 +13,9 @@ struct IRInst;
 //   signed operand is converted to unsigned.
 void legalizeBinaryOp(IRInst* inst);
 
+// The logical binary operators such as AND and OR takes boolean types are its input.
+// If they are in integer type, as an example, we need to explicitly cast to bool type.
+// Also the return type from the logical operators should be a boolean type.
+void legalizeLogicalAndOr(IRInst* inst);
+
 } // namespace Slang

@@ -12322,15 +12322,16 @@ static Expr* _getParamDefaultValue(SemanticsVisitor* visitor, VarDeclBase* varDe
 bool SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* structDecl)
 {
     // If a type or its base type already defines any explicit constructors, do not synthesize any
-    // constructors. see:
-    // https://github.com/shader-slang/slang/blob/master/docs/proposals/004-initialization.md#inheritance-initialization
+    // constructors.
+    // See
+    // https://github.com/shader-slang/spec/blob/main/proposals/004-initialization.md#inheritance-initialization
     if (_hasExplicitConstructor(structDecl, true))
         return false;
 
     // synthesize the signature first.
     // The constructor's visibility level is the same as the struct itself.
-    // See:
-    // https://github.com/shader-slang/slang/blob/master/docs/proposals/004-initialization.md#synthesis-of-constructors-for-member-initialization
+    // See
+    // https://github.com/shader-slang/spec/blob/main/proposals/004-initialization.md#synthesis-of-constructors-for-member-initialization
     DeclVisibility ctorVisibility = getDeclVisibility(structDecl);
 
     // Only the members whose visibility level is higher or equal than the
