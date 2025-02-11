@@ -56,16 +56,16 @@ struct Partial
 // Warnings here should be a bit different
 struct Implicit
 {
-    //CHK-DAG: warning 41021: default initializer for 'Implicit' will not initialize field 'a'
     int a;
     int b = 1;
-    //CHK-DAG: warning 41021: default initializer for 'Implicit' will not initialize field 'c'
     int c;
     int d = 1 + 1;
 }
 
 int using_implicit(int x)
 {
+    // no default constructor will be called, because there is no __init() synthesized for `Implicit`
+    // so no warnings will be reported on members of `Implicit`
     Implicit impl;
     impl.a = x;
     return impl.c;

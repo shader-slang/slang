@@ -161,8 +161,8 @@ static void _lookUpMembersInValue(
 static bool _isUncheckedLocalVar(const Decl* decl)
 {
     auto checkStateExt = decl->checkState;
-    auto isUnchecked =
-        checkStateExt.getState() == DeclCheckState::Unchecked || checkStateExt.isBeingChecked();
+    auto isUnchecked = checkStateExt.getState() == DeclCheckState::Unchecked ||
+                       checkStateExt.isBeingChecked() || decl->hiddenFromLookup;
     return isUnchecked && isLocalVar(decl);
 }
 

@@ -515,6 +515,17 @@ struct IRNVAPISlotDecoration : IRDecoration
     UnownedStringSlice getSpaceName() { return getSpaceNameOperand()->getStringSlice(); }
 };
 
+struct IRMaxTessFactorDecoration : IRDecoration
+{
+    enum
+    {
+        kOp = kIROp_MaxTessFactorDecoration
+    };
+    IR_LEAF_ISA(MaxTessFactorDecoration)
+
+    IRFloatLit* getMaxTessFactor() { return cast<IRFloatLit>(getOperand(0)); }
+};
+
 struct IROutputControlPointsDecoration : IRDecoration
 {
     enum
@@ -2413,7 +2424,7 @@ struct IRCall : IRInst
     IR_LEAF_ISA(Call)
 
     IRInst* getCallee() { return getOperand(0); }
-
+    IRUse* getCalleeUse() { return getOperands(); }
     UInt getArgCount() { return getOperandCount() - 1; }
     IRUse* getArgs() { return getOperands() + 1; }
     IROperandList<IRInst> getArgsList()
@@ -3656,6 +3667,7 @@ public:
     IRBasicType* getUInt64Type();
     IRBasicType* getUInt16Type();
     IRBasicType* getUInt8Type();
+    IRBasicType* getFloatType();
     IRBasicType* getCharType();
     IRStringType* getStringType();
     IRNativeStringType* getNativeStringType();
@@ -3868,6 +3880,8 @@ public:
     // Set the data type of an instruction, while preserving
     // its rate, if any.
     void setDataType(IRInst* inst, IRType* dataType);
+
+    IRInst* emitGetCurrentStage();
 
     /// Extract the value wrapped inside an existential box.
     IRInst* emitGetValueFromBoundInterface(IRType* type, IRInst* boundInterfaceValue);
@@ -4505,6 +4519,9 @@ public:
 
     IRInst* emitShr(IRType* type, IRInst* op0, IRInst* op1);
     IRInst* emitShl(IRType* type, IRInst* op0, IRInst* op1);
+
+    IRInst* emitAnd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitOr(IRType* type, IRInst* left, IRInst* right);
 
     IRSPIRVAsmOperand* emitSPIRVAsmOperandLiteral(IRInst* literal);
     IRSPIRVAsmOperand* emitSPIRVAsmOperandInst(IRInst* inst);

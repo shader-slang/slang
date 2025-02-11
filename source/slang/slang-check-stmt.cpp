@@ -54,6 +54,8 @@ void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
     // that need to be recursively checked.
     //
     ensureDeclBase(stmt->decl, DeclCheckState::DefinitionChecked, this);
+    if (auto decl = as<Decl>(stmt->decl))
+        decl->hiddenFromLookup = false;
 }
 
 void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
@@ -66,14 +68,41 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
             if (as<AggTypeDeclBase>(decl))
                 ensureAllDeclsRec(decl, DeclCheckState::DefinitionChecked);
         }
+
+        // Consider this code:
+        // ```
+        // {
+        //       int a = 5 + b; // should error.
+        //       int b = 3;
+        // }
+        //
+        // ```
+        // In order to detect the error trying to use `b` before it's declared within
+        // a block, our lookup logic contains a condition that ignores a decl if its
+        // `hiddenFromLookup` field is set to `true`.
+        // See _lookUpDirectAndTransparentMembers().
+        // This field will be set to false when we reach the decl through the DeclStmt.
+        //
+        if (auto seqStmt = as<SeqStmt>(stmt->body))
+        {
+            for (auto subStmt : seqStmt->stmts)
+            {
+                if (auto declStmt = as<DeclStmt>(subStmt))
+                {
+                    if (auto decl = as<Decl>(declStmt->decl))
+                        decl->hiddenFromLookup = true;
+                }
+            }
+        }
     }
     checkStmt(stmt->body);
 }
 
 void SemanticsStmtVisitor::visitSeqStmt(SeqStmt* stmt)
 {
-    for (auto ss : stmt->stmts)
+    for (auto& ss : stmt->stmts)
     {
+        ss = maybeParseStmt(ss, *this);
         checkStmt(ss);
     }
 }
@@ -338,6 +367,40 @@ void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
     HashSet<Stmt*> checkedStmt;
     for (auto caseStmt : stmt->targetCases)
     {
+        CapabilitySet set((CapabilityName)caseStmt->capability);
+
+        CapabilityName canonicalStage = CapabilityName::Invalid;
+        bool isStage = isStageAtom((CapabilityName)caseStmt->capability, canonicalStage);
+        if (as<StageSwitchStmt>(stmt))
+        {
+            if (!isStage && caseStmt->capability != 0)
+            {
+                getSink()->diagnose(
+                    caseStmt->capabilityToken.loc,
+                    Diagnostics::unknownStageName,
+                    caseStmt->capabilityToken);
+            }
+            caseStmt->capability = (int)canonicalStage;
+        }
+        else
+        {
+            if (isStage)
+            {
+                getSink()->diagnose(
+                    caseStmt->capabilityToken.loc,
+                    Diagnostics::targetSwitchCaseCannotBeAStage);
+            }
+            else if (
+                caseStmt->capabilityToken.getContentLength() != 0 &&
+                (set.getCapabilityTargetSets().getCount() != 1 || set.isInvalid() || set.isEmpty()))
+            {
+                getSink()->diagnose(
+                    caseStmt->capabilityToken.loc,
+                    Diagnostics::invalidTargetSwitchCase,
+                    capabilityNameToString((CapabilityName)caseStmt->capability));
+            }
+        }
+
         if (checkedStmt.contains(caseStmt->body))
             continue;
         subContext.checkStmt(caseStmt);
@@ -348,22 +411,12 @@ void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
 void SemanticsStmtVisitor::visitTargetCaseStmt(TargetCaseStmt* stmt)
 {
     auto switchStmt = FindOuterStmt<TargetSwitchStmt>();
-    CapabilitySet set((CapabilityName)stmt->capability);
     if (getShared()->isInLanguageServer() &&
         getShared()->getSession()->getCompletionRequestTokenName() ==
             stmt->capabilityToken.getName())
     {
         getShared()->getLinkage()->contentAssistInfo.completionSuggestions.scopeKind =
             CompletionSuggestions::ScopeKind::Capabilities;
-    }
-
-    if (stmt->capabilityToken.getContentLength() != 0 &&
-        (set.getCapabilityTargetSets().getCount() != 1 || set.isInvalid() || set.isEmpty()))
-    {
-        getSink()->diagnose(
-            stmt->capabilityToken.loc,
-            Diagnostics::invalidTargetSwitchCase,
-            capabilityNameToString((CapabilityName)stmt->capability));
     }
     if (!switchStmt)
     {

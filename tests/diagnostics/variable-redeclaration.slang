@@ -37,7 +37,7 @@ int testLocalShadowing(int x)
 }
 
 // Structure fields
-
+// Note: more diagnostics will be reported here because of the constructor synthesis
 struct S
 {
 	int f;

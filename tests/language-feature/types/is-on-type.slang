@@ -1,5 +1,6 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -vk
 
 // Test that `is` operator works on generic type param.
 
@@ -39,7 +40,7 @@ func test<T : I>(T t) -> int
 [numthreads(1,1, 1)]
 void computeMain()
 {
-    B b;
+    B b = {};
     // CHECK: 2
     outputBuffer[0] = test(b);
 }
