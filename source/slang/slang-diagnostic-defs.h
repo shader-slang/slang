@@ -456,6 +456,11 @@ DIAGNOSTIC(
     Error,
     unexpectedTokenExpectedComponentDefinition,
     "unexpected token '$0', only component definitions are allowed in a shader scope.")
+DIAGNOSTIC(
+    20005,
+    Error,
+    invalidEmptyParenthesisExpr,
+    "empty parenthesis '()' is not a valid expression.")
 DIAGNOSTIC(20008, Error, invalidOperator, "invalid operator '$0'.")
 DIAGNOSTIC(20011, Error, unexpectedColon, "unexpected ':'.")
 DIAGNOSTIC(
@@ -556,6 +561,13 @@ DIAGNOSTIC(
     Error,
     spirvUndefinedId,
     "SPIRV id '%$0' is not defined in the current assembly block location")
+
+DIAGNOSTIC(
+    29115,
+    Error,
+    targetSwitchCaseCannotBeAStage,
+    "cannot use a stage name in '__target_switch', use '__stage_switch' for stage-specific code.")
+
 //
 // 3xxxx - Semantic analysis
 //
@@ -1040,6 +1052,12 @@ DIAGNOSTIC(
     attributeExpectedStringArg,
     "attribute '$0' expects argument $1 to be string")
 
+DIAGNOSTIC(
+    31009,
+    Error,
+    expectedSingleFloatArg,
+    "attribute '$0' expects a single floating point argument")
+
 DIAGNOSTIC(31100, Error, unknownStageName, "unknown stage name '$0'")
 DIAGNOSTIC(31101, Error, unknownImageFormatName, "unknown image format '$0'")
 DIAGNOSTIC(31101, Error, unknownDiagnosticName, "unknown diagnostic '$0'")
@@ -1190,6 +1208,12 @@ DIAGNOSTIC(
     Error,
     overloadedFuncUsedWithDerivativeOfAttributes,
     "cannot resolve overloaded functions for derivative-of attributes.")
+DIAGNOSTIC(
+    31158,
+    Error,
+    primalSubstituteTargetMustHaveHigherDifferentiabilityLevel,
+    "primal substitute function for differentiable method must also be differentiable. Use "
+    "[Differentiable] or [TreatAsDifferentiable] (for empty derivatives)")
 
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 DIAGNOSTIC(31201, Error, modifierNotAllowed, "modifier '$0' is not allowed here.")

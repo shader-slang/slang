@@ -410,6 +410,9 @@ INST(InterfaceRequirementEntry, interface_req_entry, 2, GLOBAL)
 // We will materialize this inst during `translateGLSLGlobalVar`.
 INST(GetWorkGroupSize, GetWorkGroupSize, 0, HOISTABLE)
 
+// An inst that returns the current stage of the calling entry point.
+INST(GetCurrentStage, GetCurrentStage, 0, 0)
+
 INST(Param, param, 0, 0)
 INST(StructField, field, 2, 0)
 INST(Var, var, 0, 0)
@@ -756,6 +759,9 @@ INST(GetPerVertexInputArray, GetPerVertexInputArray, 1, HOISTABLE)
 INST(ResolveVaryingInputRef, ResolveVaryingInputRef, 1, HOISTABLE)
 
 INST(ForceVarIntoStructTemporarily, ForceVarIntoStructTemporarily, 1, 0)
+INST(ForceVarIntoRayPayloadStructTemporarily, ForceVarIntoRayPayloadStructTemporarily, 1, 0)
+INST_RANGE(ForceVarIntoStructTemporarily, ForceVarIntoStructTemporarily, ForceVarIntoRayPayloadStructTemporarily)
+
 INST(MetalAtomicCast, MetalAtomicCast, 1, 0)
 
 INST(IsTextureAccess, IsTextureAccess, 1, 0)
@@ -845,6 +851,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(DownstreamModuleExportDecoration,  downstreamModuleExport, 0, 0)
     INST(DownstreamModuleImportDecoration,  downstreamModuleImport, 0, 0)
     INST(PatchConstantFuncDecoration,       patchConstantFunc,      1, 0)
+    INST(MaxTessFactorDecoration,           maxTessFactor,          1, 0)
     INST(OutputControlPointsDecoration,     outputControlPoints,    1, 0)
     INST(OutputTopologyDecoration,          outputTopology,         1, 0)
     INST(PartitioningDecoration,            partioning,             1, 0)
@@ -988,6 +995,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
+    INST(RayPayloadDecoration, raypayload, 0, 0)
 
     /* Mesh Shader outputs */
         INST(VerticesDecoration, vertices, 1, 0)

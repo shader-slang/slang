@@ -52,6 +52,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-legalize-array-return-type.h"
+#include "slang-ir-legalize-binary-operator.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-mesh-outputs.h"
@@ -90,6 +91,7 @@
 #include "slang-ir-specialize-buffer-load-arg.h"
 #include "slang-ir-specialize-matrix-layout.h"
 #include "slang-ir-specialize-resources.h"
+#include "slang-ir-specialize-stage-switch.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-ssa.h"
@@ -322,6 +324,7 @@ struct RequiredLoweringPassSet
     bool dynamicResource;
     bool dynamicResourceHeap;
     bool resolveVaryingInputRef;
+    bool specializeStageSwitch;
 };
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
@@ -443,6 +446,9 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_ResolveVaryingInputRef:
         result.resolveVaryingInputRef = true;
+        break;
+    case kIROp_GetCurrentStage:
+        result.specializeStageSwitch = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -1031,6 +1037,10 @@ Result linkAndOptimizeIR(
         cleanupGenerics(targetProgram, irModule, sink);
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER-LOWER-GENERICS");
 
+    // After dynamic dispatch logic is resolved into ordinary function calls,
+    // we can now run our stage specialization logic.
+    if (requiredLoweringPassSet.specializeStageSwitch)
+        specializeStageSwitch(irModule);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 #if 0
@@ -1463,6 +1473,10 @@ Result linkAndOptimizeIR(
     {
         floatNonUniformResourceIndex(irModule, NonUniformResourceIndexFloatMode::Textual);
     }
+
+    if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
+        isWGPUTarget(targetRequest) || isMetalTarget(targetRequest))
+        legalizeLogicalAndOr(irModule->getModuleInst());
 
     // Legalize non struct parameters that are expected to be structs for HLSL.
     if (isD3DTarget(targetRequest))

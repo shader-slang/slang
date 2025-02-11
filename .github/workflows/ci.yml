@@ -184,6 +184,10 @@ jobs:
            --platform "${{matrix.platform}}" \
            --config "${{matrix.config}}" \
            --skip-file tests/expected-example-failure-github.txt
+      - name: Run slangc tests
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm'
+        run: |
+          PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
         if: steps.filter.outputs.should-run == 'true' && matrix.full-gpu-tests && matrix.platform != 'wasm'
         run: |

@@ -13,6 +13,10 @@
 #include "slang-support.h"
 #include "window.h"
 
+#if defined(_WIN32)
+#include <d3d12.h>
+#endif
+
 #include <slang-rhi.h>
 #include <slang-rhi/acceleration-structure-utils.h>
 #include <slang-rhi/shader-cursor.h>
@@ -1390,6 +1394,20 @@ static SlangResult _innerMain(
 
         desc.requiredFeatures = requiredFeatureList.getBuffer();
         desc.requiredFeatureCount = (int)requiredFeatureList.getCount();
+
+#if defined(_WIN32)
+        // When the experimental feature is enabled, things become unstable.
+        // It is enabled only when requested.
+        D3D12ExperimentalFeaturesDesc experimentalFD = {};
+        UUID features[1] = {D3D12ExperimentalShaderModels};
+        experimentalFD.featureCount = 1;
+        experimentalFD.featureIIDs = features;
+        experimentalFD.configurationStructs = nullptr;
+        experimentalFD.configurationStructSizes = nullptr;
+
+        if (options.dx12Experimental)
+            desc.next = &experimentalFD;
+#endif
 
         // Look for args going to slang
         {

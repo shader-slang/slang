@@ -118,6 +118,7 @@ protected:
 
     void _emitHLSLDecorationSingleString(const char* name, IRFunc* entryPoint, IRStringLit* val);
     void _emitHLSLDecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val);
+    void _emitHLSLDecorationSingleFloat(const char* name, IRFunc* entryPoint, IRFloatLit* val);
 
     void _emitStageAccessSemantic(IRStageAccessDecoration* decoration, const char* name);
 };

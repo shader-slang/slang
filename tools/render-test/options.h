@@ -89,6 +89,8 @@ struct Options
 
     bool enableBackendValidation = false;
 
+    bool dx12Experimental = false;
+
     Options() { downstreamArgs.addName("slang"); }
 
     static SlangResult parse(
