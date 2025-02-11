@@ -1,0 +1,9 @@
+result code = -1
+standard error = {
+tests/diagnostics/test1.slang(31): warning 41016: use of uninitialized variable 'foo'
+    const let result = process(foo);
+                              ^
+tests/diagnostics/test1.slang(5): error 56003: use of uninitialized resource type 'Texture2D'.
+struct Foo
+       ^~~
+}

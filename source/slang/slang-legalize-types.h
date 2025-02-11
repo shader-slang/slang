@@ -592,8 +592,9 @@ struct IRTypeLegalizationContext
     IRBuilder* builder;
     TargetProgram* targetProgram;
     IRBuilder builderStorage;
+    DiagnosticSink* m_sink;
 
-    IRTypeLegalizationContext(TargetProgram* target, IRModule* inModule);
+    IRTypeLegalizationContext(TargetProgram* target, IRModule* inModule, DiagnosticSink* sink);
 
     // When inserting new globals, put them before this one.
     IRInst* insertBeforeGlobal = nullptr;

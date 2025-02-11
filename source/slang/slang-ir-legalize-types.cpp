@@ -91,7 +91,7 @@ LegalVal LegalVal::wrappedBuffer(LegalVal const& baseVal, LegalElementWrapping c
 
 //
 
-IRTypeLegalizationContext::IRTypeLegalizationContext(TargetProgram* target, IRModule* inModule)
+IRTypeLegalizationContext::IRTypeLegalizationContext(TargetProgram* target, IRModule* inModule, DiagnosticSink* sink)
 {
     targetProgram = target;
 
@@ -100,6 +100,8 @@ IRTypeLegalizationContext::IRTypeLegalizationContext(TargetProgram* target, IRMo
 
     builderStorage = IRBuilder(inModule);
     builder = &builderStorage;
+
+    m_sink = sink;
 }
 
 static void registerLegalizedValue(
@@ -2046,6 +2048,22 @@ static LegalVal coerceToLegalType(IRTypeLegalizationContext* context, LegalType 
     }
 }
 
+static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* inst)
+{
+    if (auto structType = as<IRStructType>(inst->getFullType()))
+    {
+        for (auto field: structType->getFields())
+        {
+            if (isResourceType(field->getFieldType()))
+            {
+                context->m_sink->diagnose(field, Diagnostics::useOfUninitializedResouceType, field->getFieldType());
+                SLANG_ABORT_COMPILATION("use of uninitialized resource type");
+            }
+        }
+    }
+    return LegalVal();
+}
+
 static LegalVal legalizeInst(
     IRTypeLegalizationContext* context,
     IRInst* inst,
@@ -2122,7 +2140,7 @@ static LegalVal legalizeInst(
         result = legalizePrintf(context, args);
         break;
     case kIROp_undefined:
-        return LegalVal();
+        return legalizeUndefined(context, inst);
     case kIROp_GpuForeach:
         // This case should only happen when compiling for a target that does not support
         // GpuForeach
@@ -4015,8 +4033,8 @@ static void legalizeTypes(IRTypeLegalizationContext* context)
 //
 struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
 {
-    IRResourceTypeLegalizationContext(TargetProgram* target, IRModule* module)
-        : IRTypeLegalizationContext(target, module)
+    IRResourceTypeLegalizationContext(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+        : IRTypeLegalizationContext(target, module, sink)
     {
     }
 
@@ -4046,8 +4064,8 @@ struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
 //
 struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
 {
-    IRExistentialTypeLegalizationContext(TargetProgram* target, IRModule* module)
-        : IRTypeLegalizationContext(target, module)
+    IRExistentialTypeLegalizationContext(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+        : IRTypeLegalizationContext(target, module, sink)
     {
     }
 
@@ -4087,8 +4105,8 @@ struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
 // a public function signature.
 struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 {
-    IREmptyTypeLegalizationContext(TargetProgram* target, IRModule* module)
-        : IRTypeLegalizationContext(target, module)
+    IREmptyTypeLegalizationContext(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+        : IRTypeLegalizationContext(target, module, sink)
     {
     }
 
@@ -4129,9 +4147,7 @@ void legalizeResourceTypes(TargetProgram* target, IRModule* module, DiagnosticSi
 {
     SLANG_PROFILE;
 
-    SLANG_UNUSED(sink);
-
-    IRResourceTypeLegalizationContext context(target, module);
+    IRResourceTypeLegalizationContext context(target, module, sink);
     legalizeTypes(&context);
 }
 
@@ -4139,18 +4155,13 @@ void legalizeExistentialTypeLayout(TargetProgram* target, IRModule* module, Diag
 {
     SLANG_PROFILE;
 
-    SLANG_UNUSED(module);
-    SLANG_UNUSED(sink);
-
-    IRExistentialTypeLegalizationContext context(target, module);
+    IRExistentialTypeLegalizationContext context(target, module, sink);
     legalizeTypes(&context);
 }
 
 void legalizeEmptyTypes(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
 {
-    SLANG_UNUSED(sink);
-
-    IREmptyTypeLegalizationContext context(target, module);
+    IREmptyTypeLegalizationContext context(target, module, sink);
     legalizeTypes(&context);
 }
 
