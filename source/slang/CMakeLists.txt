@@ -197,6 +197,7 @@ add_custom_target(
         "${CMAKE_CURRENT_BINARY_DIR}/slang-version-header/slang-tag-version.h"
         "${CMAKE_BINARY_DIR}/$<CONFIG>/include/slang-tag-version.h"
 )
+set_target_properties(copy_slang_headers PROPERTIES FOLDER "generated")
 
 #
 # Slang itself
