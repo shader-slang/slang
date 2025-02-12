@@ -3192,6 +3192,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     void ensureAtomicCapability(IRInst* atomicInst, SpvOp op)
     {
         auto typeOp = atomicInst->getDataType()->getOp();
+        if (typeOp == kIROp_VoidType)
+        {
+            auto ptrType = atomicInst->getOperand(0)->getDataType();
+            IRBuilder builder(atomicInst);
+            if (auto valType = tryGetPointedToType(&builder, ptrType))
+            {
+                if (auto atomicType = as<IRAtomicType>(valType))
+                    valType = atomicType->getElementType();
+                typeOp = valType->getOp();
+            }
+        }
         switch (op)
         {
         case SpvOpAtomicFAddEXT:
@@ -5094,18 +5105,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         SpvBuiltIn builtinName;
         SpvStorageClass storageClass = SpvStorageClassInput;
+        bool flat = false;
         BuiltinSpvVarKey() = default;
-        BuiltinSpvVarKey(SpvBuiltIn builtin, SpvStorageClass storageClass)
-            : builtinName(builtin), storageClass(storageClass)
+        BuiltinSpvVarKey(SpvBuiltIn builtin, SpvStorageClass storageClass, bool isFlat)
+            : builtinName(builtin), storageClass(storageClass), flat(isFlat)
         {
         }
         bool operator==(const BuiltinSpvVarKey& other) const
         {
-            return builtinName == other.builtinName && storageClass == other.storageClass;
+            return builtinName == other.builtinName && storageClass == other.storageClass &&
+                   flat == other.flat;
         }
         HashCode getHashCode() const
         {
-            return combineHash(Slang::getHashCode(builtinName), Slang::getHashCode(storageClass));
+            return combineHash(
+                Slang::getHashCode(builtinName),
+                Slang::getHashCode(storageClass),
+                Slang::getHashCode(flat));
         }
     };
     Dictionary<BuiltinSpvVarKey, SpvInst*> m_builtinGlobalVars;
@@ -5127,26 +5143,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return false;
     }
 
-    void maybeEmitFlatDecorationForBuiltinVar(IRInst* irInst, SpvInst* spvInst)
+    bool needFlatDecorationForBuiltinVar(IRInst* irInst)
     {
         if (!irInst)
-            return;
+            return false;
         if (irInst->getOp() != kIROp_GlobalVar && irInst->getOp() != kIROp_GlobalParam)
-            return;
+            return false;
         auto ptrType = as<IRPtrType>(irInst->getDataType());
         if (!ptrType)
-            return;
+            return false;
         auto addrSpace = ptrType->getAddressSpace();
         if (addrSpace == AddressSpace::Input || addrSpace == AddressSpace::BuiltinInput)
         {
             if (isIntegralScalarOrCompositeType(ptrType->getValueType()))
             {
                 if (isInstUsedInStage(irInst, Stage::Fragment))
-                    _maybeEmitInterpolationModifierDecoration(
-                        IRInterpolationMode::NoInterpolation,
-                        getID(spvInst));
+                    return true;
             }
         }
+        return false;
     }
 
     SpvInst* getBuiltinGlobalVar(IRType* type, SpvBuiltIn builtinVal, IRInst* irInst)
@@ -5155,7 +5170,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto ptrType = as<IRPtrTypeBase>(type);
         SLANG_ASSERT(ptrType && "`getBuiltinGlobalVar`: `type` must be ptr type.");
         auto storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
-        auto key = BuiltinSpvVarKey(builtinVal, storageClass);
+        bool isFlat = needFlatDecorationForBuiltinVar(irInst);
+        auto key = BuiltinSpvVarKey(builtinVal, storageClass, isFlat);
         if (m_builtinGlobalVars.tryGetValue(key, result))
         {
             return result;
@@ -5185,7 +5201,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         m_builtinGlobalVars[key] = varInst;
 
-        maybeEmitFlatDecorationForBuiltinVar(irInst, varInst);
+        if (isFlat)
+        {
+            _maybeEmitInterpolationModifierDecoration(
+                IRInterpolationMode::NoInterpolation,
+                getID(varInst));
+        }
 
         return varInst;
     }

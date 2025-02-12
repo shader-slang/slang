@@ -1208,6 +1208,12 @@ DIAGNOSTIC(
     Error,
     overloadedFuncUsedWithDerivativeOfAttributes,
     "cannot resolve overloaded functions for derivative-of attributes.")
+DIAGNOSTIC(
+    31158,
+    Error,
+    primalSubstituteTargetMustHaveHigherDifferentiabilityLevel,
+    "primal substitute function for differentiable method must also be differentiable. Use "
+    "[Differentiable] or [TreatAsDifferentiable] (for empty derivatives)")
 
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 DIAGNOSTIC(31201, Error, modifierNotAllowed, "modifier '$0' is not allowed here.")
