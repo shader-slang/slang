@@ -123,7 +123,6 @@ set(core_module_source_common_args
     generated
     EXPLICIT_SOURCE
     ./slang-embedded-core-module-source.cpp
-    ${core_module_meta_generated_headers}
     REQUIRES
     generate-core-module-headers
     EXTRA_COMPILE_DEFINITIONS_PRIVATE
@@ -138,6 +137,7 @@ slang_add_target(
     ${core_module_source_common_args}
     TARGET_NAME slang-embedded-core-module-source
     EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_EMBED_CORE_MODULE_SOURCE
+    EXPLICIT_SOURCE ${core_module_meta_generated_headers}
     EXCLUDE_FROM_ALL
 )
 
