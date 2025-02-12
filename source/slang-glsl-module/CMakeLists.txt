@@ -1,8 +1,6 @@
 #
 # Generate an embeddable glsl module
 #
-if (${SLANG_EMBED_CORE_MODULE})
-
 set(glsl_module_generated_header_dir ${CMAKE_CURRENT_BINARY_DIR})
 set(glsl_module_generated_header
     ${glsl_module_generated_header_dir}/slang-glsl-module-generated.h
@@ -16,27 +14,18 @@ add_custom_command(
     VERBATIM
 )
 
-set(glsl_module_common_args
+slang_add_target(
     .
     MODULE
-    FOLDER
-    generated
-    LINK_WITH_PRIVATE
-    core
+    FOLDER generated
+    LINK_WITH_PRIVATE core
     USE_EXTRA_WARNINGS
     EXPLICIT_SOURCE
-    ./slang-embedded-glsl-module.cpp
-)
-
-slang_add_target(
-    ${glsl_module_common_args}
-    TARGET_NAME slang-glsl-module
+        ./slang-embedded-glsl-module.cpp
+        ${glsl_module_generated_header}
     EXCLUDE_FROM_ALL
     EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_SHARED_LIBRARY_TOOL
     EXPORT_SET_NAME SlangTargets
-    EXPLICIT_SOURCE ${glsl_module_generated_header}
     INCLUDE_DIRECTORIES_PRIVATE ${glsl_module_generated_header_dir}
     INSTALL
 )
-
-endif()
