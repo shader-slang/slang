@@ -4259,7 +4259,7 @@ static ParamDecl* parseModernParamDecl(Parser* parser)
     // like `in`, `out`, and `in out`/`inout` be applied to the
     // type (after the colon).
     //
-    auto modifiers = ParseModifiers(parser);
+    auto modifiers = ParseModifiers(parser, LookupMask::SyntaxDecl);
 
     // We want to allow both "modern"-style and traditional-style
     // parameters to appear in any modern-style parameter list,
