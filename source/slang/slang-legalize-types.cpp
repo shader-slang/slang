@@ -254,7 +254,7 @@ SourceLoc findBestSourceLocFromUses(IRInst* inst)
             return user->sourceLoc;
     }
 
-    return SourceLoc();
+    return inst->sourceLoc;
 }
 // Helper wrapper function around isResourceType that checks if the given
 // type is a pointer to a resource type or a physical storage buffer.

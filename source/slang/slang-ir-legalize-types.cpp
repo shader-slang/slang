@@ -2064,7 +2064,6 @@ static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* in
             loc = getDiagnosticPos(containerType);
 
         context->m_sink->diagnose(loc, Diagnostics::useOfUninitializedOpaqueHandle, opaqueType);
-        SLANG_ABORT_COMPILATION("use of uninitialized resource type");
     }
     return LegalVal();
 }
