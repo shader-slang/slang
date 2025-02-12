@@ -4,59 +4,73 @@
 
 namespace Slang
 {
-void checkForInvalidShaderParameterTypeForMetal(IRModule* module, DiagnosticSink* sink)
+
+template<typename P>
+auto isOrContains(P predicate, IRType* type) -> decltype(predicate(type))
 {
-    HashSet<IRInst*> workListSet;
-    List<IRInst*> workList;
-    for (auto inst : module->getGlobalInsts())
+    HashSet<IRType*> visited;
+
+    auto go = [&visited, &predicate](auto&& self, IRType* type) -> decltype(predicate(type))
     {
-        if (inst->getOp() == kIROp_ParameterBlockType)
-        {
-            auto type = inst->getOperand(0);
-            if (workListSet.add(type))
-                workList.add(type);
-            // Diagnose an error on `ParameterBlock<ConstantBuffer<T>>`.
-            if (type->getOp() == kIROp_ConstantBufferType)
-            {
-                bool foundUseSite = false;
-                for (auto use = inst->firstUse; use; use = use->nextUse)
-                {
-                    auto user = use->getUser();
-                    if (user->sourceLoc.isValid())
-                    {
-                        sink->diagnose(
-                            user,
-                            Diagnostics::constantBufferInParameterBlockNotAllowedOnMetal);
-                        foundUseSite = true;
-                        break;
-                    }
-                }
-                if (!foundUseSite)
-                    sink->diagnose(
-                        inst,
-                        Diagnostics::constantBufferInParameterBlockNotAllowedOnMetal);
-            }
-        }
-    }
-    // Diagnose an error any any struct fields whose type is `ConstantBuffer<T>` if the
-    // struct is used inside a `ParameterBlock`.
-    for (Index i = 0; i < workList.getCount(); i++)
-    {
-        auto type = workList[i];
+        // Prevent infinite recursion by tracking visited types
+        if (!visited.add(type))
+            return {};
+
+        // Check if the current type matches the predicate
+        if (auto result = predicate(type))
+            return result;
+
+        // Recursively check struct fields
         if (auto structType = as<IRStructType>(type))
         {
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();
-                if (fieldType->getOp() == kIROp_ConstantBufferType)
+                if (auto result = self(self, fieldType))
+                    return result;
+            }
+        }
+
+        return {};
+    };
+
+    return go(go, type);
+}
+
+void checkForInvalidShaderParameterTypeForMetal(IRModule* module, DiagnosticSink* sink)
+{
+    auto isConstantBuffer = [](IRType* type) -> std::optional<IRType*>
+    {
+        if (type->getOp() == kIROp_ConstantBufferType)
+            return type;
+        return {};
+    };
+
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (inst->getOp() != kIROp_ParameterBlockType)
+            continue;
+
+        auto type = as<IRType>(inst->getOperand(0));
+        if (auto constantBufferType = isOrContains(isConstantBuffer, type))
+        {
+            // Try to find a valid source location from uses
+            bool foundUseSite = false;
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                if (user->sourceLoc.isValid())
                 {
                     sink->diagnose(
-                        field->getKey(),
+                        user,
                         Diagnostics::constantBufferInParameterBlockNotAllowedOnMetal);
+                    foundUseSite = true;
+                    break;
                 }
-                if (workListSet.add(fieldType))
-                    workList.add(fieldType);
             }
+
+            if (!foundUseSite)
+                sink->diagnose(inst, Diagnostics::constantBufferInParameterBlockNotAllowedOnMetal);
         }
     }
 }
