@@ -9,7 +9,8 @@
 #
 
 #
-# Generate an embeddable core module
+# Generate an embeddable core module, this uses slang-bootstrap which will
+# include the embedded source we have above
 #
 
 set(core_module_generated_header_dir ${CMAKE_CURRENT_BINARY_DIR})
@@ -102,7 +103,7 @@ add_custom_target(
 set_target_properties(generate-core-module-headers PROPERTIES FOLDER generated)
 
 #
-# Generate embedded core module source
+# Generate embedded core module source library (or a dummy library with just nullptrs)
 #
 
 set(core_module_source_common_args
