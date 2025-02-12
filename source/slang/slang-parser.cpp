@@ -1197,7 +1197,7 @@ bool tryParseUsingSyntaxDecl(
     return tryParseUsingSyntaxDeclImpl<T>(parser, syntaxDecl, outSyntax);
 }
 
-static Modifiers ParseModifiers(Parser* parser)
+static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = LookupMask::Default)
 {
     Modifiers modifiers;
     Modifier** modifierLink = &modifiers.first;
@@ -1218,10 +1218,7 @@ static Modifiers ParseModifiers(Parser* parser)
                 Token nameToken = peekToken(parser);
 
                 Modifier* parsedModifier = nullptr;
-                if (tryParseUsingSyntaxDecl<Modifier>(
-                        parser,
-                        &parsedModifier,
-                        LookupMask::SyntaxDecl))
+                if (tryParseUsingSyntaxDecl<Modifier>(parser, &parsedModifier, modifierLookupMask))
                 {
                     parsedModifier->keywordName = nameToken.getName();
                     if (!parsedModifier->loc.isValid())
@@ -6302,7 +6299,7 @@ ExpressionStmt* Parser::ParseExpressionStatement()
 ParamDecl* Parser::ParseParameter()
 {
     ParamDecl* parameter = astBuilder->create<ParamDecl>();
-    parameter->modifiers = ParseModifiers(this);
+    parameter->modifiers = ParseModifiers(this, LookupMask::SyntaxDecl);
     currentLookupScope = currentScope->parent;
     _parseTraditionalParamDeclCommonBase(this, parameter, kDeclaratorParseOption_AllowEmpty);
     resetLookupScope();
