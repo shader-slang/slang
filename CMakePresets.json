@@ -12,15 +12,8 @@
       "generator": "Ninja Multi-Config",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>"
-      }
-    },
-    {
-      "name": "default-dev",
-      "description": "Default dev build using Ninja Multi-Config generator",
-      "inherits": "default",
-      "cacheVariables": {
-        "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE"
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>",
+        "SLANG_ENABLE_IR_BREAK_ALLOC": "$<$<CONFIG:Debug>:TRUE>$<$<NOT:$<CONFIG:Debug>>:FALSE>"
       }
     },
     {
@@ -89,7 +82,7 @@
   "buildPresets": [
     {
       "name": "debug",
-      "configurePreset": "default-dev",
+      "configurePreset": "default",
       "configuration": "Debug"
     },
     {
