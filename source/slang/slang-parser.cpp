@@ -1100,7 +1100,7 @@ static SyntaxDecl* tryLookUpSyntaxDecl(Parser* parser, Name* name)
         nullptr, // no semantics visitor available yet
         name,
         parser->currentScope,
-        LookupMask::Default,
+        LookupMask::SyntaxDecl,
         true);
 
     // If we didn't find anything, or the result was overloaded,
