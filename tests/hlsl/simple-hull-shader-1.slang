@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry hullMain -stage hull -allow-glsl
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry hullMain -stage hull -allow-glsl
 // Currently SPIR-V fails to compile this hull shader (#4914)
-//DISABLE_TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry hullMain -stage hull -allow-glsl
+//TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry hullMain -stage hull -allow-glsl
 
 //HLSL: hullMain
 
@@ -9,9 +9,9 @@
 //GLSL-DAG: location = 1
 //GLSL-DAG: location = 2
 
-//SPIRV-DAG: location 0
-//SPIRV-DAG: location 1
-//SPIRV-DAG: location 2
+//SPIRV-DAG: OpDecorate {{.*}} Location 0
+//SPIRV-DAG: OpDecorate {{.*}} Location 1
+//SPIRV-DAG: OpDecorate {{.*}} Location 2
 
 struct HsOut
 {
