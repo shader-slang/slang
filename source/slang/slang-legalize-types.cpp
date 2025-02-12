@@ -198,6 +198,27 @@ bool isResourceType(IRType* type)
     return false;
 }
 
+bool isOpaqueType(IRType* type, List<IRType*>& opaqueTypes)
+{
+    if (isResourceType(type))
+    {
+        opaqueTypes.add(type);
+        return true;
+    }
+
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (isOpaqueType(field->getFieldType(), opaqueTypes))
+            {
+                opaqueTypes.add(type);
+                return true;
+            }
+        }
+    }
+    return false;
+}
 // Helper wrapper function around isResourceType that checks if the given
 // type is a pointer to a resource type or a physical storage buffer.
 bool isPointerToResourceType(IRType* type)

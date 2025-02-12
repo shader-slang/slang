@@ -2053,19 +2053,17 @@ static LegalVal coerceToLegalType(IRTypeLegalizationContext* context, LegalType 
 
 static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* inst)
 {
-    if (auto structType = as<IRStructType>(inst->getFullType()))
+    List<IRType*> opaqueTypes;
+    if (isOpaqueType(inst->getFullType(), opaqueTypes))
     {
-        for (auto field : structType->getFields())
-        {
-            if (isResourceType(field->getFieldType()))
-            {
-                context->m_sink->diagnose(
-                    field,
-                    Diagnostics::useOfUninitializedResourceType,
-                    field->getFieldType());
-                SLANG_ABORT_COMPILATION("use of uninitialized resource type");
-            }
-        }
+        auto opaqueType = opaqueTypes[0];
+        auto containerType = opaqueTypes.getCount() > 1 ? opaqueTypes[1] : opaqueType;
+
+        context->m_sink->diagnose(
+            containerType,
+            Diagnostics::useOfUninitializedResourceType,
+            opaqueType);
+        SLANG_ABORT_COMPILATION("use of uninitialized resource type");
     }
     return LegalVal();
 }

@@ -703,6 +703,7 @@ void legalizeEmptyTypes(TargetProgram* target, IRModule* module, DiagnosticSink*
 
 bool isResourceType(IRType* type);
 
+bool isOpaqueType(IRType* type, List<IRType*>& opaqueTypes);
 
 } // namespace Slang
 
