@@ -11,6 +11,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DMETAL
 
 #version 430
 
@@ -89,9 +90,9 @@ bool testShuffleX() {
         & testVShuffleX<uint, 2>()
         & testVShuffleX<uint, 3>()
         & testVShuffleX<uint, 4>()
-        
-        // Disabled on WGPU as these built-in types are not supported as of time of writing.
-#if !defined(WGPU)
+
+        // Disabled on WGPU and Metal as these built-in types are not supported as of time of writing.
+#if !defined(WGPU) && !defined(METAL)
         & test1ShuffleX<double>() // WARNING: intel GPU's lack FP64 support
         & testVShuffleX<double, 2>()
         & testVShuffleX<double, 3>()
@@ -100,30 +101,33 @@ bool testShuffleX() {
         & testVShuffleX<int8_t, 2>()
         & testVShuffleX<int8_t, 3>()
         & testVShuffleX<int8_t, 4>()
-        & test1ShuffleX<int16_t>() 
-        & testVShuffleX<int16_t, 2>()
-        & testVShuffleX<int16_t, 3>()
-        & testVShuffleX<int16_t, 4>()
-        & test1ShuffleX<int64_t>() 
+        & test1ShuffleX<int64_t>()
         & testVShuffleX<int64_t, 2>()
         & testVShuffleX<int64_t, 3>()
         & testVShuffleX<int64_t, 4>()
-        & test1ShuffleX<uint8_t>() 
+        & test1ShuffleX<uint8_t>()
         & testVShuffleX<uint8_t, 2>()
         & testVShuffleX<uint8_t, 3>()
         & testVShuffleX<uint8_t, 4>()
-        & test1ShuffleX<uint16_t>() 
-        & testVShuffleX<uint16_t, 2>()
-        & testVShuffleX<uint16_t, 3>()
-        & testVShuffleX<uint16_t, 4>()
-        & test1ShuffleX<uint64_t>() 
-        & testVShuffleX<uint64_t, 2>()
-        & testVShuffleX<uint64_t, 3>()
-        & testVShuffleX<uint64_t, 4>()
         & test1ShuffleX<bool>()
         & testVShuffleX<bool, 2>()
         & testVShuffleX<bool, 3>()
         & testVShuffleX<bool, 4>()
+        & test1ShuffleX<uint64_t>()
+        & testVShuffleX<uint64_t, 2>()
+        & testVShuffleX<uint64_t, 3>()
+        & testVShuffleX<uint64_t, 4>()
+#endif
+        // Disabled on WGPU as these built-in types are not supported as of time of writing.
+#if !defined(WGPU)
+        & test1ShuffleX<int16_t>()
+        & testVShuffleX<int16_t, 2>()
+        & testVShuffleX<int16_t, 3>()
+        & testVShuffleX<int16_t, 4>()
+        & test1ShuffleX<uint16_t>()
+        & testVShuffleX<uint16_t, 2>()
+        & testVShuffleX<uint16_t, 3>()
+        & testVShuffleX<uint16_t, 4>()
 #endif
         ;
 }
