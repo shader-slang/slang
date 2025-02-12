@@ -227,6 +227,21 @@ bool isOpaqueType(IRType* type, List<IRType*>& opaqueTypes)
         }
     }
 
+    if (auto tupleType = as<IRTupleTypeBase>(type))
+    {
+        for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+        {
+            if (auto elementType = as<IRType>(tupleType->getOperand(i)))
+            {
+                if (isOpaqueType(elementType, opaqueTypes))
+                {
+                    opaqueTypes.add(type);
+                    return true;
+                }
+            }
+        }
+    }
+
     return false;
 }
 
