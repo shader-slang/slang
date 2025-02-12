@@ -2714,6 +2714,16 @@ Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink
     return result;
 }
 
+bool isSimpleName(String const& name)
+{
+    for (char c : name)
+    {
+        if (!CharUtil::isAlphaOrDigit(c) && c != '_' && c != '$')
+            return false;
+    }
+    return true;
+}
+
 Expr* ComponentType::findDeclFromStringInType(
     Type* type,
     String const& name,
@@ -2743,8 +2753,19 @@ Expr* ComponentType::findDeclFromStringInType(
 
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
 
-    Expr* expr = linkage->parseTermString(name, scope);
+    Expr* expr = nullptr;
 
+    if (isSimpleName(name))
+    {
+        auto varExpr = astBuilder->create<VarExpr>();
+        varExpr->scope = scope;
+        varExpr->name = getLinkage()->getNamePool()->getName(name);
+        expr = varExpr;
+    }
+    else
+    {
+        expr = linkage->parseTermString(name, scope);
+    }
     SemanticsContext context(linkage->getSemanticsForReflection());
     context = context.allowStaticReferenceToNonStaticMember().withSink(sink);
 

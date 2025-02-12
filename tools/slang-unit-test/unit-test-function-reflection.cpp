@@ -43,6 +43,8 @@ SLANG_UNIT_TEST(functionReflection)
         int bar2<T>(T a, float3 b) { return 0; }
         int bar3(float3 b) { return 0; }
         int bar4<T:IFloat>(T a){return 0;}
+
+        struct Foo { __init() {} }
         )";
 
     auto moduleName = "moduleG" + String(Process::getId());
@@ -209,4 +211,9 @@ SLANG_UNIT_TEST(functionReflection)
 
     // GitHub issue #6317: bar2 is a function, not a type, so it should not be found.
     SLANG_CHECK(module->getLayout()->findTypeByName("bar4") == nullptr);
+
+    auto fooType = module->getLayout()->findTypeByName("Foo");
+    SLANG_CHECK_ABORT(fooType != nullptr);
+    auto ctor = module->getLayout()->findFunctionByNameInType(fooType, "$init");
+    SLANG_CHECK(ctor != nullptr);
 }
