@@ -1,0 +1,9 @@
+result code = -1
+standard error = {
+tests/diagnostics/uninitialized-resource-type.slang(40): warning 41016: use of uninitialized variable 'foo'
+    const let result = process(foo);
+                              ^
+tests/diagnostics/uninitialized-resource-type.slang(40): error 56003: use of uninitialized opaque type 'array<Texture2D,2>'.
+    const let result = process(foo);
+                              ^
+}

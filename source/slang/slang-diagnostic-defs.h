@@ -2551,7 +2551,7 @@ DIAGNOSTIC(
     attemptToQuerySizeOfUnsizedArray,
     "cannot obtain the size of an unsized array.")
 
-DIAGNOSTIC(56003, Error, useOfUninitializedResourceType, "use of uninitialized opaque type '$0'.")
+DIAGNOSTIC(56003, Error, useOfUninitializedOpaqueType, "use of uninitialized opaque type '$0'.")
 
 // Metal
 DIAGNOSTIC(

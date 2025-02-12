@@ -2058,11 +2058,12 @@ static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* in
     {
         auto opaqueType = opaqueTypes[0];
         auto containerType = opaqueTypes.getCount() > 1 ? opaqueTypes[1] : opaqueType;
+        SourceLoc loc = findBestSourceLocFromUses(inst);
 
-        context->m_sink->diagnose(
-            containerType,
-            Diagnostics::useOfUninitializedResourceType,
-            opaqueType);
+        if (!loc.isValid())
+            loc = getDiagnosticPos(containerType);
+
+        context->m_sink->diagnose(loc, Diagnostics::useOfUninitializedOpaqueType, opaqueType);
         SLANG_ABORT_COMPILATION("use of uninitialized resource type");
     }
     return LegalVal();
