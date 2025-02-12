@@ -29,14 +29,20 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
                 for (UInt i = 0; i < call->getArgCount(); i++)
                 {
                     auto arg = call->getArg(i);
-                    if (arg->getOp() != kIROp_ForceVarIntoStructTemporarily)
+                    const bool isForcedStruct = arg->getOp() == kIROp_ForceVarIntoStructTemporarily;
+                    const bool isForcedRayPayloadStruct =
+                        arg->getOp() == kIROp_ForceVarIntoRayPayloadStructTemporarily;
+                    if (!(isForcedStruct || isForcedRayPayloadStruct))
                         continue;
                     auto forceStructArg = arg->getOperand(0);
                     auto forceStructBaseType =
                         (IRType*)(forceStructArg->getDataType()->getOperand(0));
+                    IRBuilder builder(call);
                     if (forceStructBaseType->getOp() == kIROp_StructType)
                     {
                         call->setArg(i, arg->getOperand(0));
+                        if (isForcedRayPayloadStruct)
+                            builder.addRayPayloadDecoration(forceStructBaseType);
                         continue;
                     }
 
@@ -47,14 +53,19 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
                     // `__forceVarIntoStructTemporarily` is a parameter to a side effect type
                     // (`ref`, `out`, `inout`) we copy the struct back into our original non-struct
                     // parameter.
-                    IRBuilder builder(call);
+
+                    const auto typeNameHint = isForcedRayPayloadStruct
+                                                  ? "RayPayload_t"
+                                                  : "ForceVarIntoStructTemporarily_t";
+                    const auto varNameHint =
+                        isForcedRayPayloadStruct ? "rayPayload" : "forceVarIntoStructTemporarily";
 
                     builder.setInsertBefore(call->getCallee());
                     auto structType = builder.createStructType();
                     StringBuilder structName;
-                    builder.addNameHintDecoration(
-                        structType,
-                        UnownedStringSlice("ForceVarIntoStructTemporarily_t"));
+                    builder.addNameHintDecoration(structType, UnownedStringSlice(typeNameHint));
+                    if (isForcedRayPayloadStruct)
+                        builder.addRayPayloadDecoration(structType);
 
                     auto elementBufferKey = builder.createStructKey();
                     builder.addNameHintDecoration(elementBufferKey, UnownedStringSlice("data"));
@@ -65,9 +76,7 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
 
                     builder.setInsertBefore(call);
                     auto structVar = builder.emitVar(structType);
-                    builder.addNameHintDecoration(
-                        structVar,
-                        UnownedStringSlice("forceVarIntoStructTemporarily"));
+                    builder.addNameHintDecoration(structVar, UnownedStringSlice(varNameHint));
                     builder.emitStore(
                         builder.emitFieldAddress(
                             builder.getPtrType(_dataField->getFieldType()),

@@ -1605,6 +1605,11 @@ struct IRPayloadDecoration : public IRDecoration
     IR_LEAF_ISA(PayloadDecoration)
 };
 
+struct IRRayPayloadDecoration : public IRDecoration
+{
+    IR_LEAF_ISA(RayPayloadDecoration)
+};
+
 // Mesh shader decorations
 
 struct IRMeshOutputDecoration : public IRDecoration
@@ -5289,6 +5294,8 @@ public:
     {
         addDecoration(inst, kIROp_EntryPointParamDecoration, entryPointFunc);
     }
+
+    void addRayPayloadDecoration(IRType* inst) { addDecoration(inst, kIROp_RayPayloadDecoration); }
 };
 
 // Helper to establish the source location that will be used
