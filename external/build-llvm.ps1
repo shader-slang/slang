@@ -32,7 +32,7 @@ function New-TemporaryDirectory {
 }
 
 # Check if required programs are available
-$requiredPrograms = "cmake", "git"
+$requiredPrograms = "cmake", "git", "ninja"
 foreach ($prog in $requiredPrograms) {
     if (-not (Get-Command $prog -ErrorAction SilentlyContinue)) {
         Msg "This script needs $prog, but it isn't in PATH"
@@ -105,7 +105,7 @@ if (-not $installPrefix) { Fail "please set --install-prefix" }
 Msg "##########################################################"
 Msg "# Fetching LLVM from $repo at $branch"
 Msg "##########################################################"
-# git clone --depth 1 --branch $branch $repo $sourceDir
+git clone --depth 1 --branch $branch $repo $sourceDir
 
 # Configure LLVM with CMake
 Msg "##########################################################"
@@ -138,8 +138,9 @@ $cmakeArgumentsForSlang = @(
 
 $buildDir = Join-Path $sourceDir "build"
 New-Item -Path $buildDir -ItemType Directory -Force
-
-cmake -S $sourceDir\llvm -B $buildDir $cmakeArgumentsForSlang + $extraArguments
+$myScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$toolchainFile = Join-Path $myScriptDir "WindowsToolchain\Windows.MSVC.toolchain.cmake"
+cmake -S $sourceDir\llvm -B $buildDir $cmakeArgumentsForSlang + $extraArguments -G "Ninja" --toolchain $toolchainFile
 
 # Build LLVM
 Msg "##########################################################"

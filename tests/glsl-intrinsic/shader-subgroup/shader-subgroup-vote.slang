@@ -11,6 +11,9 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
 
+// Not testing because CI runners may not support Metal's intrinsics.
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DMETAL
+
 #version 430
 
 //TEST_INPUT:ubuffer(data=[9], stride=4):name=inputBuffer
@@ -168,7 +171,7 @@ void computeMain()
     outputBuffer.data[4] = 1;
 
     // All equal intrinsic is not supported on WGSL as of time of writing.
-#if !defined(WGPU)
+#if !defined(WGPU) && !defined(METAL)
     if (testAllEqual()) {
         subgroupBarrier();
         outputBuffer.data[4] = 2;
