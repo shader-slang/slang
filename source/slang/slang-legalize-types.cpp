@@ -198,6 +198,64 @@ bool isResourceType(IRType* type)
     return false;
 }
 
+bool isOpaqueType(IRType* type, List<IRType*>& opaqueTypes)
+{
+    if (isResourceType(type))
+    {
+        opaqueTypes.add(type);
+        return true;
+    }
+
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (isOpaqueType(field->getFieldType(), opaqueTypes))
+            {
+                opaqueTypes.add(type);
+                return true;
+            }
+        }
+    }
+
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+    {
+        if (isOpaqueType(arrayType->getElementType(), opaqueTypes))
+        {
+            opaqueTypes.add(type);
+            return true;
+        }
+    }
+
+    if (auto tupleType = as<IRTupleTypeBase>(type))
+    {
+        for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+        {
+            if (auto elementType = as<IRType>(tupleType->getOperand(i)))
+            {
+                if (isOpaqueType(elementType, opaqueTypes))
+                {
+                    opaqueTypes.add(type);
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+SourceLoc findBestSourceLocFromUses(IRInst* inst)
+{
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if (user->sourceLoc.isValid())
+            return user->sourceLoc;
+    }
+
+    return inst->sourceLoc;
+}
 // Helper wrapper function around isResourceType that checks if the given
 // type is a pointer to a resource type or a physical storage buffer.
 bool isPointerToResourceType(IRType* type)
