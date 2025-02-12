@@ -2551,11 +2551,7 @@ DIAGNOSTIC(
     attemptToQuerySizeOfUnsizedArray,
     "cannot obtain the size of an unsized array.")
 
-DIAGNOSTIC(
-    56003,
-    Error,
-    useOfUninitializedResouceType,
-    "use of uninitialized resource type '$0'.")
+DIAGNOSTIC(56003, Error, useOfUninitializedResourceType, "use of uninitialized resource type '$0'.")
 
 // Metal
 DIAGNOSTIC(

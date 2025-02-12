@@ -91,7 +91,10 @@ LegalVal LegalVal::wrappedBuffer(LegalVal const& baseVal, LegalElementWrapping c
 
 //
 
-IRTypeLegalizationContext::IRTypeLegalizationContext(TargetProgram* target, IRModule* inModule, DiagnosticSink* sink)
+IRTypeLegalizationContext::IRTypeLegalizationContext(
+    TargetProgram* target,
+    IRModule* inModule,
+    DiagnosticSink* sink)
 {
     targetProgram = target;
 
@@ -2052,11 +2055,14 @@ static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* in
 {
     if (auto structType = as<IRStructType>(inst->getFullType()))
     {
-        for (auto field: structType->getFields())
+        for (auto field : structType->getFields())
         {
             if (isResourceType(field->getFieldType()))
             {
-                context->m_sink->diagnose(field, Diagnostics::useOfUninitializedResouceType, field->getFieldType());
+                context->m_sink->diagnose(
+                    field,
+                    Diagnostics::useOfUninitializedResourceType,
+                    field->getFieldType());
                 SLANG_ABORT_COMPILATION("use of uninitialized resource type");
             }
         }
@@ -4064,7 +4070,10 @@ struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
 //
 struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
 {
-    IRExistentialTypeLegalizationContext(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+    IRExistentialTypeLegalizationContext(
+        TargetProgram* target,
+        IRModule* module,
+        DiagnosticSink* sink)
         : IRTypeLegalizationContext(target, module, sink)
     {
     }
