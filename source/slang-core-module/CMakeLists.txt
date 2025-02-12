@@ -100,15 +100,37 @@ set(core_module_generated_header_dir ${CMAKE_CURRENT_BINARY_DIR})
 set(core_module_generated_header
     ${core_module_generated_header_dir}/slang-core-module-generated.h
 )
+set(glsl_module_generated_header_dir
+    ${CMAKE_CURRENT_BINARY_DIR}/../slang-glsl-module
+)
+set(glsl_module_generated_header
+    ${glsl_module_generated_header_dir}/slang-glsl-module-generated.h
+)
+
+# Propagate to parent directory scope, so they're visible to
+# slang-glsl-module/CMakeLists.txt
+set(glsl_module_generated_header_dir
+    ${glsl_module_generated_header_dir}
+    PARENT_SCOPE
+)
+set(glsl_module_generated_header ${glsl_module_generated_header} PARENT_SCOPE)
 
 add_custom_command(
     OUTPUT ${core_module_generated_header} ${glsl_module_generated_header}
     COMMAND
         slang-bootstrap -archive-type riff-lz4 -save-core-module-bin-source
-        ${core_module_generated_header}
+        ${core_module_generated_header} -save-glsl-module-bin-source
+        ${glsl_module_generated_header}
     DEPENDS slang-bootstrap
     VERBATIM
 )
+# Add a target so that we can depend on the above step when we create the glsl
+# module
+add_custom_target(
+    generate_core_module_headers
+    DEPENDS ${core_module_generated_header} ${glsl_module_generated_header}
+)
+set_target_properties(generate_core_module_headers PROPERTIES FOLDER generated)
 
 set(core_module_common_args
     .
