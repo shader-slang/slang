@@ -9,54 +9,6 @@
 #
 
 #
-# Generate an embeddable core module, this uses slang-bootstrap which will
-# include the embedded source we have above
-#
-
-set(core_module_generated_header_dir ${CMAKE_CURRENT_BINARY_DIR})
-set(core_module_generated_header
-    ${core_module_generated_header_dir}/slang-core-module-generated.h
-)
-add_custom_command(
-    OUTPUT ${core_module_generated_header}
-    COMMAND
-        slang-bootstrap -archive-type riff-lz4 -save-core-module-bin-source
-        ${core_module_generated_header}
-    DEPENDS slang-bootstrap
-    VERBATIM
-)
-
-set(core_module_common_args
-    .
-    OBJECT
-    EXCLUDE_FROM_ALL
-    EXPORT_MACRO_PREFIX
-    SLANG
-    EXPORT_TYPE_AS
-    ${SLANG_LIB_TYPE}
-    FOLDER
-    generated
-    LINK_WITH_PRIVATE
-    core
-    USE_EXTRA_WARNINGS
-    EXPLICIT_SOURCE
-    ./slang-embedded-core-module.cpp
-)
-
-slang_add_target(
-    ${core_module_common_args}
-    TARGET_NAME slang-embedded-core-module
-    EXPLICIT_SOURCE ${core_module_generated_header}
-    EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_EMBED_CORE_MODULE
-    INCLUDE_DIRECTORIES_PRIVATE ${core_module_generated_header_dir}
-)
-
-slang_add_target(
-    ${core_module_common_args}
-    TARGET_NAME slang-no-embedded-core-module
-)
-
-#
 # Compiling the meta.slang files
 #
 
@@ -95,12 +47,6 @@ add_custom_command(
     WORKING_DIRECTORY "${core_module_meta_source_dir}"
     VERBATIM
 )
-
-add_custom_target(
-    generate-core-module-headers
-    DEPENDS ${core_module_meta_generated_headers}
-)
-set_target_properties(generate-core-module-headers PROPERTIES FOLDER generated)
 
 #
 # Generate embedded core module source library (or a dummy library with just nullptrs)
@@ -143,4 +89,53 @@ slang_add_target(
     ${core_module_source_common_args}
     TARGET_NAME slang-no-embedded-core-module-source
     EXCLUDE_FROM_ALL
+)
+
+#
+# Use that source to generate an embeddable core module, this uses
+# slang-bootstrap which will include the embedded source we have above
+#
+
+set(core_module_generated_header_dir ${CMAKE_CURRENT_BINARY_DIR})
+set(core_module_generated_header
+    ${core_module_generated_header_dir}/slang-core-module-generated.h
+)
+
+add_custom_command(
+    OUTPUT ${core_module_generated_header} ${glsl_module_generated_header}
+    COMMAND
+        slang-bootstrap -archive-type riff-lz4 -save-core-module-bin-source
+        ${core_module_generated_header}
+    DEPENDS slang-bootstrap
+    VERBATIM
+)
+
+set(core_module_common_args
+    .
+    OBJECT
+    EXCLUDE_FROM_ALL
+    EXPORT_MACRO_PREFIX
+    SLANG
+    EXPORT_TYPE_AS
+    ${SLANG_LIB_TYPE}
+    FOLDER
+    generated
+    LINK_WITH_PRIVATE
+    core
+    USE_EXTRA_WARNINGS
+    EXPLICIT_SOURCE
+    ./slang-embedded-core-module.cpp
+)
+
+slang_add_target(
+    ${core_module_common_args}
+    TARGET_NAME slang-embedded-core-module
+    EXPLICIT_SOURCE ${core_module_generated_header}
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_EMBED_CORE_MODULE
+    INCLUDE_DIRECTORIES_PRIVATE ${core_module_generated_header_dir}
+)
+
+slang_add_target(
+    ${core_module_common_args}
+    TARGET_NAME slang-no-embedded-core-module
 )
