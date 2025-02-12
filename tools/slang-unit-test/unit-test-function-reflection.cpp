@@ -42,6 +42,7 @@ SLANG_UNIT_TEST(functionReflection)
         int bar1(IFloat a, IFloat b) { return 0; }
         int bar2<T>(T a, float3 b) { return 0; }
         int bar3(float3 b) { return 0; }
+        int bar4<T:IFloat>(T a){return 0;}
         )";
 
     auto moduleName = "moduleG" + String(Process::getId());
@@ -205,4 +206,7 @@ SLANG_UNIT_TEST(functionReflection)
     resolvedFunctionReflection = bar3Reflection->specializeWithArgTypes(1, argTypes);
     SLANG_CHECK(resolvedFunctionReflection != nullptr);
     SLANG_CHECK(resolvedFunctionReflection == bar3Reflection);
+
+    // GitHub issue #6317: bar2 is a function, not a type, so it should not be found.
+    SLANG_CHECK(module->getLayout()->findTypeByName("bar4") == nullptr);
 }
