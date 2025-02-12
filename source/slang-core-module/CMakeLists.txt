@@ -138,9 +138,11 @@ slang_add_target(
     ${core_module_source_common_args}
     TARGET_NAME slang-embedded-core-module-source
     EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_EMBED_CORE_MODULE_SOURCE
+    EXCLUDE_FROM_ALL
 )
 
 slang_add_target(
     ${core_module_source_common_args}
     TARGET_NAME slang-no-embedded-core-module-source
+    EXCLUDE_FROM_ALL
 )
