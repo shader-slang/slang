@@ -1218,7 +1218,7 @@ enum class LookupMask : uint8_t
     Value = 0x4,
     Attribute = 0x8,
     SyntaxDecl = 0x10,
-    Default = type | Function | Value,
+    Default = type | Function | Value | SyntaxDecl,
 };
 
 /// Flags for options to be used when looking up declarations

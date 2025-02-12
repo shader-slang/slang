@@ -1091,7 +1091,10 @@ static Token peekToken(Parser* parser)
     return parser->tokenReader.peekToken();
 }
 
-static SyntaxDecl* tryLookUpSyntaxDecl(Parser* parser, Name* name)
+static SyntaxDecl* tryLookUpSyntaxDecl(
+    Parser* parser,
+    Name* name,
+    LookupMask syntaxLookupMask = LookupMask::Default)
 {
     // Let's look up the name and see what we find.
 
@@ -1100,7 +1103,7 @@ static SyntaxDecl* tryLookUpSyntaxDecl(Parser* parser, Name* name)
         nullptr, // no semantics visitor available yet
         name,
         parser->currentScope,
-        LookupMask::SyntaxDecl,
+        syntaxLookupMask,
         true);
 
     // If we didn't find anything, or the result was overloaded,
@@ -1175,7 +1178,10 @@ bool tryParseUsingSyntaxDeclImpl(Parser* parser, SyntaxDecl* syntaxDecl, T** out
 }
 
 template<typename T>
-bool tryParseUsingSyntaxDecl(Parser* parser, T** outSyntax)
+bool tryParseUsingSyntaxDecl(
+    Parser* parser,
+    T** outSyntax,
+    LookupMask syntaxLookupMask = LookupMask::Default)
 {
     if (peekTokenType(parser) != TokenType::Identifier)
         return false;
@@ -1183,7 +1189,7 @@ bool tryParseUsingSyntaxDecl(Parser* parser, T** outSyntax)
     auto nameToken = peekToken(parser);
     auto name = nameToken.getName();
 
-    auto syntaxDecl = tryLookUpSyntaxDecl(parser, name);
+    auto syntaxDecl = tryLookUpSyntaxDecl(parser, name, syntaxLookupMask);
 
     if (!syntaxDecl)
         return false;
@@ -1212,7 +1218,10 @@ static Modifiers ParseModifiers(Parser* parser)
                 Token nameToken = peekToken(parser);
 
                 Modifier* parsedModifier = nullptr;
-                if (tryParseUsingSyntaxDecl<Modifier>(parser, &parsedModifier))
+                if (tryParseUsingSyntaxDecl<Modifier>(
+                        parser,
+                        &parsedModifier,
+                        LookupMask::SyntaxDecl))
                 {
                     parsedModifier->keywordName = nameToken.getName();
                     if (!parsedModifier->loc.isValid())
@@ -4918,7 +4927,7 @@ static DeclBase* ParseDeclWithModifiers(
             // as a declaration keyword and parse a declaration using
             // its associated callback:
             Decl* parsedDecl = nullptr;
-            if (tryParseUsingSyntaxDecl<Decl>(parser, &parsedDecl))
+            if (tryParseUsingSyntaxDecl<Decl>(parser, &parsedDecl, LookupMask::Default))
             {
                 decl = parsedDecl;
                 break;
