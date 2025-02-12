@@ -9453,10 +9453,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // should handle propgation of value-size information from constraints
             // back to generic parameters?
             //
-            if (auto declRefType = as<DeclRefType>(constraintDecl->sub.type))
+            if (auto genParamDeclRef =
+                    isDeclRefTypeOf<GenericTypeParamDeclBase>(constraintDecl->sub.type))
             {
-                auto typeParamDeclVal =
-                    subContext->findLoweredDecl(declRefType->getDeclRef().getDecl());
+                auto typeParamDeclVal = subContext->findLoweredDecl(genParamDeclRef.getDecl());
                 SLANG_ASSERT(typeParamDeclVal && typeParamDeclVal->val);
                 subBuilder->addTypeConstraintDecoration(typeParamDeclVal->val, supType);
             }

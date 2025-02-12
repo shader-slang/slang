@@ -186,7 +186,7 @@ static bool canIgnoreType(IRType* type, IRType* upper)
     if (auto spec = as<IRSpecialize>(type))
     {
         IRInst* inner = getResolvedInstForDecorations(spec);
-        IRType* innerType = as<IRType>(inner);
+        IRType* innerType = (IRType*)(inner);
         return canIgnoreType(innerType, upper);
     }
 
