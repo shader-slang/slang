@@ -39,10 +39,24 @@ auto isOrContains(P predicate, IRType* type) -> decltype(predicate(type))
 
 void checkForInvalidShaderParameterTypeForMetal(IRModule* module, DiagnosticSink* sink)
 {
-    auto isConstantBuffer = [](IRType* type) -> std::optional<IRType*>
+    auto isConstantBufferWithResource = [](IRType* type) -> std::optional<IRType*>
     {
         if (type->getOp() == kIROp_ConstantBufferType)
-            return type;
+        {
+            // Get the type inside the constant buffer
+            auto innerType = as<IRType>(type->getOperand(0));
+
+            // Check if the inner type contains any resource types
+            auto hasResource = [](IRType* t) -> std::optional<IRType*>
+            {
+                if (isResourceType(t))
+                    return t;
+                return {};
+            };
+
+            if (auto resourceType = isOrContains(hasResource, innerType))
+                return type; // Return the constant buffer type if it contains a resource
+        }
         return {};
     };
 
@@ -52,7 +66,7 @@ void checkForInvalidShaderParameterTypeForMetal(IRModule* module, DiagnosticSink
             continue;
 
         auto type = as<IRType>(inst->getOperand(0));
-        if (auto constantBufferType = isOrContains(isConstantBuffer, type))
+        if (auto invalidCBType = isOrContains(isConstantBufferWithResource, type))
         {
             // Try to find a valid source location from uses
             bool foundUseSite = false;
@@ -63,18 +77,20 @@ void checkForInvalidShaderParameterTypeForMetal(IRModule* module, DiagnosticSink
                 {
                     sink->diagnose(
                         user,
-                        Diagnostics::constantBufferInParameterBlockNotAllowedOnMetal);
+                        Diagnostics::
+                            resourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal);
                     foundUseSite = true;
                     break;
                 }
             }
 
             if (!foundUseSite)
-                sink->diagnose(inst, Diagnostics::constantBufferInParameterBlockNotAllowedOnMetal);
+                sink->diagnose(
+                    inst,
+                    Diagnostics::resourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal);
         }
     }
 }
-
 void checkForInvalidShaderParameterType(
     TargetRequest* target,
     IRModule* module,
