@@ -1336,8 +1336,7 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
 
                 // Check that the session has the generic C/CPP compiler availability - which is all
                 // we should need for CPU target
-                if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(
-                        context->getSession(),
+                if (SLANG_SUCCEEDED(context->getSession()->checkPassThroughSupport(
                         SLANG_PASS_THROUGH_GENERIC_C_CPP)))
                 {
                     availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
@@ -2838,7 +2837,7 @@ static TestResult generateExpectedOutput(
             TypeTextUtil::findCompileTargetFromName(args[targetIndex + 1].getUnownedSlice());
 
         // Check the session supports it. If not we ignore it
-        if (SLANG_FAILED(spSessionCheckCompileTargetSupport(context->getSession(), target)))
+        if (SLANG_FAILED(context->getSession()->checkCompileTargetSupport(target)))
         {
             return TestResult::Ignored;
         }
@@ -4749,7 +4748,7 @@ SlangResult innerMain(int argc, char** argv)
                 continue;
             }
 
-            if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, passThru)))
+            if (SLANG_SUCCEEDED(session->checkPassThroughSupport(passThru)))
             {
                 context.availableBackendFlags |= PassThroughFlags(1) << int(i);
 
