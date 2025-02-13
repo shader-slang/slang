@@ -47,6 +47,15 @@
       "generator": "Visual Studio 16 2019"
     },
     {
+      "name": "vs2019-dev",
+      "inherits": "msvc-base",
+      "description": "Visual Studio 2019 project with debug assisting features",
+      "generator": "Visual Studio 16 2019",
+      "cacheVariables": {
+        "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE"
+      }
+    },
+    {
       "name": "vs2022",
       "inherits": "msvc-base",
       "description": "Visual Studio 2022 project",
