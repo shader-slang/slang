@@ -1016,9 +1016,10 @@ SLANG_API SlangReflectionType* spReflection_FindTypeByName(
                 SubstitutionSet(genericDeclRef),
                 astBuilder,
                 genericDeclRef.getDecl()->inner);
-            return convert(DeclRefType::create(
-                astBuilder,
-                createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, innerDeclRef)));
+            if (as<AggTypeDecl>(innerDeclRef.getDecl()) ||
+                as<SimpleTypeDecl>(innerDeclRef.getDecl()))
+                return convert(DeclRefType::create(astBuilder, innerDeclRef));
+            return nullptr;
         }
 
         if (as<ErrorType>(result))

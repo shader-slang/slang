@@ -3066,4 +3066,17 @@ bool resolveStageOfProfileWithEntryPoint(
     const List<RefPtr<TargetRequest>>& targets,
     FuncDecl* entryPointFuncDecl,
     DiagnosticSink* sink);
+
+// For an extensions decl, collect a list of decls on which the extension might be applying to.
+// For example, if we see a `extension Foo`, return a `Decl*` that represents `struct Foo`.
+// In the case of free-form generic extensions i.e. `extension<T:IFoo> T : IBar`, return `IFoo`.
+// These are the decls that we need to register the extension with in
+// `mapTypeToCandidateExtensions`.
+// Returns true when any base decls are found.
+bool getExtensionTargetDeclList(
+    ASTBuilder* astBuilder,
+    DeclRefType* targetDeclRefType,
+    ExtensionDecl* extDeclRef,
+    ShortList<AggTypeDecl*>& targetDecls);
+
 } // namespace Slang

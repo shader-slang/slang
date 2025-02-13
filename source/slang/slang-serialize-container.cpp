@@ -5,6 +5,7 @@
 #include "../core/slang-math.h"
 #include "../core/slang-stream.h"
 #include "../core/slang-text-io.h"
+#include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-mangled-lexer.h"
 #include "slang-parser.h"
@@ -813,15 +814,16 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                         if (auto targetDeclRefType =
                                                 as<DeclRefType>(extensionDecl->targetType))
                                         {
-                                            // Attach our extension to that type as a candidate...
-                                            if (auto aggTypeDeclRef =
-                                                    targetDeclRefType->getDeclRef()
-                                                        .as<AggTypeDecl>())
+                                            ShortList<AggTypeDecl*> baseDecls;
+                                            getExtensionTargetDeclList(
+                                                astBuilder,
+                                                targetDeclRefType,
+                                                extensionDecl,
+                                                baseDecls);
+                                            for (auto baseDecl : baseDecls)
                                             {
-                                                auto aggTypeDecl = aggTypeDeclRef.getDecl();
-
                                                 _getCandidateExtensionList(
-                                                    aggTypeDecl,
+                                                    baseDecl,
                                                     moduleDecl->mapTypeToCandidateExtensions)
                                                     .add(extensionDecl);
                                             }

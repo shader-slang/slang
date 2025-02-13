@@ -530,6 +530,13 @@ interface ITexelElement
     __init(Element x);
 }
 
+extension<T:__BuiltinArithmeticType> T : ITexelElement
+{
+    typealias Element = T;
+    static const int elementCount = 1;
+    __intrinsic_op(0) __init(Element x);
+}
+
 ${{{
 // Scalar types that can be used as texel element.
 const char* texeElementScalarTypes[] = {
@@ -545,12 +552,6 @@ const char* texeElementScalarTypes[] = {
 for (auto elementType : texeElementScalarTypes)
 {
 }}}
-extension $(elementType) : ITexelElement
-{
-    typealias Element = $(elementType);
-    static const int elementCount = 1;
-    __intrinsic_op(0) __init(Element x);
-}
 extension<int N> vector<$(elementType), N> : ITexelElement
 {
     typealias Element = $(elementType);

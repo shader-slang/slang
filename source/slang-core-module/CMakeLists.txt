@@ -121,7 +121,7 @@ add_custom_command(
         slang-bootstrap -archive-type riff-lz4 -save-core-module-bin-source
         ${core_module_generated_header} -save-glsl-module-bin-source
         ${glsl_module_generated_header}
-    DEPENDS slang-bootstrap
+    DEPENDS slang-bootstrap slang-without-embedded-core-module
     VERBATIM
 )
 # Add a target so that we can depend on the above step when we create the glsl
