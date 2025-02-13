@@ -3290,8 +3290,8 @@ pp->getModule()->getModuleInst()->dump();
 
 // DEBUG
 // Dump IR
-printf("Created global value for varying input:\n");
-pp->getModule()->getModuleInst()->dump();
+//printf("Created global value for varying input:\n");
+// pp->getModule()->getModuleInst()->dump();
         tryReplaceUsesOfStageInput(context, globalValue, pp);
 #if 0
         for (auto dec : pp->getDecorations())
@@ -3334,9 +3334,8 @@ pp->getModule()->getModuleInst()->dump();
                 }
             }
 
-//DEBUG
-if (!realGlobalVar)
-    printf("Warning: Could not find real global var for shadowing decoration\n");
+//if (!realGlobalVar)
+//    printf("Warning: Could not find real global var for shadowing decoration\n");
             SLANG_ASSERT(realGlobalVar);
 
             // Remove all stores into the global var introduced during
@@ -3363,12 +3362,11 @@ if (!realGlobalVar)
             globalVar->replaceUsesWith(realGlobalVar);
             globalVar->removeAndDeallocate();
         }
-        
-        // DEBUG
+
 // Dump IR
-printf("Replaced global accessed with shadow:\n");
-pp->getModule()->getModuleInst()->dump();
-printf("printed\n");
+//printf("Replaced global accessed with shadow:\n");
+//pp->getModule()->getModuleInst()->dump();
+//printf("printed\n");
 #endif
     }
     else
