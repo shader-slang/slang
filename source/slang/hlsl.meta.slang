@@ -20568,7 +20568,7 @@ ${
 // In order to support this approach, we need intrinsics that
 // can magically fetch the binding information for a resource.
 //
-// TODO: These operations are kind of *screaming* for us tohlsl.m
+// TODO: These operations are kind of *screaming* for us to
 // have a built-in `interface` that all of the opaque resource
 // types conform to, so that we can define builtins that work
 // for any resource type.

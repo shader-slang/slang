@@ -14,7 +14,7 @@ public:
 
     void build(IRModule* module);
 
-    /// Retrieves the set of entry points that invoke the given instruction in its call graph.
+    /// Retrieves the set of entry points that transitively invoke the given instruction.
     /// Returns nullptr if the instruction has no referencing entry points.
     const HashSet<IRFunc*>* getReferencingEntryPoints(IRInst* inst) const;
 
@@ -25,7 +25,6 @@ public:
     /// Retrieves the set of calls that invoke the given function.
     /// Returns nullptr if the function is never called.
     const HashSet<IRCall*>* getReferencingCalls(IRFunc* func) const;
-
 
     const Dictionary<IRInst*, HashSet<IRFunc*>>& getReferencingEntryPointsMap() const;
 

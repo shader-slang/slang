@@ -27,6 +27,8 @@ public:
     {
         for (auto implicitSysVal : m_implicitSystemValueInstructions)
         {
+            // Call graph is guaranteed to return valid referencing functions(non nullptr) as
+            // instructions processed here are all valid/non-dead instructions.
             for (auto parentFunc : *m_callGraph.getReferencingFunctions(implicitSysVal))
             {
                 auto param = getOrCreateSystemValueVariable(parentFunc, implicitSysVal);
@@ -105,7 +107,7 @@ private:
             (systemValueName == SystemValueSemanticName::WaveLaneCount) ||
             (systemValueName == SystemValueSemanticName::WaveLaneIndex));
 
-        List<IRFunc*> functionWorkList;
+        List<IRFunc*> createParamWorkList;
         List<ModifyCallWorkItem> modifyCallWorkList;
 
         const auto addWorkItems = [&](const HashSet<IRCall*>& calls)
@@ -116,7 +118,7 @@ private:
                 {
                     // The caller(of a function that was added a parameter) also requires a
                     // new parameter to pass in the system value variable to the callee.
-                    functionWorkList.add(caller);
+                    createParamWorkList.add(caller);
 
                     // The call needs to be modified to account for the new parameter.
                     modifyCallWorkList.add({call, caller});
@@ -141,6 +143,8 @@ private:
 
                 fixUpFuncType(func);
                 getParamMap(func).add(systemValueName, param);
+
+                // Update all functions that call this function.
                 if (auto calls = m_callGraph.getReferencingCalls(func))
                 {
                     addWorkItems(*calls);
@@ -148,24 +152,23 @@ private:
             }
         };
 
-        functionWorkList.add(func);
-        for (Index i = 0; i < functionWorkList.getCount(); i++)
+        createParamWorkList.add(func);
+        for (Index i = 0; i < createParamWorkList.getCount(); i++)
         {
-            createParamWork(functionWorkList[i]);
+            createParamWork(createParamWorkList[i]);
         }
 
         return modifyCallWorkList;
     }
 
     //
-    // In addition to modifying the function signatures, we need to ensure the calls to the modified
-    // function include the system value variable.
+    // The function calls need to be modified to account for the change in function signature.
     //
     void modifyCalls(
-        const List<ModifyCallWorkItem>& workItems,
+        const List<ModifyCallWorkItem>& workList,
         SystemValueSemanticName systemValueName)
     {
-        for (const auto workItem : workItems)
+        for (const auto workItem : workList)
         {
             auto call = workItem.call;
             auto param = tryGetParam(workItem.caller, systemValueName);
@@ -197,10 +200,8 @@ private:
 
         // If parameter for the specific function and system value type combination was already
         // created, return it directly.
-        if (auto param = tryGetParam(parentFunc, systemValueName))
-        {
-            return param;
-        }
+        if (auto existingParam = tryGetParam(parentFunc, systemValueName))
+            return existingParam;
 
         // Create new parameters for the relevant functions up to the entry point function.
         const auto callWorkItems =
@@ -209,16 +210,19 @@ private:
         // Modify related function calls to account for the new parameters.
         modifyCalls(callWorkItems, systemValueName);
 
-        return tryGetParam(parentFunc, systemValueName);
+        auto newParam = tryGetParam(parentFunc, systemValueName);
+        SLANG_ASSERT(newParam);
+        return newParam;
     }
 
     const CallGraph& m_callGraph;
     const List<IRImplicitSystemValue*>& m_implicitSystemValueInstructions;
 
     Dictionary<IRFunc*, SystemValueParamMap> m_functionMap;
-
     IRBuilder m_builder;
 
+    // Type of system value.
+    //
     // Implicit system values are currently only being used for subgroup size and
     // subgroup invocation id, both of which are 32-bit unsigned.
     IRType* m_paramType;
