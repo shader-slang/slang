@@ -101,12 +101,6 @@ private:
         SystemValueSemanticName systemValueName,
         UnownedStringSlice systemValueString)
     {
-        // Implicit system values are currently only being used for subgroup size and
-        // subgroup invocation id.
-        SLANG_ASSERT(
-            (systemValueName == SystemValueSemanticName::WaveLaneCount) ||
-            (systemValueName == SystemValueSemanticName::WaveLaneIndex));
-
         List<IRFunc*> createParamWorkList;
         List<ModifyCallWorkItem> modifyCallWorkList;
 
@@ -196,7 +190,12 @@ private:
     {
         auto systemValueName =
             convertSystemValueSemanticNameToEnum(implicitSysVal->getSystemValueName());
-        SLANG_ASSERT(systemValueName != SystemValueSemanticName::Unknown);
+
+        // Implicit system values are currently only being used for subgroup size and
+        // subgroup invocation id.
+        SLANG_ASSERT(
+            (systemValueName == SystemValueSemanticName::WaveLaneCount) ||
+            (systemValueName == SystemValueSemanticName::WaveLaneIndex));
 
         // If parameter for the specific function and system value type combination was already
         // created, return it directly.
