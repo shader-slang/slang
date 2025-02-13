@@ -1,5 +1,7 @@
+//TEST(compute):SIMPLE(filecheck=SPIRV):-target spirv-asm -stage compute -entry computeMain -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
 
+// SPIRV: OpCapability VariablePointers
 // CHECK: type: int32_t
 // CHECK-NEXT: 35
 // CHECK-NEXT: 76
