@@ -1,6 +1,5 @@
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -entry hullMain -stage hull -allow-glsl
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -entry hullMain -stage hull -allow-glsl
-// Currently SPIR-V fails to compile this hull shader (#4914)
 //TEST:SIMPLE(filecheck=SPIRV):-target spirv -entry hullMain -stage hull -allow-glsl
 
 //HLSL: hullMain
@@ -22,7 +21,7 @@ struct HsOut
 struct HscOut
 {
     float EdgeTessFactor[4] : SV_TessFactor;
-    float InsideTessFactor[2] : SV_InsideTessFactor;
+    float InsideTessFactor[1] : SV_InsideTessFactor;
     uint instanceId;
 };
 
