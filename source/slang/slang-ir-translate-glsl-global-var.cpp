@@ -89,7 +89,8 @@ struct GlobalVarTranslationContext
                 bool hasExistingLayout = false;
                 if (auto existingLayoutDecoration = input->findDecoration<IRLayoutDecoration>())
                 {
-                    if (auto existingVarLayout = as<IRVarLayout>(existingLayoutDecoration->getLayout()))                        
+                    if (auto existingVarLayout =
+                            as<IRVarLayout>(existingLayoutDecoration->getLayout()))
                     {
                         fieldTypeLayout = existingVarLayout->getTypeLayout();
                         hasExistingLayout = true;
@@ -100,7 +101,7 @@ struct GlobalVarTranslationContext
                 {
                     fieldTypeLayout = fieldTypeLayoutBuilder.build();
                 }
-                
+
                 IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout);
                 varLayoutBuilder.setStage(entryPointDecor->getProfile().getStage());
                 if (auto semanticDecor = input->findDecoration<IRSemanticDecoration>())
@@ -116,7 +117,7 @@ struct GlobalVarTranslationContext
                         fieldTypeLayoutBuilder.addResourceUsage(
                             LayoutResourceKind::VaryingInput,
                             LayoutSize(1));
-                    }                    
+                    }
                     if (auto layoutDecor = findVarLayout(input))
                     {
                         if (auto offsetAttr =
