@@ -2564,7 +2564,7 @@ DIAGNOSTIC(
     56101,
     Error,
     resourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal,
-    "nesting a 'ConstantBuffer' containing resource typews inside a 'ParameterBlock' is not "
+    "nesting a 'ConstantBuffer' containing resource types inside a 'ParameterBlock' is not "
     "supported on Metal, please use 'ParameterBlock' instead.")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
