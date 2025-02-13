@@ -2551,6 +2551,8 @@ DIAGNOSTIC(
     attemptToQuerySizeOfUnsizedArray,
     "cannot obtain the size of an unsized array.")
 
+DIAGNOSTIC(56003, Fatal, useOfUninitializedOpaqueHandle, "use of uninitialized opaque handle '$0'.")
+
 // Metal
 DIAGNOSTIC(
     56100,
