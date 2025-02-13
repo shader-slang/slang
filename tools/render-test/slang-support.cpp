@@ -35,7 +35,7 @@ void ShaderCompilerUtil::Output::reset()
         desc.slangGlobalScope = nullptr;
     }
 
-    session = nullptr;
+    globalSession = nullptr;
     m_requestDEPRECATED = nullptr;
 }
 
@@ -58,7 +58,7 @@ static SlangResult _compileProgramImpl(
     globalSession->createCompileRequest(slangRequest.writeRef());
     SLANG_ALLOW_DEPRECATED_END
     out.m_requestDEPRECATED = slangRequest;
-    out.session = globalSession;
+    out.globalSession = globalSession;
 
     bool hasRepro = false;
 
@@ -97,7 +97,7 @@ static SlangResult _compileProgramImpl(
             spSetTargetProfile(
                 slangRequest,
                 0,
-                spFindProfile(out.session, input.profile.getBuffer()));
+                spFindProfile(out.globalSession, input.profile.getBuffer()));
         if (options.generateSPIRVDirectly)
             spSetTargetFlags(slangRequest, 0, SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY);
         else
