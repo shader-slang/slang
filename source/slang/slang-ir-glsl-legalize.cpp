@@ -3277,7 +3277,7 @@ void legalizeEntryPointParameterForGLSL(
 
 //DEBUG
 // printf("Before global value for varying input:\n");
-pp->getModule()->getModuleInst()->dump();
+//pp->getModule()->getModuleInst()->dump();
         auto globalValue = createGLSLGlobalVaryings(
             context,
             codeGenContext,

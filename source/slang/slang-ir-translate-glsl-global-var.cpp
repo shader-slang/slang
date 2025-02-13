@@ -169,26 +169,10 @@ struct GlobalVarTranslationContext
                 
                 // Relate "global variable" to a "global parameter" for use later in compilation
                 // to resolve a "global variable" shadowing a "global parameter" relationship.
-                
-                // Decorate either the input or nested fields with "shadowing".                
-                if (false) //auto inputStructType = as<IRStructType>(inputType))
-                {
-                    // TODO: Recurse into nested fields, this works on only one level of nesting.
-                    for (auto field : inputStructType->getFields())
-                    {                        
-                        builder.addGlobalVariableShadowingGlobalParameterDecoration(
-                            inputParam,
-                            field,
-                            field->getKey());
-                    }
-                }
-                //else
-                //{
-                    builder.addGlobalVariableShadowingGlobalParameterDecoration(
-                        inputParam,
-                        input,
-                        inputKeys[i]);
-                //}
+                builder.addGlobalVariableShadowingGlobalParameterDecoration(
+                    inputParam,
+                    input,
+                    inputKeys[i]);
             }
 
             // For each entry point, introduce a new parameter to represent each input parameter,
