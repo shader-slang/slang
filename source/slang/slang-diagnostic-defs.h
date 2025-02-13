@@ -2551,6 +2551,8 @@ DIAGNOSTIC(
     attemptToQuerySizeOfUnsizedArray,
     "cannot obtain the size of an unsized array.")
 
+DIAGNOSTIC(56003, Fatal, useOfUninitializedOpaqueHandle, "use of uninitialized opaque handle '$0'.")
+
 // Metal
 DIAGNOSTIC(
     56100,
@@ -2558,6 +2560,12 @@ DIAGNOSTIC(
     constantBufferInParameterBlockNotAllowedOnMetal,
     "nested 'ConstantBuffer' inside a 'ParameterBlock' is not supported on Metal, use "
     "'ParameterBlock' instead.")
+DIAGNOSTIC(
+    56101,
+    Error,
+    resourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal,
+    "nesting a 'ConstantBuffer' containing resource types inside a 'ParameterBlock' is not "
+    "supported on Metal, please use 'ParameterBlock' instead.")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")

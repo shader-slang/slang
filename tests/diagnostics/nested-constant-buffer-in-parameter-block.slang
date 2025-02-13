@@ -1,20 +1,33 @@
 //TEST:SIMPLE(filecheck=CHECK): -target metal
 
-struct S
+struct T
 {
-    // CHECK-DAG: ([[# @LINE+1]]): error 56100:
-    ConstantBuffer<int> cb;
+    RWStructuredBuffer<int> buf;
+}
+    
+struct U
+{
+    ConstantBuffer<T> t;
 }
 
-ParameterBlock<S> s;
+struct S
+{
+    ConstantBuffer<RWStructuredBuffer<int>> cb;
+}
 
-// CHECK-DAG: ([[# @LINE+1]]): error 56100:
-ParameterBlock<ConstantBuffer<int>> s2;
+// CHECK-DAG: ([[# @LINE+1]]): error 56101:
+ParameterBlock<S> s1;
+
+// CHECK-DAG: ([[# @LINE+1]]): error 56101:
+ParameterBlock<U> s2;
+
+// CHECK-DAG: ([[# @LINE+1]]): error 56101:
+ParameterBlock<ConstantBuffer<RWStructuredBuffer<int>>> s3;
 
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1,1,1)]
 void kernelMain()
 {
-    outputBuffer[0] = s.cb + s2;
+    outputBuffer[0] = s1.cb[0] + s2.t.buf[0] + s3[0];
 }

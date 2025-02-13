@@ -7,6 +7,7 @@
 #include "slang-gfx.h"
 #include "unit-test/slang-unit-test.h"
 
+#include <mutex>
 using namespace gfx;
 
 namespace gfx_test
@@ -15,6 +16,9 @@ namespace gfx_test
 
 Slang::ComPtr<slang::ISession> createSession(gfx::IDevice* device, ISlangFileSystemExt* fileSys)
 {
+    static std::mutex m;
+    std::lock_guard<std ::mutex> lock(m);
+
     Slang::ComPtr<slang::ISession> slangSession;
     device->getSlangSession(slangSession.writeRef());
     slang::SessionDesc sessionDesc = {};

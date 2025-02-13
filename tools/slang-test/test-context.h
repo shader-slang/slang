@@ -201,7 +201,7 @@ protected:
     Slang::List<TestReporter*> m_reporters;
     Slang::List<TestRequirements*> m_testRequirements = nullptr;
 
-    SlangSession* m_session;
+    Slang::ComPtr<SlangSession> m_session;
 
     Slang::Dictionary<Slang::String, SharedLibraryTool> m_sharedLibTools;
 

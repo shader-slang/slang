@@ -62,9 +62,10 @@ generator(
     TARGET_NAME
     slang-bootstrap
     USE_FEWER_WARNINGS
+    LINK_WITH_PUBLIC
+    slang-without-embedded-core-module
     LINK_WITH_PRIVATE
     prelude
-    slang-without-embedded-core-module
     slang-capability-lookup
     slang-lookup-tables
     Threads::Threads
