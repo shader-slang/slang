@@ -4,6 +4,7 @@
 
 #include "slang-emit-c-like.h"
 #include "slang-extension-tracker.h"
+#include "slang-ir-call-graph.h"
 
 namespace Slang
 {
@@ -178,7 +179,7 @@ protected:
 
     void _beforeComputeEmitProcessInstruction(IRInst* parentFunc, IRInst* inst, IRBuilder& builder);
 
-    Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingEntryPoints;
+    CallGraph m_callGraph;
 
     RefPtr<ShaderExtensionTracker> m_glslExtensionTracker;
 };

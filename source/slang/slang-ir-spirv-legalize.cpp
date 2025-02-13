@@ -2,7 +2,6 @@
 #include "slang-ir-spirv-legalize.h"
 
 #include "slang-emit-base.h"
-#include "slang-ir-call-graph.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-dce.h"
@@ -2102,7 +2101,7 @@ static bool hasExplicitInterlockInst(IRFunc* func)
 void insertFragmentShaderInterlock(SPIRVEmitSharedContext* context, IRModule* module)
 {
     HashSet<IRFunc*> fragmentShaders;
-    for (auto& [inst, entryPoints] : context->m_referencingEntryPoints)
+    for (const auto& [inst, entryPoints] : context->m_callGraph.getReferencingEntryPointsMap())
     {
         if (isRasterOrderedResource(inst))
         {
@@ -2154,7 +2153,7 @@ void legalizeIRForSPIRV(
     SLANG_UNUSED(entryPoints);
     legalizeSPIRV(context, module, codeGenContext->getSink());
     simplifyIRForSpirvLegalization(context->m_targetProgram, codeGenContext->getSink(), module);
-    buildEntryPointReferenceGraph(context->m_referencingEntryPoints, module);
+    context->m_callGraph.build(module);
     insertFragmentShaderInterlock(context, module);
 }
 

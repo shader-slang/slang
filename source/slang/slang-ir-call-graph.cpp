@@ -7,16 +7,44 @@
 namespace Slang
 {
 
-void buildEntryPointReferenceGraph(
-    Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints,
-    IRModule* module,
-    Dictionary<IRInst*, HashSet<IRFunc*>>* referencingFunctions,
-    Dictionary<IRFunc*, HashSet<IRCall*>>* referencingCalls)
+CallGraph::CallGraph(IRModule* module)
+{
+    build(module);
+}
+
+template<typename T, typename U>
+static void addToReferenceMap(Dictionary<T, HashSet<U>>& map, T key, U value)
+{
+    if (auto set = map.tryGetValue(key))
+    {
+        set->add(value);
+    }
+    else
+    {
+        HashSet<U> newSet;
+        newSet.add(value);
+        map.add(key, _Move(newSet));
+    }
+}
+
+
+void CallGraph::registerInstructionReference(IRInst* inst, IRFunc* entryPoint, IRFunc* parentFunc)
+{
+    addToReferenceMap(m_referencingEntryPoints, inst, entryPoint);
+    addToReferenceMap(m_referencingFunctions, inst, parentFunc);
+}
+
+void CallGraph::registerCallReference(IRFunc* func, IRCall* call)
+{
+    addToReferenceMap(m_referencingCalls, func, call);
+}
+
+void CallGraph::build(IRModule* module)
 {
     struct WorkItem
     {
-        IRFunc* entryPoint;
         IRInst* inst;
+        IRFunc* entryPoint;
         IRFunc* parentFunc;
 
         HashCode getHashCode() const
@@ -36,54 +64,11 @@ void buildEntryPointReferenceGraph(
             workList.add(item);
     };
 
-    auto registerEntryPointReference = [&](IRFunc* entryPoint, IRInst* inst)
-    {
-        if (auto set = referencingEntryPoints.tryGetValue(inst))
-            set->add(entryPoint);
-        else
-        {
-            HashSet<IRFunc*> newSet;
-            newSet.add(entryPoint);
-            referencingEntryPoints.add(inst, _Move(newSet));
-        }
-    };
-
-    const auto registerFunctionReference = [&](IRFunc* func, IRInst* inst)
-    {
-        if (referencingFunctions && func)
-        {
-            if (auto set = referencingFunctions->tryGetValue(inst))
-                set->add(func);
-            else
-            {
-                HashSet<IRFunc*> newSet;
-                newSet.add(func);
-                referencingFunctions->add(inst, _Move(newSet));
-            }
-        }
-    };
-
-    auto registerCallReference = [&](IRCall* call, IRFunc* func)
-    {
-        if (referencingCalls)
-        {
-            if (auto set = referencingCalls->tryGetValue(func))
-                set->add(call);
-            else
-            {
-                HashSet<IRCall*> newSet;
-                newSet.add(call);
-                referencingCalls->add(func, _Move(newSet));
-            }
-        }
-    };
-
-    auto visit = [&](IRFunc* entryPoint, IRInst* inst, IRFunc* parentFunc)
+    auto visit = [&](IRInst* inst, IRFunc* entryPoint, IRFunc* parentFunc)
     {
         if (auto code = as<IRGlobalValueWithCode>(inst))
         {
-            registerEntryPointReference(entryPoint, inst);
-            registerFunctionReference(parentFunc, inst);
+            registerInstructionReference(inst, entryPoint, parentFunc);
 
             if (auto func = as<IRFunc>(code))
             {
@@ -92,40 +77,39 @@ void buildEntryPointReferenceGraph(
 
             for (auto child : code->getChildren())
             {
-                addToWorkList({entryPoint, child, parentFunc});
+                addToWorkList({child, entryPoint, parentFunc});
             }
             return;
         }
+
         switch (inst->getOp())
         {
-        // Only these instruction types are registered to the entry point reference graph.
+        // Only these instruction types and `IRGlobalValueWithCode` instructions are registered to
+        // the reference graph.
+        case kIROp_Call:
+            {
+                auto call = as<IRCall>(inst);
+                registerCallReference(as<IRFunc>(call->getCallee()), call);
+                addToWorkList({call->getCallee(), entryPoint, parentFunc});
+            }
+            [[fallthrough]];
         case kIROp_GlobalParam:
         case kIROp_SPIRVAsmOperandBuiltinVar:
         case kIROp_ImplicitSystemValue:
-            registerEntryPointReference(entryPoint, inst);
-            registerFunctionReference(parentFunc, inst);
+            registerInstructionReference(inst, entryPoint, parentFunc);
             break;
 
         case kIROp_Block:
         case kIROp_SPIRVAsm:
             for (auto child : inst->getChildren())
             {
-                addToWorkList({entryPoint, child, parentFunc});
-            }
-            break;
-        case kIROp_Call:
-            registerEntryPointReference(entryPoint, inst);
-            registerFunctionReference(parentFunc, inst);
-            {
-                auto call = as<IRCall>(inst);
-                registerCallReference(call, as<IRFunc>(call->getCallee()));
-                addToWorkList({entryPoint, call->getCallee(), parentFunc});
+                addToWorkList({child, entryPoint, parentFunc});
             }
             break;
         case kIROp_SPIRVAsmOperandInst:
             {
                 auto operand = as<IRSPIRVAsmOperandInst>(inst);
-                addToWorkList({entryPoint, operand->getValue(), parentFunc});
+                addToWorkList({operand->getValue(), entryPoint, parentFunc});
             }
             break;
         }
@@ -137,7 +121,7 @@ void buildEntryPointReferenceGraph(
             case kIROp_GlobalParam:
             case kIROp_GlobalVar:
             case kIROp_SPIRVAsmOperandBuiltinVar:
-                addToWorkList({entryPoint, operand, parentFunc});
+                addToWorkList({operand, entryPoint, parentFunc});
                 break;
             }
         }
@@ -149,21 +133,40 @@ void buildEntryPointReferenceGraph(
             globalInst->findDecoration<IREntryPointDecoration>())
         {
             auto entryPointFunc = as<IRFunc>(globalInst);
-            visit(entryPointFunc, globalInst, nullptr);
+            visit(globalInst, entryPointFunc, nullptr);
         }
     }
     for (Index i = 0; i < workList.getCount(); i++)
-        visit(workList[i].entryPoint, workList[i].inst, workList[i].parentFunc);
+        visit(workList[i].inst, workList[i].entryPoint, workList[i].parentFunc);
 }
 
-HashSet<IRFunc*>* getReferencingEntryPoints(
-    Dictionary<IRInst*, HashSet<IRFunc*>>& m_referencingEntryPoints,
-    IRInst* inst)
+const HashSet<IRFunc*>* CallGraph::getReferencingEntryPoints(IRInst* inst) const
 {
-    auto* referencingEntryPoints = m_referencingEntryPoints.tryGetValue(inst);
+    const auto* referencingEntryPoints = m_referencingEntryPoints.tryGetValue(inst);
     if (!referencingEntryPoints)
         return nullptr;
     return referencingEntryPoints;
+}
+
+const HashSet<IRFunc*>* CallGraph::getReferencingFunctions(IRInst* inst) const
+{
+    const auto* referencingFunctions = m_referencingFunctions.tryGetValue(inst);
+    if (!referencingFunctions)
+        return nullptr;
+    return referencingFunctions;
+}
+
+const HashSet<IRCall*>* CallGraph::getReferencingCalls(IRFunc* func) const
+{
+    const auto* referencingCalls = m_referencingCalls.tryGetValue(func);
+    if (!referencingCalls)
+        return nullptr;
+    return referencingCalls;
+}
+
+const Dictionary<IRInst*, HashSet<IRFunc*>>& CallGraph::getReferencingEntryPointsMap() const
+{
+    return m_referencingEntryPoints;
 }
 
 } // namespace Slang

@@ -47,7 +47,7 @@ void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
     //
     // Handle cases where "require" IR operations exist in the function body and are required
     // as entry point decorations.
-    auto entryPoints = getReferencingEntryPoints(m_referencingEntryPoints, parentFunc);
+    auto entryPoints = m_callGraph.getReferencingEntryPoints(parentFunc);
     if (entryPoints == nullptr)
         return;
 
@@ -81,7 +81,7 @@ void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
 
 void GLSLSourceEmitter::beforeComputeEmitActions(IRModule* module)
 {
-    buildEntryPointReferenceGraph(this->m_referencingEntryPoints, module);
+    m_callGraph.build(module);
 
     IRBuilder builder(module);
     for (auto globalInst : module->getGlobalInsts())

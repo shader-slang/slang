@@ -1,6 +1,7 @@
 // slang-ir-spirv-legalize.h
 #pragma once
 #include "../core/slang-basic.h"
+#include "slang-ir-call-graph.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-spirv-snippet.h"
 
@@ -20,9 +21,8 @@ struct SPIRVEmitSharedContext
     TargetProgram* m_targetProgram;
     Dictionary<IRTargetIntrinsicDecoration*, RefPtr<SpvSnippet>> m_parsedSpvSnippets;
 
-    Dictionary<IRInst*, HashSet<IRFunc*>>
-        m_referencingEntryPoints; // The entry-points that directly or transitively reference this
-                                  // global inst.
+    // Track entry-points that directly or transitively reference this global inst.
+    CallGraph m_callGraph;
 
     DiagnosticSink* m_sink;
     const SPIRVCoreGrammarInfo* m_grammarInfo;

@@ -1,32 +1,41 @@
+#pragma once
+
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 
 namespace Slang
 {
 
-void buildEntryPointReferenceGraph(
-    Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints,
-    IRModule* module,
-    Dictionary<IRInst*, HashSet<IRFunc*>>* referencingFunctions = nullptr,
-    Dictionary<IRFunc*, HashSet<IRCall*>>* referencingCalls = nullptr);
-
-HashSet<IRFunc*>* getReferencingEntryPoints(
-    Dictionary<IRInst*, HashSet<IRFunc*>>& m_referencingEntryPoints,
-    IRInst* inst);
-
-
-/*
-class FunctionCallGraph
+struct CallGraph
 {
 public:
+    CallGraph() = default;
+    explicit CallGraph(IRModule* module);
+
+    void build(IRModule* module);
+
+    /// Retrieves the set of entry points that invoke the given instruction in its call graph.
+    /// Returns nullptr if the instruction has no referencing entry points.
+    const HashSet<IRFunc*>* getReferencingEntryPoints(IRInst* inst) const;
+
+    /// Retrieves the set of functions that directly contain the given instruction in their body.
+    /// Returns nullptr if the instruction is not referenced by any function.
     const HashSet<IRFunc*>* getReferencingFunctions(IRInst* inst) const;
-    const HashSet<IRCall*>* getFunctionCalls(IRFunc* func) const;
+
+    /// Retrieves the set of calls that invoke the given function.
+    /// Returns nullptr if the function is never called.
+    const HashSet<IRCall*>* getReferencingCalls(IRFunc* func) const;
+
+
+    const Dictionary<IRInst*, HashSet<IRFunc*>>& getReferencingEntryPointsMap() const;
 
 private:
-    Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingFunctions;
-    Dictionary<IRFunc*, HashSet<IRCall*>> m_functionCalls;
-};
-*/
+    void registerInstructionReference(IRInst* inst, IRFunc* entryPoint, IRFunc* parentFunc);
+    void registerCallReference(IRFunc* func, IRCall* call);
 
+    Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingEntryPoints;
+    Dictionary<IRInst*, HashSet<IRFunc*>> m_referencingFunctions;
+    Dictionary<IRFunc*, HashSet<IRCall*>> m_referencingCalls;
+};
 
 } // namespace Slang

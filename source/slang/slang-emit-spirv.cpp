@@ -3553,8 +3553,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto parentFunc = getParentFunc(inst);
 
-                HashSet<IRFunc*>* entryPointsUsingInst =
-                    getReferencingEntryPoints(m_referencingEntryPoints, parentFunc);
+                auto entryPointsUsingInst = m_callGraph.getReferencingEntryPoints(parentFunc);
                 for (IRFunc* entryPoint : *entryPointsUsingInst)
                 {
                     bool isQuad = true;
@@ -3608,8 +3607,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
 
         case kIROp_RequireMaximallyReconverges:
-            if (auto entryPointsUsingInst =
-                    getReferencingEntryPoints(m_referencingEntryPoints, getParentFunc(inst)))
+            if (
+                // auto entryPointsUsingInst =
+                // getReferencingEntryPoints(m_referencingEntryPoints, getParentFunc(inst))
+                auto entryPointsUsingInst =
+                    m_callGraph.getReferencingEntryPoints(getParentFunc(inst)))
             {
                 ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_maximal_reconvergence"));
                 for (IRFunc* entryPoint : *entryPointsUsingInst)
@@ -3623,7 +3625,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_RequireQuadDerivatives:
             if (auto entryPointsUsingInst =
-                    getReferencingEntryPoints(m_referencingEntryPoints, getParentFunc(inst)))
+                    m_callGraph.getReferencingEntryPoints(getParentFunc(inst)))
             {
                 ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_quad_control"));
                 requireSPIRVCapability(SpvCapabilityQuadControlKHR);
@@ -4326,7 +4328,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             if (m_mapIRInstToSpvInst.tryGetValue(globalInst, spvGlobalInst))
                             {
                                 // Is this globalInst referenced by this entry point?
-                                auto refSet = m_referencingEntryPoints.tryGetValue(globalInst);
+                                auto refSet = m_callGraph.getReferencingEntryPoints(globalInst);
                                 if (refSet && refSet->contains(entryPoint))
                                 {
                                     if (!isSpirv14OrLater())
@@ -5129,7 +5131,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     bool isInstUsedInStage(IRInst* inst, Stage s)
     {
-        auto* referencingEntryPoints = m_referencingEntryPoints.tryGetValue(inst);
+        auto referencingEntryPoints = m_callGraph.getReferencingEntryPoints(inst);
         if (!referencingEntryPoints)
             return false;
         for (auto entryPoint : *referencingEntryPoints)
@@ -5329,7 +5331,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 else if (semanticName == "sv_primitiveid")
                 {
-                    auto entryPoints = m_referencingEntryPoints.tryGetValue(inst);
+                    auto entryPoints = m_callGraph.getReferencingEntryPoints(inst);
                     // SPIRV requires `Geometry` capability being declared for a fragment
                     // shader, if that shader uses sv_primitiveid.
                     // We will check if this builtin is used by non-ray-tracing, non-geometry or
@@ -8029,7 +8031,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 case SpvOpExecutionMode:
                     {
                         if (auto refEntryPointSet =
-                                m_referencingEntryPoints.tryGetValue(getParentFunc(inst)))
+                                m_callGraph.getReferencingEntryPoints(getParentFunc(inst)))
                         {
                             for (auto entryPoint : *refEntryPointSet)
                             {

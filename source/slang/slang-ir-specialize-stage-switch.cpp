@@ -123,8 +123,7 @@ void specializeFuncToStage(
 
 void specializeStageSwitch(IRModule* module)
 {
-    Dictionary<IRInst*, HashSet<IRFunc*>> mapInstToReferencingEntryPoints;
-    buildEntryPointReferenceGraph(mapInstToReferencingEntryPoints, module);
+    const auto callGraph = CallGraph(module);
 
     HashSet<IRInst*> stageSpecificFunctions;
     discoverStageSpecificFunctions(stageSpecificFunctions, module);
@@ -133,7 +132,7 @@ void specializeStageSwitch(IRModule* module)
     Dictionary<IRInst*, Dictionary<Stage, IRInst*>> mapFuncToStageSpecializedFunc;
     for (auto func : stageSpecificFunctions)
     {
-        auto referencingEntryPoints = mapInstToReferencingEntryPoints.tryGetValue(func);
+        auto referencingEntryPoints = callGraph.getReferencingEntryPoints(func);
         if (!referencingEntryPoints)
             continue;
         if (func->findDecoration<IREntryPointDecoration>())

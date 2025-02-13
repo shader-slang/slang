@@ -13,8 +13,7 @@ struct GlobalVarTranslationContext
 
     void processModule(IRModule* module)
     {
-        Dictionary<IRInst*, HashSet<IRFunc*>> referencingEntryPoints;
-        buildEntryPointReferenceGraph(referencingEntryPoints, module);
+        const auto callGraph = CallGraph(module);
 
         List<IRInst*> entryPoints;
         List<IRInst*> getWorkGroupSizeInsts;
@@ -30,7 +29,7 @@ struct GlobalVarTranslationContext
                 getWorkGroupSizeInsts.add(inst);
         }
         for (auto inst : getWorkGroupSizeInsts)
-            materializeGetWorkGroupSize(module, referencingEntryPoints, inst);
+            materializeGetWorkGroupSize(module, callGraph, inst);
         IRBuilder builder(module);
 
         for (auto entryPoint : entryPoints)
@@ -39,7 +38,7 @@ struct GlobalVarTranslationContext
             List<IRInst*> inputVars;
             for (auto inst : module->getGlobalInsts())
             {
-                if (auto referencingEntryPointSet = referencingEntryPoints.tryGetValue(inst))
+                if (auto referencingEntryPointSet = callGraph.getReferencingEntryPoints(inst))
                 {
                     if (referencingEntryPointSet->contains((IRFunc*)entryPoint))
                     {
@@ -266,7 +265,7 @@ struct GlobalVarTranslationContext
     //
     void materializeGetWorkGroupSize(
         IRModule* module,
-        Dictionary<IRInst*, HashSet<IRFunc*>>& referenceGraph,
+        const CallGraph& callGraph,
         IRInst* workgroupSizeInst)
     {
         IRBuilder builder(workgroupSizeInst);
@@ -276,7 +275,7 @@ struct GlobalVarTranslationContext
             {
                 if (auto parentFunc = getParentFunc(use->getUser()))
                 {
-                    auto referenceSet = referenceGraph.tryGetValue(parentFunc);
+                    auto referenceSet = callGraph.getReferencingEntryPoints(parentFunc);
                     if (!referenceSet)
                         return;
                     if (referenceSet->getCount() == 1)

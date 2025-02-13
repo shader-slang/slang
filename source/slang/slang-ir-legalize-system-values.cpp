@@ -2,6 +2,7 @@
 
 #include "core/slang-dictionary.h"
 #include "core/slang-string.h"
+#include "slang-ir-call-graph.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-legalize-varying-params.h"
 
@@ -13,11 +14,9 @@ class ImplicitSystemValueLegalizationContext
 public:
     ImplicitSystemValueLegalizationContext(
         IRModule* module,
-        const Dictionary<IRInst*, HashSet<IRFunc*>>& functionReferenceGraph,
-        const Dictionary<IRFunc*, HashSet<IRCall*>>& callReferenceGraph,
+        const CallGraph& callGraph,
         const List<IRImplicitSystemValue*>& implicitSystemValueInstructions)
-        : m_functionReferenceGraph(functionReferenceGraph)
-        , m_callReferenceGraph(callReferenceGraph)
+        : m_callGraph(callGraph)
         , m_implicitSystemValueInstructions(implicitSystemValueInstructions)
         , m_builder(module)
         , m_paramType(m_builder.getUIntType())
@@ -28,9 +27,9 @@ public:
     {
         for (auto implicitSysVal : m_implicitSystemValueInstructions)
         {
-            for (auto entryPoint : *m_functionReferenceGraph.tryGetValue(implicitSysVal))
+            for (auto parentFunc : *m_callGraph.getReferencingFunctions(implicitSysVal))
             {
-                auto param = getOrCreateSystemValueVariable(entryPoint, implicitSysVal);
+                auto param = getOrCreateSystemValueVariable(parentFunc, implicitSysVal);
                 implicitSysVal->replaceUsesWith(param);
                 implicitSysVal->removeAndDeallocate();
             }
@@ -113,7 +112,7 @@ private:
         {
             for (auto call : calls)
             {
-                for (auto caller : m_functionReferenceGraph.getValue(call))
+                for (auto caller : *m_callGraph.getReferencingFunctions(call))
                 {
                     // The caller(of a function that was added a parameter) also requires a
                     // new parameter to pass in the system value variable to the callee.
@@ -142,7 +141,7 @@ private:
 
                 fixUpFuncType(func);
                 getParamMap(func).add(systemValueName, param);
-                if (auto calls = m_callReferenceGraph.tryGetValue(func))
+                if (auto calls = m_callGraph.getReferencingCalls(func))
                 {
                     addWorkItems(*calls);
                 }
@@ -213,8 +212,7 @@ private:
         return tryGetParam(parentFunc, systemValueName);
     }
 
-    const Dictionary<IRInst*, HashSet<IRFunc*>>& m_functionReferenceGraph;
-    const Dictionary<IRFunc*, HashSet<IRCall*>>& m_callReferenceGraph;
+    const CallGraph& m_callGraph;
     const List<IRImplicitSystemValue*>& m_implicitSystemValueInstructions;
 
     Dictionary<IRFunc*, SystemValueParamMap> m_functionMap;
@@ -228,15 +226,10 @@ private:
 
 void legalizeImplicitSystemValues(
     IRModule* module,
-    const Dictionary<IRInst*, HashSet<IRFunc*>>& functionReferenceGraph,
-    const Dictionary<IRFunc*, HashSet<IRCall*>>& callReferenceGraph,
+    const CallGraph& callGraph,
     const List<IRImplicitSystemValue*>& implicitSystemValueInstructions)
 {
-    ImplicitSystemValueLegalizationContext(
-        module,
-        functionReferenceGraph,
-        callReferenceGraph,
-        implicitSystemValueInstructions)
+    ImplicitSystemValueLegalizationContext(module, callGraph, implicitSystemValueInstructions)
         .legalize();
 }
 

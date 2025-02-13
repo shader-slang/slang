@@ -1,5 +1,6 @@
 // slang-ir-legalize-system-values.h
 #pragma once
+#include "slang-ir-call-graph.h"
 #include "slang-ir-insts.h"
 
 namespace Slang
@@ -7,8 +8,7 @@ namespace Slang
 
 void legalizeImplicitSystemValues(
     IRModule* module,
-    const Dictionary<IRInst*, HashSet<IRFunc*>>& functionReferenceGraph,
-    const Dictionary<IRFunc*, HashSet<IRCall*>>& callReferenceGraph,
+    const CallGraph& callGraph,
     const List<IRImplicitSystemValue*>& implicitSystemValueInstructions);
 
 } // namespace Slang

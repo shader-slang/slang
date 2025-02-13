@@ -1,6 +1,5 @@
 #include "slang-ir-wgsl-legalize.h"
 
-#include "slang-ir-call-graph.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-legalize-binary-operator.h"
 #include "slang-ir-legalize-global-values.h"
@@ -235,19 +234,10 @@ void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink)
     // Legalize implicit system values to entry point parameters.
     if (instContext.implicitSystemValueInstructions.getCount() != 0)
     {
-        Dictionary<IRInst*, HashSet<IRFunc*>> entryPointReferenceGraph;
-        // Dictionary<IRInst*, HashSet<CallItem>> functionReferenceGraph;
-        Dictionary<IRInst*, HashSet<IRFunc*>> functionReferenceGraph;
-        Dictionary<IRFunc*, HashSet<IRCall*>> callReferenceGraph;
-        buildEntryPointReferenceGraph(
-            entryPointReferenceGraph,
-            module,
-            &functionReferenceGraph,
-            &callReferenceGraph);
+        const auto callGraph = CallGraph(module);
         legalizeImplicitSystemValues(
             module,
-            functionReferenceGraph,
-            callReferenceGraph,
+            callGraph,
             instContext.implicitSystemValueInstructions);
     }
 
