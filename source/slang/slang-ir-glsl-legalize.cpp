@@ -3292,10 +3292,11 @@ pp->getModule()->getModuleInst()->dump();
 // Dump IR
 printf("Created global value for varying input:\n");
 pp->getModule()->getModuleInst()->dump();
-                
         tryReplaceUsesOfStageInput(context, globalValue, pp);
+#if 0
         for (auto dec : pp->getDecorations())
         {
+            
             if (dec->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
                 continue;
             auto globalVar = dec->getOperand(0);
@@ -3362,12 +3363,13 @@ if (!realGlobalVar)
             globalVar->replaceUsesWith(realGlobalVar);
             globalVar->removeAndDeallocate();
         }
-
-// DEBUG
+        
+        // DEBUG
 // Dump IR
 printf("Replaced global accessed with shadow:\n");
 pp->getModule()->getModuleInst()->dump();
 printf("printed\n");
+#endif
     }
     else
     {

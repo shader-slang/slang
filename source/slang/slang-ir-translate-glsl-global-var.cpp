@@ -163,14 +163,15 @@ struct GlobalVarTranslationContext
                 setInsertBeforeOrdinaryInst(&builder, firstBlock->getFirstOrdinaryInst());
                 auto inputType = cast<IRPtrTypeBase>(input->getDataType())->getValueType();
                 builder.emitStore(
-                    input,
-                    builder
-                        .emitFieldExtract(inputType, builder.emitLoad(inputParam), inputKeys[i]));
+                   input,
+                   builder
+                       .emitFieldExtract(inputType, builder.emitLoad(inputParam), inputKeys[i]));
+                
                 // Relate "global variable" to a "global parameter" for use later in compilation
                 // to resolve a "global variable" shadowing a "global parameter" relationship.
                 
                 // Decorate either the input or nested fields with "shadowing".                
-                if (auto inputStructType = as<IRStructType>(inputType))
+                if (false) //auto inputStructType = as<IRStructType>(inputType))
                 {
                     // TODO: Recurse into nested fields, this works on only one level of nesting.
                     for (auto field : inputStructType->getFields())
@@ -181,13 +182,13 @@ struct GlobalVarTranslationContext
                             field->getKey());
                     }
                 }
-                else
-                {
+                //else
+                //{
                     builder.addGlobalVariableShadowingGlobalParameterDecoration(
                         inputParam,
                         input,
                         inputKeys[i]);
-                }
+                //}
             }
 
             // For each entry point, introduce a new parameter to represent each input parameter,
