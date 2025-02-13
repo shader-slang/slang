@@ -12,7 +12,8 @@
       "generator": "Ninja Multi-Config",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>",
+        "SLANG_ENABLE_IR_BREAK_ALLOC": "$<$<CONFIG:Debug>:TRUE>$<$<NOT:$<CONFIG:Debug>>:FALSE>"
       }
     },
     {
@@ -44,6 +45,15 @@
       "inherits": "msvc-base",
       "description": "Visual Studio 2019 project",
       "generator": "Visual Studio 16 2019"
+    },
+    {
+      "name": "vs2019-dev",
+      "inherits": "msvc-base",
+      "description": "Visual Studio 2019 project with debug assisting features",
+      "generator": "Visual Studio 16 2019",
+      "cacheVariables": {
+        "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE"
+      }
     },
     {
       "name": "vs2022",
