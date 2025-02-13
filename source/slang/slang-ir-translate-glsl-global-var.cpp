@@ -84,32 +84,24 @@ struct GlobalVarTranslationContext
                 inputKeys.add(key);
                 builder.createStructField(inputStructType, key, inputType);
 
-                IRTypeLayout::Builder* fieldTypeLayout;             
-                IRStructTypeLayout::Builder structTypeLayoutBuilder(&builder);
-                IRTypeLayout::Builder basicTypeLayoutBuilder(&builder);
-                if (auto structType = as<IRStructType>(inputType))
+                IRTypeLayout::Builder fieldTypeLayoutBuilder(&builder);
+                IRTypeLayout* fieldTypeLayout = nullptr;
+                bool hasExistingLayout = false;
+                if (auto existingLayoutDecoration = input->findDecoration<IRLayoutDecoration>())
                 {
-                    fieldTypeLayout = &structTypeLayoutBuilder;
-
-                    // If the input is a struct, we need to add all the fields to the input
-                    // struct type.
-                    for (auto field : structType->getFields())
-                    {   
-                        IRTypeLayout::Builder nestedFieldTypeLayout(&builder);
-                        IRVarLayout::Builder nestedVarLayoutBuilder(&builder, nestedFieldTypeLayout.build());
-                        nestedFieldTypeLayout.addResourceUsage(
-                            LayoutResourceKind::VaryingInput,
-                            LayoutSize(1));
-                        auto fieldKey = builder.createStructKey();                      
-                        structTypeLayoutBuilder.addField(fieldKey, nestedVarLayoutBuilder.build());
+                    if (auto existingVarLayout = as<IRVarLayout>(existingLayoutDecoration->getLayout()))                        
+                    {
+                        fieldTypeLayout = existingVarLayout->getTypeLayout();
+                        hasExistingLayout = true;
                     }
                 }
-                else
-                {
-                    fieldTypeLayout = &basicTypeLayoutBuilder;
-                }                
 
-                IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout->build());
+                if (!hasExistingLayout)
+                {
+                    fieldTypeLayout = fieldTypeLayoutBuilder.build();
+                }
+                
+                IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout);
                 varLayoutBuilder.setStage(entryPointDecor->getProfile().getStage());
                 if (auto semanticDecor = input->findDecoration<IRSemanticDecoration>())
                 {
@@ -119,9 +111,12 @@ struct GlobalVarTranslationContext
                 }
                 else
                 {
-                    fieldTypeLayout->addResourceUsage(
-                        LayoutResourceKind::VaryingInput,
-                        LayoutSize(1));
+                    if (!hasExistingLayout)
+                    {
+                        fieldTypeLayoutBuilder.addResourceUsage(
+                            LayoutResourceKind::VaryingInput,
+                            LayoutSize(1));
+                    }                    
                     if (auto layoutDecor = findVarLayout(input))
                     {
                         if (auto offsetAttr =
@@ -162,11 +157,12 @@ struct GlobalVarTranslationContext
                 auto input = inputVars[i];
                 setInsertBeforeOrdinaryInst(&builder, firstBlock->getFirstOrdinaryInst());
                 auto inputType = cast<IRPtrTypeBase>(input->getDataType())->getValueType();
+                // TODO: This could be more efficient as a Load(FieldAddress(inputParam, i))
+                // operation instead of a FieldExtract(Load(inputParam)).
                 builder.emitStore(
                     input,
                     builder
                         .emitFieldExtract(inputType, builder.emitLoad(inputParam), inputKeys[i]));
-                
                 // Relate "global variable" to a "global parameter" for use later in compilation
                 // to resolve a "global variable" shadowing a "global parameter" relationship.
                 builder.addGlobalVariableShadowingGlobalParameterDecoration(
