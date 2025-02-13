@@ -2922,7 +2922,7 @@ void tryReplaceUsesOfStageInput(
                                 {
                                     fieldVal = element.val;
                                     break;
-                                }                                
+                                }
                                 if (auto tupleValType =
                                         as<ScalarizedTupleValImpl>(element.val.impl))
                                 {
