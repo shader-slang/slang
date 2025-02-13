@@ -3275,9 +3275,6 @@ void legalizeEntryPointParameterForGLSL(
             ptrType->getAddressSpace() == AddressSpace::Input ||
             ptrType->getAddressSpace() == AddressSpace::BuiltinInput);
 
-//DEBUG
-// printf("Before global value for varying input:\n");
-//pp->getModule()->getModuleInst()->dump();
         auto globalValue = createGLSLGlobalVaryings(
             context,
             codeGenContext,
@@ -3288,10 +3285,6 @@ void legalizeEntryPointParameterForGLSL(
             stage,
             pp);
 
-// DEBUG
-// Dump IR
-//printf("Created global value for varying input:\n");
-// pp->getModule()->getModuleInst()->dump();
         tryReplaceUsesOfStageInput(context, globalValue, pp);
 #if 0
         for (auto dec : pp->getDecorations())
@@ -3362,11 +3355,6 @@ void legalizeEntryPointParameterForGLSL(
             globalVar->replaceUsesWith(realGlobalVar);
             globalVar->removeAndDeallocate();
         }
-
-// Dump IR
-//printf("Replaced global accessed with shadow:\n");
-//pp->getModule()->getModuleInst()->dump();
-//printf("printed\n");
 #endif
     }
     else
