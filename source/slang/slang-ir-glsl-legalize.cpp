@@ -3284,10 +3284,9 @@ void legalizeEntryPointParameterForGLSL(
             LayoutResourceKind::VaryingInput,
             stage,
             pp);
-
         tryReplaceUsesOfStageInput(context, globalValue, pp);
         for (auto dec : pp->getDecorations())
-        {            
+        {
             if (dec->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
                 continue;
             auto globalVar = dec->getOperand(0);
