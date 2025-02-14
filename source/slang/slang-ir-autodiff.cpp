@@ -1634,6 +1634,17 @@ void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
     {
         if (auto pairType = as<IRDifferentialPairTypeBase>(globalInst))
         {
+#if 0
+            if (auto vecType = as<IRVectorType>(pairType->getValueType()))
+            {
+                auto op0 = vecType->getOperand(0);
+                if (op0->getOp() == kIROp_FloatType)
+                {
+                    int a = 0;
+                    ++a;
+                }
+            }
+#endif
             addTypeToDictionary(pairType->getValueType(), pairType->getWitness());
         }
 
