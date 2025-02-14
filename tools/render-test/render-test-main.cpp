@@ -970,7 +970,8 @@ Result RenderTestApp::update()
     if (m_options.shaderType == Options::ShaderProgramType::Compute)
     {
         auto passEncoder = encoder->beginComputePass();
-        auto rootObject = passEncoder->bindPipeline(static_cast<IComputePipeline*>(m_pipeline.get()));
+        auto rootObject =
+            passEncoder->bindPipeline(static_cast<IComputePipeline*>(m_pipeline.get()));
         applyBinding(rootObject);
         passEncoder->dispatchCompute(
             m_options.computeDispatchSize[0],
@@ -994,7 +995,8 @@ Result RenderTestApp::update()
         renderPass.depthStencilAttachment = &depthStencilAttachment;
 
         auto passEncoder = encoder->beginRenderPass(renderPass);
-        auto rootObject = passEncoder->bindPipeline(static_cast<IRenderPipeline*>(m_pipeline.get()));
+        auto rootObject =
+            passEncoder->bindPipeline(static_cast<IRenderPipeline*>(m_pipeline.get()));
         applyBinding(rootObject);
         setProjectionMatrix(rootObject);
 
