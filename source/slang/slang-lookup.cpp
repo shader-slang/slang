@@ -71,7 +71,11 @@ bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
     {
         return (int(mask) & int(LookupMask::Attribute)) != 0;
     }
-
+    // syntax declaration
+    else if (const auto syntaxDecl = as<SyntaxDecl>(decl))
+    {
+        return (int(mask) & int(LookupMask::SyntaxDecl)) != 0;
+    }
     // default behavior is to assume a value declaration
     // (no overloading allowed)
 
