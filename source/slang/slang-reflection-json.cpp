@@ -328,6 +328,22 @@ static void emitUserAttributes(PrettyWriter& writer, slang::VariableReflection* 
         writer << "]";
     }
 }
+static void emitUserAttributes(PrettyWriter& writer, slang::FunctionReflection* func)
+{
+    auto attribCount = func->getUserAttributeCount();
+    if (attribCount)
+    {
+        writer << ",\n\"userAttribs\": [";
+        for (unsigned int i = 0; i < attribCount; i++)
+        {
+            if (i > 0)
+                writer << ",\n";
+            auto attrib = func->getUserAttributeByIndex(i);
+            emitUserAttributeJSON(writer, attrib);
+        }
+        writer << "]";
+    }
+}
 
 static void emitReflectionVarLayoutJSON(PrettyWriter& writer, slang::VariableLayoutReflection* var)
 {
@@ -1090,6 +1106,8 @@ static void emitReflectionEntryPointJSON(
         writer.dedent();
         writer << "\n]";
     }
+
+    emitUserAttributes(writer, entryPoint->getFunction());
 
     writer.dedent();
     writer << "\n}";
