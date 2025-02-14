@@ -1086,9 +1086,6 @@ Result RenderTestApp::update()
                 m_options.shaderType == Options::ShaderProgramType::GraphicsMeshCompute ||
                 m_options.shaderType == Options::ShaderProgramType::GraphicsTaskMeshCompute)
             {
-                auto request = m_compilationOutput.output.getRequestForReflection();
-                auto slangReflection = (slang::ShaderReflection*)spGetReflection(request);
-
                 SLANG_RETURN_ON_FAIL(writeBindingOutput(m_options.outputPath));
             }
             else

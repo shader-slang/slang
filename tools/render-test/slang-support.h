@@ -73,7 +73,6 @@ struct ShaderCompilerUtil
         /// Compile request that owns the lifetime of reflection information.
         ComPtr<SlangCompileRequest> m_extraRequestForReflection = nullptr;
 
-        SlangCompileRequest* getRequestForKernels() const { return m_requestForKernels; }
         SlangCompileRequest* getRequestForReflection() const
         {
             return m_extraRequestForReflection ? m_extraRequestForReflection : m_requestForKernels;
