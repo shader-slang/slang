@@ -1452,7 +1452,7 @@ struct UseGraph
         //
         IROutOfOrderCloneContext ctx;
         List<UseChain> chains = chainSets[use];
-        for (auto chain : chains)
+        for (auto& chain : chains)
         {
             chain.replace(&ctx, builder, inst);
         }
@@ -1474,7 +1474,10 @@ struct UseGraph
             return false;
 
         auto& chain = chainSets.getFirst().value;
-        return chain.getCount() == 1;
+        if (chain.getCount() != 1)
+            return false;
+
+        return chain.getFirst().chain.getCount() == 1;
     }
 
     List<IRUse*> getUniqueUses() const
