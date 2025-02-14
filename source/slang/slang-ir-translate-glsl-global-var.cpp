@@ -83,8 +83,26 @@ struct GlobalVarTranslationContext
                 auto key = builder.createStructKey();
                 inputKeys.add(key);
                 builder.createStructField(inputStructType, key, inputType);
-                IRTypeLayout::Builder fieldTypeLayout(&builder);
-                IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout.build());
+
+                IRTypeLayout::Builder fieldTypeLayoutBuilder(&builder);
+                IRTypeLayout* fieldTypeLayout = nullptr;
+                bool hasExistingLayout = false;
+                if (auto existingLayoutDecoration = input->findDecoration<IRLayoutDecoration>())
+                {
+                    if (auto existingVarLayout =
+                            as<IRVarLayout>(existingLayoutDecoration->getLayout()))
+                    {
+                        fieldTypeLayout = existingVarLayout->getTypeLayout();
+                        hasExistingLayout = true;
+                    }
+                }
+
+                if (!hasExistingLayout)
+                {
+                    fieldTypeLayout = fieldTypeLayoutBuilder.build();
+                }
+
+                IRVarLayout::Builder varLayoutBuilder(&builder, fieldTypeLayout);
                 varLayoutBuilder.setStage(entryPointDecor->getProfile().getStage());
                 if (auto semanticDecor = input->findDecoration<IRSemanticDecoration>())
                 {
@@ -94,9 +112,12 @@ struct GlobalVarTranslationContext
                 }
                 else
                 {
-                    fieldTypeLayout.addResourceUsage(
-                        LayoutResourceKind::VaryingInput,
-                        LayoutSize(1));
+                    if (!hasExistingLayout)
+                    {
+                        fieldTypeLayoutBuilder.addResourceUsage(
+                            LayoutResourceKind::VaryingInput,
+                            LayoutSize(1));
+                    }
                     if (auto layoutDecor = findVarLayout(input))
                     {
                         if (auto offsetAttr =
@@ -137,6 +158,8 @@ struct GlobalVarTranslationContext
                 auto input = inputVars[i];
                 setInsertBeforeOrdinaryInst(&builder, firstBlock->getFirstOrdinaryInst());
                 auto inputType = cast<IRPtrTypeBase>(input->getDataType())->getValueType();
+                // TODO: This could be more efficient as a Load(FieldAddress(inputParam, i))
+                // operation instead of a FieldExtract(Load(inputParam)).
                 builder.emitStore(
                     input,
                     builder

@@ -2923,6 +2923,22 @@ void tryReplaceUsesOfStageInput(
                                     fieldVal = element.val;
                                     break;
                                 }
+                                if (auto tupleValType =
+                                        as<ScalarizedTupleValImpl>(element.val.impl))
+                                {
+                                    for (auto tupleElement : tupleValType->elements)
+                                    {
+                                        if (tupleElement.key == fieldKey)
+                                        {
+                                            fieldVal = tupleElement.val;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (fieldVal.flavor != ScalarizedVal::Flavor::none)
+                                {
+                                    break;
+                                }
                             }
                             if (fieldVal.flavor != ScalarizedVal::Flavor::none)
                             {
@@ -3290,45 +3306,54 @@ void legalizeEntryPointParameterForGLSL(
             if (dec->getOp() != kIROp_GlobalVariableShadowingGlobalParameterDecoration)
                 continue;
             auto globalVar = dec->getOperand(0);
-            auto key = dec->getOperand(1);
-            IRInst* realGlobalVar = nullptr;
-            if (globalValue.flavor != ScalarizedVal::Flavor::tuple)
-                continue;
-            if (auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl))
+            auto globalVarType = cast<IRPtrTypeBase>(globalVar->getDataType())->getValueType();
+            if (as<IRStructType>(globalVarType))
             {
-                for (auto elem : tupleVal->elements)
-                {
-                    if (elem.key == key)
-                    {
-                        realGlobalVar = elem.val.irValue;
-                        break;
-                    }
-                }
+                tryReplaceUsesOfStageInput(context, globalValue, globalVar);
             }
-            SLANG_ASSERT(realGlobalVar);
+            else
+            {
 
-            // Remove all stores into the global var introduced during
-            // the initial glsl global var translation pass since we are
-            // going to replace the global var with a pointer to the real
-            // input, and it makes no sense to store values into such real
-            // input locations.
-            traverseUses(
-                globalVar,
-                [&](IRUse* use)
+                auto key = dec->getOperand(1);
+                IRInst* realGlobalVar = nullptr;
+                if (globalValue.flavor != ScalarizedVal::Flavor::tuple)
+                    continue;
+                if (auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl))
                 {
-                    auto user = use->getUser();
-                    if (auto store = as<IRStore>(user))
+                    for (auto elem : tupleVal->elements)
                     {
-                        if (store->getPtrUse() == use)
+                        if (elem.key == key)
                         {
-                            store->removeAndDeallocate();
+                            realGlobalVar = elem.val.irValue;
+                            break;
                         }
                     }
-                });
-            // we will be replacing uses of `globalVarToReplace`. We need
-            // globalVarToReplaceNextUse to catch the next use before it is removed from the
-            // list of uses.
-            globalVar->replaceUsesWith(realGlobalVar);
+                }
+                SLANG_ASSERT(realGlobalVar);
+
+                // Remove all stores into the global var introduced during
+                // the initial glsl global var translation pass since we are
+                // going to replace the global var with a pointer to the real
+                // input, and it makes no sense to store values into such real
+                // input locations.
+                traverseUses(
+                    globalVar,
+                    [&](IRUse* use)
+                    {
+                        auto user = use->getUser();
+                        if (auto store = as<IRStore>(user))
+                        {
+                            if (store->getPtrUse() == use)
+                            {
+                                store->removeAndDeallocate();
+                            }
+                        }
+                    });
+                // we will be replacing uses of `globalVarToReplace`. We need
+                // globalVarToReplaceNextUse to catch the next use before it is removed from the
+                // list of uses.
+                globalVar->replaceUsesWith(realGlobalVar);
+            }
             globalVar->removeAndDeallocate();
         }
     }
