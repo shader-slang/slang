@@ -63,14 +63,14 @@ bool FenceImpl::waitForFence(uint64_t value, uint64_t timeout)
 
     // Create and store the notification block
     MTL::SharedEventNotificationBlock block = ^(MTL::SharedEvent* event, uint64_t eventValue) {
-        dispatch_semaphore_signal(semaphore);
+      dispatch_semaphore_signal(semaphore);
     };
 
     // Set up notification handler
     m_event->notifyListener(m_eventListener.get(), value, block);
 
     // Wait for the notification or timeout
-    if (timeout & (1LLU<<63))
+    if (timeout & (1LLU << 63))
     {
         timeout = DISPATCH_TIME_FOREVER;
     }
