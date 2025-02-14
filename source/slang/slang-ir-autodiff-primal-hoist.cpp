@@ -1457,7 +1457,7 @@ struct UseGraph
             chain.replace(&ctx, builder, inst);
         }
 
-        if (!isTrivial())
+        if (!isTrivial(chains))
         {
             builder->setInsertBefore(use->getUser());
             auto lastInstInChain = ctx.cloneInstOutOfOrder(builder, use->get());
@@ -1467,17 +1467,15 @@ struct UseGraph
         }
     }
 
-    bool isTrivial()
+    bool isTrivial(const List<UseChain>& chains)
     {
         // We're trivial if there's only one chain, and it has only one use.
-        if (chainSets.getCount() != 1)
+        if (chains.getCount() != 1)
             return false;
 
-        auto& chain = chainSets.getFirst().value;
+        auto& chain = chains.getFirst().chain;
         if (chain.getCount() != 1)
             return false;
-
-        return chain.getFirst().chain.getCount() == 1;
     }
 
     List<IRUse*> getUniqueUses() const
