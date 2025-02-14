@@ -54,6 +54,36 @@ struct SpecializationContext
     SpecializationOptions options;
     bool changed = false;
 
+    // Keep the record of cloned IRs and avoid duplication.
+    struct WitnessTableKey
+    {
+        IRWitnessTableType* witnessTableType;
+        IRInst* concreteType;
+        IRInstListBase decorationsAndChildren;
+
+        WitnessTableKey(IRWitnessTable* wt)
+            : witnessTableType(as<IRWitnessTableType>(wt->getFullType()))
+            , concreteType(wt->getOperand(0))
+            , decorationsAndChildren(wt->getDecorationsAndChildren())
+        {}
+
+        bool operator==(const WitnessTableKey &other) const
+        {
+            if (witnessTableType != other.witnessTableType)
+                return false;
+            if (concreteType != other.concreteType)
+                return false;
+            if (decorationsAndChildren.first != other.decorationsAndChildren.first)
+                return false;
+            return true;
+            }
+        HashCode getHashCode() const
+        {
+            return combineHash(HashCode(witnessTableType), HashCode(concreteType));
+        }
+    };
+    Dictionary<WitnessTableKey, IRInst*> mapClonedWitnessTable;
+
 
     SpecializationContext(IRModule* inModule, TargetProgram* target, SpecializationOptions options)
         : workList(*inModule->getContainerPool().getList<IRInst>())
@@ -3097,6 +3127,24 @@ IRInst* specializeGenericImpl(
             // simply clone it completely into the global scope.
             //
             IRInst* clonedInst = cloneInst(&env, builder, ii);
+
+            // Avoid duplicated witness tables.
+            //
+            if (auto clonedWitness = as<IRWitnessTable>(clonedInst))
+            {
+                IRInst* cachedInst;
+                if (context->mapClonedWitnessTable.tryGetValue(clonedWitness, cachedInst))
+                {
+                    builder->setInsertBefore(clonedInst);
+                    clonedInst->replaceUsesWith(cachedInst);
+                    clonedInst->removeAndDeallocate();
+                    clonedInst = cachedInst;
+                }
+                else
+                {
+                    context->mapClonedWitnessTable.add(clonedWitness, clonedInst);
+                }
+            }
 
             // Any new instructions we create during cloning were
             // not present when we initially built our work list,
