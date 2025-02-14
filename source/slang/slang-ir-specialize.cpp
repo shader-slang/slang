@@ -59,24 +59,18 @@ struct SpecializationContext
     {
         IRWitnessTableType* witnessTableType;
         IRInst* concreteType;
-        IRInstListBase decorationsAndChildren;
 
         WitnessTableKey(IRWitnessTable* wt)
             : witnessTableType(as<IRWitnessTableType>(wt->getFullType()))
             , concreteType(wt->getOperand(0))
-            , decorationsAndChildren(wt->getDecorationsAndChildren())
-        {}
-
-        bool operator==(const WitnessTableKey &other) const
         {
-            if (witnessTableType != other.witnessTableType)
-                return false;
-            if (concreteType != other.concreteType)
-                return false;
-            if (decorationsAndChildren.first != other.decorationsAndChildren.first)
-                return false;
-            return true;
-            }
+        }
+
+        bool operator==(const WitnessTableKey& other) const
+        {
+            return witnessTableType == other.witnessTableType && concreteType == other.concreteType;
+        }
+
         HashCode getHashCode() const
         {
             return combineHash(HashCode(witnessTableType), HashCode(concreteType));
@@ -3135,8 +3129,7 @@ IRInst* specializeGenericImpl(
                 IRInst* cachedInst;
                 if (context->mapClonedWitnessTable.tryGetValue(clonedWitness, cachedInst))
                 {
-                    builder->setInsertBefore(clonedInst);
-                    clonedInst->replaceUsesWith(cachedInst);
+                    env.mapOldValToNew[ii] = cachedInst;
                     clonedInst->removeAndDeallocate();
                     clonedInst = cachedInst;
                 }
