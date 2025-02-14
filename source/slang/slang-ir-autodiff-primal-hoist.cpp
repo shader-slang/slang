@@ -1474,8 +1474,7 @@ struct UseGraph
             return false;
 
         auto& chain = chains.getFirst().chain;
-        if (chain.getCount() != 1)
-            return false;
+        return chain.getCount() == 1;
     }
 
     List<IRUse*> getUniqueUses() const
