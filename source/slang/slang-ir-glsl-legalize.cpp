@@ -3353,8 +3353,8 @@ void legalizeEntryPointParameterForGLSL(
                 // globalVarToReplaceNextUse to catch the next use before it is removed from the
                 // list of uses.
                 globalVar->replaceUsesWith(realGlobalVar);
+                globalVar->removeAndDeallocate();
             }
-            globalVar->removeAndDeallocate();
         }
     }
     else
