@@ -67,16 +67,7 @@ struct ShaderCompilerUtil
         ComPtr<slang::IComponentType> slangProgram;
         ShaderProgramDesc desc = {};
 
-        /// Compile request that owns the lifetime of compiled kernel code.
-        ComPtr<SlangCompileRequest> m_requestForKernels = nullptr;
-
-        /// Compile request that owns the lifetime of reflection information.
-        ComPtr<SlangCompileRequest> m_extraRequestForReflection = nullptr;
-
-        SlangCompileRequest* getRequestForReflection() const
-        {
-            return m_extraRequestForReflection ? m_extraRequestForReflection : m_requestForKernels;
-        }
+        ComPtr<SlangCompileRequest> m_requestDEPRECATED = nullptr;
 
         SlangSession* session = nullptr;
     };

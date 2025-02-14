@@ -36,8 +36,7 @@ void ShaderCompilerUtil::Output::reset()
     }
 
     session = nullptr;
-    m_requestForKernels = nullptr;
-    m_extraRequestForReflection = nullptr;
+    m_requestDEPRECATED = nullptr;
 }
 
 static SlangResult _compileProgramImpl(
@@ -58,7 +57,7 @@ static SlangResult _compileProgramImpl(
     SLANG_ALLOW_DEPRECATED_BEGIN
     globalSession->createCompileRequest(slangRequest.writeRef());
     SLANG_ALLOW_DEPRECATED_END
-    out.m_requestForKernels = slangRequest;
+    out.m_requestDEPRECATED = slangRequest;
     out.session = globalSession;
 
     bool hasRepro = false;
@@ -354,9 +353,9 @@ static SlangResult compileProgram(
         //
         SLANG_RETURN_ON_FAIL(_compileProgramImpl(globalSession, options, input, request, out));
 
-        out.m_extraRequestForReflection = slangOutput.getRequestForReflection();
+        out.m_requestDEPRECATED = slangOutput.m_requestDEPRECATED;
         out.desc.slangGlobalScope = slangOutput.desc.slangGlobalScope;
-        slangOutput.m_requestForKernels = nullptr;
+        slangOutput.m_requestDEPRECATED = nullptr;
 
         return SLANG_OK;
     }
