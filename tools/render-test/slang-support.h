@@ -88,28 +88,12 @@ struct ShaderCompilerUtil
         Slang::String sourcePath;
     };
 
+    // Wrapper for compileProgram
     static SlangResult compileWithLayout(
         slang::IGlobalSession* globalSession,
         const Options& options,
         const ShaderCompilerUtil::Input& input,
         OutputAndLayout& output);
-
-    static SlangResult readSource(
-        const Slang::String& inSourcePath,
-        Slang::List<char>& outSourceText);
-
-    static SlangResult _compileProgramImpl(
-        slang::IGlobalSession* globalSession,
-        const Options& options,
-        const Input& input,
-        const ShaderCompileRequest& request,
-        Output& out);
-    static SlangResult compileProgram(
-        slang::IGlobalSession* globalSession,
-        const Options& options,
-        const Input& input,
-        const ShaderCompileRequest& request,
-        Output& out);
 };
 
 
