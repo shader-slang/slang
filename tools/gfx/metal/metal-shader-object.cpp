@@ -768,7 +768,7 @@ Result RootShaderObjectImpl::bindAsRoot(BindingContext* context, RootShaderObjec
 Result RootShaderObjectImpl::init(IDevice* device, RootShaderObjectLayoutImpl* layout)
 {
     SLANG_RETURN_ON_FAIL(Super::init(device, layout));
-
+    m_entryPoints.clear();
     for (auto entryPointInfo : layout->getEntryPoints())
     {
         RefPtr<ShaderObjectImpl> entryPoint;

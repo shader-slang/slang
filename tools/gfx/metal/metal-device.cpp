@@ -875,7 +875,16 @@ Result DeviceImpl::waitForFences(
     bool waitForAll,
     uint64_t timeout)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    // return SLANG_E_NOT_IMPLEMENTED;
+    for (GfxCount i = 0; i < fenceCount; ++i)
+    {
+        FenceImpl* fenceImpl = static_cast<FenceImpl*>(fences[i]);
+        if (!fenceImpl->waitForFence(fenceValues[i], timeout))
+        {
+            return SLANG_FAIL;
+        }
+    }
+    return SLANG_OK;
 }
 
 } // namespace metal
