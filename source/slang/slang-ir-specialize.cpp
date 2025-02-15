@@ -57,12 +57,11 @@ struct SpecializationContext
     // Keep the record of cloned IRs and avoid duplication.
     struct WitnessTableKey
     {
-        IRWitnessTableType* witnessTableType;
-        IRInst* concreteType;
+        IRType* witnessTableType;
+        IRType* concreteType;
 
-        WitnessTableKey(IRWitnessTable* wt)
-            : witnessTableType(as<IRWitnessTableType>(wt->getFullType()))
-            , concreteType(wt->getOperand(0))
+        WitnessTableKey(IRType* wtt, IRType* ct)
+            : witnessTableType(wtt), concreteType(ct)
         {
         }
 
@@ -3117,27 +3116,58 @@ IRInst* specializeGenericImpl(
                 return specializedVal;
             }
 
-            // For any instruction other than a `return`, we will
-            // simply clone it completely into the global scope.
-            //
-            IRInst* clonedInst = cloneInst(&env, builder, ii);
+            IRInst* clonedInst;
 
-            // Avoid duplicated witness tables.
+            // Deduplicate witness tables.
+            // As long as its type and the concrete type are same, they shouldn't be cloned.
             //
-            if (auto clonedWitness = as<IRWitnessTable>(clonedInst))
+            if (auto witnessTable = as<IRWitnessTable>(ii))
             {
-                IRInst* cachedInst;
-                if (context->mapClonedWitnessTable.tryGetValue(clonedWitness, cachedInst))
+                auto witnessTableType = witnessTable->getFullType();
+
+                // We need to apply specialization from `env` to `concreteType`.
+                auto concreteType = witnessTable->getConcreteType();
+                IRType* clonedConcreteType = as<IRType>(cloneInst(&env, builder, concreteType));
+
+                SpecializationContext::WitnessTableKey cacheKey(
+                    witnessTableType,
+                    clonedConcreteType);
+
+                if (!context->mapClonedWitnessTable.tryGetValue(cacheKey, clonedInst))
                 {
-                    env.mapOldValToNew[ii] = cachedInst;
-                    clonedInst->removeAndDeallocate();
-                    clonedInst = cachedInst;
+                    // Not found from cache
+                    // Need to create a new one
+                    IRInst* newOperands[] = {clonedConcreteType};
+
+                    clonedInst = builder->emitIntrinsicInst(
+                        witnessTableType,
+                        kIROp_WitnessTable,
+                        1,
+                        newOperands);
+
+                    clonedInst->sourceLoc = ii->sourceLoc;
+
+                    if (clonedInst != ii)
+                    {
+                        // TODO: Decoration shouldn't matter but it casues a trouble if we don't
+                        // clone them here. It is unclear why.
+                        cloneInstDecorationsAndChildren(&env, builder->getModule(), ii, clonedInst);
+                    }
+
+                    context->mapClonedWitnessTable.add(cacheKey, clonedInst);
                 }
-                else
-                {
-                    context->mapClonedWitnessTable.add(clonedWitness, clonedInst);
-                }
+
+                env.mapOldValToNew[ii] = clonedInst;
             }
+            else
+            {
+                // For any instruction other than a `return`, we will
+                // simply clone it completely into the global scope.
+                //
+                clonedInst = cloneInst(&env, builder, ii);
+            }
+
+            SLANG_ASSERT(clonedInst);
 
             // Any new instructions we create during cloning were
             // not present when we initially built our work list,
