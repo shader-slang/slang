@@ -114,6 +114,22 @@ struct ReflectingPrinting
 
         List<ComPtr<slang::IComponentType>> componentsToLink;
 
+        // ### Variable decls
+        // 
+        key("global constants");
+        WITH_ARRAY()
+        for (auto decl: module->getModuleReflection()->getChildren()) {
+            if (auto varDecl = decl->asVariable();
+                varDecl 
+                && varDecl->findModifier(slang::Modifier::Const)
+                && varDecl->findModifier(slang::Modifier::Static)
+                )
+            {
+                element();
+                printVariable(varDecl);
+            }
+        }
+
         // ### Finding Entry Points
         //
 
@@ -213,6 +229,13 @@ struct ReflectingPrinting
         printQuotedString(name);
         key("type");
         printType(type);
+
+        int64_t value;
+        if (SLANG_SUCCEEDED(variable->getDefaultValueInt(&value)))
+        {
+            key("value");
+            printf("%" PRId64, value);
+        }
     }
 
     // ### Types
