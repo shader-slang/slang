@@ -1430,7 +1430,7 @@ bool SemanticsVisitor::shouldSkipChecking(Decl* decl, DeclCheckState state)
     return false;
 }
 
-void SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
+IntVal* SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
 {
     // The easiest way to test if the declaration is circular is to
     // validate it as a constant.
@@ -1444,8 +1444,8 @@ void SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
     //
     //
     if (!isScalarIntegerType(varDecl->type))
-        return;
-    tryConstantFoldDeclRef(DeclRef<VarDeclBase>(varDecl), ConstantFoldingKind::LinkTime, nullptr);
+        return nullptr;
+    return tryConstantFoldDeclRef(DeclRef<VarDeclBase>(varDecl), ConstantFoldingKind::LinkTime, nullptr);
 }
 
 void SemanticsDeclModifiersVisitor::visitStructDecl(StructDecl* structDecl)
@@ -2350,7 +2350,14 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // a constant with a circular definition.
         //
         varDecl->setCheckState(DeclCheckState::DefinitionChecked);
-        _validateCircularVarDefinition(varDecl);
+        auto intVal = _validateCircularVarDefinition(varDecl);
+
+        // Update constant value
+        //
+        if (!varDecl->val)
+        {
+            varDecl->val = intVal;
+        }
     }
     else
     {
