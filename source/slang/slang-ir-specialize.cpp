@@ -3123,27 +3123,26 @@ IRInst* specializeGenericImpl(
             //
             if (auto witnessTable = as<IRWitnessTable>(ii))
             {
+                // CLone type and concreteType to use as cache-key
                 auto witnessTableType = witnessTable->getFullType();
+                IRType* clonedWitnessTableType =
+                    as<IRType>(cloneInst(&env, builder, witnessTableType));
 
-                // We need to apply specialization from `env` to `concreteType`.
                 auto concreteType = witnessTable->getConcreteType();
                 IRType* clonedConcreteType = as<IRType>(cloneInst(&env, builder, concreteType));
 
                 SpecializationContext::WitnessTableKey cacheKey(
-                    witnessTableType,
+                    clonedWitnessTableType,
                     clonedConcreteType);
 
                 if (!context->mapClonedWitnessTable.tryGetValue(cacheKey, clonedInst))
                 {
-                    // Not found from cache
-                    // Need to create a new one
-                    IRInst* newOperands[] = {clonedConcreteType};
-
+                    // Not found from cache and need to create a new one
                     clonedInst = builder->emitIntrinsicInst(
-                        witnessTableType,
+                        clonedWitnessTableType,
                         kIROp_WitnessTable,
                         1,
-                        newOperands);
+                        (IRInst* const*)&clonedConcreteType);
 
                     clonedInst->sourceLoc = ii->sourceLoc;
 
