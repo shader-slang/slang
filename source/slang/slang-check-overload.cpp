@@ -2518,6 +2518,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     {
         if (key.fromOperatorExpr(opExpr))
         {
+            key.isGLSLMode = getShared()->glslModuleDecl != nullptr;
             OverloadCandidate candidate;
             if (typeCheckingCache->resolvedOperatorOverloadCache.tryGetValue(key, candidate))
             {
@@ -2731,7 +2732,14 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         // We will report errors for this one candidate, then, to give
         // the user the most help we can.
         if (shouldAddToCache)
-            typeCheckingCache->resolvedOperatorOverloadCache[key] = *context.bestCandidate;
+        {
+            if (isFromCoreModule(context.bestCandidate->item.declRef.getDecl()) ||
+                getShared()->glslModuleDecl ==
+                    getModuleDecl(context.bestCandidate->item.declRef.getDecl()))
+            {
+                typeCheckingCache->resolvedOperatorOverloadCache[key] = *context.bestCandidate;
+            }
+        }
 
         // Now that we have resolved the overload candidate, we need to undo an `openExistential`
         // operation that was applied to `out` arguments.

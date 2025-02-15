@@ -172,15 +172,17 @@ struct BasicTypeKeyPair
 
 struct OperatorOverloadCacheKey
 {
-    intptr_t operatorName;
+    int32_t operatorName;
+    bool isGLSLMode;
     BasicTypeKey args[2];
     bool operator==(OperatorOverloadCacheKey key) const
     {
-        return operatorName == key.operatorName && args[0] == key.args[0] && args[1] == key.args[1];
+        return operatorName == key.operatorName && args[0] == key.args[0] &&
+               args[1] == key.args[1] && isGLSLMode == key.isGLSLMode;
     }
     HashCode getHashCode() const
     {
-        return combineHash((int)(UInt64)(void*)(operatorName), args[0].getRaw(), args[1].getRaw());
+        return combineHash(operatorName, args[0].getRaw(), args[1].getRaw(), isGLSLMode ? 1 : 0);
     }
     bool fromOperatorExpr(OperatorExpr* opExpr)
     {
@@ -299,7 +301,7 @@ struct OverloadCandidate
     SubstitutionSet subst;
 };
 
-struct TypeCheckingCache
+struct TypeCheckingCache : public RefObject
 {
     Dictionary<OperatorOverloadCacheKey, OverloadCandidate> resolvedOperatorOverloadCache;
     Dictionary<BasicTypeKeyPair, ConversionCost> conversionCostCache;
@@ -634,6 +636,9 @@ struct SharedSemanticsContext : public RefObject
     Module* m_module = nullptr;
 
     DiagnosticSink* m_sink = nullptr;
+
+    // Whether the current module has imported the GLSL module.
+    ModuleDecl* glslModuleDecl = nullptr;
 
     /// (optional) modules that comes from previously processed translation units in the
     /// front-end request that are made visible to the module being checked. This allows

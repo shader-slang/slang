@@ -51,4 +51,34 @@ void stripFrontEndOnlyInstructions(IRModule* module, IRStripOptions const& optio
     _stripFrontEndOnlyInstructionsRec(module->getModuleInst(), options);
 }
 
+void stripImportedWitnessTable(IRModule* module)
+{
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto inst = globalInst;
+        switch (globalInst->getOp())
+        {
+        case kIROp_Generic:
+            inst = findGenericReturnVal(as<IRGeneric>(globalInst));
+            break;
+        case kIROp_WitnessTable:
+            break;
+        default:
+            continue;
+        }
+        if (inst->getOp() != kIROp_WitnessTable)
+            continue;
+        if (!globalInst->findDecoration<IRImportDecoration>())
+            continue;
+        IRInst* nextChild = nullptr;
+        for (auto child = inst->getFirstChild(); child;)
+        {
+            nextChild = child->getNextInst();
+            if (child->getOp() == kIROp_WitnessTable)
+                child->removeAndDeallocate();
+            child = nextChild;
+        }
+    }
+}
+
 } // namespace Slang

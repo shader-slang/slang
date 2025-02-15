@@ -2374,6 +2374,15 @@ public:
         m_obfuscatedSourceMap = sourceMap;
     }
 
+    ArrayView<IRInst*> findSymbolByMangledName(const ImmutableHashedString& mangledName) const
+    {
+        if (auto list = m_mapMangledNameToGlobalInst.tryGetValue(mangledName))
+            return list->getArrayView();
+        return {};
+    }
+
+    void buildMangledNameToGlobalInstMap();
+
     IRDeduplicationContext* getDeduplicationContext() const { return &m_deduplicationContext; }
 
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
@@ -2459,6 +2468,8 @@ private:
     ComPtr<IBoxValue<SourceMap>> m_obfuscatedSourceMap;
 
     Dictionary<IRInst*, IRAnalysis> m_mapInstToAnalysis;
+
+    Dictionary<ImmutableHashedString, List<IRInst*>> m_mapMangledNameToGlobalInst;
 };
 
 

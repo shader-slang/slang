@@ -52,13 +52,26 @@ struct IRSharedSpecContext
     // A map from mangled symbol names to zero or
     // more global IR values that have that name,
     // in the *original* module.
-    typedef Dictionary<String, RefPtr<IRSpecSymbol>> SymbolDictionary;
+    typedef Dictionary<ImmutableHashedString, RefPtr<IRSpecSymbol>> SymbolDictionary;
     SymbolDictionary symbols;
+
+    Dictionary<ImmutableHashedString, bool> isImportedSymbol;
+
+    bool useAutodiff = false;
 
     IRBuilder builderStorage;
 
     // The "global" specialization environment.
     IRSpecEnv globalEnv;
+};
+
+void insertGlobalValueSymbol(IRSharedSpecContext* sharedContext, IRInst* gv);
+
+struct WitnessTableCloenInfo : RefObject
+{
+    IRWitnessTable* clonedTable;
+    IRWitnessTable* originalTable;
+    Dictionary<UnownedStringSlice, IRWitnessTableEntry*> deferredEntries;
 };
 
 struct IRSpecContextBase
@@ -69,7 +82,27 @@ struct IRSpecContextBase
 
     IRModule* getModule() { return getShared()->module; }
 
-    IRSharedSpecContext::SymbolDictionary& getSymbols() { return getShared()->symbols; }
+    List<IRModule*> irModules;
+
+    HashSet<UnownedStringSlice> deferredWitnessTableEntryKeys;
+    List<RefPtr<WitnessTableCloenInfo>> witnessTables;
+
+    IRSpecSymbol* findSymbols(UnownedStringSlice mangledName)
+    {
+        ImmutableHashedString hashedName(mangledName);
+        RefPtr<IRSpecSymbol> symbol;
+        if (shared->symbols.tryGetValue(hashedName, symbol))
+            return symbol;
+        for (auto m : irModules)
+        {
+            for (auto inst : m->findSymbolByMangledName(hashedName))
+                insertGlobalValueSymbol(shared, inst);
+        }
+        if (shared->symbols.tryGetValue(hashedName, symbol))
+            return symbol;
+        shared->symbols[hashedName] = nullptr;
+        return nullptr;
+    }
 
     // The current specialization environment to use.
     IRSpecEnv* env = nullptr;
@@ -165,6 +198,25 @@ void cloneDecorations(IRSpecContextBase* context, IRInst* clonedValue, IRInst* o
     SLANG_UNUSED(context);
     for (auto originalDecoration : originalValue->getDecorations())
     {
+        if (!context->shared->useAutodiff)
+        {
+            switch (originalDecoration->getOp())
+            {
+            case kIROp_ForwardDerivativeDecoration:
+            case kIROp_BackwardDerivativeIntermediateTypeDecoration:
+            case kIROp_BackwardDerivativePrimalDecoration:
+            case kIROp_BackwardDerivativePropagateDecoration:
+            case kIROp_BackwardDerivativePrimalContextDecoration:
+            case kIROp_BackwardDerivativePrimalReturnDecoration:
+            case kIROp_PrimalSubstituteDecoration:
+            case kIROp_BackwardDerivativeDecoration:
+            case kIROp_UserDefinedBackwardDerivativeDecoration:
+            case kIROp_DifferentiableTypeDictionaryDecoration:
+            case kIROp_ForwardDifferentiableDecoration:
+            case kIROp_BackwardDifferentiableDecoration:
+                continue;
+            }
+        }
         cloneInst(context, builder, originalDecoration);
     }
 
@@ -407,15 +459,17 @@ static void cloneExtraDecorationsFromInst(
         {
         default:
             break;
-
+        case kIROp_ForwardDerivativeDecoration:
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+        case kIROp_PrimalSubstituteDecoration:
+            if (!context->getShared()->useAutodiff)
+                break;
+            [[fallthrough]];
         case kIROp_HLSLExportDecoration:
         case kIROp_BindExistentialSlotsDecoration:
         case kIROp_LayoutDecoration:
         case kIROp_PublicDecoration:
         case kIROp_SequentialIDDecoration:
-        case kIROp_ForwardDerivativeDecoration:
-        case kIROp_UserDefinedBackwardDerivativeDecoration:
-        case kIROp_PrimalSubstituteDecoration:
         case kIROp_IntrinsicOpDecoration:
         case kIROp_NonCopyableTypeDecoration:
         case kIROp_DynamicDispatchWitnessDecoration:
@@ -580,6 +634,16 @@ IRGeneric* cloneGenericImpl(
     return clonedVal;
 }
 
+UnownedStringSlice getMangledName(IRInst* inst)
+{
+    for (auto decor : inst->getDecorations())
+    {
+        if (auto linkageDecor = as<IRLinkageDecoration>(decor))
+            return linkageDecor->getMangledName();
+    }
+    return UnownedStringSlice();
+}
+
 IRStructKey* cloneStructKeyImpl(
     IRSpecContextBase* context,
     IRBuilder* builder,
@@ -618,7 +682,43 @@ IRWitnessTable* cloneWitnessTableImpl(
         auto clonedSubType = cloneType(context, (IRType*)(originalTable->getConcreteType()));
         clonedTable = builder->createWitnessTable(clonedBaseType, clonedSubType);
     }
-    cloneSimpleGlobalValueImpl(context, originalTable, originalValues, clonedTable, registerValue);
+
+    if (registerValue)
+        registerClonedValue(context, clonedTable, originalValues);
+
+    // Set up an IR builder for inserting into the witness table
+    IRBuilder builderStorage = *context->builder;
+    IRBuilder* entryBuilder = &builderStorage;
+    entryBuilder->setInsertInto(clonedTable);
+
+    // Clone decorations first
+    for (auto decoration : originalTable->getDecorations())
+    {
+        cloneInst(context, entryBuilder, decoration);
+    }
+
+    RefPtr<WitnessTableCloenInfo> witnessInfo = new WitnessTableCloenInfo();
+    witnessInfo->clonedTable = clonedTable;
+    witnessInfo->originalTable = originalTable;
+
+    // Clone only the witness table entries that are actually used
+    for (auto child : originalTable->getDecorationsAndChildren())
+    {
+        if (auto entry = as<IRWitnessTableEntry>(child))
+        {
+            // Skip witness table entries during the first pass,
+            // and just add them to the deferred work list.
+            witnessInfo->deferredEntries.add(getMangledName(entry->getRequirementKey()), entry);
+        }
+        else
+        {
+            // Clone any non-entry children as is
+            cloneInst(context, entryBuilder, child);
+        }
+    }
+    cloneExtraDecorations(context, clonedTable, originalValues);
+    context->witnessTables.add(witnessInfo);
+
     return clonedTable;
 }
 
@@ -886,12 +986,12 @@ IRFunc* specializeIRForEntryPoint(
     // so that the mangled name of the decl-ref is
     // not the same as the mangled name of the decl.
     //
-    RefPtr<IRSpecSymbol> sym;
-    if (!context->getSymbols().tryGetValue(mangledName, sym))
+    IRSpecSymbol* sym = context->findSymbols(mangledName.getUnownedSlice());
+    if (!sym)
     {
         String hashedName = getHashedName(mangledName.getUnownedSlice());
-
-        if (!context->getSymbols().tryGetValue(hashedName, sym))
+        sym = context->findSymbols(hashedName.getUnownedSlice());
+        if (!sym)
         {
             SLANG_UNEXPECTED("no matching IR symbol");
             return nullptr;
@@ -1280,6 +1380,26 @@ IRInst* cloneInst(
     else
         cloneDecorationsAndChildren(context, clonedInst, originalInst);
     cloneExtraDecorations(context, clonedInst, originalValues);
+
+    switch (originalInst->getOp())
+    {
+    case kIROp_LookupWitness:
+
+        // If `originalVal` represents a witness table entry key, add the key
+        // to witnessTableEntryWorkList.
+        context->deferredWitnessTableEntryKeys.add(
+            getMangledName(as<IRLookupWitnessMethod>(originalInst)->getRequirementKey()));
+        break;
+    case kIROp_ForwardDerivativeDecoration:
+    case kIROp_BackwardDerivativeDecoration:
+        if (context->getShared()->useAutodiff)
+        {
+            if (auto key = as<IRStructKey>(originalInst->getOperand(0)))
+                context->deferredWitnessTableEntryKeys.add(getMangledName(key));
+        }
+        break;
+    }
+
     return clonedInst;
 }
 
@@ -1335,9 +1455,9 @@ IRInst* cloneGlobalValueWithLinkage(
     // with the same mangled name as `originalVal` and try
     // to pick the "best" one for our target.
 
-    auto mangledName = String(originalLinkage->getMangledName());
-    RefPtr<IRSpecSymbol> sym;
-    if (!context->getSymbols().tryGetValue(mangledName, sym))
+    auto mangledName = originalLinkage->getMangledName();
+    IRSpecSymbol* sym = context->findSymbols(mangledName);
+    if (!sym)
     {
         if (!originalVal)
             return nullptr;
@@ -1419,6 +1539,11 @@ void insertGlobalValueSymbol(IRSharedSpecContext* sharedContext, IRInst* gv)
     {
         sharedContext->symbols.add(mangledName, sym);
     }
+
+    if (as<IRImportDecoration>(linkage))
+        sharedContext->isImportedSymbol.tryGetValueOrAdd(mangledName, true);
+    else
+        sharedContext->isImportedSymbol.set(mangledName, false);
 }
 
 void insertGlobalValueSymbols(IRSharedSpecContext* sharedContext, IRModule* originalModule)
@@ -1743,6 +1868,66 @@ void GLSLReplaceAtomicUint(IRSpecContext* context, TargetProgram* targetProgram,
     convertAtomicToStorageBuffer(context, bindingToInstMapUnsorted);
 }
 
+bool doesModuleUseAutodiff(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_Call:
+        if (auto callee = getResolvedInstForDecorations(inst->getOperand(0)))
+        {
+            switch (callee->getOp())
+            {
+            case kIROp_ForwardDifferentiate:
+            case kIROp_BackwardDifferentiate:
+            case kIROp_BackwardDifferentiatePrimal:
+            case kIROp_BackwardDifferentiatePropagate:
+                return true;
+            }
+        }
+        return false;
+    default:
+        for (auto child : inst->getChildren())
+        {
+            if (child->findDecoration<IRImportDecoration>())
+                continue;
+            if (doesModuleUseAutodiff(child))
+                return true;
+        }
+        return false;
+    }
+}
+
+void cloneUsedWitnessTableEntries(IRSpecContext* context)
+{
+    bool changed = true;
+    while (changed)
+    {
+        changed = false;
+        for (Index i = 0; i < context->witnessTables.getCount(); i++)
+        {
+            auto table = context->witnessTables[i].get();
+            ShortList<UnownedStringSlice> entriesToRemove;
+            for (auto entry : table->deferredEntries)
+            {
+                if (context->deferredWitnessTableEntryKeys.contains(entry.first))
+                {
+                    IRBuilder builder(table->clonedTable);
+                    builder.setInsertInto(table->clonedTable);
+                    auto deferredKeyCount = context->deferredWitnessTableEntryKeys.getCount();
+                    cloneInst(context, &builder, entry.second);
+                    entriesToRemove.add(entry.first);
+                    if (deferredKeyCount != context->deferredWitnessTableEntryKeys.getCount())
+                        changed = true;
+                }
+            }
+            for (auto entry : entriesToRemove)
+            {
+                table->deferredEntries.remove(entry);
+            }
+        }
+    }
+}
+
 LinkedIR linkIR(CodeGenContext* codeGenContext)
 {
     SLANG_PROFILE;
@@ -1763,50 +1948,59 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
 
     state->target = target;
     state->targetReq = targetReq;
-
+    auto& irModules = stateStorage.contextStorage.irModules;
 
     auto sharedContext = state->getSharedContext();
     initializeSharedSpecContext(sharedContext, session, nullptr, target, targetReq);
 
     state->irModule = sharedContext->module;
 
-
     // We need to be able to look up IR definitions for any symbols in
     // modules that the program depends on (transitively). To
     // accelerate lookup, we will create a symbol table for looking
     // up IR definitions by their mangled name.
     //
-
-    List<IRModule*> irModules;
-
-    // Link the core modules.
-    auto& coreModules = static_cast<Session*>(linkage->getGlobalSession())->coreModules;
-    for (auto& m : coreModules)
-        irModules.add(m->getIRModule());
+    List<IRModule*> builtinModules;
+    for (auto& m : static_cast<Session*>(linkage->getGlobalSession())->coreModules)
+        builtinModules.add(m->getIRModule());
 
     // Link modules in the program.
-    program->enumerateIRModules([&](IRModule* irModule) { irModules.add(irModule); });
+    program->enumerateModules(
+        [&](Module* module)
+        {
+            if (UnownedStringSlice(module->getName()) == "glsl")
+                builtinModules.add(module->getIRModule());
+            else
+                irModules.add(module->getIRModule());
+        });
 
-    // Add any modules that were loaded as libraries
-    for (IRModule* irModule : irModules)
-    {
-        insertGlobalValueSymbols(sharedContext, irModule);
-    }
-
-    // We will also insert the IR global symbols from the IR module
+    // We will also consider the IR global symbols from the IR module
     // attached to the `TargetProgram`, since this module is
     // responsible for associating layout information to those
     // global symbols via decorations.
     //
     auto irModuleForLayout = targetProgram->getExistingIRModuleForLayout();
-    insertGlobalValueSymbols(sharedContext, irModuleForLayout);
+    irModules.add(irModuleForLayout);
+
+    Index userModuleCount = irModules.getCount();
+    irModules.addRange(builtinModules);
+    ArrayView<IRModule*> userModules = irModules.getArrayView(0, userModuleCount);
+
+    for (IRModule* irModule : userModules)
+    {
+        // Check if the user module uses auto-diff.
+        if (!sharedContext->useAutodiff)
+        {
+            sharedContext->useAutodiff = doesModuleUseAutodiff(irModule->getModuleInst());
+        }
+    }
 
     auto context = state->getContext();
 
     // Combine all of the contents of IRGlobalHashedStringLiterals
     {
         StringSlicePool pool(StringSlicePool::Style::Empty);
-        for (IRModule* irModule : irModules)
+        for (IRModule* irModule : userModules)
         {
             findGlobalHashedStringLiterals(irModule, pool);
         }
@@ -1875,7 +2069,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // instructions in all the input modules.
     //
 
-    for (IRModule* irModule : irModules)
+    for (IRModule* irModule : userModules)
     {
         for (auto inst : irModule->getGlobalInsts())
         {
@@ -1885,6 +2079,8 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
             }
         }
     }
+
+    cloneUsedWitnessTableEntries(context);
 
     bool shouldCopyGlobalParams =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::PreserveParameters);
@@ -1896,7 +2092,9 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
             // We need to copy over exported symbols,
             // and any global parameters if preserve-params option is set.
             if (_isHLSLExported(inst) || shouldCopyGlobalParams && as<IRGlobalParam>(inst) ||
-                as<IRDifferentiableTypeAnnotation>(inst))
+                sharedContext->useAutodiff &&
+                    (as<IRDifferentiableTypeAnnotation>(inst) ||
+                     inst->findDecorationImpl(kIROp_AutoDiffBuiltinDecoration) != nullptr))
             {
                 auto cloned = cloneValue(context, inst);
                 if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
@@ -1917,7 +2115,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // `[assumedWaveSize(...)]` decoration might require that all specified
     // values match exactly).
     //
-    for (IRModule* irModule : irModules)
+    for (IRModule* irModule : userModules)
     {
         for (auto decoration : irModule->getModuleInst()->getDecorations())
         {

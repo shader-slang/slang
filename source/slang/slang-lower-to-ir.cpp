@@ -8171,11 +8171,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subBuilder->addPublicDecoration(irWitnessTable);
         }
 
-        if (parentDecl->findModifier<HLSLExportModifier>())
+        for (auto mod : parentDecl->modifiers)
         {
-            subBuilder->addHLSLExportDecoration(irWitnessTable);
-            subBuilder->addKeepAliveDecoration(irWitnessTable);
+            if (as<HLSLExportModifier>(mod))
+            {
+                subBuilder->addHLSLExportDecoration(irWitnessTable);
+                subBuilder->addKeepAliveDecoration(irWitnessTable);
+            }
+            else if (as<AutoDiffBuiltinAttribute>(mod))
+            {
+                subBuilder->addAutoDiffBuiltinDecoration(irWitnessTable);
+            }
         }
+
 
         // Make sure that all the entries in the witness table have been filled in,
         // including any cases where there are sub-witness-tables for conformances
@@ -11804,6 +11812,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         stripOptions.stripSourceLocs = false;
         stripFrontEndOnlyInstructions(module, stripOptions);
 
+        stripImportedWitnessTable(module);
+
         // Stripping out decorations could leave some dead code behind
         // in the module, and in some cases that extra code is also
         // undesirable (e.g., the string literals referenced by name-hint
@@ -11846,6 +11856,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             compileRequest->getSourceManager(),
             &writer);
     }
+
+    module->buildMangledNameToGlobalInstMap();
 
     return module;
 }
@@ -12507,7 +12519,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         // Eliminate any dead code
         eliminateDeadCode(irModule, options);
     }
-
+    irModule->buildMangledNameToGlobalInstMap();
     m_irModuleForLayout = irModule;
     return irModule;
 }

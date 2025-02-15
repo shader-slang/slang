@@ -4538,6 +4538,18 @@ RefPtr<IRModule> IRModule::create(Session* session)
     return module;
 }
 
+void IRModule::buildMangledNameToGlobalInstMap()
+{
+    m_mapMangledNameToGlobalInst.clear();
+    for (auto inst : getGlobalInsts())
+    {
+        if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
+        {
+            m_mapMangledNameToGlobalInst[linkageDecor->getMangledName()].add(inst);
+        }
+    }
+}
+
 IRDominatorTree* IRModule::findOrCreateDominatorTree(IRGlobalValueWithCode* func)
 {
     IRAnalysis* analysis = m_mapInstToAnalysis.tryGetValue(func);
@@ -8225,6 +8237,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_Block:
     case kIROp_Each:
     case kIROp_TypeEqualityWitness:
+    case kIROp_DifferentiableTypeAnnotation:
         return false;
 
         /// Liveness markers have no side effects
