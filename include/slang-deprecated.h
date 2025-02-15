@@ -659,6 +659,9 @@ extern "C"
         SlangSession* globalSession,
         char const* name);
     SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inVar);
+    SLANG_API SlangResult
+    spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar,
+        int64_t* rs);
     SLANG_API SlangReflectionGeneric* spReflectionVariable_GetGenericContainer(
         SlangReflectionVariable* var);
     SLANG_API SlangReflectionVariable* spReflectionVariable_applySpecializations(
