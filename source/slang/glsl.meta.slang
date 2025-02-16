@@ -6334,7 +6334,7 @@ void requireGLSLExtForSubgroupBasicBuiltin() {
     }
 }
 
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
 void setupExtForSubgroupBasicBuiltIn() {
     __target_switch
     {
@@ -6409,7 +6409,8 @@ public property uint gl_SubgroupID
 
 public property uint gl_SubgroupSize
 {
-    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
     get {
         setupExtForSubgroupBasicBuiltIn();
         return WaveGetLaneCount();
@@ -6418,7 +6419,8 @@ public property uint gl_SubgroupSize
 
 public property uint gl_SubgroupInvocationID
 {
-    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
     get {
         setupExtForSubgroupBasicBuiltIn();
         return WaveGetLaneIndex();
