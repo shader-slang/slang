@@ -3470,18 +3470,9 @@ struct IRRequirePrelude : IRInst
     UnownedStringSlice getPrelude() { return as<IRStringLit>(getOperand(0))->getStringSlice(); }
 };
 
-struct IRRequireGLSLExtension : IRInst
+struct IRRequireTargetExtension : IRInst
 {
-    IR_LEAF_ISA(RequireGLSLExtension)
-    UnownedStringSlice getExtensionName()
-    {
-        return as<IRStringLit>(getOperand(0))->getStringSlice();
-    }
-};
-
-struct IRRequireWGSLExtension : IRInst
-{
-    IR_LEAF_ISA(RequireWGSLExtension)
+    IR_LEAF_ISA(RequireTargetExtension)
     UnownedStringSlice getExtensionName()
     {
         return as<IRStringLit>(getOperand(0))->getStringSlice();

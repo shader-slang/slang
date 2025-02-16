@@ -1,4 +1,4 @@
-// slang-ir-translate-in-out-global-var.h
+// slang-ir-translate-global-varying-var.h
 // #pragma once
 
 namespace Slang
@@ -9,6 +9,6 @@ struct CodeGenContext;
 
 /// Translate GLSL-flavored global in/out variables into
 /// entry point parameters with system value semantics.
-void translateInOutGlobalVar(CodeGenContext* context, IRModule* module);
+void translateGlobalVaryingVar(CodeGenContext* context, IRModule* module);
 
 } // namespace Slang

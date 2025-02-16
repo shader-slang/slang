@@ -1,4 +1,4 @@
-#include "slang-ir-translate-in-out-global-var.h"
+#include "slang-ir-translate-global-varying-var.h"
 
 #include "slang-ir-call-graph.h"
 #include "slang-ir-insts.h"
@@ -373,7 +373,7 @@ struct GlobalVarTranslationContext
     }
 };
 
-void translateInOutGlobalVar(CodeGenContext* context, IRModule* module)
+void translateGlobalVaryingVar(CodeGenContext* context, IRModule* module)
 {
     GlobalVarTranslationContext ctx;
     ctx.context = context;

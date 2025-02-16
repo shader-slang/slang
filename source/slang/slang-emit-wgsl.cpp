@@ -1696,9 +1696,9 @@ void WGSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
     }
 }
 
-void WGSLSourceEmitter::emitRequireExtension(IRInst* inst)
+void WGSLSourceEmitter::emitRequireExtension(IRRequireTargetExtension* inst)
 {
-    _requireExtension(as<IRRequireWGSLExtension>(inst)->getExtensionName());
+    _requireExtension(inst->getExtensionName());
 }
 
 } // namespace Slang

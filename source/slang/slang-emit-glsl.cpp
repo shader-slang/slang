@@ -30,7 +30,7 @@ void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
     IRInst* inst,
     IRBuilder& builder)
 {
-    if (auto requireGLSLExt = as<IRRequireGLSLExtension>(inst))
+    if (auto requireGLSLExt = as<IRRequireTargetExtension>(inst))
     {
         _requireGLSLExtension(requireGLSLExt->getExtensionName());
         return;

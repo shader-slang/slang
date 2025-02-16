@@ -678,7 +678,7 @@ protected:
     void _emitCallArgList(IRCall* call, int startingOperandIndex = 1);
     virtual void emitCallArg(IRInst* arg);
 
-    virtual void emitRequireExtension(IRInst* inst) { SLANG_UNUSED(inst); }
+    virtual void emitRequireExtension(IRRequireTargetExtension* inst) { SLANG_UNUSED(inst); }
 
     String _generateUniqueName(const UnownedStringSlice& slice);
 

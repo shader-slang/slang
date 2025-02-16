@@ -57,7 +57,7 @@ public:
         EmitOpInfo const& inOuterPrec) SLANG_OVERRIDE;
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* varDecl) SLANG_OVERRIDE;
 
-    virtual void emitRequireExtension(IRInst* inst) SLANG_OVERRIDE;
+    virtual void emitRequireExtension(IRRequireTargetExtension* inst) SLANG_OVERRIDE;
 
     virtual void handleRequiredCapabilitiesImpl(IRInst* inst) SLANG_OVERRIDE;
 
