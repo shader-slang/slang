@@ -1,5 +1,5 @@
 // slang-ir-translate-global-varying-var.h
-// #pragma once
+#pragma once
 
 namespace Slang
 {
