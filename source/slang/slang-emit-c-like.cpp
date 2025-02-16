@@ -3055,6 +3055,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             emitOperand(as<IRGlobalValueRef>(inst)->getOperand(0), getInfo(EmitOp::General));
             break;
         }
+    case kIROp_RequireWGSLExtension:
+        {
+            emitRequireExtension(inst);
+            break;
+        }
     default:
         diagnoseUnhandledInst(inst);
         break;
