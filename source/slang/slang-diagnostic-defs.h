@@ -249,6 +249,14 @@ DIAGNOSTIC(
     "kernel must follow the '-entry' option for its corresponding entry point")
 
 DIAGNOSTIC(
+    71,
+    Warning,
+    bindingAttributeIgnoredOnUniform,
+    "binding attribute on uniform '$0' will be ignored since it will be packed into the default "
+    "constant buffer at descriptor set 0 binding 0. To use explicit bindings, declare the uniform "
+    "inside a constant buffer.")
+
+DIAGNOSTIC(
     80,
     Error,
     duplicateOutputPathsForEntryPointAndTarget,

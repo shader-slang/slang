@@ -3511,34 +3511,22 @@ static void collectParameters(ParameterBindingContext* inContext, ComponentType*
 /// Emit a diagnostic about a uniform/ordinary parameter at global scope.
 void diagnoseGlobalUniform(SharedParameterBindingContext* sharedContext, VarDeclBase* varDecl)
 {
-    // This subroutine gets invoked if a shader parameter containing
-    // "ordinary" data (sometimes just called "uniform" data) is present
-    // at the global scope.
-    //
-    // Slang can support such parameters by aggregating them into
-    // an implicit constant buffer, but it is also common for programmers
-    // to accidentally declare a global-scope shader parameter when they
-    // meant to declare a global variable instead:
-    //
-    //      int gCounter = 0; // this is a shader parameter, not a global
-    //
-    // In order to avoid mistakes, we'd like to warn the user when
-    // they write code like the above, and hint to them that they
-    // should make their intention more explicit with a keyword:
-    //
-    //      static int gCounter = 0; // this is now a (static) global
-    //
-    //      uniform int gCounter; // this is now explicitly a shader parameter
-    //
-    // We skip the diagnostic whenever the variable was explicitly `uniform`,
-    // under the assumption that the programmer who added that modifier
-    // knew what they were opting into.
-    //
-    if (varDecl->hasModifier<HLSLUniformModifier>())
-        return;
+    // Don't emit the implicit global shader parameter warning if the variable is explicitly marked
+    // as uniform
+    if (!varDecl->hasModifier<HLSLUniformModifier>())
+    {
+        getSink(sharedContext)
+            ->diagnose(varDecl, Diagnostics::globalUniformNotExpected, varDecl->getName());
+    }
 
-    getSink(sharedContext)
-        ->diagnose(varDecl, Diagnostics::globalUniformNotExpected, varDecl->getName());
+    // Always check and warn about binding attributes being ignored, regardless of uniform modifier
+    if (varDecl->findModifier<GLSLBindingAttribute>())
+    {
+        sharedContext->m_sink->diagnose(
+            varDecl,
+            Diagnostics::bindingAttributeIgnoredOnUniform,
+            varDecl->getName());
+    }
 }
 
 
