@@ -3511,7 +3511,8 @@ static void collectParameters(ParameterBindingContext* inContext, ComponentType*
 /// Emit a diagnostic about a uniform/ordinary parameter at global scope.
 void diagnoseGlobalUniform(SharedParameterBindingContext* sharedContext, VarDeclBase* varDecl)
 {
-    // Don't emit the implicit global shader parameter warning if the variable is explicitly marked as uniform
+    // Don't emit the implicit global shader parameter warning if the variable is explicitly marked
+    // as uniform
     if (!varDecl->hasModifier<HLSLUniformModifier>())
     {
         getSink(sharedContext)
