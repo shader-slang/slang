@@ -2011,6 +2011,13 @@ TokenReader MacroInvocation::_getArgTokens(Index paramIndex)
         // to the parameter, and we construct a `TokenReader` that will play
         // back the tokens of that argument.
         //
+        // Special case: If we have no arguments but the macro expects one parameter,
+        // return an empty token range
+        if (m_args.getCount() == 0 && m_macro->params.getCount() == 1)
+        {
+            return TokenReader(argTokens, argTokens);
+        }
+
         SLANG_ASSERT(paramIndex < m_args.getCount());
         auto arg = m_args[paramIndex];
         return TokenReader(argTokens + arg.beginTokenIndex, argTokens + arg.endTokenIndex);
@@ -2037,8 +2044,15 @@ TokenReader MacroInvocation::_getArgTokens(Index paramIndex)
             // When there are no arguments for the varaidic parameter we will
             // construct an empty token range that comes after the other arguments.
             //
-            auto arg = m_args[lastArgIndex];
-            return TokenReader(argTokens + arg.endTokenIndex, argTokens + arg.endTokenIndex);
+            if (lastArgIndex >= 0)
+            {
+                auto arg = m_args[lastArgIndex];
+                return TokenReader(argTokens + arg.endTokenIndex, argTokens + arg.endTokenIndex);
+            }
+            else
+            {
+                return TokenReader(argTokens, argTokens);
+            }
         }
 
         // Because the `m_argTokens` array includes the commas between arguments,
