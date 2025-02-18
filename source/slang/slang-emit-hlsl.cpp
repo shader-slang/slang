@@ -1252,23 +1252,30 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
             case IRConstant::FloatKind::Nan:
                 {
-                    m_writer->emit("(0.0 / 0.0)");
+                    m_writer->emit("(0.0f / 0.0f)");
                     return;
                 }
             case IRConstant::FloatKind::PositiveInfinity:
                 {
-                    m_writer->emit("(1.0 / 0.0)");
+                    m_writer->emit("(1.0f / 0.0f)");
                     return;
                 }
             case IRConstant::FloatKind::NegativeInfinity:
                 {
-                    m_writer->emit("(-1.0 / 0.0)");
+                    m_writer->emit("(-1.0f / 0.0f)");
                     return;
                 }
             default:
-                break;
+                {
+                    m_writer->emit(constantInst->value.floatVal);
+                    // Add 'f' suffix for 32-bit float literals to ensure DXC treats them as float
+                    if (constantInst->getDataType()->getOp() == kIROp_FloatType)
+                    {
+                        m_writer->emit("f");
+                    }
+                    return;
+                }
             }
-            break;
         }
 
     default:
