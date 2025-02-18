@@ -36,16 +36,15 @@ void ShaderCompilerUtil::Output::reset()
     }
 
     session = nullptr;
-    m_requestForKernels = nullptr;
-    m_extraRequestForReflection = nullptr;
+    m_requestDEPRECATED = nullptr;
 }
 
-/* static */ SlangResult ShaderCompilerUtil::_compileProgramImpl(
+static SlangResult _compileProgramImpl(
     slang::IGlobalSession* globalSession,
     const Options& options,
-    const Input& input,
+    const ShaderCompilerUtil::Input& input,
     const ShaderCompileRequest& request,
-    Output& out)
+    ShaderCompilerUtil::Output& out)
 {
     out.reset();
 
@@ -58,7 +57,7 @@ void ShaderCompilerUtil::Output::reset()
     SLANG_ALLOW_DEPRECATED_BEGIN
     globalSession->createCompileRequest(slangRequest.writeRef());
     SLANG_ALLOW_DEPRECATED_END
-    out.m_requestForKernels = slangRequest;
+    out.m_requestDEPRECATED = slangRequest;
     out.session = globalSession;
 
     bool hasRepro = false;
@@ -303,12 +302,12 @@ void ShaderCompilerUtil::Output::reset()
     return SLANG_OK;
 }
 
-/* static */ SlangResult ShaderCompilerUtil::compileProgram(
+static SlangResult compileProgram(
     slang::IGlobalSession* globalSession,
     const Options& options,
-    const Input& input,
+    const ShaderCompilerUtil::Input& input,
     const ShaderCompileRequest& request,
-    Output& out)
+    ShaderCompilerUtil::Output& out)
 {
     if (input.passThrough == SLANG_PASS_THROUGH_NONE)
     {
@@ -333,7 +332,7 @@ void ShaderCompilerUtil::Output::reset()
         // compile in another pass using the desired downstream compiler
         // so that we can get the refleciton information we need.
         //
-        Output slangOutput;
+        ShaderCompilerUtil::Output slangOutput;
         if (canUseSlangForPrecompile)
         {
             ShaderCompilerUtil::Input slangInput = input;
@@ -354,17 +353,16 @@ void ShaderCompilerUtil::Output::reset()
         //
         SLANG_RETURN_ON_FAIL(_compileProgramImpl(globalSession, options, input, request, out));
 
-        out.m_extraRequestForReflection = slangOutput.getRequestForReflection();
+        out.m_requestDEPRECATED = slangOutput.m_requestDEPRECATED;
         out.desc.slangGlobalScope = slangOutput.desc.slangGlobalScope;
-        slangOutput.m_requestForKernels = nullptr;
+        slangOutput.m_requestDEPRECATED = nullptr;
 
         return SLANG_OK;
     }
 }
 
-/* static */ SlangResult ShaderCompilerUtil::readSource(
-    const String& inSourcePath,
-    List<char>& outSourceText)
+// Helper for compileWithLayout
+/* static */ SlangResult readSource(const String& inSourcePath, List<char>& outSourceText)
 {
     // Read in the source code
     FILE* sourceFile = fopen(inSourcePath.getBuffer(), "rb");
@@ -392,8 +390,8 @@ void ShaderCompilerUtil::Output::reset()
 /* static */ SlangResult ShaderCompilerUtil::compileWithLayout(
     slang::IGlobalSession* globalSession,
     const Options& options,
-    const ShaderCompilerUtil::Input& input,
-    OutputAndLayout& output)
+    const Input& input,
+    ShaderCompilerUtil::OutputAndLayout& output)
 {
     String sourcePath = options.sourcePath;
     auto shaderType = options.shaderType;
@@ -531,12 +529,7 @@ void ShaderCompilerUtil::Output::reset()
         c.idOverride = conformance.idOverride;
         compileRequest.typeConformances.add(c);
     }
-    return ShaderCompilerUtil::compileProgram(
-        globalSession,
-        options,
-        input,
-        compileRequest,
-        output.output);
+    return compileProgram(globalSession, options, input, compileRequest, output.output);
 }
 
 } // namespace renderer_test
