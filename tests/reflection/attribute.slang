@@ -5,6 +5,7 @@
 //TEST:REFLECTION:-stage compute -entry main -target hlsl -no-codegen
 
 [__AttributeUsage(_AttributeTargets.Struct)]
+[__AttributeUsage(_AttributeTargets.Function)]
 struct MyStructAttribute
 {
     int iParam;
@@ -58,6 +59,7 @@ D param3;
 [StructVarParam(1)] int globalInt2;
 
 
+[MyStruct(2, 3.0)]
 [numthreads(1, 1, 1)]
 void main(
     uint3 dispatchThreadID : SV_DispatchThreadID,
