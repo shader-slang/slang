@@ -3042,10 +3042,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
                 m_requiredPreludes.add(preludeTextInst);
             break;
         }
-    case kIROp_RequireGLSLExtension:
-        {
-            break; // should already have set requirement; case covered for empty intrinsic block
-        }
     case kIROp_RequireComputeDerivative:
         {
             break; // should already have been parsed and used.
@@ -3053,6 +3049,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_GlobalValueRef:
         {
             emitOperand(as<IRGlobalValueRef>(inst)->getOperand(0), getInfo(EmitOp::General));
+            break;
+        }
+    case kIROp_RequireTargetExtension:
+        {
+            emitRequireExtension(as<IRRequireTargetExtension>(inst));
             break;
         }
     default:

@@ -440,8 +440,8 @@ attribute_syntax [Differentiable(order:int = 0)] : BackwardDifferentiableAttribu
 __intrinsic_op($(kIROp_RequirePrelude))
 void __requirePrelude(constexpr String preludeText);
 
-__intrinsic_op($(kIROp_RequireGLSLExtension))
-void __requireGLSLExtension(constexpr String preludeText);
+__intrinsic_op($(kIROp_RequireTargetExtension))
+void __requireTargetExtension(constexpr String preludeText);
 
 /// @experimetal
 /// Perform a compile-time condition check and emit a compile-time error if the condition is false.

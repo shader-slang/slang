@@ -3228,6 +3228,20 @@ protected:
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
                 break;
             }
+        case SystemValueSemanticName::WaveLaneCount:
+            {
+                result.systemValueName = toSlice("threads_per_simdgroup");
+                result.permittedTypes.add(builder.getUIntType());
+                result.permittedTypes.add(builder.getUInt16Type());
+                break;
+            }
+        case SystemValueSemanticName::WaveLaneIndex:
+            {
+                result.systemValueName = toSlice("thread_index_in_simdgroup");
+                result.permittedTypes.add(builder.getUIntType());
+                result.permittedTypes.add(builder.getUInt16Type());
+                break;
+            }
         default:
             m_sink->diagnose(
                 parentVar,
@@ -3845,6 +3859,20 @@ protected:
                 break;
             }
 
+        case SystemValueSemanticName::WaveLaneCount:
+            {
+                result.systemValueName = toSlice("subgroup_size");
+                result.permittedTypes.add(builder.getUIntType());
+                break;
+            }
+
+        case SystemValueSemanticName::WaveLaneIndex:
+            {
+                result.systemValueName = toSlice("subgroup_invocation_id");
+                result.permittedTypes.add(builder.getUIntType());
+                break;
+            }
+
         case SystemValueSemanticName::ViewID:
         case SystemValueSemanticName::ViewportArrayIndex:
         case SystemValueSemanticName::StartVertexLocation:
@@ -3853,7 +3881,6 @@ protected:
                 result.isUnsupported = true;
                 break;
             }
-
         default:
             {
                 m_sink->diagnose(
