@@ -308,8 +308,7 @@ struct BindingQueryLoweringContext : public WorkListPass
             OpaqueValueInfo baseInfo = findOrComputeOpaqueValueInfo(baseInst);
 
             // If we couldn't find it we are done
-            if (baseInfo.registerIndex == nullptr ||
-                baseInfo.registerSpace == nullptr)
+            if (baseInfo.registerIndex == nullptr || baseInfo.registerSpace == nullptr)
             {
                 return baseInfo;
             }
@@ -324,24 +323,26 @@ struct BindingQueryLoweringContext : public WorkListPass
 
                 switch (shape)
                 {
-                    case SLANG_TEXTURE_1D:
-                    case SLANG_TEXTURE_2D:
-                    case SLANG_TEXTURE_3D:
-                    case SLANG_TEXTURE_CUBE:
-                    case SLANG_STRUCTURED_BUFFER:
-                    case SLANG_BYTE_ADDRESS_BUFFER:
-                    case SLANG_TEXTURE_BUFFER:
+                case SLANG_TEXTURE_1D:
+                case SLANG_TEXTURE_2D:
+                case SLANG_TEXTURE_3D:
+                case SLANG_TEXTURE_CUBE:
+                case SLANG_STRUCTURED_BUFFER:
+                case SLANG_BYTE_ADDRESS_BUFFER:
+                case SLANG_TEXTURE_BUFFER:
                     {
                         const auto access = resourceType->getAccess();
                         bool isReadOnly = (access == SLANG_RESOURCE_ACCESS_READ);
 
-                        kind = isReadOnly ? LayoutResourceKind::ShaderResource : LayoutResourceKind::UnorderedAccess;
+                        kind = isReadOnly ? LayoutResourceKind::ShaderResource
+                                          : LayoutResourceKind::UnorderedAccess;
                         break;
                     }
-                    default: break;
+                default:
+                    break;
                 }
             }
-            else if (as< IRSamplerStateTypeBase>(elementType))
+            else if (as<IRSamplerStateTypeBase>(elementType))
             {
                 kind = LayoutResourceKind::SamplerState;
             }
@@ -363,7 +364,9 @@ struct BindingQueryLoweringContext : public WorkListPass
                 if (auto elementTypeLayout = as<IRTypeLayout>(layoutDecoration->getLayout()))
                 {
                     IRTypeSizeAttr* sizeAttr = elementTypeLayout->findSizeAttr(kind);
-                    sizeAttr = sizeAttr ? sizeAttr : elementTypeLayout->findSizeAttr(LayoutResourceKind::DescriptorTableSlot);
+                    sizeAttr = sizeAttr ? sizeAttr
+                                        : elementTypeLayout->findSizeAttr(
+                                              LayoutResourceKind::DescriptorTableSlot);
 
                     if (!sizeAttr)
                     {
@@ -385,7 +388,8 @@ struct BindingQueryLoweringContext : public WorkListPass
 
             builder.setInsertBefore(opaqueValue);
 
-            auto calcRegisterInst = builder.emitAdd(indexType,
+            auto calcRegisterInst = builder.emitAdd(
+                indexType,
                 builder.emitMul(indexType, builder.getIntValue(indexType, stride), indexInst),
                 baseInfo.registerIndex);
 
