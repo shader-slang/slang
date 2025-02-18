@@ -2055,6 +2055,14 @@ DIAGNOSTIC(
     "shader parameter '$0' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` "
     "specified for Vulkan, nor is `-fvk-$1-shift` used.")
 
+DIAGNOSTIC(
+    39071,
+    Warning,
+    bindingAttributeIgnoredOnUniform,
+    "binding attribute on uniform '$0' will be ignored since it will be packed into the default "
+    "constant buffer at descriptor set 0 binding 0. To use explicit bindings, declare the uniform "
+    "inside a constant buffer.")
+
 //
 
 // 4xxxx - IL code generation.
