@@ -3123,7 +3123,7 @@ IRInst* specializeGenericImpl(
             //
             if (auto witnessTable = as<IRWitnessTable>(ii))
             {
-                // CLone type and concreteType to use as cache-key
+                // Clone type and concreteType to use as cache-key
                 auto witnessTableType = witnessTable->getFullType();
                 IRType* clonedWitnessTableType =
                     as<IRType>(cloneInst(&env, builder, witnessTableType));
@@ -3137,7 +3137,7 @@ IRInst* specializeGenericImpl(
 
                 if (!context->mapClonedWitnessTable.tryGetValue(cacheKey, clonedInst))
                 {
-                    // Not found from cache and need to create a new one
+                    // It is not found from cache and we need to create a new one.
                     clonedInst = builder->emitIntrinsicInst(
                         clonedWitnessTableType,
                         kIROp_WitnessTable,
@@ -3146,12 +3146,11 @@ IRInst* specializeGenericImpl(
 
                     clonedInst->sourceLoc = ii->sourceLoc;
 
-                    if (clonedInst != ii)
-                    {
-                        // TODO: Decoration shouldn't matter but it casues a trouble if we don't
-                        // clone them here. It is unclear why.
-                        cloneInstDecorationsAndChildren(&env, builder->getModule(), ii, clonedInst);
-                    }
+                    // It seems that the children are same when the witnessTableType and the
+                    // concrete type are same.
+                    // If it changes in the future, we will need to clone the witness-table-entries
+                    // from the children and use them as the cacheKey as well.
+                    cloneInstDecorationsAndChildren(&env, builder->getModule(), ii, clonedInst);
 
                     context->mapClonedWitnessTable.add(cacheKey, clonedInst);
                 }
