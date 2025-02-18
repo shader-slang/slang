@@ -18,6 +18,7 @@
 #include "../core/slang-file-system.h"
 #include "../core/slang-memory-file-system.h"
 #include "../core/slang-writer.h"
+#include "../core/slang-type-text-util.h"
 #include "core/slang-shared-library.h"
 #include "slang-ast-dump.h"
 #include "slang-check-impl.h"
@@ -3726,6 +3727,37 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
             {
                 SLANG_RETURN_ON_FAIL(
                     translationUnit->getModule()->precompileForTarget(targetEnum, nullptr));
+
+               // If dump-intermediates is enabled, get the precompiled target code
+               // and write it out
+               if (getOptionSet().getBoolOption(CompilerOptionName::DumpIntermediates))
+               {
+                   ComPtr<ISlangBlob> blob;
+                   SLANG_RETURN_ON_FAIL(
+                       translationUnit->getModule()->getPrecompiledTargetCode(targetEnum, blob.writeRef()));
+                   if (blob)
+                   {
+                       StringBuilder path;
+                       path << "precompiled-";
+                       if (target->getTarget() == CodeGenTarget::None)
+                       {
+                           path << "none";
+                       }
+                       else
+                       {
+                           path << TypeTextUtil::getCompileTargetName(targetEnum);
+                       }
+                       path << "-";
+                       path << translationUnit->getModule()->getName();
+                       path << ".bin";
+
+                       SLANG_RETURN_ON_FAIL(File::writeAllBytes(path, blob->getBufferPointer(), blob->getBufferSize()));
+                   }
+                   else
+                   {
+                       printf("Failed to get precompiled target code\n");
+                   }
+                }
             }
         }
     }
