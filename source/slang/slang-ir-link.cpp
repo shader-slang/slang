@@ -138,6 +138,26 @@ void registerClonedValue(IRSpecContextBase* context, IRInst* clonedValue, IRInst
     // an `Add()` call.
     //
     context->getEnv()->clonedValues[originalValue] = clonedValue;
+
+    switch (clonedValue->getOp())
+    {
+    case kIROp_LookupWitness:
+
+        // If `originalVal` represents a witness table entry key, add the key
+        // to witnessTableEntryWorkList.
+        context->deferredWitnessTableEntryKeys.add(
+            getMangledName(as<IRLookupWitnessMethod>(clonedValue)->getRequirementKey()));
+        break;
+    case kIROp_ForwardDerivativeDecoration:
+    case kIROp_BackwardDerivativeDecoration:
+    case kIROp_UserDefinedBackwardDerivativeDecoration:
+        if (context->getShared()->useAutodiff)
+        {
+            if (auto key = as<IRStructKey>(clonedValue->getOperand(0)))
+                context->deferredWitnessTableEntryKeys.add(getMangledName(key));
+        }
+        break;
+    }
 }
 
 // Information on values to use when registering a cloned value
@@ -168,26 +188,6 @@ void registerClonedValue(
     for (auto s = originalValues.sym; s; s = s->nextWithSameName)
     {
         registerClonedValue(context, clonedValue, s->irGlobalValue);
-    }
-
-    switch (clonedValue->getOp())
-    {
-    case kIROp_LookupWitness:
-
-        // If `originalVal` represents a witness table entry key, add the key
-        // to witnessTableEntryWorkList.
-        context->deferredWitnessTableEntryKeys.add(
-            getMangledName(as<IRLookupWitnessMethod>(clonedValue)->getRequirementKey()));
-        break;
-    case kIROp_ForwardDerivativeDecoration:
-    case kIROp_BackwardDerivativeDecoration:
-    case kIROp_UserDefinedBackwardDerivativeDecoration:
-        if (context->getShared()->useAutodiff)
-        {
-            if (auto key = as<IRStructKey>(clonedValue->getOperand(0)))
-                context->deferredWitnessTableEntryKeys.add(getMangledName(key));
-        }
-        break;
     }
 }
 
