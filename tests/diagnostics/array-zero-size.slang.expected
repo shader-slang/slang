@@ -1,8 +1,0 @@
-result code = -1
-standard error = {
-tests/diagnostics/array-zero-size.slang(13): error 30025: array size must be larger than zero.
-func bar() -> int[0];
-                  ^
-}
-standard output = {
-}
