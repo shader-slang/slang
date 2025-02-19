@@ -8184,7 +8184,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-
         // Make sure that all the entries in the witness table have been filled in,
         // including any cases where there are sub-witness-tables for conformances
         Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
@@ -11543,6 +11542,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     IRGenContext* context = &contextStorage;
 
     RefPtr<IRModule> module = IRModule::create(session);
+
+    module->setName(translationUnit->getModuleDecl()->getName());
 
     IRBuilder builderStorage(module);
     IRBuilder* builder = &builderStorage;

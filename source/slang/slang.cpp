@@ -705,6 +705,7 @@ SlangResult Session::_readBuiltinModule(
             module->setModuleDecl(moduleDecl);
         }
 
+        srcModule.irModule->setName(module->getNameObj());
         module->setIRModule(srcModule.irModule);
 
         // Put in the loaded module map
@@ -1272,9 +1273,6 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
     , m_astBuilder(astBuilder)
     , m_cmdLineContext(new CommandLineContext())
 {
-    // if (builtinLinkage)
-    //     m_astBuilder->m_cachedNodes = builtinLinkage->getASTBuilder()->m_cachedNodes;
-
     getNamePool()->setRootNamePool(session->getRootNamePool());
 
     m_defaultSourceManager.initialize(session->getBuiltinSourceManager(), nullptr);
@@ -4099,6 +4097,8 @@ RefPtr<Module> Linkage::loadModuleFromIRBlobImpl(
 
     loadedModulesList.add(resultModule);
     resultModule->setPathInfo(filePathInfo);
+    resultModule->getIRModule()->setName(resultModule->getNameObj());
+
     return resultModule;
 }
 

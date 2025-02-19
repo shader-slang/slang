@@ -2401,6 +2401,9 @@ public:
 
     IRInstListBase getGlobalInsts() const { return getModuleInst()->getChildren(); }
 
+    Name* getName() const { return m_name; }
+    void setName(Name* name) { m_name = name; }
+
     /// Create an empty instruction with the `op` opcode and space for
     /// a number of operands given by `operandCount`.
     ///
@@ -2452,6 +2455,9 @@ private:
     /// `IRModuleInst` for the module the instruction belongs to, if any.
     ///
     IRModuleInst* m_moduleInst = nullptr;
+
+    // The name of the module.
+    Name* m_name = nullptr;
 
     /// The memory arena from which all IR instructions (and any associated state) in this module
     /// are allocated.

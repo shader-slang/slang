@@ -59,7 +59,7 @@ void stripImportedWitnessTable(IRModule* module)
         switch (globalInst->getOp())
         {
         case kIROp_Generic:
-            inst = findGenericReturnVal(as<IRGeneric>(globalInst));
+            inst = findInnerMostGenericReturnVal(as<IRGeneric>(globalInst));
             break;
         case kIROp_WitnessTable:
             break;

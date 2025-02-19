@@ -169,6 +169,26 @@ void registerClonedValue(
     {
         registerClonedValue(context, clonedValue, s->irGlobalValue);
     }
+
+    switch (clonedValue->getOp())
+    {
+    case kIROp_LookupWitness:
+
+        // If `originalVal` represents a witness table entry key, add the key
+        // to witnessTableEntryWorkList.
+        context->deferredWitnessTableEntryKeys.add(
+            getMangledName(as<IRLookupWitnessMethod>(clonedValue)->getRequirementKey()));
+        break;
+    case kIROp_ForwardDerivativeDecoration:
+    case kIROp_BackwardDerivativeDecoration:
+    case kIROp_UserDefinedBackwardDerivativeDecoration:
+        if (context->getShared()->useAutodiff)
+        {
+            if (auto key = as<IRStructKey>(clonedValue->getOperand(0)))
+                context->deferredWitnessTableEntryKeys.add(getMangledName(key));
+        }
+        break;
+    }
 }
 
 IRInst* cloneInst(
@@ -249,16 +269,6 @@ void cloneDecorationsAndChildren(
 
     // We will also clone the location here, just because this is a convenient bottleneck
     clonedValue->sourceLoc = originalValue->sourceLoc;
-}
-
-UnownedStringSlice getMangledName(IRInst* inst)
-{
-    for (auto decor : inst->getDecorations())
-    {
-        if (auto linkageDecor = as<IRLinkageDecoration>(decor))
-            return linkageDecor->getMangledName();
-    }
-    return UnownedStringSlice();
 }
 
 // We use an `IRSpecContext` for the case where we are cloning
@@ -363,16 +373,6 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
 
             cloneDecorationsAndChildren(this, clonedValue, originalValue);
             addHoistableInst(builder, clonedValue);
-
-            switch (originalValue->getOp())
-            {
-            case kIROp_LookupWitness:
-                // If `originalVal` represents a witness table entry key, add the key
-                // to witnessTableEntryWorkList.
-                deferredWitnessTableEntryKeys.add(
-                    getMangledName(as<IRLookupWitnessMethod>(originalValue)->getRequirementKey()));
-                break;
-            }
             return clonedValue;
         }
         break;
@@ -682,6 +682,37 @@ IRGlobalGenericParam* cloneGlobalGenericParamImpl(
     return clonedVal;
 }
 
+bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* table)
+{
+    for (auto decor : table->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_HLSLExportDecoration:
+        case kIROp_KeepAliveDecoration:
+            return true;
+        }
+    }
+
+    auto conformanceType = getResolvedInstForDecorations(table->getConformanceType());
+
+    for (auto decor : conformanceType->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_ComInterfaceDecoration:
+            return true;
+        case kIROp_KnownBuiltinDecoration:
+            if (as<IRKnownBuiltinDecoration>(decor)->getName() == toSlice("IDifferentiable"))
+                return context->getShared()->useAutodiff;
+            break;
+        default:
+            break;
+        }
+    }
+
+    return false;
+}
 
 IRWitnessTable* cloneWitnessTableImpl(
     IRSpecContextBase* context,
@@ -722,32 +753,14 @@ IRWitnessTable* cloneWitnessTableImpl(
     witnessInfo->clonedTable = clonedTable;
     witnessInfo->originalTable = originalTable;
 
-    bool shouldDeepCloneWitnessTable = false;
-    for (auto decor : clonedTable->getDecorations())
-    {
-        switch (decor->getOp())
-        {
-        case kIROp_HLSLExportDecoration:
-        case kIROp_KeepAliveDecoration:
-            shouldDeepCloneWitnessTable = true;
-            break;
-        }
-    }
-    if (!shouldDeepCloneWitnessTable)
-    {
-        if (getResolvedInstForDecorations(clonedBaseType)
-                ->findDecoration<IRComInterfaceDecoration>())
-        {
-            shouldDeepCloneWitnessTable = true;
-        }
-    }
+    bool shouldDeepClone = shouldDeepCloneWitnessTable(context, originalTable);
 
     // Clone only the witness table entries that are actually used
     for (auto child : originalTable->getDecorationsAndChildren())
     {
         if (auto entry = as<IRWitnessTableEntry>(child))
         {
-            if (!shouldDeepCloneWitnessTable)
+            if (!shouldDeepClone)
             {
                 // Skip witness table entries during the first pass,
                 // and just add them to the deferred work list.
@@ -1166,7 +1179,8 @@ CapabilitySet getTargetCapabilities(IRSpecContext* context)
     return context->getShared()->targetReq->getTargetCaps();
 }
 
-/// Get the most appropriate ("best") capability requirements for `inVal` based on the `targetCaps`.
+/// Get the most appropriate ("best") capability requirements for `inVal` based on the
+/// `targetCaps`.
 static CapabilitySet _getBestSpecializationCaps(IRInst* inVal, CapabilitySet const& targetCaps)
 {
     IRInst* val = getResolvedInstForDecorations(inVal);
@@ -1424,27 +1438,6 @@ IRInst* cloneInst(
     else
         cloneDecorationsAndChildren(context, clonedInst, originalInst);
     cloneExtraDecorations(context, clonedInst, originalValues);
-
-    switch (originalInst->getOp())
-    {
-    case kIROp_LookupWitness:
-
-        // If `originalVal` represents a witness table entry key, add the key
-        // to witnessTableEntryWorkList.
-        context->deferredWitnessTableEntryKeys.add(
-            getMangledName(as<IRLookupWitnessMethod>(originalInst)->getRequirementKey()));
-        break;
-    case kIROp_ForwardDerivativeDecoration:
-    case kIROp_BackwardDerivativeDecoration:
-    case kIROp_UserDefinedBackwardDerivativeDecoration:
-        if (context->getShared()->useAutodiff)
-        {
-            if (auto key = as<IRStructKey>(originalInst->getOperand(0)))
-                context->deferredWitnessTableEntryKeys.add(getMangledName(key));
-        }
-        break;
-    }
-
     return clonedInst;
 }
 
@@ -1775,8 +1768,8 @@ void convertAtomicToStorageBuffer(
     IRSpecContext* context,
     Dictionary<int, List<IRInst*>>& bindingToInstMapUnsorted)
 {
-    // Atomic_uint definitions needs to become a storage buffer to follow GL_EXT_vulkan_glsl_relaxed
-    // and to allow translation of atomic_uint into SPIRV
+    // Atomic_uint definitions needs to become a storage buffer to follow
+    // GL_EXT_vulkan_glsl_relaxed and to allow translation of atomic_uint into SPIRV
 
     IRBuilder builder = *context->builder;
 
@@ -1823,8 +1816,8 @@ void convertAtomicToStorageBuffer(
         instToSwitch->setFullType(storageBuffer);
 
         // All references to a atomic_uint need to be an element ref. to emulate storage buffer
-        // usage All function calls must be inlined since storage buffers cannot pass as parameters
-        // to atomic methods
+        // usage All function calls must be inlined since storage buffers cannot pass as
+        // parameters to atomic methods
         for (auto& i : bindingToInstList.second)
         {
             int64_t currOffset =
@@ -1892,12 +1885,13 @@ void GLSLReplaceAtomicUint(IRSpecContext* context, TargetProgram* targetProgram,
             {
             case kIROp_GLSLAtomicUintType:
                 {
-                    // atomic_uint are supported by GLSL->VK through converting to a different type
-                    // (GL_EXT_vulkan_glsl_relaxed). atomic_uint are not supported by SPIR-V->VK;
-                    // this means that to get SPIR-V to work we must convert the type ourselves to
-                    // an equivlent representation (storage buffer); the added benifit is that then
-                    // HLSL is possible to emit as a target as well since atomic_uint is not an HLSL
-                    // concept, but storageBuffer->RWBuffer is and HLSL concept
+                    // atomic_uint are supported by GLSL->VK through converting to a different
+                    // type (GL_EXT_vulkan_glsl_relaxed). atomic_uint are not supported by
+                    // SPIR-V->VK; this means that to get SPIR-V to work we must convert the
+                    // type ourselves to an equivlent representation (storage buffer); the added
+                    // benifit is that then HLSL is possible to emit as a target as well since
+                    // atomic_uint is not an HLSL concept, but storageBuffer->RWBuffer is and
+                    // HLSL concept
                     auto layout = inst->findDecoration<IRLayoutDecoration>()->getLayout();
                     auto layoutVal = as<IRVarOffsetAttr>(layout->getOperand(1));
                     assert(layoutVal != nullptr);
@@ -1930,10 +1924,31 @@ bool doesModuleUseAutodiff(IRInst* inst)
             }
         }
         return false;
+    case kIROp_DifferentialPairGetDifferentialUserCode:
+    case kIROp_DifferentialPairGetPrimalUserCode:
+    case kIROp_DifferentialPairUserCodeType:
+        return true;
     default:
         for (auto child : inst->getChildren())
         {
-            if (child->findDecoration<IRImportDecoration>())
+            bool isImported = false;
+            for (auto decor : child->getDecorations())
+            {
+                if (as<IRImportDecoration>(decor))
+                {
+                    isImported = true;
+                    break;
+                }
+                else if (as<IRAutoPyBindCudaDecoration>(decor))
+                {
+                    return true;
+                }
+                else if (as<IRAutoPyBindExportInfoDecoration>(decor))
+                {
+                    return true;
+                }
+            }
+            if (isImported)
                 continue;
             if (doesModuleUseAutodiff(child))
                 return true;
@@ -2005,21 +2020,18 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // accelerate lookup, we will create a symbol table for looking
     // up IR definitions by their mangled name.
     //
+    auto globalSession = static_cast<Session*>(linkage->getGlobalSession());
     List<IRModule*> builtinModules;
-    for (auto& m : static_cast<Session*>(linkage->getGlobalSession())->coreModules)
+    for (auto& m : globalSession->coreModules)
         builtinModules.add(m->getIRModule());
 
     // Link modules in the program.
-    program->enumerateModules(
-        [&](Module* module)
-        {
-            if (UnownedStringSlice(module->getName()) == "glsl")
-                builtinModules.add(module->getIRModule());
-        });
     program->enumerateIRModules(
         [&](IRModule* module)
         {
-            if (!builtinModules.contains(module))
+            if (module->getName() == globalSession->glslModuleName)
+                builtinModules.add(module);
+            else
                 irModules.add(module);
         });
 
@@ -2029,7 +2041,8 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // global symbols via decorations.
     //
     auto irModuleForLayout = targetProgram->getExistingIRModuleForLayout();
-    irModules.add(irModuleForLayout);
+    if (irModuleForLayout)
+        irModules.add(irModuleForLayout);
 
     Index userModuleCount = irModules.getCount();
     irModules.addRange(builtinModules);
@@ -2152,6 +2165,10 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         }
     }
 
+    // In previous steps, we have skipped cloning the witness table entries, and
+    // registered any used witness table entry keys to context->deferredWitnessTableEntryKeys
+    // for on-demand cloning. Now we will use the deferred keys to clone the witness table
+    // entries that are referenced.
     cloneUsedWitnessTableEntries(context);
 
     // It is possible that metadata has been attached to the input modules

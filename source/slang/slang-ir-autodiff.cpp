@@ -1026,12 +1026,9 @@ IRInst* AutoDiffSharedContext::findDifferentiableInterface()
     {
         for (auto globalInst : module->getGlobalInsts())
         {
-            // TODO: This seems like a particularly dangerous way to look for an interface.
-            // See if we can lower IDifferentiable to a separate IR inst.
-            //
             if (auto intf = as<IRInterfaceType>(globalInst))
             {
-                if (auto decor = intf->findDecoration<IRNameHintDecoration>())
+                if (auto decor = intf->findDecoration<IRKnownBuiltinDecoration>())
                 {
                     if (decor->getName() == toSlice("IDifferentiable"))
                     {
