@@ -1450,6 +1450,14 @@ static SlangResult _innerMain(
         }
     }
 
+    // Print adapter info after device creation but before any other operations
+    if (options.showAdapterInfo)
+    {
+        auto info = device->getDeviceInfo();
+        auto out = stdWriters->getOut();
+        out.print("Using graphics adapter: %s\n", info.adapterName);
+    }
+
     // If the only test is we can startup, then we are done
     if (options.onlyStartup)
     {
