@@ -1326,7 +1326,11 @@ static int getInstRegionNestLevel(
 
 struct UseChain
 {
+    // The chain of uses from the base use to the relevant use.
+    // However, this is stored in reverse order (so that the last use is the 'base use')
+    //
     List<IRUse*> chain;
+
     static List<UseChain> from(
         IRUse* baseUse,
         Func<bool, IRUse*> isRelevantUse,
@@ -1366,41 +1370,20 @@ struct UseChain
         return result;
     }
 
-    void replace(IROutOfOrderCloneContext* ctx, IRBuilder* builder, IRInst* inst)
+    // This function only replaces the inner links, not the base use.
+    void replaceInnerLinks(IROutOfOrderCloneContext* ctx, IRBuilder* builder)
     {
         SLANG_ASSERT(chain.getCount() > 0);
 
-        // Simple case: if there is only one use, then we can just replace it.
-        if (chain.getCount() == 1)
+        const UIndex count = chain.getCount();
+
+        // Process the chain in reverse order (excluding the first and last elements).
+        // That is, iterate from count - 2 down to 1 (inclusive).
+        for (int i = ((int)count) - 2; i >= 1; i--)
         {
-            builder->replaceOperand(chain.getLast(), inst);
-            chain.clear();
-            return;
+            IRUse* use = chain[i];
+            ctx->cloneInstOutOfOrder(builder, use->get());
         }
-
-        // Pop the last use, which is the base use that needs to be replaced.
-        auto baseUse = chain.getLast();
-        chain.removeLast();
-
-        // Ensure that replacement inst is set as mapping for the baseUse.
-        ctx->cloneEnv.mapOldValToNew[baseUse->get()] = inst;
-
-        IRBuilder chainBuilder(builder->getModule());
-        setInsertAfterOrdinaryInst(&chainBuilder, inst);
-
-        chain.reverse();
-        chain.removeLast();
-
-        // Clone the rest of the chain.
-        for (auto& use : chain)
-        {
-            ctx->cloneInstOutOfOrder(&chainBuilder, use->get());
-        }
-
-        // We won't actually replace the final use, because if there are multiple chains
-        // it can cause problems. The parent UseGraph will handle that.
-
-        chain.clear();
     }
 
     IRInst* getUser() const
@@ -1417,6 +1400,14 @@ struct UseGraph
     //
     OrderedDictionary<IRUse*, List<UseChain>> chainSets;
 
+    // Create a UseGraph from a base inst.
+    //
+    // `isRelevantUse` is a predicate that determines if a use is relevant. Traversal will stop at
+    // this use, and all chains to this use will be grouped together.
+    //
+    // `passthroughInst` is a predicate that determines if an inst should be looked through
+    // for uses.
+    //
     static UseGraph from(
         IRInst* baseInst,
         Func<bool, IRUse*> isRelevantUse,
@@ -1445,26 +1436,33 @@ struct UseGraph
         return result;
     }
 
-    void replace(IRBuilder* builder, IRUse* use, IRInst* inst)
+    void replace(IRBuilder* builder, IRUse* relevantUse, IRInst* inst)
     {
         // Since we may have common nodes, we will use an out-of-order cloning context
         // that can retroactively correct the uses as needed.
         //
         IROutOfOrderCloneContext ctx;
-        List<UseChain> chains = chainSets[use];
+        List<UseChain> chains = chainSets[relevantUse];
+
+        // Link the first use of each chain to inst.
+        for (auto& chain : chains)
+            ctx.cloneEnv.mapOldValToNew[chain.chain.getLast()->get()] = inst;
+
+        // Process the inner links of each chain using the replacement.
         for (auto& chain : chains)
         {
-            chain.replace(&ctx, builder, inst);
+            IRBuilder chainBuilder(builder->getModule());
+            setInsertAfterOrdinaryInst(&chainBuilder, inst);
+
+            chain.replaceInnerLinks(&ctx, builder);
         }
 
-        if (!isTrivial(chains))
-        {
-            builder->setInsertBefore(use->getUser());
-            auto lastInstInChain = ctx.cloneInstOutOfOrder(builder, use->get());
+        // Finally, replace the relevant use (i.e, "final use") with the new replacement inst.
+        builder->setInsertBefore(relevantUse->getUser());
+        auto lastInstInChain = ctx.cloneInstOutOfOrder(builder, relevantUse->get());
 
-            // Replace the base use.
-            builder->replaceOperand(use, lastInstInChain);
-        }
+        // Replace the base use.
+        builder->replaceOperand(relevantUse, lastInstInChain);
     }
 
     bool isTrivial(const List<UseChain>& chains)
