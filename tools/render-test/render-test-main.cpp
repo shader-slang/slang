@@ -1470,7 +1470,7 @@ static SlangResult _innerMain(
     {
         auto info = device->getDeviceInfo();
         auto out = stdWriters->getOut();
-        out.print("Using graphics adapter: %s\n", info.adapterName);        
+        out.print("Using graphics adapter: %s\n", info.adapterName);
     }
 
     // If the only test is we can startup, then we are done
