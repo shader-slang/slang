@@ -2384,7 +2384,9 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
             {
                 if (constElementCount->getValue() <= 0)
                 {
-                    getSink()->diagnose(subscriptExpr->indexExprs[0], Diagnostics::invalidArraySize);
+                    getSink()->diagnose(
+                        subscriptExpr->indexExprs[0],
+                        Diagnostics::invalidArraySize);
                     return CreateErrorExpr(subscriptExpr);
                 }
             }
