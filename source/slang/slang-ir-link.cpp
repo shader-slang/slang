@@ -182,6 +182,28 @@ IRInst* cloneInst(IRSpecContextBase* context, IRBuilder* builder, IRInst* origin
     return cloneInst(context, builder, originalInst, originalInst);
 }
 
+bool isAutoDiffDecoration(IRInst* decor)
+{
+    switch (decor->getOp())
+    {
+    case kIROp_ForwardDerivativeDecoration:
+    case kIROp_BackwardDerivativeIntermediateTypeDecoration:
+    case kIROp_BackwardDerivativePrimalDecoration:
+    case kIROp_BackwardDerivativePropagateDecoration:
+    case kIROp_BackwardDerivativePrimalContextDecoration:
+    case kIROp_BackwardDerivativePrimalReturnDecoration:
+    case kIROp_PrimalSubstituteDecoration:
+    case kIROp_BackwardDerivativeDecoration:
+    case kIROp_UserDefinedBackwardDerivativeDecoration:
+    case kIROp_DifferentiableTypeDictionaryDecoration:
+    case kIROp_ForwardDifferentiableDecoration:
+    case kIROp_BackwardDifferentiableDecoration:
+        return true;
+    default:
+        return false;
+    }
+}
+
 /// Clone any decorations from `originalValue` onto `clonedValue`
 void cloneDecorations(IRSpecContextBase* context, IRInst* clonedValue, IRInst* originalValue)
 {
@@ -198,25 +220,8 @@ void cloneDecorations(IRSpecContextBase* context, IRInst* clonedValue, IRInst* o
     SLANG_UNUSED(context);
     for (auto originalDecoration : originalValue->getDecorations())
     {
-        if (!context->shared->useAutodiff)
-        {
-            switch (originalDecoration->getOp())
-            {
-            case kIROp_ForwardDerivativeDecoration:
-            case kIROp_BackwardDerivativeIntermediateTypeDecoration:
-            case kIROp_BackwardDerivativePrimalDecoration:
-            case kIROp_BackwardDerivativePropagateDecoration:
-            case kIROp_BackwardDerivativePrimalContextDecoration:
-            case kIROp_BackwardDerivativePrimalReturnDecoration:
-            case kIROp_PrimalSubstituteDecoration:
-            case kIROp_BackwardDerivativeDecoration:
-            case kIROp_UserDefinedBackwardDerivativeDecoration:
-            case kIROp_DifferentiableTypeDictionaryDecoration:
-            case kIROp_ForwardDifferentiableDecoration:
-            case kIROp_BackwardDifferentiableDecoration:
-                continue;
-            }
-        }
+        if (!context->shared->useAutodiff && isAutoDiffDecoration(originalDecoration))
+            continue;
         cloneInst(context, builder, originalDecoration);
     }
 
@@ -237,6 +242,8 @@ void cloneDecorationsAndChildren(
     SLANG_UNUSED(context);
     for (auto originalItem : originalValue->getDecorationsAndChildren())
     {
+        if (!context->shared->useAutodiff && isAutoDiffDecoration(originalItem))
+            continue;
         cloneInst(context, builder, originalItem);
     }
 
@@ -685,13 +692,17 @@ IRWitnessTable* cloneWitnessTableImpl(
     bool registerValue = true)
 {
     IRWitnessTable* clonedTable = dstTable;
+    IRType* clonedBaseType = nullptr;
     if (!clonedTable)
     {
-        auto clonedBaseType = cloneType(context, (IRType*)(originalTable->getConformanceType()));
+        clonedBaseType = cloneType(context, (IRType*)(originalTable->getConformanceType()));
         auto clonedSubType = cloneType(context, (IRType*)(originalTable->getConcreteType()));
         clonedTable = builder->createWitnessTable(clonedBaseType, clonedSubType);
     }
-
+    else
+    {
+        clonedBaseType = (IRType*)clonedTable->getConformanceType();
+    }
     if (registerValue)
         registerClonedValue(context, clonedTable, originalValues);
 
@@ -711,15 +722,23 @@ IRWitnessTable* cloneWitnessTableImpl(
     witnessInfo->clonedTable = clonedTable;
     witnessInfo->originalTable = originalTable;
 
-    bool isExported = false;
+    bool shouldDeepCloneWitnessTable = false;
     for (auto decor : clonedTable->getDecorations())
     {
         switch (decor->getOp())
         {
         case kIROp_HLSLExportDecoration:
         case kIROp_KeepAliveDecoration:
-            isExported = true;
+            shouldDeepCloneWitnessTable = true;
             break;
+        }
+    }
+    if (!shouldDeepCloneWitnessTable)
+    {
+        if (getResolvedInstForDecorations(clonedBaseType)
+                ->findDecoration<IRComInterfaceDecoration>())
+        {
+            shouldDeepCloneWitnessTable = true;
         }
     }
 
@@ -728,7 +747,7 @@ IRWitnessTable* cloneWitnessTableImpl(
     {
         if (auto entry = as<IRWitnessTableEntry>(child))
         {
-            if (!isExported)
+            if (!shouldDeepCloneWitnessTable)
             {
                 // Skip witness table entries during the first pass,
                 // and just add them to the deferred work list.
@@ -862,6 +881,9 @@ void cloneGlobalValueWithCodeCommon(
                 }
                 else
                 {
+                    if (oi->getOp() == kIROp_DifferentiableTypeAnnotation &&
+                        !context->getShared()->useAutodiff)
+                        continue;
                     cloneInst(context, builder, oi);
                 }
             }
@@ -1414,6 +1436,7 @@ IRInst* cloneInst(
         break;
     case kIROp_ForwardDerivativeDecoration:
     case kIROp_BackwardDerivativeDecoration:
+    case kIROp_UserDefinedBackwardDerivativeDecoration:
         if (context->getShared()->useAutodiff)
         {
             if (auto key = as<IRStructKey>(originalInst->getOperand(0)))

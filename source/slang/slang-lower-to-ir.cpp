@@ -11812,7 +11812,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         stripOptions.stripSourceLocs = false;
         stripFrontEndOnlyInstructions(module, stripOptions);
 
-        // stripImportedWitnessTable(module);
+        stripImportedWitnessTable(module);
 
         // Stripping out decorations could leave some dead code behind
         // in the module, and in some cases that extra code is also

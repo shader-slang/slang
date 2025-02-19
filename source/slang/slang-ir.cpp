@@ -8237,7 +8237,6 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_Block:
     case kIROp_Each:
     case kIROp_TypeEqualityWitness:
-    case kIROp_DifferentiableTypeAnnotation:
         return false;
 
         /// Liveness markers have no side effects
