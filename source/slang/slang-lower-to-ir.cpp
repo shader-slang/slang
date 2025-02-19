@@ -8168,7 +8168,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // If the witness table is for a COM interface, always keep it alive.
         if (irWitnessTableBaseType->findDecoration<IRComInterfaceDecoration>())
         {
-            subBuilder->addPublicDecoration(irWitnessTable);
+            subBuilder->addHLSLExportDecoration(irWitnessTable);
         }
 
         for (auto mod : parentDecl->modifiers)
@@ -11812,7 +11812,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         stripOptions.stripSourceLocs = false;
         stripFrontEndOnlyInstructions(module, stripOptions);
 
-        stripImportedWitnessTable(module);
+        // stripImportedWitnessTable(module);
 
         // Stripping out decorations could leave some dead code behind
         // in the module, and in some cases that extra code is also
@@ -11896,7 +11896,7 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
         context->irBuilder = builder;
 
         componentType->acceptVisitor(this, nullptr);
-
+        module->buildMangledNameToGlobalInstMap();
         return module;
     }
 
@@ -12052,6 +12052,7 @@ struct TypeConformanceIRGenContext
         {
             builder->addSequentialIDDecoration(witness, conformanceIdOverride);
         }
+        module->buildMangledNameToGlobalInstMap();
         return module;
     }
 };

@@ -244,6 +244,16 @@ void cloneDecorationsAndChildren(
     clonedValue->sourceLoc = originalValue->sourceLoc;
 }
 
+UnownedStringSlice getMangledName(IRInst* inst)
+{
+    for (auto decor : inst->getDecorations())
+    {
+        if (auto linkageDecor = as<IRLinkageDecoration>(decor))
+            return linkageDecor->getMangledName();
+    }
+    return UnownedStringSlice();
+}
+
 // We use an `IRSpecContext` for the case where we are cloning
 // code from one or more input modules to create a "linked" output
 // module. Along the way, we will resolve profile-specific functions
@@ -347,6 +357,15 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
             cloneDecorationsAndChildren(this, clonedValue, originalValue);
             addHoistableInst(builder, clonedValue);
 
+            switch (originalValue->getOp())
+            {
+            case kIROp_LookupWitness:
+                // If `originalVal` represents a witness table entry key, add the key
+                // to witnessTableEntryWorkList.
+                deferredWitnessTableEntryKeys.add(
+                    getMangledName(as<IRLookupWitnessMethod>(originalValue)->getRequirementKey()));
+                break;
+            }
             return clonedValue;
         }
         break;
@@ -634,16 +653,6 @@ IRGeneric* cloneGenericImpl(
     return clonedVal;
 }
 
-UnownedStringSlice getMangledName(IRInst* inst)
-{
-    for (auto decor : inst->getDecorations())
-    {
-        if (auto linkageDecor = as<IRLinkageDecoration>(decor))
-            return linkageDecor->getMangledName();
-    }
-    return UnownedStringSlice();
-}
-
 IRStructKey* cloneStructKeyImpl(
     IRSpecContextBase* context,
     IRBuilder* builder,
@@ -696,27 +705,40 @@ IRWitnessTable* cloneWitnessTableImpl(
     {
         cloneInst(context, entryBuilder, decoration);
     }
+    cloneExtraDecorations(context, clonedTable, originalValues);
 
     RefPtr<WitnessTableCloenInfo> witnessInfo = new WitnessTableCloenInfo();
     witnessInfo->clonedTable = clonedTable;
     witnessInfo->originalTable = originalTable;
+
+    bool isExported = false;
+    for (auto decor : clonedTable->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_HLSLExportDecoration:
+        case kIROp_KeepAliveDecoration:
+            isExported = true;
+            break;
+        }
+    }
 
     // Clone only the witness table entries that are actually used
     for (auto child : originalTable->getDecorationsAndChildren())
     {
         if (auto entry = as<IRWitnessTableEntry>(child))
         {
-            // Skip witness table entries during the first pass,
-            // and just add them to the deferred work list.
-            witnessInfo->deferredEntries.add(getMangledName(entry->getRequirementKey()), entry);
+            if (!isExported)
+            {
+                // Skip witness table entries during the first pass,
+                // and just add them to the deferred work list.
+                witnessInfo->deferredEntries.add(getMangledName(entry->getRequirementKey()), entry);
+                continue;
+            }
         }
-        else
-        {
-            // Clone any non-entry children as is
-            cloneInst(context, entryBuilder, child);
-        }
+        // Clone any non-entry children as is
+        cloneInst(context, entryBuilder, child);
     }
-    cloneExtraDecorations(context, clonedTable, originalValues);
     context->witnessTables.add(witnessInfo);
 
     return clonedTable;
@@ -1067,7 +1089,7 @@ IRFunc* specializeIRForEntryPoint(
     if (!clonedFunc)
     {
         SLANG_UNEXPECTED("expected entry point to be a function");
-        return nullptr;
+        UNREACHABLE_RETURN(nullptr);
     }
 
     if (!clonedFunc->findDecorationImpl(kIROp_KeepAliveDecoration))
@@ -1970,8 +1992,12 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         {
             if (UnownedStringSlice(module->getName()) == "glsl")
                 builtinModules.add(module->getIRModule());
-            else
-                irModules.add(module->getIRModule());
+        });
+    program->enumerateIRModules(
+        [&](IRModule* module)
+        {
+            if (!builtinModules.contains(module))
+                irModules.add(module);
         });
 
     // We will also consider the IR global symbols from the IR module
@@ -2080,8 +2106,6 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         }
     }
 
-    cloneUsedWitnessTableEntries(context);
-
     bool shouldCopyGlobalParams =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::PreserveParameters);
 
@@ -2104,6 +2128,8 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
             }
         }
     }
+
+    cloneUsedWitnessTableEntries(context);
 
     // It is possible that metadata has been attached to the input modules
     // themselves, which should be copied over to the output module.
