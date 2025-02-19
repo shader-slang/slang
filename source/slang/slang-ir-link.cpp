@@ -703,9 +703,12 @@ bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* tab
         case kIROp_ComInterfaceDecoration:
             return true;
         case kIROp_KnownBuiltinDecoration:
-            if (as<IRKnownBuiltinDecoration>(decor)->getName() == toSlice("IDifferentiable"))
-                return context->getShared()->useAutodiff;
-            break;
+            {
+                auto name = as<IRKnownBuiltinDecoration>(decor)->getName();
+                if (name == toSlice("IDifferentiable") || name == toSlice("IDifferentiablePtr"))
+                    return context->getShared()->useAutodiff;
+                break;
+            }
         default:
             break;
         }
@@ -1927,6 +1930,9 @@ bool doesModuleUseAutodiff(IRInst* inst)
     case kIROp_DifferentialPairGetDifferentialUserCode:
     case kIROp_DifferentialPairGetPrimalUserCode:
     case kIROp_DifferentialPairUserCodeType:
+    case kIROp_DifferentialPtrPairType:
+    case kIROp_DifferentialPtrPairGetPrimal:
+    case kIROp_DifferentialPtrPairGetDifferential:
         return true;
     default:
         for (auto child : inst->getChildren())

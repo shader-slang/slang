@@ -646,6 +646,7 @@ interface IDifferentiable
 /// @remarks Support for this interface is still experimental and subject to change.
 ///
 __magic_type(DifferentiablePtrType)
+[KnownBuiltin("IDifferentiablePtr")]
 interface IDifferentiablePtrType
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::DifferentialPtrType) )
