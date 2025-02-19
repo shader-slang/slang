@@ -685,7 +685,8 @@ SlangResult RenderTestApp::initialize(
                 shaderTableDesc.rayGenShaderEntryPointNames = raygenNames;
                 shaderTableDesc.missShaderCount = 1;
                 shaderTableDesc.missShaderEntryPointNames = missNames;
-                SLANG_RETURN_ON_FAIL(device->createShaderTable(shaderTableDesc, m_shaderTable.writeRef()));
+                SLANG_RETURN_ON_FAIL(
+                    device->createShaderTable(shaderTableDesc, m_shaderTable.writeRef()));
             }
             break;
         }
@@ -1011,8 +1012,9 @@ Result RenderTestApp::update()
         state.pipeline = static_cast<IRayTracingPipeline*>(m_pipeline.get());
         state.rootObject = rootObject;
         state.shaderTable = m_shaderTable;
-        passEncoder->setRayTracingState( state );
-        passEncoder->dispatchRays(0,
+        passEncoder->setRayTracingState(state);
+        passEncoder->dispatchRays(
+            0,
             m_options.computeDispatchSize[0],
             m_options.computeDispatchSize[1],
             m_options.computeDispatchSize[2]);
