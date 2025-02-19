@@ -2348,13 +2348,12 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // a constant with a circular definition.
         //
         varDecl->setCheckState(DeclCheckState::DefinitionChecked);
-        auto intVal = _validateCircularVarDefinition(varDecl);
 
         // Update constant value
         //
         if (!varDecl->val)
         {
-            varDecl->val = intVal;
+            varDecl->val = _validateCircularVarDefinition(varDecl);
         }
     }
     else

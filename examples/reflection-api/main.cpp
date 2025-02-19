@@ -115,15 +115,14 @@ struct ReflectingPrinting
         List<ComPtr<slang::IComponentType>> componentsToLink;
 
         // ### Variable decls
-        // 
+        //
         key("global constants");
         WITH_ARRAY()
-        for (auto decl: module->getModuleReflection()->getChildren()) {
-            if (auto varDecl = decl->asVariable();
-                varDecl 
-                && varDecl->findModifier(slang::Modifier::Const)
-                && varDecl->findModifier(slang::Modifier::Static)
-                )
+        for (auto decl : module->getModuleReflection()->getChildren())
+        {
+            if (auto varDecl = decl->asVariable(); varDecl &&
+                                                   varDecl->findModifier(slang::Modifier::Const) &&
+                                                   varDecl->findModifier(slang::Modifier::Static))
             {
                 element();
                 printVariable(varDecl);
