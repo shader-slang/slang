@@ -1465,16 +1465,6 @@ struct UseGraph
         builder->replaceOperand(relevantUse, lastInstInChain);
     }
 
-    bool isTrivial(const List<UseChain>& chains)
-    {
-        // We're trivial if there's only one chain, and it has only one use.
-        if (chains.getCount() != 1)
-            return false;
-
-        auto& chain = chains.getFirst().chain;
-        return chain.getCount() == 1;
-    }
-
     List<IRUse*> getUniqueUses() const
     {
         List<IRUse*> result;
