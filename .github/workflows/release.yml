@@ -44,7 +44,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
-          fetch-depth: "0"
+          fetch-depth: "1" # Fetch only the latest commit (shallow clone)
       - name: Setup
         uses: ./.github/actions/common-setup
         with:
