@@ -336,6 +336,10 @@ static bool _isSubCommand(const char* arg)
             }
             optionsOut->testDir = *argCursor++;
         }
+        else if (strcmp(arg, "-show-adapter-info") == 0)
+        {
+            optionsOut->showAdapterInfo = true;
+        }
         else
         {
             stdError.print("unknown option '%s'\n", arg);

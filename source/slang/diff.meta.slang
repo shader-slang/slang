@@ -1,4 +1,3 @@
-
 /// `[ForwardDerivative(fwdFn)]` attribute can be used to provide a forward-mode
 /// derivative implementation.
 /// Invoking `fwd_diff(decoratedFn)` will place a call to `fwdFn` instead of synthesizing
@@ -79,7 +78,6 @@ attribute_syntax [ForwardDerivative(function)] : ForwardDerivativeAttribute;
 ///
 /// For member functions, or functions nested inside namespaces, `bwdFn` may need to be a fully qualified 
 /// name.
-///
 ///
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [BackwardDerivative(function)] : BackwardDerivativeAttribute;
@@ -2150,7 +2148,7 @@ DifferentialPair<T> __d_clamp(DifferentialPair<T> dpx, DifferentialPair<T> dpMin
 {
     return DifferentialPair<T>(
         clamp(dpx.p, dpMin.p, dpMax.p),
-        dpx.p < dpMin.p ? dpMin.d : (dpx.p > dpMax.p ? dpMax.d : dpx.d));
+        (dpx.p >= dpMin.p && dpx.p <= dpMax.p) ? dpx.d : (dpx.p < dpMin.p ? dpMin.d : dpMax.d));
 }
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
@@ -2158,9 +2156,11 @@ __generic<T : __BuiltinFloatingPointType>
 [BackwardDerivativeOf(clamp)]
 void __d_clamp(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpMin, inout DifferentialPair<T> dpMax, T.Differential dOut)
 {
-    dpx = diffPair(dpx.p, dpx.p > dpMin.p && dpx.p < dpMax.p ? dOut : T.dzero());
-    dpMin = diffPair(dpMin.p, dpx.p <= dpMin.p ? dOut : T.dzero());
-    dpMax = diffPair(dpMax.p, dpx.p >= dpMax.p ? dOut : T.dzero());
+    // Propagate the derivative to x if x is within [min, max] (including the boundaries).
+    dpx = diffPair(dpx.p, (dpx.p >= dpMin.p && dpx.p <= dpMax.p) ? dOut : T.dzero());
+    // If x is strictly below min or above max, the gradient is instead applied to the clamp bounds
+    dpMin = diffPair(dpMin.p, dpx.p < dpMin.p ? dOut : T.dzero());
+    dpMax = diffPair(dpMax.p, dpx.p > dpMax.p ? dOut : T.dzero());
 }
 VECTOR_MATRIX_TERNARY_DIFF_IMPL(clamp)
 

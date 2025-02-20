@@ -310,7 +310,15 @@ standard output = {
                     }
                 }
             ],
-            "threadGroupSize": [1, 1, 1]
+            "threadGroupSize": [1, 1, 1],
+            "userAttribs": [{
+                "name": "MyStruct",
+                "arguments": [
+                    2,
+                    3.000000
+                ]
+            }
+            ]
         }
     ]
 }
