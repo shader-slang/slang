@@ -1910,8 +1910,22 @@ void GLSLReplaceAtomicUint(IRSpecContext* context, TargetProgram* targetProgram,
     convertAtomicToStorageBuffer(context, bindingToInstMapUnsorted);
 }
 
+bool isDiffPairType(IRInst* type)
+{
+    for (;;)
+    {
+        auto type1 = (IRType*)unwrapAttributedType(type);
+        auto type2 = unwrapArray(type1);
+        if (type2 == type)
+            break;
+        type = type2;
+    }
+    return as<IRDifferentialPairTypeBase>(type) != nullptr;
+}
+
 bool doesModuleUseAutodiff(IRInst* inst)
 {
+    return false;
     switch (inst->getOp())
     {
     case kIROp_Call:
@@ -1929,11 +1943,13 @@ bool doesModuleUseAutodiff(IRInst* inst)
         return false;
     case kIROp_DifferentialPairGetDifferentialUserCode:
     case kIROp_DifferentialPairGetPrimalUserCode:
-    case kIROp_DifferentialPairUserCodeType:
-    case kIROp_DifferentialPtrPairType:
     case kIROp_DifferentialPtrPairGetPrimal:
     case kIROp_DifferentialPtrPairGetDifferential:
         return true;
+    case kIROp_StructField:
+        return isDiffPairType(as<IRStructField>(inst)->getFieldType());
+    case kIROp_Param:
+        return isDiffPairType(inst->getDataType());
     default:
         for (auto child : inst->getChildren())
         {
@@ -2054,13 +2070,13 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     irModules.addRange(builtinModules);
     ArrayView<IRModule*> userModules = irModules.getArrayView(0, userModuleCount);
 
+    // Check if any user module uses auto-diff, if so we will need to link
+    // additional witnesses and decorations.
     for (IRModule* irModule : userModules)
     {
-        // Check if the user module uses auto-diff.
-        if (!sharedContext->useAutodiff)
-        {
-            sharedContext->useAutodiff = doesModuleUseAutodiff(irModule->getModuleInst());
-        }
+        if (sharedContext->useAutodiff)
+            break;
+        sharedContext->useAutodiff = doesModuleUseAutodiff(irModule->getModuleInst());
     }
 
     auto context = state->getContext();
