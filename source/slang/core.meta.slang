@@ -1,4 +1,4 @@
-//public module core;
+public module core;
 
 // Slang `core` library
 
@@ -2425,7 +2425,7 @@ for( int C = 1; C <= 4; ++C )
 
 //@hidden:
 __intrinsic_op($(kIROp_BuiltinCast))
-T __cast<T, U>(U u);
+internal T __builtin_cast<T, U>(U u);
 
 // If T is implicitly convertible to U, then vector<T,N> is implicitly convertible to vector<U,N>.
 __generic<ToType, let N : int> extension vector<ToType,N>
@@ -2440,7 +2440,7 @@ __generic<ToType, let N : int> extension vector<ToType,N>
     [TreatAsDifferentiable]
     __init<FromType>(FromType value) where ToType(FromType) implicit
     {
-        this = __cast<vector<ToType,N>>(vector<FromType,N>(value));
+        this = __builtin_cast<vector<ToType,N>>(vector<FromType,N>(value));
     }
 }
 
