@@ -15,43 +15,39 @@
 
 #version 430
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName2
 {
     uint data[];
 } outputBuffer;
 
-layout(local_size_x = 4) in;
+layout(local_size_x = 32) in;
 
 void computeMain()
 {
-    uint index = gl_GlobalInvocationID.x;
+    if (gl_GlobalInvocationID.x == 3) {
+        outputBuffer.data[0] = true
+            && gl_SubgroupInvocationID == 3
 
-    outputBuffer.data[index] = true
-        // Warp/wave size is not Metal devices is not (consistently) 32.
+            // Warp/wave size is not Metal devices is not (consistently) 32.
 #if defined(TARGET_METAL)
-        && (gl_SubgroupSize > 0U)
+            && (gl_SubgroupSize > 0U)
 #else
-        && gl_SubgroupSize == 32
+            && gl_SubgroupSize == 32
 #endif
-        //
-        // These conditions are only true at the 4th subgroup invocation(id 3).
-        // We still write results to the buffer at every invocation however because
-        // the metal compiler does not(?) handle memory divergence well.
-        //
-        && (gl_SubgroupInvocationID == 3U)
-        // These intrinsics are only available on Vulkan(SPIRV and GLSL).
-#if defined(TARGET_VK)
-        && gl_SubgroupID  == 0 //1 subgroup, 0 based indexing
-        && gl_NumSubgroups == 1
-        && gl_SubgroupEqMask == uvec4(0b1000,0,0,0)
-        && gl_SubgroupGeMask == uvec4(0xFFFFFFF8,0,0,0)
-        && gl_SubgroupGtMask == uvec4(0xFFFFFFF0,0,0,0)
-        && gl_SubgroupLeMask == uvec4(0b1111,0,0,0)
-        && gl_SubgroupLtMask == uvec4(0b111,0,0,0)
-#endif
-    ;
 
+            // These intrinsics are only available on Vulkan(SPIRV and GLSL).
+#if defined(TARGET_VK)
+            && gl_SubgroupID  == 0 //1 subgroup, 0 based indexing
+            && gl_NumSubgroups == 1
+            && gl_SubgroupEqMask == uvec4(0b1000,0,0,0)
+            && gl_SubgroupGeMask == uvec4(0xFFFFFFF8,0,0,0)
+            && gl_SubgroupGtMask == uvec4(0xFFFFFFF0,0,0,0)
+            && gl_SubgroupLeMask == uvec4(0b1111,0,0,0)
+            && gl_SubgroupLtMask == uvec4(0b111,0,0,0)
+#endif
+            ;
+    }
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint
     // CHECK_HLSL: void computeMain(
