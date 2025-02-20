@@ -10,8 +10,8 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -xslang -DTARGET_VK
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly -xslang -DTARGET_VK
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DTARGET_METAL
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DTARGET_METAL
 
 #version 430
 
@@ -27,13 +27,14 @@ void computeMain()
 {
     if (gl_GlobalInvocationID.x == 3) {
         outputBuffer.data[0] = true
-            && gl_SubgroupInvocationID == 3
 
             // Warp/wave size is not Metal devices is not (consistently) 32.
 #if defined(TARGET_METAL)
             && (gl_SubgroupSize > 0U)
+            && (gl_subgroupInvocationID > 0U)
 #else
             && gl_SubgroupSize == 32
+            && gl_SubgroupInvocationID == 3
 #endif
 
             // These intrinsics are only available on Vulkan(SPIRV and GLSL).
