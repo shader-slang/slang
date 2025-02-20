@@ -4066,7 +4066,18 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
     auto t = type;
     if (op.op1 != kIROp_Nop)
     {
-        t = getUInt64Type();
+        if (toStyle == TypeCastStyle::Bool)
+            t = getIntType();
+        else
+            t = getUInt64Type();
+        if (auto vecType = as<IRVectorType>(type))
+            t = getVectorType(t, vecType->getElementCount());
+        else if (auto matType = as<IRMatrixType>(type))
+            t = getMatrixType(
+                t,
+                matType->getRowCount(),
+                matType->getColumnCount(),
+                matType->getLayout());
     }
     auto result = emitIntrinsicInst(t, op.op0, 1, &value);
     if (op.op1 != kIROp_Nop)

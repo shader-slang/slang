@@ -2436,6 +2436,7 @@ __generic<ToType, let N : int> extension vector<ToType,N>
 
     __implicit_conversion(constraint+)
     [__unsafeForceInlineEarly]
+    [__readNone]
     __init<FromType>(FromType value) where ToType(FromType) implicit
     {
         this = __cast<vector<ToType,N>>(vector<FromType,N>(value));
