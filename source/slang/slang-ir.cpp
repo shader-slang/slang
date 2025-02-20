@@ -5259,6 +5259,11 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
         SLANG_ASSERT(as<IRIntLit>(index));
         type = (IRType*)tupleType->getOperand(getIntVal(index));
     }
+    else if (auto hlslInputPatchType = as<IRHLSLInputPatchType>(valueType))
+    {
+        type = hlslInputPatchType->getElementType();
+    }
+
     SLANG_RELEASE_ASSERT(type);
     auto inst = createInst<IRGetElementPtr>(
         this,
