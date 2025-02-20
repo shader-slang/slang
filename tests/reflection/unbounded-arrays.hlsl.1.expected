@@ -23,7 +23,15 @@ standard output = {
                 "elementCount": 0,
                 "elementType": {
                     "kind": "resource",
-                    "baseShape": "texture2D"
+                    "baseShape": "texture2D",
+                    "resultType": {
+                        "kind": "vector",
+                        "elementCount": 4,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "float32"
+                        }
+                    }
                 }
             }
         },
@@ -32,7 +40,15 @@ standard output = {
             "binding": {"kind": "shaderResource", "index": 0},
             "type": {
                 "kind": "resource",
-                "baseShape": "texture2D"
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         },
         {
@@ -40,7 +56,15 @@ standard output = {
             "binding": {"kind": "shaderResource", "index": 1},
             "type": {
                 "kind": "resource",
-                "baseShape": "texture2D"
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         },
         {
@@ -60,7 +84,15 @@ standard output = {
             "binding": {"kind": "shaderResource", "space": 1, "index": 0},
             "type": {
                 "kind": "resource",
-                "baseShape": "texture2D"
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         },
         {
@@ -77,7 +109,15 @@ standard output = {
                             "name": "t",
                             "type": {
                                 "kind": "resource",
-                                "baseShape": "texture3D"
+                                "baseShape": "texture3D",
+                                "resultType": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                }
                             },
                             "binding": {"kind": "shaderResource", "index": 0}
                         },
