@@ -147,6 +147,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl);
 
+    void visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl);
+
     void validateGenericConstraintSubType(GenericTypeConstraintDecl* decl, TypeExp type);
 
     void visitGenericDecl(GenericDecl* genericDecl);
@@ -2909,6 +2911,16 @@ void SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
             validateGenericConstraintSubType(decl, type);
         }
     }
+}
+
+void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl)
+{
+    CheckConstraintSubType(decl->toType);
+
+    if (!decl->fromType.type)
+        decl->fromType = TranslateTypeNodeForced(decl->fromType);
+    if (!decl->toType.type)
+        decl->toType = TranslateTypeNodeForced(decl->toType);
 }
 
 void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
