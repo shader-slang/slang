@@ -1925,7 +1925,6 @@ bool isDiffPairType(IRInst* type)
 
 bool doesModuleUseAutodiff(IRInst* inst)
 {
-    return false;
     switch (inst->getOp())
     {
     case kIROp_Call:
