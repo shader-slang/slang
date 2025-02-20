@@ -1,7 +1,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 typedef DifferentialPair<float> dpfloat;
@@ -177,5 +177,47 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         outputBuffer[27] = dpmax.d.x; // Expected: 0.0
         outputBuffer[28] = dpmax.d.y; // Expected: 0.0
         outputBuffer[29] = dpmax.d.z; // Expected: 0.3
+    }
+
+    // New tests: Forward-mode tests for derivative propagation at the edges with clamp(x, 0, 1)
+    {
+        // Lower edge: x exactly = 0
+        dpfloat dpx = dpfloat(0.0, 0.4);
+        dpfloat dpmin = dpfloat(0.0, 0.8);
+        dpfloat dpmax = dpfloat(1.0, 0.5);
+        dpfloat res = fwd_diff(_clamp)(dpx, dpmin, dpmax);
+        outputBuffer[30] = res.d; // Expected: 0.4 (propagated from x)
+    }
+
+    {
+        // Upper edge: x exactly = 1
+        dpfloat dpx = dpfloat(1.0, 0.7);
+        dpfloat dpmin = dpfloat(0.0, 0.8);
+        dpfloat dpmax = dpfloat(1.0, 0.9);
+        dpfloat res = fwd_diff(_clamp)(dpx, dpmin, dpmax);
+        outputBuffer[31] = res.d; // Expected: 0.7 (propagated from x)
+    }
+
+    // Reverse-mode tests for derivative propagation at the edges with clamp(x, 0, 1)
+    {
+        // Lower edge: x exactly = 0
+        dpfloat dpx = dpfloat(0.0, 0.0);
+        dpfloat dpmin = dpfloat(0.0, 0.0);
+        dpfloat dpmax = dpfloat(1.0, 0.0);
+        bwd_diff(_clamp)(dpx, dpmin, dpmax, 1.0);
+        outputBuffer[32] = dpx.d;   // Expected: 1.0 (propagated from x)
+        outputBuffer[33] = dpmin.d; // Expected: 0.0
+        outputBuffer[34] = dpmax.d; // Expected: 0.0
+    }
+
+    {
+        // Upper edge: x exactly = 1
+        dpfloat dpx = dpfloat(1.0, 0.0);
+        dpfloat dpmin = dpfloat(0.0, 0.0);
+        dpfloat dpmax = dpfloat(1.0, 0.0);
+        bwd_diff(_clamp)(dpx, dpmin, dpmax, 1.0);
+        outputBuffer[35] = dpx.d;   // Expected: 1.0 (propagated from x)
+        outputBuffer[36] = dpmin.d; // Expected: 0.0
+        outputBuffer[37] = dpmax.d; // Expected: 0.0
     }
 }
