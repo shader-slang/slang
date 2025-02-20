@@ -31,7 +31,7 @@ struct HscOut
     float InsideTessFactor[1] : SV_InsideTessFactor; // Should be legalized to float[2]
 };
 
-[domain("quad")]
+[domain("tri")]
 [partitioning("integer")]
 [outputtopology("triangle_ccw")]
 [outputcontrolpoints(4)]
