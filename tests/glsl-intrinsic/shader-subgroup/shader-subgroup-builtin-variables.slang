@@ -31,7 +31,7 @@ void computeMain()
             // Warp/wave size is not Metal devices is not (consistently) 32.
 #if defined(TARGET_METAL)
             && (gl_SubgroupSize > 0U)
-            && (gl_subgroupInvocationID > 0U)
+            && (gl_SubgroupInvocationID > 0U)
 #else
             && gl_SubgroupSize == 32
             && gl_SubgroupInvocationID == 3

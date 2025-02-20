@@ -153,7 +153,8 @@ struct GlobalVarTranslationContext
             builder.addLayoutDecoration(inputParam, paramLayout);
 
             // Initialize all global variables.
-            for (Index i = 0; i < inputVars.getCount(); i++)
+            // for (Index i = 0; i < inputVars.getCount(); i++)
+            for (Index i = inputVars.getCount() - 1; i >= 0; i--)
             {
                 auto input = inputVars[i];
                 setInsertBeforeOrdinaryInst(&builder, firstBlock->getFirstOrdinaryInst());
