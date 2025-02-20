@@ -1258,7 +1258,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
             }
 
             addTypeToDictionary((IRType*)item->getBaseType(), item->getWitness());
-
+#if 0
             // TODO: Is this really needed?
             if (!as<IRInterfaceType>(item->getBaseType()) &&
                 !as<IRAssociatedType>(item->getBaseType()))
@@ -1311,6 +1311,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
                     addTypeToDictionary((IRType*)diffType, diffWitness);
                 }
             }
+#endif
         }
     }
 }

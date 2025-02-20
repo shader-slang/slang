@@ -8186,13 +8186,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Make sure that all the entries in the witness table have been filled in,
         // including any cases where there are sub-witness-tables for conformances
-        Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
-        lowerWitnessTable(
-            subContext,
-            inheritanceDecl->witnessTable,
-            irWitnessTable,
-            mapASTToIRWitnessTable);
-
+        bool isExplicitExtern = false;
+        if (!isImportedDecl(context, parentDecl, isExplicitExtern))
+        {
+            Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
+            lowerWitnessTable(
+                subContext,
+                inheritanceDecl->witnessTable,
+                irWitnessTable,
+                mapASTToIRWitnessTable);
+        }
         irWitnessTable->moveToEnd();
 
         return LoweredValInfo::simple(

@@ -67,7 +67,7 @@ struct IRSharedSpecContext
 
 void insertGlobalValueSymbol(IRSharedSpecContext* sharedContext, IRInst* gv);
 
-struct WitnessTableCloenInfo : RefObject
+struct WitnessTableCloneInfo : RefObject
 {
     IRWitnessTable* clonedTable;
     IRWitnessTable* originalTable;
@@ -85,7 +85,7 @@ struct IRSpecContextBase
     List<IRModule*> irModules;
 
     HashSet<UnownedStringSlice> deferredWitnessTableEntryKeys;
-    List<RefPtr<WitnessTableCloenInfo>> witnessTables;
+    List<RefPtr<WitnessTableCloneInfo>> witnessTables;
 
     IRSpecSymbol* findSymbols(UnownedStringSlice mangledName)
     {
@@ -752,7 +752,7 @@ IRWitnessTable* cloneWitnessTableImpl(
     }
     cloneExtraDecorations(context, clonedTable, originalValues);
 
-    RefPtr<WitnessTableCloenInfo> witnessInfo = new WitnessTableCloenInfo();
+    RefPtr<WitnessTableCloneInfo> witnessInfo = new WitnessTableCloneInfo();
     witnessInfo->clonedTable = clonedTable;
     witnessInfo->originalTable = originalTable;
 
@@ -1971,6 +1971,11 @@ bool doesModuleUseAutodiff(IRInst* inst)
             }
             if (isImported)
                 continue;
+            for (auto decor : child->getDecorations())
+            {
+                if (isAutoDiffDecoration(decor))
+                    return true;
+            }
             if (doesModuleUseAutodiff(child))
                 return true;
         }
