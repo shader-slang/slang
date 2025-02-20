@@ -321,6 +321,21 @@ cmake -B build -G Ninja
 cmake --build build -j
 ```
 
+## Static linking against libslang
+
+If linking against a static `libslang.a` you will need to link against some
+dependencies also if you're not already incorporating them into your project.
+
+You will need to link against:
+
+```
+${SLANG_DIR}/build/Release/lib/libslang.a
+${SLANG_DIR}/build/Release/lib/libcompiler-core.a
+${SLANG_DIR}/build/Release/lib/libcore.a
+${SLANG_DIR}/build/external/miniz/libminiz.a
+${SLANG_DIR}/build/external/lz4/build/cmake/liblz4.a
+```
+
 ## Notes
 
 [^1] below 3.25, CMake lacks the ability to mark directories as being
