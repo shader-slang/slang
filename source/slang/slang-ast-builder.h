@@ -640,7 +640,7 @@ public:
         Type* fromType,
         Type* toType,
         DeclRef<Decl> declRef);
-        
+
     /// Helpers to get type info from the SharedASTBuilder
     const ReflectClassInfo* findClassInfo(const UnownedStringSlice& slice)
     {
