@@ -851,6 +851,20 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_BuiltinCast:
+            {
+                IRBuilder builder(module);
+                builder.setInsertBefore(inst);
+                // See if we can replace the default construct inst with concrete values.
+                if (auto newCast =
+                        builder.emitCast(inst->getFullType(), inst->getOperand(0), false))
+                {
+                    inst->replaceUsesWith(newCast);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
         case kIROp_VectorReshape:
             {
                 auto fromType = as<IRVectorType>(inst->getOperand(0)->getDataType());

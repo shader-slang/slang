@@ -3995,7 +3995,7 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
     }
 }
 
-IRInst* IRBuilder::emitCast(IRType* type, IRInst* value)
+IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinCast)
 {
     if (isTypeEqual(type, value->getDataType()))
         return value;
@@ -4009,8 +4009,17 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value)
         SLANG_UNREACHABLE("cast from void type");
     }
 
-    SLANG_RELEASE_ASSERT(toStyle != TypeCastStyle::Unknown);
-    SLANG_RELEASE_ASSERT(fromStyle != TypeCastStyle::Unknown);
+    if (toStyle == TypeCastStyle::Unknown || fromStyle == TypeCastStyle::Unknown)
+    {
+        if (fallbackToBuiltinCast)
+        {
+            return emitIntrinsicInst(type, kIROp_BuiltinCast, 1, &value);
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
 
     struct OpSeq
     {
@@ -8288,6 +8297,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:
     case kIROp_WrapExistential:
+    case kIROp_BuiltinCast:
     case kIROp_BitCast:
     case kIROp_CastFloatToInt:
     case kIROp_CastIntToFloat:

@@ -1675,6 +1675,15 @@ int SemanticsVisitor::CompareOverloadCandidates(OverloadCandidate* left, Overloa
         if (itemDiff)
             return itemDiff;
 
+        // If one candidate is an implicit conversion, and other candidate is not,
+        // then we should prefer the implicit conversion.
+        int leftIsImplicitConversion =
+            left->item.declRef.getDecl()->findModifier<ImplicitConversionModifier>() ? 1 : 0;
+        int rightIsImplicitConversion =
+            right->item.declRef.getDecl()->findModifier<ImplicitConversionModifier>() ? 1 : 0;
+        if (leftIsImplicitConversion != rightIsImplicitConversion)
+            return rightIsImplicitConversion - leftIsImplicitConversion;
+
         auto specificityDiff = compareOverloadCandidateSpecificity(left->item, right->item);
         if (specificityDiff)
             return specificityDiff;
