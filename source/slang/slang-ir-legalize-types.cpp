@@ -2149,6 +2149,13 @@ static LegalVal legalizeInst(
         // This case should only happen when compiling for a target that does not support
         // GpuForeach
         return LegalVal();
+    case kIROp_StructuredBufferLoad:
+        // empty types are removed, so we need to make sure that we're still
+        // loading a none type when we try and load from a to-be-optimized
+        // out structured buffer
+        if (type.flavor == LegalType::Flavor::none)
+            return LegalVal();
+        [[fallthrough]];
     default:
         // TODO: produce a user-visible diagnostic here
         SLANG_UNEXPECTED("non-simple operand(s)!");
