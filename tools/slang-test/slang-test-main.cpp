@@ -4899,6 +4899,12 @@ SlangResult innerMain(int argc, char** argv)
         options.includeCategories.add(fullTestCategory, fullTestCategory);
     }
 
+    // Don't include OptiX tests unless the client has explicit opted into them.
+    if (!options.includeCategories.containsKey(optixTestCategory))
+    {
+        options.excludeCategories.add(optixTestCategory, optixTestCategory);
+    }
+
     // Exclude rendering tests when building under AppVeyor.
     //
     // TODO: this is very ad hoc, and we should do something cleaner.
