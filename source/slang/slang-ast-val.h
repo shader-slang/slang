@@ -621,6 +621,20 @@ class TypeEqualityWitness : public SubtypeWitness
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+class TypeCoercionWitness : public Witness
+{
+    SLANG_AST_CLASS(TypeCoercionWitness)
+
+    Type* getFromType() { return as<Type>(getOperand(0)); }
+    Type* getToType() { return as<Type>(getOperand(1)); }
+
+    DeclRef<Decl> getDeclRef() { return as<DeclRefBase>(getOperand(2)); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
 // A witness that one type is a subtype of another
 // because some in-scope declaration says so
 class DeclaredSubtypeWitness : public SubtypeWitness

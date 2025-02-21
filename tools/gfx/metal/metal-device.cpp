@@ -653,8 +653,8 @@ Result DeviceImpl::createTextureView(
     MTL::PixelFormat pixelFormat = desc.format == Format::Unknown
                                        ? textureImpl->m_pixelFormat
                                        : MetalUtil::translatePixelFormat(desc.format);
-    NS::Range levelRange(sr.baseArrayLayer, sr.layerCount);
-    NS::Range sliceRange(sr.mipLevel, sr.mipLevelCount);
+    NS::Range sliceRange(sr.baseArrayLayer, sr.layerCount);
+    NS::Range levelRange(sr.mipLevel, sr.mipLevelCount);
 
     viewImpl->m_textureView = NS::TransferPtr(textureImpl->m_texture->newTextureView(
         pixelFormat,

@@ -178,6 +178,11 @@ enum : ConversionCost
     // Additional cost when casting an LValue.
     kConversionCost_LValueCast = 800,
 
+    // The cost of this conversion is defined by the type coercion constraint.
+    kConversionCost_TypeCoercionConstraint = 1000,
+    kConversionCost_TypeCoercionConstraintPlusScalarToVector =
+        kConversionCost_TypeCoercionConstraint + kConversionCost_ScalarToVector,
+
     // Conversion is impossible
     kConversionCost_Impossible = 0xFFFFFFFF,
 };

@@ -1045,11 +1045,28 @@ int getTypeBitSize(Type* t)
 }
 
 ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
-    Decl* decl,
+    DeclRef<Decl> decl,
     Type* toType,
     Expr* arg)
 {
-    ConversionCost candidateCost = getImplicitConversionCost(decl);
+    ConversionCost candidateCost = getImplicitConversionCost(decl.getDecl());
+
+    if (candidateCost == kConversionCost_TypeCoercionConstraint ||
+        candidateCost == kConversionCost_TypeCoercionConstraintPlusScalarToVector)
+    {
+        if (auto genApp = as<GenericAppDeclRef>(decl.declRefBase))
+        {
+            for (auto genArg : genApp->getArgs())
+            {
+                if (auto wit = as<TypeCoercionWitness>(genArg))
+                {
+                    candidateCost -= kConversionCost_TypeCoercionConstraint;
+                    candidateCost += getConversionCost(wit->getToType(), wit->getFromType());
+                    break;
+                }
+            }
+        }
+    }
 
     // Fix up the cost if the operand is a const lit.
     if (isScalarIntegerType(toType))
@@ -1577,10 +1594,8 @@ bool SemanticsVisitor::_coerce(
         ImplicitCastMethod method;
         for (auto candidate : overloadContext.bestCandidates)
         {
-            ConversionCost candidateCost = getImplicitConversionCostWithKnownArg(
-                candidate.item.declRef.getDecl(),
-                toType,
-                fromExpr);
+            ConversionCost candidateCost =
+                getImplicitConversionCostWithKnownArg(candidate.item.declRef, toType, fromExpr);
             if (candidateCost < bestCost)
             {
                 method.conversionFuncOverloadCandidate = candidate;
@@ -1632,7 +1647,7 @@ bool SemanticsVisitor::_coerce(
         // cost associated with the initializer we are invoking.
         //
         ConversionCost cost = getImplicitConversionCostWithKnownArg(
-            overloadContext.bestCandidate->item.declRef.getDecl(),
+            overloadContext.bestCandidate->item.declRef,
             toType,
             fromExpr);
 

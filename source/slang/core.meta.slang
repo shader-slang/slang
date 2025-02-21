@@ -1,4 +1,4 @@
-//public module core;
+public module core;
 
 // Slang `core` library
 
@@ -2367,49 +2367,6 @@ __generic<T> __extension vector<T, 4>
 
 ${{{{
 
-// The above extensions are generic in the *type* of the vector,
-// but explicit in the *size*. We will now declare an extension
-// for each builtin type that is generic in the size.
-//
-for (int tt = 0; tt < kBaseTypeCount; ++tt)
-{
-    if(kBaseTypes[tt].tag == BaseType::Void) continue;
-
-    sb << "__generic<let N : int> __extension vector<"
-        << kBaseTypes[tt].name << ",N>\n{\n";
-
-    for (int ff = 0; ff < kBaseTypeCount; ++ff)
-    {
-        if(kBaseTypes[ff].tag == BaseType::Void) continue;
-
-
-        if( tt != ff )
-        {
-            auto cost = getBaseTypeConversionCost(
-                kBaseTypes[tt],
-                kBaseTypes[ff]);
-            auto op = getBaseTypeConversionOp(
-                kBaseTypes[tt],
-                kBaseTypes[ff]);
-
-			// Implicit conversion from a vector of the same
-			// size, but different element type.
-            sb << "    __implicit_conversion(" << cost << ")\n";
-            sb << "    __intrinsic_op(" << int(op) << ")\n";
-            sb << "    __init(vector<" << kBaseTypes[ff].name << ",N> value);\n";
-
-			// Constructor to make a vector from a scalar of another type.
-            if (cost != kConversionCost_Impossible)
-            {
-                cost += kConversionCost_ScalarToVector;
-                sb << "    __implicit_conversion(" << cost << ")\n";
-                sb << "    [__unsafeForceInlineEarly]\n";
-                sb << "    __init(" << kBaseTypes[ff].name << " value) { this = vector<" << kBaseTypes[tt].name << ",N>( " << kBaseTypes[tt].name << "(value)); }\n";
-            }
-        }
-    }
-    sb << "}\n";
-}
 
 for( int R = 1; R <= 4; ++R )
 for( int C = 1; C <= 4; ++C )
@@ -2464,38 +2421,36 @@ for( int C = 1; C <= 4; ++C )
     sb << "}\n";
 }
 
-for (int tt = 0; tt < kBaseTypeCount; ++tt)
-{
-    if(kBaseTypes[tt].tag == BaseType::Void) continue;
-    auto toType = kBaseTypes[tt].name;
 }}}}
 
-__generic<let R : int, let C : int, let L : int> extension matrix<$(toType),R,C,L>
+//@hidden:
+__intrinsic_op($(kIROp_BuiltinCast))
+internal T __builtin_cast<T, U>(U u);
+
+// If T is implicitly convertible to U, then vector<T,N> is implicitly convertible to vector<U,N>.
+__generic<ToType, let N : int> extension vector<ToType,N>
 {
-${{{{
-    for (int ff = 0; ff < kBaseTypeCount; ++ff)
+    __implicit_conversion(constraint)
+    __intrinsic_op(BuiltinCast)
+    __init<FromType>(vector<FromType,N> value) where ToType(FromType) implicit;
+
+    __implicit_conversion(constraint+)
+    [__unsafeForceInlineEarly]
+    [__readNone]
+    [TreatAsDifferentiable]
+    __init<FromType>(FromType value) where ToType(FromType) implicit
     {
-        if(kBaseTypes[ff].tag == BaseType::Void) continue;
-        if( tt == ff ) continue;
-
-        auto cost = getBaseTypeConversionCost(
-            kBaseTypes[tt],
-            kBaseTypes[ff]);
-        auto fromType = kBaseTypes[ff].name;
-        auto op = getBaseTypeConversionOp(
-                kBaseTypes[tt],
-                kBaseTypes[ff]);
-}}}}
-    __implicit_conversion($(cost))
-    __intrinsic_op($(op))
-    __init(matrix<$(fromType),R,C,L> value);
-${{{{
+        this = __builtin_cast<vector<ToType,N>>(vector<FromType,N>(value));
     }
-}}}}
 }
-${{{{
+
+// If T is implicitly convertible to U, then matrix<T,R,C,L> is implicitly convertible to matrix<U,R,C,L>.
+__generic<ToType, let R : int, let C : int, let L : int> extension matrix<ToType,R,C,L>
+{
+    __implicit_conversion(constraint)
+    __intrinsic_op(BuiltinCast)
+    __init<FromType>(matrix<FromType,R,C,L> value) where ToType(FromType) implicit;
 }
-}}}}
 
 //@ hidden:
 __generic<T, U>

@@ -1279,10 +1279,10 @@ class ImplicitConversionModifier : public Modifier
     SLANG_AST_CLASS(ImplicitConversionModifier)
 
     // The conversion cost, used to rank conversions
-    ConversionCost cost;
+    ConversionCost cost = kConversionCost_None;
 
     // A builtin identifier for identifying conversions that need special treatment.
-    BuiltinConversionKind builtinConversionKind;
+    BuiltinConversionKind builtinConversionKind = kBuiltinConversion_Unknown;
 };
 
 class FormatAttribute : public Attribute

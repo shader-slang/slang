@@ -715,13 +715,6 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         // system as being solved now, as a result of the witness we found.
     }
 
-    // Add a flat cost to all unconstrained generic params.
-    for (auto typeParamDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeParamDecl>())
-    {
-        if (!constrainedGenericParams.contains(typeParamDecl))
-            outBaseCost += kConversionCost_UnconstraintGenericParam;
-    }
-
     // Make sure we haven't constructed any spurious constraints
     // that we aren't able to satisfy:
     for (auto c : system->constraints)
@@ -730,6 +723,58 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         {
             return DeclRef<Decl>();
         }
+    }
+
+    // Verify that all type coercion constraints can be satisfied.
+    for (auto constraintDecl :
+         genericDeclRef.getDecl()->getMembersOfType<TypeCoercionConstraintDecl>())
+    {
+        DeclRef<TypeCoercionConstraintDecl> constraintDeclRef =
+            m_astBuilder
+                ->getGenericAppDeclRef(
+                    genericDeclRef,
+                    args.getArrayView().arrayView,
+                    constraintDecl)
+                .as<TypeCoercionConstraintDecl>();
+        auto fromType = constraintDeclRef.substitute(m_astBuilder, constraintDecl->fromType.Ptr());
+        auto toType = constraintDeclRef.substitute(m_astBuilder, constraintDecl->toType.Ptr());
+        auto conversionCost = getConversionCost(toType, fromType);
+        if (constraintDecl->findModifier<ImplicitConversionModifier>())
+        {
+            if (conversionCost > kConversionCost_GeneralConversion)
+            {
+                // The type arguments are not implicitly convertible, return failure.
+                return DeclRef<Decl>();
+            }
+        }
+        else
+        {
+            if (conversionCost == kConversionCost_Impossible)
+            {
+                // The type arguments are not convertible, return failure.
+                return DeclRef<Decl>();
+            }
+        }
+        if (auto fromDecl = isDeclRefTypeOf<Decl>(constraintDecl->fromType))
+        {
+            constrainedGenericParams.add(fromDecl.getDecl());
+        }
+        if (auto toDecl = isDeclRefTypeOf<Decl>(constraintDecl->toType))
+        {
+            constrainedGenericParams.add(toDecl.getDecl());
+        }
+        // If we are to expand the support of type coercion constraint beyond simple builtin core
+        // module functions, then the witness should be a reference to the conversion function. For
+        // now, this isn't required, and it is not easy to get it from the coercion logic, so we
+        // leave it empty.
+        args.add(m_astBuilder->getTypeCoercionWitness(fromType, toType, DeclRef<Decl>()));
+    }
+
+    // Add a flat cost to all unconstrained generic params.
+    for (auto typeParamDecl : genericDeclRef.getDecl()->getMembersOfType<GenericTypeParamDecl>())
+    {
+        if (!constrainedGenericParams.contains(typeParamDecl))
+            outBaseCost += kConversionCost_UnconstraintGenericParam;
     }
 
     return m_astBuilder->getGenericAppDeclRef(genericDeclRef, args.getArrayView().arrayView);

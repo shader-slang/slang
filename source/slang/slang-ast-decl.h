@@ -612,6 +612,15 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
     const TypeExp& _getSupOverride() const { return sup; }
 };
 
+class TypeCoercionConstraintDecl : public Decl
+{
+    SLANG_AST_CLASS(TypeCoercionConstraintDecl)
+
+    SourceLoc whereTokenLoc = SourceLoc();
+    TypeExp fromType;
+    TypeExp toType;
+};
+
 class GenericValueParamDecl : public VarDeclBase
 {
     SLANG_AST_CLASS(GenericValueParamDecl)

@@ -1721,6 +1721,20 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
             constraint->sup = parser->ParseTypeExp();
             AddMember(genericParent, constraint);
         }
+        else if (AdvanceIf(parser, TokenType::LParent))
+        {
+            auto constraint = parser->astBuilder->create<TypeCoercionConstraintDecl>();
+            constraint->whereTokenLoc = whereToken.loc;
+            parser->FillPosition(constraint);
+            constraint->toType = subType;
+            constraint->fromType = parser->ParseTypeExp();
+            parser->ReadToken(TokenType::RParent);
+            if (AdvanceIf(parser, "implicit"))
+            {
+                addModifier(constraint, parser->astBuilder->create<ImplicitConversionModifier>());
+            }
+            AddMember(genericParent, constraint);
+        }
     }
 }
 
@@ -8910,8 +8924,19 @@ static NodeBase* parseImplicitConversionModifier(Parser* parser, void* /*userDat
     ConversionCost cost = kConversionCost_Default;
     if (AdvanceIf(parser, TokenType::LParent))
     {
-        cost =
-            ConversionCost(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+        if (AdvanceIf(parser, "constraint"))
+        {
+            cost = kConversionCost_TypeCoercionConstraint;
+            if (AdvanceIf(parser, TokenType::OpAdd))
+            {
+                cost = kConversionCost_TypeCoercionConstraintPlusScalarToVector;
+            }
+        }
+        else
+        {
+            cost = ConversionCost(
+                stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+        }
         if (AdvanceIf(parser, TokenType::Comma))
         {
             builtinKind = BuiltinConversionKind(

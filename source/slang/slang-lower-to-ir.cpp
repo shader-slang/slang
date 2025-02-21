@@ -1737,6 +1737,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             context->irBuilder->getTypeEqualityWitness(witnessType, subType, supType));
     }
 
+    LoweredValInfo visitTypeCoercionWitness(TypeCoercionWitness*)
+    {
+        // When we fully support type coercion constraints, we should lower the witness into a
+        // function that does the conversion.
+        return LoweredValInfo();
+    }
+
     LoweredValInfo visitTransitiveSubtypeWitness(TransitiveSubtypeWitness* val)
     {
         // The base (subToMid) will turn into a value with

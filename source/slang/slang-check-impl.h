@@ -1511,7 +1511,10 @@ public:
     // perform implicit type conversion.
     ConversionCost getImplicitConversionCost(Decl* decl);
 
-    ConversionCost getImplicitConversionCostWithKnownArg(Decl* decl, Type* toType, Expr* arg);
+    ConversionCost getImplicitConversionCostWithKnownArg(
+        DeclRef<Decl> decl,
+        Type* toType,
+        Expr* arg);
 
 
     BuiltinConversionKind getImplicitConversionBuiltinKind(Decl* decl);
