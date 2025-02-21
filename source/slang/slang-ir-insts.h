@@ -4025,7 +4025,7 @@ public:
     /// the inst.
     IRInst* emitDefaultConstructRaw(IRType* type);
 
-    IRInst* emitCast(IRType* type, IRInst* value);
+    IRInst* emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinCast = true);
 
     IRInst* emitVectorReshape(IRType* type, IRInst* value);
 
