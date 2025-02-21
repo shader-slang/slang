@@ -331,6 +331,81 @@ struct GLSLLegalizationContext
     IRBuilder* getBuilder() { return builder; }
 };
 
+struct RayTracingOutParams
+{
+    List<IRParam*> outParams;
+    List<IRVarLayout*> outParamLayouts;
+};
+
+static RayTracingOutParams collectRayTracingOutParams(
+    GLSLLegalizationContext* context,
+    IRFunc* func)
+{
+    RayTracingOutParams result;
+    
+    // Collect all out and in out parameters
+    for (auto param = func->getFirstParam(); param; param = param->getNextParam())
+    {
+        auto paramType = param->getDataType();
+        if (auto outType = as<IROutType>(paramType))
+        {
+            auto paramLayout = param->findDecoration<IRLayoutDecoration>();
+            if (paramLayout)
+            {
+                result.outParams.add(param);
+                result.outParamLayouts.add(cast<IRVarLayout>(paramLayout->getLayout()));
+            }
+        }
+        else if (auto inOutType = as<IRInOutType>(paramType))
+        {
+            auto paramLayout = param->findDecoration<IRLayoutDecoration>();
+            if (paramLayout)
+            {
+                result.outParams.add(param);
+                result.outParamLayouts.add(cast<IRVarLayout>(paramLayout->getLayout()));
+            }
+        }
+    }
+    
+    return result;
+}
+
+static IRType* createConsolidatedRayPayloadType(
+    GLSLLegalizationContext* context,
+    const RayTracingOutParams& outParams)
+{
+    auto builder = context->getBuilder();
+    
+    // Create a struct type to hold all out parameters
+    auto structType = builder->createStructType();
+    
+    // Add fields for each out parameter
+    for (Index i = 0; i < outParams.outParams.getCount(); ++i)
+    {
+        auto param = outParams.outParams[i];
+        auto paramType = param->getDataType();
+        IRType* valueType = nullptr;
+        
+        if (auto outType = as<IROutType>(paramType))
+            valueType = outType->getValueType();
+        else if (auto inOutType = as<IRInOutType>(paramType))
+            valueType = inOutType->getValueType();
+        
+        auto key = builder->createStructKey();
+        builder->addNameHintDecoration(key, UnownedStringSlice("field"));
+        builder->createStructField(structType, key, valueType);
+    }
+    
+    return structType;
+}
+
+// Forward declare the function
+void legalizeRayTracingEntryPointParameterForGLSL(
+    GLSLLegalizationContext* context,
+    IRFunc* func,
+    IRParam* pp,
+    IRVarLayout* paramLayout);
+
 // This examines the passed type and determines the GLSL mesh shader indices
 // builtin name and type
 GLSLSystemValueInfo* getMeshOutputIndicesSystemValueInfo(
@@ -1363,7 +1438,6 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         {
             // Otherwise we just create and add
             GLSLLegalizationContext::SystemSemanticGlobal semanticGlobalTmp;
-
             // We need to create the global. For now we *don't* know how many indices will be used.
             // So we will
 
@@ -2309,49 +2383,32 @@ void legalizeRayTracingEntryPointParameterForGLSL(
     IRVarLayout* paramLayout)
 {
     auto builder = context->getBuilder();
-    auto paramType = pp->getDataType();
 
-    // The parameter might be either an `in` parameter,
-    // or an `out` or `in out` parameter, and in those
-    // latter cases its IR-level type will include a
-    // wrapping "pointer-like" type (e.g., `Out<Float>`
-    // instead of just `Float`).
-    //
-    // Because global shader parameters are read-only
-    // in the same way function types are, we can take
-    // care of that detail here just by allocating a
-    // global shader parameter with exactly the type
-    // of the original function parameter.
-    //
-    auto globalParam = addGlobalParam(builder->getModule(), paramType);
+    // Create a global variable to hold the parameter
+    auto paramType = pp->getDataType();
+    IRType* valueType = nullptr;
+    if (auto outType = as<IROutType>(paramType))
+        valueType = outType->getValueType();
+    else if (auto inOutType = as<IRInOutType>(paramType))
+        valueType = inOutType->getValueType();
+    else
+        valueType = paramType;
+
+    auto globalParam = addGlobalParam(builder->getModule(), valueType);
     builder->addLayoutDecoration(globalParam, paramLayout);
     moveValueBefore(globalParam, builder->getFunc());
-    pp->replaceUsesWith(globalParam);
 
-    // Because linkage between ray-tracing shaders is
-    // based on the type of incoming/outgoing payload
-    // and attribute parameters, it would be an error to
-    // eliminate the global parameter *even if* it is
-    // not actually used inside the entry point.
-    //
-    // We attach a decoration to the entry point that
-    // makes note of the dependency, so that steps
-    // like dead code elimination cannot get rid of
-    // the parameter.
-    //
-    // TODO: We could consider using a structure like
-    // this for *all* of the entry point parameters
-    // that get moved to the global scope, since SPIR-V
-    // ends up requiring such information on an `OpEntryPoint`.
-    //
-    // As a further alternative, we could decide to
-    // keep entry point varying input/outtput attached
-    // to the parameter list through all of the Slang IR
-    // steps, and only declare it as global variables at
-    // the last minute when emitting a GLSL `main` or
-    // SPIR-V for an entry point.
-    //
+    // Add the ray payload decoration
+    // Note: We use location 0 for now, but this should be assigned properly
+    builder->addVulkanRayPayloadDecoration(globalParam, 0);
+
+    // Because linkage between ray-tracing shaders is based on the type of 
+    // incoming/outgoing payload and attribute parameters, we need to ensure
+    // the parameter isn't eliminated
     builder->addDependsOnDecoration(func, globalParam);
+
+    // Replace the parameter with the global
+    pp->replaceUsesWith(globalParam);
 }
 
 static void legalizeMeshPayloadInputParam(
@@ -3198,8 +3255,54 @@ void legalizeEntryPointParameterForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        legalizeRayTracingEntryPointParameterForGLSL(context, func, pp, paramLayout);
-        return;
+        {
+            // Check if this is an out or inout parameter
+            auto paramType = pp->getDataType();
+            if (as<IROutType>(paramType) || as<IRInOutType>(paramType))
+            {
+                // First, collect all out parameters
+                auto outParams = collectRayTracingOutParams(context, func);
+                
+                // If this is the first out parameter we've seen, create the consolidated type
+                if (outParams.outParams[0] == pp)
+                {
+                    // Create a consolidated struct type for all out parameters
+                    auto consolidatedType = createConsolidatedRayPayloadType(context, outParams);
+                    
+                    // Create a single global variable for all out parameters
+                    auto globalParam = addGlobalParam(builder->getModule(), consolidatedType);
+                    builder->addLayoutDecoration(globalParam, paramLayout);
+                    moveValueBefore(globalParam, builder->getFunc());
+
+                    // Add the ray payload decoration
+                    builder->addVulkanRayPayloadDecoration(globalParam, 0);
+
+                    // Because linkage between ray-tracing shaders is based on the type of 
+                    // incoming/outgoing payload and attribute parameters, we need to ensure
+                    // the parameter isn't eliminated
+                    builder->addDependsOnDecoration(func, globalParam);
+
+                    // For each out parameter, create a field access to the consolidated struct
+                    for (Index i = 0; i < outParams.outParams.getCount(); ++i)
+                    {
+                        auto param = outParams.outParams[i];
+                        auto key = builder->createStructKey();
+                        builder->addNameHintDecoration(key, UnownedStringSlice("field"));
+                        
+                        // Create field access
+                        auto fieldAccess = builder->emitFieldAddress(
+                            builder->getPtrType(param->getDataType()),
+                            globalParam,
+                            key);
+
+                        // Replace the parameter with the field access
+                        param->replaceUsesWith(fieldAccess);
+                    }
+                }
+                return;
+            }
+        }
+        break;
     }
 
     // Is the parameter type a special pointer type
@@ -4180,4 +4283,6 @@ void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
     }
 }
 
+
 } // namespace Slang
+
