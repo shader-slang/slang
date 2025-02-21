@@ -1543,6 +1543,17 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
                     if (declaredArraySize == requiredArraySize)
                         break;
 
+                    auto toSize = getIntVal(requiredArraySize);
+                    auto fromSize = getIntVal(declaredArraySize);
+                    if (toSize < fromSize)
+                    {
+                        context->getSink()->diagnose(
+                            inVarLayout,
+                            Diagnostics::cannotConvertArrayOfSmallerToLargerSize,
+                            fromSize,
+                            toSize);
+                    }
+
                     // Array sizes differ, need type adapter
                     RefPtr<ScalarizedTypeAdapterValImpl> typeAdapter =
                         new ScalarizedTypeAdapterValImpl;
@@ -2007,6 +2018,7 @@ ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType*
                 // Get array sizes once
                 auto fromSize = getIntVal(fromArray->getElementCount());
                 auto toSize = getIntVal(toArray->getElementCount());
+                SLANG_ASSERT(fromSize <= toSize);
 
                 // Extract elements one at a time up to the source array size
                 for (Index i = 0; i < fromSize; i++)
@@ -2018,12 +2030,15 @@ ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType*
                     elements.add(element);
                 }
 
-                // Fill remaining elements with default value up to target size
-                auto elementType = toArray->getElementType();
-                auto defaultValue = builder->emitDefaultConstruct(elementType);
-                for (Index i = fromSize; i < toSize; i++)
+                if (fromSize < toSize)
                 {
-                    elements.add(defaultValue);
+                    // Fill remaining elements with default value up to target size
+                    auto elementType = toArray->getElementType();
+                    auto defaultValue = builder->emitDefaultConstruct(elementType);
+                    for (Index i = fromSize; i < toSize; i++)
+                    {
+                        elements.add(defaultValue);
+                    }
                 }
 
                 val = builder->emitMakeArray(toType, elements.getCount(), elements.getBuffer());

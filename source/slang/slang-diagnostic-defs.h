@@ -605,6 +605,11 @@ DIAGNOSTIC(30019, Error, typeMismatch, "expected an expression of type '$0', got
 DIAGNOSTIC(30021, Error, noApplicationFunction, "$0: no overload takes arguments ($1)")
 DIAGNOSTIC(30022, Error, invalidTypeCast, "invalid type cast between \"$0\" and \"$1\".")
 DIAGNOSTIC(30023, Error, typeHasNoPublicMemberOfName, "\"$0\" does not have public member \"$1\".")
+DIAGNOSTIC(
+    30024,
+    Error,
+    cannotConvertArrayOfSmallerToLargerSize,
+    "Cannot convert array of size $0 to array of size $1 as this would truncate data")
 DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be larger than zero.")
 DIAGNOSTIC(
     30026,
