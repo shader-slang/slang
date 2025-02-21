@@ -1443,7 +1443,10 @@ IntVal* SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
     //
     if (!isScalarIntegerType(varDecl->type))
         return nullptr;
-    return tryConstantFoldDeclRef(DeclRef<VarDeclBase>(varDecl), ConstantFoldingKind::LinkTime, nullptr);
+    return tryConstantFoldDeclRef(
+        DeclRef<VarDeclBase>(varDecl),
+        ConstantFoldingKind::LinkTime,
+        nullptr);
 }
 
 void SemanticsDeclModifiersVisitor::visitStructDecl(StructDecl* structDecl)
