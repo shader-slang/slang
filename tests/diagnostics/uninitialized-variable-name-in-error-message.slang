@@ -6,6 +6,12 @@
 RWStructuredBuffer<float> gInput;
 RWStructuredBuffer<float> outputBuffer;
 
+//CHK-DAG: ([[#@LINE+1]]): warning 41016: use of uninitialized variable 'a'
+float func1() { float a; return a; }
+
+//CHK-DAG: ([[#@LINE+1]]): warning 41016: use of uninitialized variable 'b'
+float func2() { float b; return b; }
+
 int test(int inVal)
 {
     return inVal;
@@ -16,12 +22,16 @@ int test(int inVal)
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int tid = dispatchThreadID.x;
-    int inVal; // = tid; // intentionally uninitialized
+    int inVal1; // intentionally uninitialized
+    int inVal2; // intentionally uninitialized
 
     for (int i = 0; i <2; ++i)
     {
-        // CHK: ([[#@LINE+1]]): warning 41016: use of uninitialized variable 'inVal'
-        int outVal = test(inVal);
+        // CHK-DAG: ([[#@LINE+1]]): warning 41016: use of uninitialized variable 'inVal1'
+        int outVal = test(inVal1);
+
+        // CHK-DAG: ([[#@LINE+1]]): warning 41016: use of uninitialized variable 'inVal2'
+        outVal += test(inVal2);
         outputBuffer[tid] = outVal;
     }
 }
