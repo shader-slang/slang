@@ -136,8 +136,15 @@ void MetalSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     switch (texType->getAccess())
     {
     case SLANG_RESOURCE_ACCESS_READ:
-        m_writer->emit("access::sample");
-        break;
+        {
+            // Metal does not support access::sample for texture buffers, so we need to emit
+            // access::read instead.
+            if (texType->GetBaseShape() == SLANG_TEXTURE_BUFFER)
+                m_writer->emit("access::read");
+            else
+                m_writer->emit("access::sample");
+            break;
+        }
 
     case SLANG_RESOURCE_ACCESS_WRITE:
         m_writer->emit("access::write");
