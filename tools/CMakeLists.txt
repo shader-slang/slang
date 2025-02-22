@@ -169,12 +169,16 @@ if(SLANG_ENABLE_GFX)
                 ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/gfx/gfx.slang
                 ${modules_dest_dir}/gfx.slang
             COMMAND
-                ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/gfx/slang.slang
+                ${CMAKE_COMMAND} -E copy
+                ${CMAKE_CURRENT_LIST_DIR}/gfx/slang.slang
                 ${modules_dest_dir}/slang.slang
             WORKING_DIRECTORY ${slang_SOURCE_DIR}
             VERBATIM
         )
-        set_target_properties(copy-gfx-slang-modules PROPERTIES FOLDER generators)
+        set_target_properties(
+            copy-gfx-slang-modules
+            PROPERTIES FOLDER generators
+        )
         install(
             FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
             DESTINATION ${runtime_subdir}
