@@ -301,10 +301,28 @@ struct OverloadCandidate
     SubstitutionSet subst;
 };
 
+struct ResolvedOperatorOverload
+{
+    // The resolved decl.
+    Decl* decl;
+
+    // The cached overload candidate in the current TypeCheckingCache.
+    // Note that a `OverloadCandidate` object is not migratable over different
+    // Linkages (compile sessions), so we will need to use `cacheVersion` to track
+    // if this `candidate` is valid for the current session. If not, we will
+    // recreate it from `decl`.
+    OverloadCandidate candidate;
+    // The version of the TypeCheckingCache for which the cached candidate is valid.
+    int cacheVersion;
+};
+
 struct TypeCheckingCache : public RefObject
 {
-    Dictionary<OperatorOverloadCacheKey, OverloadCandidate> resolvedOperatorOverloadCache;
+    Dictionary<OperatorOverloadCacheKey, ResolvedOperatorOverload> resolvedOperatorOverloadCache;
     Dictionary<BasicTypeKeyPair, ConversionCost> conversionCostCache;
+
+    // The version used to invalidate the cached declRefs in ResolvedOperatorOverload entries.
+    int version = 0;
 };
 
 enum class CoercionSite
