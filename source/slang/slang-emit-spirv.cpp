@@ -1542,7 +1542,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 else if (storageClass == SpvStorageClassNodePayloadAMDX)
                 {
                     auto spvValueType = ensureInst(valueType);
-                    auto spvNodePayloadType = emitOpTypeNodePayloadArray(inst, spvValueType);
+                    auto spvNodePayloadType = emitOpTypeNodePayloadArray(nullptr, spvValueType);
                     valueTypeId = getID(spvNodePayloadType);
                 }
                 else

@@ -20,6 +20,9 @@ void main(uint3 dispatchThreadId : SV_GroupThreadID)
     int myData = recordData.myData;
 }
 
+//CHK: OpCapability ShaderEnqueueAMDX
+//CHK: OpExtension "SPV_AMDX_shader_enqueue"
+
 //CHK: ; Types, variables and constants
 //CHK: [[MemberType:%[a-zA-Z_0-9]+]] = OpTypeInt 32 1
 //CHK: [[StructType:%[a-zA-Z_0-9]+]] = OpTypeStruct [[MemberType]]

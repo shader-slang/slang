@@ -24407,9 +24407,7 @@ struct DispatchNodeInputRecord
         case spirv:
             return spirv_asm
             {
-                %in_payload_t = OpTypeNodePayloadArrayAMDX $$T;
-                %in_payload_ptr_t = OpTypePointer NodePayloadAMDX %in_payload_t;
-                %var = OpVariable %in_payload_ptr_t NodePayloadAMDX;
+                %var = OpVariable $$NodePayloadPtr<T> NodePayloadAMDX;
                 result : $$NodePayloadPtr<T> = OpAccessChain %var $index;
             };
         }
