@@ -158,13 +158,15 @@ jobs:
             "$bin_dir/slang-test" \
               -server-count 8 \
               -category ${{ matrix.test-category }} \
-              -api all-cpu \
-              -expected-failure-list tests/expected-failure-github.txt
+              -api all-cpu \              
+              -expected-failure-list tests/expected-failure-github.txt \
+              gfx-unit-test-tool/precompiledTargetModule2Vulkan
           elif [[ "${{matrix.has-gpu}}" == "true" ]]; then
             "$bin_dir/slang-test" \
               -category ${{ matrix.test-category }} \
               -api all-dx12 \
-              -expected-failure-list tests/expected-failure-github.txt
+              -expected-failure-list tests/expected-failure-github.txt \
+              gfx-unit-test-tool/precompiledTargetModule2Vulkan
           else
             "$bin_dir/slang-test" \
               -category ${{ matrix.test-category }} \
@@ -196,7 +198,8 @@ jobs:
             -category ${{ matrix.test-category }} \
             -emit-spirv-via-glsl \
             -api vk \
-            -expected-failure-list tests/expected-failure.txt
+            -expected-failure-list tests/expected-failure.txt \
+            gfx-unit-test-tool/precompiledTargetModule2Vulkan
       - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests
         with:
