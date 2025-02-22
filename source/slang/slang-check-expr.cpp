@@ -4914,6 +4914,40 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
     return createLookupResultExpr(expr->name, lookupResult, expr->baseExpression, expr->loc, expr);
 }
 
+bool isValidVectorSwizzleName(Name* name)
+{
+    if (!name)
+        return false;
+    if (name->text.getLength() > 4 || name->text.getLength() == 0)
+        return false;
+    bool isRGBA = false;
+    bool isXYZW = false;
+    for (auto ch : name->text)
+    {
+        switch (ch)
+        {
+        case 'w':
+        case 'x':
+        case 'y':
+        case 'z':
+            isXYZW = true;
+            continue;
+        case 'r':
+        case 'g':
+        case 'b':
+        case 'a':
+            isRGBA = true;
+            continue;
+        default:
+            return false;
+        }
+    }
+    // A valid swizzle cannot mix XYZW and RGBA.
+    if (isXYZW && isRGBA)
+        return false;
+    return true;
+}
+
 Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
 {
     bool needDeref = false;
@@ -4955,15 +4989,21 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     }
     if (auto baseVecType = as<VectorExpressionType>(baseType))
     {
-        return CheckSwizzleExpr(
-            expr,
-            baseVecType->getElementType(),
-            baseVecType->getElementCount());
+        if (isValidVectorSwizzleName(expr->name))
+        {
+            return CheckSwizzleExpr(
+                expr,
+                baseVecType->getElementType(),
+                baseVecType->getElementCount());
+        }
     }
-    else if (auto baseScalarType = as<BasicExpressionType>(baseType))
+    if (auto baseScalarType = as<BasicExpressionType>(baseType))
     {
-        // Treat scalar like a 1-element vector when swizzling
-        return CheckSwizzleExpr(expr, baseScalarType, 1);
+        if (isValidVectorSwizzleName(expr->name))
+        {
+            // Treat scalar like a 1-element vector when swizzling
+            return CheckSwizzleExpr(expr, baseScalarType, 1);
+        }
     }
     else if (as<NamespaceType>(baseType))
     {
