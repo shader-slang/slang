@@ -2600,20 +2600,20 @@ for(auto fixity : kIncDecFixities)
 $(fixity.qual)
 __generic<T : __BuiltinArithmeticType>
 [__unsafeForceInlineEarly]
-T operator$(op.name)(in out T value)
-{$(fixity.bodyPrefix) value = value $(op.binOp) T(1); return $(fixity.returnVal); }
+T operator$(op.name)( in out T value)
+{ $(fixity.bodyPrefix) value = value $(op.binOp) __builtin_cast<T>(1); return $(fixity.returnVal); }
 
 $(fixity.qual)
 __generic<T : __BuiltinArithmeticType, let N : int>
 [__unsafeForceInlineEarly]
 vector<T,N> operator$(op.name)(in out vector<T,N> value)
-{$(fixity.bodyPrefix) value = value $(op.binOp) T(1); return $(fixity.returnVal); }
+{$(fixity.bodyPrefix) value = value $(op.binOp) __builtin_cast<T>(1); return $(fixity.returnVal); }
 
 $(fixity.qual)
 __generic<T : __BuiltinArithmeticType, let R : int, let C : int, let L : int>
 [__unsafeForceInlineEarly]
 matrix<T,R,C> operator$(op.name)(in out matrix<T,R,C,L> value)
-{$(fixity.bodyPrefix) value = value $(op.binOp) T(1); return $(fixity.returnVal); }
+{$(fixity.bodyPrefix) value = value $(op.binOp) __builtin_cast<T>(1); return $(fixity.returnVal); }
 
 $(fixity.qual)
 __generic<T, let addrSpace : uint64_t>
