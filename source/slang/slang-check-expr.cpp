@@ -4895,12 +4895,9 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     if (auto modifiedType = as<ModifiedType>(baseType))
         baseType = modifiedType->getBase();
 
-    // Note: Checking for vector types before declaration-reference types,
-    // because vectors are also declaration reference types...
-    //
-    // Also note: the way this is done right now means that the ability
-    // to swizzle vectors interferes with any chance of looking up
-    // members via extension, for vector or scalar types.
+    // Try handle swizzle-able types (scalar,vector,matrix) first.
+    // If checking as a swizzle failed for these types,
+    // we will fallback to normal member lookup.
     //
     if (auto baseScalarType = as<BasicExpressionType>(baseType))
     {
