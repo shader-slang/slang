@@ -5005,7 +5005,7 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
             return CheckSwizzleExpr(expr, baseScalarType, 1);
         }
     }
-    else if (as<NamespaceType>(baseType))
+    if (as<NamespaceType>(baseType))
     {
         return _lookupStaticMember(expr, expr->baseExpression);
     }
