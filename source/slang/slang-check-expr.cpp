@@ -4902,7 +4902,21 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     // to swizzle vectors interferes with any chance of looking up
     // members via extension, for vector or scalar types.
     //
-    if (auto baseMatrixType = as<MatrixExpressionType>(baseType))
+    if (auto baseScalarType = as<BasicExpressionType>(baseType))
+    {
+        // Treat scalar like a 1-element vector when swizzling
+        auto swizzle = CheckSwizzleExpr(expr, baseScalarType, 1);
+        if (swizzle)
+            return swizzle;
+    }
+    else if (auto baseVecType = as<VectorExpressionType>(baseType))
+    {
+        auto swizzle =
+            CheckSwizzleExpr(expr, baseVecType->getElementType(), baseVecType->getElementCount());
+        if (swizzle)
+            return swizzle;
+    }
+    else if (auto baseMatrixType = as<MatrixExpressionType>(baseType))
     {
         auto swizzle = CheckMatrixSwizzleExpr(
             expr,
@@ -4912,20 +4926,7 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
         if (swizzle)
             return swizzle;
     }
-    if (auto baseVecType = as<VectorExpressionType>(baseType))
-    {
-        auto swizzle =
-            CheckSwizzleExpr(expr, baseVecType->getElementType(), baseVecType->getElementCount());
-        if (swizzle)
-            return swizzle;
-    }
-    if (auto baseScalarType = as<BasicExpressionType>(baseType))
-    {
-        // Treat scalar like a 1-element vector when swizzling
-        auto swizzle = CheckSwizzleExpr(expr, baseScalarType, 1);
-        if (swizzle)
-            return swizzle;
-    }
+
     if (as<NamespaceType>(baseType))
     {
         return _lookupStaticMember(expr, expr->baseExpression);
