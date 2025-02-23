@@ -4136,12 +4136,6 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
     IntegerLiteralValue baseElementRowCount,
     IntegerLiteralValue baseElementColCount)
 {
-    MatrixSwizzleExpr* swizExpr = m_astBuilder->create<MatrixSwizzleExpr>();
-    swizExpr->loc = memberRefExpr->loc;
-    swizExpr->base = memberRefExpr->baseExpression;
-    swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
-    swizExpr->checked = true;
-
     // We can have up to 4 swizzles of two elements each
     MatrixCoord elementCoords[4];
     int elementCount = 0;
@@ -4170,24 +4164,14 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
         // Throw out swizzling with more than 4 output elements
         if (elementCount >= 4)
         {
-            getSink()->diagnose(
-                swizExpr,
-                Diagnostics::invalidSwizzleExpr,
-                swizzleText,
-                baseElementType->toString());
-            return CreateErrorExpr(memberRefExpr);
+            return nullptr;
         }
         MatrixCoord elementCoord = {0, 0};
 
         // Check for the preceding underscore
         if (*cursor++ != '_')
         {
-            getSink()->diagnose(
-                swizExpr,
-                Diagnostics::invalidSwizzleExpr,
-                swizzleText,
-                baseElementType->toString());
-            return CreateErrorExpr(memberRefExpr);
+            return nullptr;
         }
 
         // Check for one or zero indexing
@@ -4196,12 +4180,7 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
             // Can't mix one and zero indexing
             if (zeroIndexOffset == 1)
             {
-                getSink()->diagnose(
-                    swizExpr,
-                    Diagnostics::invalidSwizzleExpr,
-                    swizzleText,
-                    baseElementType->toString());
-                return CreateErrorExpr(memberRefExpr);
+                return nullptr;
             }
             zeroIndexOffset = 0;
             // Increment the index since we saw 'm'
@@ -4212,12 +4191,7 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
             // Can't mix one and zero indexing
             if (zeroIndexOffset == 0)
             {
-                getSink()->diagnose(
-                    swizExpr,
-                    Diagnostics::invalidSwizzleExpr,
-                    swizzleText,
-                    baseElementType->toString());
-                return CreateErrorExpr(memberRefExpr);
+                return nullptr;
             }
             zeroIndexOffset = 1;
         }
@@ -4229,13 +4203,7 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
 
             if (ch < '0' || ch > '4')
             {
-                // An invalid character in the swizzle is an error
-                getSink()->diagnose(
-                    swizExpr,
-                    Diagnostics::invalidSwizzleExpr,
-                    swizzleText,
-                    baseElementType->toString());
-                return CreateErrorExpr(memberRefExpr);
+                return nullptr;
             }
             const int subIndex = ch - '0' - zeroIndexOffset;
 
@@ -4255,12 +4223,7 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
             // Account for off-by-one and reject 0 if oneIndexed
             if (subIndex >= elementLimit || subIndex < 0)
             {
-                getSink()->diagnose(
-                    swizExpr,
-                    Diagnostics::invalidSwizzleExpr,
-                    swizzleText,
-                    baseElementType->toString());
-                return CreateErrorExpr(memberRefExpr);
+                return nullptr;
             }
         }
         // Check if we've seen this index before
@@ -4274,6 +4237,12 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
         elementCoords[elementCount] = elementCoord;
         elementCount++;
     }
+
+    MatrixSwizzleExpr* swizExpr = m_astBuilder->create<MatrixSwizzleExpr>();
+    swizExpr->loc = memberRefExpr->loc;
+    swizExpr->base = memberRefExpr->baseExpression;
+    swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
+    swizExpr->checked = true;
 
     // Store our list in the actual AST node
     for (int ee = 0; ee < elementCount; ++ee)
@@ -4324,11 +4293,7 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
                 constantColCount->getValue());
         }
     }
-    getSink()->diagnose(
-        memberRefExpr,
-        Diagnostics::unimplemented,
-        "swizzle on matrix of unknown size");
-    return CreateErrorExpr(memberRefExpr);
+    return nullptr;
 }
 
 Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType* baseTupleType)
@@ -4439,10 +4404,6 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
     Type* baseElementType,
     IntegerLiteralValue baseElementCount)
 {
-    SwizzleExpr* swizExpr = m_astBuilder->create<SwizzleExpr>();
-    swizExpr->loc = memberRefExpr->loc;
-    swizExpr->base = memberRefExpr->baseExpression;
-    swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
     IntegerLiteralValue limitElement = baseElementCount;
 
     ShortList<uint32_t, 4> elementIndices;
@@ -4518,18 +4479,18 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
         elementIndices.add(elementIndex);
     }
 
-    swizExpr->elementIndices = _Move(elementIndices);
-
     if (anyError)
     {
-        getSink()->diagnose(
-            swizExpr,
-            Diagnostics::invalidSwizzleExpr,
-            swizzleText,
-            baseElementType->toString());
-        return CreateErrorExpr(memberRefExpr);
+        return nullptr;
     }
-    else if (swizExpr->elementIndices.getCount() == 1)
+
+    SwizzleExpr* swizExpr = m_astBuilder->create<SwizzleExpr>();
+    swizExpr->loc = memberRefExpr->loc;
+    swizExpr->base = memberRefExpr->baseExpression;
+    swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
+    swizExpr->elementIndices = _Move(elementIndices);
+
+    if (swizExpr->elementIndices.getCount() == 1)
     {
         // single-component swizzle produces a scalar
         //
@@ -4568,11 +4529,7 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
     }
     else
     {
-        getSink()->diagnose(
-            memberRefExpr,
-            Diagnostics::unimplemented,
-            "swizzle on vector of unknown size");
-        return CreateErrorExpr(memberRefExpr);
+        return nullptr;
     }
 }
 
@@ -4914,40 +4871,6 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
     return createLookupResultExpr(expr->name, lookupResult, expr->baseExpression, expr->loc, expr);
 }
 
-bool isValidVectorSwizzleName(Name* name)
-{
-    if (!name)
-        return false;
-    if (name->text.getLength() > 4 || name->text.getLength() == 0)
-        return false;
-    bool isRGBA = false;
-    bool isXYZW = false;
-    for (auto ch : name->text)
-    {
-        switch (ch)
-        {
-        case 'w':
-        case 'x':
-        case 'y':
-        case 'z':
-            isXYZW = true;
-            continue;
-        case 'r':
-        case 'g':
-        case 'b':
-        case 'a':
-            isRGBA = true;
-            continue;
-        default:
-            return false;
-        }
-    }
-    // A valid swizzle cannot mix XYZW and RGBA.
-    if (isXYZW && isRGBA)
-        return false;
-    return true;
-}
-
 Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
 {
     bool needDeref = false;
@@ -4981,29 +4904,27 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     //
     if (auto baseMatrixType = as<MatrixExpressionType>(baseType))
     {
-        return CheckMatrixSwizzleExpr(
+        auto swizzle = CheckMatrixSwizzleExpr(
             expr,
             baseMatrixType->getElementType(),
             baseMatrixType->getRowCount(),
             baseMatrixType->getColumnCount());
+        if (swizzle)
+            return swizzle;
     }
     if (auto baseVecType = as<VectorExpressionType>(baseType))
     {
-        if (isValidVectorSwizzleName(expr->name))
-        {
-            return CheckSwizzleExpr(
-                expr,
-                baseVecType->getElementType(),
-                baseVecType->getElementCount());
-        }
+        auto swizzle =
+            CheckSwizzleExpr(expr, baseVecType->getElementType(), baseVecType->getElementCount());
+        if (swizzle)
+            return swizzle;
     }
     if (auto baseScalarType = as<BasicExpressionType>(baseType))
     {
-        if (isValidVectorSwizzleName(expr->name))
-        {
-            // Treat scalar like a 1-element vector when swizzling
-            return CheckSwizzleExpr(expr, baseScalarType, 1);
-        }
+        // Treat scalar like a 1-element vector when swizzling
+        auto swizzle = CheckSwizzleExpr(expr, baseScalarType, 1);
+        if (swizzle)
+            return swizzle;
     }
     if (as<NamespaceType>(baseType))
     {
