@@ -49,6 +49,7 @@ DIAGNOSTIC(-1, Note, seeUsingOf, "see using of '$0'")
 DIAGNOSTIC(-1, Note, seeDefinitionOfShader, "see definition of shader '$0'")
 DIAGNOSTIC(-1, Note, seeInclusionOf, "see inclusion of '$0'")
 DIAGNOSTIC(-1, Note, seeModuleBeingUsedIn, "see module '$0' being used in '$1'")
+DIAGNOSTIC(-1, Note, seeCallOfFunc, "see call to '$0'")
 DIAGNOSTIC(-1, Note, seePipelineRequirementDefinition, "see pipeline requirement definition")
 DIAGNOSTIC(
     -1,
@@ -2309,7 +2310,7 @@ DIAGNOSTIC(
     41402,
     Error,
     staticAssertionConditionNotConstant,
-    "condition for static assertion cannot be evaluated at the compile-time.")
+    "condition for static assertion cannot be evaluated at compile time.")
 
 DIAGNOSTIC(
     41402,

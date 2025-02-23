@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHK):-target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE:-target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHK):-target glsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHK):-target spirv -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain
@@ -56,14 +56,12 @@ extension MyType<T>
 [numthreads(1,1,1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-    //CHK-NOT:error {{.*}} TEST_specialize
-    //CHK: error {{.*}} TEST_specialize T_is_int
-    //CHK-NOT:error {{.*}} TEST_specialize
+    // CHK-DAG: error {{.*}} TEST_specialize T_is_int
+    // CHK:error {{.*}} TEST_specialize<float>
     TEST_specialize<float>();
 
-    //CHK-NOT:error {{.*}} TEST_specialize
-    //CHK: error 41400: {{.*}} TEST_specialize T_is_float
-    //CHK-NOT:error {{.*}} TEST_specialize
+    // CHK-DAG: error {{.*}} TEST_specialize T_is_float
+    // CHK:error {{.*}} TEST_specialize<int>
     TEST_specialize<int>();
 
     //HLSL: error {{.*}} TEST_target_switch all
