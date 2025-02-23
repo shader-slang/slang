@@ -1,6 +1,4 @@
-//TEST:SIMPLE:-target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHK):-target glsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHK):-target spirv -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHK):-target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=HLSL):-target hlsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=SPV):-target spirv -stage compute -entry computeMain
