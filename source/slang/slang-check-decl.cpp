@@ -10452,6 +10452,12 @@ void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDec
     {
         return;
     }
+
+    if (getText(moduleDecl->getName()) == "glsl")
+    {
+        getShared()->glslModuleDecl = moduleDecl;
+    }
+
     importedModulesList.add(moduleDecl);
     importedModulesSet.add(moduleDecl);
 
