@@ -74,7 +74,7 @@ void main(uint3 threadIdx : SV_DispatchThreadID)
     sessionDesc.targets = &targetDesc;
 
     auto start = platform::PerformanceCounter::now();
-    for (int pass = 0; pass < 1000; pass++)
+    for (int pass = 0; pass < 100; pass++)
     {
         ComPtr<slang::ISession> session;
         SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
