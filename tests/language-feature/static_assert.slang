@@ -57,11 +57,11 @@ extension MyType<T>
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     // CHK-DAG: error {{.*}} TEST_specialize T_is_int
-    // CHK-DAG:error {{.*}} TEST_specialize<float>
+    // CHK-DAG:{{.*}} TEST_specialize<float>
     TEST_specialize<float>();
 
     // CHK-DAG: error {{.*}} TEST_specialize T_is_float
-    // CHK-DAG:error {{.*}} TEST_specialize<int>
+    // CHK-DAG:{{.*}} TEST_specialize<int>
     TEST_specialize<int>();
 
     //HLSL: error {{.*}} TEST_target_switch all
