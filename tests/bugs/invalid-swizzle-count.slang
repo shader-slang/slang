@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -emit-spirv-directly
-// CHECK: error 30052
-// CHECK-NOT: error 30052
+// CHECK: error 30027
+// CHECK-NOT: error 30027
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1,1,1)]
