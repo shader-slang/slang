@@ -178,6 +178,9 @@ void precompiledModule2TestImplCommon(
     GFX_CHECK_CALL_ABORT(
         device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
+    
     const int numberCount = 4;
     float initialData[] = {0.0f, 0.0f, 0.0f, 0.0f};
     IBufferResource::Desc bufferDesc = {};
@@ -194,9 +197,15 @@ void precompiledModule2TestImplCommon(
 
     ComPtr<IBufferResource> numbersBuffer;
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
+    
     GFX_CHECK_CALL_ABORT(
         device->createBufferResource(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
+    
     ComPtr<IResourceView> bufferView;
     IResourceView::Desc viewDesc = {};
     viewDesc.type = IResourceView::Type::UnorderedAccess;
@@ -204,6 +213,9 @@ void precompiledModule2TestImplCommon(
     GFX_CHECK_CALL_ABORT(
         device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef()));
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
+    
     // We have done all the set up work, now it is time to start recording a command buffer for
     // GPU execution.
     {
@@ -227,8 +239,13 @@ void precompiledModule2TestImplCommon(
         queue->waitOnHost();
     }
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
+    
     compareComputeResult(device, numbersBuffer, Slang::makeArray<float>(3.0f, 3.0f, 3.0f, 3.0f));
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
 }
 
 void precompiledModule2TestImpl(IDevice* device, UnitTestContext* context)

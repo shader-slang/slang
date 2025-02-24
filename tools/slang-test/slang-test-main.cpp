@@ -4975,6 +4975,8 @@ SlangResult innerMain(int argc, char** argv)
                 fflush(stderr);
                 runUnitTestModule(&context, testOptions, spawnType, "gfx-unit-test-tool");
                 out.print("out gfx-unit-test-tool FILE LINE: %s %d\n", __FILE__, __LINE__);
+                fflush(stdout);
+                fflush(stderr);
             }
             out.print("4939 FILE LINE: %s %d\n", __FILE__, __LINE__);
 

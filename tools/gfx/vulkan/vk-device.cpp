@@ -1971,6 +1971,8 @@ Result DeviceImpl::createBufferResourceImpl(
 
     VkMemoryPropertyFlags reqMemoryProperties = 0;
 
+    printf("File Line function %s %d %d\n", __FILE__, __LINE__, __FUNCTION__);
+    fflush(stdout);
     VkBufferUsageFlags usage = _calcBufferUsageFlags(desc.allowedStates) | additionalUsageFlag;
     if (m_api.m_extendedFeatures.vulkan12Features.bufferDeviceAddress)
     {
@@ -2013,13 +2015,18 @@ Result DeviceImpl::createBufferResourceImpl(
             reqMemoryProperties,
             desc.isShared,
             extMemHandleType));
+        printf("File Line function %s %d %d\n", __FILE__, __LINE__, __FUNCTION__);
+        fflush(stdout);
     }
     else
     {
+        printf("File Line function %s %d %d\n", __FILE__, __LINE__, __FUNCTION__);
+        fflush(stdout);
         SLANG_RETURN_ON_FAIL(
             buffer->m_buffer.init(m_api, desc.sizeInBytes, usage, reqMemoryProperties));
     }
-
+    printf("File Line function %s %d %d\n", __FILE__, __LINE__, __FUNCTION__);
+    fflush(stdout);
     if (initData)
     {
         if (desc.memoryType == MemoryType::DeviceLocal)
@@ -2069,7 +2076,8 @@ Result DeviceImpl::createBufferResourceImpl(
             m_api.vkUnmapMemory(m_device, buffer->m_buffer.m_memory);
         }
     }
-
+    printf("File Line function %s %d %d\n", __FILE__, __LINE__, __FUNCTION__);
+    fflush(stdout);
     returnComPtr(outResource, buffer);
     return SLANG_OK;
 }
