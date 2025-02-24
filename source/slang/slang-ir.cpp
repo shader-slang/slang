@@ -5652,6 +5652,13 @@ IRInst* IRBuilder::emitDiscard()
     return inst;
 }
 
+IRInst* IRBuilder::emitCheckpointObject(IRInst* value)
+{
+    auto inst =
+        createInst<IRCheckpointObject>(this, kIROp_CheckpointObject, value->getFullType(), value);
+    addInst(inst);
+    return inst;
+}
 
 IRInst* IRBuilder::emitBranch(IRBlock* pBlock)
 {

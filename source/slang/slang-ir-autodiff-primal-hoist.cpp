@@ -281,6 +281,138 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
     return recomputeBlockMap;
 }
 
+// Checks if list A is a subset of list B by comparing their primal count parameters.
+//
+// Parameters:
+//   indicesA - First list of IndexTrackingInfo to compare
+//   indicesB - Second list of IndexTrackingInfo to compare
+//
+// Returns:
+//   true if all indices in indicesA are present in indicesB, false otherwise
+//
+bool areIndicesSubsetOf(List<IndexTrackingInfo>& indicesA, List<IndexTrackingInfo>& indicesB)
+{
+    if (indicesA.getCount() > indicesB.getCount())
+        return false;
+
+    for (Index ii = 0; ii < indicesA.getCount(); ii++)
+    {
+        if (indicesA[ii].primalCountParam != indicesB[ii].primalCountParam)
+            return false;
+    }
+
+    return true;
+}
+
+bool canInstBeStored(IRInst* inst)
+{
+    // Cannot store insts whose value is a type or a witness table, or a function.
+    // These insts get lowered to target-specific logic, and cannot be
+    // stored into variables or context structs as normal values.
+    //
+    if (as<IRTypeType>(inst->getDataType()) || as<IRWitnessTableType>(inst->getDataType()) ||
+        as<IRTypeKind>(inst->getDataType()) || as<IRFuncType>(inst->getDataType()) ||
+        !inst->getDataType())
+        return false;
+
+    return true;
+}
+
+// This is a helper that converts insts in a loop condition block into two if necessary,
+// then replaces all uses 'outside' the loop region with the new insts. This is because
+// insts in loop condition blocks can be used in two distinct regions (the loop body, and
+// after the loop).
+//
+// We'll use CheckpointObject for the splitting, which is allowed on any value-typed inst.
+//
+void splitLoopConditionBlockInsts(
+    IRGlobalValueWithCode* func,
+    Dictionary<IRBlock*, List<IndexTrackingInfo>>& indexedBlockInfo)
+{
+    // RefPtr<IRDominatorTree> domTree = computeDominatorTree(func);
+
+    // Collect primal loop condition blocks, and map differential blocks to their primal blocks.
+    List<IRBlock*> loopConditionBlocks;
+    Dictionary<IRBlock*, IRBlock*> diffBlockMap;
+    for (auto block : func->getBlocks())
+    {
+        if (auto loop = as<IRLoop>(block->getTerminator()))
+        {
+            auto loopConditionBlock = getLoopConditionBlock(loop);
+            if (isDifferentialBlock(loopConditionBlock))
+            {
+                auto diffDecor = loopConditionBlock->findDecoration<IRDifferentialInstDecoration>();
+                diffBlockMap[cast<IRBlock>(diffDecor->getPrimalInst())] = loopConditionBlock;
+            }
+            else
+                loopConditionBlocks.add(loopConditionBlock);
+        }
+    }
+
+    // For each loop condition block, split the insts that are used in both the loop body and
+    // after the loop.
+    // Use the dominator tree to find uses of insts outside the loop body
+    //
+    // Essentially we want to split the uses dominated by the true block and the false block of the
+    // condition.
+    //
+    IRBuilder builder(func->getModule());
+
+    for (auto condBlock : loopConditionBlocks)
+    {
+        // For each inst in the primal condition block, check if it has uses inside the loop body
+        // as well as outside of it. (Use the indexedBlockInfo to perform the teets)
+        //
+        for (auto inst = condBlock->getFirstInst(); inst; inst = inst->getNextInst())
+        {
+            // Skip terminators and insts that can't be stored
+            if (as<IRTerminatorInst>(inst) || !canInstBeStored(inst))
+                continue;
+            // Shouldn't see any vars.
+            SLANG_ASSERT(!as<IRVar>(inst));
+
+            HashSet<IRUse*> loopUses;
+            HashSet<IRUse*> afterLoopUses;
+
+            // Get the indices for the condition block
+            auto condBlockIndices = indexedBlockInfo.getValue(condBlock);
+
+            // Check all uses of this inst
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto userBlock = getBlock(use->getUser());
+                auto userBlockIndices = indexedBlockInfo.getValue(as<IRBlock>(userBlock));
+
+                // If all of the condBlock's indices are a subset of the userBlock's indices,
+                // then the userBlock is inside the loop.
+                //
+                bool isInLoop = areIndicesSubsetOf(condBlockIndices, userBlockIndices);
+
+                if (isInLoop)
+                    loopUses.add(use);
+                else
+                    afterLoopUses.add(use);
+            }
+
+            // If inst has uses both inside and after the loop, create a copy for after-loop uses
+            if (loopUses.getCount() > 0 && afterLoopUses.getCount() > 0)
+            {
+                setInsertAfterOrdinaryInst(&builder, inst);
+                auto copy = builder.emitCheckpointObject(inst);
+                copy->sourceLoc = inst->sourceLoc; // Copy source location so that checkpoint
+                                                   // reporting is accurate
+                // Replace after-loop uses with the copy
+                for (auto use : afterLoopUses)
+                {
+                    // Sanity check
+                    SLANG_ASSERT(!loopUses.contains(use));
+                    builder.replaceOperand(use, copy);
+                }
+            }
+        }
+    }
+}
+
 RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
     IRGlobalValueWithCode* func,
     Dictionary<IRBlock*, IRBlock*>& mapDiffBlockToRecomputeBlock,
@@ -1297,20 +1429,6 @@ bool areIndicesEqual(
     return true;
 }
 
-bool areIndicesSubsetOf(List<IndexTrackingInfo>& indicesA, List<IndexTrackingInfo>& indicesB)
-{
-    if (indicesA.getCount() > indicesB.getCount())
-        return false;
-
-    for (Index ii = 0; ii < indicesA.getCount(); ii++)
-    {
-        if (indicesA[ii].primalCountParam != indicesB[ii].primalCountParam)
-            return false;
-    }
-
-    return true;
-}
-
 static int getInstRegionNestLevel(
     Dictionary<IRBlock*, List<IndexTrackingInfo>>& indexedBlockInfo,
     IRBlock* defBlock,
@@ -1521,21 +1639,6 @@ static List<IndexTrackingInfo> maybeTrimIndices(
     }
     return result;
 }
-
-bool canInstBeStored(IRInst* inst)
-{
-    // Cannot store insts whose value is a type or a witness table, or a function.
-    // These insts get lowered to target-specific logic, and cannot be
-    // stored into variables or context structs as normal values.
-    //
-    if (as<IRTypeType>(inst->getDataType()) || as<IRWitnessTableType>(inst->getDataType()) ||
-        as<IRTypeKind>(inst->getDataType()) || as<IRFuncType>(inst->getDataType()) ||
-        !inst->getDataType())
-        return false;
-
-    return true;
-}
-
 
 /// Legalizes all accesses to primal insts from recompute and diff blocks.
 ///
@@ -2116,6 +2219,39 @@ void buildIndexedBlocks(
     }
 }
 
+// This function simply turns all CheckpointObject insts into a 'no-op'.
+// i.e. simply replaces all uses of CheckpointObject with the original value.
+//
+// This operation is 'correct' because if CheckpointObject's operand is visible
+// in a block, then it is visible in all dominated blocks.
+//
+void lowerCheckpointObjectInsts(IRGlobalValueWithCode* func)
+{
+    // For each block in the function
+    for (auto block : func->getBlocks())
+    {
+        // For each instruction in the block
+        for (auto inst = block->getFirstInst(); inst;)
+        {
+            // Get next inst before potentially removing current one
+            auto nextInst = inst->getNextInst();
+
+            // Check if this is a CheckpointObject instruction
+            if (auto copyInst = as<IRCheckpointObject>(inst))
+            {
+                // Replace all uses of the copy with the original value
+                auto originalVal = copyInst->getVal();
+                copyInst->replaceUsesWith(originalVal);
+
+                // Remove the now unused copy instruction
+                inst->removeAndDeallocate();
+            }
+
+            inst = nextInst;
+        }
+    }
+}
+
 // For each primal inst that is used in reverse blocks, decide if we should recompute or store
 // its value, then make them accessible in reverse blocks based the decision.
 //
@@ -2128,6 +2264,9 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
     //
     Dictionary<IRBlock*, List<IndexTrackingInfo>> indexedBlockInfo;
     buildIndexedBlocks(indexedBlockInfo, func);
+
+    // Split loop condition insts into two if necessary.
+    splitLoopConditionBlockInsts(func, indexedBlockInfo);
 
     // Create recompute blocks for each region following the same control flow structure
     // as in primal code.
@@ -2148,7 +2287,12 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
     // Legalize the primal inst accesses by introducing local variables / arrays and emitting
     // necessary load/store logic.
     //
-    return ensurePrimalAvailability(primalsInfo, func, indexedBlockInfo);
+    auto hoistedPrimalsInfo = ensurePrimalAvailability(primalsInfo, func, indexedBlockInfo);
+
+    // Lower CheckpointObject insts to a no-op.
+    lowerCheckpointObjectInsts(func);
+
+    return hoistedPrimalsInfo;
 }
 
 void DefaultCheckpointPolicy::preparePolicy(IRGlobalValueWithCode* func)
@@ -2324,6 +2468,9 @@ static bool shouldStoreInst(IRInst* inst)
 
             break;
         }
+    case kIROp_CheckpointObject:
+        // Special inst for when a value must be stored.
+        return true;
     default:
         break;
     }
