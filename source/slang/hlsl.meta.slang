@@ -11676,25 +11676,6 @@ vector<T,N> nextafter(vector<T,N> x, vector<T,N> y)
     }
 }
 
-/// Generate a random number (unsupported).
-/// @param x The seed value.
-/// @remarks This function is not supported in that it always returns 0.
-/// @deprecated
-/// @category math
-[__readNone]
-[deprecated("Always returns 0")]
-float noise(float x)
-{
-    return 0;
-}
-
-[__readNone]
-[deprecated("Always returns 0")]
-__generic<let N : int> float noise(vector<float, N> x)
-{
-    return 0;
-}
-
 /// Indicate that an index may be non-uniform at execution time.
 ///
 /// Shader Model 5.1 and 6.x introduce support for dynamic indexing
