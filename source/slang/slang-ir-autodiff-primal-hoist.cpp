@@ -371,17 +371,17 @@ void splitLoopConditionBlockInsts(
             // Shouldn't see any vars.
             SLANG_ASSERT(!as<IRVar>(inst));
 
-            HashSet<IRUse*> loopUses;
-            HashSet<IRUse*> afterLoopUses;
+            List<IRUse*> loopUses;
+            List<IRUse*> afterLoopUses;
 
             // Get the indices for the condition block
-            auto condBlockIndices = indexedBlockInfo.getValue(condBlock);
+            auto& condBlockIndices = indexedBlockInfo[condBlock];
 
             // Check all uses of this inst
             for (auto use = inst->firstUse; use; use = use->nextUse)
             {
                 auto userBlock = getBlock(use->getUser());
-                auto userBlockIndices = indexedBlockInfo.getValue(as<IRBlock>(userBlock));
+                auto& userBlockIndices = indexedBlockInfo[userBlock];
 
                 // If all of the condBlock's indices are a subset of the userBlock's indices,
                 // then the userBlock is inside the loop.
@@ -399,13 +399,12 @@ void splitLoopConditionBlockInsts(
             {
                 setInsertAfterOrdinaryInst(&builder, inst);
                 auto copy = builder.emitCheckpointObject(inst);
-                copy->sourceLoc = inst->sourceLoc; // Copy source location so that checkpoint
-                                                   // reporting is accurate
+
+                // Copy source location so that checkpoint reporting is accurate
+                copy->sourceLoc = inst->sourceLoc;
                 // Replace after-loop uses with the copy
                 for (auto use : afterLoopUses)
                 {
-                    // Sanity check
-                    SLANG_ASSERT(!loopUses.contains(use));
                     builder.replaceOperand(use, copy);
                 }
             }
