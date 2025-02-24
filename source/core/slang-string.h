@@ -790,6 +790,57 @@ public:
     UnownedStringSlice getUnownedSlice() const { return StringRepresentation::asSlice(m_buffer); }
 };
 
+class ImmutableHashedString
+{
+public:
+    String slice;
+    HashCode64 hashCode;
+    ImmutableHashedString()
+        : hashCode(0)
+    {
+    }
+    ImmutableHashedString(const UnownedStringSlice& slice)
+        : slice(slice), hashCode(slice.getHashCode())
+    {
+    }
+    ImmutableHashedString(const char* begin, const char* end)
+        : slice(begin, end), hashCode(slice.getHashCode())
+    {
+    }
+    ImmutableHashedString(const char* begin, size_t len)
+        : slice(UnownedStringSlice(begin, len)), hashCode(slice.getHashCode())
+    {
+    }
+    ImmutableHashedString(const char* begin)
+        : slice(begin), hashCode(slice.getHashCode())
+    {
+    }
+    ImmutableHashedString(const String& str)
+        : slice(str), hashCode(str.getHashCode())
+    {
+    }
+    ImmutableHashedString(String&& str)
+        : slice(_Move(str)), hashCode(str.getHashCode())
+    {
+    }
+    ImmutableHashedString(const ImmutableHashedString& other) = default;
+    ImmutableHashedString& operator=(const ImmutableHashedString& other) = default;
+    bool operator==(const ImmutableHashedString& other) const
+    {
+        return hashCode == other.hashCode && slice == other.slice;
+    }
+    bool operator!=(const ImmutableHashedString& other) const
+    {
+        return hashCode != other.hashCode || slice != other.slice;
+    }
+    bool operator==(const UnownedStringSlice& other) const { return slice == other; }
+    bool operator!=(const UnownedStringSlice& other) const { return slice != other; }
+    bool operator==(const String& other) const { return slice == other.getUnownedSlice(); }
+    bool operator!=(const String& other) const { return slice != other.getUnownedSlice(); }
+    bool operator==(const char* other) const { return slice == UnownedStringSlice(other); }
+    HashCode64 getHashCode() const { return hashCode; }
+};
+
 class SLANG_RT_API StringBuilder : public String
 {
 private:

@@ -1026,12 +1026,9 @@ IRInst* AutoDiffSharedContext::findDifferentiableInterface()
     {
         for (auto globalInst : module->getGlobalInsts())
         {
-            // TODO: This seems like a particularly dangerous way to look for an interface.
-            // See if we can lower IDifferentiable to a separate IR inst.
-            //
             if (auto intf = as<IRInterfaceType>(globalInst))
             {
-                if (auto decor = intf->findDecoration<IRNameHintDecoration>())
+                if (auto decor = intf->findDecoration<IRKnownBuiltinDecoration>())
                 {
                     if (decor->getName() == toSlice("IDifferentiable"))
                     {
@@ -1261,7 +1258,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
             }
 
             addTypeToDictionary((IRType*)item->getBaseType(), item->getWitness());
-
+#if 0
             // TODO: Is this really needed?
             if (!as<IRInterfaceType>(item->getBaseType()) &&
                 !as<IRAssociatedType>(item->getBaseType()))
@@ -1314,6 +1311,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
                     addTypeToDictionary((IRType*)diffType, diffWitness);
                 }
             }
+#endif
         }
     }
 }

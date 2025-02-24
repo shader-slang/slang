@@ -331,7 +331,9 @@ Result DeviceImpl::getTextureAllocationInfo(
     FormatInfo formatInfo;
     gfxGetFormatInfo(desc.format, &formatInfo);
     MTL::PixelFormat pixelFormat = MetalUtil::translatePixelFormat(desc.format);
-    Size alignment = m_device->minimumLinearTextureAlignmentForPixelFormat(pixelFormat);
+    bool isCompressed = gfxIsCompressedFormat(desc.format);
+    Size alignment =
+        isCompressed ? 1 : m_device->minimumLinearTextureAlignmentForPixelFormat(pixelFormat);
     Size size = 0;
     ITextureResource::Extents extents = desc.size;
     extents.width = extents.width ? extents.width : 1;

@@ -4538,6 +4538,18 @@ RefPtr<IRModule> IRModule::create(Session* session)
     return module;
 }
 
+void IRModule::buildMangledNameToGlobalInstMap()
+{
+    m_mapMangledNameToGlobalInst.clear();
+    for (auto inst : getGlobalInsts())
+    {
+        if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
+        {
+            m_mapMangledNameToGlobalInst[linkageDecor->getMangledName()].add(inst);
+        }
+    }
+}
+
 IRDominatorTree* IRModule::findOrCreateDominatorTree(IRGlobalValueWithCode* func)
 {
     IRAnalysis* analysis = m_mapInstToAnalysis.tryGetValue(func);
