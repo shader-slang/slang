@@ -176,7 +176,7 @@ attribute_syntax [NoDiffThis] : NoDiffThisAttribute;
 // for internal use.
 //
 [__AutoDiffBuiltin]
-export struct NullDifferential : IDifferentiable
+struct NullDifferential : IDifferentiable
 { 
     // for now, we'll use at least one field to make sure the type is non-empty
     uint dummy;
