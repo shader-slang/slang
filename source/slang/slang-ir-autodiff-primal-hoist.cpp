@@ -358,6 +358,10 @@ void splitLoopConditionBlockInsts(
     //
     IRBuilder builder(func->getModule());
 
+
+    List<IRUse*> loopUses;
+    List<IRUse*> afterLoopUses;
+
     for (auto condBlock : loopConditionBlocks)
     {
         // For each inst in the primal condition block, check if it has uses inside the loop body
@@ -371,11 +375,11 @@ void splitLoopConditionBlockInsts(
             // Shouldn't see any vars.
             SLANG_ASSERT(!as<IRVar>(inst));
 
-            List<IRUse*> loopUses;
-            List<IRUse*> afterLoopUses;
-
             // Get the indices for the condition block
             auto& condBlockIndices = indexedBlockInfo[condBlock];
+
+            loopUses.clear();
+            afterLoopUses.clear();
 
             // Check all uses of this inst
             for (auto use = inst->firstUse; use; use = use->nextUse)
@@ -402,6 +406,7 @@ void splitLoopConditionBlockInsts(
 
                 // Copy source location so that checkpoint reporting is accurate
                 copy->sourceLoc = inst->sourceLoc;
+
                 // Replace after-loop uses with the copy
                 for (auto use : afterLoopUses)
                 {
