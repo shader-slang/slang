@@ -19,6 +19,7 @@ static Slang::Result precompileProgram(
     const char* shaderModuleName,
     bool precompileToTarget)
 {
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     Slang::ComPtr<slang::ISession> slangSession;
     SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
     slang::SessionDesc sessionDesc = {};
@@ -27,7 +28,7 @@ static Slang::Result precompileProgram(
     sessionDesc.searchPaths = searchPaths.getBuffer();
     auto globalSession = slangSession->getGlobalSession();
     globalSession->createSession(sessionDesc, slangSession.writeRef());
-
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     slang::IModule* module;
     {
         Slang::ComPtr<slang::IBlob> diagnosticsBlob;
@@ -36,7 +37,7 @@ static Slang::Result precompileProgram(
     }
     if (!module)
         return SLANG_FAIL;
-
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     if (precompileToTarget)
     {
         SlangCompileTarget target;
@@ -62,7 +63,7 @@ static Slang::Result precompileProgram(
             diagnoseIfNeeded(diagnosticsBlob);
         }
     }
-
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     // Write loaded modules to memory file system.
     for (SlangInt i = 0; i < slangSession->getLoadedModuleCount(); i++)
     {
@@ -76,6 +77,7 @@ static Slang::Result precompileProgram(
             fileSys->saveFileBlob((Slang::String(name) + ".slang-module").getBuffer(), outBlob);
         }
     }
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     return SLANG_OK;
 }
 
@@ -84,12 +86,13 @@ void precompiledModule2TestImplCommon(
     UnitTestContext* context,
     bool precompileToTarget)
 {
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     Slang::ComPtr<ITransientResourceHeap> transientHeap;
     ITransientResourceHeap::Desc transientHeapDesc = {};
     transientHeapDesc.constantBufferSize = 4096;
     GFX_CHECK_CALL_ABORT(
         device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
-
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     // First, load and compile the slang source.
     ComPtr<ISlangMutableFileSystem> memoryFileSystem =
         ComPtr<ISlangMutableFileSystem>(new Slang::MemoryFileSystem());
@@ -108,6 +111,7 @@ void precompiledModule2TestImplCommon(
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
     slang::TargetDesc targetDesc = {};
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     switch (device->getDeviceInfo().deviceType)
     {
     case gfx::DeviceType::DirectX12:

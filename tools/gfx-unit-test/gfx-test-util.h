@@ -112,9 +112,12 @@ void runTestImpl(
     {
         SLANG_IGNORE_TEST
     }
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     auto device = createTestingDevice(context, api, searchPaths, shaderCache);
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     if (!device)
     {
+        printf("File, Line: %s, %d\n", __FILE__, __LINE__);
         SLANG_IGNORE_TEST
     }
 #if SLANG_WIN32
@@ -126,21 +129,27 @@ void runTestImpl(
 #endif
     // Skip d3d11 tests when we don't have DXBC support as they're bound to
     // fail without a backend compiler
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     if (api == Slang::RenderApiFlag::D3D11 && !SLANG_ENABLE_DXBC_SUPPORT)
     {
+        printf("File, Line: %s, %d\n", __FILE__, __LINE__);
         SLANG_IGNORE_TEST
     }
     try
     {
+        printf("File, Line: %s, %d\n", __FILE__, __LINE__);
         renderDocBeginFrame();
         f(device, context);
     }
     catch (AbortTestException& e)
     {
+        printf("File, Line: %s, %d\n", __FILE__, __LINE__);
         renderDocEndFrame();
         throw e;
     }
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     renderDocEndFrame();
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
 }
 
 #define GFX_CHECK_CALL(x) SLANG_CHECK(!SLANG_FAILED(x))
