@@ -311,6 +311,7 @@ Result PipelineStateImpl::createVKComputePipelineState()
 
     VkComputePipelineCreateInfo computePipelineInfo = {
         VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
+    SLANG_ASSERT(programImpl->m_stageCreateInfos.getCount() == 1);
     computePipelineInfo.stage = programImpl->m_stageCreateInfos[0];
     computePipelineInfo.layout = programImpl->m_rootObjectLayout->m_pipelineLayout;
 
