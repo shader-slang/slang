@@ -4546,10 +4546,12 @@ static SlangResult runUnitTestModule(
 {
     ISlangSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
     ComPtr<ISlangSharedLibrary> moduleLibrary;
+    printf("about to loadSharedLIbrayr FILE LINE: %s %d\n", __FILE__, __LINE__);
 
     SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary(
         Path::combine(context->dllDirectoryPath, moduleName).getBuffer(),
         moduleLibrary.writeRef()));
+    printf("FILE LINE: %s %d\n", __FILE__, __LINE__);
 
     UnitTestGetModuleFunc getModuleFunc =
         (UnitTestGetModuleFunc)moduleLibrary->findFuncByName("slangUnitTestGetModule");
@@ -4929,16 +4931,19 @@ SlangResult innerMain(int argc, char** argv)
                 testOptions.categories.add(smokeTestCategory);
                 runUnitTestModule(&context, testOptions, spawnType, "slang-unit-test-tool");
             }
+            out.print("4932 FILE LINE: %s %d\n", __FILE__, __LINE__);
 
             {
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
                 runUnitTestModule(&context, testOptions, spawnType, "gfx-unit-test-tool");
             }
+            out.print("4939 FILE LINE: %s %d\n", __FILE__, __LINE__);
+
 
             TestReporter::set(nullptr);
         }
-        out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        out.print("4941 FILE LINE: %s %d\n", __FILE__, __LINE__);
         
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
         // excution or driver instability. We can try running them again.
@@ -4972,12 +4977,12 @@ SlangResult innerMain(int argc, char** argv)
                 reporter.addResult(TestResult::Fail);
             }
         }
-        out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        out.print("4975 FILE LINE: %s %d\n", __FILE__, __LINE__);
         
         reporter.outputSummary();
         return reporter.didAllSucceed() ? SLANG_OK : SLANG_FAIL;
     }
-    out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+    out.print("4980 FILE LINE: %s %d\n", __FILE__, __LINE__);
 }
 
 int main(int argc, char** argv)
