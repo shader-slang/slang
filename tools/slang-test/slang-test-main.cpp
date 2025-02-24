@@ -4545,6 +4545,8 @@ static SlangResult runUnitTestModule(
     const char* moduleName)
 {
     printf("about to loadSharedLIbrayr FILE LINE: %s %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
     ISlangSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
     ComPtr<ISlangSharedLibrary> moduleLibrary;
 
