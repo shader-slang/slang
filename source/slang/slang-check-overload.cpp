@@ -2565,7 +2565,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 // We should only use the cached candidate if it is persistent direct declref
                 // created from GlobalSession's ASTBuilder, or it is created in the current Linkage.
                 if (candidate.cacheVersion == typeCheckingCache->version ||
-                    as<DirectDeclRef>(candidate.candidate.item.declRef.declRefBase))
+                    findNextOuterGeneric(candidate.decl) == nullptr)
                 {
                     context.bestCandidateStorage = candidate.candidate;
                     context.bestCandidate = &context.bestCandidateStorage;
