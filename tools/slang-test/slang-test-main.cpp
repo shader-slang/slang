@@ -4553,17 +4553,19 @@ static SlangResult runUnitTestModule(
     SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary(
         Path::combine(context->dllDirectoryPath, moduleName).getBuffer(),
         moduleLibrary.writeRef()));
-    printf("FILE LINE: %s %d\n", __FILE__, __LINE__);
-
+    printf("FILE LINE: %s %d\n", __FILE__, __LINE__); fflush(stdout); fflush(stderr);
     UnitTestGetModuleFunc getModuleFunc =
         (UnitTestGetModuleFunc)moduleLibrary->findFuncByName("slangUnitTestGetModule");
     if (!getModuleFunc)
         return SLANG_FAIL;
-    printf("FILE LINE: %s %d\n", __FILE__, __LINE__);
+    printf("FILE LINE: %s %d\n", __FILE__, __LINE__);    fflush(stdout);    fflush(stderr);
 
     IUnitTestModule* testModule = getModuleFunc();
     if (!testModule)
         return SLANG_FAIL;
+    printf("FILE LINE: %s %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
 
     UnitTestContext unitTestContext;
     unitTestContext.slangGlobalSession = context->getSession();
@@ -4601,6 +4603,9 @@ static SlangResult runUnitTestModule(
         }
     }
     printf("4601 FILE LINE: %s %d\n", __FILE__, __LINE__);
+    printf("FILE LINE: %s %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
 
     auto runUnitTest = [&](TestItem test)
     {
@@ -4651,10 +4656,16 @@ static SlangResult runUnitTestModule(
             testModule->setTestReporter(reporter);
             try
             {
+                printf("FILE LINE: %s %d\n", __FILE__, __LINE__);
+                fflush(stdout);
+                fflush(stderr);
                 printf("TF FILE LINE: %s %d\n", __FILE__, __LINE__);
                 
                 test.testFunc(&unitTestContext);
                 printf("TF2 FILE LINE: %s %d\n", __FILE__, __LINE__);
+                printf("FILE LINE: %s %d\n", __FILE__, __LINE__);
+                fflush(stdout);
+                fflush(stderr);
                 
             }
             catch (...)
@@ -4692,8 +4703,13 @@ static SlangResult runUnitTestModule(
         for (auto t : tests)
         {
             printf("Run unit test file %s line %d\n", __FILE__, __LINE__);
+            fflush(stdout);
+            fflush(stderr);
             runUnitTest(t);
             printf("Ran unit test file %s line %d\n", __FILE__, __LINE__);
+            fflush(stdout);
+            fflush(stderr);
+
         }
     }
 
