@@ -123,11 +123,12 @@ void precompiledModule2TestImplCommon(
         targetDesc.profile = device->getSlangSession()->getGlobalSession()->findProfile("GLSL_460");
         break;
     }
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     sessionDesc.targets = &targetDesc;
     sessionDesc.fileSystem = memoryFileSystem.get();
     auto globalSession = slangSession->getGlobalSession();
     globalSession->createSession(sessionDesc, slangSession.writeRef());
-
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     const char* moduleSrc = R"(
             import "precompiled-module-imported";
 
@@ -145,6 +146,7 @@ void precompiledModule2TestImplCommon(
             }
         )";
     memoryFileSystem->saveFile("precompiled-module.slang", moduleSrc, strlen(moduleSrc));
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     GFX_CHECK_CALL_ABORT(loadComputeProgram(
         device,
         slangSession,
@@ -152,13 +154,14 @@ void precompiledModule2TestImplCommon(
         "precompiled-module",
         "computeMain",
         slangReflection));
-
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     ComputePipelineStateDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
     ComPtr<gfx::IPipelineState> pipelineState;
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     GFX_CHECK_CALL_ABORT(
         device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
-
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     const int numberCount = 4;
     float initialData[] = {0.0f, 0.0f, 0.0f, 0.0f};
     IBufferResource::Desc bufferDesc = {};
@@ -174,16 +177,17 @@ void precompiledModule2TestImplCommon(
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
     ComPtr<IBufferResource> numbersBuffer;
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     GFX_CHECK_CALL_ABORT(
         device->createBufferResource(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
-
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     ComPtr<IResourceView> bufferView;
     IResourceView::Desc viewDesc = {};
     viewDesc.type = IResourceView::Type::UnorderedAccess;
     viewDesc.format = Format::Unknown;
     GFX_CHECK_CALL_ABORT(
         device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef()));
-
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     // We have done all the set up work, now it is time to start recording a command buffer for
     // GPU execution.
     {
@@ -206,8 +210,9 @@ void precompiledModule2TestImplCommon(
         queue->executeCommandBuffer(commandBuffer);
         queue->waitOnHost();
     }
-
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     compareComputeResult(device, numbersBuffer, Slang::makeArray<float>(3.0f, 3.0f, 3.0f, 3.0f));
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
 }
 
 void precompiledModule2TestImpl(IDevice* device, UnitTestContext* context)

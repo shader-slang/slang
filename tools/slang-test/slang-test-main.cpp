@@ -4734,20 +4734,23 @@ SlangResult innerMain(int argc, char** argv)
     TestCategory* passThroughCategories[SLANG_PASS_THROUGH_COUNT_OF] = {nullptr};
 
     // Work out what backends/pass-thrus are available
+    auto out = StdWriters::getOut();
     {
         SlangSession* session = context.getSession();
 
-        auto out = StdWriters::getOut();
+        
         out.print("Supported backends:");
 
         for (int i = 0; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
         {
+            out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+
             const SlangPassThrough passThru = SlangPassThrough(i);
             if (passThru == SLANG_PASS_THROUGH_NONE)
             {
                 continue;
             }
-
+            out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
             if (SLANG_SUCCEEDED(session->checkPassThroughSupport(passThru)))
             {
                 context.availableBackendFlags |= PassThroughFlags(1) << int(i);
@@ -4764,19 +4767,21 @@ SlangResult innerMain(int argc, char** argv)
                 out.write(buf.getBuffer(), buf.getLength());
             }
         }
-
+        out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
         out.print("\n");
     }
-
+    out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
     {
+        out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
         SlangSession* session = context.getSession();
-
+        out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
         const bool hasLlvm =
             SLANG_SUCCEEDED(session->checkPassThroughSupport(SLANG_PASS_THROUGH_LLVM));
         const auto hostCallableCompiler = session->getDownstreamCompilerForTransition(
             SLANG_CPP_SOURCE,
             SLANG_SHADER_HOST_CALLABLE);
-
+        out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
         if (hasLlvm && hostCallableCompiler == SLANG_PASS_THROUGH_LLVM && SLANG_PROCESSOR_X86)
         {
             // TODO(JS)
@@ -4788,8 +4793,11 @@ SlangResult innerMain(int argc, char** argv)
             // double (ie not x86/llvm)
             categorySet.add("war-double-host-callable", fullTestCategory);
         }
+        out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
     }
-
+    out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
     // Working out what renderApis is worked on on demand through
     // _getAvailableRenderApiFlags()
 
@@ -4797,17 +4805,22 @@ SlangResult innerMain(int argc, char** argv)
         // We can set the slangc command line tool, to just use the function defined here
         context.setInnerMainFunc("slangc", &SlangCTool::innerMain);
     }
-
+    out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
     SLANG_RETURN_ON_FAIL(
         Options::parse(argc, argv, &categorySet, StdWriters::getError(), &context.options));
-
+    out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
     Options& options = context.options;
-
+    out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
     context.setMaxTestRunnerThreadCount(options.serverCount);
-
+    out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
     // Set up the prelude/s
     TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], context.getSession());
-
+    out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
     if (options.outputMode == TestOutputMode::TeamCity)
     {
         // On TeamCity CI there is an issue with unix/linux targets where test system may be
@@ -4818,15 +4831,19 @@ SlangResult innerMain(int argc, char** argv)
         _disableCPPBackends(&context);
 #endif
     }
+    out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
 
 #if SLANG_PROCESSOR_X86
     // Disable d3d12 tests on x86 right now since dxc for 32-bit windows doesn't seem to recognize
     // sm_6_6.
     _disableD3D12Backend(&context);
 #endif
-
+    out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
     if (options.subCommand.getLength())
     {
+        out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
         // Get the function from the tool
         auto func = context.getInnerMainFunc(options.binDir, options.subCommand);
         if (!func)
@@ -4852,18 +4869,21 @@ SlangResult innerMain(int argc, char** argv)
             int(args.getCount()),
             args.getBuffer());
     }
-
+    out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
     if (options.includeCategories.getCount() == 0)
     {
         options.includeCategories.add(fullTestCategory, fullTestCategory);
     }
-
+    out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
     // Don't include OptiX tests unless the client has explicit opted into them.
     if (!options.includeCategories.containsKey(optixTestCategory))
     {
         options.excludeCategories.add(optixTestCategory, optixTestCategory);
     }
-
+    out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
     // Exclude rendering tests when building under AppVeyor.
     //
     // TODO: this is very ad hoc, and we should do something cleaner.
@@ -4889,7 +4909,8 @@ SlangResult innerMain(int argc, char** argv)
             // Enumerate test files according to policy
             runTestsInDirectory(&context);
         }
-
+        out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
         // Run the unit tests (these are internal C++ tests - not specified via files in a
         // directory) They are registered with SLANG_UNIT_TEST macro
         //
@@ -4917,7 +4938,8 @@ SlangResult innerMain(int argc, char** argv)
 
             TestReporter::set(nullptr);
         }
-
+        out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
         // excution or driver instability. We can try running them again.
         static constexpr int kFailedTestLimitForRetry = 16;
@@ -4950,10 +4972,12 @@ SlangResult innerMain(int argc, char** argv)
                 reporter.addResult(TestResult::Fail);
             }
         }
-
+        out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+        
         reporter.outputSummary();
         return reporter.didAllSucceed() ? SLANG_OK : SLANG_FAIL;
     }
+    out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
 }
 
 int main(int argc, char** argv)
