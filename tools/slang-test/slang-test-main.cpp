@@ -4544,9 +4544,9 @@ static SlangResult runUnitTestModule(
     SpawnType spawnType,
     const char* moduleName)
 {
+    printf("about to loadSharedLIbrayr FILE LINE: %s %d\n", __FILE__, __LINE__);
     ISlangSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
     ComPtr<ISlangSharedLibrary> moduleLibrary;
-    printf("about to loadSharedLIbrayr FILE LINE: %s %d\n", __FILE__, __LINE__);
 
     SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary(
         Path::combine(context->dllDirectoryPath, moduleName).getBuffer(),
@@ -4557,6 +4557,7 @@ static SlangResult runUnitTestModule(
         (UnitTestGetModuleFunc)moduleLibrary->findFuncByName("slangUnitTestGetModule");
     if (!getModuleFunc)
         return SLANG_FAIL;
+    printf("FILE LINE: %s %d\n", __FILE__, __LINE__);
 
     IUnitTestModule* testModule = getModuleFunc();
     if (!testModule)
@@ -4597,6 +4598,7 @@ static SlangResult runUnitTestModule(
             }
         }
     }
+    printf("FILE LINE: %s %d\n", __FILE__, __LINE__);
 
     auto runUnitTest = [&](TestItem test)
     {
@@ -4615,6 +4617,7 @@ static SlangResult runUnitTestModule(
             {
                 TestReporter::TestScope scopeTest(reporter, options.command);
                 ExecuteResult exeRes;
+                printf("RPC FILE LINE: %s %d\n", __FILE__, __LINE__);
 
                 SlangResult rpcRes = _executeRPC(
                     context,
@@ -4622,8 +4625,10 @@ static SlangResult runUnitTestModule(
                     TestServerProtocol::ExecuteUnitTestArgs::g_methodName,
                     &args,
                     exeRes);
+                printf("2RPC FILE LINE: %s %d\n", __FILE__, __LINE__);
                 const auto testResult = _asTestResult(ToolReturnCode(exeRes.resultCode));
-
+                printf("2RPC FILE LINE: %s %d\n", __FILE__, __LINE__);
+                
                 // If the test fails, output any output - which might give information about
                 // individual tests that have failed.
                 if (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail)
@@ -4644,7 +4649,11 @@ static SlangResult runUnitTestModule(
             testModule->setTestReporter(reporter);
             try
             {
+                printf("TF FILE LINE: %s %d\n", __FILE__, __LINE__);
+                
                 test.testFunc(&unitTestContext);
+                printf("TF2 FILE LINE: %s %d\n", __FILE__, __LINE__);
+                
             }
             catch (...)
             {
