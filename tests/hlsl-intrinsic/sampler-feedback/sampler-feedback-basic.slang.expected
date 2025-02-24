@@ -67,7 +67,11 @@ standard output = {
             "binding": {"kind": "shaderResource", "index": 0},
             "type": {
                 "kind": "resource",
-                "baseShape": "texture2D"
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "float32"
+                }
             }
         },
         {
@@ -76,7 +80,11 @@ standard output = {
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
-                "array": true
+                "array": true,
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "float32"
+                }
             }
         },
         {

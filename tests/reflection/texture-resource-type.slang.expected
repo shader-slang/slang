@@ -1,0 +1,220 @@
+result code = 0
+standard error = {
+}
+standard output = {
+{
+    "parameters": [
+        {
+            "name": "NoParameters",
+            "binding": {"kind": "shaderResource", "index": 0},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
+            }
+        },
+        {
+            "name": "FloatTexture",
+            "binding": {"kind": "shaderResource", "index": 1},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "float32"
+                }
+            }
+        },
+        {
+            "name": "FloatTwoTexture",
+            "binding": {"kind": "shaderResource", "index": 2},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 2,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
+            }
+        },
+        {
+            "name": "FloatFourTexture",
+            "binding": {"kind": "shaderResource", "index": 3},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
+            }
+        },
+        {
+            "name": "IntTexture",
+            "binding": {"kind": "shaderResource", "index": 4},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "int32"
+                }
+            }
+        },
+        {
+            "name": "IntTwoTexture",
+            "binding": {"kind": "shaderResource", "index": 5},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 2,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "int32"
+                    }
+                }
+            }
+        },
+        {
+            "name": "IntFourTexture",
+            "binding": {"kind": "shaderResource", "index": 6},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "int32"
+                    }
+                }
+            }
+        },
+        {
+            "name": "UintTexture",
+            "binding": {"kind": "shaderResource", "index": 7},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "uint32"
+                }
+            }
+        },
+        {
+            "name": "UintTwoTexture",
+            "binding": {"kind": "shaderResource", "index": 8},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 2,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "uint32"
+                    }
+                }
+            }
+        },
+        {
+            "name": "UintFourTexture",
+            "binding": {"kind": "shaderResource", "index": 9},
+            "type": {
+                "kind": "resource",
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "uint32"
+                    }
+                }
+            }
+        }
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage": "compute",
+            "parameters": [
+                {
+                    "name": "dispatchThreadID",
+                    "semanticName": "SV_DISPATCHTHREADID",
+                    "type": {
+                        "kind": "vector",
+                        "elementCount": 3,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "uint32"
+                        }
+                    }
+                }
+            ],
+            "threadGroupSize": [1, 1, 1],
+            "bindings": [
+                {
+                    "name": "NoParameters",
+                    "binding": {"kind": "shaderResource", "index": 0, "used": 0}
+                },
+                {
+                    "name": "FloatTexture",
+                    "binding": {"kind": "shaderResource", "index": 1, "used": 0}
+                },
+                {
+                    "name": "FloatTwoTexture",
+                    "binding": {"kind": "shaderResource", "index": 2, "used": 0}
+                },
+                {
+                    "name": "FloatFourTexture",
+                    "binding": {"kind": "shaderResource", "index": 3, "used": 0}
+                },
+                {
+                    "name": "IntTexture",
+                    "binding": {"kind": "shaderResource", "index": 4, "used": 0}
+                },
+                {
+                    "name": "IntTwoTexture",
+                    "binding": {"kind": "shaderResource", "index": 5, "used": 0}
+                },
+                {
+                    "name": "IntFourTexture",
+                    "binding": {"kind": "shaderResource", "index": 6, "used": 0}
+                },
+                {
+                    "name": "UintTexture",
+                    "binding": {"kind": "shaderResource", "index": 7, "used": 0}
+                },
+                {
+                    "name": "UintTwoTexture",
+                    "binding": {"kind": "shaderResource", "index": 8, "used": 0}
+                },
+                {
+                    "name": "UintFourTexture",
+                    "binding": {"kind": "shaderResource", "index": 9, "used": 0}
+                }
+            ]
+        }
+    ]
+}
+}

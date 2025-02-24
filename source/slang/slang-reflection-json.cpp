@@ -514,6 +514,10 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
                 break;
 
             case SLANG_STRUCTURED_BUFFER:
+            case SLANG_TEXTURE_1D:
+            case SLANG_TEXTURE_2D:
+            case SLANG_TEXTURE_3D:
+            case SLANG_TEXTURE_CUBE:
                 if (auto resultType = type->getResourceResultType())
                 {
                     writer.maybeComma();
