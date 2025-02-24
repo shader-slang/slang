@@ -20309,7 +20309,7 @@ void ReorderThread( HitObject HitOrMiss )
 ///
 /// There doesn't appear to be an equivalent for debugBreak for HLSL
 
-
+[require(glsl)]
 __specialized_for_target(glsl)
 [[vk::spirv_instruction(1, "NonSemantic.DebugBreak")]]
 void __glslDebugBreak();

@@ -377,6 +377,8 @@ Int getSpecializationConstantId(IRGlobalParam* param);
 
 void legalizeDefUse(IRGlobalValueWithCode* func);
 
+UnownedStringSlice getMangledName(IRInst* inst);
+
 } // namespace Slang
 
 #endif
