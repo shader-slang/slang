@@ -2012,6 +2012,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeTuple:
     case kIROp_MakeValuePack:
+    case kIROp_BuiltinCast:
         return transcribeConstruct(builder, origInst);
     case kIROp_MakeStruct:
         return transcribeMakeStruct(builder, origInst);
