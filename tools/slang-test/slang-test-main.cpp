@@ -4598,7 +4598,7 @@ static SlangResult runUnitTestModule(
             }
         }
     }
-    printf("FILE LINE: %s %d\n", __FILE__, __LINE__);
+    printf("4601 FILE LINE: %s %d\n", __FILE__, __LINE__);
 
     auto runUnitTest = [&](TestItem test)
     {
@@ -4688,10 +4688,15 @@ static SlangResult runUnitTestModule(
         testModule->setTestReporter(reporter);
 
         for (auto t : tests)
+        {
+            printf("Run unit test file %s line %d\n", __FILE__, __LINE__);
             runUnitTest(t);
+            printf("Ran unit test file %s line %d\n", __FILE__, __LINE__);
+        }
     }
 
     testModule->destroy();
+    printf("Done run unit tests file %s line %d\n", __FILE__, __LINE__);
     return SLANG_OK;
 }
 
@@ -4938,14 +4943,18 @@ SlangResult innerMain(int argc, char** argv)
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
                 testOptions.categories.add(smokeTestCategory);
+                out.print("in slang-unit-test-tool FILE LINE: %s %d\n", __FILE__, __LINE__);
                 runUnitTestModule(&context, testOptions, spawnType, "slang-unit-test-tool");
+                out.print("out slang-unit-test-tool FILE LINE: %s %d\n", __FILE__, __LINE__);
             }
             out.print("4932 FILE LINE: %s %d\n", __FILE__, __LINE__);
 
             {
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
+                out.print("in gfx-unit-test-tool FILE LINE: %s %d\n", __FILE__, __LINE__);
                 runUnitTestModule(&context, testOptions, spawnType, "gfx-unit-test-tool");
+                out.print("out gfx-unit-test-tool FILE LINE: %s %d\n", __FILE__, __LINE__);
             }
             out.print("4939 FILE LINE: %s %d\n", __FILE__, __LINE__);
 
