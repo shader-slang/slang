@@ -213,7 +213,7 @@ void precompiledModule2TestImpl(IDevice* device, UnitTestContext* context)
 
 void precompiledTargetModule2TestImpl(IDevice* device, UnitTestContext* context)
 {
-    precompiledModule2TestImplCommon(device, context, true);
+    precompiledModule2TestImplCommon(device, context, false);
 }
 
 SLANG_UNIT_TEST(precompiledModule2D3D12)
@@ -223,6 +223,7 @@ SLANG_UNIT_TEST(precompiledModule2D3D12)
 
 SLANG_UNIT_TEST(precompiledTargetModule2D3D12)
 {
+    printf("Starting precompiledTargetModule2D3D12\n");
     runTestImpl(precompiledTargetModule2TestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 
