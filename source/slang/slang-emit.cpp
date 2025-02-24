@@ -100,7 +100,7 @@
 #include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-synthesize-active-mask.h"
-#include "slang-ir-translate-glsl-global-var.h"
+#include "slang-ir-translate-global-varying-var.h"
 #include "slang-ir-uniformity.h"
 #include "slang-ir-user-type-hint.h"
 #include "slang-ir-validate.h"
@@ -318,7 +318,7 @@ struct RequiredLoweringPassSet
     bool bindingQuery;
     bool meshOutput;
     bool higherOrderFunc;
-    bool glslGlobalVar;
+    bool globalVaryingVar;
     bool glslSSBO;
     bool byteAddressBuffer;
     bool dynamicResource;
@@ -422,7 +422,7 @@ void calcRequiredLoweringPassSet(
     case kIROp_GlobalInputDecoration:
     case kIROp_GlobalOutputDecoration:
     case kIROp_GetWorkGroupSize:
-        result.glslGlobalVar = true;
+        result.globalVaryingVar = true;
         break;
     case kIROp_BindExistentialSlotsDecoration:
         result.bindExistential = true;
@@ -667,8 +667,8 @@ Result linkAndOptimizeIR(
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
         lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(irModule, sink);
 
-    if (requiredLoweringPassSet.glslGlobalVar)
-        translateGLSLGlobalVar(codeGenContext, irModule);
+    if (requiredLoweringPassSet.globalVaryingVar)
+        translateGlobalVaryingVar(codeGenContext, irModule);
 
     if (requiredLoweringPassSet.resolveVaryingInputRef)
         resolveVaryingInputRef(irModule);

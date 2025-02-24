@@ -1,3 +1,6 @@
+// slang-ir-call-graph.h
+#pragma once
+
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 
