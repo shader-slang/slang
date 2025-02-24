@@ -105,6 +105,21 @@
       "configuration": "RelWithDebInfo"
     },
     {
+      "name": "vs2022-debug",
+      "configurePreset": "vs2022",
+      "configuration": "Debug"
+    },
+    {
+      "name": "vs2022-release",
+      "configurePreset": "vs2022",
+      "configuration": "Release"
+    },
+    {
+      "name": "vs2022-releaseWithDebugInfo",
+      "configurePreset": "vs2022",
+      "configuration": "RelWithDebInfo"
+    },
+    {
       "name": "emscripten",
       "configurePreset": "emscripten",
       "configuration": "Release",

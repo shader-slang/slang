@@ -36,8 +36,6 @@ struct Ray
     float3 eval(float t) { return origin + t * dir; }
 };
 
-RaytracingAccelerationStructure sceneBVH;
-
 uint getCommittedStatus<let Flags : int>(RayQuery<Flags> q)
 {
     return q.CommittedStatus();

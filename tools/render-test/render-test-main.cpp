@@ -355,7 +355,7 @@ struct AssignValsFromLayoutContext
             if (field.name.getLength() == 0)
             {
                 // If no name was given, assume by-indexing matching is requested
-                auto fieldCursor = dstCursor.getElement((GfxIndex)fieldIndex);
+                auto fieldCursor = dstCursor.getElement((uint32_t)fieldIndex);
                 if (!fieldCursor.isValid())
                 {
                     StdWriters::getError().print(
@@ -986,15 +986,10 @@ Result RenderTestApp::update()
     auto encoder = m_queue->createCommandEncoder();
     if (m_options.shaderType == Options::ShaderProgramType::Compute)
     {
-        auto rootObject = m_device->createRootShaderObject(m_pipeline);
-        applyBinding(rootObject);
-        rootObject->finalize();
-
         auto passEncoder = encoder->beginComputePass();
-        ComputeState state;
-        state.pipeline = static_cast<IComputePipeline*>(m_pipeline.get());
-        state.rootObject = rootObject;
-        passEncoder->setComputeState(state);
+        auto rootObject =
+            passEncoder->bindPipeline(static_cast<IComputePipeline*>(m_pipeline.get()));
+        applyBinding(rootObject);
         passEncoder->dispatchCompute(
             m_options.computeDispatchSize[0],
             m_options.computeDispatchSize[1],
@@ -1022,11 +1017,6 @@ Result RenderTestApp::update()
     }
     else
     {
-        auto rootObject = m_device->createRootShaderObject(m_pipeline);
-        applyBinding(rootObject);
-        setProjectionMatrix(rootObject);
-        rootObject->finalize();
-
         RenderPassColorAttachment colorAttachment = {};
         colorAttachment.view = m_colorBufferView;
         colorAttachment.loadOp = LoadOp::Clear;
@@ -1041,10 +1031,12 @@ Result RenderTestApp::update()
         renderPass.depthStencilAttachment = &depthStencilAttachment;
 
         auto passEncoder = encoder->beginRenderPass(renderPass);
+        auto rootObject =
+            passEncoder->bindPipeline(static_cast<IRenderPipeline*>(m_pipeline.get()));
+        applyBinding(rootObject);
+        setProjectionMatrix(rootObject);
 
         RenderState state;
-        state.pipeline = static_cast<IRenderPipeline*>(m_pipeline.get());
-        state.rootObject = rootObject;
         state.viewports[0] = Viewport((float)gWindowWidth, (float)gWindowHeight);
         state.viewportCount = 1;
         state.scissorRects[0] = ScissorRect(gWindowWidth, gWindowHeight);
