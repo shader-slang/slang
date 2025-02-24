@@ -4660,7 +4660,8 @@ static SlangResult runUnitTestModule(
                 fflush(stdout);
                 fflush(stderr);
                 printf("TF FILE LINE: %s %d\n", __FILE__, __LINE__);
-                
+                fflush(stdout);
+                fflush(stderr);               
                 test.testFunc(&unitTestContext);
                 printf("TF2 FILE LINE: %s %d\n", __FILE__, __LINE__);
                 printf("FILE LINE: %s %d\n", __FILE__, __LINE__);
@@ -4702,11 +4703,11 @@ static SlangResult runUnitTestModule(
 
         for (auto t : tests)
         {
-            printf("Run unit test file %s line %d\n", __FILE__, __LINE__);
+            printf("A Run unit test file %s line %d\n", __FILE__, __LINE__);
             fflush(stdout);
             fflush(stderr);
             runUnitTest(t);
-            printf("Ran unit test file %s line %d\n", __FILE__, __LINE__);
+            printf("B Ran unit test file %s line %d\n", __FILE__, __LINE__);
             fflush(stdout);
             fflush(stderr);
 

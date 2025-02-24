@@ -1722,6 +1722,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
                         }
                     }
                 }
+                //HERE
             }
         });
 

@@ -138,18 +138,24 @@ void runTestImpl(
     try
     {
         printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+        fflush(stdout);
         renderDocBeginFrame();
         f(device, context);
+        printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+        fflush(stdout);
     }
     catch (AbortTestException& e)
     {
-        printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+        printf("EXCEPTION! File, Line: %s, %d\n", __FILE__, __LINE__);
+        fflush(stdout);
         renderDocEndFrame();
         throw e;
     }
-    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    printf("Dun.. File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
     renderDocEndFrame();
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
 }
 
 #define GFX_CHECK_CALL(x) SLANG_CHECK(!SLANG_FAILED(x))

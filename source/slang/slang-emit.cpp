@@ -2049,6 +2049,37 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     List<uint8_t> spirv, outSpirv;
     emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirv);
 
+    // Re-link together SPIRV
+    /*
+    // Load embedded precompiled libraries from IR into library artifacts
+    List<ComPtr<IArtifact>> libraries;
+    program->enumerateIRModules(
+        [&](IRModule* irModule)
+        {
+            for (auto globalInst : irModule->getModuleInst()->getChildren())
+            {
+                if (target == CodeGenTarget::SPIRVAssembly || target == CodeGenTarget::SPIRV)
+                {
+                    if (auto inst = as<IREmbeddedDownstreamIR>(globalInst))
+                    {
+                        if (inst->getTarget() == CodeGenTarget::SPIRV)
+                        {
+                            auto slice = inst->getBlob()->getStringSlice();
+                            ArtifactDesc desc =
+                                ArtifactDescUtil::makeDescForCompileTarget(SLANG_SPIRV);
+                            desc.kind = ArtifactKind::Library;
+
+                            auto library = ArtifactUtil::createArtifact(desc);
+
+                            library->addRepresentationUnknown(StringBlob::create(slice));
+                            libraries.add(library);
+                        }
+                    }
+                }
+            }
+        });
+
+    */
 #if 0
     String optErr;
     if (SLANG_FAILED(optimizeSPIRV(spirv, optErr, outSpirv)))
