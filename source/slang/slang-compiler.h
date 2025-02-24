@@ -3591,6 +3591,7 @@ public:
 
     RefPtr<RefObject> m_typeCheckingCache;
     TypeCheckingCache* getTypeCheckingCache();
+    std::mutex m_typeCheckingCacheMutex;
 
 private:
     struct BuiltinModuleInfo
