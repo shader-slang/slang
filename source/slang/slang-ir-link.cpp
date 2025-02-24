@@ -303,7 +303,6 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_StructKey:
     case kIROp_InterfaceRequirementEntry:
     case kIROp_GlobalGenericParam:
-    case kIROp_WitnessTable:
     case kIROp_InterfaceType:
         return cloneGlobalValue(this, originalValue);
 

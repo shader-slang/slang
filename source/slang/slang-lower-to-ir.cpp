@@ -8145,16 +8145,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         auto irWitnessTableBaseType = lowerType(subContext, superType);
 
-        // Create the IR-level witness table
-        auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, nullptr);
+        // Register a dummy value to avoid infinite recursions.
+        // Without this, the call to lowerType() can get into an infinite recursion.
+        //
+        context->setGlobalValue(
+            inheritanceDecl,
+            LoweredValInfo::simple(findOuterMostGeneric(subBuilder->getInsertLoc().getParent())));
 
-        // Register the value now, rather than later, to avoid any possible infinite recursion.
+        auto irSubType = lowerType(subContext, subType);
+
+        // Create the IR-level witness table
+        auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, irSubType);
+
+        // Override with the correct witness-table
         context->setGlobalValue(
             inheritanceDecl,
             LoweredValInfo::simple(findOuterMostGeneric(irWitnessTable)));
-
-        auto irSubType = lowerType(subContext, subType);
-        irWitnessTable->setConcreteType(irSubType);
 
         // TODO(JS):
         // Should the mangled name take part in obfuscation if enabled?

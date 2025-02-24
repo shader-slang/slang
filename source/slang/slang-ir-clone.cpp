@@ -309,6 +309,11 @@ void cloneDecoration(
     IRInst* newParent,
     IRModule* module)
 {
+    // If the parent is hoistable and is the same as the original decoration's parent,
+    // skip cloning to avoid duplicating decorations
+    if (getIROpInfo(newParent->getOp()).isHoistable() && oldDecoration->getParent() == newParent)
+        return;
+
     IRBuilder builder(module);
 
     if (auto first = newParent->getFirstDecorationOrChild())
