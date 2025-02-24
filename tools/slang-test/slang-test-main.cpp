@@ -4656,7 +4656,7 @@ static SlangResult runUnitTestModule(
             testModule->setTestReporter(reporter);
             try
             {
-                printf("FILE LINE: %s %d\n", __FILE__, __LINE__);
+                printf("ft1 FILE LINE: %s %d\n", __FILE__, __LINE__);
                 fflush(stdout);
                 fflush(stderr);
                 printf("TF FILE LINE: %s %d\n", __FILE__, __LINE__);
@@ -4777,7 +4777,7 @@ SlangResult innerMain(int argc, char** argv)
 
         for (int i = 0; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
         {
-            out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
+            out.print("4780 abc FILE LINE: %s %d\n", __FILE__, __LINE__);
 
             const SlangPassThrough passThru = SlangPassThrough(i);
             if (passThru == SLANG_PASS_THROUGH_NONE)
@@ -4971,6 +4971,8 @@ SlangResult innerMain(int argc, char** argv)
                 TestOptions testOptions;
                 testOptions.categories.add(unitTestCategory);
                 out.print("in gfx-unit-test-tool FILE LINE: %s %d\n", __FILE__, __LINE__);
+                fflush(stdout);
+                fflush(stderr);
                 runUnitTestModule(&context, testOptions, spawnType, "gfx-unit-test-tool");
                 out.print("out gfx-unit-test-tool FILE LINE: %s %d\n", __FILE__, __LINE__);
             }

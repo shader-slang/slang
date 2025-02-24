@@ -20,6 +20,8 @@ static Slang::Result precompileProgram(
     bool precompileToTarget)
 {
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
     Slang::ComPtr<slang::ISession> slangSession;
     SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
     slang::SessionDesc sessionDesc = {};
@@ -29,6 +31,8 @@ static Slang::Result precompileProgram(
     auto globalSession = slangSession->getGlobalSession();
     globalSession->createSession(sessionDesc, slangSession.writeRef());
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
     slang::IModule* module;
     {
         Slang::ComPtr<slang::IBlob> diagnosticsBlob;
@@ -38,6 +42,8 @@ static Slang::Result precompileProgram(
     if (!module)
         return SLANG_FAIL;
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
     if (precompileToTarget)
     {
         SlangCompileTarget target;
@@ -78,6 +84,8 @@ static Slang::Result precompileProgram(
         }
     }
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
     return SLANG_OK;
 }
 
@@ -93,6 +101,8 @@ void precompiledModule2TestImplCommon(
     GFX_CHECK_CALL_ABORT(
         device->createTransientResourceHeap(transientHeapDesc, transientHeap.writeRef()));
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
     // First, load and compile the slang source.
     ComPtr<ISlangMutableFileSystem> memoryFileSystem =
         ComPtr<ISlangMutableFileSystem>(new Slang::MemoryFileSystem());
@@ -124,6 +134,8 @@ void precompiledModule2TestImplCommon(
         break;
     }
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
     sessionDesc.targets = &targetDesc;
     sessionDesc.fileSystem = memoryFileSystem.get();
     auto globalSession = slangSession->getGlobalSession();
@@ -147,6 +159,8 @@ void precompiledModule2TestImplCommon(
         )";
     memoryFileSystem->saveFile("precompiled-module.slang", moduleSrc, strlen(moduleSrc));
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
     GFX_CHECK_CALL_ABORT(loadComputeProgram(
         device,
         slangSession,
@@ -159,6 +173,8 @@ void precompiledModule2TestImplCommon(
     pipelineDesc.program = shaderProgram.get();
     ComPtr<gfx::IPipelineState> pipelineState;
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
     GFX_CHECK_CALL_ABORT(
         device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
