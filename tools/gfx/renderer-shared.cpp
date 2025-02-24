@@ -1109,26 +1109,99 @@ Result ShaderProgramBase::compileShaders(RendererBase* device)
                              SlangInt entryPointIndex)
     {
         auto stage = entryPointInfo->getStage();
-        ComPtr<ISlangBlob> kernelCode;
-        ComPtr<ISlangBlob> diagnostics;
-        auto compileResult = device->getEntryPointCodeFromShaderCache(
-            entryPointComponent,
-            entryPointIndex,
-            0,
-            kernelCode.writeRef(),
-            diagnostics.writeRef());
-        if (diagnostics)
+        List<ComPtr<ISlangBlob>> kernelCodes;
         {
-            DebugMessageType msgType = DebugMessageType::Warning;
-            if (compileResult != SLANG_OK)
-                msgType = DebugMessageType::Error;
-            getDebugCallback()->handleMessage(
-                msgType,
-                DebugMessageSource::Slang,
-                (char*)diagnostics->getBufferPointer());
+            ComPtr<ISlangBlob> spirv;
+            ComPtr<ISlangBlob> diagnostics;
+            auto compileResult = device->getEntryPointCodeFromShaderCache(
+                entryPointComponent,
+                entryPointIndex,
+                0,
+                spirv.writeRef(),
+                diagnostics.writeRef());
+            if (diagnostics)
+            {
+                DebugMessageType msgType = DebugMessageType::Warning;
+                if (compileResult != SLANG_OK)
+                    msgType = DebugMessageType::Error;
+                getDebugCallback()->handleMessage(
+                    msgType,
+                    DebugMessageSource::Slang,
+                    (char*)diagnostics->getBufferPointer());
+            }
+            kernelCodes.add(spirv);
         }
-        SLANG_RETURN_ON_FAIL(compileResult);
-        SLANG_RETURN_ON_FAIL(createShaderModule(entryPointInfo, kernelCode));
+
+        // If target precompilation was used, kernelCode may only represent the
+        // glue code holding together the bits of precompiled target IR.
+        // Collect those dependency target IRs too.
+        ComPtr<slang::IModulePrecompileService_Experimental> componentPrecompileService;
+        if (entryPointComponent->queryInterface(
+                slang::IModulePrecompileService_Experimental::getTypeGuid(),
+                (void**)componentPrecompileService.writeRef()) == SLANG_OK)
+        {
+            SlangInt dependencyCount = componentPrecompileService->getModuleDependencyCount();
+            if (dependencyCount > 0)
+            {
+                for (int dependencyIndex = 0; dependencyIndex < dependencyCount; dependencyIndex++)
+                {
+                    ComPtr<slang::IModule> dependencyModule;
+                    {
+                        ComPtr<slang::IBlob> diagnosticsBlob;
+                        auto result = componentPrecompileService->getModuleDependency(
+                            dependencyIndex,
+                            dependencyModule.writeRef(),
+                            diagnosticsBlob.writeRef());
+                        if (diagnosticsBlob)
+                        {
+                            DebugMessageType msgType = DebugMessageType::Warning;
+                            if (result != SLANG_OK)
+                                msgType = DebugMessageType::Error;
+                            getDebugCallback()->handleMessage(
+                                msgType,
+                                DebugMessageSource::Slang,
+                                (char*)diagnosticsBlob->getBufferPointer());
+                        }
+                        SLANG_RETURN_ON_FAIL(result);
+                    }
+
+                    ComPtr<slang::IBlob> spirv;
+                    {
+                        ComPtr<slang::IBlob> diagnosticsBlob;
+                        SlangResult result = SLANG_OK;
+                        ComPtr<slang::IModulePrecompileService_Experimental> precompileService;
+                        result = dependencyModule->queryInterface(
+                            slang::IModulePrecompileService_Experimental::getTypeGuid(),
+                            (void**)precompileService.writeRef());
+                        if (result == SLANG_OK)
+                        {
+                            ComPtr<slang::IBlob> diagnosticsBlob;
+                            auto result = precompileService->getPrecompiledTargetCode(
+                                    SLANG_SPIRV,
+                                    spirv.writeRef(),
+                                diagnosticsBlob.writeRef());
+                            if (result == SLANG_OK)
+                            {
+                                kernelCodes.add(spirv);
+                            }
+                            if (diagnosticsBlob)
+                            {
+                                DebugMessageType msgType = DebugMessageType::Warning;
+                                if (result != SLANG_OK)
+                                    msgType = DebugMessageType::Error;
+                                getDebugCallback()->handleMessage(
+                                    msgType,
+                                    DebugMessageSource::Slang,
+                                    (char*)diagnosticsBlob->getBufferPointer());
+                            }
+                        }
+                        SLANG_RETURN_ON_FAIL(result);
+                    }
+                }
+            }
+        }
+
+        SLANG_RETURN_ON_FAIL(createShaderModule(entryPointInfo, kernelCodes));
         return SLANG_OK;
     };
 
@@ -1160,10 +1233,10 @@ Result ShaderProgramBase::compileShaders(RendererBase* device)
 
 Result ShaderProgramBase::createShaderModule(
     slang::EntryPointReflection* entryPointInfo,
-    ComPtr<ISlangBlob> kernelCode)
+    List<ComPtr<ISlangBlob>> kernelCodes)
 {
     SLANG_UNUSED(entryPointInfo);
-    SLANG_UNUSED(kernelCode);
+    SLANG_UNUSED(kernelCodes);
     return SLANG_OK;
 }
 
