@@ -127,6 +127,10 @@ void ResourceCommandEncoder::copyTextureToBuffer(
     assert(srcSubresource.mipLevelCount <= 1);
 
     auto encoder = m_commandBuffer->getMetalBlitCommandEncoder();
+    auto& desc = *static_cast<TextureResourceImpl*>(src)->getDesc();
+    const TextureResource::Extents mipSize = calcMipSize(desc.size, srcSubresource.mipLevel);
+    Size bytesPerImage = mipSize.height * dstRowStride;
+
     encoder->copyFromTexture(
         static_cast<TextureResourceImpl*>(src)->m_texture.get(),
         srcSubresource.baseArrayLayer,
@@ -136,7 +140,7 @@ void ResourceCommandEncoder::copyTextureToBuffer(
         static_cast<BufferResourceImpl*>(dst)->m_buffer.get(),
         dstOffset,
         dstRowStride,
-        dstSize);
+        extent.depth == 1 ? 0 : bytesPerImage);
 }
 
 void ResourceCommandEncoder::uploadBufferData(
@@ -156,7 +160,106 @@ void ResourceCommandEncoder::uploadTextureData(
     ITextureResource::SubresourceData* subResourceData,
     GfxCount subResourceDataCount)
 {
-    SLANG_UNIMPLEMENTED_X("uploadTextureData");
+    auto dstTexture = static_cast<TextureResourceImpl*>(dst);
+    auto& desc = *dstTexture->getDesc();
+
+    // Calculate buffer size needed
+    Size bufferSize = 0;
+    FormatInfo sizeInfo;
+    gfxGetFormatInfo(desc.format, &sizeInfo);
+    MTL::PixelFormat pixelFormat = MetalUtil::translatePixelFormat(desc.format);
+    bool isCompressed = gfxIsCompressedFormat(desc.format);
+
+    Size rowAlignment =
+        isCompressed
+            ? 1
+            : m_commandBuffer->m_device->m_device->minimumLinearTextureAlignmentForPixelFormat(
+                  pixelFormat);
+
+    for (GfxIndex i = 0; i < subResourceRange.mipLevelCount; ++i)
+    {
+        GfxIndex currentLevel = subResourceRange.mipLevel + i;
+        const TextureResource::Extents mipSize = calcMipSize(desc.size, currentLevel);
+
+        auto rowSizeInBytes = (mipSize.width + sizeInfo.blockWidth - 1) / sizeInfo.blockWidth *
+                              sizeInfo.blockSizeInBytes;
+        rowSizeInBytes = (rowSizeInBytes + rowAlignment - 1) & ~(rowAlignment - 1);
+
+        auto numRows = (mipSize.height + sizeInfo.blockHeight - 1) / sizeInfo.blockHeight;
+        bufferSize += (rowSizeInBytes * numRows) * mipSize.depth;
+    }
+    bufferSize *= subResourceRange.layerCount;
+
+    // Create staging buffer
+    NS::SharedPtr<MTL::Buffer> stagingBuffer = NS::TransferPtr(
+        m_commandBuffer->m_device->m_device->newBuffer(bufferSize, MTL::ResourceStorageModeShared));
+
+    if (!stagingBuffer)
+        return;
+
+    auto encoder = m_commandBuffer->getMetalBlitCommandEncoder();
+    if (!encoder)
+        return;
+
+    // Copy data to staging buffer and then to texture
+    Size bufferOffset = 0;
+    for (GfxIndex i = 0; i < subResourceRange.layerCount; i++)
+    {
+        // We only allocate staging buffer with size of one slice.
+        GfxIndex currentSlice = subResourceRange.baseArrayLayer + i;
+        uint8_t* bufferData = (uint8_t*)stagingBuffer->contents();
+        Size dstOffset = 0;
+
+        for (GfxIndex j = 0; j < subResourceRange.mipLevelCount; j++)
+        {
+            GfxIndex currentLevel = subResourceRange.mipLevel + j;
+            const auto& subresourceData = subResourceData[j];
+            const TextureResource::Extents mipSize = calcMipSize(desc.size, currentLevel);
+
+            auto rowSizeInBytes = (mipSize.width + sizeInfo.blockWidth - 1) / sizeInfo.blockWidth *
+                                  sizeInfo.blockSizeInBytes;
+            auto rowSizeInBytesAligned = (rowSizeInBytes + rowAlignment - 1) & ~(rowAlignment - 1);
+
+            auto numRows = (mipSize.height + sizeInfo.blockHeight - 1) / sizeInfo.blockHeight;
+
+            const uint8_t* srcData = (const uint8_t*)subresourceData.data;
+            if (rowSizeInBytesAligned == rowSizeInBytes)
+            {
+                // If the row size is already aligned, we can copy the data directly.
+                memcpy(bufferData + dstOffset, srcData, rowSizeInBytes * numRows * mipSize.depth);
+            }
+            else
+            {
+                for (GfxIndex k = 0; k < mipSize.depth; ++k)
+                {
+                    for (GfxIndex row = 0; row < numRows; ++row)
+                    {
+                        // Copy data to staging buffer, note that the staging buffer has to have the
+                        // same alignment as the texture while the src data doesn't have such
+                        // requirement, therefore we have to copy the data row by row. We don't care
+                        // about the content of the alignment padding.
+                        memcpy(bufferData + dstOffset, srcData, rowSizeInBytes);
+                        dstOffset += rowSizeInBytesAligned;
+                        srcData += rowSizeInBytes;
+                    }
+                }
+            }
+
+            // Copy from staging buffer to texture
+            encoder->copyFromBuffer(
+                stagingBuffer.get(),
+                bufferOffset,
+                rowSizeInBytesAligned,
+                rowSizeInBytesAligned * numRows,
+                MTL::Size(mipSize.width, mipSize.height, mipSize.depth),
+                dstTexture->m_texture.get(),
+                currentSlice,
+                currentLevel,
+                MTL::Origin(offset.x, offset.y, offset.z));
+
+            bufferOffset += rowSizeInBytes * numRows * mipSize.depth;
+        }
+    }
 }
 
 void ResourceCommandEncoder::bufferBarrier(
