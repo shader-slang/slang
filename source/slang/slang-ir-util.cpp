@@ -1528,6 +1528,16 @@ bool isOne(IRInst* inst)
     }
 }
 
+IRPtrTypeBase* asRelevantPtrType(IRInst* inst)
+{
+    if (auto ptrType = as<IRPtrTypeBase>(inst))
+    {
+        if (ptrType->getAddressSpace() != AddressSpace::UserPointer)
+            return ptrType;
+    }
+    return nullptr;
+}
+
 IRPtrTypeBase* isMutablePointerType(IRInst* inst)
 {
     switch (inst->getOp())
@@ -1535,7 +1545,7 @@ IRPtrTypeBase* isMutablePointerType(IRInst* inst)
     case kIROp_ConstRefType:
         return nullptr;
     default:
-        return as<IRPtrTypeBase>(inst);
+        return asRelevantPtrType(inst);
     }
 }
 

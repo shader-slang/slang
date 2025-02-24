@@ -1174,7 +1174,7 @@ IRVar* emitIndexedLocalVar(
     SourceLoc location)
 {
     // Cannot store pointers. Case should have been handled by now.
-    SLANG_RELEASE_ASSERT(!as<IRPtrTypeBase>(baseType));
+    SLANG_RELEASE_ASSERT(!asRelevantPtrType(baseType));
 
     // Cannot store types. Case should have been handled by now.
     SLANG_RELEASE_ASSERT(!as<IRTypeType>(baseType));
@@ -1656,7 +1656,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                             return true;
                         }
                         else if (
-                            as<IRPtrTypeBase>(instToStore->getDataType()) &&
+                            asRelevantPtrType(instToStore->getDataType()) &&
                             !isDifferentialOrRecomputeBlock(defBlock))
                         {
                             return true;

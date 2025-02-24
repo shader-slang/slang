@@ -291,7 +291,7 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
     if (isNoDiffType(origType))
         return nullptr;
 
-    if (auto ptrType = as<IRPtrTypeBase>(origType))
+    if (auto ptrType = asRelevantPtrType(origType))
         return builder->getPtrType(
             origType->getOp(),
             differentiateType(builder, ptrType->getValueType()));
@@ -556,7 +556,7 @@ IRType* AutoDiffTranscriberBase::tryGetDiffPairType(IRBuilder* builder, IRType* 
     if (isNoDiffType(originalType))
         return nullptr;
 
-    if (auto origPtrType = as<IRPtrTypeBase>(originalType))
+    if (auto origPtrType = asRelevantPtrType(originalType))
     {
         if (auto diffPairValueType = tryGetDiffPairType(builder, origPtrType->getValueType()))
             return builder->getPtrType(originalType->getOp(), diffPairValueType);

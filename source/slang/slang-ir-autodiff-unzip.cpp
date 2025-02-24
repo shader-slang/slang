@@ -332,8 +332,8 @@ bool isIntermediateContextType(IRInst* type)
     case kIROp_Specialize:
         return isIntermediateContextType(as<IRSpecialize>(type)->getBase());
     default:
-        if (as<IRPtrTypeBase>(type))
-            return isIntermediateContextType(as<IRPtrTypeBase>(type)->getValueType());
+        if (auto ptrType = asRelevantPtrType(type))
+            return isIntermediateContextType(ptrType->getValueType());
         return false;
     }
 }
