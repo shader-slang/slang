@@ -595,6 +595,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     }
 
     {
+        // Specify -HV 2021 when using a DXC version that supports the newer language model.
         const SemanticVersion firstHlsl2021Version(1, 7);
 
         if (m_desc.version >= firstHlsl2021Version)
