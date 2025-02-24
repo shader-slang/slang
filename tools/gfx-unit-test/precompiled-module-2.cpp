@@ -250,12 +250,20 @@ void precompiledModule2TestImplCommon(
 
 void precompiledModule2TestImpl(IDevice* device, UnitTestContext* context)
 {
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
     precompiledModule2TestImplCommon(device, context, false);
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
 }
 
 void precompiledTargetModule2TestImpl(IDevice* device, UnitTestContext* context)
 {
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
     precompiledModule2TestImplCommon(device, context, false);
+    printf("File, Line: %s, %d\n", __FILE__, __LINE__);
+    fflush(stdout);
 }
 
 SLANG_UNIT_TEST(precompiledModule2D3D12)
