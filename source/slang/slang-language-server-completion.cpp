@@ -728,7 +728,6 @@ void CompletionContext::createSwizzleCandidates(
     }
     else if (auto scalarType = as<BasicExpressionType>(type))
     {
-        const char* memberNames[1] = {"x"};
         String typeStr;
         if (scalarType)
             typeStr = scalarType->toString();
