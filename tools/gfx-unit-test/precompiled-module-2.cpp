@@ -180,7 +180,7 @@ void precompiledModule2TestImplCommon(
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     fflush(stdout);
     fflush(stderr);
-    
+
     const int numberCount = 4;
     float initialData[] = {0.0f, 0.0f, 0.0f, 0.0f};
     IBufferResource::Desc bufferDesc = {};
@@ -199,13 +199,13 @@ void precompiledModule2TestImplCommon(
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     fflush(stdout);
     fflush(stderr);
-    
+
     GFX_CHECK_CALL_ABORT(
         device->createBufferResource(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     fflush(stdout);
     fflush(stderr);
-    
+
     ComPtr<IResourceView> bufferView;
     IResourceView::Desc viewDesc = {};
     viewDesc.type = IResourceView::Type::UnorderedAccess;
@@ -215,7 +215,7 @@ void precompiledModule2TestImplCommon(
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     fflush(stdout);
     fflush(stderr);
-    
+
     // We have done all the set up work, now it is time to start recording a command buffer for
     // GPU execution.
     {
@@ -241,7 +241,7 @@ void precompiledModule2TestImplCommon(
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     fflush(stdout);
     fflush(stderr);
-    
+
     compareComputeResult(device, numbersBuffer, Slang::makeArray<float>(3.0f, 3.0f, 3.0f, 3.0f));
     printf("File, Line: %s, %d\n", __FILE__, __LINE__);
     fflush(stdout);
@@ -298,7 +298,7 @@ SLANG_UNIT_TEST(precompiledTargetModule2Vulkan)
     }
     catch (const std::exception&)
     {
-                printf("Caught exception\n");
+        printf("Caught exception\n");
         fflush(stdout);
     }
     catch (...)
@@ -306,7 +306,6 @@ SLANG_UNIT_TEST(precompiledTargetModule2Vulkan)
         printf("Caught unknown exception\n");
         fflush(stdout);
     }
-
 }
 
 } // namespace gfx_test

@@ -2684,7 +2684,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
         {
             printf("Unable to access 'test' function\n");
         }
-        
+
         printf("Unload handle\n");
         fflush(stdout);
         SharedLibrary::unload(handle);
@@ -4555,12 +4555,16 @@ static SlangResult runUnitTestModule(
     SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary(
         Path::combine(context->dllDirectoryPath, moduleName).getBuffer(),
         moduleLibrary.writeRef()));
-    printf("FILE LINE: %s %d\n", __FILE__, __LINE__); fflush(stdout); fflush(stderr);
+    printf("FILE LINE: %s %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
     UnitTestGetModuleFunc getModuleFunc =
         (UnitTestGetModuleFunc)moduleLibrary->findFuncByName("slangUnitTestGetModule");
     if (!getModuleFunc)
         return SLANG_FAIL;
-    printf("FILE LINE: %s %d\n", __FILE__, __LINE__);    fflush(stdout);    fflush(stderr);
+    printf("FILE LINE: %s %d\n", __FILE__, __LINE__);
+    fflush(stdout);
+    fflush(stderr);
 
     IUnitTestModule* testModule = getModuleFunc();
     if (!testModule)
@@ -4637,7 +4641,7 @@ static SlangResult runUnitTestModule(
                 printf("2RPC FILE LINE: %s %d\n", __FILE__, __LINE__);
                 const auto testResult = _asTestResult(ToolReturnCode(exeRes.resultCode));
                 printf("2RPC FILE LINE: %s %d\n", __FILE__, __LINE__);
-                
+
                 // If the test fails, output any output - which might give information about
                 // individual tests that have failed.
                 if (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail)
@@ -4663,13 +4667,12 @@ static SlangResult runUnitTestModule(
                 fflush(stderr);
                 printf("TF FILE LINE: %s %d\n", __FILE__, __LINE__);
                 fflush(stdout);
-                fflush(stderr);               
+                fflush(stderr);
                 test.testFunc(&unitTestContext);
                 printf("TF2 FILE LINE: %s %d\n", __FILE__, __LINE__);
                 printf("FILE LINE: %s %d\n", __FILE__, __LINE__);
                 fflush(stdout);
                 fflush(stderr);
-                
             }
             catch (...)
             {
@@ -4712,7 +4715,6 @@ static SlangResult runUnitTestModule(
             printf("B Ran unit test file %s line %d\n", __FILE__, __LINE__);
             fflush(stdout);
             fflush(stderr);
-
         }
     }
 
@@ -4775,7 +4777,7 @@ SlangResult innerMain(int argc, char** argv)
     {
         SlangSession* session = context.getSession();
 
-        
+
         out.print("Supported backends:");
 
         for (int i = 0; i < SLANG_PASS_THROUGH_COUNT_OF; ++i)
@@ -4818,7 +4820,7 @@ SlangResult innerMain(int argc, char** argv)
             SLANG_CPP_SOURCE,
             SLANG_SHADER_HOST_CALLABLE);
         out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
+
         if (hasLlvm && hostCallableCompiler == SLANG_PASS_THROUGH_LLVM && SLANG_PROCESSOR_X86)
         {
             // TODO(JS)
@@ -4831,10 +4833,9 @@ SlangResult innerMain(int argc, char** argv)
             categorySet.add("war-double-host-callable", fullTestCategory);
         }
         out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
     }
     out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
+
     // Working out what renderApis is worked on on demand through
     // _getAvailableRenderApiFlags()
 
@@ -4843,21 +4844,21 @@ SlangResult innerMain(int argc, char** argv)
         context.setInnerMainFunc("slangc", &SlangCTool::innerMain);
     }
     out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
+
     SLANG_RETURN_ON_FAIL(
         Options::parse(argc, argv, &categorySet, StdWriters::getError(), &context.options));
     out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
+
     Options& options = context.options;
     out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
+
     context.setMaxTestRunnerThreadCount(options.serverCount);
     out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
+
     // Set up the prelude/s
     TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], context.getSession());
     out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
+
     if (options.outputMode == TestOutputMode::TeamCity)
     {
         // On TeamCity CI there is an issue with unix/linux targets where test system may be
@@ -4876,11 +4877,11 @@ SlangResult innerMain(int argc, char** argv)
     _disableD3D12Backend(&context);
 #endif
     out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
+
     if (options.subCommand.getLength())
     {
         out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
+
         // Get the function from the tool
         auto func = context.getInnerMainFunc(options.binDir, options.subCommand);
         if (!func)
@@ -4907,20 +4908,20 @@ SlangResult innerMain(int argc, char** argv)
             args.getBuffer());
     }
     out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
+
     if (options.includeCategories.getCount() == 0)
     {
         options.includeCategories.add(fullTestCategory, fullTestCategory);
     }
     out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
+
     // Don't include OptiX tests unless the client has explicit opted into them.
     if (!options.includeCategories.containsKey(optixTestCategory))
     {
         options.excludeCategories.add(optixTestCategory, optixTestCategory);
     }
     out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
+
     // Exclude rendering tests when building under AppVeyor.
     //
     // TODO: this is very ad hoc, and we should do something cleaner.
@@ -4947,7 +4948,7 @@ SlangResult innerMain(int argc, char** argv)
             runTestsInDirectory(&context);
         }
         out.print("FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
+
         // Run the unit tests (these are internal C++ tests - not specified via files in a
         // directory) They are registered with SLANG_UNIT_TEST macro
         //
@@ -4987,7 +4988,7 @@ SlangResult innerMain(int argc, char** argv)
             TestReporter::set(nullptr);
         }
         out.print("4941 FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
+
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
         // excution or driver instability. We can try running them again.
         static constexpr int kFailedTestLimitForRetry = 16;
@@ -5021,7 +5022,7 @@ SlangResult innerMain(int argc, char** argv)
             }
         }
         out.print("4975 FILE LINE: %s %d\n", __FILE__, __LINE__);
-        
+
         reporter.outputSummary();
         return reporter.didAllSucceed() ? SLANG_OK : SLANG_FAIL;
     }

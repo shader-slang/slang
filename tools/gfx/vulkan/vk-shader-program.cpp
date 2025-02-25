@@ -1,10 +1,9 @@
 // vk-shader-program.cpp
 #include "vk-shader-program.h"
 
+#include "external/spirv-tools/include/spirv-tools/linker.hpp"
 #include "vk-device.h"
 #include "vk-util.h"
-
-#include "external/spirv-tools/include/spirv-tools/linker.hpp"
 
 namespace gfx
 {
@@ -71,14 +70,14 @@ VkPipelineShaderStageCreateInfo ShaderProgramImpl::compileEntryPoint(
     return shaderStageCreateInfo;
 }
 
-static ComPtr<ISlangBlob> LinkUsingSPIRVTools(List<ComPtr<ISlangBlob> > kernelCodes)
+static ComPtr<ISlangBlob> LinkUsingSPIRVTools(List<ComPtr<ISlangBlob>> kernelCodes)
 {
     spvtools::Context context(SPV_ENV_UNIVERSAL_1_5);
     spvtools::LinkerOptions options;
     spvtools::MessageConsumer consumer = [](spv_message_level_t level,
-                                        const char* source,
-                                        const spv_position_t& position,
-                                        const char* message)
+                                            const char* source,
+                                            const spv_position_t& position,
+                                            const char* message)
     {
         printf("SPIRV-TOOLS: %s\n", message);
         printf("SPIRV-TOOLS: %s\n", source);
@@ -108,7 +107,8 @@ static ComPtr<ISlangBlob> LinkUsingSPIRVTools(List<ComPtr<ISlangBlob> > kernelCo
 
     // Replace kernel code with linked binary
     // Creates a new blob with the linked binary
-    linkedKernelCode = RawBlob::create(linked_binary.data(), linked_binary.size() * sizeof(uint32_t));
+    linkedKernelCode =
+        RawBlob::create(linked_binary.data(), linked_binary.size() * sizeof(uint32_t));
 
     return linkedKernelCode;
 }
