@@ -2684,7 +2684,9 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
         {
             printf("Unable to access 'test' function\n");
         }
-
+        
+        printf("Unload handle\n");
+        fflush(stdout);
         SharedLibrary::unload(handle);
 
         if (!(inValue == value && strcmp(inBuffer, buffer) == 0))

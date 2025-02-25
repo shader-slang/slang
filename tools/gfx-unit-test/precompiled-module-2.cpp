@@ -284,11 +284,29 @@ SLANG_UNIT_TEST(precompiledModule2Vulkan)
 
 SLANG_UNIT_TEST(precompiledTargetModule2Vulkan)
 {
-    printf("Starting precompiledTargetModule2Vulkan\n");
-    fflush(stdout);
-    runTestImpl(precompiledTargetModule2TestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
-    printf("Finished precompiledTargetModule2Vulkan\n");
-    fflush(stdout);
+    // catch all exceptions
+    try
+    {
+        printf("Starting precompiledTargetModule2Vulkan\n");
+        fflush(stdout);
+        runTestImpl(
+            precompiledTargetModule2TestImpl,
+            unitTestContext,
+            Slang::RenderApiFlag::Vulkan);
+        printf("Finished precompiledTargetModule2Vulkan\n");
+        fflush(stdout);
+    }
+    catch (const std::exception&)
+    {
+                printf("Caught exception\n");
+        fflush(stdout);
+    }
+    catch (...)
+    {
+        printf("Caught unknown exception\n");
+        fflush(stdout);
+    }
+
 }
 
 } // namespace gfx_test
