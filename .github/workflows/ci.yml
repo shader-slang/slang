@@ -158,7 +158,7 @@ jobs:
             "$bin_dir/slang-test" \
               -server-count 8 \
               -category ${{ matrix.test-category }} \
-              -api all-cpu \
+              -api all-cpu \              
               -expected-failure-list tests/expected-failure-github.txt \
               gfx-unit-test-tool/precompiledTargetModule2Vulkan
           elif [[ "${{matrix.has-gpu}}" == "true" ]]; then
