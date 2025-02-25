@@ -265,6 +265,9 @@ INST(ExpandTypeOrVal, ExpandTypeOrVal, 1, HOISTABLE)
 // A type that identifies it's contained type as being emittable as `spirv_literal.
 INST(SPIRVLiteralType, spirvLiteralType, 1, HOISTABLE)
 
+// WorkGraphs
+INST(SPIRVNodePayloadArrayType, spirvNodePayloadArrayType, 2, HOISTABLE)
+
 // A TypeType-typed IRValue represents a IRType.
 // It is used to represent a type parameter/argument in a generics.
 INST(TypeType, type_t, 0, HOISTABLE)

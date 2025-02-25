@@ -1757,6 +1757,14 @@ struct IRSPIRVLiteralType : IRType
     IRType* getValueType() { return static_cast<IRType*>(getOperand(0)); }
 };
 
+struct IRSPIRVNodePayloadArrayType : IRType
+{
+    IR_LEAF_ISA(SPIRVNodePayloadArrayType)
+
+    IRType* getRecordType() { return static_cast<IRType*>(getOperand(0)); }
+    IRIntLit* getNodeID() { return static_cast<IRIntLit*>(getOperand(1)); }
+};
+
 struct IRPtrTypeBase : IRType
 {
     IRType* getValueType() { return (IRType*)getOperand(0); }

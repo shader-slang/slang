@@ -2585,12 +2585,36 @@ template<typename T>
 SpvInst* emitOpTypeNodePayloadArray(IRInst* inst, const T& type)
 {
     static_assert(isSingular<T>);
-    return emitInstMemoized(
+    return emitInst(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypeNodePayloadArrayAMDX,
         kResultID,
         type);
+}
+
+// https://htmlpreview.github.io/?https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/AMD/SPV_AMDX_shader_enqueue.html#OpTypeNodePayloadArrayAMDX
+SpvInst* emitOpConstantString(IRInst* inst, const UnownedStringSlice& str)
+{
+    return emitInstMemoized(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpConstantStringAMDX,
+        kResultID,
+        str);
+}
+
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorateId
+template<typename T1, typename T2>
+SpvInst* emitOpDecoratePayloadNodeName(IRInst* inst, const T1& target, const T2& id)
+{
+    return emitInst(
+        getSection(SpvLogicalSectionID::Annotations),
+        inst,
+        SpvOpDecorateId,
+        target,
+        SpvDecorationPayloadNodeNameAMDX,
+        id);
 }
 
 #endif // SLANG_IN_SPIRV_EMIT_CONTEXT
