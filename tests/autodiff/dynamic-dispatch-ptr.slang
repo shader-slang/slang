@@ -1,4 +1,4 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
 
 //CHECK: 1.0 
 
@@ -38,6 +38,6 @@ void computeMain(
 )
 {
     DifferentialPair<float4> dp;
-    __bwd_diff(splat)(s, dp, float4(1.0f));
+    bwd_diff(splat)(s, dp, float4(1.0f));
     outBuffer[id.x] = dp.d;
 }
