@@ -4410,16 +4410,7 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
 
     bool anyDuplicates = false;
     bool anyError = false;
-    if (memberRefExpr->name == getSession()->getCompletionRequestTokenName())
-    {
-        auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
-        suggestions.clear();
-        suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
-        suggestions.swizzleBaseType =
-            memberRefExpr->baseExpression ? memberRefExpr->baseExpression->type : nullptr;
-        suggestions.elementCount[0] = baseElementCount;
-        suggestions.elementCount[1] = 0;
-    }
+
     auto swizzleText = getText(memberRefExpr->name);
 
     for (Index i = 0; i < swizzleText.getLength(); i++)
@@ -4867,6 +4858,28 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
     if (expr->name == getSession()->getCompletionRequestTokenName())
     {
         suggestCompletionItems(CompletionSuggestions::ScopeKind::Member, lookupResult);
+        if (expr->baseExpression)
+        {
+            if (auto vectorType = as<VectorExpressionType>(expr->baseExpression->type))
+            {
+                auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
+                suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
+                suggestions.elementCount[1] = 0;
+                suggestions.swizzleBaseType = vectorType;
+                if (auto elementCount = as<ConstantIntVal>(vectorType->getElementCount()))
+                    suggestions.elementCount[0] = elementCount->getValue();
+                else
+                    suggestions.elementCount[0] = 1;
+            }
+            else if (auto scalarType = as<BasicExpressionType>(expr->baseExpression->type))
+            {
+                auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
+                suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
+                suggestions.elementCount[1] = 0;
+                suggestions.elementCount[0] = 1;
+                suggestions.swizzleBaseType = scalarType;
+            }
+        }
     }
     return createLookupResultExpr(expr->name, lookupResult, expr->baseExpression, expr->loc, expr);
 }

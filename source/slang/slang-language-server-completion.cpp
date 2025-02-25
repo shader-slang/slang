@@ -512,11 +512,14 @@ LanguageServerResult<CompletionResult> CompletionContext::tryCompleteMemberAndSy
 
 CompletionResult CompletionContext::collectMembersAndSymbols()
 {
+    List<LanguageServerProtocol::CompletionItem> result;
+
     auto linkage = version->linkage;
     if (linkage->contentAssistInfo.completionSuggestions.scopeKind ==
         CompletionSuggestions::ScopeKind::Swizzle)
     {
-        return createSwizzleCandidates(
+        createSwizzleCandidates(
+            result,
             linkage->contentAssistInfo.completionSuggestions.swizzleBaseType,
             linkage->contentAssistInfo.completionSuggestions.elementCount);
     }
@@ -526,12 +529,12 @@ CompletionResult CompletionContext::collectMembersAndSymbols()
     {
         return createCapabilityCandidates();
     }
-    List<LanguageServerProtocol::CompletionItem> result;
     bool useCommitChars = true;
     bool addKeywords = false;
     switch (linkage->contentAssistInfo.completionSuggestions.scopeKind)
     {
     case CompletionSuggestions::ScopeKind::Member:
+    case CompletionSuggestions::ScopeKind::Swizzle:
         useCommitChars =
             (commitCharacterBehavior == CommitCharacterBehavior::MembersOnly ||
              commitCharacterBehavior == CommitCharacterBehavior::All);
@@ -698,13 +701,12 @@ CompletionResult CompletionContext::createCapabilityCandidates()
     return result;
 }
 
-CompletionResult CompletionContext::createSwizzleCandidates(
+void CompletionContext::createSwizzleCandidates(
+    List<LanguageServerProtocol::CompletionItem>& result,
     Type* type,
     IntegerLiteralValue elementCount[2])
 {
-    List<LanguageServerProtocol::CompletionItem> result;
     // Hard code members for vector and matrix types.
-    result.clear();
     if (auto vectorType = as<VectorExpressionType>(type))
     {
         const char* memberNames[4] = {"x", "y", "z", "w"};
@@ -723,6 +725,19 @@ CompletionResult CompletionContext::createSwizzleCandidates(
             item.label = memberNames[i];
             result.add(item);
         }
+    }
+    else if (auto scalarType = as<BasicExpressionType>(type))
+    {
+        const char* memberNames[1] = {"x"};
+        String typeStr;
+        if (scalarType)
+            typeStr = scalarType->toString();
+        LanguageServerProtocol::CompletionItem item;
+        item.data = 0;
+        item.detail = typeStr;
+        item.kind = LanguageServerProtocol::kCompletionItemKindVariable;
+        item.label = "x";
+        result.add(item);
     }
     else if (auto matrixType = as<MatrixExpressionType>(type))
     {
@@ -769,12 +784,6 @@ CompletionResult CompletionContext::createSwizzleCandidates(
             result.add(item);
         }
     }
-    for (auto& item : result)
-    {
-        for (auto ch : getCommitChars())
-            item.commitCharacters.add(ch);
-    }
-    return result;
 }
 
 LanguageServerProtocol::CompletionItem CompletionContext::generateGUIDCompletionItem()
