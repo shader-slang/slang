@@ -1103,6 +1103,8 @@ void ShaderProgramBase::init(const IShaderProgram::Desc& inDesc)
 
 Result ShaderProgramBase::compileShaders(RendererBase* device)
 {
+    // Check target type from RenderBase device
+    auto compileTarget = device->slangContext.compileTarget;
     // For a fully specialized program, read and store its kernel code in `shaderProgram`.
     auto compileShader = [&](slang::EntryPointReflection* entryPointInfo,
                              slang::IComponentType* entryPointComponent,
@@ -1111,13 +1113,13 @@ Result ShaderProgramBase::compileShaders(RendererBase* device)
         auto stage = entryPointInfo->getStage();
         List<ComPtr<ISlangBlob>> kernelCodes;
         {
-            ComPtr<ISlangBlob> spirv;
+            ComPtr<ISlangBlob> downstreamIR;
             ComPtr<ISlangBlob> diagnostics;
             auto compileResult = device->getEntryPointCodeFromShaderCache(
                 entryPointComponent,
                 entryPointIndex,
                 0,
-                spirv.writeRef(),
+                downstreamIR.writeRef(),
                 diagnostics.writeRef());
             if (diagnostics)
             {
@@ -1129,7 +1131,7 @@ Result ShaderProgramBase::compileShaders(RendererBase* device)
                     DebugMessageSource::Slang,
                     (char*)diagnostics->getBufferPointer());
             }
-            kernelCodes.add(spirv);
+            kernelCodes.add(downstreamIR);
         }
 
         // If target precompilation was used, kernelCode may only represent the
@@ -1141,6 +1143,7 @@ Result ShaderProgramBase::compileShaders(RendererBase* device)
                 (void**)componentPrecompileService.writeRef()) == SLANG_OK)
         {
             SlangInt dependencyCount = componentPrecompileService->getModuleDependencyCount();
+            printf("There are %d dependencies\n", dependencyCount);
             if (dependencyCount > 0)
             {
                 for (int dependencyIndex = 0; dependencyIndex < dependencyCount; dependencyIndex++)
@@ -1148,10 +1151,14 @@ Result ShaderProgramBase::compileShaders(RendererBase* device)
                     ComPtr<slang::IModule> dependencyModule;
                     {
                         ComPtr<slang::IBlob> diagnosticsBlob;
+                        printf("dependency %d\n", dependencyIndex);
+                        fflush(stdout);
                         auto result = componentPrecompileService->getModuleDependency(
                             dependencyIndex,
                             dependencyModule.writeRef(),
                             diagnosticsBlob.writeRef());
+                        printf("not skippt get.  did nto crash yet\n");
+                        fflush(stdout);
                         if (diagnosticsBlob)
                         {
                             DebugMessageType msgType = DebugMessageType::Warning;
@@ -1165,7 +1172,7 @@ Result ShaderProgramBase::compileShaders(RendererBase* device)
                         SLANG_RETURN_ON_FAIL(result);
                     }
 
-                    ComPtr<slang::IBlob> spirv;
+                    ComPtr<slang::IBlob> downstreamIR;
                     {
                         ComPtr<slang::IBlob> diagnosticsBlob;
                         SlangResult result = SLANG_OK;
@@ -1177,12 +1184,12 @@ Result ShaderProgramBase::compileShaders(RendererBase* device)
                         {
                             ComPtr<slang::IBlob> diagnosticsBlob;
                             auto result = precompileService->getPrecompiledTargetCode(
-                                    SLANG_SPIRV,
-                                    spirv.writeRef(),
+                                    compileTarget,
+                                    downstreamIR.writeRef(),
                                 diagnosticsBlob.writeRef());
                             if (result == SLANG_OK)
                             {
-                                kernelCodes.add(spirv);
+                                kernelCodes.add(downstreamIR);
                             }
                             if (diagnosticsBlob)
                             {
