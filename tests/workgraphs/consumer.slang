@@ -1,4 +1,7 @@
-//TEST:SIMPLE(filecheck=CHK): -target spirv-asm -stage compute -entry main -skip-spirv-validation
+//TEST:SIMPLE(filecheck=CHK): -target spirv-asm -stage compute -entry computeMain -skip-spirv-validation
+
+RWStructuredBuffer<int> outputBuffer;
+
 struct RecordData
 {
     int myData;
@@ -6,19 +9,26 @@ struct RecordData
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void main(uint3 dispatchThreadId : SV_GroupThreadID)
+void computeMain(uint3 dispatchThreadId : SV_GroupThreadID)
 {
     spirv_asm
     {
-        OpExecutionMode $main ShaderIndexAMDX $(0);
-        OpExecutionMode $main StaticNumWorkgroupsAMDX $(1) $(1) $(1);
+        OpExecutionMode $computeMain ShaderIndexAMDX $(0);
+        OpExecutionMode $computeMain StaticNumWorkgroupsAMDX $(1) $(1) $(1);
     };
 
-    DispatchNodeInputRecord<RecordData> inputData;
+    //TODO: "myNodeID" is supposed to come from [NodeID("name")] attribute of the entry point.
+    // Until it is implemented properly, we will use an int-type generic argument.
+    //
+    #define myNodeID 0
+    DispatchNodeInputRecord<RecordData, myNodeID> inputData;
 
-    let recordData = inputData.Get();
-    int myData = recordData.myData;
+    int myData = inputData.Get().myData;
+    outputBuffer[dispatchThreadId.x] = myData;
 }
+
+//CHK: OpCapability ShaderEnqueueAMDX
+//CHK: OpExtension "SPV_AMDX_shader_enqueue"
 
 //CHK: ; Types, variables and constants
 //CHK: [[MemberType:%[a-zA-Z_0-9]+]] = OpTypeInt 32 1
