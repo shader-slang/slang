@@ -407,7 +407,7 @@ INST(WitnessTableEntry, witness_table_entry, 2, 0)
 INST(InterfaceRequirementEntry, interface_req_entry, 2, GLOBAL)
 
 // An inst to represent the workgroup size of the calling entry point.
-// We will materialize this inst during `translateGlobalInOutVar`.
+// We will materialize this inst during `translateGlobalVaryingVar`.
 INST(GetWorkGroupSize, GetWorkGroupSize, 0, HOISTABLE)
 
 // An inst that returns the current stage of the calling entry point.
