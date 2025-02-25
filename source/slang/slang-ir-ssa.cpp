@@ -694,6 +694,7 @@ IRInst* readVarRec(ConstructSSAContext* context, SSABlockInfo* blockInfo, IRVar*
 
             auto type = var->getDataType()->getValueType();
             val = blockInfo->builder.emitUndefined(type);
+            cloneRelevantDecorations(var, val);
         }
         else if (!multiplePreds)
         {
@@ -776,6 +777,7 @@ IRInst* readVar(ConstructSSAContext* context, SSABlockInfo* blockInfo, IRVar* va
         //
         auto type = var->getDataType()->getValueType();
         val = blockInfo->builder.emitUndefined(type);
+        cloneRelevantDecorations(var, val);
         writeVar(context, blockInfo, var, val);
         return val;
     }
