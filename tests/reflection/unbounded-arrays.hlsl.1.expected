@@ -75,7 +75,15 @@ standard output = {
                 "elementCount": 0,
                 "elementType": {
                     "kind": "resource",
-                    "baseShape": "textureCube"
+                    "baseShape": "textureCube",
+                    "resultType": {
+                        "kind": "vector",
+                        "elementCount": 4,
+                        "elementType": {
+                            "kind": "scalar",
+                            "scalarType": "float32"
+                        }
+                    }
                 }
             }
         },
