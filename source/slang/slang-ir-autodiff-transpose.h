@@ -619,7 +619,7 @@ struct DiffTransposePass
                     if (isDifferentialInst(varInst) && tryGetPrimalTypeFromDiffInst(varInst))
                     {
                         if (auto ptrPrimalType =
-                                as<IRPtrTypeBase>(tryGetPrimalTypeFromDiffInst(varInst)))
+                                asRelevantPtrType(tryGetPrimalTypeFromDiffInst(varInst)))
                         {
                             varInst->insertAtEnd(firstRevDiffBlock);
 
@@ -1119,7 +1119,7 @@ struct DiffTransposePass
 
         auto getDiffPairType = [](IRType* type)
         {
-            if (auto ptrType = as<IRPtrTypeBase>(type))
+            if (auto ptrType = asRelevantPtrType(type))
                 type = ptrType->getValueType();
             return as<IRDifferentialPairType>(type);
         };
@@ -1168,7 +1168,7 @@ struct DiffTransposePass
                 argRequiresLoad.add(false);
                 writebacks.add(DiffValWriteBack{instPair->getDiff(), tempVar});
             }
-            else if (!as<IRPtrTypeBase>(arg->getDataType()) && getDiffPairType(arg->getDataType()))
+            else if (!asRelevantPtrType(arg->getDataType()) && getDiffPairType(arg->getDataType()))
             {
                 // Normal differentiable input parameter will become an inout DiffPair parameter
                 // in the propagate func. The split logic has already prepared the initial value
@@ -1240,7 +1240,6 @@ struct DiffTransposePass
             argTypes.add(as<IRPtrTypeBase>(primalContextVar->getDataType())->getValueType());
             argRequiresLoad.add(false);
         }
-
 
         auto revFnType =
             this->autodiffContext->transcriberSet.propagateTranscriber->differentiateFunctionType(

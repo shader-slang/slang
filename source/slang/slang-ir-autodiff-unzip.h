@@ -75,16 +75,15 @@ struct DiffUnzipPass
              primalParam = primalParam->getNextParam())
         {
             auto type = primalParam->getFullType();
-            if (auto ptrType = as<IRPtrTypeBase>(type))
+            if (auto ptrType = asRelevantPtrType(type))
             {
                 type = ptrType->getValueType();
             }
             if (auto pairType = as<IRDifferentialPairType>(type))
             {
                 IRInst* diffType = diffTypeContext.getDiffTypeFromPairType(builder, pairType);
-                if (as<IRPtrTypeBase>(primalParam->getFullType()))
-                    diffType =
-                        builder->getPtrType(primalParam->getFullType()->getOp(), (IRType*)diffType);
+                if (auto ptrType = asRelevantPtrType(primalParam->getFullType()))
+                    diffType = builder->getPtrType(ptrType->getOp(), (IRType*)diffType);
                 auto primalRef = builder->emitPrimalParamRef(primalParam);
                 auto diffRef = builder->emitDiffParamRef((IRType*)diffType, primalParam);
                 builder->markInstAsDifferential(diffRef, pairType->getValueType());
