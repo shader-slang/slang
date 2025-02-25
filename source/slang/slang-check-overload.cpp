@@ -2509,27 +2509,6 @@ String SemanticsVisitor::getCallSignatureString(OverloadResolveContext& context)
 Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 {
     OverloadResolveContext context;
-    // check if this is a core module operator call, if so we want to use cached results
-    // to speed up compilation
-    bool shouldAddToCache = false;
-    OperatorOverloadCacheKey key;
-    TypeCheckingCache* typeCheckingCache = getLinkage()->getTypeCheckingCache();
-    if (auto opExpr = as<OperatorExpr>(expr))
-    {
-        if (key.fromOperatorExpr(opExpr))
-        {
-            OverloadCandidate candidate;
-            if (typeCheckingCache->resolvedOperatorOverloadCache.tryGetValue(key, candidate))
-            {
-                context.bestCandidateStorage = candidate;
-                context.bestCandidate = &context.bestCandidateStorage;
-            }
-            else
-            {
-                shouldAddToCache = true;
-            }
-        }
-    }
 
     // Look at the base expression for the call, and figure out how to invoke it.
     auto funcExpr = expr->functionExpr;
@@ -2569,6 +2548,43 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     context.loc = expr->loc;
     context.sourceScope = m_outerScope;
     context.baseExpr = GetBaseExpr(funcExpr);
+
+    // check if this is a core module operator call, if so we want to use cached results
+    // to speed up compilation
+    bool shouldAddToCache = false;
+    OperatorOverloadCacheKey key;
+    TypeCheckingCache* typeCheckingCache = getLinkage()->getTypeCheckingCache();
+    if (auto opExpr = as<OperatorExpr>(expr))
+    {
+        if (key.fromOperatorExpr(opExpr))
+        {
+            key.isGLSLMode = getShared()->glslModuleDecl != nullptr;
+            ResolvedOperatorOverload candidate;
+            if (typeCheckingCache->resolvedOperatorOverloadCache.tryGetValue(key, candidate))
+            {
+                // We should only use the cached candidate if it is persistent direct declref
+                // created from GlobalSession's ASTBuilder, or it is created in the current Linkage.
+                if (candidate.cacheVersion == typeCheckingCache->version ||
+                    findNextOuterGeneric(candidate.decl) == nullptr)
+                {
+                    context.bestCandidateStorage = candidate.candidate;
+                    context.bestCandidate = &context.bestCandidateStorage;
+                }
+                else
+                {
+                    LookupResultItem overloadCandidate = {};
+                    overloadCandidate.declRef = getOuterGenericOrSelf(candidate.decl);
+                    AddDeclRefOverloadCandidates(overloadCandidate, context, 0);
+                    shouldAddToCache = true;
+                }
+            }
+            else
+            {
+                shouldAddToCache = true;
+            }
+        }
+    }
+
     // We run a special case here where an `InvokeExpr`
     // with a single argument where the base/func expression names
     // a type should always be treated as an explicit type coercion
@@ -2731,7 +2747,18 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         // We will report errors for this one candidate, then, to give
         // the user the most help we can.
         if (shouldAddToCache)
-            typeCheckingCache->resolvedOperatorOverloadCache[key] = *context.bestCandidate;
+        {
+            if (isFromCoreModule(context.bestCandidate->item.declRef.getDecl()) ||
+                getShared()->glslModuleDecl ==
+                    getModuleDecl(context.bestCandidate->item.declRef.getDecl()))
+            {
+                ResolvedOperatorOverload overloadResult;
+                overloadResult.candidate = *context.bestCandidate;
+                overloadResult.decl = context.bestCandidate->item.declRef.getDecl();
+                overloadResult.cacheVersion = typeCheckingCache->version;
+                typeCheckingCache->resolvedOperatorOverloadCache[key] = overloadResult;
+            }
+        }
 
         // Now that we have resolved the overload candidate, we need to undo an `openExistential`
         // operation that was applied to `out` arguments.

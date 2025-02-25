@@ -2175,4 +2175,14 @@ void legalizeDefUse(IRGlobalValueWithCode* func)
     }
 }
 
+UnownedStringSlice getMangledName(IRInst* inst)
+{
+    for (auto decor : inst->getDecorations())
+    {
+        if (auto linkageDecor = as<IRLinkageDecoration>(decor))
+            return linkageDecor->getMangledName();
+    }
+    return UnownedStringSlice();
+}
+
 } // namespace Slang
