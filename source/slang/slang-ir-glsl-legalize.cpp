@@ -1528,6 +1528,43 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
 
                 val = ScalarizedVal::typeAdapter(typeAdapter);
             }
+
+            if (auto requiredArrayType = as<IRArrayTypeBase>(systemValueInfo->requiredType))
+            {
+                // Find first array declarator and handle size mismatch
+                for (auto dd = declarator; dd; dd = dd->next)
+                {
+                    if (dd->flavor != GlobalVaryingDeclarator::Flavor::array)
+                        continue;
+
+                    // Compare the array size
+                    auto declaredArraySize = dd->elementCount;
+                    auto requiredArraySize = requiredArrayType->getElementCount();
+                    if (declaredArraySize == requiredArraySize)
+                        break;
+
+                    auto toSize = getIntVal(requiredArraySize);
+                    auto fromSize = getIntVal(declaredArraySize);
+                    if (toSize < fromSize)
+                    {
+                        context->getSink()->diagnose(
+                            inVarLayout,
+                            Diagnostics::cannotConvertArrayOfSmallerToLargerSize,
+                            fromSize,
+                            toSize);
+                    }
+
+                    // Array sizes differ, need type adapter
+                    RefPtr<ScalarizedTypeAdapterValImpl> typeAdapter =
+                        new ScalarizedTypeAdapterValImpl;
+                    typeAdapter->actualType = systemValueInfo->requiredType;
+                    typeAdapter->pretendType = builder->getArrayType(inType, declaredArraySize);
+                    typeAdapter->val = val;
+
+                    val = ScalarizedVal::typeAdapter(typeAdapter);
+                    break;
+                }
+            }
         }
     }
     else
@@ -1970,6 +2007,42 @@ ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType*
                 fromArray->getElementType(),
                 val,
                 builder->getIntValue(builder->getIntType(), 0));
+        }
+        else if (auto toArray = as<IRArrayTypeBase>(toType))
+        {
+            // If array sizes differ, we need to reshape the array
+            if (fromArray->getElementCount() != toArray->getElementCount())
+            {
+                List<IRInst*> elements;
+
+                // Get array sizes once
+                auto fromSize = getIntVal(fromArray->getElementCount());
+                auto toSize = getIntVal(toArray->getElementCount());
+                SLANG_ASSERT(fromSize <= toSize);
+
+                // Extract elements one at a time up to the source array size
+                for (Index i = 0; i < fromSize; i++)
+                {
+                    auto element = builder->emitElementExtract(
+                        fromArray->getElementType(),
+                        val,
+                        builder->getIntValue(builder->getIntType(), i));
+                    elements.add(element);
+                }
+
+                if (fromSize < toSize)
+                {
+                    // Fill remaining elements with default value up to target size
+                    auto elementType = toArray->getElementType();
+                    auto defaultValue = builder->emitDefaultConstruct(elementType);
+                    for (Index i = fromSize; i < toSize; i++)
+                    {
+                        elements.add(defaultValue);
+                    }
+                }
+
+                val = builder->emitMakeArray(toType, elements.getCount(), elements.getBuffer());
+            }
         }
     }
     // TODO: actually consider what needs to go on here...
