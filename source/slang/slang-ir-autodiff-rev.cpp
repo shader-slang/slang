@@ -370,7 +370,7 @@ IRType* BackwardDiffTranscriberBase::transcribeParamTypeForPropagateFunc(
     auto diffPairType = tryGetDiffPairType(builder, paramType);
     if (diffPairType)
     {
-        if (!as<IRPtrTypeBase>(diffPairType) && !as<IRDifferentialPtrPairType>(diffPairType))
+        if (!asRelevantPtrType(diffPairType) && !as<IRDifferentialPtrPairType>(diffPairType))
             return builder->getInOutType(diffPairType);
         return diffPairType;
     }
@@ -514,7 +514,7 @@ InstPair BackwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRF
             {
                 // As long as the primal parameter is not an out or constref type,
                 // we need to fetch the primal value from the parameter.
-                if (as<IRPtrTypeBase>(propagateParamType))
+                if (asRelevantPtrType(propagateParamType))
                 {
                     primalArg = builder.emitLoad(param);
                 }
@@ -544,7 +544,7 @@ InstPair BackwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRF
         }
         else
         {
-            auto primalPtrType = as<IRPtrTypeBase>(primalParamType);
+            auto primalPtrType = asRelevantPtrType(primalParamType);
             SLANG_RELEASE_ASSERT(primalPtrType);
             auto primalValueType = primalPtrType->getValueType();
             auto var = builder.emitVar(primalValueType);

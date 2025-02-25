@@ -475,6 +475,31 @@ void calcRequiredLoweringPassSet(
     }
 }
 
+void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink)
+{
+    static const int maxDepth = 5;
+    for (int i = 0; i < maxDepth; i++)
+    {
+        auto func = getParentFunc(inst);
+        if (!func)
+            return;
+        bool shouldContinue = false;
+        for (auto use = func->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (auto call = as<IRCall>(user))
+            {
+                sink->diagnose(call, Diagnostics::seeCallOfFunc, func);
+                inst = call;
+                shouldContinue = true;
+                break;
+            }
+        }
+        if (!shouldContinue)
+            return;
+    }
+}
+
 bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
 {
     switch (inst->getOp())
@@ -498,6 +523,7 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
                     {
                         sink->diagnose(inst, Diagnostics::staticAssertionFailureWithoutMessage);
                     }
+                    diagnoseCallStack(inst, sink);
                 }
             }
             else

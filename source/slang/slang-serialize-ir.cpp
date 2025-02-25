@@ -1047,6 +1047,8 @@ Result IRSerialReader::read(
         }
     }
 
+    outModule->buildMangledNameToGlobalInstMap();
+
     return SLANG_OK;
 }
 

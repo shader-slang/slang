@@ -604,7 +604,7 @@ inline bool isRelevantDifferentialPair(IRType* type)
     {
         return true;
     }
-    else if (auto argPtrType = as<IRPtrTypeBase>(type))
+    else if (auto argPtrType = asRelevantPtrType(type))
     {
         if (as<IRDifferentialPairType>(argPtrType->getValueType()))
         {
