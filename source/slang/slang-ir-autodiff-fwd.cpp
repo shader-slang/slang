@@ -1777,7 +1777,7 @@ void insertTempVarForMutableParams(IRModule* module, IRFunc* func)
 
     for (auto param : params)
     {
-        auto ptrType = as<IRPtrTypeBase>(param->getDataType());
+        auto ptrType = asRelevantPtrType(param->getDataType());
         auto tempVar = builder.emitVar(ptrType->getValueType());
         param->replaceUsesWith(tempVar);
         mapParamToTempVar[param] = tempVar;
@@ -2245,7 +2245,7 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(
                 builder->emitDifferentialPairGetPrimal(diffPairParam),
                 builder->emitDifferentialPairGetDifferential(diffType, diffPairParam));
         }
-        else if (auto pairPtrType = as<IRPtrTypeBase>(diffPairType))
+        else if (auto pairPtrType = asRelevantPtrType(diffPairType))
         {
             auto ptrInnerPairType = as<IRDifferentialPairTypeBase>(pairPtrType->getValueType());
             // Make a local copy of the parameter for primal and diff parts.

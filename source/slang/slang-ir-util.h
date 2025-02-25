@@ -271,6 +271,10 @@ bool isZero(IRInst* inst);
 
 bool isOne(IRInst* inst);
 
+// Casts inst to IRPtrTypeBase, excluding UserPointer address space.
+IRPtrTypeBase* asRelevantPtrType(IRInst* inst);
+
+// Returns the pointer type if it is pointer type that is not a const ref or a user pointer.
 IRPtrTypeBase* isMutablePointerType(IRInst* inst);
 
 void initializeScratchData(IRInst* inst);
