@@ -809,9 +809,12 @@ Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSe
 
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
 
-    if (m_typeCheckingCache)
-        linkage->m_typeCheckingCache =
-            new TypeCheckingCache(*static_cast<TypeCheckingCache*>(m_typeCheckingCache.get()));
+    {
+        std::lock_guard<std::mutex> lock(m_typeCheckingCacheMutex);
+        if (m_typeCheckingCache)
+            linkage->m_typeCheckingCache =
+                new TypeCheckingCache(*static_cast<TypeCheckingCache*>(m_typeCheckingCache.get()));
+    }
 
     linkage->setMatrixLayoutMode(desc.defaultMatrixLayoutMode);
 
@@ -1308,14 +1311,16 @@ Linkage::~Linkage()
     if (m_typeCheckingCache)
     {
         auto globalSession = getSessionImpl();
+        std::lock_guard<std::mutex> lock(globalSession->m_typeCheckingCacheMutex);
         if (!globalSession->m_typeCheckingCache ||
             globalSession->getTypeCheckingCache()->resolvedOperatorOverloadCache.getCount() <
                 getTypeCheckingCache()->resolvedOperatorOverloadCache.getCount())
         {
             globalSession->m_typeCheckingCache = m_typeCheckingCache;
+            getTypeCheckingCache()->version++;
         }
+        destroyTypeCheckingCache();
     }
-    destroyTypeCheckingCache();
 }
 
 SearchDirectoryList& Linkage::getSearchDirectories()
