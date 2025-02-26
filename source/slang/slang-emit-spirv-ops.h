@@ -2604,7 +2604,7 @@ SpvInst* emitOpConstantString(IRInst* inst, const UnownedStringSlice& str)
         str);
 }
 
-// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorateId
+// https://github.khronos.org/SPIRV-Registry/extensions/AMD/SPV_AMDX_shader_enqueue.html#_decorations
 template<typename T1, typename T2>
 SpvInst* emitOpDecoratePayloadNodeName(IRInst* inst, const T1& target, const T2& id)
 {
