@@ -1,10 +1,9 @@
 // vk-shader-program.cpp
 #include "vk-shader-program.h"
 
+#include "external/spirv-tools/include/spirv-tools/linker.hpp"
 #include "vk-device.h"
 #include "vk-util.h"
-
-#include "external/spirv-tools/include/spirv-tools/linker.hpp"
 
 namespace gfx
 {

@@ -1,12 +1,12 @@
 // glslang-module.h
 #pragma once
 
-#include "slang-com-ptr.h"
-#include "slang-com-helper.h"
 #include "core/slang-list.h"
-#include "slang.h"
-#include "slang-glslang/slang-glslang.h"
 #include "external/spirv-tools/include/spirv-tools/linker.hpp"
+#include "slang-com-helper.h"
+#include "slang-com-ptr.h"
+#include "slang-glslang/slang-glslang.h"
+#include "slang.h"
 
 namespace gfx
 {

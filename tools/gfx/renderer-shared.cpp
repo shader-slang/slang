@@ -1178,8 +1178,8 @@ Result ShaderProgramBase::compileShaders(RendererBase* device)
                         {
                             ComPtr<slang::IBlob> diagnosticsBlob;
                             auto result = precompileService->getPrecompiledTargetCode(
-                                    compileTarget,
-                                    downstreamIR.writeRef(),
+                                compileTarget,
+                                downstreamIR.writeRef(),
                                 diagnosticsBlob.writeRef());
                             if (result == SLANG_OK)
                             {

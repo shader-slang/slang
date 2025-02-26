@@ -6,8 +6,8 @@
 #include "glslang/Public/ShaderLang.h"
 #include "slang.h"
 #include "spirv-tools/libspirv.h"
-#include "spirv-tools/optimizer.hpp"
 #include "spirv-tools/linker.hpp"
+#include "spirv-tools/optimizer.hpp"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -1028,14 +1028,16 @@ extern "C"
         if (success == SPV_SUCCESS)
         {
             request->linkResult = new uint32_t[linkedBinary.size()];
-            memcpy((void*)request->linkResult, linkedBinary.data(),
+            memcpy(
+                (void*)request->linkResult,
+                linkedBinary.data(),
                 linkedBinary.size() * sizeof(uint32_t));
             request->linkResultSize = linkedBinary.size();
         }
 
         return success;
     }
-    catch(...)
+    catch (...)
     {
         return false;
     }
