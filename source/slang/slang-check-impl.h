@@ -172,15 +172,17 @@ struct BasicTypeKeyPair
 
 struct OperatorOverloadCacheKey
 {
-    intptr_t operatorName;
+    int32_t operatorName;
+    bool isGLSLMode;
     BasicTypeKey args[2];
     bool operator==(OperatorOverloadCacheKey key) const
     {
-        return operatorName == key.operatorName && args[0] == key.args[0] && args[1] == key.args[1];
+        return operatorName == key.operatorName && args[0] == key.args[0] &&
+               args[1] == key.args[1] && isGLSLMode == key.isGLSLMode;
     }
     HashCode getHashCode() const
     {
-        return combineHash((int)(UInt64)(void*)(operatorName), args[0].getRaw(), args[1].getRaw());
+        return combineHash(operatorName, args[0].getRaw(), args[1].getRaw(), isGLSLMode ? 1 : 0);
     }
     bool fromOperatorExpr(OperatorExpr* opExpr)
     {
@@ -299,10 +301,28 @@ struct OverloadCandidate
     SubstitutionSet subst;
 };
 
-struct TypeCheckingCache
+struct ResolvedOperatorOverload
 {
-    Dictionary<OperatorOverloadCacheKey, OverloadCandidate> resolvedOperatorOverloadCache;
+    // The resolved decl.
+    Decl* decl;
+
+    // The cached overload candidate in the current TypeCheckingCache.
+    // Note that a `OverloadCandidate` object is not migratable over different
+    // Linkages (compile sessions), so we will need to use `cacheVersion` to track
+    // if this `candidate` is valid for the current session. If not, we will
+    // recreate it from `decl`.
+    OverloadCandidate candidate;
+    // The version of the TypeCheckingCache for which the cached candidate is valid.
+    int cacheVersion;
+};
+
+struct TypeCheckingCache : public RefObject
+{
+    Dictionary<OperatorOverloadCacheKey, ResolvedOperatorOverload> resolvedOperatorOverloadCache;
     Dictionary<BasicTypeKeyPair, ConversionCost> conversionCostCache;
+
+    // The version used to invalidate the cached declRefs in ResolvedOperatorOverload entries.
+    int version = 0;
 };
 
 enum class CoercionSite
@@ -634,6 +654,9 @@ struct SharedSemanticsContext : public RefObject
     Module* m_module = nullptr;
 
     DiagnosticSink* m_sink = nullptr;
+
+    // Whether the current module has imported the GLSL module.
+    ModuleDecl* glslModuleDecl = nullptr;
 
     /// (optional) modules that comes from previously processed translation units in the
     /// front-end request that are made visible to the module being checked. This allows
@@ -1473,7 +1496,7 @@ public:
     /// by calling a function that indirectly reads the variable) will be allowed and then
     /// exhibit undefined behavior at runtime.
     ///
-    void _validateCircularVarDefinition(VarDeclBase* varDecl);
+    IntVal* _validateCircularVarDefinition(VarDeclBase* varDecl);
 
     bool shouldSkipChecking(Decl* decl, DeclCheckState state);
 
@@ -1511,7 +1534,10 @@ public:
     // perform implicit type conversion.
     ConversionCost getImplicitConversionCost(Decl* decl);
 
-    ConversionCost getImplicitConversionCostWithKnownArg(Decl* decl, Type* toType, Expr* arg);
+    ConversionCost getImplicitConversionCostWithKnownArg(
+        DeclRef<Decl> decl,
+        Type* toType,
+        Expr* arg);
 
 
     BuiltinConversionKind getImplicitConversionBuiltinKind(Decl* decl);

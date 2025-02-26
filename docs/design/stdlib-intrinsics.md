@@ -114,12 +114,6 @@ Sections of the `expansion` string that are to be replaced are prefixed by the `
 * $XH - Ray tracing hit object attribute
 * $P - Type-based prefix as used for CUDA and C++ targets (I8 for int8_t, F32 - float etc)
 
-## __specialized_for_target(target)
-
-Specialized for target allows defining an implementation *body* for a particular target. The target is the same as is used for [__target_intrinsic](#target-intrinsic). 
-
-A declaration can consist of multiple definitions with bodies (for each target) using, `specialized_for_target`, as well as having `target_intrinsic` if that is applicable for a target.
-
 ## __attributeTarget(astClassName)
 
 For an attribute, specifies the AST class (and derived class) the attribute can be applied to.

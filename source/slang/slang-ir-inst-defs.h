@@ -716,6 +716,8 @@ INST(BitNot, bitnot, 1, 0)
 
 INST(Select, select, 3, 0)
 
+INST(CheckpointObject, checkpointObj, 1, 0)
+
 INST(GetStringHash, getStringHash, 1, 0)
 
 INST(WaveGetActiveMask, waveGetActiveMask, 0, 0)
@@ -1202,6 +1204,7 @@ INST(ExtractExistentialWitnessTable,    extractExistentialWitnessTable, 1, HOIST
 INST(ExtractTaggedUnionTag,             extractTaggedUnionTag,      1, 0)
 INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 
+INST(BuiltinCast,                       BuiltinCast,                1, 0)
 INST(BitCast,                           bitCast,                    1, 0)
 INST(Reinterpret,                       reinterpret,                1, 0)
 INST(Unmodified,                        unmodified,                1, 0)

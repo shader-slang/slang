@@ -176,7 +176,7 @@ attribute_syntax [NoDiffThis] : NoDiffThisAttribute;
 // for internal use.
 //
 [__AutoDiffBuiltin]
-export struct NullDifferential : IDifferentiable
+struct NullDifferential : IDifferentiable
 { 
     // for now, we'll use at least one field to make sure the type is non-empty
     uint dummy;
@@ -2074,7 +2074,7 @@ DifferentialPair<T> __d_max(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
 {
     return DifferentialPair<T>(
         max(dpx.p, dpy.p),
-        dpx.p > dpy.p ? dpx.d : dpy.d
+        dpx.p > dpy.p ? dpx.d : (dpx.p < dpy.p ? dpy.d : __mul_p_d(T(0.5), T.dadd(dpx.d, dpy.d)))
     );
 }
 
@@ -2084,8 +2084,8 @@ __generic<T : __BuiltinFloatingPointType>
 [BackwardDerivativeOf(max)]
 void __d_max(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, T.Differential dOut)
 {
-    dpx = diffPair(dpx.p, dpx.p > dpy.p ? dOut : T.dzero());
-    dpy = diffPair(dpy.p, dpy.p > dpx.p ? dOut : T.dzero());
+    dpx = diffPair(dpx.p, dpx.p > dpy.p ? dOut : (dpx.p < dpy.p ? T.dzero() : __mul_p_d(T(0.5), dOut)));
+    dpy = diffPair(dpy.p, dpy.p > dpx.p ? dOut : (dpy.p < dpx.p ? T.dzero() : __mul_p_d(T(0.5), dOut)));
 }
 
 VECTOR_MATRIX_BINARY_DIFF_IMPL(max)
@@ -2099,7 +2099,7 @@ DifferentialPair<T> __d_min(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
 {
     return DifferentialPair<T>(
         min(dpx.p, dpy.p),
-        dpx.p < dpy.p ? dpx.d : dpy.d
+        dpx.p < dpy.p ? dpx.d : (dpx.p > dpy.p ? dpy.d : __mul_p_d(T(0.5), T.dadd(dpx.d, dpy.d)))
     );
 }
 
@@ -2109,8 +2109,8 @@ __generic<T : __BuiltinFloatingPointType>
 [BackwardDerivativeOf(min)]
 void __d_min(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, T.Differential dOut)
 {
-    dpx = diffPair(dpx.p, dpx.p < dpy.p ? dOut : T.dzero());
-    dpy = diffPair(dpy.p, dpy.p < dpx.p ? dOut : T.dzero());
+    dpx = diffPair(dpx.p, dpx.p < dpy.p ? dOut : (dpx.p > dpy.p ? T.dzero() : __mul_p_d(T(0.5), dOut)));
+    dpy = diffPair(dpy.p, dpy.p < dpx.p ? dOut : (dpy.p > dpx.p ? T.dzero() : __mul_p_d(T(0.5), dOut)));
 }
 
 VECTOR_MATRIX_BINARY_DIFF_IMPL(min)

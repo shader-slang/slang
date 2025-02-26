@@ -410,6 +410,11 @@ const char* getBuiltinModuleNameStr(slang::BuiltinModuleName name)
     return result;
 }
 
+TypeCheckingCache* Session::getTypeCheckingCache()
+{
+    return static_cast<TypeCheckingCache*>(m_typeCheckingCache.get());
+}
+
 Session::BuiltinModuleInfo Session::getBuiltinModuleInfo(slang::BuiltinModuleName name)
 {
     Session::BuiltinModuleInfo result;
@@ -700,6 +705,7 @@ SlangResult Session::_readBuiltinModule(
             module->setModuleDecl(moduleDecl);
         }
 
+        srcModule.irModule->setName(module->getNameObj());
         module->setIRModule(srcModule.irModule);
 
         // Put in the loaded module map
@@ -802,6 +808,13 @@ Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSe
     slang::SessionDesc desc = makeFromSizeVersioned<slang::SessionDesc>((uint8_t*)&inDesc);
 
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
+
+    {
+        std::lock_guard<std::mutex> lock(m_typeCheckingCacheMutex);
+        if (m_typeCheckingCache)
+            linkage->m_typeCheckingCache =
+                new TypeCheckingCache(*static_cast<TypeCheckingCache*>(m_typeCheckingCache.get()));
+    }
 
     linkage->setMatrixLayoutMode(desc.defaultMatrixLayoutMode);
 
@@ -1263,9 +1276,6 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
     , m_astBuilder(astBuilder)
     , m_cmdLineContext(new CommandLineContext())
 {
-    if (builtinLinkage)
-        m_astBuilder->m_cachedNodes = builtinLinkage->getASTBuilder()->m_cachedNodes;
-
     getNamePool()->setRootNamePool(session->getRootNamePool());
 
     m_defaultSourceManager.initialize(session->getBuiltinSourceManager(), nullptr);
@@ -1297,7 +1307,20 @@ ISlangUnknown* Linkage::getInterface(const Guid& guid)
 
 Linkage::~Linkage()
 {
-    destroyTypeCheckingCache();
+    // Upstream type checking cache.
+    if (m_typeCheckingCache)
+    {
+        auto globalSession = getSessionImpl();
+        std::lock_guard<std::mutex> lock(globalSession->m_typeCheckingCacheMutex);
+        if (!globalSession->m_typeCheckingCache ||
+            globalSession->getTypeCheckingCache()->resolvedOperatorOverloadCache.getCount() <
+                getTypeCheckingCache()->resolvedOperatorOverloadCache.getCount())
+        {
+            globalSession->m_typeCheckingCache = m_typeCheckingCache;
+            getTypeCheckingCache()->version++;
+        }
+        destroyTypeCheckingCache();
+    }
 }
 
 SearchDirectoryList& Linkage::getSearchDirectories()
@@ -1318,12 +1341,11 @@ TypeCheckingCache* Linkage::getTypeCheckingCache()
     {
         m_typeCheckingCache = new TypeCheckingCache();
     }
-    return m_typeCheckingCache;
+    return static_cast<TypeCheckingCache*>(m_typeCheckingCache.get());
 }
 
 void Linkage::destroyTypeCheckingCache()
 {
-    delete m_typeCheckingCache;
     m_typeCheckingCache = nullptr;
 }
 
@@ -4080,6 +4102,8 @@ RefPtr<Module> Linkage::loadModuleFromIRBlobImpl(
 
     loadedModulesList.add(resultModule);
     resultModule->setPathInfo(filePathInfo);
+    resultModule->getIRModule()->setName(resultModule->getNameObj());
+
     return resultModule;
 }
 

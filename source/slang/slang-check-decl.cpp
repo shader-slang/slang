@@ -147,6 +147,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl);
 
+    void visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl);
+
     void validateGenericConstraintSubType(GenericTypeConstraintDecl* decl, TypeExp type);
 
     void visitGenericDecl(GenericDecl* genericDecl);
@@ -1428,7 +1430,7 @@ bool SemanticsVisitor::shouldSkipChecking(Decl* decl, DeclCheckState state)
     return false;
 }
 
-void SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
+IntVal* SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
 {
     // The easiest way to test if the declaration is circular is to
     // validate it as a constant.
@@ -1442,8 +1444,11 @@ void SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
     //
     //
     if (!isScalarIntegerType(varDecl->type))
-        return;
-    tryConstantFoldDeclRef(DeclRef<VarDeclBase>(varDecl), ConstantFoldingKind::LinkTime, nullptr);
+        return nullptr;
+    return tryConstantFoldDeclRef(
+        DeclRef<VarDeclBase>(varDecl),
+        ConstantFoldingKind::LinkTime,
+        nullptr);
 }
 
 void SemanticsDeclModifiersVisitor::visitStructDecl(StructDecl* structDecl)
@@ -2348,7 +2353,13 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         // a constant with a circular definition.
         //
         varDecl->setCheckState(DeclCheckState::DefinitionChecked);
-        _validateCircularVarDefinition(varDecl);
+
+        // Update constant value
+        //
+        if (!varDecl->val)
+        {
+            varDecl->val = _validateCircularVarDefinition(varDecl);
+        }
     }
     else
     {
@@ -2909,6 +2920,16 @@ void SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
             validateGenericConstraintSubType(decl, type);
         }
     }
+}
+
+void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl)
+{
+    CheckConstraintSubType(decl->toType);
+
+    if (!decl->fromType.type)
+        decl->fromType = TranslateTypeNodeForced(decl->fromType);
+    if (!decl->toType.type)
+        decl->toType = TranslateTypeNodeForced(decl->toType);
 }
 
 void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
@@ -10440,6 +10461,12 @@ void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDec
     {
         return;
     }
+
+    if (getText(moduleDecl->getName()) == "glsl")
+    {
+        getShared()->glslModuleDecl = moduleDecl;
+    }
+
     importedModulesList.add(moduleDecl);
     importedModulesSet.add(moduleDecl);
 

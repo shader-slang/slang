@@ -2664,6 +2664,22 @@ struct IRDiscard : IRTerminatorInst
 {
 };
 
+// Used for representing a distinct copy of an object.
+// This will get lowered into a no-op in the backend,
+// but is useful for IR transformations that need to consider
+// different uses of an inst separately.
+//
+// For example, when we hoist primal insts out of a loop,
+// we need to make distinct copies of the inst for its uses
+// within the loop body and outside of it.
+//
+struct IRCheckpointObject : IRInst
+{
+    IR_LEAF_ISA(CheckpointObject);
+
+    IRInst* getVal() { return getOperand(0); }
+};
+
 // Signals that this point in the code should be unreachable.
 // We can/should emit a dataflow error if we can ever determine
 // that a block ending in one of these can actually be
@@ -4025,7 +4041,7 @@ public:
     /// the inst.
     IRInst* emitDefaultConstructRaw(IRType* type);
 
-    IRInst* emitCast(IRType* type, IRInst* value);
+    IRInst* emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinCast = true);
 
     IRInst* emitVectorReshape(IRType* type, IRInst* value);
 
@@ -4407,6 +4423,8 @@ public:
     IRInst* emitThrow(IRInst* val);
 
     IRInst* emitDiscard();
+
+    IRInst* emitCheckpointObject(IRInst* value);
 
     IRInst* emitUnreachable();
     IRInst* emitMissingReturn();
