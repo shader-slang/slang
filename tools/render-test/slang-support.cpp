@@ -183,7 +183,7 @@ static SlangResult _compileProgramImpl(
     ComPtr<slang::IBlob> diagnostics;
     auto module = slangSession->loadModuleFromSourceString(
         "main",
-        "main.slang",
+        request.source.path,
         source.getBuffer(),
         diagnostics.writeRef());
     if (!module)
