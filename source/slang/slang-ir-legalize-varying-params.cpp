@@ -3,6 +3,7 @@
 
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-lower-out-parameters.h"
 #include "slang-ir-util.h"
 #include "slang-parameter-binding.h"
 
@@ -4005,11 +4006,36 @@ private:
     const UnownedStringSlice userSemanticName = toSlice("user_semantic");
 };
 
+void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointInfo& entryPoint)
+{
+    const auto oldFunc = entryPoint.entryPointFunc;
+    entryPoint.entryPointFunc = lowerOutParameters(oldFunc, sink);
+
+    // Since this will no longer be the entry point function, remove those decorations
+    List<IRDecoration*> ds;
+    for (auto decor : oldFunc->getDecorations())
+    {
+        if (as<IRKeepAliveDecoration>(decor) || as<IREntryPointDecoration>(decor))
+        {
+            ds.add(decor);
+        }
+    }
+
+    for (auto decor : ds)
+    {
+        decor->removeFromParent();
+    }
+}
+
 void legalizeEntryPointVaryingParamsForMetal(
     IRModule* module,
     DiagnosticSink* sink,
     List<EntryPointInfo>& entryPoints)
 {
+    for (auto& e : entryPoints)
+    {
+        legalizeVertexShaderOutputParamsForMetal(sink, e);
+    }
     LegalizeMetalEntryPointContext context(module, sink);
     context.legalizeEntryPoints(entryPoints);
 }
