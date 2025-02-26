@@ -24385,8 +24385,8 @@ uint packUint4x8Clamp(int32_t4 unpackedValue)
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "pack_clamp_s8";
-    case wgsl: __intrinsic_asm "pack4xI8Clamp";
+    case hlsl: __intrinsic_asm "pack_clamp_u8";
+    case wgsl: __intrinsic_asm "pack4xU8Clamp";
     default:
         return packInt4x8(clamp(unpackedValue, 0, 255));
     }
@@ -24401,7 +24401,7 @@ uint packUint4x8Clamp(int16_t4 unpackedValue)
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "pack_clamp_s8";
+    case hlsl: __intrinsic_asm "pack_clamp_u8";
     default:
         return packInt4x8(clamp(unpackedValue, 0, 255));
     }
