@@ -3164,6 +3164,22 @@ SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inV
     return false;
 }
 
+SLANG_API SlangResult
+spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t* rs)
+{
+    auto decl = convert(inVar).getDecl();
+    if (auto varDecl = as<VarDeclBase>(decl))
+    {
+        if (auto constantVal = as<ConstantIntVal>(varDecl->val))
+        {
+            *rs = constantVal->getValue();
+            return 0;
+        }
+    }
+
+    return SLANG_E_INVALID_ARG;
+}
+
 SLANG_API SlangReflectionGeneric* spReflectionVariable_GetGenericContainer(
     SlangReflectionVariable* var)
 {
