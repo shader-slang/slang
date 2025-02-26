@@ -135,7 +135,7 @@ bool isNoDiffType(IRType* paramType)
 
             paramType = attrType->getBaseType();
         }
-        else if (auto ptrType = as<IRPtrTypeBase>(paramType))
+        else if (auto ptrType = asRelevantPtrType(paramType))
         {
             paramType = ptrType->getValueType();
         }
@@ -184,7 +184,7 @@ IRInst* DifferentialPairTypeBuilder::emitFieldAccessor(
     IRStructKey* key)
 {
     IRInst* pairType = nullptr;
-    if (auto basePtrType = as<IRPtrTypeBase>(baseInst->getDataType()))
+    if (auto basePtrType = asRelevantPtrType(baseInst->getDataType()))
     {
         auto loweredType = lowerDiffPairType(builder, basePtrType->getValueType());
 
@@ -203,7 +203,7 @@ IRInst* DifferentialPairTypeBuilder::emitFieldAccessor(
             baseInst,
             key));
     }
-    else if (auto ptrType = as<IRPtrTypeBase>(pairType))
+    else if (auto ptrType = asRelevantPtrType(pairType))
     {
         if (auto ptrInnerSpecializedType = as<IRSpecialize>(ptrType->getValueType()))
         {
@@ -240,7 +240,7 @@ IRInst* DifferentialPairTypeBuilder::emitFieldAccessor(
                 baseInst,
                 key));
         }
-        else if (auto genericPtrType = as<IRPtrTypeBase>(genericType))
+        else if (auto genericPtrType = asRelevantPtrType(genericType))
         {
             if (auto genericPairStructType = as<IRStructType>(genericPtrType->getValueType()))
             {
@@ -1026,12 +1026,9 @@ IRInst* AutoDiffSharedContext::findDifferentiableInterface()
     {
         for (auto globalInst : module->getGlobalInsts())
         {
-            // TODO: This seems like a particularly dangerous way to look for an interface.
-            // See if we can lower IDifferentiable to a separate IR inst.
-            //
             if (auto intf = as<IRInterfaceType>(globalInst))
             {
-                if (auto decor = intf->findDecoration<IRNameHintDecoration>())
+                if (auto decor = intf->findDecoration<IRKnownBuiltinDecoration>())
                 {
                     if (decor->getName() == toSlice("IDifferentiable"))
                     {
@@ -1261,7 +1258,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
             }
 
             addTypeToDictionary((IRType*)item->getBaseType(), item->getWitness());
-
+#if 0
             // TODO: Is this really needed?
             if (!as<IRInterfaceType>(item->getBaseType()) &&
                 !as<IRAssociatedType>(item->getBaseType()))
@@ -1314,6 +1311,7 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
                     addTypeToDictionary((IRType*)diffType, diffWitness);
                 }
             }
+#endif
         }
     }
 }
@@ -1648,7 +1646,7 @@ IRType* DifferentiableTypeConformanceContext::differentiateType(
     IRBuilder* builder,
     IRInst* primalType)
 {
-    if (auto ptrType = as<IRPtrTypeBase>(primalType))
+    if (auto ptrType = asRelevantPtrType(primalType))
         return builder->getPtrType(
             primalType->getOp(),
             differentiateType(builder, ptrType->getValueType()));

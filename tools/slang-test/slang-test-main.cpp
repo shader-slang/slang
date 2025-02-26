@@ -1391,6 +1391,47 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
             }
         }
 
+        // After determining available APIs, print adapter info for each one
+        if (context->options.showAdapterInfo && availableRenderApiFlags)
+        {
+            StdWriters::getOut().print("\nAdapter Information for Available APIs:\n");
+            for (int i = 0; i < int(RenderApiType::CountOf); ++i)
+            {
+                const RenderApiType apiType = RenderApiType(i);
+                const RenderApiFlags apiFlag = RenderApiFlags(1) << int(apiType);
+
+                if (availableRenderApiFlags & apiFlag)
+                {
+                    // Create command line to query adapter info
+                    CommandLine cmdLine;
+                    cmdLine.setExecutableLocation(
+                        ExecutableLocation(context->options.binDir, "render-test"));
+
+                    // Add the API type
+                    StringBuilder builder;
+                    builder << "-" << RenderApiUtil::getApiName(apiType);
+                    cmdLine.addArg(builder);
+
+                    // Add flags to show adapter info and only startup
+                    cmdLine.addArg("-show-adapter-info");
+                    cmdLine.addArg("-only-startup");
+
+                    // Run render-test to get adapter info
+                    ExecuteResult exeRes;
+                    if (SLANG_SUCCEEDED(
+                            spawnAndWaitSharedLibrary(context, "adapter-info", cmdLine, exeRes)))
+                    {
+                        // Output the adapter info
+                        StdWriters::getOut().print(
+                            "\n%s:\n%s",
+                            RenderApiUtil::getApiName(apiType).begin(),
+                            exeRes.standardOutput.getBuffer());
+                    }
+                }
+            }
+            StdWriters::getOut().print("\n");
+        }
+
         context->availableRenderApiFlags = availableRenderApiFlags;
         context->isAvailableRenderApiFlagsValid = true;
     }

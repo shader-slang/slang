@@ -11676,25 +11676,6 @@ vector<T,N> nextafter(vector<T,N> x, vector<T,N> y)
     }
 }
 
-/// Generate a random number (unsupported).
-/// @param x The seed value.
-/// @remarks This function is not supported in that it always returns 0.
-/// @deprecated
-/// @category math
-[__readNone]
-[deprecated("Always returns 0")]
-float noise(float x)
-{
-    return 0;
-}
-
-[__readNone]
-[deprecated("Always returns 0")]
-__generic<let N : int> float noise(vector<float, N> x)
-{
-    return 0;
-}
-
 /// Indicate that an index may be non-uniform at execution time.
 ///
 /// Shader Model 5.1 and 6.x introduce support for dynamic indexing
@@ -20309,7 +20290,7 @@ void ReorderThread( HitObject HitOrMiss )
 ///
 /// There doesn't appear to be an equivalent for debugBreak for HLSL
 
-
+[require(glsl)]
 __specialized_for_target(glsl)
 [[vk::spirv_instruction(1, "NonSemantic.DebugBreak")]]
 void __glslDebugBreak();
@@ -23667,6 +23648,8 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "$0.OuterProductAccumulate($1, $2, $3, $4, $5, $6)";
     case spirv:
         let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
         let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
@@ -23742,6 +23725,8 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "$0.ReduceSumAccumulate($1, $2)";
     case spirv:
         let bufferPtr = buffer.GetBufferPointer();
         spirv_asm

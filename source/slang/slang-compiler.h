@@ -2209,7 +2209,7 @@ public:
     TypeCheckingCache* getTypeCheckingCache();
     void destroyTypeCheckingCache();
 
-    TypeCheckingCache* m_typeCheckingCache = nullptr;
+    RefPtr<RefObject> m_typeCheckingCache = nullptr;
 
     // Modules that have been dynamically loaded via `import`
     //
@@ -3588,6 +3588,10 @@ public:
     CommandOptions m_commandOptions;
 
     int m_typeDictionarySize = 0;
+
+    RefPtr<RefObject> m_typeCheckingCache;
+    TypeCheckingCache* getTypeCheckingCache();
+    std::mutex m_typeCheckingCacheMutex;
 
 private:
     struct BuiltinModuleInfo

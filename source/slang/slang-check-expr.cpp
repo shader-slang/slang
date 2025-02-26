@@ -2378,6 +2378,18 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                 IntegerConstantExpressionCoercionType::AnyInteger,
                 nullptr,
                 ConstantFoldingKind::LinkTime);
+
+            // Validate that array size is greater than zero
+            if (auto constElementCount = as<ConstantIntVal>(elementCount))
+            {
+                if (constElementCount->getValue() <= 0)
+                {
+                    getSink()->diagnose(
+                        subscriptExpr->indexExprs[0],
+                        Diagnostics::invalidArraySize);
+                    return CreateErrorExpr(subscriptExpr);
+                }
+            }
         }
         else if (subscriptExpr->indexExprs.getCount() != 0)
         {

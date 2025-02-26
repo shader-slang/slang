@@ -116,6 +116,7 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_PtrCast:
     case kIROp_Reinterpret:
     case kIROp_BitCast:
+    case kIROp_BuiltinCast:
     case kIROp_MakeTuple:
     case kIROp_MakeDifferentialPair:
     case kIROp_MakeExistential:
@@ -178,7 +179,13 @@ bool opCanBeConstExprByBackwardPass(IRInst* value)
 {
     if (value->getOp() == kIROp_Param)
         return isLoopPhi(as<IRParam, IRDynamicCastBehavior::NoUnwrap>(value));
-    return opCanBeConstExpr(value->getOp());
+    if (opCanBeConstExpr(value->getOp()))
+        return true;
+    if (auto callInst = as<IRCall>(value))
+    {
+        return !callInst->mightHaveSideEffects();
+    }
+    return false;
 }
 
 void markConstExpr(PropagateConstExprContext* context, IRInst* value)
