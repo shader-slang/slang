@@ -1912,6 +1912,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto newType = emitOpTypeNodePayloadArray(
                     inst, nodePayloadArrayType->getRecordType());
 
+                // TODO: This is a temporary hack.
+                // The NodeID must come from an attribute [NodeID("name")].
                 Slang::StringBuilder str;
                 str << "NodeID_" << uint32_t(nodePayloadArrayType->getNodeID()->getValue());
                 SpvInst* spvStr = emitOpConstantString(nullptr, str.getUnownedSlice());
@@ -7854,7 +7856,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         return getSection(SpvLogicalSectionID::Annotations);
                     case SpvOpTypeNodePayloadArrayAMDX:
                         return getSection(SpvLogicalSectionID::ConstantsAndTypes);
-
                     default:
                         return defaultParent;
                     }
