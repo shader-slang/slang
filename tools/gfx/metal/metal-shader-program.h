@@ -33,7 +33,7 @@ public:
 
     virtual Result createShaderModule(
         slang::EntryPointReflection* entryPointInfo,
-        List<ComPtr<ISlangBlob>> kernelCodes) override;
+        List<ComPtr<ISlangBlob>>& kernelCodes) override;
 };
 
 

@@ -21,7 +21,7 @@ ShaderProgramImpl::~ShaderProgramImpl() {}
 
 Result ShaderProgramImpl::createShaderModule(
     slang::EntryPointReflection* entryPointInfo,
-    List<ComPtr<ISlangBlob>> kernelCodes)
+    List<ComPtr<ISlangBlob>>& kernelCodes)
 {
     Module module;
     module.stage = entryPointInfo->getStage();
