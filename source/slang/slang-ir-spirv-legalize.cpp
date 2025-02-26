@@ -422,20 +422,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
 
             AddressSpace addressSpace = AddressSpace::ThreadLocal;
-            // Figure out storage class based on var layout.
-            if (auto layout = getVarLayout(inst))
-            {
-                auto cls = getGlobalParamAddressSpace(layout);
-                if (cls != AddressSpace::Generic)
-                    addressSpace = cls;
-                else if (auto systemValueAttr = layout->findAttr<IRSystemValueSemanticAttr>())
-                {
-                    String semanticName = systemValueAttr->getName();
-                    semanticName = semanticName.toLower();
-                    if (semanticName == "sv_pointsize")
-                        addressSpace = AddressSpace::BuiltinInput;
-                }
-            }
+            // Figure out storage class based on builtin info or var layout.
+            auto cls = getGlobalParamAddressSpace(inst);
+            if (cls != AddressSpace::Generic)
+                addressSpace = cls;
 
             // Don't do any processing for specialization constants.
             if (addressSpace == AddressSpace::SpecializationConstant)
@@ -635,8 +625,22 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return addressSpace;
     }
 
-    AddressSpace getGlobalParamAddressSpace(IRVarLayout* varLayout)
+    AddressSpace getGlobalParamAddressSpace(IRInst* varInst)
     {
+        if (auto builtinDecor = varInst->findDecoration<IRTargetBuiltinVarDecoration>())
+        {
+            switch (builtinDecor->getBuiltinVarName())
+            {
+            case IRTargetBuiltinVarName::SpvInstanceIndex:
+            case IRTargetBuiltinVarName::SpvBaseInstance:
+                return AddressSpace::BuiltinInput;
+            }
+        }
+
+        auto varLayout = getVarLayout(varInst);
+        if (!varLayout)
+            return AddressSpace::Generic;
+
         auto typeLayout = varLayout->getTypeLayout()->unwrapArray();
         if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
         {
@@ -663,15 +667,25 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                      "resolve a storage class address space.");
             }
         }
+        auto systemValueAttr = varLayout->findSystemValueSemanticAttr();
+
+        if (systemValueAttr)
+        {
+            // TODO: is this needed?
+            String semanticName = systemValueAttr->getName();
+            semanticName = semanticName.toLower();
+            if (semanticName == "sv_pointsize")
+                result = AddressSpace::BuiltinInput;
+        }
 
         switch (result)
         {
         case AddressSpace::Input:
-            if (varLayout->findSystemValueSemanticAttr())
+            if (systemValueAttr)
                 result = AddressSpace::BuiltinInput;
             break;
         case AddressSpace::Output:
-            if (varLayout->findSystemValueSemanticAttr())
+            if (systemValueAttr)
                 result = AddressSpace::BuiltinOutput;
             break;
         }
@@ -781,9 +795,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             addressSpace = AddressSpace::GroupShared;
         }
-        else if (const auto varLayout = getVarLayout(inst))
+        else
         {
-            auto cls = getGlobalParamAddressSpace(varLayout);
+            auto cls = getGlobalParamAddressSpace(inst);
             if (cls != AddressSpace::Generic)
                 addressSpace = cls;
         }
