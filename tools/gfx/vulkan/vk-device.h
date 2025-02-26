@@ -1,9 +1,9 @@
 // vk-device.h
 #pragma once
 
+#include "glslang-module.h"
 #include "vk-base.h"
 #include "vk-framebuffer.h"
-#include "glslang-module.h"
 
 namespace gfx
 {
