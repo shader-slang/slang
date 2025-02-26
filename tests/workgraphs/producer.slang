@@ -30,6 +30,8 @@ void computeMain()
 //CHK: OpCapability ShaderEnqueueAMDX
 //CHK: OpExtension "SPV_AMDX_shader_enqueue"
 
+//CHK: ; Annotations
+
 //CHK-DAG: [[RecordType:%[a-zA-Z_0-9]+]] = OpTypeNodePayloadArrayAMDX %RecordData
 //CHK-DAG: [[PtrType:%[a-zA-Z_0-9]+]] = OpTypePointer NodePayloadAMDX [[RecordType]]
 //CHK-DAG: [[NodeID:%[a-zA-Z_0-9]+]] = OpConstantStringAMDX "NodeID_0"
@@ -38,6 +40,8 @@ void computeMain()
 //CHK-NOT: = OpTypeNodePayloadArrayAMDX
 //CHK-NOT: = OpConstantStringAMDX
 //CHK-NOT: OpDecorateID {{.*}} PayloadNodeNameAMDX
+
+//CHK: ; Function
 
 // ThreadNodeOutputRecords::__init()
 //CHK: [[Alloc:%[a-zA-Z_0-9]+]] = OpAllocateNodePayloadsAMDX [[PtrType]] %
