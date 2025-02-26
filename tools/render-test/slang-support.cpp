@@ -349,9 +349,12 @@ static SlangResult compileProgram(
         SLANG_RETURN_ON_FAIL(_compileProgramImpl(globalSession, options, input, request, out));
 
         out.m_requestDEPRECATED = slangOutput.m_requestDEPRECATED;
-        out.desc.slangGlobalScope = slangOutput.desc.slangGlobalScope;
+        // slangOutput.desc.slangGlobalScope and slangOutput.slangProgram are the same object, but
+        // the latter is a ComPtr while the former isn't. Therefore we need to detach so that the
+        // object doesn't get destroyed.
+        SLANG_ASSERT(slangOutput.desc.slangGlobalScope == slangOutput.slangProgram.get());
+        out.desc.slangGlobalScope = slangOutput.slangProgram.detach();
         slangOutput.m_requestDEPRECATED = nullptr;
-
         return SLANG_OK;
     }
 }
