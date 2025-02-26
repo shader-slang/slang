@@ -1931,8 +1931,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_SPIRVNodePayloadArrayType:
             if (auto nodePayloadArrayType = as<IRSPIRVNodePayloadArrayType>(inst))
             {
-                auto newType = emitOpTypeNodePayloadArray(
-                    inst, nodePayloadArrayType->getRecordType());
+                auto newType =
+                    emitOpTypeNodePayloadArray(inst, nodePayloadArrayType->getRecordType());
 
                 // TODO: This is a temporary hack.
                 // The NodeID must come from an attribute [NodeID("name")].
@@ -1941,10 +1941,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 SpvInst* spvStr = emitOpConstantString(nullptr, str.getUnownedSlice());
                 (void)spvStr;
 
-                auto r = emitOpDecoratePayloadNodeName(
-                    nullptr,
-                    newType,
-                    spvStr);
+                auto r = emitOpDecoratePayloadNodeName(nullptr, newType, spvStr);
                 (void)r;
                 return newType;
             }
