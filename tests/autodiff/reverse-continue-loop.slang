@@ -16,7 +16,7 @@ float test_loop_with_continue(float y)
     //CHK-DAG: note: 20 bytes (FixedArray<float, 5> ) used to checkpoint the following item:
     float t = y;
 
-    //CHK-DAG: note: 4 bytes (int32_t) used for a loop counter here:
+    //CHK-DAG: note: 4 bytes (int32_t) used to checkpoint the following item:
     for (int i = 0; i < 3; i++)
     {
         if (t > 4.0)
