@@ -257,6 +257,10 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             outOptions.dx12Experimental = true;
         }
+        else if (argValue == "-show-adapter-info")
+        {
+            outOptions.showAdapterInfo = true;
+        }
         else
         {
             // Lookup

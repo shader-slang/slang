@@ -49,6 +49,7 @@ DIAGNOSTIC(-1, Note, seeUsingOf, "see using of '$0'")
 DIAGNOSTIC(-1, Note, seeDefinitionOfShader, "see definition of shader '$0'")
 DIAGNOSTIC(-1, Note, seeInclusionOf, "see inclusion of '$0'")
 DIAGNOSTIC(-1, Note, seeModuleBeingUsedIn, "see module '$0' being used in '$1'")
+DIAGNOSTIC(-1, Note, seeCallOfFunc, "see call to '$0'")
 DIAGNOSTIC(-1, Note, seePipelineRequirementDefinition, "see pipeline requirement definition")
 DIAGNOSTIC(
     -1,
@@ -605,6 +606,11 @@ DIAGNOSTIC(30019, Error, typeMismatch, "expected an expression of type '$0', got
 DIAGNOSTIC(30021, Error, noApplicationFunction, "$0: no overload takes arguments ($1)")
 DIAGNOSTIC(30022, Error, invalidTypeCast, "invalid type cast between \"$0\" and \"$1\".")
 DIAGNOSTIC(30023, Error, typeHasNoPublicMemberOfName, "\"$0\" does not have public member \"$1\".")
+DIAGNOSTIC(
+    30024,
+    Error,
+    cannotConvertArrayOfSmallerToLargerSize,
+    "Cannot convert array of size $0 to array of size $1 as this would truncate data")
 DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be larger than zero.")
 DIAGNOSTIC(
     30026,
@@ -2055,6 +2061,14 @@ DIAGNOSTIC(
     "shader parameter '$0' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` "
     "specified for Vulkan, nor is `-fvk-$1-shift` used.")
 
+DIAGNOSTIC(
+    39071,
+    Warning,
+    bindingAttributeIgnoredOnUniform,
+    "binding attribute on uniform '$0' will be ignored since it will be packed into the default "
+    "constant buffer at descriptor set 0 binding 0. To use explicit bindings, declare the uniform "
+    "inside a constant buffer.")
+
 //
 
 // 4xxxx - IL code generation.
@@ -2301,7 +2315,7 @@ DIAGNOSTIC(
     41402,
     Error,
     staticAssertionConditionNotConstant,
-    "condition for static assertion cannot be evaluated at the compile-time.")
+    "condition for static assertion cannot be evaluated at compile time.")
 
 DIAGNOSTIC(
     41402,

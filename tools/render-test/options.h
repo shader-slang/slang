@@ -91,6 +91,8 @@ struct Options
 
     bool dx12Experimental = false;
 
+    bool showAdapterInfo = false;
+
     Options() { downstreamArgs.addName("slang"); }
 
     static SlangResult parse(

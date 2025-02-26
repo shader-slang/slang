@@ -1,4 +1,3 @@
-
 /// `[ForwardDerivative(fwdFn)]` attribute can be used to provide a forward-mode
 /// derivative implementation.
 /// Invoking `fwd_diff(decoratedFn)` will place a call to `fwdFn` instead of synthesizing
@@ -79,7 +78,6 @@ attribute_syntax [ForwardDerivative(function)] : ForwardDerivativeAttribute;
 ///
 /// For member functions, or functions nested inside namespaces, `bwdFn` may need to be a fully qualified 
 /// name.
-///
 ///
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [BackwardDerivative(function)] : BackwardDerivativeAttribute;
@@ -178,7 +176,7 @@ attribute_syntax [NoDiffThis] : NoDiffThisAttribute;
 // for internal use.
 //
 [__AutoDiffBuiltin]
-export struct NullDifferential : IDifferentiable
+struct NullDifferential : IDifferentiable
 { 
     // for now, we'll use at least one field to make sure the type is non-empty
     uint dummy;
@@ -2076,7 +2074,7 @@ DifferentialPair<T> __d_max(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
 {
     return DifferentialPair<T>(
         max(dpx.p, dpy.p),
-        dpx.p > dpy.p ? dpx.d : dpy.d
+        dpx.p > dpy.p ? dpx.d : (dpx.p < dpy.p ? dpy.d : __mul_p_d(T(0.5), T.dadd(dpx.d, dpy.d)))
     );
 }
 
@@ -2086,8 +2084,8 @@ __generic<T : __BuiltinFloatingPointType>
 [BackwardDerivativeOf(max)]
 void __d_max(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, T.Differential dOut)
 {
-    dpx = diffPair(dpx.p, dpx.p > dpy.p ? dOut : T.dzero());
-    dpy = diffPair(dpy.p, dpy.p > dpx.p ? dOut : T.dzero());
+    dpx = diffPair(dpx.p, dpx.p > dpy.p ? dOut : (dpx.p < dpy.p ? T.dzero() : __mul_p_d(T(0.5), dOut)));
+    dpy = diffPair(dpy.p, dpy.p > dpx.p ? dOut : (dpy.p < dpx.p ? T.dzero() : __mul_p_d(T(0.5), dOut)));
 }
 
 VECTOR_MATRIX_BINARY_DIFF_IMPL(max)
@@ -2101,7 +2099,7 @@ DifferentialPair<T> __d_min(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
 {
     return DifferentialPair<T>(
         min(dpx.p, dpy.p),
-        dpx.p < dpy.p ? dpx.d : dpy.d
+        dpx.p < dpy.p ? dpx.d : (dpx.p > dpy.p ? dpy.d : __mul_p_d(T(0.5), T.dadd(dpx.d, dpy.d)))
     );
 }
 
@@ -2111,8 +2109,8 @@ __generic<T : __BuiltinFloatingPointType>
 [BackwardDerivativeOf(min)]
 void __d_min(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpy, T.Differential dOut)
 {
-    dpx = diffPair(dpx.p, dpx.p < dpy.p ? dOut : T.dzero());
-    dpy = diffPair(dpy.p, dpy.p < dpx.p ? dOut : T.dzero());
+    dpx = diffPair(dpx.p, dpx.p < dpy.p ? dOut : (dpx.p > dpy.p ? T.dzero() : __mul_p_d(T(0.5), dOut)));
+    dpy = diffPair(dpy.p, dpy.p < dpx.p ? dOut : (dpy.p > dpx.p ? T.dzero() : __mul_p_d(T(0.5), dOut)));
 }
 
 VECTOR_MATRIX_BINARY_DIFF_IMPL(min)
@@ -2150,7 +2148,7 @@ DifferentialPair<T> __d_clamp(DifferentialPair<T> dpx, DifferentialPair<T> dpMin
 {
     return DifferentialPair<T>(
         clamp(dpx.p, dpMin.p, dpMax.p),
-        dpx.p < dpMin.p ? dpMin.d : (dpx.p > dpMax.p ? dpMax.d : dpx.d));
+        (dpx.p >= dpMin.p && dpx.p <= dpMax.p) ? dpx.d : (dpx.p < dpMin.p ? dpMin.d : dpMax.d));
 }
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
@@ -2158,9 +2156,11 @@ __generic<T : __BuiltinFloatingPointType>
 [BackwardDerivativeOf(clamp)]
 void __d_clamp(inout DifferentialPair<T> dpx, inout DifferentialPair<T> dpMin, inout DifferentialPair<T> dpMax, T.Differential dOut)
 {
-    dpx = diffPair(dpx.p, dpx.p > dpMin.p && dpx.p < dpMax.p ? dOut : T.dzero());
-    dpMin = diffPair(dpMin.p, dpx.p <= dpMin.p ? dOut : T.dzero());
-    dpMax = diffPair(dpMax.p, dpx.p >= dpMax.p ? dOut : T.dzero());
+    // Propagate the derivative to x if x is within [min, max] (including the boundaries).
+    dpx = diffPair(dpx.p, (dpx.p >= dpMin.p && dpx.p <= dpMax.p) ? dOut : T.dzero());
+    // If x is strictly below min or above max, the gradient is instead applied to the clamp bounds
+    dpMin = diffPair(dpMin.p, dpx.p < dpMin.p ? dOut : T.dzero());
+    dpMax = diffPair(dpMax.p, dpx.p > dpMax.p ? dOut : T.dzero());
 }
 VECTOR_MATRIX_TERNARY_DIFF_IMPL(clamp)
 

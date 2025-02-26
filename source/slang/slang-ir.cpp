@@ -3995,7 +3995,7 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
     }
 }
 
-IRInst* IRBuilder::emitCast(IRType* type, IRInst* value)
+IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinCast)
 {
     if (isTypeEqual(type, value->getDataType()))
         return value;
@@ -4009,8 +4009,17 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value)
         SLANG_UNREACHABLE("cast from void type");
     }
 
-    SLANG_RELEASE_ASSERT(toStyle != TypeCastStyle::Unknown);
-    SLANG_RELEASE_ASSERT(fromStyle != TypeCastStyle::Unknown);
+    if (toStyle == TypeCastStyle::Unknown || fromStyle == TypeCastStyle::Unknown)
+    {
+        if (fallbackToBuiltinCast)
+        {
+            return emitIntrinsicInst(type, kIROp_BuiltinCast, 1, &value);
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
 
     struct OpSeq
     {
@@ -4057,7 +4066,18 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value)
     auto t = type;
     if (op.op1 != kIROp_Nop)
     {
-        t = getUInt64Type();
+        if (toStyle == TypeCastStyle::Bool)
+            t = getIntType();
+        else
+            t = getUInt64Type();
+        if (auto vecType = as<IRVectorType>(type))
+            t = getVectorType(t, vecType->getElementCount());
+        else if (auto matType = as<IRMatrixType>(type))
+            t = getMatrixType(
+                t,
+                matType->getRowCount(),
+                matType->getColumnCount(),
+                matType->getLayout());
     }
     auto result = emitIntrinsicInst(t, op.op0, 1, &value);
     if (op.op1 != kIROp_Nop)
@@ -4516,6 +4536,18 @@ RefPtr<IRModule> IRModule::create(Session* session)
     moduleInst->module = module;
 
     return module;
+}
+
+void IRModule::buildMangledNameToGlobalInstMap()
+{
+    m_mapMangledNameToGlobalInst.clear();
+    for (auto inst : getGlobalInsts())
+    {
+        if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
+        {
+            m_mapMangledNameToGlobalInst[linkageDecor->getMangledName()].add(inst);
+        }
+    }
 }
 
 IRDominatorTree* IRModule::findOrCreateDominatorTree(IRGlobalValueWithCode* func)
@@ -5259,6 +5291,11 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
         SLANG_ASSERT(as<IRIntLit>(index));
         type = (IRType*)tupleType->getOperand(getIntVal(index));
     }
+    else if (auto hlslInputPatchType = as<IRHLSLInputPatchType>(valueType))
+    {
+        type = hlslInputPatchType->getElementType();
+    }
+
     SLANG_RELEASE_ASSERT(type);
     auto inst = createInst<IRGetElementPtr>(
         this,
@@ -5627,6 +5664,13 @@ IRInst* IRBuilder::emitDiscard()
     return inst;
 }
 
+IRInst* IRBuilder::emitCheckpointObject(IRInst* value)
+{
+    auto inst =
+        createInst<IRCheckpointObject>(this, kIROp_CheckpointObject, value->getFullType(), value);
+    addInst(inst);
+    return inst;
+}
 
 IRInst* IRBuilder::emitBranch(IRBlock* pBlock)
 {
@@ -8288,6 +8332,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:
     case kIROp_WrapExistential:
+    case kIROp_BuiltinCast:
     case kIROp_BitCast:
     case kIROp_CastFloatToInt:
     case kIROp_CastIntToFloat:
