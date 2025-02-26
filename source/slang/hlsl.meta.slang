@@ -24173,37 +24173,37 @@ struct DispatchNodeInputRecord
 
 [__readNone]
 [ForceInline]
-uint16_t __lsb_as_u16(uint32_t val)
+uint16_t __lsbAsUint16(uint32_t val)
 {
     return uint16_t(val & 0xFFU);
 }
 
 [__readNone]
 [ForceInline]
-uint32_t __lsb_as_u32(uint32_t val)
+uint32_t __lsbAsUint32(uint32_t val)
 {
     return (val & 0xFFU);
 }
 
 [__readNone]
 [ForceInline]
-int8_t __lsb_as_s8(uint32_t val)
+int8_t __lsbAsInt8(uint32_t val)
 {
     return int8_t(val);
 }
 
 [__readNone]
 [ForceInline]
-int16_t __lsb_as_s16(uint32_t val)
+int16_t __lsbAsInt16(uint32_t val)
 {
-    return int16_t(__lsb_as_s8(val));
+    return int16_t(__lsbAsInt8(val));
 }
 
 [__readNone]
 [ForceInline]
-int32_t __lsb_as_s32(uint32_t val)
+int32_t __lsbAsInt32(uint32_t val)
 {
-    return int32_t(__lsb_as_s8(val));
+    return int32_t(__lsbAsInt8(val));
 }
 
 //@public:
@@ -24228,9 +24228,9 @@ uint32_t4 unpackUint4x8ToUint32(uint packedValue)
     default:
         return uint32_t4
         (
-            __lsb_as_u32(packedValue),
-            __lsb_as_u32(packedValue >> 8U),
-            __lsb_as_u32(packedValue >> 16U),
+            __lsbAsUint32(packedValue),
+            __lsbAsUint32(packedValue >> 8U),
+            __lsbAsUint32(packedValue >> 16U),
             uint32_t(packedValue >> 24U),
         );
     }
@@ -24254,9 +24254,9 @@ uint16_t4 unpackUint4x8ToUint16(uint packedValue)
     default:
         return uint16_t4
         (
-            __lsb_as_u16(packedValue),
-            __lsb_as_u16(packedValue >> 8U),
-            __lsb_as_u16(packedValue >> 16U),
+            __lsbAsUint16(packedValue),
+            __lsbAsUint16(packedValue >> 8U),
+            __lsbAsUint16(packedValue >> 16U),
             uint16_t(packedValue >> 24U),
         );
     }
@@ -24281,9 +24281,9 @@ int32_t4 unpackInt4x8ToInt32(uint packedValue)
     default:
         return int32_t4
         (
-            __lsb_as_s32(packedValue),
-            __lsb_as_s32(packedValue >> 8U),
-            __lsb_as_s32(packedValue >> 16U),
+            __lsbAsInt32(packedValue),
+            __lsbAsInt32(packedValue >> 8U),
+            __lsbAsInt32(packedValue >> 16U),
             int32_t(int8_t(packedValue >> 24U)),
         );
     }
@@ -24307,9 +24307,9 @@ int16_t4 unpackInt4x8ToInt16(uint packedValue)
     default:
         return int16_t4
         (
-            __lsb_as_s16(packedValue),
-            __lsb_as_s16(packedValue >> 8U),
-            __lsb_as_s16(packedValue >> 16U),
+            __lsbAsInt16(packedValue),
+            __lsbAsInt16(packedValue >> 8U),
+            __lsbAsInt16(packedValue >> 16U),
             int16_t(int8_t(packedValue >> 24U)),
         );
     }
@@ -24326,9 +24326,9 @@ uint packUint4x8(uint32_t4 unpackedValue)
     case hlsl: __intrinsic_asm "pack_u8";
     case wgsl: __intrinsic_asm "pack4xU8";
     default:
-        return __lsb_as_u32(unpackedValue.x)
-            | (__lsb_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_as_u32(unpackedValue.z) << 16U)
+        return __lsbAsUint32(unpackedValue.x)
+            | (__lsbAsUint32(unpackedValue.y) << 8U)
+            | (__lsbAsUint32(unpackedValue.z) << 16U)
             | (unpackedValue.w << 24U);
     }
 }
