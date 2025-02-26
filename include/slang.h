@@ -4356,6 +4356,9 @@ struct IModule : public IComponentType
 {
     SLANG_COM_INTERFACE(0xc720e64, 0x8722, 0x4d31, {0x89, 0x90, 0x63, 0x8a, 0x98, 0xb1, 0xc2, 0x79})
 
+    /// Find and an entry point by name.
+    /// Note that this does not work in case the function is not explicitly designated as an entry point, e.g. using a `[shader("...")]` attribute.
+    /// In such cases, consider using `IModule::findAndCheckEntryPoint` instead.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     findEntryPointByName(char const* name, IEntryPoint** outEntryPoint) = 0;
 
