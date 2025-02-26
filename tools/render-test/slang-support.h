@@ -68,7 +68,6 @@ struct ShaderCompilerUtil
         ShaderProgramDesc desc = {};
 
         ComPtr<slang::ISession> m_session = nullptr;
-        slang::ProgramLayout* getReflection() const { return slangProgram->getLayout(); }
 
         slang::IGlobalSession* globalSession = nullptr;
     };
