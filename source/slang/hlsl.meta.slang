@@ -17291,8 +17291,8 @@ uint dot4add_u8packed(uint x, uint y, uint acc)
             result:$$uint = OpIAdd %dotResult $acc;
         };
     default:
-        uint4 vecX = unpack_u8u32(uint8_t4_packed(x));
-        uint4 vecY = unpack_u8u32(uint8_t4_packed(y));
+        uint4 vecX = unpackUint4x8ToUint32(x);
+        uint4 vecY = unpackUint4x8ToUint32(y);
         return dot(vecX, vecY) + acc;
     }
 }
@@ -17319,8 +17319,8 @@ int dot4add_i8packed(uint x, uint y, int acc)
             result:$$int = OpIAdd %dotResult $acc;
         };
     default:
-        int4 vecX = unpack_s8s32(int8_t4_packed(x));
-        int4 vecY = unpack_s8s32(int8_t4_packed(y));
+        int4 vecX = unpackInt4x8ToInt32(x);
+        int4 vecY = unpackInt4x8ToInt32(y);
         return dot(vecX, vecY) + acc;
     }
 }
