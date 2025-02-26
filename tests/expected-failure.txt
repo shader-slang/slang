@@ -6,5 +6,3 @@ tests/bugs/byte-address-buffer-interlocked-add-f32.slang (vk)
 tests/ir/loop-unroll-0.slang.1 (vk)
 tests/hlsl-intrinsic/texture/float-atomics.slang (vk)
 gfx-unit-test-tool/precompiledTargetModule2Vulkan.internal
-tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables.slang.8 (mtl)
-tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables-2.slang.3 (mtl)
