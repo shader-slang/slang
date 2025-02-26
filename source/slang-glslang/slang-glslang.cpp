@@ -7,6 +7,7 @@
 #include "slang.h"
 #include "spirv-tools/libspirv.h"
 #include "spirv-tools/optimizer.hpp"
+#include "spirv-tools/linker.hpp"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -976,4 +977,66 @@ extern "C"
     request.sizeInBytes = sizeof(request);
     request.set(*inRequest);
     return glslang_compile_1_1(&request);
+}
+
+extern "C"
+#ifdef _MSC_VER
+    _declspec(dllexport)
+#else
+    __attribute__((__visibility__("default")))
+#endif
+        int glslang_linkSPIRV(glslang_LinkRequest* request)
+{
+    if (!request || !request->modules || request->linkResult)
+        return false;
+
+    try
+    {
+        spvtools::Context context(SPV_ENV_UNIVERSAL_1_5);
+        spvtools::LinkerOptions options = {};
+
+        spvtools::MessageConsumer consumer = [](spv_message_level_t level,
+                                                const char* source,
+                                                const spv_position_t& position,
+                                                const char* message)
+        {
+            printf("SPIRV-TOOLS: %s\n", message);
+            printf("SPIRV-TOOLS: %s\n", source);
+            printf("SPIRV-TOOLS: %zu:%zu\n", position.index, position.column);
+        };
+        context.SetMessageConsumer(consumer);
+
+        std::vector<std::vector<uint32_t>> moduleVecs(request->moduleCount);
+        std::vector<const uint32_t*> moduleData(request->moduleCount);
+        std::vector<size_t> moduleSizes(request->moduleCount);
+
+        for (size_t i = 0; i < request->moduleCount; ++i)
+        {
+            moduleData[i] = request->modules[i];
+            moduleSizes[i] = request->moduleSizes[i];
+        }
+
+        std::vector<uint32_t> linkedBinary;
+        spv_result_t success = spvtools::Link(
+            context,
+            moduleData.data(),
+            moduleSizes.data(),
+            request->moduleCount,
+            &linkedBinary,
+            options);
+
+        if (success == SPV_SUCCESS)
+        {
+            request->linkResult = new uint32_t[linkedBinary.size()];
+            memcpy((void*)request->linkResult, linkedBinary.data(),
+                linkedBinary.size() * sizeof(uint32_t));
+            request->linkResultSize = linkedBinary.size();
+        }
+
+        return success;
+    }
+    catch(...)
+    {
+        return false;
+    }
 }

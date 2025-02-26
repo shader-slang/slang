@@ -3,6 +3,7 @@
 
 #include "vk-base.h"
 #include "vk-framebuffer.h"
+#include "glslang-module.h"
 
 namespace gfx
 {
@@ -196,6 +197,7 @@ public:
 
     VulkanModule m_module;
     VulkanApi m_api;
+    GlslangModule m_glslang;
 
     VulkanDeviceQueue m_deviceQueue;
     uint32_t m_queueFamilyIndex;
