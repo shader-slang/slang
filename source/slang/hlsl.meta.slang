@@ -24017,7 +24017,7 @@ T workgroupUniformLoad<T>(__ref T v)
 }
 
 //
-// Pack/Unpack Math Intrinsics
+// HLSL Pack/Unpack Math Intrinsics
 //
 // These were introduced in SM 6.6 but requirements are dropped to SM 5.0 here
 // to expose these intrinsics on targets that do not have SM 6.6 features.
@@ -24025,13 +24025,16 @@ T workgroupUniformLoad<T>(__ref T v)
 
 //@public:
 
+typealias uint8_t4_packed = uint;
+typealias int8_t4_packed = uint;
+
 /// Unpack 4 signed 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int16_t4 unpack_s8s16(int8_t4_packed packed)
 {
-    return unpackInt4x8ToInt16(uint(packed));
+    return unpackInt4x8ToInt16(packed);
 }
 
 /// Unpack 4 unsigned 8-bit values into a vector of 16 bit integers.
@@ -24040,7 +24043,7 @@ int16_t4 unpack_s8s16(int8_t4_packed packed)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint16_t4 unpack_u8u16(uint8_t4_packed packed)
 {
-    return unpackUint4x8ToUint16(uint(packed));
+    return unpackUint4x8ToUint16(packed);
 }
 
 /// Unpack 4 signed 8-bit values into a vector of 32 bit integers.
@@ -24049,7 +24052,7 @@ uint16_t4 unpack_u8u16(uint8_t4_packed packed)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int32_t4 unpack_s8s32(int8_t4_packed packed)
 {
-    return unpackInt4x8ToInt32(uint(packed));
+    return unpackInt4x8ToInt32(packed);
 }
 
 /// Unpack 4 unsigned 8-bit values into a vector of 32 bit integers.
@@ -24058,7 +24061,7 @@ int32_t4 unpack_s8s32(int8_t4_packed packed)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint32_t4 unpack_u8u32(uint8_t4_packed packed)
 {
-    return unpackUint4x8ToUint32(uint(packed));
+    return unpackUint4x8ToUint32(packed);
 }
 
 /// Pack a vector of 4 unsigned 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
@@ -24067,7 +24070,7 @@ uint32_t4 unpack_u8u32(uint8_t4_packed packed)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint8_t4_packed pack_u8(uint32_t4 unpackedValue)
 {
-    return uint8_t4_packed(packUint4x8(unpackedValue));
+    return packUint4x8(unpackedValue);
 }
 
 /// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
@@ -24076,7 +24079,7 @@ uint8_t4_packed pack_u8(uint32_t4 unpackedValue)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int8_t4_packed pack_s8(int32_t4 unpackedValue)
 {
-    return int8_t4_packed(packInt4x8(unpackedValue));
+    return packInt4x8(unpackedValue);
 }
 
 /// Pack a vector of 4 unsigned 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
@@ -24085,7 +24088,7 @@ int8_t4_packed pack_s8(int32_t4 unpackedValue)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint8_t4_packed pack_u8(uint16_t4 unpackedValue)
 {
-    return uint8_t4_packed(packUint4x8(unpackedValue));
+    return packUint4x8(unpackedValue);
 }
 
 /// Pack a vector of 4 signed 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
@@ -24094,7 +24097,7 @@ uint8_t4_packed pack_u8(uint16_t4 unpackedValue)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int8_t4_packed pack_s8(int16_t4 unpackedValue)
 {
-    return int8_t4_packed(packInt4x8(unpackedValue));
+    return packInt4x8(unpackedValue);
 }
 
 /// Pack a vector of 4 unsigned 32 bit integers into a packed value of 4 8-bit integers,
@@ -24104,7 +24107,7 @@ int8_t4_packed pack_s8(int16_t4 unpackedValue)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint8_t4_packed pack_clamp_u8(int32_t4 unpackedValue)
 {
-    return uint8_t4_packed(packUint4x8Clamp(unpackedValue));
+    return packUint4x8Clamp(unpackedValue);
 }
 
 /// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers,
@@ -24114,7 +24117,7 @@ uint8_t4_packed pack_clamp_u8(int32_t4 unpackedValue)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int8_t4_packed pack_clamp_s8(int32_t4 unpackedValue)
 {
-    return int8_t4_packed(packInt4x8Clamp(unpackedValue));
+    return packInt4x8Clamp(unpackedValue);
 }
 
 /// Pack a vector of 4 unsigned 16 bit integers into a packed value of 4 8-bit integers,
@@ -24124,7 +24127,7 @@ int8_t4_packed pack_clamp_s8(int32_t4 unpackedValue)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint8_t4_packed pack_clamp_u8(int16_t4 unpackedValue)
 {
-    return uint8_t4_packed(packUint4x8Clamp(unpackedValue));
+    return packUint4x8Clamp(unpackedValue);
 }
 
 /// Pack a vector of 4 signed 16 bit integers into a packed value of 4 8-bit integers,
@@ -24134,7 +24137,7 @@ uint8_t4_packed pack_clamp_u8(int16_t4 unpackedValue)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
 {
-    return int8_t4_packed(packInt4x8Clamp(unpackedValue));
+    return packInt4x8Clamp(unpackedValue);
 }
 
 // Work-graphs
