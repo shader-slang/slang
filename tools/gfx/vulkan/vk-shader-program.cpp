@@ -71,7 +71,7 @@ VkPipelineShaderStageCreateInfo ShaderProgramImpl::compileEntryPoint(
     return shaderStageCreateInfo;
 }
 
-static ComPtr<ISlangBlob> LinkUsingSPIRVTools(List<ComPtr<ISlangBlob> > kernelCodes)
+static ComPtr<ISlangBlob> linkUsingSPIRVTools(List<ComPtr<ISlangBlob> > kernelCodes)
 {
     spvtools::Context context(SPV_ENV_UNIVERSAL_1_5);
     spvtools::LinkerOptions options;
@@ -115,9 +115,9 @@ static ComPtr<ISlangBlob> LinkUsingSPIRVTools(List<ComPtr<ISlangBlob> > kernelCo
 
 Result ShaderProgramImpl::createShaderModule(
     slang::EntryPointReflection* entryPointInfo,
-    List<ComPtr<ISlangBlob>> kernelCodes)
+    List<ComPtr<ISlangBlob>>& kernelCodes)
 {
-    ComPtr<ISlangBlob> linkedKernel = LinkUsingSPIRVTools(kernelCodes);
+    ComPtr<ISlangBlob> linkedKernel = linkUsingSPIRVTools(kernelCodes);
     m_codeBlobs.add(linkedKernel);
 
     VkShaderModule shaderModule;

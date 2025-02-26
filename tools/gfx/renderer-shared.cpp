@@ -1234,7 +1234,7 @@ Result ShaderProgramBase::compileShaders(RendererBase* device)
 
 Result ShaderProgramBase::createShaderModule(
     slang::EntryPointReflection* entryPointInfo,
-    List<ComPtr<ISlangBlob>> kernelCodes)
+    List<ComPtr<ISlangBlob>>& kernelCodes)
 {
     SLANG_UNUSED(entryPointInfo);
     SLANG_UNUSED(kernelCodes);

@@ -10,7 +10,7 @@ using namespace Slang;
 
 Result ShaderProgramImpl::createShaderModule(
     slang::EntryPointReflection* entryPointInfo,
-    List<ComPtr<ISlangBlob>> kernelCodes)
+    List<ComPtr<ISlangBlob>>& kernelCodes)
 {
     ShaderBinary shaderBin;
     shaderBin.stage = entryPointInfo->getStage();
