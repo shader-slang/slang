@@ -12974,6 +12974,7 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
     // The requirement for `foo` should be glsl+glsl_ext_1 | spirv.
     //
     CapabilitySet declaredCaps;
+    CapabilityAtom stageToJoin = CapabilityAtom::Invalid;
     for (Decl* parent = decl; parent; parent = getParentDecl(parent))
     {
         CapabilitySet localDeclaredCaps;
@@ -12985,7 +12986,7 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
                 if (auto decoration = as<RequireCapabilityAttribute>(mod))
                     localDeclaredCaps.unionWith(decoration->capabilitySet);
                 else if (auto entrypoint = as<EntryPointAttribute>(mod))
-                    localDeclaredCaps.join(entrypoint->capabilitySet);
+                    stageToJoin = entrypoint->capabilitySet.getTargetStage();
             }
         }
         else
@@ -13001,6 +13002,8 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
         if (shouldBreak)
             break;
     }
+    if (!declaredCaps.isEmpty() && stageToJoin != CapabilityAtom::Invalid)
+        declaredCaps.join(CapabilitySet((CapabilityName)stageToJoin));
     return declaredCaps;
 }
 
