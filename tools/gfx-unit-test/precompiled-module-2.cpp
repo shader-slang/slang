@@ -112,7 +112,7 @@ void precompiledModule2TestImplCommon(
     {
     case gfx::DeviceType::DirectX12:
         targetDesc.format = SLANG_DXIL;
-        targetDesc.profile = device->getSlangSession()->getGlobalSession()->findProfile("sm_6_1");
+        targetDesc.profile = device->getSlangSession()->getGlobalSession()->findProfile("sm_6_6");
         break;
     case gfx::DeviceType::Vulkan:
         targetDesc.format = SLANG_SPIRV;
