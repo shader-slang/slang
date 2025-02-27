@@ -1019,6 +1019,7 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
     SlangResult initDeviceResult = SLANG_OK;
 
+    m_glslang.init();
     for (int forceSoftware = 0; forceSoftware <= 1; forceSoftware++)
     {
         initDeviceResult = m_module.init(forceSoftware != 0);
