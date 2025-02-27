@@ -21,16 +21,16 @@ ShaderProgramImpl::~ShaderProgramImpl() {}
 
 Result ShaderProgramImpl::createShaderModule(
     slang::EntryPointReflection* entryPointInfo,
-    ComPtr<ISlangBlob> kernelCode)
+    List<ComPtr<ISlangBlob>>& kernelCodes)
 {
     Module module;
     module.stage = entryPointInfo->getStage();
     module.entryPointName = entryPointInfo->getNameOverride();
-    module.code = kernelCode;
+    module.code = kernelCodes[0];
 
     dispatch_data_t data = dispatch_data_create(
-        kernelCode->getBufferPointer(),
-        kernelCode->getBufferSize(),
+        kernelCodes[0]->getBufferPointer(),
+        kernelCodes[0]->getBufferSize(),
         dispatch_get_main_queue(),
         NULL);
     NS::Error* error;
