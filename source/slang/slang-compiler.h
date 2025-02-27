@@ -27,6 +27,8 @@
 #include "slang-syntax.h"
 #include "slang.h"
 
+#include <chrono>
+
 namespace Slang
 {
 struct PathInfo;
