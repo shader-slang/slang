@@ -3970,7 +3970,10 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
     {
         return _getTypeStyleId(matrixType->getElementType());
     }
+    // Try to simplify style if we can, otherwise just handle it unsimplified
     auto style = getTypeStyle(type->getOp());
+    if (style == kIROp_Invalid)
+        style = type->getOp();
     switch (style)
     {
     case kIROp_IntType:
