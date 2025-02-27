@@ -729,8 +729,7 @@ void CompletionContext::createSwizzleCandidates(
     else if (auto scalarType = as<BasicExpressionType>(type))
     {
         String typeStr;
-        if (scalarType)
-            typeStr = scalarType->toString();
+        typeStr = scalarType->toString();
         LanguageServerProtocol::CompletionItem item;
         item.data = 0;
         item.detail = typeStr;
