@@ -24,6 +24,7 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
         String name;
         IRType* type;
         IRVarLayout* layout;
+        IRParam* origParam; // Track the original parameter for this field
     };
     List<FieldInfo> fieldInfos;
 
@@ -54,7 +55,7 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
             }
         }
 
-        fieldInfos.add({resultKey, "result", func->getResultType(), resultLayout});
+        fieldInfos.add({resultKey, "result", func->getResultType(), resultLayout, nullptr});
     }
 
     // Process parameters
@@ -80,7 +81,7 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
                 paramLayout = as<IRVarLayout>(layoutDecor->getLayout());
             }
 
-            fieldInfos.add({fieldKey, fieldName, valueType, paramLayout});
+            fieldInfos.add({fieldKey, fieldName, valueType, paramLayout, param});
 
             if (outType->getOp() == kIROp_InOutType)
             {
@@ -133,13 +134,36 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
         // Create fields for the struct
         for (auto& fieldInfo : fieldInfos)
         {
-            builder.createStructField(returnStruct, fieldInfo.key, fieldInfo.type);
+            auto field = builder.createStructField(returnStruct, fieldInfo.key, fieldInfo.type);
 
             // Add layout for this field if available
             if (fieldInfo.layout)
             {
                 builder.addLayoutDecoration(fieldInfo.key, fieldInfo.layout);
                 structTypeLayoutBuilder.addField(fieldInfo.key, fieldInfo.layout);
+            }
+
+            // Transfer decorations from the original parameter to the field
+            if (fieldInfo.origParam != nullptr)
+            {
+                // Transfer semantic decorations
+                for (auto decor : fieldInfo.origParam->getDecorations())
+                {
+                    if (auto semanticDecor = as<IRSemanticDecoration>(decor))
+                    {
+                        auto semanticAttr = builder.getSemanticAttr(
+                            kIROp_SemanticDecoration,
+                            semanticDecor->getSemanticName(),
+                            semanticDecor->getSemanticIndex());
+
+                        builder.addDecoration(fieldInfo.key, semanticAttr);
+                    }
+                    else if (auto outputDecor = as<IROutputDecoration>(decor))
+                    {
+                        // Also transfer output decoration
+                        builder.addDecoration(fieldInfo.key, builder.getOutputDecoration());
+                    }
+                }
             }
         }
 
@@ -174,6 +198,26 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
         {
             // Use the layout from the out parameter
             newResultLayout = outVars[0].layout;
+
+            // For single out parameter, transfer semantic decorations directly to the result
+            auto origParam = outVars[0].origParam;
+            if (origParam)
+            {
+                for (auto decor : origParam->getDecorations())
+                {
+                    if (auto semanticDecor = as<IRSemanticDecoration>(decor))
+                    {
+                        // Create a semantic decoration for the result
+                        auto semanticAttr = builder.getSemanticAttr(
+                            kIROp_SemanticDecoration,
+                            semanticDecor->getSemanticName(),
+                            semanticDecor->getSemanticIndex());
+
+                        // We'll add this to the function later
+                        builder.addDecoration(newFunc, semanticAttr);
+                    }
+                }
+            }
         }
     }
     else
@@ -270,19 +314,23 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
 
         if (varInfo.isInOut)
         {
-            for (auto newParam : newParams)
+            // Find the corresponding parameter by direct pointer comparison
+            int newParamIndex = 0;
+            for (auto param : func->getParams())
             {
-                if (auto nameHint = varInfo.origParam->findDecoration<IRNameHintDecoration>())
+                if (!as<IROutTypeBase>(param->getDataType()) ||
+                    as<IROutTypeBase>(param->getDataType())->getOp() != kIROp_InOutType)
                 {
-                    if (auto newNameHint = newParam->findDecoration<IRNameHintDecoration>())
-                    {
-                        if (nameHint->getName() == newNameHint->getName())
-                        {
-                            builder.emitStore(varInfo.var, newParam);
-                            break;
-                        }
-                    }
+                    newParamIndex++;
+                    continue;
                 }
+
+                if (param == varInfo.origParam)
+                {
+                    builder.emitStore(varInfo.var, newParams[newParamIndex]);
+                    break;
+                }
+                newParamIndex++;
             }
         }
     }
@@ -386,13 +434,26 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
             // Create a new entry point layout with updated result layout
             auto newEntryPointLayout = builder.getEntryPointLayout(paramsLayout, newResultLayout);
 
-            // Copy any additional properties from the original layout
-            // (This would depend on what properties IREntryPointLayout has)
-
             // Add the new layout decoration to the new function
             builder.addLayoutDecoration(newFunc, newEntryPointLayout);
+
+            // Add entry point decoration with the same stage
+            builder.addEntryPointDecoration(
+                newFunc,
+                entryPointDecor->getProfile(),
+                entryPointDecor->getName()->getStringSlice(),
+                entryPointDecor->getModuleName()->getStringSlice());
         }
     }
+
+    // Transfer export decoration if present
+    // if (auto exportDecor = func->findDecoration<IRExportDecoration>())
+    // {
+    //     builder.addExportDecoration(newFunc, exportDecor->getExportName());
+    // }
+
+    // Add keepAlive decoration to ensure the new function is preserved
+    builder.addKeepAliveDecoration(newFunc);
 
     fprintf(
         stderr,
