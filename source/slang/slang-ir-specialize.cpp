@@ -1517,14 +1517,9 @@ struct SpecializationContext
                     auto val = makeExistential->getWrappedValue();
                     auto valType = val->getFullType();
                     if (isCompileTimeConstantType(valType))
-                    {
-                        auto val = makeExistential->getWrappedValue();
                         newArgs.add(val);
-                    }
                     else
-                    {
                         newArgs.add(arg);
-                    }
                 }
                 else if (auto wrapExistential = as<IRWrapExistential>(arg))
                 {
