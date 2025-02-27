@@ -8,11 +8,6 @@ namespace test
     {
         return x;
     }
-
-    uint g(uint x)
-    {
-        return x;
-    }
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
@@ -25,7 +20,6 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     int inVal = tid;
     // Should be able to resolve 'test' properly (and not get confused by the module declaration with the same name)
     int outVal = test.f<3>(vector<uint, 3>(1, 2, 3)).y;
-    //int outVal = test.g(2);
     outputBuffer[tid] = outVal;
     // CHECK: 2
 }
