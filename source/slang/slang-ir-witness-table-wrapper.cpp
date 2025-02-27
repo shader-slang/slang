@@ -190,11 +190,16 @@ struct GenerateWitnessTableWrapperContext
         //
         auto concreteType = witnessTable->getConcreteType();
         IRIntegerValue typeSize, sizeLimit;
-        if (!sharedContext
-                 ->doesTypeFitInAnyValue(concreteType, interfaceType, &typeSize, &sizeLimit))
+        bool isTypeOpaque = false;
+        if (!sharedContext->doesTypeFitInAnyValue(
+                concreteType,
+                interfaceType,
+                &typeSize,
+                &sizeLimit,
+                &isTypeOpaque))
         {
             HashSet<IRType*> visited;
-            if (isOpaqueType(concreteType, visited))
+            if (isTypeOpaque)
             {
                 sharedContext->sink->diagnose(
                     concreteType,

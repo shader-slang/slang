@@ -376,7 +376,9 @@ static Result _calcSizeAndAlignment(
     default:
         break;
     }
-    if (as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type))
+
+    if (as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type) ||
+        type->getOp() == kIROp_RaytracingAccelerationStructureType)
     {
         *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
         return SLANG_OK;
