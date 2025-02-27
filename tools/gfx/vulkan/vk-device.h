@@ -1,6 +1,7 @@
 // vk-device.h
 #pragma once
 
+#include "glslang-module.h"
 #include "vk-base.h"
 #include "vk-framebuffer.h"
 
@@ -196,6 +197,7 @@ public:
 
     VulkanModule m_module;
     VulkanApi m_api;
+    GlslangModule m_glslang;
 
     VulkanDeviceQueue m_deviceQueue;
     uint32_t m_queueFamilyIndex;
