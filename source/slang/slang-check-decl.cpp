@@ -12741,11 +12741,11 @@ static void _propagateRequirement(
     // if stmt inside parent, set the provenance tracker to the calling function
     if (!decl)
         decl = visitor->getParentFuncOfVisitor();
-    if (referencedDecl && decl)
+    if (referencedNode && decl)
     {
         // Here we store a childDecl that added/removed capabilities from a parentDecl
         decl->capabilityRequirementProvenance.add(
-            DeclReferenceWithLoc{referencedDecl, referenceLoc});
+            ProvenenceNodeWithLoc{referencedNode, referenceLoc});
     }
 };
 
@@ -12980,9 +12980,12 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
         bool shouldBreak = false;
         if (!as<AggTypeDeclBase>(parent) || parent->inferredCapabilityRequirements.isEmpty())
         {
-            for (auto decoration : parent->getModifiersOfType<RequireCapabilityAttribute>())
+            for (auto mod : parent->modifiers)
             {
-                localDeclaredCaps.unionWith(decoration->capabilitySet);
+                if (auto decoration = as<RequireCapabilityAttribute>(mod))
+                    localDeclaredCaps.unionWith(decoration->capabilitySet);
+                else if (auto entrypoint = as<EntryPointAttribute>(mod))
+                    localDeclaredCaps.join(entrypoint->capabilitySet);
             }
         }
         else
@@ -13295,63 +13298,84 @@ void diagnoseMissingCapabilityProvenance(
     Decl* decl,
     CapabilitySet& setToFind)
 {
-    HashSet<Decl*> checkedDecls;
-    DeclReferenceWithLoc declWithRef;
-    declWithRef.referencedDecl = decl;
-    declWithRef.referenceLoc = (decl) ? decl->loc : SourceLoc();
+    HashSet<NodeBase*> checkedDecls;
+    ProvenenceNodeWithLoc provNode;
+    provNode.referencedNode = decl;
+    provNode.referenceLoc = (decl) ? decl->loc : SourceLoc();
     bool bottomOfProvenanceStack = false;
     // Find the bottom of the atom provenance stack which fails to contain `setToFind`
-    while (!bottomOfProvenanceStack && declWithRef.referencedDecl)
+    while (!bottomOfProvenanceStack && provNode.referencedNode)
     {
         bottomOfProvenanceStack = true;
-        for (auto& i : declWithRef.referencedDecl->capabilityRequirementProvenance)
+        if (auto referencedDecl = as<Decl>(provNode.referencedNode))
         {
-            if (checkedDecls.contains(i.referencedDecl))
-                continue;
-            checkedDecls.add(i.referencedDecl);
-
-            if (!i.referencedDecl->inferredCapabilityRequirements.implies(setToFind))
+            for (auto& i : referencedDecl->capabilityRequirementProvenance)
             {
-                // We found a source of the incompatible capability, follow this
-                // element inside the provenance stack until we are at the bottom
-                declWithRef = i;
-                bottomOfProvenanceStack = false;
-                break;
+                if (checkedDecls.contains(i.referencedNode))
+                    continue;
+                checkedDecls.add(i.referencedNode);
+                auto innerReferencedDecl = as<Decl>(i.referencedNode);
+                if (!innerReferencedDecl ||
+                    !innerReferencedDecl->inferredCapabilityRequirements.implies(setToFind))
+                {
+                    // We found a source of the incompatible capability, follow this
+                    // element inside the provenance stack until we are at the bottom
+                    provNode = i;
+                    bottomOfProvenanceStack = false;
+                    break;
+                }
             }
+        }
+        else
+        {
+            provNode = provNode;
+            bottomOfProvenanceStack = false;
         }
     }
 
-    if (!declWithRef.referencedDecl)
+    if (!provNode.referencedNode)
         return;
 
-    // Diagnose the use-site
-    maybeDiagnose(
-        sink,
-        optionSet,
-        DiagnosticCategory::Capability,
-        declWithRef.referenceLoc,
-        Diagnostics::seeUsingOf,
-        declWithRef.referencedDecl);
-    // Diagnose the definition as the problem
-    maybeDiagnose(
-        sink,
-        optionSet,
-        DiagnosticCategory::Capability,
-        declWithRef.referencedDecl->loc,
-        Diagnostics::seeDefinitionOf,
-        declWithRef.referencedDecl);
-
-    // If we find a 'require' modifier, this is contributing to the overall capability
-    // incompatibility. We should hint to the user that this declaration is problematic.
-    if (auto requireCapabilityAttribute =
-            declWithRef.referencedDecl->findModifier<RequireCapabilityAttribute>())
+    if (auto referencedDecl = as<Decl>(provNode.referencedNode))
+    {
+        // Diagnose the use-site
         maybeDiagnose(
             sink,
             optionSet,
             DiagnosticCategory::Capability,
-            requireCapabilityAttribute->loc,
-            Diagnostics::seeDeclarationOf,
-            requireCapabilityAttribute);
+            provNode.referenceLoc,
+            Diagnostics::seeUsingOf,
+            referencedDecl);
+        // Diagnose the definition as the problem
+        maybeDiagnose(
+            sink,
+            optionSet,
+            DiagnosticCategory::Capability,
+            referencedDecl->loc,
+            Diagnostics::seeDefinitionOf,
+            referencedDecl);
+        // If we find a 'require' modifier, this is contributing to the overall capability
+        // incompatibility. We should hint to the user that this declaration is problematic.
+        if (auto requireCapabilityAttribute =
+                referencedDecl->findModifier<RequireCapabilityAttribute>())
+            maybeDiagnose(
+                sink,
+                optionSet,
+                DiagnosticCategory::Capability,
+                requireCapabilityAttribute->loc,
+                Diagnostics::seeDeclarationOf,
+                requireCapabilityAttribute);
+    }
+    else
+    {
+        maybeDiagnose(
+            sink,
+            optionSet,
+            DiagnosticCategory::Capability,
+            provNode.referenceLoc,
+            Diagnostics::seeUsingOf,
+            provNode.referencedNode->astNodeType);
+    }
 }
 
 void diagnoseCapabilityProvenance(
@@ -13369,7 +13393,20 @@ void diagnoseCapabilityProvenance(
         printedDecls.add(declToPrint);
         for (auto& provenance : declToPrint->capabilityRequirementProvenance)
         {
-            if (!provenance.referencedDecl->inferredCapabilityRequirements.implies(atomToFind))
+            auto referencedDecl = as<Decl>(provenance.referencedNode);
+            if (!referencedDecl)
+            {
+                maybeDiagnose(
+                    sink,
+                    optionSet,
+                    DiagnosticCategory::Capability,
+                    provenance.referenceLoc,
+                    Diagnostics::seeUsingOf,
+                    provenance.referencedNode->astNodeType);
+                break;
+            }
+
+            if (!referencedDecl->inferredCapabilityRequirements.implies(atomToFind))
                 continue;
             maybeDiagnose(
                 sink,
@@ -13377,8 +13414,8 @@ void diagnoseCapabilityProvenance(
                 DiagnosticCategory::Capability,
                 provenance.referenceLoc,
                 Diagnostics::seeUsingOf,
-                provenance.referencedDecl);
-            declToPrint = provenance.referencedDecl;
+                referencedDecl);
+            declToPrint = referencedDecl;
             if (printedDecls.contains(declToPrint))
                 break;
             if (declToPrint->findModifier<RequireCapabilityAttribute>())
@@ -13484,14 +13521,30 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
     for (auto i : simplifiedFailedAtomsSet)
     {
         CapabilityAtom formattedAtom = asAtom(i);
-        maybeDiagnose(
-            getSink(),
-            this->getOptionSet(),
-            DiagnosticCategory::Capability,
-            decl->loc,
-            diagnosticInfo,
-            decl,
-            formattedAtom);
+        CapabilityName canonicalName;
+        if (isStageAtom((CapabilityName)formattedAtom, canonicalName))
+        {
+            // Provide a more friendly message if atom is a stage.
+            maybeDiagnose(
+                getSink(),
+                this->getOptionSet(),
+                DiagnosticCategory::Capability,
+                decl->loc,
+                Diagnostics::declHasDependenciesNotCompatibleOnStage,
+                decl,
+                formattedAtom);
+        }
+        else
+        {
+            maybeDiagnose(
+                getSink(),
+                this->getOptionSet(),
+                DiagnosticCategory::Capability,
+                decl->loc,
+                diagnosticInfo,
+                decl,
+                formattedAtom);
+        }
         // Print provenances.
         diagnoseCapabilityProvenance(
             this->getOptionSet(),
