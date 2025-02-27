@@ -2053,11 +2053,11 @@ static LegalVal coerceToLegalType(IRTypeLegalizationContext* context, LegalType 
 
 static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* inst)
 {
-    List<IRType*> opaqueTypes;
+    HashSet<IRType*> opaqueTypes;
     if (isOpaqueType(inst->getFullType(), opaqueTypes))
     {
         auto opaqueType = opaqueTypes[0];
-        auto containerType = opaqueTypes.getCount() > 1 ? opaqueTypes[1] : opaqueType;
+        auto containerType = opaqueTypes.getCount() > 1 ? *opaqueTypes.begin() : opaqueType;
         SourceLoc loc = findBestSourceLocFromUses(inst);
 
         if (!loc.isValid())

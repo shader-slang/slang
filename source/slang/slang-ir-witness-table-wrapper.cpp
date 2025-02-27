@@ -193,16 +193,27 @@ struct GenerateWitnessTableWrapperContext
         if (!sharedContext
                  ->doesTypeFitInAnyValue(concreteType, interfaceType, &typeSize, &sizeLimit))
         {
-            sharedContext->sink->diagnose(
-                concreteType,
-                Diagnostics::typeDoesNotFitAnyValueSize,
-                concreteType);
-            sharedContext->sink->diagnoseWithoutSourceView(
-                concreteType,
-                Diagnostics::typeAndLimit,
-                concreteType,
-                typeSize,
-                sizeLimit);
+            HashSet<IRType*> visited;
+            if (isOpaqueType(concreteType, visited))
+            {
+                sharedContext->sink->diagnose(
+                    concreteType,
+                    Diagnostics::typeCannotBePackedIntoAnyValue,
+                    concreteType);
+            }
+            else
+            {
+                sharedContext->sink->diagnose(
+                    concreteType,
+                    Diagnostics::typeDoesNotFitAnyValueSize,
+                    concreteType);
+                sharedContext->sink->diagnoseWithoutSourceView(
+                    concreteType,
+                    Diagnostics::typeAndLimit,
+                    concreteType,
+                    typeSize,
+                    sizeLimit);
+            }
             return;
         }
 

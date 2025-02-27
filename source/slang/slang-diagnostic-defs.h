@@ -2204,7 +2204,7 @@ DIAGNOSTIC(
     41012,
     Error,
     typeCannotBePackedIntoAnyValue,
-    "type '$0' contains fields that cannot be packed into an AnyValue.")
+    "type '$0' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.")
 DIAGNOSTIC(
     41020,
     Error,

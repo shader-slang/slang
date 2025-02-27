@@ -198,7 +198,7 @@ bool isResourceType(IRType* type)
     return false;
 }
 
-bool isOpaqueType(IRType* type, List<IRType*>& opaqueTypes)
+bool isOpaqueType(IRType* type, HashSet<IRType*>& opaqueTypes)
 {
     if (isResourceType(type))
     {
@@ -208,14 +208,15 @@ bool isOpaqueType(IRType* type, List<IRType*>& opaqueTypes)
 
     if (auto structType = as<IRStructType>(type))
     {
+        opaqueTypes.add(structType);
         for (auto field : structType->getFields())
         {
             if (isOpaqueType(field->getFieldType(), opaqueTypes))
             {
-                opaqueTypes.add(type);
                 return true;
             }
         }
+        opaqueTypes.remove(structType);
     }
 
     if (auto arrayType = as<IRArrayTypeBase>(type))
