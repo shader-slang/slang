@@ -17,6 +17,15 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
     List<IRType*> returnTypes;
     List<IRType*> paramTypes;
 
+    // Keep track of field information for struct
+    struct FieldInfo
+    {
+        IRStructKey* key;
+        String name;
+        IRType* type;
+    };
+    List<FieldInfo> fieldInfos;
+
     struct VarInfo
     {
         IRVar* var;
@@ -25,20 +34,38 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
     };
     List<VarInfo> outVars;
 
-    // If original function returns non-void, add it to tuple types
+    // If original function returns non-void, add it to return types
     if (!as<IRVoidType>(func->getResultType()))
+    {
         returnTypes.add(func->getResultType());
+
+        auto resultKey = builder.createStructKey();
+        builder.addNameHintDecoration(resultKey, String("result").getUnownedSlice());
+        fieldInfos.add({resultKey, "result", func->getResultType()});
+    }
 
     // Process parameters
     for (auto param : func->getParams())
     {
         if (auto outType = as<IROutTypeBase>(param->getDataType()))
         {
-            returnTypes.add(outType->getValueType());
+            auto valueType = outType->getValueType();
+            returnTypes.add(valueType);
+
+            // Get parameter name for field name
+            String fieldName = "param";
+            if (auto nameHint = param->findDecoration<IRNameHintDecoration>())
+                fieldName = String(nameHint->getName());
+
+            auto fieldKey = builder.createStructKey();
+            builder.addNameHintDecoration(
+                fieldKey,
+                builder.getStringValue(fieldName.getUnownedSlice()));
+            fieldInfos.add({fieldKey, fieldName, valueType});
 
             if (outType->getOp() == kIROp_InOutType)
             {
-                paramTypes.add(outType->getValueType());
+                paramTypes.add(valueType);
             }
 
             outVars.add(VarInfo{nullptr, param, outType->getOp() == kIROp_InOutType});
@@ -52,17 +79,38 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
     // Create new function
     auto newFunc = builder.createFunc();
 
-    // Copy all decorations except name hint
+    // Copy all decorations
     for (auto decor : func->getDecorations())
     {
         cloneDecoration(&cloneEnv, decor, newFunc, builder.getModule());
     }
 
-    // Determine result type
+    // Create return struct type if we have multiple return values
     IRType* resultType;
-    if (returnTypes.getCount() > 1)
+    IRStructType* returnStruct = nullptr;
+
+    if (fieldInfos.getCount() > 1)
     {
-        resultType = builder.getTupleType(returnTypes);
+        returnStruct = builder.createStructType();
+
+        // Create name for struct
+        StringBuilder nameBuilder;
+        if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
+            nameBuilder << nameHint->getName() << "_Result";
+        else
+            nameBuilder << "Function_Result";
+
+        builder.addNameHintDecoration(
+            returnStruct,
+            builder.getStringValue(nameBuilder.toString().getUnownedSlice()));
+
+        // Create fields for the struct
+        for (auto& fieldInfo : fieldInfos)
+        {
+            builder.createStructField(returnStruct, fieldInfo.key, fieldInfo.type);
+        }
+
+        resultType = returnStruct;
     }
     else if (returnTypes.getCount() == 1)
     {
@@ -89,16 +137,22 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
             if (outType->getOp() == kIROp_InOutType)
             {
                 auto newParam = builder.emitParam(outType->getValueType());
-                if (auto nameHint = param->findDecoration<IRNameHintDecoration>())
-                    builder.addNameHintDecoration(newParam, nameHint->getName());
+                // Clone all decorations from original parameter
+                for (auto decor : param->getDecorations())
+                {
+                    cloneDecoration(&cloneEnv, decor, newParam, builder.getModule());
+                }
                 newParams.add(newParam);
             }
         }
         else
         {
             auto newParam = builder.emitParam(param->getDataType());
-            if (auto nameHint = param->findDecoration<IRNameHintDecoration>())
-                builder.addNameHintDecoration(newParam, nameHint->getName());
+            // Clone all decorations from original parameter
+            for (auto decor : param->getDecorations())
+            {
+                cloneDecoration(&cloneEnv, decor, newParam, builder.getModule());
+            }
             newParams.add(newParam);
         }
     }
@@ -158,36 +212,58 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
         inlineCall(callResult);
     }
 
-    // Construct return tuple
-    List<IRInst*> tupleValues;
+    // Construct return value
+    IRInst* returnValue = nullptr;
 
-    if (!as<IRVoidType>(func->getResultType()))
+    if (returnStruct)
     {
-        tupleValues.add(callResult);
-    }
+        // Collect field values in order
+        List<IRInst*> fieldValues;
 
-    for (auto& varInfo : outVars)
-    {
-        tupleValues.add(builder.emitLoad(varInfo.var));
-    }
+        // Add original return value if non-void
+        if (!as<IRVoidType>(func->getResultType()))
+        {
+            fieldValues.add(callResult);
+        }
 
-    IRInst* returnValue;
-    if (tupleValues.getCount() > 1)
-    {
-        returnValue = builder.emitMakeTuple(tupleValues);
+        // Add out parameter values
+        for (auto& varInfo : outVars)
+        {
+            fieldValues.add(builder.emitLoad(varInfo.var));
+        }
+
+        // Create struct with all field values
+        returnValue = builder.emitMakeStruct(returnStruct, fieldValues);
     }
-    else if (tupleValues.getCount() == 1)
+    else if (returnTypes.getCount() == 1)
     {
-        returnValue = tupleValues[0];
-    }
-    else
-    {
-        returnValue = nullptr;
+        // Single return value
+        if (!as<IRVoidType>(func->getResultType()))
+        {
+            returnValue = callResult;
+        }
+        else if (outVars.getCount() == 1)
+        {
+            returnValue = builder.emitLoad(outVars[0].var);
+        }
     }
 
     builder.emitReturn(returnValue);
 
+    fprintf(
+        stderr,
+        "Original function:\n%s\n",
+        dumpIRToString(func, {IRDumpOptions::Mode::Detailed, 0}).getBuffer());
+    fprintf(
+        stderr,
+        "Transformed function:\n%s\n",
+        dumpIRToString(newFunc, {IRDumpOptions::Mode::Detailed, 0}).getBuffer());
+    fprintf(
+        stderr,
+        "Transformed function type:\n%s\n",
+        dumpIRToString(returnStruct, {IRDumpOptions::Mode::Detailed, 0}).getBuffer());
     return newFunc;
 }
+
 
 } // namespace Slang
