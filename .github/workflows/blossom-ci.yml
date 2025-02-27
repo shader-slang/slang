@@ -27,15 +27,6 @@ jobs:
           OPERATION: 'AUTH'
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO_KEY_DATA: ${{ secrets.BLOSSOM_KEY }}
-      - name: Run blossom action
-        uses: NVIDIA/blossom-action@main
-        env:
-            REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            REPO_KEY_DATA: ${{ secrets.BLOSSOM_KEY }}
-        with:
-            args1: ${{ fromJson(needs.Authorization.outputs.args).args1 }}
-            args2: ${{ fromJson(needs.Authorization.outputs.args).args2 }}
-            args3: ${{ fromJson(needs.Authorization.outputs.args).args3 }}
       # repo specific steps 
       #- name: Setup java
       #  uses: actions/setup-java@v1
