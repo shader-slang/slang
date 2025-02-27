@@ -12441,10 +12441,13 @@ bool SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
     {
         auto member = resultMembers[i];
         auto parentAggDecl = getParentAggTypeDecl(member);
-        ;
 
         auto ctorParam = m_astBuilder->create<ParamDecl>();
         ctorParam->type = (TypeExp)member->type;
+        if (auto atomicType = as<AtomicType>(ctorParam->type))
+        {
+            ctorParam->type.type = atomicType->getElementType();
+        }
 
         if (!stopProcessingDefaultValues)
             ctorParam->initExpr = _getParamDefaultValue(this, member);
