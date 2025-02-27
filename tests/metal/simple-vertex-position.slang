@@ -14,3 +14,8 @@ void vertexMain(out float4 position : SV_Position)
 {
     position = float4(0.6, 0.1, 0.6, 0.33);
 }
+
+// float4 vertexMain():SV_Position
+// {
+//     return float4(0.6, 0.1, 0.6, 0.33);
+// }
