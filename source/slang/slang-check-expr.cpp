@@ -4848,17 +4848,21 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
     //
     baseExpr = maybeOpenExistential(baseExpr);
 
+    // In case our base expressin is still overloaded, we can perform
+    // some more refinement.
+    //
     // Handle the case of an overloaded base expression
     // here, in case we can use the name of the member to
     // disambiguate which of the candidates is meant, or if
     // we can return an overloaded result.
+    //
     if (auto overloadedExpr = as<OverloadedExpr>(baseExpr))
     {
         // If a member (dynamic or static) lookup result contains both the actual definition
         // and the interface definition obtained from inheritance, we want to filter out
         // the interface definitions.
         LookupResult filteredLookupResult;
-        for (auto lookupResult : overloadedExpr->lookupResult2)
+        for (auto lookupResult : overloadedExpr->lookupResult2.items)
         {
             bool shouldRemove = false;
             if (lookupResult.declRef.getParent().as<InterfaceDecl>())
