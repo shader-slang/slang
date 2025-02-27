@@ -64,7 +64,7 @@ jobs:
           
   Job-trigger:
     name: Start ci job
-    needs: [Authorization]
+    needs: [Vulnerability-scan]
     runs-on: blossom
     steps:
       - name: Start ci job
