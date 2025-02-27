@@ -1914,6 +1914,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto newType =
                     emitOpTypeNodePayloadArray(inst, nodePayloadArrayType->getRecordType());
 
+ #if 0
                 // TODO: This is a temporary hack.
                 // The NodeID must come from an attribute [NodeID("name")].
                 Slang::StringBuilder str;
@@ -1921,8 +1922,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 SpvInst* spvStr = emitOpConstantString(nullptr, str.getUnownedSlice());
                 (void)spvStr;
 
-                auto r = emitOpDecoratePayloadNodeName(nullptr, newType, spvStr);
-                (void)r;
+                emitOpDecoratePayloadNodeName(nullptr, newType, spvStr);
+#endif
                 return newType;
             }
         default:
