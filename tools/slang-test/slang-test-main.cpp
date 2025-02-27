@@ -159,7 +159,7 @@ typedef TestResult (*TestCallback)(TestContext* context, TestInput& input);
 // Globals
 
 // Pre declare
-static void _addRenderTestOptions(const Options& options, CommandLine& cmdLine);
+static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine);
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -3301,11 +3301,6 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
 
 static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine)
 {
-    if (options.adapter.getLength())
-    {
-        ioCmdLine.addArg("-adapter");
-        ioCmdLine.addArg(options.adapter);
-    }
     if (!options.emitSPIRVDirectly)
     {
         ioCmdLine.addArg("-emit-spirv-via-glsl");
