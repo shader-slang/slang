@@ -4,6 +4,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-lower-out-parameters.h"
+#include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-util.h"
 #include "slang-parameter-binding.h"
 
@@ -1879,6 +1880,7 @@ private:
             auto structType = as<IRStructType>(param->getDataType());
             builder.setInsertBefore(func->getFirstBlock()->getFirstOrdinaryInst());
             auto varLayout = findVarLayout(param);
+            SLANG_ASSERT(varLayout);
 
             // If `param` already has a semantic, we don't want to hoist its fields out.
             if (varLayout->findSystemValueSemanticAttr() != nullptr ||
@@ -2237,6 +2239,7 @@ private:
                 index++;
                 continue;
             }
+            SLANG_ASSERT(typeLayout);
             typeLayout->getFieldLayout(index);
             auto fieldLayout = typeLayout->getFieldLayout(index);
             if (auto offsetAttr = fieldLayout->findOffsetAttr(K))
