@@ -13332,7 +13332,7 @@ void diagnoseMissingCapabilityProvenance(
         else
         {
             provNode = provNode;
-            bottomOfProvenanceStack = false;
+            bottomOfProvenanceStack = true;
         }
     }
 
