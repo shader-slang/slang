@@ -291,6 +291,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getModuleDependency(
     {
         return SLANG_E_INVALID_ARG;
     }
+    getModuleDependencies()[dependencyIndex]->addRef();
     *outModule = getModuleDependencies()[dependencyIndex];
     return SLANG_OK;
 }
