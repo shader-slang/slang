@@ -13331,7 +13331,6 @@ void diagnoseMissingCapabilityProvenance(
         }
         else
         {
-            provNode = provNode;
             bottomOfProvenanceStack = true;
         }
     }
