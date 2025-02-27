@@ -23,6 +23,7 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
         IRStructKey* key;
         String name;
         IRType* type;
+        IRVarLayout* layout;
     };
     List<FieldInfo> fieldInfos;
 
@@ -31,6 +32,7 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
         IRVar* var;
         IRParam* origParam;
         bool isInOut;
+        IRVarLayout* layout;
     };
     List<VarInfo> outVars;
 
@@ -40,8 +42,19 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
         returnTypes.add(func->getResultType());
 
         auto resultKey = builder.createStructKey();
-        builder.addNameHintDecoration(resultKey, String("result").getUnownedSlice());
-        fieldInfos.add({resultKey, "result", func->getResultType()});
+        builder.addNameHintDecoration(resultKey, UnownedStringSlice("result"));
+
+        // Get layout for the return value if available
+        IRVarLayout* resultLayout = nullptr;
+        if (auto funcLayout = func->findDecoration<IRLayoutDecoration>())
+        {
+            if (auto entryPointLayout = as<IREntryPointLayout>(funcLayout->getLayout()))
+            {
+                resultLayout = entryPointLayout->getResultLayout();
+            }
+        }
+
+        fieldInfos.add({resultKey, "result", func->getResultType(), resultLayout});
     }
 
     // Process parameters
@@ -58,17 +71,23 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
                 fieldName = String(nameHint->getName());
 
             auto fieldKey = builder.createStructKey();
-            builder.addNameHintDecoration(
-                fieldKey,
-                builder.getStringValue(fieldName.getUnownedSlice()));
-            fieldInfos.add({fieldKey, fieldName, valueType});
+            builder.addNameHintDecoration(fieldKey, UnownedStringSlice(fieldName.getBuffer()));
+
+            // Get layout for parameter if available
+            IRVarLayout* paramLayout = nullptr;
+            if (auto layoutDecor = param->findDecoration<IRLayoutDecoration>())
+            {
+                paramLayout = as<IRVarLayout>(layoutDecor->getLayout());
+            }
+
+            fieldInfos.add({fieldKey, fieldName, valueType, paramLayout});
 
             if (outType->getOp() == kIROp_InOutType)
             {
                 paramTypes.add(valueType);
             }
 
-            outVars.add(VarInfo{nullptr, param, outType->getOp() == kIROp_InOutType});
+            outVars.add(VarInfo{nullptr, param, outType->getOp() == kIROp_InOutType, paramLayout});
         }
         else
         {
@@ -79,15 +98,19 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
     // Create new function
     auto newFunc = builder.createFunc();
 
-    // Copy all decorations
+    // Copy all decorations except layout (we'll handle that separately)
     for (auto decor : func->getDecorations())
     {
-        cloneDecoration(&cloneEnv, decor, newFunc, builder.getModule());
+        if (!as<IRLayoutDecoration>(decor))
+        {
+            cloneDecoration(&cloneEnv, decor, newFunc, builder.getModule());
+        }
     }
 
     // Create return struct type if we have multiple return values
     IRType* resultType;
     IRStructType* returnStruct = nullptr;
+    IRVarLayout* newResultLayout = nullptr;
 
     if (fieldInfos.getCount() > 1)
     {
@@ -102,19 +125,56 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
 
         builder.addNameHintDecoration(
             returnStruct,
-            builder.getStringValue(nameBuilder.toString().getUnownedSlice()));
+            UnownedStringSlice(nameBuilder.toString().getBuffer()));
+
+        // Create struct type layout builder
+        IRStructTypeLayout::Builder structTypeLayoutBuilder(&builder);
 
         // Create fields for the struct
         for (auto& fieldInfo : fieldInfos)
         {
             builder.createStructField(returnStruct, fieldInfo.key, fieldInfo.type);
+
+            // Add layout for this field if available
+            if (fieldInfo.layout)
+            {
+                builder.addLayoutDecoration(fieldInfo.key, fieldInfo.layout);
+                structTypeLayoutBuilder.addField(fieldInfo.key, fieldInfo.layout);
+            }
         }
+
+        // Build the struct type layout
+        auto typeLayout = structTypeLayoutBuilder.build();
+
+        // Create a var layout for the struct
+        IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
+        newResultLayout = varLayoutBuilder.build();
+
+        // Add layout decoration to the struct type
+        builder.addLayoutDecoration(returnStruct, newResultLayout);
 
         resultType = returnStruct;
     }
     else if (returnTypes.getCount() == 1)
     {
         resultType = returnTypes[0];
+
+        // For single return value, use the original result layout if available
+        if (!as<IRVoidType>(func->getResultType()))
+        {
+            if (auto funcLayout = func->findDecoration<IRLayoutDecoration>())
+            {
+                if (auto entryPointLayout = as<IREntryPointLayout>(funcLayout->getLayout()))
+                {
+                    newResultLayout = entryPointLayout->getResultLayout();
+                }
+            }
+        }
+        else if (outVars.getCount() == 1)
+        {
+            // Use the layout from the out parameter
+            newResultLayout = outVars[0].layout;
+        }
     }
     else
     {
@@ -130,6 +190,17 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
 
     // Create parameters and track them
     List<IRParam*> newParams;
+    IRVarLayout* paramsLayout = nullptr;
+
+    // Get the original parameters layout if available
+    if (auto funcLayout = func->findDecoration<IRLayoutDecoration>())
+    {
+        if (auto entryPointLayout = as<IREntryPointLayout>(funcLayout->getLayout()))
+        {
+            paramsLayout = entryPointLayout->getParamsLayout();
+        }
+    }
+
     for (auto param : func->getParams())
     {
         if (auto outType = as<IROutTypeBase>(param->getDataType()))
@@ -137,22 +208,50 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
             if (outType->getOp() == kIROp_InOutType)
             {
                 auto newParam = builder.emitParam(outType->getValueType());
-                // Clone all decorations from original parameter
+
+                // Copy layout decoration explicitly
+                if (auto layoutDecor = param->findDecoration<IRLayoutDecoration>())
+                {
+                    if (auto varLayout = as<IRVarLayout>(layoutDecor->getLayout()))
+                    {
+                        builder.addLayoutDecoration(newParam, varLayout);
+                    }
+                }
+
+                // Clone all other decorations from original parameter
                 for (auto decor : param->getDecorations())
                 {
-                    cloneDecoration(&cloneEnv, decor, newParam, builder.getModule());
+                    if (!as<IRLayoutDecoration>(decor))
+                    {
+                        cloneDecoration(&cloneEnv, decor, newParam, builder.getModule());
+                    }
                 }
+
                 newParams.add(newParam);
             }
         }
         else
         {
             auto newParam = builder.emitParam(param->getDataType());
-            // Clone all decorations from original parameter
+
+            // Copy layout decoration explicitly
+            if (auto layoutDecor = param->findDecoration<IRLayoutDecoration>())
+            {
+                if (auto varLayout = as<IRVarLayout>(layoutDecor->getLayout()))
+                {
+                    builder.addLayoutDecoration(newParam, varLayout);
+                }
+            }
+
+            // Clone all other decorations from original parameter
             for (auto decor : param->getDecorations())
             {
-                cloneDecoration(&cloneEnv, decor, newParam, builder.getModule());
+                if (!as<IRLayoutDecoration>(decor))
+                {
+                    cloneDecoration(&cloneEnv, decor, newParam, builder.getModule());
+                }
             }
+
             newParams.add(newParam);
         }
     }
@@ -162,6 +261,12 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
     {
         auto outType = as<IROutTypeBase>(varInfo.origParam->getDataType());
         varInfo.var = builder.emitVar(outType->getValueType());
+
+        // Copy layout to the variable if available
+        if (varInfo.layout)
+        {
+            builder.addLayoutDecoration(varInfo.var, varInfo.layout);
+        }
 
         if (varInfo.isInOut)
         {
@@ -210,6 +315,22 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
     if (useCount == 1)
     {
         inlineCall(callResult);
+
+        // Remove keepAlive and entryPoint decorations from old function
+        List<IRDecoration*> decorationsToRemove;
+        for (auto decor : func->getDecorations())
+        {
+            if (as<IRKeepAliveDecoration>(decor) || as<IREntryPointDecoration>(decor))
+            {
+                decorationsToRemove.add(decor);
+            }
+        }
+
+        // Remove them after iteration is complete
+        for (auto decor : decorationsToRemove)
+        {
+            decor->removeFromParent();
+        }
     }
 
     // Construct return value
@@ -250,6 +371,29 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
 
     builder.emitReturn(returnValue);
 
+    // Update entry point layout if needed
+    if (auto entryPointDecor = func->findDecoration<IREntryPointDecoration>())
+    {
+        // Get the original entry point layout if available
+        IREntryPointLayout* originalEntryPointLayout = nullptr;
+        if (auto layoutDecor = func->findDecoration<IRLayoutDecoration>())
+        {
+            originalEntryPointLayout = as<IREntryPointLayout>(layoutDecor->getLayout());
+        }
+
+        if (originalEntryPointLayout)
+        {
+            // Create a new entry point layout with updated result layout
+            auto newEntryPointLayout = builder.getEntryPointLayout(paramsLayout, newResultLayout);
+
+            // Copy any additional properties from the original layout
+            // (This would depend on what properties IREntryPointLayout has)
+
+            // Add the new layout decoration to the new function
+            builder.addLayoutDecoration(newFunc, newEntryPointLayout);
+        }
+    }
+
     fprintf(
         stderr,
         "Original function:\n%s\n",
@@ -260,8 +404,9 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
         dumpIRToString(newFunc, {IRDumpOptions::Mode::Detailed, 0}).getBuffer());
     fprintf(
         stderr,
-        "Transformed function type:\n%s\n",
-        dumpIRToString(returnStruct, {IRDumpOptions::Mode::Detailed, 0}).getBuffer());
+        "Transformed function:\n%s\n",
+        dumpIRToString(newFunc->getModule()->getModuleInst(), {IRDumpOptions::Mode::Detailed, 0})
+            .getBuffer());
     return newFunc;
 }
 

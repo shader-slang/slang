@@ -4037,7 +4037,10 @@ void legalizeEntryPointVaryingParamsForMetal(
 {
     for (auto& e : entryPoints)
     {
-        legalizeVertexShaderOutputParamsForMetal(sink, e);
+        if (e.entryPointDecor->getProfile().getStage() == Stage::Vertex)
+        {
+            legalizeVertexShaderOutputParamsForMetal(sink, e);
+        }
     }
     LegalizeMetalEntryPointContext context(module, sink);
     context.legalizeEntryPoints(entryPoints);
