@@ -12,5 +12,3 @@ tests/compute/interface-shader-param-in-struct.slang.4 syn (wgpu)
 tests/compute/interface-shader-param.slang.5 syn (wgpu)
 tests/language-feature/shader-params/interface-shader-param-ordinary.slang.4 syn (wgpu)
 gfx-unit-test-tool/precompiledTargetModule2Vulkan.internal
-tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables.slang.8 (mtl)
-tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables-2.slang.3 (mtl)
