@@ -2832,6 +2832,11 @@ struct VariableReflection
         return spReflectionVariable_HasDefaultValue((SlangReflectionVariable*)this);
     }
 
+    SlangResult getDefaultValueInt(int64_t* value)
+    {
+        return spReflectionVariable_GetDefaultValueInt((SlangReflectionVariable*)this, value);
+    }
+
     GenericReflection* getGenericContainer()
     {
         return (GenericReflection*)spReflectionVariable_GetGenericContainer(

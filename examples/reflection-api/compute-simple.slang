@@ -1,5 +1,8 @@
 // compute-simple.slang
 
+static const uint THREADGROUP_SIZE_X = 8;
+static const uint THREADGROUP_SIZE_Y = THREADGROUP_SIZE_X;
+
 struct ImageProcessingOptions
 {
     float3 tintColor;
@@ -10,7 +13,7 @@ struct ImageProcessingOptions
 }
 
 [shader("compute")]
-[numthreads(8, 8)]
+[numthreads(THREADGROUP_SIZE_X, THREADGROUP_SIZE_Y)]
 void processImage(
     uint3 threadID : SV_DispatchThreadID,
     uniform Texture2D inputImage,
