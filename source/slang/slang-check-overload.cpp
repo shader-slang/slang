@@ -1347,7 +1347,7 @@ int SemanticsVisitor::CompareLookupResultItems(
     bool leftIsModule = (as<ModuleDeclarationDecl>(left.declRef) != nullptr);
     bool rightIsModule = (as<ModuleDeclarationDecl>(right.declRef) != nullptr);
     if (leftIsModule != rightIsModule)
-        return int(rightIsModule) - int(leftIsModule);
+        return int(leftIsModule) - int(rightIsModule);
 
     // If both are interface requirements, prefer the more derived interface.
     if (leftIsInterfaceRequirement && rightIsInterfaceRequirement)
