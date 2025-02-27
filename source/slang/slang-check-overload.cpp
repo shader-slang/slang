@@ -1316,15 +1316,17 @@ int SemanticsVisitor::CompareLookupResultItems(
         // Add a special case for constructors, where we prefer the one that is not synthesized,
         if (auto leftCtor = as<ConstructorDecl>(left.declRef.getDecl()))
         {
-            auto rightCtor = as<ConstructorDecl>(right.declRef.getDecl());
-            bool leftIsSynthesized =
-                leftCtor->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
-            bool rightIsSynthesized =
-                rightCtor->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
-
-            if (leftIsSynthesized != rightIsSynthesized)
+            if (auto rightCtor = as<ConstructorDecl>(right.declRef.getDecl()))
             {
-                return int(leftIsSynthesized) - int(rightIsSynthesized);
+                bool leftIsSynthesized = leftCtor->containsFlavor(
+                    ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
+                bool rightIsSynthesized = rightCtor->containsFlavor(
+                    ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
+
+                if (leftIsSynthesized != rightIsSynthesized)
+                {
+                    return int(leftIsSynthesized) - int(rightIsSynthesized);
+                }
             }
         }
 
