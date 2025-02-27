@@ -5,4 +5,3 @@ tests/language-feature/saturated-cooperation/fuse.slang (vk)
 tests/bugs/byte-address-buffer-interlocked-add-f32.slang (vk)
 tests/ir/loop-unroll-0.slang.1 (vk)
 tests/hlsl-intrinsic/texture/float-atomics.slang (vk)
-gfx-unit-test-tool/precompiledTargetModule2Vulkan.internal
