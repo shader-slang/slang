@@ -3405,6 +3405,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return emitOpBitcast(parent, inst, inst->getDataType(), vec);
     }
 
+    bool isAtomicableAddressSpace(IRInst* type)
+    {
+        auto ptrType = as<IRPtrTypeBase>(type);
+        if (!ptrType)
+            return false;
+        switch (ptrType->getAddressSpace())
+        {
+        case AddressSpace::Global:
+        case AddressSpace::StorageBuffer:
+        case AddressSpace::UserPointer:
+        case AddressSpace::GroupShared:
+        case AddressSpace::Image:
+        case AddressSpace::TaskPayloadWorkgroup:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     // The instructions that appear inside the basic blocks of
     // functions are what we will call "local" instructions.
     //
@@ -3860,53 +3879,74 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_AtomicLoad:
             {
                 IRBuilder builder{inst};
-                const auto memoryScope =
-                    emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
-                const auto memorySemantics =
-                    emitMemorySemanticMask(inst->getOperand(1), inst->getOperand(0));
-                result = emitOpAtomicLoad(
-                    parent,
-                    inst,
-                    inst->getFullType(),
-                    inst->getOperand(0),
-                    memoryScope,
-                    memorySemantics);
-                ensureAtomicCapability(inst, SpvOpAtomicLoad);
+                if (isAtomicableAddressSpace(inst->getOperand(0)->getDataType()))
+                {
+                    const auto memoryScope =
+                        emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
+                    const auto memorySemantics =
+                        emitMemorySemanticMask(inst->getOperand(1), inst->getOperand(0));
+                    result = emitOpAtomicLoad(
+                        parent,
+                        inst,
+                        inst->getFullType(),
+                        inst->getOperand(0),
+                        memoryScope,
+                        memorySemantics);
+                    ensureAtomicCapability(inst, SpvOpAtomicLoad);
+                }
+                else
+                {
+                    result = emitOpLoad(parent, inst, inst->getFullType(), inst->getOperand(0));
+                }
             }
             break;
         case kIROp_AtomicStore:
             {
                 IRBuilder builder{inst};
-                const auto memoryScope =
-                    emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
-                const auto memorySemantics =
-                    emitMemorySemanticMask(inst->getOperand(2), inst->getOperand(0));
-                result = emitOpAtomicStore(
-                    parent,
-                    inst,
-                    inst->getOperand(0),
-                    memoryScope,
-                    memorySemantics,
-                    inst->getOperand(1));
-                ensureAtomicCapability(inst, SpvOpAtomicStore);
+                if (isAtomicableAddressSpace(inst->getOperand(0)->getDataType()))
+                {
+                    const auto memoryScope =
+                        emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
+                    const auto memorySemantics =
+                        emitMemorySemanticMask(inst->getOperand(2), inst->getOperand(0));
+                    result = emitOpAtomicStore(
+                        parent,
+                        inst,
+                        inst->getOperand(0),
+                        memoryScope,
+                        memorySemantics,
+                        inst->getOperand(1));
+                    ensureAtomicCapability(inst, SpvOpAtomicStore);
+                }
+                else
+                {
+                    result = emitOpStore(parent, inst, inst->getOperand(0), inst->getOperand(1));
+                }
             }
             break;
         case kIROp_AtomicExchange:
             {
                 IRBuilder builder{inst};
-                const auto memoryScope =
-                    emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
-                const auto memorySemantics =
-                    emitMemorySemanticMask(inst->getOperand(2), inst->getOperand(0));
-                result = emitOpAtomicExchange(
-                    parent,
-                    inst,
-                    inst->getFullType(),
-                    inst->getOperand(0),
-                    memoryScope,
-                    memorySemantics,
-                    inst->getOperand(1));
-                ensureAtomicCapability(inst, SpvOpAtomicExchange);
+                if (isAtomicableAddressSpace(inst->getOperand(0)->getDataType()))
+                {
+                    const auto memoryScope =
+                        emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
+                    const auto memorySemantics =
+                        emitMemorySemanticMask(inst->getOperand(2), inst->getOperand(0));
+                    result = emitOpAtomicExchange(
+                        parent,
+                        inst,
+                        inst->getFullType(),
+                        inst->getOperand(0),
+                        memoryScope,
+                        memorySemantics,
+                        inst->getOperand(1));
+                    ensureAtomicCapability(inst, SpvOpAtomicExchange);
+                }
+                else
+                {
+                    result = emitOpStore(parent, inst, inst->getOperand(0), inst->getOperand(1));
+                }
             }
             break;
         case kIROp_AtomicCompareExchange:
