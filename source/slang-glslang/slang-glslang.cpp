@@ -176,6 +176,7 @@ extern "C"
 
     spvtools::ValidatorOptions options;
     options.SetScalarBlockLayout(true);
+    options.SetFriendlyNames(true);
 
     spvtools::SpirvTools tools(target_env);
     tools.SetMessageConsumer(validationMessageConsumer);
@@ -198,6 +199,7 @@ extern "C"
     options |= SPV_BINARY_TO_TEXT_OPTION_COMMENT;
     options |= SPV_BINARY_TO_TEXT_OPTION_PRINT;
     options |= SPV_BINARY_TO_TEXT_OPTION_COLOR;
+    options |= SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES;
 
     spv_diagnostic diagnostic = nullptr;
     spv_context context = spvContextCreate(kDefaultEnvironment);
