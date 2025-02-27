@@ -4014,6 +4014,9 @@ void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointIn
     const auto oldFunc = entryPoint.entryPointFunc;
     entryPoint.entryPointFunc = lowerOutParameters(oldFunc, sink);
 
+    if (oldFunc == entryPoint.entryPointFunc)
+        return;
+
     // Since this will no longer be the entry point function, remove those decorations
     List<IRDecoration*> ds;
     for (auto decor : oldFunc->getDecorations())
