@@ -1466,8 +1466,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Int8Type:
         case kIROp_IntType:
         case kIROp_Int64Type:
-        case kIROp_Int8x4PackedType:
-        case kIROp_UInt8x4PackedType:
             {
                 const IntInfo i = getIntTypeInfo(as<IRType>(inst));
                 if (i.width == 16)
@@ -7642,8 +7640,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             case kIROp_UInt64Type:
             case kIROp_UInt8Type:
             case kIROp_UIntPtrType:
-            case kIROp_Int8x4PackedType:
-            case kIROp_UInt8x4PackedType:
                 spvEncoding = 6; // Unsigned
                 break;
             case kIROp_FloatType:
