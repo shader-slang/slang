@@ -2141,8 +2141,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
             SLANG_ASSERT(spirvFiles.size() == spirvSizes.size());
             SlangResult linkresult = compiler->link(
                 (const uint32_t**)spirvFiles.data(),
-                spirvSizes.data(),
-                spirvFiles.size(),
+                (const uint32_t*)spirvSizes.data(),
+                (uint32_t)spirvFiles.size(),
                 linkedArtifact.writeRef());
             
             if (linkresult != SLANG_OK)
