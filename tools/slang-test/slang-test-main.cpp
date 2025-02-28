@@ -3528,7 +3528,7 @@ TestResult runComputeComparisonImpl(
     // This is due to the limitation that Slang RPC implementation expects only
     // one time communication.
     if (input.spawnType != SpawnType::UseTestServer)
-        cmdLine.addArg("-enable-backend-validation");
+        cmdLine.addArg("-enable-debug-layers");
 #endif
 
     if (context->isExecuting())
