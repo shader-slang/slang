@@ -55,7 +55,10 @@ struct CompletionContext
 
 
     CompletionResult collectMembersAndSymbols();
-    CompletionResult createSwizzleCandidates(Type* baseType, IntegerLiteralValue elementCount[2]);
+    void createSwizzleCandidates(
+        List<LanguageServerProtocol::CompletionItem>& result,
+        Type* type,
+        IntegerLiteralValue elementCount[2]);
     CompletionResult createCapabilityCandidates();
     CompletionResult collectAttributes();
     LanguageServerProtocol::CompletionItem generateGUIDCompletionItem();
