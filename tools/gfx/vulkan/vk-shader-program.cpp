@@ -74,10 +74,20 @@ Result ShaderProgramImpl::createShaderModule(
     slang::EntryPointReflection* entryPointInfo,
     List<ComPtr<ISlangBlob>>& kernelCodes)
 {
-    ComPtr<ISlangBlob> linkedKernel = m_device->m_glslang.linkSPIRV(kernelCodes);
-    if (!linkedKernel)
+    ComPtr<ISlangBlob> linkedKernel;
+    ComPtr<slang::ISession> slangSession;
+    m_device->getSlangSession(slangSession.writeRef());
+    if (kernelCodes.getCount() == 1)
     {
-        return SLANG_FAIL;
+        linkedKernel = kernelCodes[0];
+    } 
+    else
+    {
+        linkedKernel = m_device->m_glslang.linkSPIRV(kernelCodes);
+        if (!linkedKernel)
+        {
+            return SLANG_FAIL;
+        }
     }
 
     m_codeBlobs.add(linkedKernel);

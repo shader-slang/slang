@@ -653,6 +653,7 @@ typedef uint32_t SlangSizeT;
         SLANG_PASS_THROUGH_SPIRV_OPT,     ///< SPIRV-opt
         SLANG_PASS_THROUGH_METAL,         ///< Metal compiler
         SLANG_PASS_THROUGH_TINT,          ///< Tint WGSL compiler
+        SLANG_PASS_THROUGH_SPIRV_LINK,    ///< SPIRV-link
         SLANG_PASS_THROUGH_COUNT_OF,
     };
 
@@ -1008,6 +1009,8 @@ typedef uint32_t SlangSizeT;
 
         EmitReflectionJSON, // bool
         SaveGLSLModuleBinSource,
+
+        SkipDownstreamLinking,        // bool, experimental
         CountOf,
     };
 

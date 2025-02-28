@@ -80,7 +80,8 @@ Slang::Result loadComputeProgram(
     Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
     const char* shaderModuleName,
     const char* entryPointName,
-    slang::ProgramLayout*& slangReflection)
+    slang::ProgramLayout*& slangReflection,
+    PrecompilationMode precompilationMode)
 {
     Slang::ComPtr<slang::IBlob> diagnosticsBlob;
     slang::IModule* module = slangSession->loadModule(shaderModuleName, diagnosticsBlob.writeRef());
@@ -115,6 +116,12 @@ Slang::Result loadComputeProgram(
 
     gfx::IShaderProgram::Desc programDesc = {};
     programDesc.slangGlobalScope = composedProgram.get();
+    if (precompilationMode == PrecompilationMode::ExternalLink)
+    {
+        programDesc.downstreamLinkMode = gfx::IShaderProgram::DownstreamLinkMode::Deferred;
+    } else {
+        programDesc.downstreamLinkMode = gfx::IShaderProgram::DownstreamLinkMode::None;
+    }
 
     auto shaderProgram = device->createProgram(programDesc);
 

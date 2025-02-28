@@ -7,6 +7,13 @@
 
 namespace gfx_test
 {
+    enum class PrecompilationMode
+    {
+        None,
+        SlangIR,
+        InternalLink,
+        ExternalLink,    
+    };
 /// Helper function for print out diagnostic messages output by Slang compiler.
 void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob);
 
@@ -24,7 +31,8 @@ Slang::Result loadComputeProgram(
     Slang::ComPtr<gfx::IShaderProgram>& outShaderProgram,
     const char* shaderModuleName,
     const char* entryPointName,
-    slang::ProgramLayout*& slangReflection);
+    slang::ProgramLayout*& slangReflection,
+    PrecompilationMode precompilationMode = PrecompilationMode::None);
 
 Slang::Result loadComputeProgramFromSource(
     gfx::IDevice* device,
