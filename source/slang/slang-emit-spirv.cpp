@@ -3118,31 +3118,56 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return (isSpirv16OrLater() || m_useDemoteToHelperInvocationExtension);
     }
 
-    SpvInst* emitMemorySemanticMask(IRInst* inst)
+    SpvInst* emitMemorySemanticMask(IRInst* memoryOrderInst, IRInst* ptrInst)
     {
-        IRBuilder builder(inst);
-        auto memoryOrder = (IRMemoryOrder)getIntVal(inst);
-        switch (memoryOrder)
+        IRBuilder builder(memoryOrderInst);
+        auto memoryOrder = (IRMemoryOrder)getIntVal(memoryOrderInst);
+        if (memoryOrder == kIRMemoryOrder_Relaxed)
         {
-        case kIRMemoryOrder_Relaxed:
             return emitIntConstant(
                 IRIntegerValue{SpvMemorySemanticsMaskNone},
                 builder.getUIntType());
+        }
+        uint32_t memoryClass = 0;
+        if (auto ptrType = as<IRPtrTypeBase>(ptrInst->getDataType()))
+        {
+            if (ptrType->hasAddressSpace())
+            {
+                switch (ptrType->getAddressSpace())
+                {
+                case AddressSpace::StorageBuffer:
+                case AddressSpace::UserPointer:
+                    memoryClass = SpvMemorySemanticsUniformMemoryMask;
+                    break;
+                case AddressSpace::Image:
+                    memoryClass = SpvMemorySemanticsImageMemoryMask;
+                    break;
+                case AddressSpace::Output:
+                    memoryClass = SpvMemorySemanticsOutputMemoryKHRMask;
+                    break;
+                case AddressSpace::GroupShared:
+                    memoryClass = SpvMemorySemanticsWorkgroupMemoryMask;
+                    break;
+                }
+            }
+        }
+        switch (memoryOrder)
+        {
         case kIRMemoryOrder_Acquire:
             return emitIntConstant(
-                IRIntegerValue{SpvMemorySemanticsAcquireMask},
+                IRIntegerValue{SpvMemorySemanticsAcquireMask | memoryClass},
                 builder.getUIntType());
         case kIRMemoryOrder_Release:
             return emitIntConstant(
-                IRIntegerValue{SpvMemorySemanticsReleaseMask},
+                IRIntegerValue{SpvMemorySemanticsReleaseMask | memoryClass},
                 builder.getUIntType());
         case kIRMemoryOrder_AcquireRelease:
             return emitIntConstant(
-                IRIntegerValue{SpvMemorySemanticsAcquireReleaseMask},
+                IRIntegerValue{SpvMemorySemanticsAcquireReleaseMask | memoryClass},
                 builder.getUIntType());
         case kIRMemoryOrder_SeqCst:
             return emitIntConstant(
-                IRIntegerValue{SpvMemorySemanticsSequentiallyConsistentMask},
+                IRIntegerValue{SpvMemorySemanticsSequentiallyConsistentMask | memoryClass},
                 builder.getUIntType());
         default:
             SLANG_UNEXPECTED("unhandled memory order");
@@ -3380,6 +3405,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             inst->getOperand(0),
             inst->getOperand(1));
         return emitOpBitcast(parent, inst, inst->getDataType(), vec);
+    }
+
+    bool isAtomicableAddressSpace(IRInst* type)
+    {
+        auto ptrType = as<IRPtrTypeBase>(type);
+        if (!ptrType)
+            return false;
+        switch (ptrType->getAddressSpace())
+        {
+        case AddressSpace::Global:
+        case AddressSpace::StorageBuffer:
+        case AddressSpace::UserPointer:
+        case AddressSpace::GroupShared:
+        case AddressSpace::Image:
+        case AddressSpace::TaskPayloadWorkgroup:
+            return true;
+        default:
+            return false;
+        }
     }
 
     // The instructions that appear inside the basic blocks of
@@ -3805,7 +3849,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 IRBuilder builder{inst};
                 const auto memoryScope =
                     emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
-                const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(1));
+                const auto memorySemantics =
+                    emitMemorySemanticMask(inst->getOperand(1), inst->getOperand(0));
                 result = emitOpAtomicIIncrement(
                     parent,
                     inst,
@@ -3821,7 +3866,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 IRBuilder builder{inst};
                 const auto memoryScope =
                     emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
-                const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(1));
+                const auto memorySemantics =
+                    emitMemorySemanticMask(inst->getOperand(1), inst->getOperand(0));
                 result = emitOpAtomicIDecrement(
                     parent,
                     inst,
@@ -3835,50 +3881,74 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_AtomicLoad:
             {
                 IRBuilder builder{inst};
-                const auto memoryScope =
-                    emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
-                const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(1));
-                result = emitOpAtomicLoad(
-                    parent,
-                    inst,
-                    inst->getFullType(),
-                    inst->getOperand(0),
-                    memoryScope,
-                    memorySemantics);
-                ensureAtomicCapability(inst, SpvOpAtomicLoad);
+                if (isAtomicableAddressSpace(inst->getOperand(0)->getDataType()))
+                {
+                    const auto memoryScope =
+                        emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
+                    const auto memorySemantics =
+                        emitMemorySemanticMask(inst->getOperand(1), inst->getOperand(0));
+                    result = emitOpAtomicLoad(
+                        parent,
+                        inst,
+                        inst->getFullType(),
+                        inst->getOperand(0),
+                        memoryScope,
+                        memorySemantics);
+                    ensureAtomicCapability(inst, SpvOpAtomicLoad);
+                }
+                else
+                {
+                    result = emitOpLoad(parent, inst, inst->getFullType(), inst->getOperand(0));
+                }
             }
             break;
         case kIROp_AtomicStore:
             {
                 IRBuilder builder{inst};
-                const auto memoryScope =
-                    emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
-                const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(2));
-                result = emitOpAtomicStore(
-                    parent,
-                    inst,
-                    inst->getOperand(0),
-                    memoryScope,
-                    memorySemantics,
-                    inst->getOperand(1));
-                ensureAtomicCapability(inst, SpvOpAtomicStore);
+                if (isAtomicableAddressSpace(inst->getOperand(0)->getDataType()))
+                {
+                    const auto memoryScope =
+                        emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
+                    const auto memorySemantics =
+                        emitMemorySemanticMask(inst->getOperand(2), inst->getOperand(0));
+                    result = emitOpAtomicStore(
+                        parent,
+                        inst,
+                        inst->getOperand(0),
+                        memoryScope,
+                        memorySemantics,
+                        inst->getOperand(1));
+                    ensureAtomicCapability(inst, SpvOpAtomicStore);
+                }
+                else
+                {
+                    result = emitOpStore(parent, inst, inst->getOperand(0), inst->getOperand(1));
+                }
             }
             break;
         case kIROp_AtomicExchange:
             {
                 IRBuilder builder{inst};
-                const auto memoryScope =
-                    emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
-                const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(2));
-                result = emitOpAtomicExchange(
-                    parent,
-                    inst,
-                    inst->getFullType(),
-                    inst->getOperand(0),
-                    memoryScope,
-                    memorySemantics,
-                    inst->getOperand(1));
-                ensureAtomicCapability(inst, SpvOpAtomicExchange);
+                if (isAtomicableAddressSpace(inst->getOperand(0)->getDataType()))
+                {
+                    const auto memoryScope =
+                        emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
+                    const auto memorySemantics =
+                        emitMemorySemanticMask(inst->getOperand(2), inst->getOperand(0));
+                    result = emitOpAtomicExchange(
+                        parent,
+                        inst,
+                        inst->getFullType(),
+                        inst->getOperand(0),
+                        memoryScope,
+                        memorySemantics,
+                        inst->getOperand(1));
+                    ensureAtomicCapability(inst, SpvOpAtomicExchange);
+                }
+                else
+                {
+                    result = emitOpStore(parent, inst, inst->getOperand(0), inst->getOperand(1));
+                }
             }
             break;
         case kIROp_AtomicCompareExchange:
@@ -3886,8 +3956,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 IRBuilder builder{inst};
                 const auto memoryScope =
                     emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
-                const auto memorySemanticsEqual = emitMemorySemanticMask(inst->getOperand(3));
-                const auto memorySemanticsUnequal = emitMemorySemanticMask(inst->getOperand(4));
+                const auto memorySemanticsEqual =
+                    emitMemorySemanticMask(inst->getOperand(3), inst->getOperand(0));
+                const auto memorySemanticsUnequal =
+                    emitMemorySemanticMask(inst->getOperand(4), inst->getOperand(0));
                 result = emitOpAtomicCompareExchange(
                     parent,
                     inst,
@@ -3912,7 +3984,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 IRBuilder builder{inst};
                 const auto memoryScope =
                     emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
-                const auto memorySemantics = emitMemorySemanticMask(inst->getOperand(2));
+                const auto memorySemantics =
+                    emitMemorySemanticMask(inst->getOperand(2), inst->getOperand(0));
                 bool negateOperand = false;
                 auto spvOp = getSpvAtomicOp(inst, negateOperand);
                 auto operand = inst->getOperand(1);
@@ -4344,8 +4417,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                                 continue;
                                         }
                                     }
-                                    paramsSet.add(spvGlobalInst);
                                     referencedBuiltinIRVars.add(globalInst);
+                                    // Don't add duplicate vars to the interface list.
+                                    bool paramAdded = paramsSet.add(spvGlobalInst);
+                                    if (!paramAdded)
+                                        continue;
 
                                     // Don't add a global param to the interface if it is a
                                     // specialization constant.
@@ -5215,6 +5291,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         IRBuilder builder(m_irModule);
         builder.setInsertBefore(inst);
+        if (auto builtinVarDecor = inst->findDecoration<IRTargetBuiltinVarDecoration>())
+        {
+            switch (builtinVarDecor->getBuiltinVarName())
+            {
+            case IRTargetBuiltinVarName::SpvInstanceIndex:
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInstanceIndex, inst);
+            case IRTargetBuiltinVarName::SpvBaseInstance:
+                requireSPIRVCapability(SpvCapabilityDrawParameters);
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaseInstance, inst);
+            }
+        }
         if (auto layout = getVarLayout(inst))
         {
             if (auto systemValueAttr = layout->findAttr<IRSystemValueSemanticAttr>())
@@ -5308,6 +5395,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 else if (semanticName == "sv_instanceid")
                 {
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInstanceIndex, inst);
+                }
+                else if (semanticName == "sv_baseinstanceid")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaseInstance, inst);
                 }
                 else if (semanticName == "sv_isfrontface")
                 {

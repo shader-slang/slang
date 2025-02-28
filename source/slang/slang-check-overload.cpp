@@ -1316,15 +1316,17 @@ int SemanticsVisitor::CompareLookupResultItems(
         // Add a special case for constructors, where we prefer the one that is not synthesized,
         if (auto leftCtor = as<ConstructorDecl>(left.declRef.getDecl()))
         {
-            auto rightCtor = as<ConstructorDecl>(right.declRef.getDecl());
-            bool leftIsSynthesized =
-                leftCtor->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
-            bool rightIsSynthesized =
-                rightCtor->containsFlavor(ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
-
-            if (leftIsSynthesized != rightIsSynthesized)
+            if (auto rightCtor = as<ConstructorDecl>(right.declRef.getDecl()))
             {
-                return int(leftIsSynthesized) - int(rightIsSynthesized);
+                bool leftIsSynthesized = leftCtor->containsFlavor(
+                    ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
+                bool rightIsSynthesized = rightCtor->containsFlavor(
+                    ConstructorDecl::ConstructorFlavor::SynthesizedDefault);
+
+                if (leftIsSynthesized != rightIsSynthesized)
+                {
+                    return int(leftIsSynthesized) - int(rightIsSynthesized);
+                }
             }
         }
 
@@ -1345,7 +1347,7 @@ int SemanticsVisitor::CompareLookupResultItems(
     bool leftIsModule = (as<ModuleDeclarationDecl>(left.declRef) != nullptr);
     bool rightIsModule = (as<ModuleDeclarationDecl>(right.declRef) != nullptr);
     if (leftIsModule != rightIsModule)
-        return int(rightIsModule) - int(leftIsModule);
+        return int(leftIsModule) - int(rightIsModule);
 
     // If both are interface requirements, prefer the more derived interface.
     if (leftIsInterfaceRequirement && rightIsInterfaceRequirement)

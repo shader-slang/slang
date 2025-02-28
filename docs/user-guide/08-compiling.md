@@ -603,6 +603,10 @@ for compiling GLSL code. Without this setting, compiling GLSL code will result i
 > Currently, the global session type is *not* thread-safe.
 > Applications that wish to compile on multiple threads will need to ensure that each concurrent thread compiles with a distinct global session.
 
+> #### Note ####
+> Currently, the global session should be freed after any objects created from it.
+> See [issue 6344](https://github.com/shader-slang/slang/issues/6344).
+
 ### Creating a Session
 
 A _session_ uses the interface `slang::ISession`, and represents a scope for compilation with a consistent set of compiler options.

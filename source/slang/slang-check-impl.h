@@ -1496,7 +1496,7 @@ public:
     /// by calling a function that indirectly reads the variable) will be allowed and then
     /// exhibit undefined behavior at runtime.
     ///
-    void _validateCircularVarDefinition(VarDeclBase* varDecl);
+    IntVal* _validateCircularVarDefinition(VarDeclBase* varDecl);
 
     bool shouldSkipChecking(Decl* decl, DeclCheckState state);
 

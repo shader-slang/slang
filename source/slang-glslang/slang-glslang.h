@@ -152,10 +152,19 @@ inline void glslang_CompileRequest_1_2::set(const glslang_CompileRequest_1_1& in
     memcpy(this, &in, sizeof(in));
 }
 
+typedef struct glslang_LinkRequest_t
+{
+    const uint32_t** modules;    // Input: array of pointers to SPIR-V modules
+    const uint32_t* moduleSizes; // Input: array of sizes of SPIR-V modules in 32-bit words
+    int moduleCount;             // Input: number of modules in the array
+    const uint32_t* linkResult;  // Output: pointer to linked SPIR-V module
+    size_t linkResultSize;       // Output: size of the linked SPIR-V module in 32-bit words
+} glslang_LinkRequest;
+
 typedef int (*glslang_CompileFunc_1_0)(glslang_CompileRequest_1_0* request);
 typedef int (*glslang_CompileFunc_1_1)(glslang_CompileRequest_1_1* request);
 typedef int (*glslang_CompileFunc_1_2)(glslang_CompileRequest_1_2* request);
 typedef bool (*glslang_ValidateSPIRVFunc)(const uint32_t* contents, int contentsSize);
 typedef bool (*glslang_DisassembleSPIRVFunc)(const uint32_t* contents, int contentsSize);
-
+typedef bool (*glslang_LinkSPIRVFunc)(glslang_LinkRequest* request);
 #endif
