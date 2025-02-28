@@ -281,6 +281,142 @@ static Dictionary<IRBlock*, IRBlock*> createPrimalRecomputeBlocks(
     return recomputeBlockMap;
 }
 
+// Checks if list A is a subset of list B by comparing their primal count parameters.
+//
+// Parameters:
+//   indicesA - First list of IndexTrackingInfo to compare
+//   indicesB - Second list of IndexTrackingInfo to compare
+//
+// Returns:
+//   true if all indices in indicesA are present in indicesB, false otherwise
+//
+bool areIndicesSubsetOf(List<IndexTrackingInfo>& indicesA, List<IndexTrackingInfo>& indicesB)
+{
+    if (indicesA.getCount() > indicesB.getCount())
+        return false;
+
+    for (Index ii = 0; ii < indicesA.getCount(); ii++)
+    {
+        if (indicesA[ii].primalCountParam != indicesB[ii].primalCountParam)
+            return false;
+    }
+
+    return true;
+}
+
+bool canInstBeStored(IRInst* inst)
+{
+    // Cannot store insts whose value is a type or a witness table, or a function.
+    // These insts get lowered to target-specific logic, and cannot be
+    // stored into variables or context structs as normal values.
+    //
+    if (as<IRTypeType>(inst->getDataType()) || as<IRWitnessTableType>(inst->getDataType()) ||
+        as<IRTypeKind>(inst->getDataType()) || as<IRFuncType>(inst->getDataType()) ||
+        !inst->getDataType())
+        return false;
+
+    return true;
+}
+
+// This is a helper that converts insts in a loop condition block into two if necessary,
+// then replaces all uses 'outside' the loop region with the new insts. This is because
+// insts in loop condition blocks can be used in two distinct regions (the loop body, and
+// after the loop).
+//
+// We'll use CheckpointObject for the splitting, which is allowed on any value-typed inst.
+//
+void splitLoopConditionBlockInsts(
+    IRGlobalValueWithCode* func,
+    Dictionary<IRBlock*, List<IndexTrackingInfo>>& indexedBlockInfo)
+{
+    // RefPtr<IRDominatorTree> domTree = computeDominatorTree(func);
+
+    // Collect primal loop condition blocks, and map differential blocks to their primal blocks.
+    List<IRBlock*> loopConditionBlocks;
+    Dictionary<IRBlock*, IRBlock*> diffBlockMap;
+    for (auto block : func->getBlocks())
+    {
+        if (auto loop = as<IRLoop>(block->getTerminator()))
+        {
+            auto loopConditionBlock = getLoopConditionBlock(loop);
+            if (isDifferentialBlock(loopConditionBlock))
+            {
+                auto diffDecor = loopConditionBlock->findDecoration<IRDifferentialInstDecoration>();
+                diffBlockMap[cast<IRBlock>(diffDecor->getPrimalInst())] = loopConditionBlock;
+            }
+            else
+                loopConditionBlocks.add(loopConditionBlock);
+        }
+    }
+
+    // For each loop condition block, split the insts that are used in both the loop body and
+    // after the loop.
+    // Use the dominator tree to find uses of insts outside the loop body
+    //
+    // Essentially we want to split the uses dominated by the true block and the false block of the
+    // condition.
+    //
+    IRBuilder builder(func->getModule());
+
+
+    List<IRUse*> loopUses;
+    List<IRUse*> afterLoopUses;
+
+    for (auto condBlock : loopConditionBlocks)
+    {
+        // For each inst in the primal condition block, check if it has uses inside the loop body
+        // as well as outside of it. (Use the indexedBlockInfo to perform the teets)
+        //
+        for (auto inst = condBlock->getFirstInst(); inst; inst = inst->getNextInst())
+        {
+            // Skip terminators and insts that can't be stored
+            if (as<IRTerminatorInst>(inst) || !canInstBeStored(inst))
+                continue;
+            // Shouldn't see any vars.
+            SLANG_ASSERT(!as<IRVar>(inst));
+
+            // Get the indices for the condition block
+            auto& condBlockIndices = indexedBlockInfo[condBlock];
+
+            loopUses.clear();
+            afterLoopUses.clear();
+
+            // Check all uses of this inst
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto userBlock = getBlock(use->getUser());
+                auto& userBlockIndices = indexedBlockInfo[userBlock];
+
+                // If all of the condBlock's indices are a subset of the userBlock's indices,
+                // then the userBlock is inside the loop.
+                //
+                bool isInLoop = areIndicesSubsetOf(condBlockIndices, userBlockIndices);
+
+                if (isInLoop)
+                    loopUses.add(use);
+                else
+                    afterLoopUses.add(use);
+            }
+
+            // If inst has uses both inside and after the loop, create a copy for after-loop uses
+            if (loopUses.getCount() > 0 && afterLoopUses.getCount() > 0)
+            {
+                setInsertAfterOrdinaryInst(&builder, inst);
+                auto copy = builder.emitCheckpointObject(inst);
+
+                // Copy source location so that checkpoint reporting is accurate
+                copy->sourceLoc = inst->sourceLoc;
+
+                // Replace after-loop uses with the copy
+                for (auto use : afterLoopUses)
+                {
+                    builder.replaceOperand(use, copy);
+                }
+            }
+        }
+    }
+}
+
 RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
     IRGlobalValueWithCode* func,
     Dictionary<IRBlock*, IRBlock*>& mapDiffBlockToRecomputeBlock,
@@ -1174,7 +1310,7 @@ IRVar* emitIndexedLocalVar(
     SourceLoc location)
 {
     // Cannot store pointers. Case should have been handled by now.
-    SLANG_RELEASE_ASSERT(!as<IRPtrTypeBase>(baseType));
+    SLANG_RELEASE_ASSERT(!asRelevantPtrType(baseType));
 
     // Cannot store types. Case should have been handled by now.
     SLANG_RELEASE_ASSERT(!as<IRTypeType>(baseType));
@@ -1297,20 +1433,6 @@ bool areIndicesEqual(
     return true;
 }
 
-bool areIndicesSubsetOf(List<IndexTrackingInfo>& indicesA, List<IndexTrackingInfo>& indicesB)
-{
-    if (indicesA.getCount() > indicesB.getCount())
-        return false;
-
-    for (Index ii = 0; ii < indicesA.getCount(); ii++)
-    {
-        if (indicesA[ii].primalCountParam != indicesB[ii].primalCountParam)
-            return false;
-    }
-
-    return true;
-}
-
 static int getInstRegionNestLevel(
     Dictionary<IRBlock*, List<IndexTrackingInfo>>& indexedBlockInfo,
     IRBlock* defBlock,
@@ -1326,7 +1448,11 @@ static int getInstRegionNestLevel(
 
 struct UseChain
 {
+    // The chain of uses from the base use to the relevant use.
+    // However, this is stored in reverse order (so that the last use is the 'base use')
+    //
     List<IRUse*> chain;
+
     static List<UseChain> from(
         IRUse* baseUse,
         Func<bool, IRUse*> isRelevantUse,
@@ -1366,41 +1492,20 @@ struct UseChain
         return result;
     }
 
-    void replace(IROutOfOrderCloneContext* ctx, IRBuilder* builder, IRInst* inst)
+    // This function only replaces the inner links, not the base use.
+    void replaceInnerLinks(IROutOfOrderCloneContext* ctx, IRBuilder* builder)
     {
         SLANG_ASSERT(chain.getCount() > 0);
 
-        // Simple case: if there is only one use, then we can just replace it.
-        if (chain.getCount() == 1)
+        const UIndex count = chain.getCount();
+
+        // Process the chain in reverse order (excluding the first and last elements).
+        // That is, iterate from count - 2 down to 1 (inclusive).
+        for (int i = ((int)count) - 2; i >= 1; i--)
         {
-            builder->replaceOperand(chain.getLast(), inst);
-            chain.clear();
-            return;
+            IRUse* use = chain[i];
+            ctx->cloneInstOutOfOrder(builder, use->get());
         }
-
-        // Pop the last use, which is the base use that needs to be replaced.
-        auto baseUse = chain.getLast();
-        chain.removeLast();
-
-        // Ensure that replacement inst is set as mapping for the baseUse.
-        ctx->cloneEnv.mapOldValToNew[baseUse->get()] = inst;
-
-        IRBuilder chainBuilder(builder->getModule());
-        setInsertAfterOrdinaryInst(&chainBuilder, inst);
-
-        chain.reverse();
-        chain.removeLast();
-
-        // Clone the rest of the chain.
-        for (auto& use : chain)
-        {
-            ctx->cloneInstOutOfOrder(&chainBuilder, use->get());
-        }
-
-        // We won't actually replace the final use, because if there are multiple chains
-        // it can cause problems. The parent UseGraph will handle that.
-
-        chain.clear();
     }
 
     IRInst* getUser() const
@@ -1417,6 +1522,14 @@ struct UseGraph
     //
     OrderedDictionary<IRUse*, List<UseChain>> chainSets;
 
+    // Create a UseGraph from a base inst.
+    //
+    // `isRelevantUse` is a predicate that determines if a use is relevant. Traversal will stop at
+    // this use, and all chains to this use will be grouped together.
+    //
+    // `passthroughInst` is a predicate that determines if an inst should be looked through
+    // for uses.
+    //
     static UseGraph from(
         IRInst* baseInst,
         Func<bool, IRUse*> isRelevantUse,
@@ -1445,36 +1558,33 @@ struct UseGraph
         return result;
     }
 
-    void replace(IRBuilder* builder, IRUse* use, IRInst* inst)
+    void replace(IRBuilder* builder, IRUse* relevantUse, IRInst* inst)
     {
         // Since we may have common nodes, we will use an out-of-order cloning context
         // that can retroactively correct the uses as needed.
         //
         IROutOfOrderCloneContext ctx;
-        List<UseChain> chains = chainSets[use];
-        for (auto chain : chains)
+        List<UseChain> chains = chainSets[relevantUse];
+
+        // Link the first use of each chain to inst.
+        for (auto& chain : chains)
+            ctx.cloneEnv.mapOldValToNew[chain.chain.getLast()->get()] = inst;
+
+        // Process the inner links of each chain using the replacement.
+        for (auto& chain : chains)
         {
-            chain.replace(&ctx, builder, inst);
+            IRBuilder chainBuilder(builder->getModule());
+            setInsertAfterOrdinaryInst(&chainBuilder, inst);
+
+            chain.replaceInnerLinks(&ctx, builder);
         }
 
-        if (!isTrivial())
-        {
-            builder->setInsertBefore(use->getUser());
-            auto lastInstInChain = ctx.cloneInstOutOfOrder(builder, use->get());
+        // Finally, replace the relevant use (i.e, "final use") with the new replacement inst.
+        builder->setInsertBefore(relevantUse->getUser());
+        auto lastInstInChain = ctx.cloneInstOutOfOrder(builder, relevantUse->get());
 
-            // Replace the base use.
-            builder->replaceOperand(use, lastInstInChain);
-        }
-    }
-
-    bool isTrivial()
-    {
-        // We're trivial if there's only one chain, and it has only one use.
-        if (chainSets.getCount() != 1)
-            return false;
-
-        auto& chain = chainSets.getFirst().value;
-        return chain.getCount() == 1;
+        // Replace the base use.
+        builder->replaceOperand(relevantUse, lastInstInChain);
     }
 
     List<IRUse*> getUniqueUses() const
@@ -1521,21 +1631,6 @@ static List<IndexTrackingInfo> maybeTrimIndices(
     }
     return result;
 }
-
-bool canInstBeStored(IRInst* inst)
-{
-    // Cannot store insts whose value is a type or a witness table, or a function.
-    // These insts get lowered to target-specific logic, and cannot be
-    // stored into variables or context structs as normal values.
-    //
-    if (as<IRTypeType>(inst->getDataType()) || as<IRWitnessTableType>(inst->getDataType()) ||
-        as<IRTypeKind>(inst->getDataType()) || as<IRFuncType>(inst->getDataType()) ||
-        !inst->getDataType())
-        return false;
-
-    return true;
-}
-
 
 /// Legalizes all accesses to primal insts from recompute and diff blocks.
 ///
@@ -1668,7 +1763,7 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                             return true;
                         }
                         else if (
-                            as<IRPtrTypeBase>(instToStore->getDataType()) &&
+                            asRelevantPtrType(instToStore->getDataType()) &&
                             !isDifferentialOrRecomputeBlock(defBlock))
                         {
                             return true;
@@ -2116,6 +2211,39 @@ void buildIndexedBlocks(
     }
 }
 
+// This function simply turns all CheckpointObject insts into a 'no-op'.
+// i.e. simply replaces all uses of CheckpointObject with the original value.
+//
+// This operation is 'correct' because if CheckpointObject's operand is visible
+// in a block, then it is visible in all dominated blocks.
+//
+void lowerCheckpointObjectInsts(IRGlobalValueWithCode* func)
+{
+    // For each block in the function
+    for (auto block : func->getBlocks())
+    {
+        // For each instruction in the block
+        for (auto inst = block->getFirstInst(); inst;)
+        {
+            // Get next inst before potentially removing current one
+            auto nextInst = inst->getNextInst();
+
+            // Check if this is a CheckpointObject instruction
+            if (auto copyInst = as<IRCheckpointObject>(inst))
+            {
+                // Replace all uses of the copy with the original value
+                auto originalVal = copyInst->getVal();
+                copyInst->replaceUsesWith(originalVal);
+
+                // Remove the now unused copy instruction
+                inst->removeAndDeallocate();
+            }
+
+            inst = nextInst;
+        }
+    }
+}
+
 // For each primal inst that is used in reverse blocks, decide if we should recompute or store
 // its value, then make them accessible in reverse blocks based the decision.
 //
@@ -2128,6 +2256,9 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
     //
     Dictionary<IRBlock*, List<IndexTrackingInfo>> indexedBlockInfo;
     buildIndexedBlocks(indexedBlockInfo, func);
+
+    // Split loop condition insts into two if necessary.
+    splitLoopConditionBlockInsts(func, indexedBlockInfo);
 
     // Create recompute blocks for each region following the same control flow structure
     // as in primal code.
@@ -2148,7 +2279,12 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
     // Legalize the primal inst accesses by introducing local variables / arrays and emitting
     // necessary load/store logic.
     //
-    return ensurePrimalAvailability(primalsInfo, func, indexedBlockInfo);
+    auto hoistedPrimalsInfo = ensurePrimalAvailability(primalsInfo, func, indexedBlockInfo);
+
+    // Lower CheckpointObject insts to a no-op.
+    lowerCheckpointObjectInsts(func);
+
+    return hoistedPrimalsInfo;
 }
 
 void DefaultCheckpointPolicy::preparePolicy(IRGlobalValueWithCode* func)
@@ -2324,6 +2460,9 @@ static bool shouldStoreInst(IRInst* inst)
 
             break;
         }
+    case kIROp_CheckpointObject:
+        // Special inst for when a value must be stored.
+        return true;
     default:
         break;
     }

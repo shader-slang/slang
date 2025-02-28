@@ -10,6 +10,7 @@ class SlangContext
 public:
     Slang::ComPtr<slang::IGlobalSession> globalSession;
     Slang::ComPtr<slang::ISession> session;
+    SlangCompileTarget compileTarget;
     Result initialize(
         const gfx::IDevice::SlangDesc& desc,
         uint32_t extendedDescCount,
@@ -27,6 +28,7 @@ public:
             SLANG_RETURN_ON_FAIL(slang::createGlobalSession(globalSession.writeRef()));
         }
 
+        this->compileTarget = compileTarget;
         slang::SessionDesc slangSessionDesc = {};
         slangSessionDesc.defaultMatrixLayoutMode = desc.defaultMatrixLayoutMode;
         slangSessionDesc.searchPathCount = desc.searchPathCount;

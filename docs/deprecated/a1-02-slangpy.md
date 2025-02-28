@@ -1,7 +1,6 @@
 ---
-layout: user-guide
-permalink: "docs/user-guide
-/a1-02-slangpy"
+layout: deprecated
+permalink: "docs/user-guide/a1-02-slangpy"
 ---
 
 Using Slang to Write PyTorch Kernels

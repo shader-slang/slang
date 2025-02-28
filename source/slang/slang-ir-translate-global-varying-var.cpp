@@ -1,4 +1,4 @@
-#include "slang-ir-translate-glsl-global-var.h"
+#include "slang-ir-translate-global-varying-var.h"
 
 #include "slang-ir-call-graph.h"
 #include "slang-ir-insts.h"
@@ -152,8 +152,8 @@ struct GlobalVarTranslationContext
                 builder.getPtrType(kIROp_ConstRefType, inputStructType, AddressSpace::Input));
             builder.addLayoutDecoration(inputParam, paramLayout);
 
-            // Initialize all global variables.
-            for (Index i = 0; i < inputVars.getCount(); i++)
+            // Initialize all global variables in the order of struct member declaration.
+            for (Index i = inputVars.getCount() - 1; i >= 0; i--)
             {
                 auto input = inputVars[i];
                 setInsertBeforeOrdinaryInst(&builder, firstBlock->getFirstOrdinaryInst());
@@ -373,7 +373,7 @@ struct GlobalVarTranslationContext
     }
 };
 
-void translateGLSLGlobalVar(CodeGenContext* context, IRModule* module)
+void translateGlobalVaryingVar(CodeGenContext* context, IRModule* module)
 {
     GlobalVarTranslationContext ctx;
     ctx.context = context;

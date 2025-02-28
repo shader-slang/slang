@@ -186,13 +186,6 @@ void emitBaseType(ManglingContext* context, BaseType baseType)
     case BaseType::IntPtr:
         emitRaw(context, "ip");
         break;
-    case BaseType::Int8x4Packed:
-        emitRaw(context, "c4p");
-        break;
-    case BaseType::UInt8x4Packed:
-        emitRaw(context, "C4p");
-        break;
-
     default:
         SLANG_UNEXPECTED("unimplemented case in base type mangling");
         break;

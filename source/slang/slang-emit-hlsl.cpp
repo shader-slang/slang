@@ -902,8 +902,6 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             case BaseType::UInt64:
             case BaseType::UIntPtr:
             case BaseType::Bool:
-            case BaseType::Int8x4Packed:
-            case BaseType::UInt8x4Packed:
                 // Because the intermediate type will always
                 // be an integer type, we can convert to
                 // another integer type of the same size
@@ -943,8 +941,6 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             case BaseType::UInt:
             case BaseType::Int:
             case BaseType::Bool:
-            case BaseType::Int8x4Packed:
-            case BaseType::UInt8x4Packed:
                 break;
             case BaseType::UInt16:
             case BaseType::Int16:
@@ -1330,8 +1326,6 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_Int16Type:
     case kIROp_UInt16Type:
     case kIROp_HalfType:
-    case kIROp_Int8x4PackedType:
-    case kIROp_UInt8x4PackedType:
         {
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;

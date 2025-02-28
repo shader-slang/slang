@@ -1099,10 +1099,6 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_UIntPtrType:
         m_writer->emit("ulong");
         return;
-    case kIROp_Int8x4PackedType:
-    case kIROp_UInt8x4PackedType:
-        m_writer->emit("uint");
-        return;
     case kIROp_StructType:
         m_writer->emit(getName(type));
         return;

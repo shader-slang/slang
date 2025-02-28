@@ -136,7 +136,27 @@ public property uint3 gl_WorkGroupSize
 // TODO: define overload for tessellation control stage.
 public in int gl_InvocationID : SV_GSInstanceID;
 
-public in int gl_InstanceIndex : SV_InstanceID;
+internal in int __sv_InstanceIndex : SV_InstanceID;
+
+// SPIRV InstanceIndex builtin for vertex shader
+public property int gl_InstanceIndex
+{
+    [require(vertex)]
+    get
+    {
+        __target_switch
+        {
+        default:
+            return __sv_InstanceIndex;
+        case glsl:
+            __intrinsic_asm "gl_InstanceIndex";
+        case spirv:
+            return spirv_asm {
+                result:$$int = OpLoad builtin(InstanceIndex:int);
+            };
+        }
+    }
+}
 public in bool gl_FrontFacing : SV_IsFrontFace;
 
 // TODO: define overload for geometry stage.
@@ -4276,7 +4296,7 @@ __generic<T : __BuiltinType>
     case glsl:
     {
         if (__type_equals<T, float>())
-            __requireGLSLExtension("GL_EXT_shader_atomic_float");
+            __requireTargetExtension("GL_EXT_shader_atomic_float");
     }
     case spirv:
         if (__type_equals<T, float>())
@@ -4298,7 +4318,7 @@ __generic<T : __BuiltinType>
     case glsl:
     {
         if (__type_equals<T, float>())
-            __requireGLSLExtension("GL_EXT_shader_atomic_float2");
+            __requireTargetExtension("GL_EXT_shader_atomic_float2");
     }
     case spirv:
         if (__type_equals<T, float>())
@@ -4738,7 +4758,7 @@ void requireGLSLExtForRayTracingBuiltin()
     __target_switch
     {
     case glsl:
-        __requireGLSLExtension("GL_EXT_ray_tracing");
+        __requireTargetExtension("GL_EXT_ray_tracing");
         __intrinsic_asm "";
     default:
         return;
@@ -6284,22 +6304,22 @@ public void traceRayMotionNV(
 __generic<T : __BuiltinType>
 [ForceInline]
 void typeRequireChecks_shader_subgroup_GLSL() {
-    // the following is a seperate function call, since else the `__requireGLSLExtension` and associated __intrinsic_asm is ignored if the calling function also calls an __intrinsic_asm
+    // the following is a seperate function call, since else the `__requireTargetExtension` and associated __intrinsic_asm is ignored if the calling function also calls an __intrinsic_asm
     __target_switch
     {
     case glsl:
         if (__type_equals<T, half>()
             || __type_equals<T, float16_t>()
-            ) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+            ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         else if (__type_equals<T, uint8_t>()
             || __type_equals<T, int8_t>()
-            ) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int8");
+            ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_int8");
         else if (__type_equals<T, uint16_t>()
             || __type_equals<T, int16_t>()
-            ) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int16");
+            ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_int16");
         else if (__type_equals<T, uint64_t>()
             || __type_equals<T, int64_t>()
-            ) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_int64");
+            ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_int64");
 
         __intrinsic_asm "";
     }
@@ -6307,7 +6327,7 @@ void typeRequireChecks_shader_subgroup_GLSL() {
 
 __generic<T : __BuiltinType>
 void shader_subgroup_preamble() {
-    // checks needed for shader_subgroup functions; __requireGLSLExtension does not work 
+    // checks needed for shader_subgroup functions; __requireTargetExtension does not work
     // (does not add the ext specified correctly to the compile output; using extended type
     // will result in error for using the type)
     __target_switch
@@ -6327,14 +6347,14 @@ void requireGLSLExtForSubgroupBasicBuiltin() {
     __target_switch
     {
     case glsl:
-        __requireGLSLExtension("GL_KHR_shader_subgroup_basic");
+        __requireTargetExtension("GL_KHR_shader_subgroup_basic");
         __intrinsic_asm "";
     default:
         return;
     }
 }
 
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
 void setupExtForSubgroupBasicBuiltIn() {
     __target_switch
     {
@@ -6351,7 +6371,7 @@ void requireGLSLExtForSubgroupBallotBuiltin() {
     __target_switch
     {
     case glsl:
-        __requireGLSLExtension("GL_KHR_shader_subgroup_ballot");
+        __requireTargetExtension("GL_KHR_shader_subgroup_ballot");
         __intrinsic_asm "";
     default:
         return;
@@ -6409,7 +6429,8 @@ public property uint gl_SubgroupID
 
 public property uint gl_SubgroupSize
 {
-    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
     get {
         setupExtForSubgroupBasicBuiltIn();
         return WaveGetLaneCount();
@@ -6418,7 +6439,8 @@ public property uint gl_SubgroupSize
 
 public property uint gl_SubgroupInvocationID
 {
-    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
     get {
         setupExtForSubgroupBasicBuiltIn();
         return WaveGetLaneIndex();
@@ -8368,8 +8390,8 @@ void typeRequireChecks_atomic_using_float0_tier()
     {
     case glsl:
     {
-        if (__type_equals<T, uint64_t>() || __type_equals<T, int64_t>()) 
-            __requireGLSLExtension("GL_EXT_shader_atomic_int64");  
+        if (__type_equals<T, uint64_t>() || __type_equals<T, int64_t>())
+            __requireTargetExtension("GL_EXT_shader_atomic_int64");
     }
     case spirv:
         return; 
@@ -8385,16 +8407,16 @@ void typeRequireChecks_atomic_using_float1_tier()
     case glsl:
     {
         if (__type_equals<T, float>()) 
-            __requireGLSLExtension("GL_EXT_shader_atomic_float");
+            __requireTargetExtension("GL_EXT_shader_atomic_float");
         else if (__type_equals<T, half>() || __type_equals<T, float16_t>())
         {
-            __requireGLSLExtension("GL_EXT_shader_atomic_float2");
-            __requireGLSLExtension("GL_EXT_shader_explicit_arithmetic_types");
+            __requireTargetExtension("GL_EXT_shader_atomic_float2");
+            __requireTargetExtension("GL_EXT_shader_explicit_arithmetic_types");
         }
         else if (__type_equals<T, double>()) 
-            __requireGLSLExtension("GL_EXT_shader_atomic_float");
+            __requireTargetExtension("GL_EXT_shader_atomic_float");
         else if (__type_equals<T, uint64_t>() || __type_equals<T, int64_t>())
-            __requireGLSLExtension("GL_EXT_shader_atomic_int64");
+            __requireTargetExtension("GL_EXT_shader_atomic_int64");
     }
     case spirv:
         return;
@@ -8410,16 +8432,16 @@ void typeRequireChecks_atomic_using_float2_tier()
     case glsl:
     {    
         if (__type_equals<T, float>()) 
-            __requireGLSLExtension("GL_EXT_shader_atomic_float2");
+            __requireTargetExtension("GL_EXT_shader_atomic_float2");
         else if (__type_equals<T, half>() || __type_equals<T, float16_t>())
         {
-            __requireGLSLExtension("GL_EXT_shader_atomic_float2");
-            __requireGLSLExtension("GL_EXT_shader_explicit_arithmetic_types");
+            __requireTargetExtension("GL_EXT_shader_atomic_float2");
+            __requireTargetExtension("GL_EXT_shader_explicit_arithmetic_types");
         }
         else if (__type_equals<T, double>()) 
-            __requireGLSLExtension("GL_EXT_shader_atomic_float2");
-        else if (__type_equals<T, uint64_t>() || __type_equals<T, int64_t>()) 
-             __requireGLSLExtension("GL_EXT_shader_atomic_int64");        
+            __requireTargetExtension("GL_EXT_shader_atomic_float2");
+        else if (__type_equals<T, uint64_t>() || __type_equals<T, int64_t>())
+             __requireTargetExtension("GL_EXT_shader_atomic_int64");
     }
     case spirv: 
         return; 

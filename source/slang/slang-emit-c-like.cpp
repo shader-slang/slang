@@ -266,11 +266,6 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
     case kIROp_UIntPtrType:
         return UnownedStringSlice("uintptr_t");
 
-    case kIROp_Int8x4PackedType:
-        return UnownedStringSlice("int8_t4_packed");
-    case kIROp_UInt8x4PackedType:
-        return UnownedStringSlice("uint8_t4_packed");
-
     case kIROp_HalfType:
         return UnownedStringSlice("half");
 
@@ -343,6 +338,20 @@ IRNumThreadsDecoration* CLikeSourceEmitter::getComputeThreadGroupSize(
         *outWaveSize = Int(getIntVal(decor->getOperand(0)));
     }
     return decor;
+}
+
+String CLikeSourceEmitter::getTargetBuiltinVarName(IRInst* inst, IRTargetBuiltinVarName builtinName)
+{
+    switch (builtinName)
+    {
+    case IRTargetBuiltinVarName::SpvInstanceIndex:
+        return "gl_InstanceIndex";
+    case IRTargetBuiltinVarName::SpvBaseInstance:
+        return "gl_BaseInstance";
+    }
+    if (auto linkage = inst->findDecoration<IRLinkageDecoration>())
+        return linkage->getMangledName();
+    return generateName(inst);
 }
 
 List<IRWitnessTableEntry*> CLikeSourceEmitter::getSortedWitnessTableEntries(
@@ -1208,6 +1217,11 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
         return externCppDecoration->getName();
     }
 
+    if (auto builtinTargetVarDecoration = inst->findDecoration<IRTargetBuiltinVarDecoration>())
+    {
+        return getTargetBuiltinVarName(inst, builtinTargetVarDecoration->getBuiltinVarName());
+    }
+
     // If we have a name hint on the instruction, then we will try to use that
     // to provide the basis for the actual name in the output code.
     if (auto nameHintDecoration = inst->findDecoration<IRNameHintDecoration>())
@@ -1315,8 +1329,6 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         return;
                     }
                 case BaseType::UInt:
-                case BaseType::Int8x4Packed:
-                case BaseType::UInt8x4Packed:
                     {
                         m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
                         m_writer->emit("U");
@@ -3042,10 +3054,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
                 m_requiredPreludes.add(preludeTextInst);
             break;
         }
-    case kIROp_RequireGLSLExtension:
-        {
-            break; // should already have set requirement; case covered for empty intrinsic block
-        }
     case kIROp_RequireComputeDerivative:
         {
             break; // should already have been parsed and used.
@@ -3053,6 +3061,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_GlobalValueRef:
         {
             emitOperand(as<IRGlobalValueRef>(inst)->getOperand(0), getInfo(EmitOp::General));
+            break;
+        }
+    case kIROp_RequireTargetExtension:
+        {
+            emitRequireExtension(as<IRRequireTargetExtension>(inst));
             break;
         }
     default:
@@ -4025,8 +4038,6 @@ void CLikeSourceEmitter::emitVecNOrScalar(
                 m_writer->emit("ushort");
                 break;
             case kIROp_UIntType:
-            case kIROp_Int8x4PackedType:
-            case kIROp_UInt8x4PackedType:
                 m_writer->emit("uint");
                 break;
             case kIROp_UInt64Type:

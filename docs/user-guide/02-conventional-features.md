@@ -655,6 +655,7 @@ In this example, the `vertexMain` shader indicates that it is meant for the `ver
 Rasterization, compute, and ray-tracing pipelines each define their own stages, and new versions of graphics APIs may introduce new stages.
 
 For compatibility with legacy codebases, Slang supports code that leaves off `[shader(...)]` attributes; in these cases application developers must specify the names and stages for their entry points via explicit command-line or API options.
+Such entry points will not be found via `IModule::findEntryPointByName()`. Instead `IModule::findAndCheckEntryPoint()` must be used, and a stage must be specified.
 It is recommended that new codebases always use `[shader(...)]` attributes both to simplify their workflow, and to make code more explicit and "self-documenting."
 
 > #### Note ####

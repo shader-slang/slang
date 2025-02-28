@@ -87,7 +87,7 @@ struct Options
 
     bool generateSPIRVDirectly = true;
 
-    bool enableBackendValidation = false;
+    bool enableDebugLayers = false;
 
     bool dx12Experimental = false;
 

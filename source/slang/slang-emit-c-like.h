@@ -243,7 +243,6 @@ public:
     Linkage* getLinkage() { return m_codeGenContext->getLinkage(); }
     ComponentType* getProgram() { return m_codeGenContext->getProgram(); }
     TargetProgram* getTargetProgram() { return m_codeGenContext->getTargetProgram(); }
-
     //
     // Types
     //
@@ -519,6 +518,7 @@ public:
 protected:
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* inst) { SLANG_UNUSED(inst); }
     virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
+    virtual String getTargetBuiltinVarName(IRInst* inst, IRTargetBuiltinVarName builtinName);
     virtual bool doesTargetSupportPtrTypes() { return false; }
     virtual bool isResourceTypeBindless(IRType* type)
     {
@@ -677,6 +677,8 @@ protected:
     // Emit the argument list (including paranthesis) in a `CallInst`
     void _emitCallArgList(IRCall* call, int startingOperandIndex = 1);
     virtual void emitCallArg(IRInst* arg);
+
+    virtual void emitRequireExtension(IRRequireTargetExtension* inst) { SLANG_UNUSED(inst); }
 
     String _generateUniqueName(const UnownedStringSlice& slice);
 
