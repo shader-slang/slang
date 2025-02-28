@@ -3,7 +3,7 @@
 // This is a test that checks that we can apply partial specialization to a function
 // that takes existential parameters.
 
-// CEHCK: OpRayQueryProceedKHR
+// CHECK: OpRayQueryProceedKHR
 // CHECK: OpImageWrite
 
 public interface IRandom {
