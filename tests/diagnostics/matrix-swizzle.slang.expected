@@ -1,42 +1,42 @@
 result code = -1
 standard error = {
-tests/diagnostics/matrix-swizzle.slang(8): error 30052: invalid swizzle pattern '_14' on type 'int'
+tests/diagnostics/matrix-swizzle.slang(8): error 30027: '_14' is not a member of 'matrix<int,2,3>'.
     int c = m1._14; // Out of bounds
                ^~~
-tests/diagnostics/matrix-swizzle.slang(9): error 30052: invalid swizzle pattern '_32' on type 'int'
+tests/diagnostics/matrix-swizzle.slang(9): error 30027: '_32' is not a member of 'matrix<int,2,3>'.
     c = m1._32;
            ^~~
-tests/diagnostics/matrix-swizzle.slang(10): error 30052: invalid swizzle pattern '_m22' on type 'int'
+tests/diagnostics/matrix-swizzle.slang(10): error 30027: '_m22' is not a member of 'matrix<int,3,2>'.
     c = m2._m22;
            ^~~~
-tests/diagnostics/matrix-swizzle.slang(11): error 30052: invalid swizzle pattern '_' on type 'int'
+tests/diagnostics/matrix-swizzle.slang(11): error 30027: '_' is not a member of 'matrix<int,3,2>'.
     c = m2._;       // unfinished
            ^
-tests/diagnostics/matrix-swizzle.slang(12): error 30052: invalid swizzle pattern '_m' on type 'int'
+tests/diagnostics/matrix-swizzle.slang(12): error 30027: '_m' is not a member of 'matrix<int,3,2>'.
     c = m2._m;
            ^~
-tests/diagnostics/matrix-swizzle.slang(13): error 30052: invalid swizzle pattern '_1' on type 'int'
+tests/diagnostics/matrix-swizzle.slang(13): error 30027: '_1' is not a member of 'matrix<int,3,2>'.
     c = m2._1;
            ^~
-tests/diagnostics/matrix-swizzle.slang(14): error 30052: invalid swizzle pattern '_m1' on type 'int'
+tests/diagnostics/matrix-swizzle.slang(14): error 30027: '_m1' is not a member of 'matrix<int,3,2>'.
     c = m2._m1;
            ^~~
-tests/diagnostics/matrix-swizzle.slang(15): error 30052: invalid swizzle pattern '_m12_' on type 'int'
+tests/diagnostics/matrix-swizzle.slang(15): error 30027: '_m12_' is not a member of 'matrix<int,3,2>'.
     c = m2._m12_;
            ^~~~~
-tests/diagnostics/matrix-swizzle.slang(16): error 30052: invalid swizzle pattern '_m11_11' on type 'int'
+tests/diagnostics/matrix-swizzle.slang(16): error 30027: '_m11_11' is not a member of 'matrix<int,2,3>'.
     int2 c2 = m1._m11_11;   // Mixing of 1 and 0-indexing
                  ^~~~~~~
-tests/diagnostics/matrix-swizzle.slang(17): error 30052: invalid swizzle pattern '_11_11_11_11_11' on type 'int'
+tests/diagnostics/matrix-swizzle.slang(17): error 30027: '_11_11_11_11_11' is not a member of 'matrix<int,2,3>'.
     c = m1._11_11_11_11_11; // More than 4 elements
            ^~~~~~~~~~~~~~~
-tests/diagnostics/matrix-swizzle.slang(18): error 30052: invalid swizzle pattern 'x' on type 'int'
+tests/diagnostics/matrix-swizzle.slang(18): error 30027: 'x' is not a member of 'matrix<int,2,3>'.
     c = m1.x;       // Invalid character
            ^
-tests/diagnostics/matrix-swizzle.slang(19): error 30052: invalid swizzle pattern '_x' on type 'int'
+tests/diagnostics/matrix-swizzle.slang(19): error 30027: '_x' is not a member of 'matrix<int,2,3>'.
     c = m1._x;
            ^~
-tests/diagnostics/matrix-swizzle.slang(20): error 30052: invalid swizzle pattern 'x123' on type 'int'
+tests/diagnostics/matrix-swizzle.slang(20): error 30027: 'x123' is not a member of 'matrix<int,2,3>'.
     c = m1.x123;
            ^~~~
 }

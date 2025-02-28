@@ -193,6 +193,14 @@ enum class IRInterpolationMode
     PerVertex,
 };
 
+enum class IRTargetBuiltinVarName
+{
+    Unknown,
+    HlslInstanceID,
+    SpvInstanceIndex,
+    SpvBaseInstance,
+};
+
 struct IRInterpolationModeDecoration : IRDecoration
 {
     enum
@@ -703,6 +711,18 @@ struct IRLinkageDecoration : IRDecoration
     IRStringLit* getMangledNameOperand() { return cast<IRStringLit>(getOperand(0)); }
 
     UnownedStringSlice getMangledName() { return getMangledNameOperand()->getStringSlice(); }
+};
+
+// Mark a global variable as a target buitlin variable.
+struct IRTargetBuiltinVarDecoration : IRDecoration
+{
+    IR_LEAF_ISA(TargetBuiltinVarDecoration)
+
+    IRIntLit* getBuiltinVarOperand() { return cast<IRIntLit>(getOperand(0)); }
+    IRTargetBuiltinVarName getBuiltinVarName()
+    {
+        return IRTargetBuiltinVarName(getBuiltinVarOperand()->getValue());
+    }
 };
 
 struct IRUserExternDecoration : IRDecoration
@@ -4657,6 +4677,18 @@ public:
 
     //    void addLayoutDecoration(IRInst* value, Layout* layout);
     IRLayoutDecoration* addLayoutDecoration(IRInst* value, IRLayout* layout);
+
+    IRDecoration* addTargetBuiltinVarDecoration(
+        IRInst* value,
+        IRTargetBuiltinVarName builtinVarName)
+    {
+        IRInst* operands[] = {getIntValue((IRIntegerValue)builtinVarName)};
+        return addDecoration(
+            value,
+            kIROp_TargetBuiltinVarDecoration,
+            operands,
+            SLANG_COUNT_OF(operands));
+    }
 
     //    IRLayout* getLayout(Layout* astLayout);
 
