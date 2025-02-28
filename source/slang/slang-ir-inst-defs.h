@@ -926,6 +926,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         INST(ExportDecoration, export, 1, 0)
     INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
 
+        /// Mark a global variable as a target builtin variable.
+    INST(TargetBuiltinVarDecoration, TargetBuiltinVar, 1, 0)
+
         /// Marks an inst as coming from an `extern` symbol defined in the user code.
     INST(UserExternDecoration, UserExtern, 0, 0)
 

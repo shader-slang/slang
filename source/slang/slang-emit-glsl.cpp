@@ -1791,6 +1791,12 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
         }
     }
 
+    if (varDecl->findDecoration<IRTargetBuiltinVarDecoration>())
+    {
+        // By default, we don't need to emit a definition for target builtin variables.
+        return true;
+    }
+
     // Do the default thing
     return false;
 }

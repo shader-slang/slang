@@ -345,6 +345,20 @@ IRNumThreadsDecoration* CLikeSourceEmitter::getComputeThreadGroupSize(
     return decor;
 }
 
+String CLikeSourceEmitter::getTargetBuiltinVarName(IRInst* inst, IRTargetBuiltinVarName builtinName)
+{
+    switch (builtinName)
+    {
+    case IRTargetBuiltinVarName::SpvInstanceIndex:
+        return "gl_InstanceIndex";
+    case IRTargetBuiltinVarName::SpvBaseInstance:
+        return "gl_BaseInstance";
+    }
+    if (auto linkage = inst->findDecoration<IRLinkageDecoration>())
+        return linkage->getMangledName();
+    return generateName(inst);
+}
+
 List<IRWitnessTableEntry*> CLikeSourceEmitter::getSortedWitnessTableEntries(
     IRWitnessTable* witnessTable)
 {
@@ -1206,6 +1220,11 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
     {
         // Just use the linkages mangled name directly.
         return externCppDecoration->getName();
+    }
+
+    if (auto builtinTargetVarDecoration = inst->findDecoration<IRTargetBuiltinVarDecoration>())
+    {
+        return getTargetBuiltinVarName(inst, builtinTargetVarDecoration->getBuiltinVarName());
     }
 
     // If we have a name hint on the instruction, then we will try to use that

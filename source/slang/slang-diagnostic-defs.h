@@ -987,7 +987,7 @@ DIAGNOSTIC(
     36107,
     Error,
     entryPointUsesUnavailableCapability,
-    "entrypoint '$0' does not support compilation target '$1' with stage '$2'")
+    "entrypoint '$0' uses features that are not available in '$2' stage for '$1' target.")
 DIAGNOSTIC(
     36108,
     Error,
@@ -1025,7 +1025,11 @@ DIAGNOSTIC(
     Error,
     capabilityHasMultipleStages,
     "Capability '$0' is targeting stages '$1', only allowed to use 1 unique stage here.")
-
+DIAGNOSTIC(
+    36117,
+    Error,
+    declHasDependenciesNotCompatibleOnStage,
+    "'$0' uses features that are not available in '$1' stage.")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")

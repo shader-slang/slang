@@ -136,7 +136,27 @@ public property uint3 gl_WorkGroupSize
 // TODO: define overload for tessellation control stage.
 public in int gl_InvocationID : SV_GSInstanceID;
 
-public in int gl_InstanceIndex : SV_InstanceID;
+internal in int __sv_InstanceIndex : SV_InstanceID;
+
+// SPIRV InstanceIndex builtin for vertex shader
+public property int gl_InstanceIndex
+{
+    [require(vertex)]
+    get
+    {
+        __target_switch
+        {
+        default:
+            return __sv_InstanceIndex;
+        case glsl:
+            __intrinsic_asm "gl_InstanceIndex";
+        case spirv:
+            return spirv_asm {
+                result:$$int = OpLoad builtin(InstanceIndex:int);
+            };
+        }
+    }
+}
 public in bool gl_FrontFacing : SV_IsFrontFace;
 
 // TODO: define overload for geometry stage.
