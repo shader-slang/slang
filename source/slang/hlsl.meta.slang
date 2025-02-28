@@ -3,8 +3,14 @@
 
 typedef uint UINT;
 
-__intrinsic_op($(kIROp_RequireGLSLExtension))
-void __requireGLSLExtension(String extensionName);
+__intrinsic_op($(kIROp_RequireTargetExtension))
+void __requireTargetExtension(constexpr String extensionName);
+
+/// Built-in values or system value semantics represented as in/out global variables.
+/// This allows the built-ins to be arbitrarily used from a global scope without being
+/// explicitly passed as entry point parameters.
+in uint __builtinWaveLaneIndex : SV_WaveLaneIndex;
+in uint __builtinWaveLaneCount : SV_WaveLaneCount;
 
 //@public:
 /// Represents an interface for buffer data layout.
@@ -3505,7 +3511,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             __intrinsic_asm "<invalid intrinsics>";
         case glsl:
             if (isCombined == 0)
-                __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+                __requireTargetExtension("GL_EXT_samplerless_texture_functions");
             __intrinsic_asm "$ctexelFetch($0, ($1).$w1b, ($1).$w1e)$z";
         case spirv:
             const int lodLoc = Shape.dimensions+isArray;
@@ -3569,7 +3575,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 __intrinsic_asm ".Load";
             case glsl:
                 if (isCombined == 0)
-                    __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+                    __requireTargetExtension("GL_EXT_samplerless_texture_functions");
                 __intrinsic_asm "$ctexelFetchOffset($0, ($1).$w1b, ($1).$w1e, ($2))$z";
             case spirv:
                 const int lodLoc = Shape.dimensions+isArray;
@@ -3625,7 +3631,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                     return Load(__makeVector(location, 0));
                 case glsl:
                     if (isCombined == 0)
-                        __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+                        __requireTargetExtension("GL_EXT_samplerless_texture_functions");
 
                     return Load(__makeVector(location, 0));
                 case spirv:
@@ -3702,7 +3708,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                 __intrinsic_asm "<Not supported>";
             case glsl:
                 if (isCombined == 0)
-                    __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+                    __requireTargetExtension("GL_EXT_samplerless_texture_functions");
                 __intrinsic_asm "$ctexelFetch($0, $1, ($2))$z";
             case spirv:
                 if (isCombined != 0)
@@ -3752,7 +3758,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                 __intrinsic_asm ".Load";
             case glsl:
                 if (isCombined == 0)
-                    __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+                    __requireTargetExtension("GL_EXT_samplerless_texture_functions");
                 __intrinsic_asm "$ctexelFetchOffset($0, $1, ($2), ($3))$z";
             case spirv:
                 if (isCombined != 0)
@@ -3807,7 +3813,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                     return Load(location, 0);
                 case glsl:
                     if (isCombined == 0)
-                        __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+                        __requireTargetExtension("GL_EXT_samplerless_texture_functions");
                     return Load(location, 0);
             }
         }
@@ -3830,7 +3836,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                     return Load(location, sampleIndex);
                 case glsl:
                     if (isCombined == 0)
-                        __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+                        __requireTargetExtension("GL_EXT_samplerless_texture_functions");
                     return Load(location, sampleIndex);
             }
         }
@@ -13913,7 +13919,7 @@ T WaveMaskSum(WaveMask mask, T expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupAdd($1)";
     case cuda: __intrinsic_asm "_waveSum($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveSum($1)";
@@ -13940,7 +13946,7 @@ vector<T,N> WaveMaskSum(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupAdd($1)";
     case cuda: __intrinsic_asm "_waveSumMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveSum($1)";
@@ -13979,7 +13985,7 @@ bool WaveMaskAllEqual(WaveMask mask, T value)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupAllEqual($1)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual($1)";
@@ -14003,7 +14009,7 @@ bool WaveMaskAllEqual(WaveMask mask, vector<T,N> value)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupAllEqual($1)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual($1)";
@@ -14040,7 +14046,7 @@ T WaveMaskPrefixProduct(WaveMask mask, T expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveMul($1)";
     case cuda: __intrinsic_asm "_wavePrefixProduct($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
@@ -14067,7 +14073,7 @@ vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveMul($1)";
     case cuda: __intrinsic_asm "_wavePrefixProductMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
@@ -14105,7 +14111,7 @@ T WaveMaskPrefixSum(WaveMask mask, T expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveAdd($1)";
     case cuda: __intrinsic_asm "_wavePrefixSum($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixSum($1)";
@@ -14133,7 +14139,7 @@ vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveAdd($1)";
     case cuda: __intrinsic_asm "_wavePrefixSumMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixSum($1)";
@@ -14761,7 +14767,7 @@ T WaveActive$(opName.hlslName)(T expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroup$(opName.glslName)($0)";
     case hlsl: __intrinsic_asm "WaveActive$(opName.hlslName)";
     case metal: __intrinsic_asm "simd_$(opName.metalName)";
@@ -14796,7 +14802,7 @@ vector<T,N> WaveActive$(opName.hlslName)(vector<T,N> expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroup$(opName.glslName)($0)";
     case hlsl: __intrinsic_asm "WaveActive$(opName.hlslName)";
     case metal: __intrinsic_asm "simd_$(opName.metalName)";
@@ -15018,7 +15024,8 @@ uint WaveActiveCountBits(bool value)
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
-[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
 uint WaveGetLaneCount()
 {
     __target_switch
@@ -15032,6 +15039,11 @@ uint WaveGetLaneCount()
             OpCapability GroupNonUniform;
             result:$$uint = OpLoad builtin(SubgroupSize:uint)
         };
+    case metal:
+        return __builtinWaveLaneCount;
+    case wgsl:
+        __requireTargetExtension("subgroups");
+        return __builtinWaveLaneCount;
     }
 }
 
@@ -15039,7 +15051,8 @@ uint WaveGetLaneCount()
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
-[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
 uint WaveGetLaneIndex()
 {
     __target_switch
@@ -15053,6 +15066,11 @@ uint WaveGetLaneIndex()
             OpCapability GroupNonUniform;
             result:$$uint = OpLoad builtin(SubgroupLocalInvocationId:uint)
         };
+    case metal:
+        return __builtinWaveLaneIndex;
+    case wgsl:
+        __requireTargetExtension("subgroups");
+        return __builtinWaveLaneIndex;
     }
 }
 
@@ -15122,7 +15140,7 @@ T WavePrefixProduct(T expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveMul($0)";
     case hlsl: __intrinsic_asm "WavePrefixProduct";
     case metal: __intrinsic_asm "simd_prefix_exclusive_product";
@@ -15158,7 +15176,7 @@ vector<T,N> WavePrefixProduct(vector<T,N> expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveMul($0)";
     case hlsl: __intrinsic_asm "WavePrefixProduct";
     case metal: __intrinsic_asm "simd_prefix_exclusive_product";
@@ -15209,7 +15227,7 @@ T WavePrefixSum(T expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveAdd($0)";
     case hlsl: __intrinsic_asm "WavePrefixSum";
     case metal: __intrinsic_asm "simd_prefix_exclusive_sum";
@@ -15241,7 +15259,7 @@ vector<T,N> WavePrefixSum(vector<T,N> expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveAdd($0)";
     case hlsl: __intrinsic_asm "WavePrefixSum";
     case metal: __intrinsic_asm "simd_prefix_exclusive_sum";
@@ -15292,7 +15310,7 @@ T WaveReadLaneFirst(T expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupBroadcastFirst($0)";
     case hlsl: __intrinsic_asm "WaveReadLaneFirst";
     case metal: __intrinsic_asm "simd_broadcast_first";
@@ -15314,7 +15332,7 @@ vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupBroadcastFirst($0)";
     case hlsl: __intrinsic_asm "WaveReadLaneFirst";
     case metal: __intrinsic_asm "simd_broadcast_first";
@@ -15360,7 +15378,7 @@ T WaveBroadcastLaneAt(T value, constexpr int lane)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupBroadcast($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case metal: __intrinsic_asm "simd_broadcast($0, ushort($1))";
@@ -15384,7 +15402,7 @@ vector<T,N> WaveBroadcastLaneAt(vector<T,N> value, constexpr int lane)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupBroadcast($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case metal: __intrinsic_asm "simd_broadcast($0, ushort($1))";
@@ -15426,7 +15444,7 @@ T WaveReadLaneAt(T value, int lane)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case metal: __intrinsic_asm "simd_shuffle($0, ushort($1))";
@@ -15449,7 +15467,7 @@ vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case metal: __intrinsic_asm "simd_shuffle($0, ushort($1))";
@@ -15492,7 +15510,7 @@ T WaveShuffle(T value, int lane)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case metal: __intrinsic_asm "simd_shuffle($0, ushort($1))";
@@ -15516,7 +15534,7 @@ vector<T,N> WaveShuffle(vector<T,N> value, int lane)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case metal: __intrinsic_asm "simd_shuffle($0, ushort($1))";
@@ -16158,7 +16176,7 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
         {
         case hlsl: __intrinsic_asm ".GetDimensions";
         case glsl:
-            __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+            __requireTargetExtension("GL_EXT_samplerless_texture_functions");
             __intrinsic_asm "($1 = $(glslTextureSizeFunc)($0))";
         case metal: __intrinsic_asm "(*($1) = $0.get_width())";
         case spirv:
@@ -16178,7 +16196,7 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
         case hlsl: __intrinsic_asm ".Load";
         case metal: __intrinsic_asm "$c$0.read(uint($1))$z";
         case glsl:
-            __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+            __requireTargetExtension("GL_EXT_samplerless_texture_functions");
             __intrinsic_asm "$(glslLoadFuncName)($0, $1)$z";
         case spirv: return spirv_asm {
                 %sampled:__sampledType(T) = $(spvLoadInstName) $this $location;

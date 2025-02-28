@@ -407,7 +407,7 @@ INST(WitnessTableEntry, witness_table_entry, 2, 0)
 INST(InterfaceRequirementEntry, interface_req_entry, 2, GLOBAL)
 
 // An inst to represent the workgroup size of the calling entry point.
-// We will materialize this inst during `translateGLSLGlobalVar`.
+// We will materialize this inst during `translateGlobalVaryingVar`.
 INST(GetWorkGroupSize, GetWorkGroupSize, 0, HOISTABLE)
 
 // An inst that returns the current stage of the calling entry point.
@@ -666,7 +666,7 @@ INST_RANGE(TerminatorInst, Return, Unreachable)
 INST(discard, discard, 0, 0)
 
 INST(RequirePrelude, RequirePrelude, 1, 0)
-INST(RequireGLSLExtension, RequireGLSLExtension, 1, 0)
+INST(RequireTargetExtension, RequireTargetExtension, 1, 0)
 INST(RequireComputeDerivative, RequireComputeDerivative, 0, 0)
 INST(StaticAssert, StaticAssert, 2, 0)
 INST(Printf, Printf, 1, 0)
