@@ -2382,7 +2382,14 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     // otherwise they will include all of the above cases...
     else if (auto declRefType = as<DeclRefType>(type))
     {
+        // If we are trying to get the layout of some extern type, do our best
+        // to look it up in other loaded modules and generate the type layout
+        // based on that.
+        declRefType = context->layoutContext.lookupExternDeclRefType(declRefType);
+
         auto declRef = declRefType->getDeclRef();
+
+
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
             RefPtr<StructTypeLayout> structLayout = new StructTypeLayout();
