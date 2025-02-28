@@ -24,10 +24,10 @@ jobs:
         platform: [x86_64, aarch64]
         test-category: [smoke]
         include:
-          - { os: linux, platform:x86_64, runs-on: ubuntu-22.04, compiler: gcc }
+          - { os: linux, platform: x86_64, runs-on: ubuntu-22.04, compiler: gcc }
           - {
               os: linux,
-              platform:aarch64,
+              platform: aarch64,
               runs-on: ubuntu-22.04-arm,
               compiler: gcc,
             }
@@ -41,7 +41,7 @@ jobs:
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
     container: ${{ matrix.image || '' }}
-
+    
     defaults:
       run:
         shell: bash
