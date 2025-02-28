@@ -223,8 +223,20 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
     case ASTNodeType::RequireCapabilityDecl:
         sb << "__require_capability";
         break;
+    case ASTNodeType::DiscardStmt:
+        sb << "discard";
+        break;
     default:
-        sb << "decl";
+        if (ASTClassInfo::getInfo(nodeType)->isDerivedFrom((uint32_t)ASTNodeType::Expr))
+            sb << "expression";
+        else if (ASTClassInfo::getInfo(nodeType)->isDerivedFrom((uint32_t)ASTNodeType::Stmt))
+            sb << "statement";
+        else if (ASTClassInfo::getInfo(nodeType)->isDerivedFrom((uint32_t)ASTNodeType::Decl))
+            sb << "decl";
+        else if (ASTClassInfo::getInfo(nodeType)->isDerivedFrom((uint32_t)ASTNodeType::Val))
+            sb << "val";
+        else
+            sb << "node";
         break;
     }
 }

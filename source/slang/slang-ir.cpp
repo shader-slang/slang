@@ -4045,7 +4045,7 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
         /* From Float */
         {kIROp_CastFloatToInt,
          kIROp_FloatCast,
-         {kIROp_CastFloatToInt, kIROp_IntCast},
+         {kIROp_Neq},
          {kIROp_CastFloatToInt, kIROp_CastIntToPtr},
          kIROp_CastToVoid},
         /* From Bool  */
@@ -4077,6 +4077,13 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
                 matType->getColumnCount(),
                 matType->getLayout());
     }
+
+    if (op.op0 == kIROp_Neq)
+    {
+        IRInst* args[2] = {value, emitDefaultConstruct(value->getDataType())};
+        return emitIntrinsicInst(type, op.op0, 2, args);
+    }
+
     auto result = emitIntrinsicInst(t, op.op0, 1, &value);
     if (op.op1 != kIROp_Nop)
     {

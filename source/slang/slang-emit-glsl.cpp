@@ -30,7 +30,7 @@ void GLSLSourceEmitter::_beforeComputeEmitProcessInstruction(
     IRInst* inst,
     IRBuilder& builder)
 {
-    if (auto requireGLSLExt = as<IRRequireGLSLExtension>(inst))
+    if (auto requireGLSLExt = as<IRRequireTargetExtension>(inst))
     {
         _requireGLSLExtension(requireGLSLExt->getExtensionName());
         return;
@@ -1787,6 +1787,12 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
                 return true;
             }
         }
+    }
+
+    if (varDecl->findDecoration<IRTargetBuiltinVarDecoration>())
+    {
+        // By default, we don't need to emit a definition for target builtin variables.
+        return true;
     }
 
     // Do the default thing

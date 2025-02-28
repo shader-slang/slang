@@ -460,6 +460,9 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             }
         }
 
+        bool selfIsGenericParamType =
+            isDeclRefTypeOf<GenericTypeParamDeclBase>(selfType) != nullptr;
+
         for (auto constraintDeclRef :
              getMembersOfType<GenericTypeConstraintDecl>(astBuilder, genericDeclRef))
         {
@@ -471,6 +474,13 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             // Check only the sub-type.
             visitor.CheckConstraintSubType(constraintDeclRef.getDecl()->sub);
             auto sub = constraintDeclRef.getDecl()->sub;
+
+            // If the sub-type part of the generic constraint is a member expression, it can't
+            // possibly be defining a constraint for a generic type parameter, so we skip it
+            // to avoid circular checking on the generic param type.
+            if (selfIsGenericParamType && as<MemberExpr>(sub.exp))
+                continue;
+
             if (!sub.type)
                 sub = visitor.TranslateTypeNodeForced(sub);
             auto subType = constraintDeclRef.substitute(astBuilder, sub.type);
