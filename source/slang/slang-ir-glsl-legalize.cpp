@@ -2368,10 +2368,8 @@ static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam
         auto _paramType = _param->getDataType();
         IRType* valueType = _paramType;
 
-        if (as<IROutType>(_paramType))
-            valueType = as<IROutType>(_paramType)->getValueType();
-        else if (auto inOutType = as<IRInOutType>(_paramType))
-            valueType = inOutType->getValueType();
+        if (as<IROutTypeBase>(_paramType))
+            valueType = as<IROutTypeBase>(_paramType)->getValueType();
 
         auto key = builder->createStructKey();
         if (auto nameDecor = _param->findDecoration<IRNameHintDecoration>())
@@ -2442,31 +2440,22 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
 
     // Collect all out/inout parameters that need to be consolidated
     List<IRParam*> outParams;
-    List<IRParam*> otherParams;
+    List<IRParam*> params;
 
     for (auto param = firstBlock->getFirstParam(); param; param = param->getNextParam())
     {
         builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
-        if (as<IROutTypeBase>(param->getDataType()))
+        if (as<IROutType>(param->getDataType()) || as<IRInOutType>(param->getDataType()))
         {
             outParams.add(param);
         }
-        else
-        {
-            otherParams.add(param);
-        }
+        params.add(param);
     }
 
     // We don't need consolidation here.
     if (outParams.getCount() <= 1)
     {
-        // We have one out/inout param, so add it as part of otherParams so we can
-        // just do one pass of handleSingleParam().
-        if (outParams.getCount() == 1)
-        {
-            otherParams.add(outParams[0]);
-        }
-        for (auto param : otherParams)
+        for (auto param : params)
         {
             auto paramLayoutDecoration = param->findDecoration<IRLayoutDecoration>();
             SLANG_ASSERT(paramLayoutDecoration);
@@ -2475,9 +2464,24 @@ void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* f
         }
         return;
     }
+    else
+    {
+        // We need consolidation here, but before that, handle parameters other than inout/out.
+        for (auto param : params)
+        {
+            if (outParams.contains(param))
+            {
+                continue;
+            }
+            auto paramLayoutDecoration = param->findDecoration<IRLayoutDecoration>();
+            SLANG_ASSERT(paramLayoutDecoration);
+            auto paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
+            handleSingleParam(context, func, param, paramLayout);
+        }
 
-    // Consolidate the parameters
-    consolidateParameters(context, outParams);
+        // Now, consolidate the inout/out parameters
+        consolidateParameters(context, outParams);
+    }
 }
 
 static void legalizeMeshPayloadInputParam(
