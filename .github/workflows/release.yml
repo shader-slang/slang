@@ -25,7 +25,12 @@ jobs:
         test-category: [smoke]
         include:
           - { os: linux, platform:x86_64, runs-on: ubuntu-22.04, compiler: gcc }
-          - { os: linux, platform:aarch64, runs-on: ubuntu-22.04-arm, compiler: gcc }
+          - {
+              os: linux,
+              platform:aarch64,
+              runs-on: ubuntu-22.04-arm,
+              compiler: gcc,
+            }
           - { os: windows, runs-on: windows-latest, compiler: cl }
           - { os: macos, runs-on: macos-latest, compiler: clang }
 

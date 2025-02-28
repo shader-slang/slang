@@ -48,7 +48,7 @@ jobs:
           # default not full gpu tests
           - full-gpu-tests: false
           - build-llvm: true
-          - {platform: wasm, build-llvm: false }
+          - { platform: wasm, build-llvm: false }
           # The runners don't have a GPU by default except for the self-hosted ones
           - has-gpu: false
           # Self-hosted aarch64 build
