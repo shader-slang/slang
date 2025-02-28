@@ -1,5 +1,5 @@
 ---
-layout: user-guide
+layout: deprecated
 permalink: "docs/user-guide/a1-02-slangpy"
 ---
 
