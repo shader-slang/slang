@@ -1653,7 +1653,7 @@ struct SpecializationContext
     // Returns true if `inst` is a simplified existential argument ready for specialization.
     bool isSimplifiedExistentialArg(IRInst* inst)
     {
-        if (auto makeExistential = as<IRMakeExistential>(inst))
+        if (as<IRMakeExistential>(inst))
             return true;
         if (as<IRWrapExistential>(inst))
             return true;
