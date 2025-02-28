@@ -2037,9 +2037,13 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     int callId = 2;
     for (auto line : lines)
     {
-        if (line.startsWith("//COMPLETE:"))
+        line = line.trimStart();
+        if (!line.startsWith("//"))
+            continue;
+        line = line.tail(2).trimStart();
+        if (line.startsWith("COMPLETE:"))
         {
-            auto arg = line.tail(UnownedStringSlice("//COMPLETE:").getLength());
+            auto arg = line.tail(UnownedStringSlice("COMPLETE:").getLength());
             Int linePos, colPos;
             parseLocation(arg, 0, linePos, colPos);
 
@@ -2074,9 +2078,9 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                 }
             }
         }
-        else if (line.startsWith("//SIGNATURE:"))
+        else if (line.startsWith("SIGNATURE:"))
         {
-            auto arg = line.tail(UnownedStringSlice("//SIGNATURE:").getLength());
+            auto arg = line.tail(UnownedStringSlice("SIGNATURE:").getLength());
             Int linePos, colPos;
             parseLocation(arg, 0, linePos, colPos);
 
@@ -2116,9 +2120,9 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                 }
             }
         }
-        else if (line.startsWith("//HOVER:"))
+        else if (line.startsWith("HOVER:"))
         {
-            auto arg = line.tail(UnownedStringSlice("//HOVER:").getLength());
+            auto arg = line.tail(UnownedStringSlice("HOVER:").getLength());
             Int linePos, colPos;
             parseLocation(arg, 0, linePos, colPos);
 
@@ -2150,7 +2154,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                 actualOutputSB << "\ncontent:\n" << hover.contents.value << "\n";
             }
         }
-        else if (line.startsWith("//DIAGNOSTICS"))
+        else if (line.startsWith("DIAGNOSTICS"))
         {
             if (!diagnosticsReceived)
             {
@@ -3519,7 +3523,7 @@ TestResult runComputeComparisonImpl(
     // This is due to the limitation that Slang RPC implementation expects only
     // one time communication.
     if (input.spawnType != SpawnType::UseTestServer)
-        cmdLine.addArg("-enable-backend-validation");
+        cmdLine.addArg("-enable-debug-layers");
 #endif
 
     if (context->isExecuting())
