@@ -6,6 +6,8 @@
 #include "../core/slang-string-util.h"
 #include "../core/slang-type-text-util.h"
 
+#include <chrono>
+
 // Artifact
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-util.h"
