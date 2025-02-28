@@ -69,7 +69,7 @@ struct ShaderCompilerUtil
 
         ComPtr<SlangCompileRequest> m_requestDEPRECATED = nullptr;
 
-        SlangSession* session = nullptr;
+        slang::IGlobalSession* globalSession = nullptr;
     };
 
     struct OutputAndLayout

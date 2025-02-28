@@ -190,15 +190,6 @@ static bool _isSubCommand(const char* arg)
             argCursor++;
             // Assumed to be handle by .bat file that called us
         }
-        else if (strcmp(arg, "-adapter") == 0)
-        {
-            if (argCursor == argEnd)
-            {
-                stdError.print("error: expected operand for '%s'\n", arg);
-                return SLANG_FAIL;
-            }
-            optionsOut->adapter = *argCursor++;
-        }
         else if (strcmp(arg, "-server-count") == 0)
         {
             if (argCursor == argEnd)
