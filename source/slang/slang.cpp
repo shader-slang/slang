@@ -1108,17 +1108,19 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::parseCommandLineArguments(
     if (outDesc->structureSize < sizeof(slang::SessionDesc))
         return SLANG_E_BUFFER_TOO_SMALL;
     RefPtr<ParsedCommandLineData> outData = new ParsedCommandLineData();
-    SerializedOptionsData optionData;
     RefPtr<EndToEndCompileRequest> tempReq = new EndToEndCompileRequest(this);
     tempReq->processCommandLineArguments(argv, argc);
+    outData->options.setCount(1 + tempReq->getLinkage()->targets.getCount());
+    int optionDataIndex = 0;
+    SerializedOptionsData& optionData = outData->options[optionDataIndex];
+    optionDataIndex++;
     tempReq->getOptionSet().serialize(&optionData);
-    outData->options.add(optionData);
     for (auto target : tempReq->getLinkage()->targets)
     {
         slang::TargetDesc tdesc;
-        SerializedOptionsData targetOptionData;
+        SerializedOptionsData& targetOptionData = outData->options[optionDataIndex];
+        optionDataIndex++;
         tempReq->getTargetOptionSet(target).serialize(&targetOptionData);
-        outData->options.add(targetOptionData);
         tdesc.compilerOptionEntryCount = (uint32_t)targetOptionData.entries.getCount();
         tdesc.compilerOptionEntries = targetOptionData.entries.getBuffer();
         outData->targets.add(tdesc);
