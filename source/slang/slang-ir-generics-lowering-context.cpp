@@ -414,8 +414,8 @@ bool SharedGenericsLoweringContext::doesTypeFitInAnyValue(
 
     if (!areResourceTypesBindlessOnTarget(targetProgram->getTargetReq()))
     {
-        HashSet<IRType*> opaqueTypes;
-        if (isOpaqueType(concreteType, opaqueTypes))
+        IRType* opaqueType = nullptr;
+        if (isOpaqueType(concreteType, &opaqueType))
         {
             if (outIsTypeOpaque)
                 *outIsTypeOpaque = true;

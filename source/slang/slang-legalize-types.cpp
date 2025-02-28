@@ -198,32 +198,39 @@ bool isResourceType(IRType* type)
     return false;
 }
 
-bool isOpaqueType(IRType* type, HashSet<IRType*>& opaqueTypes)
+
+bool isOpaqueTypeImpl(IRType* type, HashSet<IRType*>& visited, IRType** outLeafOpaqueHandleType)
 {
+    if (visited.contains(type))
+    {
+        if (outLeafOpaqueHandleType)
+            *outLeafOpaqueHandleType = type;
+        return true;
+    }
+
+    visited.add(type);
     if (isResourceType(type))
     {
-        opaqueTypes.add(type);
+        if (outLeafOpaqueHandleType)
+            *outLeafOpaqueHandleType = type;
         return true;
     }
 
     if (auto structType = as<IRStructType>(type))
     {
-        opaqueTypes.add(structType);
         for (auto field : structType->getFields())
         {
-            if (isOpaqueType(field->getFieldType(), opaqueTypes))
+            if (isOpaqueTypeImpl(field->getFieldType(), visited, outLeafOpaqueHandleType))
             {
                 return true;
             }
         }
-        opaqueTypes.remove(structType);
     }
 
     if (auto arrayType = as<IRArrayTypeBase>(type))
     {
-        if (isOpaqueType(arrayType->getElementType(), opaqueTypes))
+        if (isOpaqueTypeImpl(arrayType->getElementType(), visited, outLeafOpaqueHandleType))
         {
-            opaqueTypes.add(type);
             return true;
         }
     }
@@ -234,9 +241,8 @@ bool isOpaqueType(IRType* type, HashSet<IRType*>& opaqueTypes)
         {
             if (auto elementType = as<IRType>(tupleType->getOperand(i)))
             {
-                if (isOpaqueType(elementType, opaqueTypes))
+                if (isOpaqueTypeImpl(elementType, visited, outLeafOpaqueHandleType))
                 {
-                    opaqueTypes.add(type);
                     return true;
                 }
             }
@@ -244,6 +250,12 @@ bool isOpaqueType(IRType* type, HashSet<IRType*>& opaqueTypes)
     }
 
     return false;
+}
+
+bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType)
+{
+    HashSet<IRType*> visited;
+    return isOpaqueTypeImpl(type, visited, outLeafOpaqueHandleType);
 }
 
 SourceLoc findBestSourceLocFromUses(IRInst* inst)

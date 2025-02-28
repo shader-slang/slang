@@ -1373,6 +1373,11 @@ struct SpecializationContext
             if (!isExistentialType(param->getDataType()))
                 continue;
 
+            // Is arg in the most simplified form for specialization? If not we are
+            // not ready to consider specialization yet.
+            if (!isSimplifiedExistentialArg(arg))
+                return false;
+
             // We *cannot* specialize unless the argument value corresponding
             // to such a parameter is one we can specialize.
             //
@@ -1416,7 +1421,6 @@ struct SpecializationContext
             auto arg = inst->getArg(argCounter++);
             if (!isExistentialType(param->getDataType()))
                 continue;
-
             if (auto makeExistential = as<IRMakeExistential>(arg))
             {
                 // Note that we use the *type* stored in the
@@ -1426,7 +1430,7 @@ struct SpecializationContext
                 // call sites that pass in the exact same argument).
                 //
                 auto val = makeExistential->getWrappedValue();
-                auto valType = val->getFullType();
+                auto valType = val->getDataType();
                 if (isCompileTimeConstantType(valType))
                 {
                     key.vals.add(valType);
@@ -1468,7 +1472,7 @@ struct SpecializationContext
             }
             else
             {
-                key.vals.add(param->getDataType());
+                SLANG_UNEXPECTED("unhandled existential argument");
             }
         }
 
@@ -1515,7 +1519,7 @@ struct SpecializationContext
                 if (auto makeExistential = as<IRMakeExistential>(arg))
                 {
                     auto val = makeExistential->getWrappedValue();
-                    auto valType = val->getFullType();
+                    auto valType = val->getDataType();
                     if (isCompileTimeConstantType(valType))
                         newArgs.add(val);
                     else
@@ -1528,7 +1532,7 @@ struct SpecializationContext
                 }
                 else
                 {
-                    newArgs.add(arg);
+                    SLANG_UNEXPECTED("missing case for existential argument");
                 }
             }
         }
@@ -1644,6 +1648,18 @@ struct SpecializationContext
         }
         return true;
     }
+
+
+    // Returns true if `inst` is a simplified existential argument ready for specialization.
+    bool isSimplifiedExistentialArg(IRInst* inst)
+    {
+        if (auto makeExistential = as<IRMakeExistential>(inst))
+            return true;
+        if (as<IRWrapExistential>(inst))
+            return true;
+        return false;
+    }
+
 
     // Similarly, we want to be able to test whether an instruction
     // used as an argument for an existential-type parameter is
