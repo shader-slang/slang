@@ -208,7 +208,6 @@ bool isOpaqueTypeImpl(IRType* type, HashSet<IRType*>& visited, IRType** outLeafO
         return true;
     }
 
-    visited.add(type);
     if (isResourceType(type))
     {
         if (outLeafOpaqueHandleType)
@@ -218,6 +217,7 @@ bool isOpaqueTypeImpl(IRType* type, HashSet<IRType*>& visited, IRType** outLeafO
 
     if (auto structType = as<IRStructType>(type))
     {
+        visited.add(type);
         for (auto field : structType->getFields())
         {
             if (isOpaqueTypeImpl(field->getFieldType(), visited, outLeafOpaqueHandleType))
@@ -225,6 +225,7 @@ bool isOpaqueTypeImpl(IRType* type, HashSet<IRType*>& visited, IRType** outLeafO
                 return true;
             }
         }
+        visited.remove(type);
     }
 
     if (auto arrayType = as<IRArrayTypeBase>(type))
