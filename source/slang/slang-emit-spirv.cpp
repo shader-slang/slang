@@ -4417,8 +4417,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                                 continue;
                                         }
                                     }
-                                    paramsSet.add(spvGlobalInst);
                                     referencedBuiltinIRVars.add(globalInst);
+                                    // Don't add duplicate vars to the interface list.
+                                    bool paramAdded = paramsSet.add(spvGlobalInst);
+                                    if (!paramAdded)
+                                        continue;
 
                                     // Don't add a global param to the interface if it is a
                                     // specialization constant.
@@ -5288,6 +5291,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         IRBuilder builder(m_irModule);
         builder.setInsertBefore(inst);
+        if (auto builtinVarDecor = inst->findDecoration<IRTargetBuiltinVarDecoration>())
+        {
+            switch (builtinVarDecor->getBuiltinVarName())
+            {
+            case IRTargetBuiltinVarName::SpvInstanceIndex:
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInstanceIndex, inst);
+            case IRTargetBuiltinVarName::SpvBaseInstance:
+                requireSPIRVCapability(SpvCapabilityDrawParameters);
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaseInstance, inst);
+            }
+        }
         if (auto layout = getVarLayout(inst))
         {
             if (auto systemValueAttr = layout->findAttr<IRSystemValueSemanticAttr>())

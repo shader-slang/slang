@@ -9,6 +9,7 @@
 
 // Confirm compilation of `(RW)ByteAddressBuffer` with aligned load / stores to wider data types.
 
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=buffer
 [vk::binding(2, 3)] RWByteAddressBuffer buffer;
 struct Block {
     float4 val[2];

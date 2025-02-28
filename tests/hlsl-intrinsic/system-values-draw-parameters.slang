@@ -32,7 +32,7 @@ VSOutput main(VSInput input,
     // CHECK_HLSL: SV_StartVertexLocation
     // CHECK_METAL: base_vertex
 
-    // CHECK_SPIRV: BuiltIn BaseInstance
+    // CHECK_SPIRV: BuiltIn InstanceIndex
     // CHECK_GLSL: gl_BaseInstance
     // CHECK_HLSL: SV_StartInstanceLocation
     // CHECK_METAL: base_instance
