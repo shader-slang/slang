@@ -2354,9 +2354,7 @@ void handleSingleParam(
     builder->addDependsOnDecoration(func, globalParam);
 }
 
-static void consolidateParameters(
-    GLSLLegalizationContext* context,
-    List<IRParam*>& params)
+static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam*>& params)
 {
     auto builder = context->getBuilder();
 
@@ -2435,9 +2433,7 @@ static void consolidateParameters(
 }
 
 // Consolidate ray tracing parameters for an entry point function
-void consolidateRayTracingParameters(
-    GLSLLegalizationContext* context,
-    IRFunc* func)
+void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* func)
 {
     auto builder = context->getBuilder();
     auto firstBlock = func->getFirstBlock();
@@ -2466,9 +2462,9 @@ void consolidateRayTracingParameters(
     {
         // We have one out/inout param, so add it as part of otherParams so we can
         // just do one pass of handleSingleParam().
-        if (outParams.getCount() == 1) 
-        { 
-            otherParams.add(outParams[0]); 
+        if (outParams.getCount() == 1)
+        {
+            otherParams.add(outParams[0]);
         }
         for (auto param : otherParams)
         {
@@ -3918,7 +3914,7 @@ void legalizeEntryPointForGLSL(
     default:
         break;
     }
-    
+
     // Next we will walk through any parameters of the entry-point function,
     // and turn them into global variables.
     if (auto firstBlock = func->getFirstBlock())
@@ -3944,7 +3940,7 @@ void legalizeEntryPointForGLSL(
 
             legalizeEntryPointParameterForGLSL(&context, codeGenContext, func, pp, paramLayout);
         }
-        
+
         // At this point we should have eliminated all uses of the
         // parameters of the entry block. Also, our control-flow
         // rules mean that the entry block cannot be the target
