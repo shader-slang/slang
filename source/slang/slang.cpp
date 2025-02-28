@@ -816,8 +816,6 @@ Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSe
                 new TypeCheckingCache(*static_cast<TypeCheckingCache*>(m_typeCheckingCache.get()));
     }
 
-    linkage->setMatrixLayoutMode(desc.defaultMatrixLayoutMode);
-
     Int searchPathCount = desc.searchPathCount;
     for (Int ii = 0; ii < searchPathCount; ++ii)
     {
@@ -844,6 +842,10 @@ Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSe
     }
 
     linkage->m_optionSet.load(desc.compilerOptionEntryCount, desc.compilerOptionEntries);
+
+    if (!linkage->m_optionSet.hasOption(CompilerOptionName::MatrixLayoutColumn) &&
+        !linkage->m_optionSet.hasOption(CompilerOptionName::MatrixLayoutRow))
+        linkage->setMatrixLayoutMode(desc.defaultMatrixLayoutMode);
 
     {
         const Int targetCount = desc.targetCount;
