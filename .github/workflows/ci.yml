@@ -177,7 +177,7 @@ jobs:
               -expected-failure-list tests/expected-failure-record-replay-tests.txt
           fi
       - name: Run Slang examples
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm'
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         run: |
           .github/workflows/ci-examples.sh \
            --bin-dir "$bin_dir" \
