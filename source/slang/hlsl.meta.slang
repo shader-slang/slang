@@ -3,8 +3,14 @@
 
 typedef uint UINT;
 
-__intrinsic_op($(kIROp_RequireGLSLExtension))
-void __requireGLSLExtension(String extensionName);
+__intrinsic_op($(kIROp_RequireTargetExtension))
+void __requireTargetExtension(constexpr String extensionName);
+
+/// Built-in values or system value semantics represented as in/out global variables.
+/// This allows the built-ins to be arbitrarily used from a global scope without being
+/// explicitly passed as entry point parameters.
+in uint __builtinWaveLaneIndex : SV_WaveLaneIndex;
+in uint __builtinWaveLaneCount : SV_WaveLaneCount;
 
 //@public:
 /// Represents an interface for buffer data layout.
@@ -3676,7 +3682,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
             __intrinsic_asm "<invalid intrinsics>";
         case glsl:
             if (isCombined == 0)
-                __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+                __requireTargetExtension("GL_EXT_samplerless_texture_functions");
             __intrinsic_asm "$ctexelFetch($0, ($1).$w1b, ($1).$w1e)$z";
         case spirv:
             const int lodLoc = Shape.dimensions+isArray;
@@ -3740,7 +3746,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 __intrinsic_asm ".Load";
             case glsl:
                 if (isCombined == 0)
-                    __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+                    __requireTargetExtension("GL_EXT_samplerless_texture_functions");
                 __intrinsic_asm "$ctexelFetchOffset($0, ($1).$w1b, ($1).$w1e, ($2))$z";
             case spirv:
                 const int lodLoc = Shape.dimensions+isArray;
@@ -3796,7 +3802,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                     return Load(__makeVector(location, 0));
                 case glsl:
                     if (isCombined == 0)
-                        __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+                        __requireTargetExtension("GL_EXT_samplerless_texture_functions");
 
                     return Load(__makeVector(location, 0));
                 case spirv:
@@ -3873,7 +3879,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                 __intrinsic_asm "<Not supported>";
             case glsl:
                 if (isCombined == 0)
-                    __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+                    __requireTargetExtension("GL_EXT_samplerless_texture_functions");
                 __intrinsic_asm "$ctexelFetch($0, $1, ($2))$z";
             case spirv:
                 if (isCombined != 0)
@@ -3923,7 +3929,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                 __intrinsic_asm ".Load";
             case glsl:
                 if (isCombined == 0)
-                    __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+                    __requireTargetExtension("GL_EXT_samplerless_texture_functions");
                 __intrinsic_asm "$ctexelFetchOffset($0, $1, ($2), ($3))$z";
             case spirv:
                 if (isCombined != 0)
@@ -3978,7 +3984,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                     return Load(location, 0);
                 case glsl:
                     if (isCombined == 0)
-                        __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+                        __requireTargetExtension("GL_EXT_samplerless_texture_functions");
                     return Load(location, 0);
             }
         }
@@ -4001,7 +4007,7 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
                     return Load(location, sampleIndex);
                 case glsl:
                     if (isCombined == 0)
-                        __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+                        __requireTargetExtension("GL_EXT_samplerless_texture_functions");
                     return Load(location, sampleIndex);
             }
         }
@@ -14090,7 +14096,7 @@ T WaveMaskSum(WaveMask mask, T expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupAdd($1)";
     case cuda: __intrinsic_asm "_waveSum($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveSum($1)";
@@ -14117,7 +14123,7 @@ vector<T,N> WaveMaskSum(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupAdd($1)";
     case cuda: __intrinsic_asm "_waveSumMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WaveActiveSum($1)";
@@ -14156,7 +14162,7 @@ bool WaveMaskAllEqual(WaveMask mask, T value)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupAllEqual($1)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual($1)";
@@ -14180,7 +14186,7 @@ bool WaveMaskAllEqual(WaveMask mask, vector<T,N> value)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupAllEqual($1)";
     case hlsl:
         __intrinsic_asm "WaveActiveAllEqual($1)";
@@ -14217,7 +14223,7 @@ T WaveMaskPrefixProduct(WaveMask mask, T expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveMul($1)";
     case cuda: __intrinsic_asm "_wavePrefixProduct($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
@@ -14244,7 +14250,7 @@ vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveMul($1)";
     case cuda: __intrinsic_asm "_wavePrefixProductMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
@@ -14282,7 +14288,7 @@ T WaveMaskPrefixSum(WaveMask mask, T expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveAdd($1)";
     case cuda: __intrinsic_asm "_wavePrefixSum($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixSum($1)";
@@ -14310,7 +14316,7 @@ vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveAdd($1)";
     case cuda: __intrinsic_asm "_wavePrefixSumMultiple($0, $1)";
     case hlsl: __intrinsic_asm "WavePrefixSum($1)";
@@ -14938,7 +14944,7 @@ T WaveActive$(opName.hlslName)(T expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroup$(opName.glslName)($0)";
     case hlsl: __intrinsic_asm "WaveActive$(opName.hlslName)";
     case metal: __intrinsic_asm "simd_$(opName.metalName)";
@@ -14973,7 +14979,7 @@ vector<T,N> WaveActive$(opName.hlslName)(vector<T,N> expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroup$(opName.glslName)($0)";
     case hlsl: __intrinsic_asm "WaveActive$(opName.hlslName)";
     case metal: __intrinsic_asm "simd_$(opName.metalName)";
@@ -15195,7 +15201,8 @@ uint WaveActiveCountBits(bool value)
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
-[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
 uint WaveGetLaneCount()
 {
     __target_switch
@@ -15209,6 +15216,11 @@ uint WaveGetLaneCount()
             OpCapability GroupNonUniform;
             result:$$uint = OpLoad builtin(SubgroupSize:uint)
         };
+    case metal:
+        return __builtinWaveLaneCount;
+    case wgsl:
+        __requireTargetExtension("subgroups");
+        return __builtinWaveLaneCount;
     }
 }
 
@@ -15216,7 +15228,8 @@ uint WaveGetLaneCount()
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
 [NonUniformReturn]
-[require(cuda_glsl_hlsl_spirv, subgroup_basic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
 uint WaveGetLaneIndex()
 {
     __target_switch
@@ -15230,6 +15243,11 @@ uint WaveGetLaneIndex()
             OpCapability GroupNonUniform;
             result:$$uint = OpLoad builtin(SubgroupLocalInvocationId:uint)
         };
+    case metal:
+        return __builtinWaveLaneIndex;
+    case wgsl:
+        __requireTargetExtension("subgroups");
+        return __builtinWaveLaneIndex;
     }
 }
 
@@ -15299,7 +15317,7 @@ T WavePrefixProduct(T expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveMul($0)";
     case hlsl: __intrinsic_asm "WavePrefixProduct";
     case metal: __intrinsic_asm "simd_prefix_exclusive_product";
@@ -15335,7 +15353,7 @@ vector<T,N> WavePrefixProduct(vector<T,N> expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveMul($0)";
     case hlsl: __intrinsic_asm "WavePrefixProduct";
     case metal: __intrinsic_asm "simd_prefix_exclusive_product";
@@ -15386,7 +15404,7 @@ T WavePrefixSum(T expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveAdd($0)";
     case hlsl: __intrinsic_asm "WavePrefixSum";
     case metal: __intrinsic_asm "simd_prefix_exclusive_sum";
@@ -15418,7 +15436,7 @@ vector<T,N> WavePrefixSum(vector<T,N> expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupExclusiveAdd($0)";
     case hlsl: __intrinsic_asm "WavePrefixSum";
     case metal: __intrinsic_asm "simd_prefix_exclusive_sum";
@@ -15469,7 +15487,7 @@ T WaveReadLaneFirst(T expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupBroadcastFirst($0)";
     case hlsl: __intrinsic_asm "WaveReadLaneFirst";
     case metal: __intrinsic_asm "simd_broadcast_first";
@@ -15491,7 +15509,7 @@ vector<T,N> WaveReadLaneFirst(vector<T,N> expr)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupBroadcastFirst($0)";
     case hlsl: __intrinsic_asm "WaveReadLaneFirst";
     case metal: __intrinsic_asm "simd_broadcast_first";
@@ -15537,7 +15555,7 @@ T WaveBroadcastLaneAt(T value, constexpr int lane)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupBroadcast($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case metal: __intrinsic_asm "simd_broadcast($0, ushort($1))";
@@ -15561,7 +15579,7 @@ vector<T,N> WaveBroadcastLaneAt(vector<T,N> value, constexpr int lane)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupBroadcast($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case metal: __intrinsic_asm "simd_broadcast($0, ushort($1))";
@@ -15603,7 +15621,7 @@ T WaveReadLaneAt(T value, int lane)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case metal: __intrinsic_asm "simd_shuffle($0, ushort($1))";
@@ -15626,7 +15644,7 @@ vector<T,N> WaveReadLaneAt(vector<T,N> value, int lane)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case metal: __intrinsic_asm "simd_shuffle($0, ushort($1))";
@@ -15669,7 +15687,7 @@ T WaveShuffle(T value, int lane)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case metal: __intrinsic_asm "simd_shuffle($0, ushort($1))";
@@ -15693,7 +15711,7 @@ vector<T,N> WaveShuffle(vector<T,N> value, int lane)
     __target_switch
     {
     case glsl:
-        if (__isHalf<T>()) __requireGLSLExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
         __intrinsic_asm "subgroupShuffle($0, $1)";
     case hlsl: __intrinsic_asm "WaveReadLaneAt";
     case metal: __intrinsic_asm "simd_shuffle($0, ushort($1))";
@@ -16335,7 +16353,7 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
         {
         case hlsl: __intrinsic_asm ".GetDimensions";
         case glsl:
-            __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+            __requireTargetExtension("GL_EXT_samplerless_texture_functions");
             __intrinsic_asm "($1 = $(glslTextureSizeFunc)($0))";
         case metal: __intrinsic_asm "(*($1) = $0.get_width())";
         case spirv:
@@ -16355,7 +16373,7 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
         case hlsl: __intrinsic_asm ".Load";
         case metal: __intrinsic_asm "$c$0.read(uint($1))$z";
         case glsl:
-            __requireGLSLExtension("GL_EXT_samplerless_texture_functions");
+            __requireTargetExtension("GL_EXT_samplerless_texture_functions");
             __intrinsic_asm "$(glslLoadFuncName)($0, $1)$z";
         case spirv: return spirv_asm {
                 %sampled:__sampledType(T) = $(spvLoadInstName) $this $location;
@@ -17468,8 +17486,8 @@ uint dot4add_u8packed(uint x, uint y, uint acc)
             result:$$uint = OpIAdd %dotResult $acc;
         };
     default:
-        uint4 vecX = unpack_u8u32(uint8_t4_packed(x));
-        uint4 vecY = unpack_u8u32(uint8_t4_packed(y));
+        uint4 vecX = unpackUint4x8ToUint32(x);
+        uint4 vecY = unpackUint4x8ToUint32(y);
         return dot(vecX, vecY) + acc;
     }
 }
@@ -17496,8 +17514,8 @@ int dot4add_i8packed(uint x, uint y, int acc)
             result:$$int = OpIAdd %dotResult $acc;
         };
     default:
-        int4 vecX = unpack_s8s32(int8_t4_packed(x));
-        int4 vecY = unpack_s8s32(int8_t4_packed(y));
+        int4 vecX = unpackInt4x8ToInt32(x);
+        int4 vecY = unpackInt4x8ToInt32(y);
         return dot(vecX, vecY) + acc;
     }
 }
@@ -24194,269 +24212,89 @@ T workgroupUniformLoad<T>(__ref T v)
 }
 
 //
-// Pack/Unpack Math Intrinsics
+// HLSL Pack/Unpack Math Intrinsics
 //
 // These were introduced in SM 6.6 but requirements are dropped to SM 5.0 here
 // to expose these intrinsics on targets that do not have SM 6.6 features.
 //
 
-//@hidden:
-[__readNone]
-[ForceInline]
-uint16_t __lsb_as_u16(uint32_t val)
-{
-    return uint16_t(val & 0xFFU);
-}
-
-//@hidden:
-[__readNone]
-[ForceInline]
-uint32_t __lsb_as_u32(uint32_t val)
-{
-    return (val & 0xFFU);
-}
-
-//@hidden:
-[__readNone]
-[ForceInline]
-int8_t __lsb_as_s8(uint32_t val)
-{
-    return int8_t(val & 0xFFU);
-}
-
-//@hidden:
-[__readNone]
-[ForceInline]
-int16_t __lsb_as_s16(uint32_t val)
-{
-    return int16_t(__lsb_as_s8(val));
-}
-
-//@hidden:
-[__readNone]
-[ForceInline]
-int32_t __lsb_as_s32(uint32_t val)
-{
-    return int32_t(__lsb_as_s8(val));
-}
-
-//@hidden:
-[__readNone]
-[ForceInline]
-uint32_t __lsb_clamp_u8_as_u32(int32_t val)
-{
-    return clamp(val, 0, 255);
-}
-
-//@hidden:
-[__readNone]
-[ForceInline]
-uint32_t __lsb_clamp_s8_as_u32(int32_t val)
-{
-    return (uint32_t(clamp(val, -128, 127)) & 0xFFU);
-}
-
 //@public:
+
+typealias uint8_t4_packed = uint;
+typealias int8_t4_packed = uint;
+
 /// Unpack 4 signed 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int16_t4 unpack_s8s16(int8_t4_packed packed)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "unpack_s8s16";
-    case spirv: 
-        return spirv_asm
-        {
-            %s8Vec = OpBitcast $$vector<int8_t, 4> $packed;
-            result:$$vector<int16_t, 4> = OpSConvert %s8Vec
-        };
-    default:
-        uint32_t packedValue = uint32_t(packed);
-        return int16_t4
-        (
-            __lsb_as_s16(packedValue),
-            __lsb_as_s16(packedValue >> 8U),
-            __lsb_as_s16(packedValue >> 16U),
-            __lsb_as_s16(packedValue >> 24U),
-        );
-    }
+    return unpackInt4x8ToInt16(packed);
 }
 
-//@public:
 /// Unpack 4 unsigned 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint16_t4 unpack_u8u16(uint8_t4_packed packed)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "unpack_u8u16";
-    case spirv: 
-        return spirv_asm
-        {
-            %u8Vec = OpBitcast $$vector<uint8_t, 4> $packed;
-            result:$$vector<uint16_t, 4> = OpUConvert %u8Vec
-        };
-    default:
-        uint32_t packedValue = uint32_t(packed);
-        return uint16_t4
-        (
-            __lsb_as_u16(packedValue),
-            __lsb_as_u16(packedValue >> 8U),
-            __lsb_as_u16(packedValue >> 16U),
-            __lsb_as_u16(packedValue >> 24U),
-        );
-    }
+    return unpackUint4x8ToUint16(packed);
 }
 
-//@public:
 /// Unpack 4 signed 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int32_t4 unpack_s8s32(int8_t4_packed packed)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "unpack_s8s32";
-    case wgsl: __intrinsic_asm "unpack4xI8";
-    case spirv: 
-        return spirv_asm
-        {
-            %s8Vec = OpBitcast $$vector<int8_t, 4> $packed;
-            result:$$vector<int32_t, 4> = OpSConvert %s8Vec
-        };
-    default:
-        uint32_t packedValue = uint32_t(packed);
-        return int32_t4
-        (
-            __lsb_as_s32(packedValue),
-            __lsb_as_s32(packedValue >> 8U),
-            __lsb_as_s32(packedValue >> 16U),
-            __lsb_as_s32(packedValue >> 24U),
-        );
-    }
+    return unpackInt4x8ToInt32(packed);
 }
 
-//@public:
 /// Unpack 4 unsigned 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint32_t4 unpack_u8u32(uint8_t4_packed packed)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "unpack_u8u32";
-    case wgsl: __intrinsic_asm "unpack4xU8";
-    case spirv: 
-        return spirv_asm
-        {
-            %u8Vec = OpBitcast $$vector<uint8_t, 4> $packed;
-            result:$$vector<uint32_t, 4> = OpUConvert %u8Vec
-        };
-    default:
-        uint32_t packedValue = uint32_t(packed);
-        return uint32_t4
-        (
-            __lsb_as_u32(packedValue),
-            __lsb_as_u32(packedValue >> 8U),
-            __lsb_as_u32(packedValue >> 16U),
-            __lsb_as_u32(packedValue >> 24U),
-        );
-    }
+    return unpackUint4x8ToUint32(packed);
 }
 
-//@public:
 /// Pack a vector of 4 unsigned 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint8_t4_packed pack_u8(uint32_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_u8";
-    case wgsl: __intrinsic_asm "pack4xU8";
-    default:
-        return uint8_t4_packed
-        (
-            __lsb_as_u32(unpackedValue.x)
-            | (__lsb_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packUint4x8(unpackedValue);
 }
 
-//@public:
 /// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int8_t4_packed pack_s8(int32_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_s8";
-    case wgsl: __intrinsic_asm "pack4xI8";
-    default:
-        return int8_t4_packed
-        (
-            __lsb_as_u32(unpackedValue.x)
-            | (__lsb_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packInt4x8(unpackedValue);
 }
 
-//@public:
 /// Pack a vector of 4 unsigned 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint8_t4_packed pack_u8(uint16_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_u8";
-    default:
-        return uint8_t4_packed
-        (
-            __lsb_as_u32(unpackedValue.x)
-            | (__lsb_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packUint4x8(unpackedValue);
 }
 
-//@public:
 /// Pack a vector of 4 signed 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int8_t4_packed pack_s8(int16_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_s8";
-    default:
-        return int8_t4_packed
-        (
-            __lsb_as_u32(unpackedValue.x)
-            | (__lsb_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packInt4x8(unpackedValue);
 }
 
-//@public:
 /// Pack a vector of 4 unsigned 32 bit integers into a packed value of 4 8-bit integers,
 /// clamping each value to the range [0, 255] to ensure it fits within 8 bits.
 [__readNone]
@@ -24464,22 +24302,9 @@ int8_t4_packed pack_s8(int16_t4 unpackedValue)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint8_t4_packed pack_clamp_u8(int32_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_clamp_u8";
-    case wgsl: __intrinsic_asm "pack4xU8Clamp(vec4<u32>($0))";
-    default:
-        return uint8_t4_packed
-        (
-            __lsb_clamp_u8_as_u32(unpackedValue.x)
-            | (__lsb_clamp_u8_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_clamp_u8_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_clamp_u8_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packUint4x8Clamp(unpackedValue);
 }
 
-//@public:
 /// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers,
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
@@ -24487,22 +24312,9 @@ uint8_t4_packed pack_clamp_u8(int32_t4 unpackedValue)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int8_t4_packed pack_clamp_s8(int32_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_clamp_s8";
-    case wgsl: __intrinsic_asm "pack4xI8Clamp";
-    default:
-        return int8_t4_packed
-        (
-            __lsb_clamp_s8_as_u32(unpackedValue.x)
-            | (__lsb_clamp_s8_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_clamp_s8_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_clamp_s8_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packInt4x8Clamp(unpackedValue);
 }
 
-//@public:
 /// Pack a vector of 4 unsigned 16 bit integers into a packed value of 4 8-bit integers,
 /// clamping each value to the range [0, 255] to ensure it fits within 8 bits.
 [__readNone]
@@ -24510,21 +24322,9 @@ int8_t4_packed pack_clamp_s8(int32_t4 unpackedValue)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint8_t4_packed pack_clamp_u8(int16_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_clamp_u8";
-    default:
-        return uint8_t4_packed
-        (
-            __lsb_clamp_u8_as_u32(unpackedValue.x)
-            | (__lsb_clamp_u8_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_clamp_u8_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_clamp_u8_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packUint4x8Clamp(unpackedValue);
 }
 
-//@public:
 /// Pack a vector of 4 signed 16 bit integers into a packed value of 4 8-bit integers,
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
@@ -24532,18 +24332,7 @@ uint8_t4_packed pack_clamp_u8(int16_t4 unpackedValue)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_clamp_s8";
-    default:
-        return int8_t4_packed
-        (
-            __lsb_clamp_s8_as_u32(unpackedValue.x)
-            | (__lsb_clamp_s8_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_clamp_s8_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_clamp_s8_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packInt4x8Clamp(unpackedValue);
 }
 
 // Work-graphs
@@ -24574,3 +24363,275 @@ struct DispatchNodeInputRecord
     }
 };
 
+//
+// Pack/Unpack Intrinsics
+//
+
+//@hidden:
+
+[__readNone]
+[ForceInline]
+uint16_t __lsbAsUint16(uint32_t val)
+{
+    return uint16_t(val & 0xFFU);
+}
+
+[__readNone]
+[ForceInline]
+uint32_t __lsbAsUint32(uint32_t val)
+{
+    return (val & 0xFFU);
+}
+
+[__readNone]
+[ForceInline]
+int8_t __lsbAsInt8(uint32_t val)
+{
+    return int8_t(val);
+}
+
+[__readNone]
+[ForceInline]
+int16_t __lsbAsInt16(uint32_t val)
+{
+    return int16_t(__lsbAsInt8(val));
+}
+
+[__readNone]
+[ForceInline]
+int32_t __lsbAsInt32(uint32_t val)
+{
+    return int32_t(__lsbAsInt8(val));
+}
+
+//@public:
+
+/// Unpack 4 unsigned 8-bit values into a vector of 32 bit integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint32_t4 unpackUint4x8ToUint32(uint packedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "unpack_u8u32";
+    case wgsl: __intrinsic_asm "unpack4xU8";
+    case spirv:
+        return spirv_asm
+        {
+            %u8Vec = OpBitcast $$vector<uint8_t, 4> $packedValue;
+            result:$$vector<uint32_t, 4> = OpUConvert %u8Vec
+        };
+    default:
+        return uint32_t4
+        (
+            __lsbAsUint32(packedValue),
+            __lsbAsUint32(packedValue >> 8U),
+            __lsbAsUint32(packedValue >> 16U),
+            uint32_t(packedValue >> 24U),
+        );
+    }
+}
+
+/// Unpack 4 unsigned 8-bit values into a vector of 16 bit integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint16_t4 unpackUint4x8ToUint16(uint packedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "unpack_u8u16";
+    case spirv:
+        return spirv_asm
+        {
+            %u8Vec = OpBitcast $$vector<uint8_t, 4> $packedValue;
+            result:$$vector<uint16_t, 4> = OpUConvert %u8Vec
+        };
+    default:
+        return uint16_t4
+        (
+            __lsbAsUint16(packedValue),
+            __lsbAsUint16(packedValue >> 8U),
+            __lsbAsUint16(packedValue >> 16U),
+            uint16_t(packedValue >> 24U),
+        );
+    }
+}
+
+/// Unpack 4 signed 8-bit values into a vector of 32 bit integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+int32_t4 unpackInt4x8ToInt32(uint packedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "unpack_s8s32";
+    case wgsl: __intrinsic_asm "unpack4xI8";
+    case spirv:
+        return spirv_asm
+        {
+            %s8Vec = OpBitcast $$vector<int8_t, 4> $packedValue;
+            result:$$vector<int32_t, 4> = OpSConvert %s8Vec
+        };
+    default:
+        return int32_t4
+        (
+            __lsbAsInt32(packedValue),
+            __lsbAsInt32(packedValue >> 8U),
+            __lsbAsInt32(packedValue >> 16U),
+            int32_t(int8_t(packedValue >> 24U)),
+        );
+    }
+}
+
+/// Unpack 4 signed 8-bit values into a vector of 16 bit integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+int16_t4 unpackInt4x8ToInt16(uint packedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "unpack_s8s16";
+    case spirv:
+        return spirv_asm
+        {
+            %s8Vec = OpBitcast $$vector<int8_t, 4> $packedValue;
+            result:$$vector<int16_t, 4> = OpSConvert %s8Vec
+        };
+    default:
+        return int16_t4
+        (
+            __lsbAsInt16(packedValue),
+            __lsbAsInt16(packedValue >> 8U),
+            __lsbAsInt16(packedValue >> 16U),
+            int16_t(int8_t(packedValue >> 24U)),
+        );
+    }
+}
+
+/// Pack a vector of 4 unsigned 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packUint4x8(uint32_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_u8";
+    case wgsl: __intrinsic_asm "pack4xU8";
+    default:
+        return __lsbAsUint32(unpackedValue.x)
+            | (__lsbAsUint32(unpackedValue.y) << 8U)
+            | (__lsbAsUint32(unpackedValue.z) << 16U)
+            | (unpackedValue.w << 24U);
+    }
+}
+
+/// Pack a vector of 4 unsigned 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packUint4x8(uint16_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_u8";
+    default:
+        return packUint4x8(uint32_t4(unpackedValue));
+    }
+}
+
+/// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packInt4x8(int32_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_s8";
+    case wgsl: __intrinsic_asm "pack4xI8";
+    default:
+        return packUint4x8(uint32_t4(unpackedValue));
+    }
+}
+
+/// Pack a vector of 4 signed 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packInt4x8(int16_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_s8";
+    default:
+        return packUint4x8(uint32_t4(unpackedValue));
+    }
+}
+
+/// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers,
+/// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packUint4x8Clamp(int32_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_clamp_u8";
+    case wgsl: __intrinsic_asm "pack4xU8Clamp(vec4<u32>($0))";
+    default:
+        return packInt4x8(clamp(unpackedValue, 0, 255));
+    }
+}
+
+/// Pack a vector of 4 unsigned 16 bit integers into a packed value of 4 8-bit integers,
+/// clamping each value to the range [0, 255] to ensure it fits within 8 bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packUint4x8Clamp(int16_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_clamp_u8";
+    default:
+        return packInt4x8(clamp(unpackedValue, 0, 255));
+    }
+}
+
+/// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers,
+/// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packInt4x8Clamp(int32_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_clamp_s8";
+    case wgsl: __intrinsic_asm "pack4xI8Clamp";
+    default:
+        return packInt4x8(clamp(unpackedValue, -128, 127));
+    }
+}
+
+/// Pack a vector of 4 signed 16 bit integers into a packed value of 4 8-bit integers,
+/// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packInt4x8Clamp(int16_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_clamp_s8";
+    default:
+        return packInt4x8(clamp(unpackedValue, -128, 127));
+    }
+}
