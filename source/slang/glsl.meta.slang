@@ -617,83 +617,7 @@ public vector<float, N> uintBitsToFloat(highp vector<uint, N> x)
 
 [__readNone]
 [ForceInline]
-uint packUnorm1x16(float c)
-{
-    return uint(round(clamp(c, 0.0, 1.0) * 65535.0));
-}
-
-[__readNone]
-[ForceInline]
-uint packSnorm1x16(float v)
-{
-    return uint(round(clamp(v ,-1.0, 1.0) * 32767.0));
-}
-
-[__readNone]
-[ForceInline]
-uint packUnorm1x8(float c)
-{
-    return uint(round(clamp(c, 0.0, 1.0) * 255.0));
-}
-
-[__readNone]
-[ForceInline]
-uint packSnorm1x8(float c)
-{
-    return uint(round(clamp(c, -1.0, 1.0) * 127.0));
-}
-
-[__readNone]
-[ForceInline]
-float unpackUnorm1x16(uint p)
-{
-    const uint wordMask = 0xffff;
-    return float(p & wordMask) / 65535.0;
-}
-
-[__readNone]
-[ForceInline]
-float unpackSnorm1x16(uint p)
-{
-    const uint wordMask = 0xffff;
-    return clamp(float(p & wordMask) / 32767.0, -1.0, 1.0);
-}
-
-[__readNone]
-[ForceInline]
-float unpackUnorm1x8(uint p)
-{
-    const uint byteMask = 0xff;
-    return float(p & byteMask) / 255.0;
-}
-
-[__readNone]
-[ForceInline]
-float unpackSnorm1x8(uint p)
-{
-    const uint byteMask = 0xff;
-    return clamp(float(p & byteMask) / 127.0, -1.0, 1.0);
-}
-
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
-uint float2half(float f)
-{
-    uint u = floatBitsToUint(f);
-    uint s = ((u >> uint(16)) & uint(0x8000));
-    uint e = 0;
-    uint m = ((u >> uint(13)) & uint(0x03ff));
-    if (m != 0)
-    {
-        e = ((((u & uint(0x7f800000)) - uint(0x38000000)) >> uint(13)) & uint(0x7c00));
-    }
-    return (s | e | m);
-}
-
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
 public vec2 unpackUnorm2x16(uint p)
 {
     return unpackUnorm2x16ToFloat(p);
@@ -701,7 +625,7 @@ public vec2 unpackUnorm2x16(uint p)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
 public vec2 unpackSnorm2x16(uint p)
 {
     return unpackSnorm2x16ToFloat(p);
@@ -709,7 +633,7 @@ public vec2 unpackSnorm2x16(uint p)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
 public vec4 unpackUnorm4x8(highp uint p)
 {
     return unpackUnorm4x8ToFloat(p);
@@ -717,7 +641,7 @@ public vec4 unpackUnorm4x8(highp uint p)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
 public vec4 unpackSnorm4x8(highp uint p)
 {
     return unpackSnorm4x8ToFloat(p);
@@ -745,7 +669,7 @@ public float half2float(uint h)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
 public vec2 unpackHalf2x16(uint p)
 {
     return unpackHalf2x16ToFloat(p);
