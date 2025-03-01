@@ -2139,21 +2139,24 @@ SlangResult emitSPIRVForEntryPointsDirectly(
 
             SLANG_ASSERT(int(spirv.getCount()) % 4 == 0);
             SLANG_ASSERT(spirvFiles.size() == spirvSizes.size());
-            SlangResult linkresult = compiler->link(
-                (const uint32_t**)spirvFiles.data(),
-                (const uint32_t*)spirvSizes.data(),
-                (uint32_t)spirvFiles.size(),
-                linkedArtifact.writeRef());
-            
-            if (linkresult != SLANG_OK)
-            {
-                return SLANG_FAIL;
-            }
 
-            ComPtr<ISlangBlob> blob;
-            linkedArtifact->loadBlob(ArtifactKeep::No, blob.writeRef());
-			
-            artifact = _Move(linkedArtifact);
+            if (spirvFiles.size() > 1)
+            {
+                SlangResult linkresult = compiler->link(
+                    (const uint32_t**)spirvFiles.data(),
+                    (const uint32_t*)spirvSizes.data(),
+                    (uint32_t)spirvFiles.size(),
+                    linkedArtifact.writeRef());
+
+                if (linkresult != SLANG_OK)
+                {
+                    return SLANG_FAIL;
+                }
+
+                ComPtr<ISlangBlob> blob;
+                linkedArtifact->loadBlob(ArtifactKeep::No, blob.writeRef());
+                artifact = _Move(linkedArtifact);
+            }
         }
 
         if (!codeGenContext->shouldSkipSPIRVValidation())
