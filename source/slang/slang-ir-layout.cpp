@@ -344,6 +344,7 @@ static Result _calcSizeAndAlignment(
     case kIROp_ComPtrType:
     case kIROp_NativeStringType:
     case kIROp_HLSLConstBufferPointerType:
+    case kIROp_RaytracingAccelerationStructureType:
         {
             *outSizeAndAlignment = IRSizeAndAlignment(kPointerSize, kPointerSize);
             return SLANG_OK;
@@ -376,9 +377,7 @@ static Result _calcSizeAndAlignment(
     default:
         break;
     }
-
-    if (as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type) ||
-        type->getOp() == kIROp_RaytracingAccelerationStructureType)
+    if (as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type))
     {
         *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
         return SLANG_OK;
