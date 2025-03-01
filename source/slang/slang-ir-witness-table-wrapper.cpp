@@ -190,19 +190,35 @@ struct GenerateWitnessTableWrapperContext
         //
         auto concreteType = witnessTable->getConcreteType();
         IRIntegerValue typeSize, sizeLimit;
-        if (!sharedContext
-                 ->doesTypeFitInAnyValue(concreteType, interfaceType, &typeSize, &sizeLimit))
+        bool isTypeOpaque = false;
+        if (!sharedContext->doesTypeFitInAnyValue(
+                concreteType,
+                interfaceType,
+                &typeSize,
+                &sizeLimit,
+                &isTypeOpaque))
         {
-            sharedContext->sink->diagnose(
-                concreteType,
-                Diagnostics::typeDoesNotFitAnyValueSize,
-                concreteType);
-            sharedContext->sink->diagnoseWithoutSourceView(
-                concreteType,
-                Diagnostics::typeAndLimit,
-                concreteType,
-                typeSize,
-                sizeLimit);
+            HashSet<IRType*> visited;
+            if (isTypeOpaque)
+            {
+                sharedContext->sink->diagnose(
+                    concreteType,
+                    Diagnostics::typeCannotBePackedIntoAnyValue,
+                    concreteType);
+            }
+            else
+            {
+                sharedContext->sink->diagnose(
+                    concreteType,
+                    Diagnostics::typeDoesNotFitAnyValueSize,
+                    concreteType);
+                sharedContext->sink->diagnoseWithoutSourceView(
+                    concreteType,
+                    Diagnostics::typeAndLimit,
+                    concreteType,
+                    typeSize,
+                    sizeLimit);
+            }
             return;
         }
 

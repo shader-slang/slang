@@ -2203,12 +2203,12 @@ DIAGNOSTIC(
     Error,
     typeDoesNotFitAnyValueSize,
     "type '$0' does not fit in the size required by its conforming interface.")
-DIAGNOSTIC(41012, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")
+DIAGNOSTIC(-1, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")
 DIAGNOSTIC(
-    41012,
+    41014,
     Error,
     typeCannotBePackedIntoAnyValue,
-    "type '$0' contains fields that cannot be packed into an AnyValue.")
+    "type '$0' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.")
 DIAGNOSTIC(
     41020,
     Error,

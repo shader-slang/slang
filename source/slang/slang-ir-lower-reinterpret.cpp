@@ -79,7 +79,7 @@ struct ReinterpretLoweringContext
                 Slang::Diagnostics::typeCannotBePackedIntoAnyValue,
                 toType);
         }
-        if (fromTypeSize != toTypeSize && cantPack == false)
+        if (fromTypeSize != toTypeSize && !cantPack && !as<IRExtractExistentialType>(fromType))
         {
             sink->diagnose(
                 inst->sourceLoc,

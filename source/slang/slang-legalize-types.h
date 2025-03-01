@@ -703,8 +703,6 @@ void legalizeEmptyTypes(TargetProgram* target, IRModule* module, DiagnosticSink*
 
 bool isResourceType(IRType* type);
 
-bool isOpaqueType(IRType* type, List<IRType*>& opaqueTypes);
-
 SourceLoc findBestSourceLocFromUses(IRInst* inst);
 } // namespace Slang
 

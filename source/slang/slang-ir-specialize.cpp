@@ -1373,11 +1373,16 @@ struct SpecializationContext
             if (!isExistentialType(param->getDataType()))
                 continue;
 
+            // Is arg in the most simplified form for specialization? If not we are
+            // not ready to consider specialization yet.
+            if (!isSimplifiedExistentialArg(arg))
+                return false;
+
             // We *cannot* specialize unless the argument value corresponding
             // to such a parameter is one we can specialize.
             //
             if (!canSpecializeExistentialArg(arg))
-                return false;
+                continue;
 
             argumentNeedSpecialization = true;
         }
@@ -1416,7 +1421,6 @@ struct SpecializationContext
             auto arg = inst->getArg(argCounter++);
             if (!isExistentialType(param->getDataType()))
                 continue;
-
             if (auto makeExistential = as<IRMakeExistential>(arg))
             {
                 // Note that we use the *type* stored in the
@@ -1426,25 +1430,32 @@ struct SpecializationContext
                 // call sites that pass in the exact same argument).
                 //
                 auto val = makeExistential->getWrappedValue();
-                auto valType = val->getFullType();
-                key.vals.add(valType);
+                auto valType = val->getDataType();
+                if (isCompileTimeConstantType(valType))
+                {
+                    key.vals.add(valType);
 
-                // We are also including the witness table in the key.
-                // This isn't required with our current language model,
-                // since a given type can only conform to a given interface
-                // in one way (so there can be only one witness table).
-                // That means that the `valType` and the existential
-                // type of `param` above should uniquely determine
-                // the witness table we see.
-                //
-                // There are forward-looking cases where supporting
-                // "overlapping conformances" could be required, and
-                // there is low incremental cost to future-proofing
-                // this code, so we go ahead and add the witness
-                // table even if it is redundant.
-                //
-                auto witnessTable = makeExistential->getWitnessTable();
-                key.vals.add(witnessTable);
+                    // We are also including the witness table in the key.
+                    // This isn't required with our current language model,
+                    // since a given type can only conform to a given interface
+                    // in one way (so there can be only one witness table).
+                    // That means that the `valType` and the existential
+                    // type of `param` above should uniquely determine
+                    // the witness table we see.
+                    //
+                    // There are forward-looking cases where supporting
+                    // "overlapping conformances" could be required, and
+                    // there is low incremental cost to future-proofing
+                    // this code, so we go ahead and add the witness
+                    // table even if it is redundant.
+                    //
+                    auto witnessTable = makeExistential->getWitnessTable();
+                    key.vals.add(witnessTable);
+                }
+                else
+                {
+                    key.vals.add(param->getDataType());
+                }
             }
             else if (auto wrapExistential = as<IRWrapExistential>(arg))
             {
@@ -1508,7 +1519,11 @@ struct SpecializationContext
                 if (auto makeExistential = as<IRMakeExistential>(arg))
                 {
                     auto val = makeExistential->getWrappedValue();
-                    newArgs.add(val);
+                    auto valType = val->getDataType();
+                    if (isCompileTimeConstantType(valType))
+                        newArgs.add(val);
+                    else
+                        newArgs.add(arg);
                 }
                 else if (auto wrapExistential = as<IRWrapExistential>(arg))
                 {
@@ -1633,6 +1648,18 @@ struct SpecializationContext
         }
         return true;
     }
+
+
+    // Returns true if `inst` is a simplified existential argument ready for specialization.
+    bool isSimplifiedExistentialArg(IRInst* inst)
+    {
+        if (as<IRMakeExistential>(inst))
+            return true;
+        if (as<IRWrapExistential>(inst))
+            return true;
+        return false;
+    }
+
 
     // Similarly, we want to be able to test whether an instruction
     // used as an argument for an existential-type parameter is
@@ -1760,21 +1787,33 @@ struct SpecializationContext
                 // created.
                 //
                 auto valType = val->getFullType();
-                auto newParam = builder->createParam(valType);
-                newParams.add(newParam);
+                if (auto extractExistentialType = as<IRExtractExistentialType>(valType))
+                {
+                    valType = extractExistentialType->getOperand(0)->getDataType();
+                    auto newParam = builder->createParam(valType);
+                    newParams.add(newParam);
+                    replacementVal = newParam;
+                }
+                else
+                {
+                    auto newParam = builder->createParam(valType);
+                    newParams.add(newParam);
 
-                // Within the body of the function we cannot just use `val`
-                // directly, because the existing code expects an existential
-                // value, including its witness table.
-                //
-                // Therefore we will create a `makeExistential(newParam, witnessTable)`
-                // in the body of the new function and use *that* as the replacement
-                // value for the original parameter (since it will have the
-                // correct existential type, and stores the right witness table).
-                //
-                auto newMakeExistential =
-                    builder->emitMakeExistential(oldParam->getFullType(), newParam, witnessTable);
-                replacementVal = newMakeExistential;
+                    // Within the body of the function we cannot just use `val`
+                    // directly, because the existing code expects an existential
+                    // value, including its witness table.
+                    //
+                    // Therefore we will create a `makeExistential(newParam, witnessTable)`
+                    // in the body of the new function and use *that* as the replacement
+                    // value for the original parameter (since it will have the
+                    // correct existential type, and stores the right witness table).
+                    //
+                    auto newMakeExistential = builder->emitMakeExistential(
+                        oldParam->getFullType(),
+                        newParam,
+                        witnessTable);
+                    replacementVal = newMakeExistential;
+                }
             }
             else if (auto oldWrapExistential = as<IRWrapExistential>(arg))
             {
