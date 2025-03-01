@@ -2390,7 +2390,7 @@ IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val)
     }
 }
 
-void legalizeRayTracingEntryPointParameterForGLSL(
+void handleSingleParam(
     GLSLLegalizationContext* context,
     IRFunc* func,
     IRParam* pp,
@@ -2440,6 +2440,136 @@ void legalizeRayTracingEntryPointParameterForGLSL(
     // SPIR-V for an entry point.
     //
     builder->addDependsOnDecoration(func, globalParam);
+}
+
+static void consolidateParameters(GLSLLegalizationContext* context, List<IRParam*>& params)
+{
+    auto builder = context->getBuilder();
+
+    // Create a struct type to hold all parameters
+    IRInst* consolidatedVar = nullptr;
+    auto structType = builder->createStructType();
+
+    // Inside the structure, add fields for each parameter
+    for (auto _param : params)
+    {
+        auto _paramType = _param->getDataType();
+        IRType* valueType = _paramType;
+
+        if (as<IROutTypeBase>(_paramType))
+            valueType = as<IROutTypeBase>(_paramType)->getValueType();
+
+        auto key = builder->createStructKey();
+        if (auto nameDecor = _param->findDecoration<IRNameHintDecoration>())
+            builder->addNameHintDecoration(key, nameDecor->getName());
+        auto field = builder->createStructField(structType, key, valueType);
+        field->removeFromParent();
+        field->insertAtEnd(structType);
+    }
+
+    // Create a global variable to hold the consolidated struct
+    consolidatedVar = builder->createGlobalVar(structType);
+    auto ptrType = builder->getPtrType(kIROp_PtrType, structType, AddressSpace::IncomingRayPayload);
+    consolidatedVar->setFullType(ptrType);
+    consolidatedVar->moveToEnd();
+
+    // Add the ray payload decoration and assign location 0.
+    builder->addVulkanRayPayloadDecoration(consolidatedVar, 0);
+
+    // Replace each parameter with a field in the consolidated struct
+    for (Index i = 0; i < params.getCount(); ++i)
+    {
+        auto _param = params[i];
+
+        // Find the i-th field
+        IRStructField* targetField = nullptr;
+        Index fieldIndex = 0;
+        for (auto field : structType->getFields())
+        {
+            if (fieldIndex == i)
+            {
+                targetField = field;
+                break;
+            }
+            fieldIndex++;
+        }
+        SLANG_ASSERT(targetField);
+
+        // Create the field address with the correct type
+        auto _paramType = _param->getDataType();
+        auto fieldType = targetField->getFieldType();
+
+        // If the parameter is an out/inout type, we need to create a pointer type
+        IRType* fieldPtrType = nullptr;
+        if (as<IROutType>(_paramType))
+        {
+            fieldPtrType = builder->getPtrType(kIROp_OutType, fieldType);
+        }
+        else if (as<IRInOutType>(_paramType))
+        {
+            fieldPtrType = builder->getPtrType(kIROp_InOutType, fieldType);
+        }
+
+        auto fieldAddr =
+            builder->emitFieldAddress(fieldPtrType, consolidatedVar, targetField->getKey());
+
+        // Replace parameter uses with field address
+        _param->replaceUsesWith(fieldAddr);
+    }
+}
+
+// Consolidate ray tracing parameters for an entry point function
+void consolidateRayTracingParameters(GLSLLegalizationContext* context, IRFunc* func)
+{
+    auto builder = context->getBuilder();
+    auto firstBlock = func->getFirstBlock();
+    if (!firstBlock)
+        return;
+
+    // Collect all out/inout parameters that need to be consolidated
+    List<IRParam*> outParams;
+    List<IRParam*> params;
+
+    for (auto param = firstBlock->getFirstParam(); param; param = param->getNextParam())
+    {
+        builder->setInsertBefore(firstBlock->getFirstOrdinaryInst());
+        if (as<IROutType>(param->getDataType()) || as<IRInOutType>(param->getDataType()))
+        {
+            outParams.add(param);
+        }
+        params.add(param);
+    }
+
+    // We don't need consolidation here.
+    if (outParams.getCount() <= 1)
+    {
+        for (auto param : params)
+        {
+            auto paramLayoutDecoration = param->findDecoration<IRLayoutDecoration>();
+            SLANG_ASSERT(paramLayoutDecoration);
+            auto paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
+            handleSingleParam(context, func, param, paramLayout);
+        }
+        return;
+    }
+    else
+    {
+        // We need consolidation here, but before that, handle parameters other than inout/out.
+        for (auto param : params)
+        {
+            if (outParams.contains(param))
+            {
+                continue;
+            }
+            auto paramLayoutDecoration = param->findDecoration<IRLayoutDecoration>();
+            SLANG_ASSERT(paramLayoutDecoration);
+            auto paramLayout = as<IRVarLayout>(paramLayoutDecoration->getLayout());
+            handleSingleParam(context, func, param, paramLayout);
+        }
+
+        // Now, consolidate the inout/out parameters
+        consolidateParameters(context, outParams);
+    }
 }
 
 static void legalizeMeshPayloadInputParam(
@@ -3129,7 +3259,6 @@ void legalizeEntryPointParameterForGLSL(
         }
     }
 
-
     // We need to create a global variable that will replace the parameter.
     // It seems superficially obvious that the variable should have
     // the same type as the parameter.
@@ -3286,7 +3415,6 @@ void legalizeEntryPointParameterForGLSL(
     case Stage::Intersection:
     case Stage::Miss:
     case Stage::RayGeneration:
-        legalizeRayTracingEntryPointParameterForGLSL(context, func, pp, paramLayout);
         return;
     }
 
@@ -3916,12 +4044,33 @@ void legalizeEntryPointForGLSL(
         invokePathConstantFuncInHullShader(&context, codeGenContext, scalarizedGlobalOutput);
     }
 
+    // Special handling for ray tracing shaders
+    bool isRayTracingShader = false;
+    switch (stage)
+    {
+    case Stage::AnyHit:
+    case Stage::Callable:
+    case Stage::ClosestHit:
+    case Stage::Intersection:
+    case Stage::Miss:
+    case Stage::RayGeneration:
+        isRayTracingShader = true;
+        consolidateRayTracingParameters(&context, func);
+        break;
+    default:
+        break;
+    }
+
     // Next we will walk through any parameters of the entry-point function,
     // and turn them into global variables.
     if (auto firstBlock = func->getFirstBlock())
     {
         for (auto pp = firstBlock->getFirstParam(); pp; pp = pp->getNextParam())
         {
+            if (isRayTracingShader)
+            {
+                continue;
+            }
             // Any initialization code we insert for parameters needs
             // to be at the start of the "ordinary" instructions in the block:
             builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
