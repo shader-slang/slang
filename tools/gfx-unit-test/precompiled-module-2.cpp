@@ -123,16 +123,16 @@ void precompiledModule2TestImplCommon(
     sessionDesc.targets = &targetDesc;
     sessionDesc.fileSystem = memoryFileSystem.get();
 
-    std::vector<slang::CompilerOptionEntry> options;
+    Slang::List<slang::CompilerOptionEntry> options;
     slang::CompilerOptionEntry skipDownstreamLinkingOption;
     skipDownstreamLinkingOption.name = slang::CompilerOptionName::SkipDownstreamLinking;
     skipDownstreamLinkingOption.value.kind = slang::CompilerOptionValueKind::Int;
     skipDownstreamLinkingOption.value.intValue0 =
         precompilationMode == PrecompilationMode::ExternalLink;
-    options.push_back(skipDownstreamLinkingOption);
+    options.add(skipDownstreamLinkingOption);
 
-    sessionDesc.compilerOptionEntries = options.data();
-    sessionDesc.compilerOptionEntryCount = options.size();
+    sessionDesc.compilerOptionEntries = options.getBuffer();
+    sessionDesc.compilerOptionEntryCount = options.getCount();
     auto globalSession = slangSession->getGlobalSession();
     globalSession->createSession(sessionDesc, slangSession.writeRef());
 

@@ -2105,14 +2105,14 @@ SlangResult emitSPIRVForEntryPointsDirectly(
             ComPtr<IArtifact> linkedArtifact;
 
             // collect spirv files
-            std::vector<uint32_t*> spirvFiles;
-            std::vector<uint32_t> spirvSizes;
+            List<uint32_t*> spirvFiles;
+            List<uint32_t> spirvSizes;
 
             // Start with the SPIR-V we just generated.
             // SPIRV-Tools-link expects the size in 32-bit words
             // whereas the spirv blob size is in bytes.
-            spirvFiles.push_back((uint32_t*)spirv.getBuffer());
-            spirvSizes.push_back(int(spirv.getCount()) / 4);
+            spirvFiles.add((uint32_t*)spirv.getBuffer());
+            spirvSizes.add(int(spirv.getCount()) / 4);
 
             // Iterate over all modules in the linkedIR. For each module, if it
             // contains an embedded downstream ir instruction, add it to the list
@@ -2129,8 +2129,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
                             if (inst->getTarget() == CodeGenTarget::SPIRV)
                             {
                                 auto slice = inst->getBlob()->getStringSlice();
-                                spirvFiles.push_back((uint32_t*)slice.begin());
-                                spirvSizes.push_back(int(slice.getLength()) / 4);
+                                spirvFiles.add((uint32_t*)slice.begin());
+                                spirvSizes.add(int(slice.getLength()) / 4);
                             }
                         }
                     }
@@ -2138,14 +2138,14 @@ SlangResult emitSPIRVForEntryPointsDirectly(
             );
 
             SLANG_ASSERT(int(spirv.getCount()) % 4 == 0);
-            SLANG_ASSERT(spirvFiles.size() == spirvSizes.size());
+            SLANG_ASSERT(spirvFiles.getCount() == spirvSizes.getCount());
 
-            if (spirvFiles.size() > 1)
+            if (spirvFiles.getCount() > 1)
             {
                 SlangResult linkresult = compiler->link(
-                    (const uint32_t**)spirvFiles.data(),
-                    (const uint32_t*)spirvSizes.data(),
-                    (uint32_t)spirvFiles.size(),
+                    (const uint32_t**)spirvFiles.getBuffer(),
+                    (const uint32_t*)spirvSizes.getBuffer(),
+                    (uint32_t)spirvFiles.getCount(),
                     linkedArtifact.writeRef());
 
                 if (linkresult != SLANG_OK)
