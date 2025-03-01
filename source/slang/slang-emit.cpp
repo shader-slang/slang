@@ -2134,8 +2134,7 @@ SlangResult emitSPIRVForEntryPointsDirectly(
                             }
                         }
                     }
-                }
-            );
+                });
 
             SLANG_ASSERT(int(spirv.getCount()) % 4 == 0);
             SLANG_ASSERT(spirvFiles.getCount() == spirvSizes.getCount());

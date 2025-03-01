@@ -241,14 +241,18 @@ SLANG_UNIT_TEST(precompiledModule2D3D12)
 
 SLANG_UNIT_TEST(precompiledTargetModuleInternalLink2D3D12)
 {
-    runTestImpl(precompiledTargetModule2InternalLinkTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
+    runTestImpl(
+        precompiledTargetModule2InternalLinkTestImpl,
+        unitTestContext,
+        Slang::RenderApiFlag::D3D12);
 }
 
 /*
 // Unavailable on D3D12/DXIL currently
 SLANG_UNIT_TEST(precompiledTargetModuleExternalLink2D3D12)
 {
-    runTestImpl(precompiledTargetModule2ExternalLinkTestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
+    runTestImpl(precompiledTargetModule2ExternalLinkTestImpl, unitTestContext,
+Slang::RenderApiFlag::D3D12);
 }
 */
 
@@ -259,12 +263,18 @@ SLANG_UNIT_TEST(precompiledModule2Vulkan)
 
 SLANG_UNIT_TEST(precompiledTargetModule2InternalLinkVulkan)
 {
-    runTestImpl(precompiledTargetModule2InternalLinkTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(
+        precompiledTargetModule2InternalLinkTestImpl,
+        unitTestContext,
+        Slang::RenderApiFlag::Vulkan);
 }
 
 SLANG_UNIT_TEST(precompiledTargetModule2ExternalLinkVulkan)
 {
-    runTestImpl(precompiledTargetModule2ExternalLinkTestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(
+        precompiledTargetModule2ExternalLinkTestImpl,
+        unitTestContext,
+        Slang::RenderApiFlag::Vulkan);
 }
 
 } // namespace gfx_test

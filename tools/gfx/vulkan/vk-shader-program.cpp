@@ -80,7 +80,7 @@ Result ShaderProgramImpl::createShaderModule(
     if (kernelCodes.getCount() == 1)
     {
         linkedKernel = kernelCodes[0];
-    } 
+    }
     else
     {
         linkedKernel = m_device->m_glslang.linkSPIRV(kernelCodes);

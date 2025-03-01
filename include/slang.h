@@ -1010,7 +1010,7 @@ typedef uint32_t SlangSizeT;
         EmitReflectionJSON, // bool
         SaveGLSLModuleBinSource,
 
-        SkipDownstreamLinking,        // bool, experimental
+        SkipDownstreamLinking, // bool, experimental
         CountOf,
     };
 

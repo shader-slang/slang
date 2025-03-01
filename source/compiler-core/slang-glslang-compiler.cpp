@@ -49,9 +49,11 @@ public:
     validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     disassemble(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
-    int link(const uint32_t** modules, const uint32_t* moduleSizes,
-             const uint32_t moduleCount,
-             IArtifact** outArtifact) SLANG_OVERRIDE;
+    int link(
+        const uint32_t** modules,
+        const uint32_t* moduleSizes,
+        const uint32_t moduleCount,
+        IArtifact** outArtifact) SLANG_OVERRIDE;
 
     /// Must be called before use
     SlangResult init(ISlangSharedLibrary* library);
@@ -328,9 +330,11 @@ SlangResult GlslangDownstreamCompiler::disassemble(const uint32_t* contents, int
     return SLANG_FAIL;
 }
 
-SlangResult GlslangDownstreamCompiler::link(const uint32_t** modules, const uint32_t* moduleSizes,
-                                            const uint32_t moduleCount,
-                                            IArtifact** outArtifact)
+SlangResult GlslangDownstreamCompiler::link(
+    const uint32_t** modules,
+    const uint32_t* moduleSizes,
+    const uint32_t moduleCount,
+    IArtifact** outArtifact)
 {
     glslang_LinkRequest request;
     memset(&request, 0, sizeof(request));

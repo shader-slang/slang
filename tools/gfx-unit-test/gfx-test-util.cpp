@@ -119,7 +119,9 @@ Slang::Result loadComputeProgram(
     if (precompilationMode == PrecompilationMode::ExternalLink)
     {
         programDesc.downstreamLinkMode = gfx::IShaderProgram::DownstreamLinkMode::Deferred;
-    } else {
+    }
+    else
+    {
         programDesc.downstreamLinkMode = gfx::IShaderProgram::DownstreamLinkMode::None;
     }
 
