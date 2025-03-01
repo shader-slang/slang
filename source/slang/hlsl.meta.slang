@@ -1079,6 +1079,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
     [ForceInline]
     T Sample(vector<float, Shape.dimensions+isArray> location, vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case hlsl:
@@ -1086,6 +1087,20 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".Sample";
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod $this $location ConstOffset|MinLod $offset $clamp;
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+
+                OpStore &status %residentCode;
+                __truncate $$T result __sampledType(T) %sampled;
+            };
         default:
             status = 0;
             return Sample(location, offset, clamp);
@@ -1153,17 +1168,30 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, sm_5_0)]
+    [require(hlsl_spirv, sm_5_0)]
     T SampleBias(vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         __requireComputeDerivative();
         __target_switch
         {
-            case hlsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
-                    , "HLSL supports only float and half type textures");
-                return __getTexture().SampleBias(__getSampler(), location, bias, offset, clamp, status);
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleBias(__getSampler(), location, bias, offset, clamp, status);
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod $this $location Bias|ConstOffset $bias $offset;
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                %sampled:__sampledType(T) = OpCompositeExtract  %sparseResult 1;
+
+                OpStore &status %residentCode;
+                __truncate $$T result __sampledType(T) %sampled;
+            };
         }
     }
 
@@ -1261,7 +1289,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone] 
     [ForceInline]
-    [require(hlsl, sm_5_0)]
+    [require(hlsl_spirv, sm_5_0)]
     float SampleCmp(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         __requireComputeDerivative();
@@ -1272,6 +1300,19 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmp(__getComparisonSampler(), location, compareValue, offset, clamp, status);
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod $this $location $compareValue ConstOffset|MinLod $offset $clamp;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1;
+            };
         }
     }
 
@@ -1296,7 +1337,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, sm_5_0)]
+    [require(hlsl_spirv, sm_5_0)]
     float SampleCmpLevelZero(vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         __target_switch
@@ -1306,6 +1347,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset, status);
+        case spirv:
+            return SampleCmpLevel(location, compareValue, 0.0, offset, status);
         }
     }
 
@@ -1373,7 +1416,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, texture_shadowlod)]
+    [require(hlsl_spirv, texture_shadowlod)]
     float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         __target_switch
@@ -1383,6 +1426,18 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
                 , "HLSL supports only float and half type textures");
             return __getTexture().SampleCmpLevel(__getComparisonSampler(), location, compareValue, level, offset, status);
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Lod|ConstOffset $level $offset;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1; 
+            };
         }
     }
 
@@ -1472,16 +1527,30 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, sm_5_0)]
+    [require(hlsl_spirv, sm_5_0)]
     T SampleGrad(vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp, out uint status)
     {
         __target_switch
         {
-            case hlsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
-                    , "HLSL supports only float and half type textures");
-                return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset, lodClamp, status);
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleGrad(__getSampler(), location, gradX, gradY, offset, lodClamp, status);
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod $this $location Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1; 
+
+                OpStore &status %residentCode;
+                __truncate $$T result __sampledType(T) %sampled;
+            };
         }
     }
 
@@ -1574,16 +1643,29 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, sm_5_0)]
+    [require(hlsl_spirv, sm_5_0)]
     T SampleLevel(vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         __target_switch
         {
-            case hlsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
-                    , "HLSL supports only float and half type textures");
-                return __getTexture().SampleLevel(__getSampler(), location, level, offset, status);
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleLevel(__getSampler(), location, level, offset, status);
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod $this $location Lod|ConstOffset $level $offset;
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1; 
+
+                OpStore &status %residentCode;
+                __truncate $$T result __sampledType(T) %sampled;
+            };
         }
     }
 }
@@ -1998,6 +2080,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
     [ForceInline]
     T Sample(SamplerState s, vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
+        __requireComputeDerivative();
         __target_switch
         {
         case hlsl:
@@ -2005,6 +2088,21 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".Sample";
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod %sampledImage $location ConstOffset|MinLod $offset $clamp;
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+
+                OpStore &status %residentCode;
+                __truncate $$T result __sampledType(T) %sampled;
+            };
         default:
             status = 0;
             return Sample(s, location, offset, clamp);
@@ -2142,17 +2240,32 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, sm_5_0)]
+    [require(hlsl_spirv, sm_5_0)]
     T SampleBias(SamplerState s, vector<float, Shape.dimensions+isArray> location, float bias, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         __requireComputeDerivative();
         __target_switch
         {
-            case hlsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
-                    , "HLSL supports only float and half type textures");
-                __intrinsic_asm ".SampleBias";
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleBias";
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleImplicitLod %sampledImage $location Bias|ConstOffset|MinLod $bias $offset $clamp;
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+
+                OpStore &status %residentCode;
+                __truncate $$T result __sampledType(T) %sampled;
+            };
        }
     }
 
@@ -2293,7 +2406,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, sm_5_0)]
+    [require(hlsl_spirv, sm_5_0)]
     float SampleCmp(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, float clamp, out uint status)
     {
         __requireComputeDerivative();
@@ -2304,6 +2417,20 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmp";
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod %sampledImage $location $compareValue ConstOffset|MinLod $offset $clamp;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1;
+            };
         }
     }
 
@@ -2342,7 +2469,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, sm_5_0)]
+    [require(hlsl_spirv, sm_5_0)]
     float SampleCmpLevelZero(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         __target_switch
@@ -2352,6 +2479,8 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpLevelZero";
+        case spirv:
+            return SampleCmpLevel(s, location, compareValue, 0.0, offset, status);
         }
     }
 
@@ -2421,7 +2550,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, texture_shadowlod)]
+    [require(hlsl_spirv, texture_shadowlod)]
     float SampleCmpLevel(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float level, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         __target_switch
@@ -2431,6 +2560,19 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
                 , "HLSL supports only float and half type textures");
             __intrinsic_asm ".SampleCmpLevel";
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod %sampledImage $location $compareValue Lod|ConstOffset $level $offset;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1;
+            };
         }
     }
 
@@ -2616,16 +2758,31 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, sm_5_0)]
+    [require(hlsl_spirv, sm_5_0)]
     T SampleGrad(SamplerState s, vector<float, Shape.dimensions+isArray> location, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.dimensions> offset, float lodClamp, out uint status)
     {
         __target_switch
         {
-            case hlsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
-                    , "HLSL supports only float and half type textures");
-                __intrinsic_asm ".SampleGrad";
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleGrad";
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability MinLod;
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod %sampledImage $location Grad|ConstOffset|MinLod $gradX $gradY $offset $lodClamp;
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+
+                OpStore &status %residentCode;
+                __truncate $$T result __sampledType(T) %sampled;
+            };
        }
     }
 
@@ -2795,16 +2952,30 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, sm_5_0)]
+    [require(hlsl_spirv, sm_5_0)]
     T SampleLevel(SamplerState s, vector<float, Shape.dimensions+isArray> location, float level, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         __target_switch
         {
         case hlsl:
-                static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
-                    || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
-                    , "HLSL supports only float and half type textures");
-                __intrinsic_asm ".SampleLevel";
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleLevel";
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleExplicitLod %sampledImage $location Lod|ConstOffset $level $offset;
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+
+                OpStore &status %residentCode;
+                __truncate $$T result __sampledType(T) %sampled;
+            };
         }
     }
 }
@@ -7469,12 +7640,18 @@ T copysign(T x, T y)
 
 // Check access status to tiled resource
 [ForceInline]
-[require(hlsl, sm_5_0)]
-bool CheckAccessFullyMapped(out uint status)
+[require(hlsl_spirv, sm_5_0)]
+bool CheckAccessFullyMapped(uint status)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "CheckAccessFullyMapped";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability SparseResidency;
+            result:$$bool = OpImageSparseTexelsResident $status;
+        };
     }
 }
 
@@ -17309,8 +17486,8 @@ uint dot4add_u8packed(uint x, uint y, uint acc)
             result:$$uint = OpIAdd %dotResult $acc;
         };
     default:
-        uint4 vecX = unpack_u8u32(uint8_t4_packed(x));
-        uint4 vecY = unpack_u8u32(uint8_t4_packed(y));
+        uint4 vecX = unpackUint4x8ToUint32(x);
+        uint4 vecY = unpackUint4x8ToUint32(y);
         return dot(vecX, vecY) + acc;
     }
 }
@@ -17337,8 +17514,8 @@ int dot4add_i8packed(uint x, uint y, int acc)
             result:$$int = OpIAdd %dotResult $acc;
         };
     default:
-        int4 vecX = unpack_s8s32(int8_t4_packed(x));
-        int4 vecY = unpack_s8s32(int8_t4_packed(y));
+        int4 vecX = unpackInt4x8ToInt32(x);
+        int4 vecY = unpackInt4x8ToInt32(y);
         return dot(vecX, vecY) + acc;
     }
 }
@@ -24035,269 +24212,89 @@ T workgroupUniformLoad<T>(__ref T v)
 }
 
 //
-// Pack/Unpack Math Intrinsics
+// HLSL Pack/Unpack Math Intrinsics
 //
 // These were introduced in SM 6.6 but requirements are dropped to SM 5.0 here
 // to expose these intrinsics on targets that do not have SM 6.6 features.
 //
 
-//@hidden:
-[__readNone]
-[ForceInline]
-uint16_t __lsb_as_u16(uint32_t val)
-{
-    return uint16_t(val & 0xFFU);
-}
-
-//@hidden:
-[__readNone]
-[ForceInline]
-uint32_t __lsb_as_u32(uint32_t val)
-{
-    return (val & 0xFFU);
-}
-
-//@hidden:
-[__readNone]
-[ForceInline]
-int8_t __lsb_as_s8(uint32_t val)
-{
-    return int8_t(val & 0xFFU);
-}
-
-//@hidden:
-[__readNone]
-[ForceInline]
-int16_t __lsb_as_s16(uint32_t val)
-{
-    return int16_t(__lsb_as_s8(val));
-}
-
-//@hidden:
-[__readNone]
-[ForceInline]
-int32_t __lsb_as_s32(uint32_t val)
-{
-    return int32_t(__lsb_as_s8(val));
-}
-
-//@hidden:
-[__readNone]
-[ForceInline]
-uint32_t __lsb_clamp_u8_as_u32(int32_t val)
-{
-    return clamp(val, 0, 255);
-}
-
-//@hidden:
-[__readNone]
-[ForceInline]
-uint32_t __lsb_clamp_s8_as_u32(int32_t val)
-{
-    return (uint32_t(clamp(val, -128, 127)) & 0xFFU);
-}
-
 //@public:
+
+typealias uint8_t4_packed = uint;
+typealias int8_t4_packed = uint;
+
 /// Unpack 4 signed 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int16_t4 unpack_s8s16(int8_t4_packed packed)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "unpack_s8s16";
-    case spirv: 
-        return spirv_asm
-        {
-            %s8Vec = OpBitcast $$vector<int8_t, 4> $packed;
-            result:$$vector<int16_t, 4> = OpSConvert %s8Vec
-        };
-    default:
-        uint32_t packedValue = uint32_t(packed);
-        return int16_t4
-        (
-            __lsb_as_s16(packedValue),
-            __lsb_as_s16(packedValue >> 8U),
-            __lsb_as_s16(packedValue >> 16U),
-            __lsb_as_s16(packedValue >> 24U),
-        );
-    }
+    return unpackInt4x8ToInt16(packed);
 }
 
-//@public:
 /// Unpack 4 unsigned 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint16_t4 unpack_u8u16(uint8_t4_packed packed)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "unpack_u8u16";
-    case spirv: 
-        return spirv_asm
-        {
-            %u8Vec = OpBitcast $$vector<uint8_t, 4> $packed;
-            result:$$vector<uint16_t, 4> = OpUConvert %u8Vec
-        };
-    default:
-        uint32_t packedValue = uint32_t(packed);
-        return uint16_t4
-        (
-            __lsb_as_u16(packedValue),
-            __lsb_as_u16(packedValue >> 8U),
-            __lsb_as_u16(packedValue >> 16U),
-            __lsb_as_u16(packedValue >> 24U),
-        );
-    }
+    return unpackUint4x8ToUint16(packed);
 }
 
-//@public:
 /// Unpack 4 signed 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int32_t4 unpack_s8s32(int8_t4_packed packed)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "unpack_s8s32";
-    case wgsl: __intrinsic_asm "unpack4xI8";
-    case spirv: 
-        return spirv_asm
-        {
-            %s8Vec = OpBitcast $$vector<int8_t, 4> $packed;
-            result:$$vector<int32_t, 4> = OpSConvert %s8Vec
-        };
-    default:
-        uint32_t packedValue = uint32_t(packed);
-        return int32_t4
-        (
-            __lsb_as_s32(packedValue),
-            __lsb_as_s32(packedValue >> 8U),
-            __lsb_as_s32(packedValue >> 16U),
-            __lsb_as_s32(packedValue >> 24U),
-        );
-    }
+    return unpackInt4x8ToInt32(packed);
 }
 
-//@public:
 /// Unpack 4 unsigned 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint32_t4 unpack_u8u32(uint8_t4_packed packed)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "unpack_u8u32";
-    case wgsl: __intrinsic_asm "unpack4xU8";
-    case spirv: 
-        return spirv_asm
-        {
-            %u8Vec = OpBitcast $$vector<uint8_t, 4> $packed;
-            result:$$vector<uint32_t, 4> = OpUConvert %u8Vec
-        };
-    default:
-        uint32_t packedValue = uint32_t(packed);
-        return uint32_t4
-        (
-            __lsb_as_u32(packedValue),
-            __lsb_as_u32(packedValue >> 8U),
-            __lsb_as_u32(packedValue >> 16U),
-            __lsb_as_u32(packedValue >> 24U),
-        );
-    }
+    return unpackUint4x8ToUint32(packed);
 }
 
-//@public:
 /// Pack a vector of 4 unsigned 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint8_t4_packed pack_u8(uint32_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_u8";
-    case wgsl: __intrinsic_asm "pack4xU8";
-    default:
-        return uint8_t4_packed
-        (
-            __lsb_as_u32(unpackedValue.x)
-            | (__lsb_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packUint4x8(unpackedValue);
 }
 
-//@public:
 /// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int8_t4_packed pack_s8(int32_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_s8";
-    case wgsl: __intrinsic_asm "pack4xI8";
-    default:
-        return int8_t4_packed
-        (
-            __lsb_as_u32(unpackedValue.x)
-            | (__lsb_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packInt4x8(unpackedValue);
 }
 
-//@public:
 /// Pack a vector of 4 unsigned 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint8_t4_packed pack_u8(uint16_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_u8";
-    default:
-        return uint8_t4_packed
-        (
-            __lsb_as_u32(unpackedValue.x)
-            | (__lsb_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packUint4x8(unpackedValue);
 }
 
-//@public:
 /// Pack a vector of 4 signed 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int8_t4_packed pack_s8(int16_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_s8";
-    default:
-        return int8_t4_packed
-        (
-            __lsb_as_u32(unpackedValue.x)
-            | (__lsb_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packInt4x8(unpackedValue);
 }
 
-//@public:
 /// Pack a vector of 4 unsigned 32 bit integers into a packed value of 4 8-bit integers,
 /// clamping each value to the range [0, 255] to ensure it fits within 8 bits.
 [__readNone]
@@ -24305,22 +24302,9 @@ int8_t4_packed pack_s8(int16_t4 unpackedValue)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint8_t4_packed pack_clamp_u8(int32_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_clamp_u8";
-    case wgsl: __intrinsic_asm "pack4xU8Clamp(vec4<u32>($0))";
-    default:
-        return uint8_t4_packed
-        (
-            __lsb_clamp_u8_as_u32(unpackedValue.x)
-            | (__lsb_clamp_u8_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_clamp_u8_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_clamp_u8_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packUint4x8Clamp(unpackedValue);
 }
 
-//@public:
 /// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers,
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
@@ -24328,22 +24312,9 @@ uint8_t4_packed pack_clamp_u8(int32_t4 unpackedValue)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int8_t4_packed pack_clamp_s8(int32_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_clamp_s8";
-    case wgsl: __intrinsic_asm "pack4xI8Clamp";
-    default:
-        return int8_t4_packed
-        (
-            __lsb_clamp_s8_as_u32(unpackedValue.x)
-            | (__lsb_clamp_s8_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_clamp_s8_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_clamp_s8_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packInt4x8Clamp(unpackedValue);
 }
 
-//@public:
 /// Pack a vector of 4 unsigned 16 bit integers into a packed value of 4 8-bit integers,
 /// clamping each value to the range [0, 255] to ensure it fits within 8 bits.
 [__readNone]
@@ -24351,21 +24322,9 @@ int8_t4_packed pack_clamp_s8(int32_t4 unpackedValue)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 uint8_t4_packed pack_clamp_u8(int16_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_clamp_u8";
-    default:
-        return uint8_t4_packed
-        (
-            __lsb_clamp_u8_as_u32(unpackedValue.x)
-            | (__lsb_clamp_u8_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_clamp_u8_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_clamp_u8_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packUint4x8Clamp(unpackedValue);
 }
 
-//@public:
 /// Pack a vector of 4 signed 16 bit integers into a packed value of 4 8-bit integers,
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
@@ -24373,18 +24332,7 @@ uint8_t4_packed pack_clamp_u8(int16_t4 unpackedValue)
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
 int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "pack_clamp_s8";
-    default:
-        return int8_t4_packed
-        (
-            __lsb_clamp_s8_as_u32(unpackedValue.x)
-            | (__lsb_clamp_s8_as_u32(unpackedValue.y) << 8U)
-            | (__lsb_clamp_s8_as_u32(unpackedValue.z) << 16U)
-            | (__lsb_clamp_s8_as_u32(unpackedValue.w) << 24U)
-        );
-    }
+    return packInt4x8Clamp(unpackedValue);
 }
 
 // Work-graphs
@@ -24415,3 +24363,275 @@ struct DispatchNodeInputRecord
     }
 };
 
+//
+// Pack/Unpack Intrinsics
+//
+
+//@hidden:
+
+[__readNone]
+[ForceInline]
+uint16_t __lsbAsUint16(uint32_t val)
+{
+    return uint16_t(val & 0xFFU);
+}
+
+[__readNone]
+[ForceInline]
+uint32_t __lsbAsUint32(uint32_t val)
+{
+    return (val & 0xFFU);
+}
+
+[__readNone]
+[ForceInline]
+int8_t __lsbAsInt8(uint32_t val)
+{
+    return int8_t(val);
+}
+
+[__readNone]
+[ForceInline]
+int16_t __lsbAsInt16(uint32_t val)
+{
+    return int16_t(__lsbAsInt8(val));
+}
+
+[__readNone]
+[ForceInline]
+int32_t __lsbAsInt32(uint32_t val)
+{
+    return int32_t(__lsbAsInt8(val));
+}
+
+//@public:
+
+/// Unpack 4 unsigned 8-bit values into a vector of 32 bit integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint32_t4 unpackUint4x8ToUint32(uint packedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "unpack_u8u32";
+    case wgsl: __intrinsic_asm "unpack4xU8";
+    case spirv:
+        return spirv_asm
+        {
+            %u8Vec = OpBitcast $$vector<uint8_t, 4> $packedValue;
+            result:$$vector<uint32_t, 4> = OpUConvert %u8Vec
+        };
+    default:
+        return uint32_t4
+        (
+            __lsbAsUint32(packedValue),
+            __lsbAsUint32(packedValue >> 8U),
+            __lsbAsUint32(packedValue >> 16U),
+            uint32_t(packedValue >> 24U),
+        );
+    }
+}
+
+/// Unpack 4 unsigned 8-bit values into a vector of 16 bit integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint16_t4 unpackUint4x8ToUint16(uint packedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "unpack_u8u16";
+    case spirv:
+        return spirv_asm
+        {
+            %u8Vec = OpBitcast $$vector<uint8_t, 4> $packedValue;
+            result:$$vector<uint16_t, 4> = OpUConvert %u8Vec
+        };
+    default:
+        return uint16_t4
+        (
+            __lsbAsUint16(packedValue),
+            __lsbAsUint16(packedValue >> 8U),
+            __lsbAsUint16(packedValue >> 16U),
+            uint16_t(packedValue >> 24U),
+        );
+    }
+}
+
+/// Unpack 4 signed 8-bit values into a vector of 32 bit integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+int32_t4 unpackInt4x8ToInt32(uint packedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "unpack_s8s32";
+    case wgsl: __intrinsic_asm "unpack4xI8";
+    case spirv:
+        return spirv_asm
+        {
+            %s8Vec = OpBitcast $$vector<int8_t, 4> $packedValue;
+            result:$$vector<int32_t, 4> = OpSConvert %s8Vec
+        };
+    default:
+        return int32_t4
+        (
+            __lsbAsInt32(packedValue),
+            __lsbAsInt32(packedValue >> 8U),
+            __lsbAsInt32(packedValue >> 16U),
+            int32_t(int8_t(packedValue >> 24U)),
+        );
+    }
+}
+
+/// Unpack 4 signed 8-bit values into a vector of 16 bit integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+int16_t4 unpackInt4x8ToInt16(uint packedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "unpack_s8s16";
+    case spirv:
+        return spirv_asm
+        {
+            %s8Vec = OpBitcast $$vector<int8_t, 4> $packedValue;
+            result:$$vector<int16_t, 4> = OpSConvert %s8Vec
+        };
+    default:
+        return int16_t4
+        (
+            __lsbAsInt16(packedValue),
+            __lsbAsInt16(packedValue >> 8U),
+            __lsbAsInt16(packedValue >> 16U),
+            int16_t(int8_t(packedValue >> 24U)),
+        );
+    }
+}
+
+/// Pack a vector of 4 unsigned 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packUint4x8(uint32_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_u8";
+    case wgsl: __intrinsic_asm "pack4xU8";
+    default:
+        return __lsbAsUint32(unpackedValue.x)
+            | (__lsbAsUint32(unpackedValue.y) << 8U)
+            | (__lsbAsUint32(unpackedValue.z) << 16U)
+            | (unpackedValue.w << 24U);
+    }
+}
+
+/// Pack a vector of 4 unsigned 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packUint4x8(uint16_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_u8";
+    default:
+        return packUint4x8(uint32_t4(unpackedValue));
+    }
+}
+
+/// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packInt4x8(int32_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_s8";
+    case wgsl: __intrinsic_asm "pack4xI8";
+    default:
+        return packUint4x8(uint32_t4(unpackedValue));
+    }
+}
+
+/// Pack a vector of 4 signed 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packInt4x8(int16_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_s8";
+    default:
+        return packUint4x8(uint32_t4(unpackedValue));
+    }
+}
+
+/// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers,
+/// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packUint4x8Clamp(int32_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_clamp_u8";
+    case wgsl: __intrinsic_asm "pack4xU8Clamp(vec4<u32>($0))";
+    default:
+        return packInt4x8(clamp(unpackedValue, 0, 255));
+    }
+}
+
+/// Pack a vector of 4 unsigned 16 bit integers into a packed value of 4 8-bit integers,
+/// clamping each value to the range [0, 255] to ensure it fits within 8 bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packUint4x8Clamp(int16_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_clamp_u8";
+    default:
+        return packInt4x8(clamp(unpackedValue, 0, 255));
+    }
+}
+
+/// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers,
+/// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packInt4x8Clamp(int32_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_clamp_s8";
+    case wgsl: __intrinsic_asm "pack4xI8Clamp";
+    default:
+        return packInt4x8(clamp(unpackedValue, -128, 127));
+    }
+}
+
+/// Pack a vector of 4 signed 16 bit integers into a packed value of 4 8-bit integers,
+/// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+uint packInt4x8Clamp(int16_t4 unpackedValue)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "pack_clamp_s8";
+    default:
+        return packInt4x8(clamp(unpackedValue, -128, 127));
+    }
+}

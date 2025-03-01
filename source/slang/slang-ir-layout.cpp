@@ -128,9 +128,6 @@ static Result _calcSizeAndAlignment(
         BASE(UIntPtr, kPointerSize);
         BASE(Double, 8);
 
-        BASE(Int8x4Packed, 4);
-        BASE(UInt8x4Packed, 4);
-
         // We are currently handling `bool` following the HLSL
         // precednet of storing it in 4 bytes.
         //
