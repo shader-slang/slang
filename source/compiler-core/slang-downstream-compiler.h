@@ -344,15 +344,18 @@ public:
     /// True if underlying compiler uses file system to communicate source
     virtual SLANG_NO_THROW bool SLANG_MCALL isFileBased() = 0;
 
-    virtual SLANG_NO_THROW int SLANG_MCALL
-    link(const uint32_t** modules, const uint32_t* moduleSizes,
-         const uint32_t moduleCount,
-         IArtifact** outArtifact) {
-            SLANG_UNREFERENCED_PARAMETER(modules);
-            SLANG_UNREFERENCED_PARAMETER(moduleSizes);
-            SLANG_UNREFERENCED_PARAMETER(moduleCount);
-            SLANG_UNREFERENCED_PARAMETER(outArtifact);
-            return 0;}
+    virtual SLANG_NO_THROW int SLANG_MCALL link(
+        const uint32_t** modules,
+        const uint32_t* moduleSizes,
+        const uint32_t moduleCount,
+        IArtifact** outArtifact)
+    {
+        SLANG_UNREFERENCED_PARAMETER(modules);
+        SLANG_UNREFERENCED_PARAMETER(moduleSizes);
+        SLANG_UNREFERENCED_PARAMETER(moduleCount);
+        SLANG_UNREFERENCED_PARAMETER(outArtifact);
+        return 0;
+    }
 };
 
 class DownstreamCompilerBase : public ComBaseObject, public IDownstreamCompiler

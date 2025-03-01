@@ -1384,8 +1384,8 @@ enum class PassThroughMode : SlangPassThroughIntegral
     LLVM = SLANG_PASS_THROUGH_LLVM,                  ///< LLVM 'compiler'
     SpirvOpt = SLANG_PASS_THROUGH_SPIRV_OPT,         ///< pass thorugh spirv to spirv-opt
     MetalC = SLANG_PASS_THROUGH_METAL,
-    Tint = SLANG_PASS_THROUGH_TINT, ///< pass through spirv to Tint API
-    SpirvLink = SLANG_PASS_THROUGH_SPIRV_LINK,       ///< pass through spirv to spirv-link
+    Tint = SLANG_PASS_THROUGH_TINT,            ///< pass through spirv to Tint API
+    SpirvLink = SLANG_PASS_THROUGH_SPIRV_LINK, ///< pass through spirv to spirv-link
     CountOf = SLANG_PASS_THROUGH_COUNT_OF,
 };
 void printDiagnosticArg(StringBuilder& sb, PassThroughMode val);

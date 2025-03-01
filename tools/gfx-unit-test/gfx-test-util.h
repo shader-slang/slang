@@ -7,13 +7,13 @@
 
 namespace gfx_test
 {
-    enum class PrecompilationMode
-    {
-        None,
-        SlangIR,
-        InternalLink,
-        ExternalLink,    
-    };
+enum class PrecompilationMode
+{
+    None,
+    SlangIR,
+    InternalLink,
+    ExternalLink,
+};
 /// Helper function for print out diagnostic messages output by Slang compiler.
 void diagnoseIfNeeded(slang::IBlob* diagnosticsBlob);
 
