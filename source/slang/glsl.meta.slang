@@ -693,154 +693,34 @@ uint float2half(float f)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
-public uint packUnorm2x16(vec2 v)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "packUnorm2x16";
-    case spirv: return spirv_asm {
-        result:$$uint = OpExtInst glsl450 PackUnorm2x16 $v
-    };
-    default:
-        return packUnorm1x16(v.x) | (packUnorm1x16(v.y) << uint(16));
-    }
-}
-
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
-public uint packSnorm2x16(vec2 v)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "packSnorm2x16";
-    case spirv: return spirv_asm {
-        result:$$uint = OpExtInst glsl450 PackSnorm2x16 $v
-    };
-    default:
-        return packSnorm1x16(v.x) | (packSnorm1x16(v.y) << uint(16));
-    }
-}
-
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
-public uint packUnorm4x8(vec4 v)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "packUnorm4x8";
-    case spirv: return spirv_asm {
-        result:$$uint = OpExtInst glsl450 PackUnorm4x8 $v
-    };
-    default:
-        return packUnorm1x8(v.x) | (packUnorm1x8(v.y) << uint(8)) | (packUnorm1x8(v.z) << uint(16)) | (packUnorm1x8(v.w) << uint(24));
-    }
-}
-
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
-public uint packSnorm4x8(vec4 v)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "packSnorm4x8";
-    case spirv: return spirv_asm {
-        result:$$uint = OpExtInst glsl450 PackSnorm4x8 $v
-    };
-    default:
-        return packSnorm1x8(v.x) | (packSnorm1x8(v.y) << uint(8)) | (packSnorm1x8(v.z) << uint(16)) | (packSnorm1x8(v.w) << uint(24));
-    }
-}
-
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_unpack)]
 public vec2 unpackUnorm2x16(uint p)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "unpackUnorm2x16";
-    case spirv: return spirv_asm {
-        result:$$vec2 = OpExtInst glsl450 UnpackUnorm2x16 $p
-    };
-    default:
-        return vec2(unpackUnorm1x16(p & uint(0xffff)), unpackUnorm1x16(p >> uint(16)));
-    }
+    return unpackUnorm2x16ToFloat(p);
 }
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_unpack)]
 public vec2 unpackSnorm2x16(uint p)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "unpackSnorm2x16";
-    case spirv: return spirv_asm {
-        result:$$vec2 = OpExtInst glsl450 UnpackSnorm2x16 $p
-    };
-    default:
-        return vec2(unpackSnorm1x16(p & uint(0xffff)), unpackSnorm1x16(p >> uint(16)));
-    }
+    return unpackSnorm2x16ToFloat(p);
 }
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_unpack)]
 public vec4 unpackUnorm4x8(highp uint p)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "unpackUnorm4x8";
-    case spirv: return spirv_asm {
-        result:$$vec4 = OpExtInst glsl450 UnpackUnorm4x8 $p
-    };
-    default:
-        return vec4(
-            unpackUnorm1x8(p),
-            unpackUnorm1x8(p >> 8),
-            unpackUnorm1x8(p >> 16),
-            unpackUnorm1x8(p >> 24));
-    }
+    return unpackUnorm4x8ToFloat(p);
 }
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_unpack)]
 public vec4 unpackSnorm4x8(highp uint p)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "unpackSnorm4x8";
-    case spirv: return spirv_asm {
-        result:$$vec4 = OpExtInst glsl450 UnpackSnorm4x8 $p
-    };
-    default:
-        return vec4(
-            unpackSnorm1x8(p),
-            unpackSnorm1x8(p >> 8),
-            unpackSnorm1x8(p >> 16),
-            unpackSnorm1x8(p >> 24));
-    }
-}
-
-[__readNone]
-[ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
-public uint packHalf2x16(vec2 v)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "packHalf2x16";
-    case spirv: return spirv_asm {
-        result:$$uint = OpExtInst glsl450 PackHalf2x16 $v
-    };
-    default:
-        return float2half(v.x) | (float2half(v.y) << uint(16));
-    }
+    return unpackSnorm4x8ToFloat(p);
 }
 
 [__readNone]
@@ -865,18 +745,10 @@ public float half2float(uint h)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_unpack)]
 public vec2 unpackHalf2x16(uint p)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "unpackHalf2x16";
-    case spirv: return spirv_asm {
-        result:$$vec2 = OpExtInst glsl450 UnpackHalf2x16 $p
-    };
-    default:
-        return vec2(half2float(p & uint(0xffff)), half2float(p >> uint(16)));
-    }
+    return unpackHalf2x16ToFloat(p);
 }
 
 [__readNone]
