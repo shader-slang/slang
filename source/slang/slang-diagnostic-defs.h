@@ -49,6 +49,7 @@ DIAGNOSTIC(-1, Note, seeUsingOf, "see using of '$0'")
 DIAGNOSTIC(-1, Note, seeDefinitionOfShader, "see definition of shader '$0'")
 DIAGNOSTIC(-1, Note, seeInclusionOf, "see inclusion of '$0'")
 DIAGNOSTIC(-1, Note, seeModuleBeingUsedIn, "see module '$0' being used in '$1'")
+DIAGNOSTIC(-1, Note, seeCallOfFunc, "see call to '$0'")
 DIAGNOSTIC(-1, Note, seePipelineRequirementDefinition, "see pipeline requirement definition")
 DIAGNOSTIC(
     -1,
@@ -605,6 +606,11 @@ DIAGNOSTIC(30019, Error, typeMismatch, "expected an expression of type '$0', got
 DIAGNOSTIC(30021, Error, noApplicationFunction, "$0: no overload takes arguments ($1)")
 DIAGNOSTIC(30022, Error, invalidTypeCast, "invalid type cast between \"$0\" and \"$1\".")
 DIAGNOSTIC(30023, Error, typeHasNoPublicMemberOfName, "\"$0\" does not have public member \"$1\".")
+DIAGNOSTIC(
+    30024,
+    Error,
+    cannotConvertArrayOfSmallerToLargerSize,
+    "Cannot convert array of size $0 to array of size $1 as this would truncate data")
 DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be larger than zero.")
 DIAGNOSTIC(
     30026,
@@ -981,7 +987,7 @@ DIAGNOSTIC(
     36107,
     Error,
     entryPointUsesUnavailableCapability,
-    "entrypoint '$0' does not support compilation target '$1' with stage '$2'")
+    "entrypoint '$0' uses features that are not available in '$2' stage for '$1' target.")
 DIAGNOSTIC(
     36108,
     Error,
@@ -1019,7 +1025,11 @@ DIAGNOSTIC(
     Error,
     capabilityHasMultipleStages,
     "Capability '$0' is targeting stages '$1', only allowed to use 1 unique stage here.")
-
+DIAGNOSTIC(
+    36117,
+    Error,
+    declHasDependenciesNotCompatibleOnStage,
+    "'$0' uses features that are not available in '$1' stage.")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")
@@ -2193,12 +2203,12 @@ DIAGNOSTIC(
     Error,
     typeDoesNotFitAnyValueSize,
     "type '$0' does not fit in the size required by its conforming interface.")
-DIAGNOSTIC(41012, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")
+DIAGNOSTIC(-1, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")
 DIAGNOSTIC(
-    41012,
+    41014,
     Error,
     typeCannotBePackedIntoAnyValue,
-    "type '$0' contains fields that cannot be packed into an AnyValue.")
+    "type '$0' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.")
 DIAGNOSTIC(
     41020,
     Error,
@@ -2309,7 +2319,7 @@ DIAGNOSTIC(
     41402,
     Error,
     staticAssertionConditionNotConstant,
-    "condition for static assertion cannot be evaluated at the compile-time.")
+    "condition for static assertion cannot be evaluated at compile time.")
 
 DIAGNOSTIC(
     41402,

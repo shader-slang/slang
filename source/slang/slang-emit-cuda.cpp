@@ -84,9 +84,6 @@ UnownedStringSlice CUDASourceEmitter::getBuiltinTypeName(IROp op)
     case kIROp_UIntPtrType:
         return UnownedStringSlice("uint");
 #endif
-    case kIROp_Int8x4PackedType:
-    case kIROp_UInt8x4PackedType:
-        return UnownedStringSlice("uint");
 
     case kIROp_HalfType:
         return UnownedStringSlice("__half");

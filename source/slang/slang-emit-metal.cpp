@@ -136,8 +136,15 @@ void MetalSourceEmitter::_emitHLSLTextureType(IRTextureTypeBase* texType)
     switch (texType->getAccess())
     {
     case SLANG_RESOURCE_ACCESS_READ:
-        m_writer->emit("access::sample");
-        break;
+        {
+            // Metal does not support access::sample for texture buffers, so we need to emit
+            // access::read instead.
+            if (texType->GetBaseShape() == SLANG_TEXTURE_BUFFER)
+                m_writer->emit("access::read");
+            else
+                m_writer->emit("access::sample");
+            break;
+        }
 
     case SLANG_RESOURCE_ACCESS_WRITE:
         m_writer->emit("access::write");
@@ -1091,10 +1098,6 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
         return;
     case kIROp_UIntPtrType:
         m_writer->emit("ulong");
-        return;
-    case kIROp_Int8x4PackedType:
-    case kIROp_UInt8x4PackedType:
-        m_writer->emit("uint");
         return;
     case kIROp_StructType:
         m_writer->emit(getName(type));

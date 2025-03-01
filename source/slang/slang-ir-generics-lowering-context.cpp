@@ -405,12 +405,23 @@ bool SharedGenericsLoweringContext::doesTypeFitInAnyValue(
     IRType* concreteType,
     IRInterfaceType* interfaceType,
     IRIntegerValue* outTypeSize,
-    IRIntegerValue* outLimit)
+    IRIntegerValue* outLimit,
+    bool* outIsTypeOpaque)
 {
     auto anyValueSize = getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
     if (outLimit)
         *outLimit = anyValueSize;
 
+    if (!areResourceTypesBindlessOnTarget(targetProgram->getTargetReq()))
+    {
+        IRType* opaqueType = nullptr;
+        if (isOpaqueType(concreteType, &opaqueType))
+        {
+            if (outIsTypeOpaque)
+                *outIsTypeOpaque = true;
+            return false;
+        }
+    }
     IRSizeAndAlignment sizeAndAlignment;
     Result result =
         getNaturalSizeAndAlignment(targetProgram->getOptionSet(), concreteType, &sizeAndAlignment);

@@ -902,8 +902,6 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             case BaseType::UInt64:
             case BaseType::UIntPtr:
             case BaseType::Bool:
-            case BaseType::Int8x4Packed:
-            case BaseType::UInt8x4Packed:
                 // Because the intermediate type will always
                 // be an integer type, we can convert to
                 // another integer type of the same size
@@ -943,8 +941,6 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             case BaseType::UInt:
             case BaseType::Int:
             case BaseType::Bool:
-            case BaseType::Int8x4Packed:
-            case BaseType::UInt8x4Packed:
                 break;
             case BaseType::UInt16:
             case BaseType::Int16:
@@ -1252,23 +1248,30 @@ void HLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
             case IRConstant::FloatKind::Nan:
                 {
-                    m_writer->emit("(0.0 / 0.0)");
+                    m_writer->emit("(0.0f / 0.0f)");
                     return;
                 }
             case IRConstant::FloatKind::PositiveInfinity:
                 {
-                    m_writer->emit("(1.0 / 0.0)");
+                    m_writer->emit("(1.0f / 0.0f)");
                     return;
                 }
             case IRConstant::FloatKind::NegativeInfinity:
                 {
-                    m_writer->emit("(-1.0 / 0.0)");
+                    m_writer->emit("(-1.0f / 0.0f)");
                     return;
                 }
             default:
-                break;
+                {
+                    m_writer->emit(constantInst->value.floatVal);
+                    // Add 'f' suffix for 32-bit float literals to ensure DXC treats them as float
+                    if (constantInst->getDataType()->getOp() == kIROp_FloatType)
+                    {
+                        m_writer->emit("f");
+                    }
+                    return;
+                }
             }
-            break;
         }
 
     default:
@@ -1323,8 +1326,6 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_Int16Type:
     case kIROp_UInt16Type:
     case kIROp_HalfType:
-    case kIROp_Int8x4PackedType:
-    case kIROp_UInt8x4PackedType:
         {
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;

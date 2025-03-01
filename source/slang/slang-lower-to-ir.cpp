@@ -1737,6 +1737,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             context->irBuilder->getTypeEqualityWitness(witnessType, subType, supType));
     }
 
+    LoweredValInfo visitTypeCoercionWitness(TypeCoercionWitness*)
+    {
+        // When we fully support type coercion constraints, we should lower the witness into a
+        // function that does the conversion.
+        return LoweredValInfo();
+    }
+
     LoweredValInfo visitTransitiveSubtypeWitness(TransitiveSubtypeWitness* val)
     {
         // The base (subToMid) will turn into a value with
@@ -4626,8 +4633,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             case BaseType::UInt64:
             case BaseType::UIntPtr:
             case BaseType::IntPtr:
-            case BaseType::Int8x4Packed:
-            case BaseType::UInt8x4Packed:
                 return LoweredValInfo::simple(getBuilder()->getIntValue(type, 0));
 
             case BaseType::Half:
@@ -8161,24 +8166,34 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // If the witness table is for a COM interface, always keep it alive.
         if (irWitnessTableBaseType->findDecoration<IRComInterfaceDecoration>())
         {
-            subBuilder->addPublicDecoration(irWitnessTable);
+            subBuilder->addHLSLExportDecoration(irWitnessTable);
         }
 
-        if (parentDecl->findModifier<HLSLExportModifier>())
+        for (auto mod : parentDecl->modifiers)
         {
-            subBuilder->addHLSLExportDecoration(irWitnessTable);
-            subBuilder->addKeepAliveDecoration(irWitnessTable);
+            if (as<HLSLExportModifier>(mod))
+            {
+                subBuilder->addHLSLExportDecoration(irWitnessTable);
+                subBuilder->addKeepAliveDecoration(irWitnessTable);
+            }
+            else if (as<AutoDiffBuiltinAttribute>(mod))
+            {
+                subBuilder->addAutoDiffBuiltinDecoration(irWitnessTable);
+            }
         }
 
         // Make sure that all the entries in the witness table have been filled in,
         // including any cases where there are sub-witness-tables for conformances
-        Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
-        lowerWitnessTable(
-            subContext,
-            inheritanceDecl->witnessTable,
-            irWitnessTable,
-            mapASTToIRWitnessTable);
-
+        bool isExplicitExtern = false;
+        if (!isImportedDecl(context, parentDecl, isExplicitExtern))
+        {
+            Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
+            lowerWitnessTable(
+                subContext,
+                inheritanceDecl->witnessTable,
+                irWitnessTable,
+                mapASTToIRWitnessTable);
+        }
         irWitnessTable->moveToEnd();
 
         return LoweredValInfo::simple(
@@ -11529,6 +11544,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     RefPtr<IRModule> module = IRModule::create(session);
 
+    module->setName(translationUnit->getModuleDecl()->getName());
+
     IRBuilder builderStorage(module);
     IRBuilder* builder = &builderStorage;
 
@@ -11797,6 +11814,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         stripOptions.stripSourceLocs = false;
         stripFrontEndOnlyInstructions(module, stripOptions);
 
+        stripImportedWitnessTable(module);
+
         // Stripping out decorations could leave some dead code behind
         // in the module, and in some cases that extra code is also
         // undesirable (e.g., the string literals referenced by name-hint
@@ -11840,6 +11859,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             &writer);
     }
 
+    module->buildMangledNameToGlobalInstMap();
+
     return module;
 }
 
@@ -11877,7 +11898,7 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
         context->irBuilder = builder;
 
         componentType->acceptVisitor(this, nullptr);
-
+        module->buildMangledNameToGlobalInstMap();
         return module;
     }
 
@@ -12033,6 +12054,7 @@ struct TypeConformanceIRGenContext
         {
             builder->addSequentialIDDecoration(witness, conformanceIdOverride);
         }
+        module->buildMangledNameToGlobalInstMap();
         return module;
     }
 };
@@ -12500,7 +12522,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         // Eliminate any dead code
         eliminateDeadCode(irModule, options);
     }
-
+    irModule->buildMangledNameToGlobalInstMap();
     m_irModuleForLayout = irModule;
     return irModule;
 }

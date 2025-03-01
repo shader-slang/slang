@@ -100,7 +100,7 @@
 #include "slang-ir-strip-default-construct.h"
 #include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-synthesize-active-mask.h"
-#include "slang-ir-translate-glsl-global-var.h"
+#include "slang-ir-translate-global-varying-var.h"
 #include "slang-ir-uniformity.h"
 #include "slang-ir-user-type-hint.h"
 #include "slang-ir-validate.h"
@@ -318,7 +318,7 @@ struct RequiredLoweringPassSet
     bool bindingQuery;
     bool meshOutput;
     bool higherOrderFunc;
-    bool glslGlobalVar;
+    bool globalVaryingVar;
     bool glslSSBO;
     bool byteAddressBuffer;
     bool dynamicResource;
@@ -422,7 +422,7 @@ void calcRequiredLoweringPassSet(
     case kIROp_GlobalInputDecoration:
     case kIROp_GlobalOutputDecoration:
     case kIROp_GetWorkGroupSize:
-        result.glslGlobalVar = true;
+        result.globalVaryingVar = true;
         break;
     case kIROp_BindExistentialSlotsDecoration:
         result.bindExistential = true;
@@ -475,6 +475,31 @@ void calcRequiredLoweringPassSet(
     }
 }
 
+void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink)
+{
+    static const int maxDepth = 5;
+    for (int i = 0; i < maxDepth; i++)
+    {
+        auto func = getParentFunc(inst);
+        if (!func)
+            return;
+        bool shouldContinue = false;
+        for (auto use = func->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (auto call = as<IRCall>(user))
+            {
+                sink->diagnose(call, Diagnostics::seeCallOfFunc, func);
+                inst = call;
+                shouldContinue = true;
+                break;
+            }
+        }
+        if (!shouldContinue)
+            return;
+    }
+}
+
 bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
 {
     switch (inst->getOp())
@@ -498,6 +523,7 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
                     {
                         sink->diagnose(inst, Diagnostics::staticAssertionFailureWithoutMessage);
                     }
+                    diagnoseCallStack(inst, sink);
                 }
             }
             else
@@ -641,8 +667,8 @@ Result linkAndOptimizeIR(
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
         lowerGLSLShaderStorageBufferObjectsToStructuredBuffers(irModule, sink);
 
-    if (requiredLoweringPassSet.glslGlobalVar)
-        translateGLSLGlobalVar(codeGenContext, irModule);
+    if (requiredLoweringPassSet.globalVaryingVar)
+        translateGlobalVaryingVar(codeGenContext, irModule);
 
     if (requiredLoweringPassSet.resolveVaryingInputRef)
         resolveVaryingInputRef(irModule);

@@ -2053,15 +2053,13 @@ static LegalVal coerceToLegalType(IRTypeLegalizationContext* context, LegalType 
 
 static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* inst)
 {
-    List<IRType*> opaqueTypes;
-    if (isOpaqueType(inst->getFullType(), opaqueTypes))
+    IRType* opaqueType = nullptr;
+    if (isOpaqueType(inst->getFullType(), &opaqueType))
     {
-        auto opaqueType = opaqueTypes[0];
-        auto containerType = opaqueTypes.getCount() > 1 ? opaqueTypes[1] : opaqueType;
         SourceLoc loc = findBestSourceLocFromUses(inst);
 
         if (!loc.isValid())
-            loc = getDiagnosticPos(containerType);
+            loc = getDiagnosticPos(opaqueType);
 
         context->m_sink->diagnose(loc, Diagnostics::useOfUninitializedOpaqueHandle, opaqueType);
     }
@@ -2148,6 +2146,12 @@ static LegalVal legalizeInst(
     case kIROp_GpuForeach:
         // This case should only happen when compiling for a target that does not support
         // GpuForeach
+        return LegalVal();
+    case kIROp_StructuredBufferLoad:
+        // empty types are removed, so we need to make sure that we're still
+        // loading a none type when we try and load from a to-be-optimized
+        // out structured buffer
+        SLANG_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
     default:
         // TODO: produce a user-visible diagnostic here

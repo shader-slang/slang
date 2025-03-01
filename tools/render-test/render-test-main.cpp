@@ -131,6 +131,7 @@ protected:
     ComPtr<IBuffer> m_vertexBuffer;
     ComPtr<IShaderProgram> m_shaderProgram;
     ComPtr<IPipeline> m_pipeline;
+    ComPtr<IShaderTable> m_shaderTable;
     ComPtr<ITexture> m_depthBuffer;
     ComPtr<ITextureView> m_depthBufferView;
     ComPtr<ITexture> m_colorBuffer;
@@ -354,7 +355,7 @@ struct AssignValsFromLayoutContext
             if (field.name.getLength() == 0)
             {
                 // If no name was given, assume by-indexing matching is requested
-                auto fieldCursor = dstCursor.getElement((GfxIndex)fieldIndex);
+                auto fieldCursor = dstCursor.getElement((uint32_t)fieldIndex);
                 if (!fieldCursor.isValid())
                 {
                     StdWriters::getError().print(
@@ -637,7 +638,7 @@ SlangResult RenderTestApp::initialize(
                 SLANG_RETURN_ON_FAIL(
                     device->createBuffer(vertexBufferDesc, kVertexData, m_vertexBuffer.writeRef()));
 
-                ColorTargetState colorTarget;
+                ColorTargetDesc colorTarget;
                 colorTarget.format = Format::R8G8B8A8_UNORM;
                 RenderPipelineDesc desc;
                 desc.program = m_shaderProgram;
@@ -648,10 +649,11 @@ SlangResult RenderTestApp::initialize(
                 m_pipeline = device->createRenderPipeline(desc);
             }
             break;
+
         case Options::ShaderProgramType::GraphicsMeshCompute:
         case Options::ShaderProgramType::GraphicsTaskMeshCompute:
             {
-                ColorTargetState colorTarget;
+                ColorTargetDesc colorTarget;
                 colorTarget.format = Format::R8G8B8A8_UNORM;
                 RenderPipelineDesc desc;
                 desc.program = m_shaderProgram;
@@ -660,6 +662,33 @@ SlangResult RenderTestApp::initialize(
                 desc.depthStencil.format = Format::D32_FLOAT;
                 m_pipeline = device->createRenderPipeline(desc);
             }
+            break;
+
+        case Options::ShaderProgramType::RayTracing:
+            {
+                RayTracingPipelineDesc desc;
+                desc.program = m_shaderProgram;
+
+                m_pipeline = device->createRayTracingPipeline(desc);
+
+                const char* raygenNames[] = {"raygenMain"};
+
+                // We don't define a miss shader for this test. OptiX allows
+                // passing nullptr to indicate no miss shader, but something in
+                // slang-rhi assumes that the miss shader always has a name. To
+                // work around that, use a dummy name.
+                const char* missNames[] = {"missNull"};
+
+                ShaderTableDesc shaderTableDesc = {};
+                shaderTableDesc.program = m_shaderProgram;
+                shaderTableDesc.rayGenShaderCount = 1;
+                shaderTableDesc.rayGenShaderEntryPointNames = raygenNames;
+                shaderTableDesc.missShaderCount = 1;
+                shaderTableDesc.missShaderEntryPointNames = missNames;
+                SLANG_RETURN_ON_FAIL(
+                    device->createShaderTable(shaderTableDesc, m_shaderTable.writeRef()));
+            }
+            break;
         }
     }
     // If success must have a pipeline state
@@ -957,16 +986,25 @@ Result RenderTestApp::update()
     auto encoder = m_queue->createCommandEncoder();
     if (m_options.shaderType == Options::ShaderProgramType::Compute)
     {
-        auto rootObject = m_device->createRootShaderObject(m_pipeline);
-        applyBinding(rootObject);
-        rootObject->finalize();
-
         auto passEncoder = encoder->beginComputePass();
-        ComputeState state;
-        state.pipeline = static_cast<IComputePipeline*>(m_pipeline.get());
-        state.rootObject = rootObject;
-        passEncoder->setComputeState(state);
+        auto rootObject =
+            passEncoder->bindPipeline(static_cast<IComputePipeline*>(m_pipeline.get()));
+        applyBinding(rootObject);
         passEncoder->dispatchCompute(
+            m_options.computeDispatchSize[0],
+            m_options.computeDispatchSize[1],
+            m_options.computeDispatchSize[2]);
+        passEncoder->end();
+    }
+    else if (m_options.shaderType == Options::ShaderProgramType::RayTracing)
+    {
+        auto passEncoder = encoder->beginRayTracingPass();
+        auto rootObject = passEncoder->bindPipeline(
+            static_cast<IRayTracingPipeline*>(m_pipeline.get()),
+            m_shaderTable);
+        applyBinding(rootObject);
+        passEncoder->dispatchRays(
+            0,
             m_options.computeDispatchSize[0],
             m_options.computeDispatchSize[1],
             m_options.computeDispatchSize[2]);
@@ -974,11 +1012,6 @@ Result RenderTestApp::update()
     }
     else
     {
-        auto rootObject = m_device->createRootShaderObject(m_pipeline);
-        applyBinding(rootObject);
-        setProjectionMatrix(rootObject);
-        rootObject->finalize();
-
         RenderPassColorAttachment colorAttachment = {};
         colorAttachment.view = m_colorBufferView;
         colorAttachment.loadOp = LoadOp::Clear;
@@ -993,13 +1026,15 @@ Result RenderTestApp::update()
         renderPass.depthStencilAttachment = &depthStencilAttachment;
 
         auto passEncoder = encoder->beginRenderPass(renderPass);
+        auto rootObject =
+            passEncoder->bindPipeline(static_cast<IRenderPipeline*>(m_pipeline.get()));
+        applyBinding(rootObject);
+        setProjectionMatrix(rootObject);
 
         RenderState state;
-        state.pipeline = static_cast<IRenderPipeline*>(m_pipeline.get());
-        state.rootObject = rootObject;
-        state.viewports[0] = Viewport((float)gWindowWidth, (float)gWindowHeight);
+        state.viewports[0] = Viewport::fromSize(gWindowWidth, gWindowHeight);
         state.viewportCount = 1;
-        state.scissorRects[0] = ScissorRect(gWindowWidth, gWindowHeight);
+        state.scissorRects[0] = ScissorRect::fromSize(gWindowWidth, gWindowHeight);
         state.scissorRectCount = 1;
 
         if (m_options.shaderType == Options::ShaderProgramType::GraphicsMeshCompute ||
@@ -1072,7 +1107,8 @@ Result RenderTestApp::update()
             if (m_options.shaderType == Options::ShaderProgramType::Compute ||
                 m_options.shaderType == Options::ShaderProgramType::GraphicsCompute ||
                 m_options.shaderType == Options::ShaderProgramType::GraphicsMeshCompute ||
-                m_options.shaderType == Options::ShaderProgramType::GraphicsTaskMeshCompute)
+                m_options.shaderType == Options::ShaderProgramType::GraphicsTaskMeshCompute ||
+                m_options.shaderType == Options::ShaderProgramType::RayTracing)
             {
                 SLANG_RETURN_ON_FAIL(writeBindingOutput(m_options.outputPath));
             }
@@ -1364,9 +1400,6 @@ static SlangResult _innerMain(
         desc.debugCallback = &debugCallback;
 #endif
 
-        if (options.enableBackendValidation)
-            desc.enableBackendValidation = true;
-
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)
             desc.slang.targetFlags = SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
@@ -1411,7 +1444,10 @@ static SlangResult _innerMain(
         desc.slang.slangGlobalSession = session;
         desc.slang.targetProfile = options.profileName.getBuffer();
         {
-            getRHI()->enableDebugLayers();
+            if (options.enableDebugLayers)
+            {
+                getRHI()->enableDebugLayers();
+            }
             SlangResult res = getRHI()->createDevice(desc, device.writeRef());
             if (SLANG_FAILED(res))
             {

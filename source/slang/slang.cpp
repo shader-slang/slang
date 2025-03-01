@@ -82,8 +82,6 @@ namespace Slang
      BaseTypeInfo::Flag::Signed | BaseTypeInfo::Flag::Integer,
      uint8_t(BaseType::IntPtr)},
     {uint8_t(sizeof(uintptr_t)), BaseTypeInfo::Flag::Integer, uint8_t(BaseType::UIntPtr)},
-    {uint8_t(sizeof(uint32_t)), BaseTypeInfo::Flag::Integer, uint8_t(BaseType::Int8x4Packed)},
-    {uint8_t(sizeof(uint32_t)), BaseTypeInfo::Flag::Integer, uint8_t(BaseType::UInt8x4Packed)},
 };
 
 /* static */ bool BaseTypeInfo::check()
@@ -135,10 +133,6 @@ namespace Slang
         return UnownedStringSlice::fromLiteral("intptr_t");
     case BaseType::UIntPtr:
         return UnownedStringSlice::fromLiteral("uintptr_t");
-    case BaseType::Int8x4Packed:
-        return UnownedStringSlice::fromLiteral("int8_t4_packed");
-    case BaseType::UInt8x4Packed:
-        return UnownedStringSlice::fromLiteral("uint8_t4_packed");
     default:
         {
             SLANG_ASSERT(!"Unknown basic type");
@@ -408,6 +402,11 @@ const char* getBuiltinModuleNameStr(slang::BuiltinModuleName name)
         SLANG_UNEXPECTED("Unknown builtin module");
     }
     return result;
+}
+
+TypeCheckingCache* Session::getTypeCheckingCache()
+{
+    return static_cast<TypeCheckingCache*>(m_typeCheckingCache.get());
 }
 
 Session::BuiltinModuleInfo Session::getBuiltinModuleInfo(slang::BuiltinModuleName name)
@@ -700,6 +699,7 @@ SlangResult Session::_readBuiltinModule(
             module->setModuleDecl(moduleDecl);
         }
 
+        srcModule.irModule->setName(module->getNameObj());
         module->setIRModule(srcModule.irModule);
 
         // Put in the loaded module map
@@ -803,7 +803,12 @@ Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSe
 
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
 
-    linkage->setMatrixLayoutMode(desc.defaultMatrixLayoutMode);
+    {
+        std::lock_guard<std::mutex> lock(m_typeCheckingCacheMutex);
+        if (m_typeCheckingCache)
+            linkage->m_typeCheckingCache =
+                new TypeCheckingCache(*static_cast<TypeCheckingCache*>(m_typeCheckingCache.get()));
+    }
 
     Int searchPathCount = desc.searchPathCount;
     for (Int ii = 0; ii < searchPathCount; ++ii)
@@ -831,6 +836,10 @@ Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSe
     }
 
     linkage->m_optionSet.load(desc.compilerOptionEntryCount, desc.compilerOptionEntries);
+
+    if (!linkage->m_optionSet.hasOption(CompilerOptionName::MatrixLayoutColumn) &&
+        !linkage->m_optionSet.hasOption(CompilerOptionName::MatrixLayoutRow))
+        linkage->setMatrixLayoutMode(desc.defaultMatrixLayoutMode);
 
     {
         const Int targetCount = desc.targetCount;
@@ -1095,17 +1104,19 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::parseCommandLineArguments(
     if (outDesc->structureSize < sizeof(slang::SessionDesc))
         return SLANG_E_BUFFER_TOO_SMALL;
     RefPtr<ParsedCommandLineData> outData = new ParsedCommandLineData();
-    SerializedOptionsData optionData;
     RefPtr<EndToEndCompileRequest> tempReq = new EndToEndCompileRequest(this);
     tempReq->processCommandLineArguments(argv, argc);
+    outData->options.setCount(1 + tempReq->getLinkage()->targets.getCount());
+    int optionDataIndex = 0;
+    SerializedOptionsData& optionData = outData->options[optionDataIndex];
+    optionDataIndex++;
     tempReq->getOptionSet().serialize(&optionData);
-    outData->options.add(optionData);
     for (auto target : tempReq->getLinkage()->targets)
     {
         slang::TargetDesc tdesc;
-        SerializedOptionsData targetOptionData;
+        SerializedOptionsData& targetOptionData = outData->options[optionDataIndex];
+        optionDataIndex++;
         tempReq->getTargetOptionSet(target).serialize(&targetOptionData);
-        outData->options.add(targetOptionData);
         tdesc.compilerOptionEntryCount = (uint32_t)targetOptionData.entries.getCount();
         tdesc.compilerOptionEntries = targetOptionData.entries.getBuffer();
         outData->targets.add(tdesc);
@@ -1263,9 +1274,6 @@ Linkage::Linkage(Session* session, ASTBuilder* astBuilder, Linkage* builtinLinka
     , m_astBuilder(astBuilder)
     , m_cmdLineContext(new CommandLineContext())
 {
-    if (builtinLinkage)
-        m_astBuilder->m_cachedNodes = builtinLinkage->getASTBuilder()->m_cachedNodes;
-
     getNamePool()->setRootNamePool(session->getRootNamePool());
 
     m_defaultSourceManager.initialize(session->getBuiltinSourceManager(), nullptr);
@@ -1297,7 +1305,20 @@ ISlangUnknown* Linkage::getInterface(const Guid& guid)
 
 Linkage::~Linkage()
 {
-    destroyTypeCheckingCache();
+    // Upstream type checking cache.
+    if (m_typeCheckingCache)
+    {
+        auto globalSession = getSessionImpl();
+        std::lock_guard<std::mutex> lock(globalSession->m_typeCheckingCacheMutex);
+        if (!globalSession->m_typeCheckingCache ||
+            globalSession->getTypeCheckingCache()->resolvedOperatorOverloadCache.getCount() <
+                getTypeCheckingCache()->resolvedOperatorOverloadCache.getCount())
+        {
+            globalSession->m_typeCheckingCache = m_typeCheckingCache;
+            getTypeCheckingCache()->version++;
+        }
+        destroyTypeCheckingCache();
+    }
 }
 
 SearchDirectoryList& Linkage::getSearchDirectories()
@@ -1318,12 +1339,11 @@ TypeCheckingCache* Linkage::getTypeCheckingCache()
     {
         m_typeCheckingCache = new TypeCheckingCache();
     }
-    return m_typeCheckingCache;
+    return static_cast<TypeCheckingCache*>(m_typeCheckingCache.get());
 }
 
 void Linkage::destroyTypeCheckingCache()
 {
-    delete m_typeCheckingCache;
     m_typeCheckingCache = nullptr;
 }
 
@@ -4080,6 +4100,8 @@ RefPtr<Module> Linkage::loadModuleFromIRBlobImpl(
 
     loadedModulesList.add(resultModule);
     resultModule->setPathInfo(filePathInfo);
+    resultModule->getIRModule()->setName(resultModule->getNameObj());
+
     return resultModule;
 }
 

@@ -95,3 +95,6 @@ typedef IUnitTestModule* (*UnitTestGetModuleFunc)();
 #define SLANG_IGNORE_TEST                              \
     getTestReporter()->addResult(TestResult::Ignored); \
     throw AbortTestException();
+#define SLANG_CHECK_MSG(condition, message) \
+    getTestReporter()                       \
+        ->addResultWithLocation((condition), #condition " " message, __FILE__, __LINE__)

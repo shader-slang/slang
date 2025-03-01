@@ -4,7 +4,7 @@
 
 // CHECK_IGNORE_CAPS-NOT: error 36107
 
-// CHECK: error 36107: entrypoint 'computeMain' does not support compilation target 'glsl' with stage 'compute'
+// CHECK: error 36107: entrypoint 'computeMain' uses features that are not available in 'compute' stage for 'glsl' target.
 // CHECK: capabilitySimplification3.slang(16): note: see using of 'WaveMultiPrefixCountBits'
 // CHECK-NOT: see using of 'WaveMultiPrefixCountBits'
 // CHECK: {{.*}}.meta.slang({{.*}}): note: see definition of 'WaveMultiPrefixCountBits'

@@ -3814,8 +3814,6 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
     case kIROp_UIntType:
     case kIROp_UIntPtrType:
     case kIROp_UInt64Type:
-    case kIROp_Int8x4PackedType:
-    case kIROp_UInt8x4PackedType:
     case kIROp_CharType:
         return getIntValue(type, 0);
     case kIROp_BoolType:
@@ -3995,7 +3993,7 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
     }
 }
 
-IRInst* IRBuilder::emitCast(IRType* type, IRInst* value)
+IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinCast)
 {
     if (isTypeEqual(type, value->getDataType()))
         return value;
@@ -4009,8 +4007,17 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value)
         SLANG_UNREACHABLE("cast from void type");
     }
 
-    SLANG_RELEASE_ASSERT(toStyle != TypeCastStyle::Unknown);
-    SLANG_RELEASE_ASSERT(fromStyle != TypeCastStyle::Unknown);
+    if (toStyle == TypeCastStyle::Unknown || fromStyle == TypeCastStyle::Unknown)
+    {
+        if (fallbackToBuiltinCast)
+        {
+            return emitIntrinsicInst(type, kIROp_BuiltinCast, 1, &value);
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
 
     struct OpSeq
     {
@@ -4038,7 +4045,7 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value)
         /* From Float */
         {kIROp_CastFloatToInt,
          kIROp_FloatCast,
-         {kIROp_CastFloatToInt, kIROp_IntCast},
+         {kIROp_Neq},
          {kIROp_CastFloatToInt, kIROp_CastIntToPtr},
          kIROp_CastToVoid},
         /* From Bool  */
@@ -4057,8 +4064,26 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value)
     auto t = type;
     if (op.op1 != kIROp_Nop)
     {
-        t = getUInt64Type();
+        if (toStyle == TypeCastStyle::Bool)
+            t = getIntType();
+        else
+            t = getUInt64Type();
+        if (auto vecType = as<IRVectorType>(type))
+            t = getVectorType(t, vecType->getElementCount());
+        else if (auto matType = as<IRMatrixType>(type))
+            t = getMatrixType(
+                t,
+                matType->getRowCount(),
+                matType->getColumnCount(),
+                matType->getLayout());
     }
+
+    if (op.op0 == kIROp_Neq)
+    {
+        IRInst* args[2] = {value, emitDefaultConstruct(value->getDataType())};
+        return emitIntrinsicInst(type, op.op0, 2, args);
+    }
+
     auto result = emitIntrinsicInst(t, op.op0, 1, &value);
     if (op.op1 != kIROp_Nop)
     {
@@ -4516,6 +4541,18 @@ RefPtr<IRModule> IRModule::create(Session* session)
     moduleInst->module = module;
 
     return module;
+}
+
+void IRModule::buildMangledNameToGlobalInstMap()
+{
+    m_mapMangledNameToGlobalInst.clear();
+    for (auto inst : getGlobalInsts())
+    {
+        if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
+        {
+            m_mapMangledNameToGlobalInst[linkageDecor->getMangledName()].add(inst);
+        }
+    }
 }
 
 IRDominatorTree* IRModule::findOrCreateDominatorTree(IRGlobalValueWithCode* func)
@@ -5632,6 +5669,13 @@ IRInst* IRBuilder::emitDiscard()
     return inst;
 }
 
+IRInst* IRBuilder::emitCheckpointObject(IRInst* value)
+{
+    auto inst =
+        createInst<IRCheckpointObject>(this, kIROp_CheckpointObject, value->getFullType(), value);
+    addInst(inst);
+    return inst;
+}
 
 IRInst* IRBuilder::emitBranch(IRBlock* pBlock)
 {
@@ -7497,8 +7541,6 @@ bool isIntegralType(IRType* t)
         case BaseType::UInt64:
         case BaseType::IntPtr:
         case BaseType::UIntPtr:
-        case BaseType::Int8x4Packed:
-        case BaseType::UInt8x4Packed:
             return true;
         default:
             return false;
@@ -7544,10 +7586,6 @@ IntInfo getIntTypeInfo(const IRType* intType)
         return {32, true};
     case kIROp_Int64Type:
         return {64, true};
-
-    case kIROp_Int8x4PackedType:
-    case kIROp_UInt8x4PackedType:
-        return {32, false};
 
     case kIROp_IntPtrType:  // target platform dependent
     case kIROp_UIntPtrType: // target platform dependent
@@ -8293,6 +8331,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:
     case kIROp_WrapExistential:
+    case kIROp_BuiltinCast:
     case kIROp_BitCast:
     case kIROp_CastFloatToInt:
     case kIROp_CastIntToFloat:

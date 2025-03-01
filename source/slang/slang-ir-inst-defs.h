@@ -407,7 +407,7 @@ INST(WitnessTableEntry, witness_table_entry, 2, 0)
 INST(InterfaceRequirementEntry, interface_req_entry, 2, GLOBAL)
 
 // An inst to represent the workgroup size of the calling entry point.
-// We will materialize this inst during `translateGLSLGlobalVar`.
+// We will materialize this inst during `translateGlobalVaryingVar`.
 INST(GetWorkGroupSize, GetWorkGroupSize, 0, HOISTABLE)
 
 // An inst that returns the current stage of the calling entry point.
@@ -666,7 +666,7 @@ INST_RANGE(TerminatorInst, Return, Unreachable)
 INST(discard, discard, 0, 0)
 
 INST(RequirePrelude, RequirePrelude, 1, 0)
-INST(RequireGLSLExtension, RequireGLSLExtension, 1, 0)
+INST(RequireTargetExtension, RequireTargetExtension, 1, 0)
 INST(RequireComputeDerivative, RequireComputeDerivative, 0, 0)
 INST(StaticAssert, StaticAssert, 2, 0)
 INST(Printf, Printf, 1, 0)
@@ -715,6 +715,8 @@ INST(Not, not, 1, 0)
 INST(BitNot, bitnot, 1, 0)
 
 INST(Select, select, 3, 0)
+
+INST(CheckpointObject, checkpointObj, 1, 0)
 
 INST(GetStringHash, getStringHash, 1, 0)
 
@@ -923,6 +925,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         INST(ImportDecoration, import, 1, 0)
         INST(ExportDecoration, export, 1, 0)
     INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
+
+        /// Mark a global variable as a target builtin variable.
+    INST(TargetBuiltinVarDecoration, TargetBuiltinVar, 1, 0)
 
         /// Marks an inst as coming from an `extern` symbol defined in the user code.
     INST(UserExternDecoration, UserExtern, 0, 0)
@@ -1202,6 +1207,7 @@ INST(ExtractExistentialWitnessTable,    extractExistentialWitnessTable, 1, HOIST
 INST(ExtractTaggedUnionTag,             extractTaggedUnionTag,      1, 0)
 INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 
+INST(BuiltinCast,                       BuiltinCast,                1, 0)
 INST(BitCast,                           bitCast,                    1, 0)
 INST(Reinterpret,                       reinterpret,                1, 0)
 INST(Unmodified,                        unmodified,                1, 0)

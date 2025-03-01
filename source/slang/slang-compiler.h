@@ -27,6 +27,8 @@
 #include "slang-syntax.h"
 #include "slang.h"
 
+#include <chrono>
+
 namespace Slang
 {
 struct PathInfo;
@@ -2209,7 +2211,7 @@ public:
     TypeCheckingCache* getTypeCheckingCache();
     void destroyTypeCheckingCache();
 
-    TypeCheckingCache* m_typeCheckingCache = nullptr;
+    RefPtr<RefObject> m_typeCheckingCache = nullptr;
 
     // Modules that have been dynamically loaded via `import`
     //
@@ -3589,6 +3591,10 @@ public:
 
     int m_typeDictionarySize = 0;
 
+    RefPtr<RefObject> m_typeCheckingCache;
+    TypeCheckingCache* getTypeCheckingCache();
+    std::mutex m_typeCheckingCacheMutex;
+
 private:
     struct BuiltinModuleInfo
     {
@@ -3750,26 +3756,6 @@ SLANG_FORCE_INLINE SlangSourceLanguage asExternal(SourceLanguage sourceLanguage)
 {
     return (SlangSourceLanguage)sourceLanguage;
 }
-
-// Helper class for recording compile time.
-struct CompileTimerRAII
-{
-    std::chrono::high_resolution_clock::time_point startTime;
-    Session* session;
-    CompileTimerRAII(Session* inSession)
-    {
-        startTime = std::chrono::high_resolution_clock::now();
-        session = inSession;
-    }
-    ~CompileTimerRAII()
-    {
-        double elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(
-                                 std::chrono::high_resolution_clock::now() - startTime)
-                                 .count() /
-                             1e6;
-        session->addTotalCompileTime(elapsedTime);
-    }
-};
 
 // helpers for error/warning reporting
 enum class DiagnosticCategory
