@@ -1694,6 +1694,21 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
     while (insertBeforeInst && insertBeforeInst->getOp() == kIROp_Param)
         insertBeforeInst = insertBeforeInst->getNextInst();
 
+    if (inst->getOp() == kIROp_WitnessTable)
+    {
+        // WitnessTable may reference specialize inst-s from its WitnessEntry
+        // children. In this case, specialize insts must be cloned before the
+        // WitnessTable.
+        //
+        for (IRInst* iter = insertBeforeInst; iter; )
+        {
+            bool isSpecialize = (iter->getOp() == kIROp_Specialize);
+            iter = iter->getNextInst();
+            if (isSpecialize)
+                insertBeforeInst = iter;
+        }
+    }
+
     // For instructions that will be placed at module scope,
     // we don't care about relative ordering, but for everything
     // else, we want to ensure that an instruction comes after
