@@ -2053,15 +2053,13 @@ static LegalVal coerceToLegalType(IRTypeLegalizationContext* context, LegalType 
 
 static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* inst)
 {
-    List<IRType*> opaqueTypes;
-    if (isOpaqueType(inst->getFullType(), opaqueTypes))
+    IRType* opaqueType = nullptr;
+    if (isOpaqueType(inst->getFullType(), &opaqueType))
     {
-        auto opaqueType = opaqueTypes[0];
-        auto containerType = opaqueTypes.getCount() > 1 ? opaqueTypes[1] : opaqueType;
         SourceLoc loc = findBestSourceLocFromUses(inst);
 
         if (!loc.isValid())
-            loc = getDiagnosticPos(containerType);
+            loc = getDiagnosticPos(opaqueType);
 
         context->m_sink->diagnose(loc, Diagnostics::useOfUninitializedOpaqueHandle, opaqueType);
     }

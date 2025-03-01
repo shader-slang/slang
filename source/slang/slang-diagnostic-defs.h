@@ -987,7 +987,7 @@ DIAGNOSTIC(
     36107,
     Error,
     entryPointUsesUnavailableCapability,
-    "entrypoint '$0' does not support compilation target '$1' with stage '$2'")
+    "entrypoint '$0' uses features that are not available in '$2' stage for '$1' target.")
 DIAGNOSTIC(
     36108,
     Error,
@@ -1025,7 +1025,11 @@ DIAGNOSTIC(
     Error,
     capabilityHasMultipleStages,
     "Capability '$0' is targeting stages '$1', only allowed to use 1 unique stage here.")
-
+DIAGNOSTIC(
+    36117,
+    Error,
+    declHasDependenciesNotCompatibleOnStage,
+    "'$0' uses features that are not available in '$1' stage.")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")
@@ -2199,12 +2203,12 @@ DIAGNOSTIC(
     Error,
     typeDoesNotFitAnyValueSize,
     "type '$0' does not fit in the size required by its conforming interface.")
-DIAGNOSTIC(41012, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")
+DIAGNOSTIC(-1, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")
 DIAGNOSTIC(
-    41012,
+    41014,
     Error,
     typeCannotBePackedIntoAnyValue,
-    "type '$0' contains fields that cannot be packed into an AnyValue.")
+    "type '$0' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.")
 DIAGNOSTIC(
     41020,
     Error,

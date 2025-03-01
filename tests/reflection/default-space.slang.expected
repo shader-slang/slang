@@ -9,7 +9,15 @@ standard output = {
             "binding": {"kind": "shaderResource", "space": 99, "index": 0},
             "type": {
                 "kind": "resource",
-                "baseShape": "texture2D"
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         },
         {
@@ -25,7 +33,15 @@ standard output = {
                             "name": "b",
                             "type": {
                                 "kind": "resource",
-                                "baseShape": "texture2D"
+                                "baseShape": "texture2D",
+                                "resultType": {
+                                    "kind": "vector",
+                                    "elementCount": 4,
+                                    "elementType": {
+                                        "kind": "scalar",
+                                        "scalarType": "float32"
+                                    }
+                                }
                             },
                             "binding": {"kind": "shaderResource", "index": 0}
                         }
@@ -43,7 +59,15 @@ standard output = {
                                 "name": "b",
                                 "type": {
                                     "kind": "resource",
-                                    "baseShape": "texture2D"
+                                    "baseShape": "texture2D",
+                                    "resultType": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        }
+                                    }
                                 },
                                 "binding": {"kind": "shaderResource", "index": 0}
                             }

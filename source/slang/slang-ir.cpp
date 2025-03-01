@@ -3814,8 +3814,6 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
     case kIROp_UIntType:
     case kIROp_UIntPtrType:
     case kIROp_UInt64Type:
-    case kIROp_Int8x4PackedType:
-    case kIROp_UInt8x4PackedType:
     case kIROp_CharType:
         return getIntValue(type, 0);
     case kIROp_BoolType:
@@ -4047,7 +4045,7 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
         /* From Float */
         {kIROp_CastFloatToInt,
          kIROp_FloatCast,
-         {kIROp_CastFloatToInt, kIROp_IntCast},
+         {kIROp_Neq},
          {kIROp_CastFloatToInt, kIROp_CastIntToPtr},
          kIROp_CastToVoid},
         /* From Bool  */
@@ -4079,6 +4077,13 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
                 matType->getColumnCount(),
                 matType->getLayout());
     }
+
+    if (op.op0 == kIROp_Neq)
+    {
+        IRInst* args[2] = {value, emitDefaultConstruct(value->getDataType())};
+        return emitIntrinsicInst(type, op.op0, 2, args);
+    }
+
     auto result = emitIntrinsicInst(t, op.op0, 1, &value);
     if (op.op1 != kIROp_Nop)
     {
@@ -7536,8 +7541,6 @@ bool isIntegralType(IRType* t)
         case BaseType::UInt64:
         case BaseType::IntPtr:
         case BaseType::UIntPtr:
-        case BaseType::Int8x4Packed:
-        case BaseType::UInt8x4Packed:
             return true;
         default:
             return false;
@@ -7583,10 +7586,6 @@ IntInfo getIntTypeInfo(const IRType* intType)
         return {32, true};
     case kIROp_Int64Type:
         return {64, true};
-
-    case kIROp_Int8x4PackedType:
-    case kIROp_UInt8x4PackedType:
-        return {32, false};
 
     case kIROp_IntPtrType:  // target platform dependent
     case kIROp_UIntPtrType: // target platform dependent

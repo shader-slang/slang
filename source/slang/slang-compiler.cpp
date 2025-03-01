@@ -16,6 +16,8 @@
 #include "slang-check-impl.h"
 #include "slang-check.h"
 
+#include <chrono>
+
 // Artifact
 #include "../compiler-core/slang-artifact-associated.h"
 #include "../compiler-core/slang-artifact-container-util.h"
@@ -1834,6 +1836,26 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
 
     return SLANG_FAIL;
 }
+
+// Helper class for recording compile time.
+struct CompileTimerRAII
+{
+    std::chrono::high_resolution_clock::time_point startTime;
+    Session* session;
+    CompileTimerRAII(Session* inSession)
+    {
+        startTime = std::chrono::high_resolution_clock::now();
+        session = inSession;
+    }
+    ~CompileTimerRAII()
+    {
+        double elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(
+                                 std::chrono::high_resolution_clock::now() - startTime)
+                                 .count() /
+                             1e6;
+        session->addTotalCompileTime(elapsedTime);
+    }
+};
 
 // Do emit logic for a zero or more entry points
 SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)

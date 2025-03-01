@@ -3,7 +3,7 @@ standard error = {
 tests/diagnostics/interfaces/anyvalue-size-validation.slang(11): error 41011: type 'S' does not fit in the size required by its conforming interface.
 struct S : IInterface
        ^
-tests/diagnostics/interfaces/anyvalue-size-validation.slang(11): note 41012: sizeof(S) is 12, limit is 8
+tests/diagnostics/interfaces/anyvalue-size-validation.slang(11): note: sizeof(S) is 12, limit is 8
 }
 standard output = {
 }
