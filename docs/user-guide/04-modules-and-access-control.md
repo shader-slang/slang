@@ -120,10 +120,6 @@ It is only valid for the user code to `import m`. Attempting to `import helper` 
 Multiple `import`s of the same module from different input files will only cause the module to be loaded once (there is no need for "include guards" or `#pragma once`).
 Note that preprocessor definitions in the current file will not affect the compilation of `import`ed code, and the preprocessor definitions in the imported code is not visible to the current file.
 
-> #### Note ####
-> Future versions of the Slang system will support loading of modules from pre-compiled binaries instead of source code.
-> The same `import` keyword will continue to work in that case.
-
 ## Access Control
 
 Slang supports access control modifiers: `public`, `internal` and `private`. The module boundary plays an important role in access control.
@@ -195,6 +191,39 @@ The Slang compiler enforces the following rules regarding access control:
 - Type definitions themselves cannot be `private`, for example, `private struct S {}` is not valid code.
 - `interface` requirements cannot be `private`.
 
+## Organizing Systems of Modules
+
+Slang does not seek to impose any specific organization of modules. However, there are some conventions that have emerged as being useful.
+
+### Module Organization Suggestions
+
+- Top-level modules are those that are `import`ed by user code.
+- The implementation details of the module are placed in the lower levels of the tree.
+
+This has the benefit that it is easy for a user to distinguish the public API from the implementation details.
+
+### Module Organization Example
+
+<img src="../assets/moduletree.png" width="300em" alt="Module organization tree diagram"/>
+
+### Module Organization Example
+
+The above diagram shows a module organization example.
+
+Top-level modules such as `utils.slang` are those that are directly `import`ed by user code. The implementation details of the module are placed in the lower levels of the tree.
+
+In this example, the `utils.slang` module needn't contain anything more than a module declaration and a list of included sub-modules, with optional `import` statement(s) to pull in any external dependencies, e.g.
+
+```
+module utils;
+import slangpy;
+
+__include "utils/accumlator.slang";
+__include "utils/tonemap.slang";
+__include "utils/fill.slang";
+```
+
+Here, all the symbols defined in `accumlator.slang`, `tonemap.slang`, and `fill.slang` are visible to the user of the `utils` module, and these helper modules do not need to clutter the top-level file hierarchy.
 
 ## Legacy Modules
 
