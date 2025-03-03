@@ -191,14 +191,14 @@ The Slang compiler enforces the following rules regarding access control:
 - Type definitions themselves cannot be `private`, for example, `private struct S {}` is not valid code.
 - `interface` requirements cannot be `private`.
 
-## Organizing Systems of Modules
+## Organizing File Structure of Modules
 
 Slang does not seek to impose any specific organization of modules. However, there are some conventions that have emerged as being useful.
 
 ### Module Organization Suggestions
 
-- Top-level modules are those that are `import`ed by user code.
-- The implementation details of the module are placed in the lower levels of the tree.
+- The top-level directory contains modules that would be `import`ed by user code.
+- The implementation details of the modules are placed in files at lower levels of the tree.
 
 This has the benefit that it is easy for a user to distinguish the public API from the implementation details.
 
@@ -210,9 +210,9 @@ This has the benefit that it is easy for a user to distinguish the public API fr
 
 The above diagram shows a module organization example.
 
-Top-level modules such as `utils.slang` are those that are directly `import`ed by user code. The implementation details of the module are placed in the lower levels of the tree.
+Top-level module files such as `utils.slang` are those that are directly `import`ed by user code. The implementation details of the module are placed in the lower levels of the tree, organized into similarly named subdirectories for clarity.
 
-In this example, the `utils.slang` module needn't contain anything more than a module declaration and a list of included sub-modules, with optional `import` statement(s) to pull in any external dependencies, e.g.
+Modules like `utils.slang` needn't contain anything more than a module declaration and a list of included files, with optional `import` statement(s) to pull in any external dependencies, e.g.
 
 ```
 module utils;
@@ -223,7 +223,7 @@ __include "utils/tonemap.slang";
 __include "utils/fill.slang";
 ```
 
-Here, all the symbols defined in `accumlator.slang`, `tonemap.slang`, and `fill.slang` are visible to the user of the `utils` module, and these helper modules do not need to clutter the top-level file hierarchy.
+Here, all the public symbols defined in `accumlator.slang`, `tonemap.slang`, and `fill.slang` are visible to the user of the `utils` module, and these constituent helper files do not need to clutter the top-level file hierarchy.
 
 ## Legacy Modules
 
