@@ -439,7 +439,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                     }
                 };
                 glsl << "if (isCombined == 0) { "
-                        "__requireGLSLExtension(\"GL_EXT_samplerless_texture_functions\"); }\n";
+                        "__requireTargetExtension(\"GL_EXT_samplerless_texture_functions\"); }\n";
                 glsl << "if (access == " << kCoreModule_ResourceAccessReadOnly
                      << ") __intrinsic_asm \"";
                 emitIntrinsic(toSlice("textureSize"), !isMultisample);

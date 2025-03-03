@@ -83,6 +83,7 @@ IRType* getMatrixElementType(IRType* type);
 
 // True if type is a resource backing memory
 bool isResourceType(IRType* type);
+bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType);
 
 // True if type is a pointer to a resource
 bool isPointerToResourceType(IRType* type);

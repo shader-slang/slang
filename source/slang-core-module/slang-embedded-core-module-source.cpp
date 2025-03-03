@@ -56,12 +56,6 @@ enum BaseTypeConversionRank : uint8_t
     kBaseTypeConversionRank_Int32,
     kBaseTypeConversionRank_IntPtr,
     kBaseTypeConversionRank_Int64,
-
-    // Packed type conversion ranks where the overall rank order does not apply.
-    // They must be explicitly casted to another type.
-    kBaseTypeConversionRank_Int8x4Packed,
-    kBaseTypeConversionRank_UInt8x4Packed,
-
     kBaseTypeConversionRank_Error,
 };
 
@@ -155,17 +149,6 @@ static const BaseTypeConversionInfo kBaseTypes[] = {
      UINT_MASK,
      kBaseTypeConversionKind_Unsigned,
      kBaseTypeConversionRank_IntPtr},
-
-    {"int8_t4_packed",
-     BaseType::Int8x4Packed,
-     0,
-     kBaseTypeConversionKind_Unsigned,
-     kBaseTypeConversionRank_Int8x4Packed},
-    {"uint8_t4_packed",
-     BaseType::UInt8x4Packed,
-     0,
-     kBaseTypeConversionKind_Unsigned,
-     kBaseTypeConversionRank_UInt8x4Packed},
 };
 
 void Session::finalizeSharedASTBuilder()
@@ -192,12 +175,6 @@ void Session::finalizeSharedASTBuilder()
         globalAstBuilder->getBuiltinType(baseType.tag);
 }
 
-static bool isConversionRankPackedType(BaseTypeConversionRank rank)
-{
-    return (rank == BaseTypeConversionRank::kBaseTypeConversionRank_Int8x4Packed) ||
-           (rank == BaseTypeConversionRank::kBaseTypeConversionRank_UInt8x4Packed);
-}
-
 // Given two base types, we need to be able to compute the cost of converting between them.
 ConversionCost getBaseTypeConversionCost(
     BaseTypeConversionInfo const& toInfo,
@@ -208,14 +185,6 @@ ConversionCost getBaseTypeConversionCost(
     {
         // Thse should represent the exact same type.
         return kConversionCost_None;
-    }
-
-    // Handle special case for packed types, where they must be explicitly casted to another type.
-    bool isToPackedType = isConversionRankPackedType(toInfo.conversionRank);
-    bool isFromPackedType = isConversionRankPackedType(fromInfo.conversionRank);
-    if (isToPackedType || isFromPackedType)
-    {
-        return kConversionCost_GeneralConversion;
     }
 
     // Conversions within the same kind are easist to handle

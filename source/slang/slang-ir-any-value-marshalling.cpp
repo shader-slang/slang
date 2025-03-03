@@ -153,8 +153,6 @@ struct AnyValueMarshallingContext
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
         case kIROp_PtrType:
-        case kIROp_Int8x4PackedType:
-        case kIROp_UInt8x4PackedType:
             context->marshalBasicType(builder, dataType, concreteTypedVar);
             break;
         case kIROp_VectorType:
@@ -311,8 +309,6 @@ struct AnyValueMarshallingContext
                     break;
                 }
             case kIROp_UIntType:
-            case kIROp_Int8x4PackedType:
-            case kIROp_UInt8x4PackedType:
 #if SLANG_PTR_IS_32
             case kIROp_UIntPtrType:
 #endif
@@ -560,8 +556,6 @@ struct AnyValueMarshallingContext
                     break;
                 }
             case kIROp_UIntType:
-            case kIROp_Int8x4PackedType:
-            case kIROp_UInt8x4PackedType:
                 {
                     ensureOffsetAt4ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
@@ -861,8 +855,6 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
     case kIROp_FloatType:
     case kIROp_UIntType:
     case kIROp_BoolType:
-    case kIROp_Int8x4PackedType:
-    case kIROp_UInt8x4PackedType:
         return alignUp(offset, 4) + 4;
     case kIROp_UInt64Type:
     case kIROp_Int64Type:

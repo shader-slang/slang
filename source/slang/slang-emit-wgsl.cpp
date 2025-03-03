@@ -511,10 +511,6 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_UIntPtrType:
         m_writer->emit("u64");
         return;
-    case kIROp_Int8x4PackedType:
-    case kIROp_UInt8x4PackedType:
-        m_writer->emit("u32");
-        return;
     case kIROp_StructType:
         m_writer->emit(getName(type));
         return;
@@ -967,8 +963,6 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                         return;
                     }
                 case BaseType::UInt:
-                case BaseType::Int8x4Packed:
-                case BaseType::UInt8x4Packed:
                     {
                         m_writer->emit("u32(");
                         m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
@@ -1694,6 +1688,11 @@ void WGSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
             }
         }
     }
+}
+
+void WGSLSourceEmitter::emitRequireExtension(IRRequireTargetExtension* inst)
+{
+    _requireExtension(inst->getExtensionName());
 }
 
 } // namespace Slang

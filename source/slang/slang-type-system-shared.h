@@ -22,8 +22,6 @@ namespace Slang
     X(Char)                  \
     X(IntPtr)                \
     X(UIntPtr)               \
-    X(Int8x4Packed)          \
-    X(UInt8x4Packed)         \
     /* end */
 
 enum class BaseType

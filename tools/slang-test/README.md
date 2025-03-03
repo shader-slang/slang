@@ -56,7 +56,25 @@ The different APIs are
 * DirectD3D11 -dx11,d3d11
 
 
-It may also be necessary to have the working directory the root directory of the slang distribution - in the example above this would be "E:\slang\". 
+It may also be necessary to have the working directory the root directory of the slang distribution - in the example above this would be "E:\slang\".
+
+## Unit tests
+
+In addition to the above test tools, there is also `slang-unit-test-tool`, which is invoked as in the following example.
+
+```
+slang-test slang-unit-test-tool/byteEncode
+```
+
+This will run the `byteEncode` test. The unit tests are located in the [tools/slang-unit-test](https://github.com/shader-slang/slang/tree/master/tools/slang-unit-test) directory, and defined with macros like `SLANG_UNIT_TEST(byteEncode)`.
+
+There are also graphics unit tests, which are run as follows:
+
+```
+slang-test gfx-unit-test-tool/precompiledTargetModule2Vulkan
+```
+
+This will run the `precompiledTargetModule2Vulkan` test. These tests are located in [tools/gfx-unit-test](https://github.com/shader-slang/slang/tree/master/tools/gfx-unit-test), and likewise defined using macros like `SLANG_UNIT_TEST(precompiledTargetModule2Vulkan)`.
 
 ## Test Categories
 
