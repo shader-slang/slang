@@ -1437,6 +1437,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         m_addressingMode = SpvAddressingModelPhysicalStorageBuffer64;
     }
 
+    bool shouldEmitArrayStride(IRInst* elementType)
+    {
+        if (isResourceType((IRType*)elementType))
+            return false;
+        for (auto decor : elementType->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_SPIRVBufferBlockDecoration:
+            case kIROp_SPIRVBlockDecoration:
+                return false;
+            }
+        }
+        return true;
+    }
+
     // Next, let's look at emitting some of the instructions
     // that can occur at global scope.
 
@@ -1680,8 +1696,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                 // Avoid validation error: Array containing a Block or BufferBlock must not be
                 // decorated with ArrayStride
-                if (!elementType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration) &&
-                    !elementType->findDecorationImpl(kIROp_SPIRVBlockDecoration))
+                if (shouldEmitArrayStride(elementType))
                 {
                     emitOpDecorateArrayStride(
                         getSection(SpvLogicalSectionID::Annotations),
