@@ -1694,8 +1694,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     stride = (int)sizeAndAlignment.getStride();
                 }
 
-                // Avoid validation error: Array containing a Block or BufferBlock must not be
-                // decorated with ArrayStride
+                // Avoid validation error: Arrays whose element type is a Block or BufferBlock,
+                // or an opaque resource must not be decorated with ArrayStride.
                 if (shouldEmitArrayStride(elementType))
                 {
                     emitOpDecorateArrayStride(
