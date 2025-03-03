@@ -2637,8 +2637,7 @@ void CodeGenContext::_dumpIntermediate(const ArtifactDesc& desc, void const* dat
 
 void CodeGenContext::maybeDumpIntermediate(IArtifact* artifact)
 {
-    if (!shouldDumpIntermediates())
-        return;
+
 
 
     _dumpIntermediateMaybeWithAssembly(artifact);
