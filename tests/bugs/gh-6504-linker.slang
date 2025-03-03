@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
+// CHECK: OpEntryPoint
+
 static extern const bool _AlphaTest = false;
 static extern const bool _BaseColorMap = false;
 static extern const bool _NormalMap = false;
