@@ -68,7 +68,9 @@ struct ExampleProgram : public TestBase
         }
 
         gGPUPrinting.loadStrings(linkedProgram->getLayout());
-
+        ComPtr<slang::IBlob> outCode;
+        SlangResult res = linkedProgram->getEntryPointCode(0, 0, outCode.writeRef());
+        std::string code((char*)outCode->getBufferPointer(), (char*)outCode->getBufferPointer() + outCode->getBufferSize());
         gfx::IShaderProgram::Desc programDesc = {};
         programDesc.slangGlobalScope = linkedProgram;
 

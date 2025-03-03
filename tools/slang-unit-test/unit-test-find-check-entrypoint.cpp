@@ -29,7 +29,7 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
     slang::TargetDesc targetDesc = {};
-    targetDesc.format = SLANG_SPIRV;
+    targetDesc.format = SLANG_CUDA_SOURCE;
     targetDesc.profile = globalSession->findProfile("spirv_1_5");
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
@@ -48,7 +48,7 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
     ComPtr<slang::IEntryPoint> entryPoint;
     module->findAndCheckEntryPoint(
         "fragMain",
-        SLANG_STAGE_FRAGMENT,
+        SLANG_STAGE_COMPUTE,
         entryPoint.writeRef(),
         diagnosticBlob.writeRef());
     SLANG_CHECK(entryPoint != nullptr);
@@ -70,4 +70,9 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
     linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnosticBlob.writeRef());
     SLANG_CHECK(code != nullptr);
     SLANG_CHECK(code->getBufferSize() != 0);
+
+	std::string codeString((char*)code->getBufferPointer(), (char*)code->getBufferPointer() + code->getBufferSize());
+
+	std::cout << codeString << std::endl;
+	
 }
