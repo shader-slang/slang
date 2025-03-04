@@ -3029,6 +3029,31 @@ void finalizeSpecialization(IRModule* module)
     }
 }
 
+// Returns true when "a" depends on "b".
+bool IsIRInstDependOn(IRInst *a, IRInst *b)
+{
+    if (a->getFullType() == b)
+        return true;
+
+    for (int i = 0; i < a->getOperandCount(); i++)
+    {
+        auto operand = a->getOperand(i);
+        if (operand == b)
+            return true;
+    }
+
+    if (auto wt = as<IRWitnessTable>(a))
+    {
+        for (auto entry : wt->getEntries())
+        {
+            if (entry->getRequirementKey() == b || entry->getSatisfyingVal() == b)
+                return true;
+        }
+    }
+
+    return false;
+}
+
 IRInst* specializeGenericImpl(
     IRGeneric* genericVal,
     IRSpecialize* specializeInst,
@@ -3098,47 +3123,56 @@ IRInst* specializeGenericImpl(
         //
         IRInstList<IRInst> ordinaryInsts = bb->getOrdinaryInsts();
 
-        // A block can have an IRWitnessTable that refers to an IRSpecialize in the same block. In
-        // this case, the IRSpecialize must be cloned before the cloning of the IRWitnessTable,
-        // because the operands are expected to be cloned prior to the cloning of the IRInst.
-        // 
-        // Similarly, there can be an IRWitnessTable that refers to antoehr IRWitnessTable in the
-        // same block.
-        // 
-        // In order to resolve the problem, we need to iterate the ordinary insts and change the
-        // order to resolve the dependencies.
+        // After IRWitnessTable became Hoistable, they are removed and insered back by
+        // `addHoistableInst()`. But when they are re-inserted, the order it appears in the block is
+        // changed. When IRWitnessTable refers to IRSpecialize, as an example, IRSpecialize must be
+        // cloned before the cloning of IRWitnessTable. It is because the operands are assumed to be
+        // cloned before the cloning of IRInst.
+        //
+        // We need to resolve the dependency problem by changing the order of them.
         //
         List<IRInst*> insts;
         int instCount = 0;
-        for (IRInst* oi : ordinaryInsts)
+        for (IRInst* ii : ordinaryInsts)
         {
-            SLANG_UNUSED(oi);
+            SLANG_UNUSED(ii);
             instCount++;
         }
         insts.reserve(instCount);
 
-        for (IRInst* oi : ordinaryInsts)
+        // First, add all instructions in their original order
+        for (IRInst* ii : ordinaryInsts)
         {
-            int whereToAdd = 0;
-            for (; whereToAdd < insts.getCount(); whereToAdd++)
-            {
-                IRInst* sibling = insts[whereToAdd];
+            insts.add(ii);
+        }
 
-                // Figure out if there are dependencies.
-                if (auto wtSibling = as<IRWitnessTable>(sibling))
+        // We'll need multiple passes to handle complex dependency chains
+        bool madeChanges = true;
+        while (madeChanges)
+        {
+            madeChanges = false;
+
+            for (int i = 0; i < instCount; i++)
+            {
+                IRInst* current = insts[i];
+
+                // Find all instructions that `current` depends on
+                for (int j = i + 1; j < instCount; j++)
                 {
-                    for (auto entry : wtSibling->getEntries())
+                    IRInst* later = insts[j];
+
+                    if (IsIRInstDependOn(current, later))
                     {
-                        if (entry->getRequirementKey() == oi || entry->getSatisfyingVal() == oi)
-                        {
-                            goto dependencyFound;
-                        }
+                        // `current` depends on `later`, so `later` must come before `current`.
+                        insts.removeAt(j);
+                        insts.insert(i, later);
+
+                        // mark the change, and continue to the next.
+                        madeChanges = true;
+                        i++;
                     }
                 }
             }
-
-        dependencyFound:
-            insts.insert(whereToAdd, oi);
         }
 
         for (auto ii : insts)
