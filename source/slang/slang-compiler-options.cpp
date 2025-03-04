@@ -347,7 +347,7 @@ void CompilerOptionSet::serialize(SerializedOptionsData* outData)
             outData->stringPool.add(val.stringValue);
             entry.value.stringValue0 = val.stringValue.getBuffer();
             outData->stringPool.add(val.stringValue2);
-            entry.value.stringValue1 = val.stringValue.getBuffer();
+            entry.value.stringValue1 = val.stringValue2.getBuffer();
             outData->entries.add(entry);
         }
     }
