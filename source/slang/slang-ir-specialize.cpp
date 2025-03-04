@@ -3096,7 +3096,52 @@ IRInst* specializeGenericImpl(
         // instructions only, because parameters were dealt
         // with explictly at an earlier point.
         //
-        for (auto ii : bb->getOrdinaryInsts())
+        IRInstList<IRInst> ordinaryInsts = bb->getOrdinaryInsts();
+
+        // A block can have an IRWitnessTable that refers to an IRSpecialize in the same block. In
+        // this case, the IRSpecialize must be cloned before the cloning of the IRWitnessTable,
+        // because the operands are expected to be cloned prior to the cloning of the IRInst.
+        // 
+        // Similarly, there can be an IRWitnessTable that refers to antoehr IRWitnessTable in the
+        // same block.
+        // 
+        // In order to resolve the problem, we need to iterate the ordinary insts and change the
+        // order to resolve the dependencies.
+        //
+        List<IRInst*> insts;
+        int instCount = 0;
+        for (IRInst* oi : ordinaryInsts)
+        {
+            SLANG_UNUSED(oi);
+            instCount++;
+        }
+        insts.reserve(instCount);
+
+        for (IRInst* oi : ordinaryInsts)
+        {
+            int whereToAdd = 0;
+            for (; whereToAdd < insts.getCount(); whereToAdd++)
+            {
+                IRInst* sibling = insts[whereToAdd];
+
+                // Figure out if there are dependencies.
+                if (auto wtSibling = as<IRWitnessTable>(sibling))
+                {
+                    for (auto entry : wtSibling->getEntries())
+                    {
+                        if (entry->getRequirementKey() == oi || entry->getSatisfyingVal() == oi)
+                        {
+                            goto dependencyFound;
+                        }
+                    }
+                }
+            }
+
+        dependencyFound:
+            insts.insert(whereToAdd, oi);
+        }
+
+        for (auto ii : insts)
         {
             // The last block of the generic is expected to end with
             // a `return` instruction for the specialized value that
