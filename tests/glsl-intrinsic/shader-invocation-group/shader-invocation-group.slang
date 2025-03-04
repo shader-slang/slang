@@ -34,6 +34,8 @@ bool testAllInvocationsEqual()
         && allInvocationsEqual(gl_GlobalInvocationID.x == 0) == false
         ;
 }
+
+[shader("compute")]
 void computeMain()
 {
     outputBuffer.data[0] = true
