@@ -3214,7 +3214,8 @@ void collectParameterLists(
         // For now we will rely on a follow up pass to remove unnecessary temporary variables if
         // we can determine that they are never actually writtten to by the user.
         //
-        bool lowerVaryingInputAsConstRef = declRef.getDecl()->hasModifier<EntryPointAttribute>();
+        bool lowerVaryingInputAsConstRef = declRef.getDecl()->hasModifier<EntryPointAttribute>() ||
+                                           declRef.getDecl()->hasModifier<NumThreadsAttribute>();
 
         // Don't collect parameters from the outer scope if
         // we are in a `static` context.
