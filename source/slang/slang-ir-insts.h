@@ -3790,7 +3790,11 @@ public:
     /// Get a 'SPIRV literal'
     IRSPIRVLiteralType* getSPIRVLiteralType(IRType* type);
 
-    IRArrayTypeBase* getArrayTypeBase(IROp op, IRType* elementType, IRInst* elementCount);
+    IRArrayTypeBase* getArrayTypeBase(
+        IROp op,
+        IRType* elementType,
+        IRInst* elementCount,
+        IRInst* stride = nullptr);
 
     IRArrayType* getArrayType(IRType* elementType, IRInst* elementCount);
 

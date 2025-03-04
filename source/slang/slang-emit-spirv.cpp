@@ -4940,6 +4940,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    bool isPhysicalCompositeType(IRType* type)
+    {
+        for (auto decor : type->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_PhysicalTypeDecoration:
+            case kIROp_SPIRVBlockDecoration:
+            case kIROp_SPIRVBufferBlockDecoration:
+                return true;
+            }
+        }
+        return false;
+    }
+
     void emitLayoutDecorations(IRStructType* structType, SpvWord spvStructID)
     {
         /*****
@@ -4968,7 +4983,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             layoutRuleName = layout->getLayoutName();
         }
         int32_t id = 0;
-        bool isPhysicalType = structType->findDecoration<IRPhysicalTypeDecoration>();
+        bool isPhysicalType = isPhysicalCompositeType(structType);
         for (auto field : structType->getFields())
         {
             for (auto decor : field->getKey()->getDecorations())

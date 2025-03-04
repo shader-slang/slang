@@ -2925,10 +2925,22 @@ IRComPtrType* IRBuilder::getComPtrType(IRType* valueType)
     return (IRComPtrType*)getType(kIROp_ComPtrType, valueType);
 }
 
-IRArrayTypeBase* IRBuilder::getArrayTypeBase(IROp op, IRType* elementType, IRInst* elementCount)
+IRArrayTypeBase* IRBuilder::getArrayTypeBase(
+    IROp op,
+    IRType* elementType,
+    IRInst* elementCount,
+    IRInst* stride)
 {
-    IRInst* operands[] = {elementType, elementCount};
-    return (IRArrayTypeBase*)getType(op, op == kIROp_ArrayType ? 2 : 1, operands);
+    if (op == kIROp_ArrayType)
+    {
+        IRInst* operands[] = {elementType, elementCount, stride};
+        return (IRArrayTypeBase*)getType(op, stride ? 3 : 2, operands);
+    }
+    else
+    {
+        IRInst* operands[] = {elementType, stride};
+        return (IRArrayTypeBase*)getType(op, stride ? 2 : 1, operands);
+    }
 }
 
 IRArrayType* IRBuilder::getArrayType(IRType* elementType, IRInst* elementCount)
