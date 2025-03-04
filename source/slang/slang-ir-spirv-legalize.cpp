@@ -132,6 +132,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             inst->getElementType(),
             builder.getIntValue(builder.getIntType(), elementSize.getStride()));
         const auto structType = builder.createStructType();
+        builder.addPhysicalTypeDecoration(structType);
         const auto arrayKey = builder.createStructKey();
         builder.createStructField(structType, arrayKey, arrayType);
         IRSizeAndAlignment structSize;
@@ -213,6 +214,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         IRBuilder builder(cbParamInst);
         builder.setInsertBefore(cbParamInst);
         auto structType = builder.createStructType();
+        builder.addPhysicalTypeDecoration(structType);
         addToWorkList(structType);
         StringBuilder sb;
         sb << "cbuffer_";

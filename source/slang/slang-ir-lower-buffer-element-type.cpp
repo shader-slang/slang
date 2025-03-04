@@ -451,6 +451,8 @@ struct LoweredElementTypeContext
             }
 
             auto loweredType = builder.createStructType();
+            builder.addPhysicalTypeDecoration(loweredType);
+
             StringBuilder nameSB;
             bool isColMajor =
                 getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
@@ -551,7 +553,7 @@ struct LoweredElementTypeContext
             // For spirv backend, we always want to lower all array types for non-varying
             // parameters, even if the element type comes out the same. This is because different
             // layout rules may have different array stride requirements.
-            if (!target->shouldEmitSPIRVDirectly() || config.addressSpace == AddressSpace::Input)
+            if (!target->shouldEmitSPIRVDirectly())
             {
                 if (!loweredInnerTypeInfo.convertLoweredToOriginal)
                 {
@@ -561,6 +563,8 @@ struct LoweredElementTypeContext
             }
 
             auto loweredType = builder.createStructType();
+            builder.addPhysicalTypeDecoration(loweredType);
+
             info.loweredType = loweredType;
             StringBuilder nameSB;
             nameSB << "_Array_" << getLayoutName(config.layoutRule->ruleName) << "_";
@@ -625,6 +629,8 @@ struct LoweredElementTypeContext
                 }
             }
             auto loweredType = builder.createStructType();
+            builder.addPhysicalTypeDecoration(loweredType);
+
             StringBuilder nameSB;
             getTypeNameHint(nameSB, type);
             nameSB << "_" << getLayoutName(config.layoutRule->ruleName);

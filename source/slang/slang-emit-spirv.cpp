@@ -1439,8 +1439,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     bool shouldEmitArrayStride(IRInst* elementType)
     {
-        if (isResourceType((IRType*)elementType))
-            return false;
         for (auto decor : elementType->getDecorations())
         {
             switch (decor->getOp())
@@ -1670,41 +1668,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_ArrayType:
         case kIROp_UnsizedArrayType:
             {
-                const auto elementType = static_cast<IRArrayTypeBase*>(inst)->getElementType();
+                auto irArrayType = static_cast<IRArrayTypeBase*>(inst);
+                const auto elementType = irArrayType->getElementType();
                 const auto arrayType =
                     inst->getOp() == kIROp_ArrayType
-                        ? emitOpTypeArray(
-                              inst,
-                              elementType,
-                              static_cast<IRArrayTypeBase*>(inst)->getElementCount())
+                        ? emitOpTypeArray(inst, elementType, irArrayType->getElementCount())
                         : emitOpTypeRuntimeArray(inst, elementType);
-                auto strideInst = as<IRArrayTypeBase>(inst)->getArrayStride();
-                int stride = 0;
-                if (strideInst)
+                auto strideInst = irArrayType->getArrayStride();
+                if (strideInst && shouldEmitArrayStride(irArrayType->getElementType()))
                 {
-                    stride = (int)getIntVal(strideInst);
-                }
-                else
-                {
-                    IRSizeAndAlignment sizeAndAlignment;
-                    getNaturalSizeAndAlignment(
-                        m_targetProgram->getOptionSet(),
-                        elementType,
-                        &sizeAndAlignment);
-                    stride = (int)sizeAndAlignment.getStride();
-                }
-
-                // Avoid validation error: Arrays whose element type is a Block or BufferBlock,
-                // or an opaque resource must not be decorated with ArrayStride.
-                if (shouldEmitArrayStride(elementType))
-                {
+                    int stride = (int)getIntVal(strideInst);
                     emitOpDecorateArrayStride(
                         getSection(SpvLogicalSectionID::Annotations),
                         nullptr,
                         arrayType,
                         SpvLiteralInteger::from32(stride));
                 }
-
                 return arrayType;
             }
         case kIROp_AtomicType:
@@ -4989,6 +4968,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             layoutRuleName = layout->getLayoutName();
         }
         int32_t id = 0;
+        bool isPhysicalType = structType->findDecoration<IRPhysicalTypeDecoration>();
         for (auto field : structType->getFields())
         {
             for (auto decor : field->getKey()->getDecorations())
@@ -5069,6 +5049,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
             }
 
+            if (!isPhysicalType)
+                continue;
+
+            // Emit explicit struct field layout decorations if the struct is physical.
             IRIntegerValue offset = 0;
             if (auto offsetDecor = field->getKey()->findDecoration<IRPackOffsetDecoration>())
             {
@@ -5099,8 +5083,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             if (matrixType)
             {
                 // SPIRV sepc on MatrixStride:
-                // Applies only to a member of a structure type.Only valid on a
-                // matrix or array whose most basic element is a matrix.Matrix
+                // Applies only to a member of a structure type. Only valid on a
+                // matrix or array whose most basic element is a matrix. Matrix
                 // Stride is an unsigned 32 - bit integer specifying the stride
                 // of the rows in a RowMajor - decorated matrix or columns in a
                 // ColMajor - decorated matrix.

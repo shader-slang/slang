@@ -879,6 +879,8 @@ IR_SIMPLE_DECORATION(ForceInlineDecoration)
 
 IR_SIMPLE_DECORATION(ForceUnrollDecoration)
 
+IR_SIMPLE_DECORATION(PhysicalTypeDecoration)
+
 struct IRSizeAndAlignmentDecoration : IRDecoration
 {
     IR_LEAF_ISA(SizeAndAlignmentDecoration)
@@ -4725,6 +4727,10 @@ public:
     IRVarLayout* getVarLayout(List<IRInst*> const& operands);
     IREntryPointLayout* getEntryPointLayout(IRVarLayout* paramsLayout, IRVarLayout* resultLayout);
 
+    void addPhysicalTypeDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_PhysicalTypeDecoration);
+    }
 
     void addNameHintDecoration(IRInst* value, IRStringLit* name)
     {

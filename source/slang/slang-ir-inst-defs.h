@@ -812,6 +812,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(InterpolationModeDecoration,       interpolationMode,      1, 0)
     INST(NameHintDecoration,                nameHint,               1, 0)
 
+    INST(PhysicalTypeDecoration,            PhysicalType,           1, 0)
+
     // Marks a type as being used as binary interface (e.g. shader parameters).
     // This prevents the legalizeEmptyType() pass from eliminating it on C++/CUDA targets.
     INST(BinaryInterfaceTypeDecoration,     BinaryInterfaceType, 0, 0)
