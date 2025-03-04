@@ -46,6 +46,7 @@ struct VertexStageOutput
 	float4			sv_position		: SV_Position;
 };
 
+[shader("vertex")]
 VertexStageOutput vertexMain(VertexStageInput input)
 {
 	VertexStageOutput output;
@@ -71,6 +72,7 @@ struct FragmentStageOutput
 	Fragment fragment	: SV_Target;
 };
 
+[shader("fragment")]
 FragmentStageOutput fragmentMain(FragmentStageInput input)
 {
 	FragmentStageOutput output;
