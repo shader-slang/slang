@@ -3029,6 +3029,31 @@ void finalizeSpecialization(IRModule* module)
     }
 }
 
+// Returns true when "a" depends on "b".
+bool IsIRInstDependOn(IRInst *a, IRInst *b)
+{
+    if (a->getFullType() == b)
+        return true;
+
+    for (int i = 0; i < a->getOperandCount(); i++)
+    {
+        auto operand = a->getOperand(i);
+        if (operand == b)
+            return true;
+    }
+
+    if (auto wt = as<IRWitnessTable>(a))
+    {
+        for (auto entry : wt->getEntries())
+        {
+            if (entry->getRequirementKey() == b || entry->getSatisfyingVal() == b)
+                return true;
+        }
+    }
+
+    return false;
+}
+
 IRInst* specializeGenericImpl(
     IRGeneric* genericVal,
     IRSpecialize* specializeInst,
@@ -3096,7 +3121,61 @@ IRInst* specializeGenericImpl(
         // instructions only, because parameters were dealt
         // with explictly at an earlier point.
         //
-        for (auto ii : bb->getOrdinaryInsts())
+        IRInstList<IRInst> ordinaryInsts = bb->getOrdinaryInsts();
+
+        // After IRWitnessTable became Hoistable, they are removed and insered back by
+        // `addHoistableInst()`. But when they are re-inserted, the order it appears in the block is
+        // changed. When IRWitnessTable refers to IRSpecialize, as an example, IRSpecialize must be
+        // cloned before the cloning of IRWitnessTable. It is because the operands are assumed to be
+        // cloned before the cloning of IRInst.
+        //
+        // We need to resolve the dependency problem by changing the order of them.
+        //
+        List<IRInst*> insts;
+        int instCount = 0;
+        for (IRInst* ii : ordinaryInsts)
+        {
+            SLANG_UNUSED(ii);
+            instCount++;
+        }
+        insts.reserve(instCount);
+
+        // First, add all instructions in their original order
+        for (IRInst* ii : ordinaryInsts)
+        {
+            insts.add(ii);
+        }
+
+        // We'll need multiple passes to handle complex dependency chains
+        bool madeChanges = true;
+        while (madeChanges)
+        {
+            madeChanges = false;
+
+            for (int i = 0; i < instCount; i++)
+            {
+                IRInst* current = insts[i];
+
+                // Find all instructions that `current` depends on
+                for (int j = i + 1; j < instCount; j++)
+                {
+                    IRInst* later = insts[j];
+
+                    if (IsIRInstDependOn(current, later))
+                    {
+                        // `current` depends on `later`, so `later` must come before `current`.
+                        insts.removeAt(j);
+                        insts.insert(i, later);
+
+                        // mark the change, and continue to the next.
+                        madeChanges = true;
+                        i++;
+                    }
+                }
+            }
+        }
+
+        for (auto ii : insts)
         {
             // The last block of the generic is expected to end with
             // a `return` instruction for the specialized value that

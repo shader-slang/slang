@@ -3177,14 +3177,27 @@ struct AutoDiffPass : public InstPassBase
                 List<IRInst*> args;
                 for (auto param : genType->getParams())
                     args.add(param);
-                as<IRWitnessTable>(innerResult.diffWitness)
-                    ->setConcreteType((IRType*)builder.emitSpecializeInst(
-                        builder.getTypeKind(),
-                        originalType,
-                        (UInt)args.getCount(),
-                        args.getBuffer()));
+
+                auto concreteType = as<IRType>(builder.emitSpecializeInst(
+                    builder.getTypeKind(),
+                    originalType,
+                    (UInt)args.getCount(),
+                    args.getBuffer()));
+
+                auto witnessTableType = innerResult.diffWitness->getFullType();
+                auto newWitnessTable = builder.createWitnessTable(witnessTableType, concreteType);
+
+                // Copy all entries from the old witness table to the new one
+                for (auto entry : as<IRWitnessTable>(innerResult.diffWitness)->getEntries())
+                {
+                    builder.createWitnessTableEntry(
+                        newWitnessTable,
+                        entry->getRequirementKey(),
+                        entry->getSatisfyingVal());
+                }
+
                 result.diffWitness =
-                    hoistValueFromGeneric(builder, innerResult.diffWitness, specInst, true);
+                    hoistValueFromGeneric(builder, newWitnessTable, specInst, true);
             }
             return result;
         }
