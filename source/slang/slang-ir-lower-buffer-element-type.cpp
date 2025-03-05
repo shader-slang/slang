@@ -451,6 +451,8 @@ struct LoweredElementTypeContext
             }
 
             auto loweredType = builder.createStructType();
+            builder.addPhysicalTypeDecoration(loweredType);
+
             StringBuilder nameSB;
             bool isColMajor =
                 getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR;
@@ -499,9 +501,9 @@ struct LoweredElementTypeContext
                 createMatrixPackFunc(matrixType, loweredType, vectorType, arrayType);
             return info;
         }
-        else if (auto arrayType = as<IRArrayType>(type))
+        else if (auto arrayTypeBase = as<IRArrayTypeBase>(type))
         {
-            auto loweredInnerTypeInfo = getLoweredTypeInfo(arrayType->getElementType(), config);
+            auto loweredInnerTypeInfo = getLoweredTypeInfo(arrayTypeBase->getElementType(), config);
 
             if (config.layoutRule->ruleName == IRTypeLayoutRuleName::Std140 &&
                 options.use16ByteArrayElementForConstantBuffer)
@@ -560,42 +562,66 @@ struct LoweredElementTypeContext
                 }
             }
 
-            auto loweredType = builder.createStructType();
-            info.loweredType = loweredType;
-            StringBuilder nameSB;
-            nameSB << "_Array_" << getLayoutName(config.layoutRule->ruleName) << "_";
-            getTypeNameHint(nameSB, arrayType->getElementType());
-            nameSB << getIntVal(arrayType->getElementCount());
-            builder.addNameHintDecoration(loweredType, nameSB.produceString().getUnownedSlice());
-            auto structKey = builder.createStructKey();
-            builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
-            IRSizeAndAlignment elementSizeAlignment;
-            getSizeAndAlignment(
-                target->getOptionSet(),
-                config.layoutRule,
-                loweredInnerTypeInfo.loweredType,
-                &elementSizeAlignment);
-            elementSizeAlignment = config.layoutRule->alignCompositeElement(elementSizeAlignment);
-            auto innerArrayType = builder.getArrayType(
-                loweredInnerTypeInfo.loweredType,
-                arrayType->getElementCount(),
-                builder.getIntValue(builder.getIntType(), elementSizeAlignment.getStride()));
-            builder.createStructField(loweredType, structKey, innerArrayType);
-            info.loweredInnerArrayType = innerArrayType;
-            info.loweredInnerStructKey = structKey;
-            info.convertLoweredToOriginal = createArrayUnpackFunc(
-                arrayType,
-                loweredType,
-                structKey,
-                innerArrayType,
-                loweredInnerTypeInfo);
-            info.convertOriginalToLowered =
-                createArrayPackFunc(arrayType, loweredType, innerArrayType, loweredInnerTypeInfo);
-            return info;
-        }
-        else if (as<IRArrayTypeBase>(type))
-        {
-            info.loweredType = builder.getVoidType();
+            auto arrayType = as<IRArrayType>(arrayTypeBase);
+            if (arrayType)
+            {
+                auto loweredType = builder.createStructType();
+                builder.addPhysicalTypeDecoration(loweredType);
+
+                info.loweredType = loweredType;
+                StringBuilder nameSB;
+                nameSB << "_Array_" << getLayoutName(config.layoutRule->ruleName) << "_";
+                getTypeNameHint(nameSB, arrayType->getElementType());
+                nameSB << getIntVal(arrayType->getElementCount());
+                builder.addNameHintDecoration(
+                    loweredType,
+                    nameSB.produceString().getUnownedSlice());
+                auto structKey = builder.createStructKey();
+                builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
+                IRSizeAndAlignment elementSizeAlignment;
+                getSizeAndAlignment(
+                    target->getOptionSet(),
+                    config.layoutRule,
+                    loweredInnerTypeInfo.loweredType,
+                    &elementSizeAlignment);
+                elementSizeAlignment =
+                    config.layoutRule->alignCompositeElement(elementSizeAlignment);
+                auto innerArrayType = builder.getArrayType(
+                    loweredInnerTypeInfo.loweredType,
+                    arrayType->getElementCount(),
+                    builder.getIntValue(builder.getIntType(), elementSizeAlignment.getStride()));
+                builder.createStructField(loweredType, structKey, innerArrayType);
+                info.loweredInnerArrayType = innerArrayType;
+                info.loweredInnerStructKey = structKey;
+                info.convertLoweredToOriginal = createArrayUnpackFunc(
+                    arrayType,
+                    loweredType,
+                    structKey,
+                    innerArrayType,
+                    loweredInnerTypeInfo);
+                info.convertOriginalToLowered = createArrayPackFunc(
+                    arrayType,
+                    loweredType,
+                    innerArrayType,
+                    loweredInnerTypeInfo);
+            }
+            else
+            {
+                IRSizeAndAlignment elementSizeAlignment;
+                getSizeAndAlignment(
+                    target->getOptionSet(),
+                    config.layoutRule,
+                    loweredInnerTypeInfo.loweredType,
+                    &elementSizeAlignment);
+                elementSizeAlignment =
+                    config.layoutRule->alignCompositeElement(elementSizeAlignment);
+                auto innerArrayType = builder.getArrayTypeBase(
+                    arrayTypeBase->getOp(),
+                    loweredInnerTypeInfo.loweredType,
+                    nullptr,
+                    builder.getIntValue(builder.getIntType(), elementSizeAlignment.getStride()));
+                info.loweredType = innerArrayType;
+            }
             return info;
         }
         else if (auto structType = as<IRStructType>(type))
@@ -625,6 +651,8 @@ struct LoweredElementTypeContext
                 }
             }
             auto loweredType = builder.createStructType();
+            builder.addPhysicalTypeDecoration(loweredType);
+
             StringBuilder nameSB;
             getTypeNameHint(nameSB, type);
             nameSB << "_" << getLayoutName(config.layoutRule->ruleName);
@@ -635,12 +663,14 @@ struct LoweredElementTypeContext
                 Index fieldId = 0;
                 for (auto field : structType->getFields())
                 {
-                    if (as<IRVoidType>(fieldLoweredTypeInfo[fieldId].loweredType))
+                    auto loweredFieldTypeInfo = fieldLoweredTypeInfo[fieldId];
+                    // When lowering type for user pointer, skip fields that are unsized array.
+                    if (config.addressSpace == AddressSpace::UserPointer &&
+                        as<IRUnsizedArrayType>(loweredFieldTypeInfo.loweredType))
                     {
                         fieldId++;
                         continue;
                     }
-                    auto loweredFieldTypeInfo = fieldLoweredTypeInfo[fieldId];
                     builder.createStructField(
                         loweredType,
                         field->getKey(),
@@ -828,7 +858,8 @@ struct LoweredElementTypeContext
     IRType* getLoweredPtrLikeType(IRType* originalPtrLikeType, IRType* newElementType)
     {
         if (as<IRPointerLikeType>(originalPtrLikeType) || as<IRPtrTypeBase>(originalPtrLikeType) ||
-            as<IRHLSLStructuredBufferTypeBase>(originalPtrLikeType))
+            as<IRHLSLStructuredBufferTypeBase>(originalPtrLikeType) ||
+            as<IRGLSLShaderStorageBufferType>(originalPtrLikeType))
         {
             IRBuilder builder(newElementType);
             builder.setInsertAfter(newElementType);
@@ -891,6 +922,8 @@ struct LoweredElementTypeContext
                 elementType = structBuffer->getElementType();
             else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
                 elementType = constBuffer->getElementType();
+            else if (auto storageBuffer = as<IRGLSLShaderStorageBufferType>(globalInst))
+                elementType = storageBuffer->getElementType();
             if (as<IRTextureBufferType>(globalInst))
                 continue;
             if (!as<IRStructType>(elementType) && !as<IRMatrixType>(elementType) &&
@@ -954,8 +987,13 @@ struct LoweredElementTypeContext
                 // getOffsetPtr(trailingPtr, index).
                 if (auto fieldAddr = as<IRFieldAddress>(ptrVal))
                 {
-                    if (auto ptrType = as<IRPtrType>(ptrVal->getDataType()))
+                    auto handleUnsizedArrayAccess = [&]() -> bool
                     {
+                        auto ptrType = as<IRPtrType>(ptrVal->getDataType());
+                        if (!ptrType)
+                            return false;
+                        if (ptrType->getAddressSpace() != AddressSpace::UserPointer)
+                            return false;
                         if (auto unsizedArrayType = as<IRUnsizedArrayType>(ptrType->getValueType()))
                         {
                             builder.setInsertBefore(ptrVal);
@@ -1019,9 +1057,12 @@ struct LoweredElementTypeContext
                                 });
                             SLANG_ASSERT(!ptrVal->hasUses());
                             ptrVal->removeAndDeallocate();
-                            continue;
+                            return true;
                         }
-                    }
+                        return false;
+                    };
+                    if (handleUnsizedArrayAccess())
+                        continue;
                 }
 
                 LoweredElementTypeInfo loweredElementTypeInfo = {};
@@ -1060,7 +1101,7 @@ struct LoweredElementTypeContext
                         getLoweredTypeInfo((IRType*)originalElementType, config);
                 }
 
-                if (!loweredElementTypeInfo.convertLoweredToOriginal)
+                if (loweredElementTypeInfo.loweredType == loweredElementTypeInfo.originalType)
                     continue;
 
                 ptrVal->setFullType(getLoweredPtrLikeType(
@@ -1355,6 +1396,21 @@ void lowerBufferElementTypeToStorageType(
     context.processModule(module);
 }
 
+IRTypeLayoutRules* getTypeLayoutRulesFromOp(IROp layoutTypeOp, IRTypeLayoutRules* defaultLayout)
+{
+    switch (layoutTypeOp)
+    {
+    case kIROp_DefaultBufferLayoutType:
+        return defaultLayout;
+    case kIROp_Std140BufferLayoutType:
+        return IRTypeLayoutRules::getStd140();
+    case kIROp_Std430BufferLayoutType:
+        return IRTypeLayoutRules::getStd430();
+    case kIROp_ScalarBufferLayoutType:
+        return IRTypeLayoutRules::getNatural();
+    }
+    return defaultLayout;
+}
 
 IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* bufferType)
 {
@@ -1395,18 +1451,7 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
             auto layoutTypeOp = structBufferType->getDataLayout()
                                     ? structBufferType->getDataLayout()->getOp()
                                     : kIROp_DefaultBufferLayoutType;
-            switch (layoutTypeOp)
-            {
-            case kIROp_DefaultBufferLayoutType:
-                return IRTypeLayoutRules::getStd430();
-            case kIROp_Std140BufferLayoutType:
-                return IRTypeLayoutRules::getStd140();
-            case kIROp_Std430BufferLayoutType:
-                return IRTypeLayoutRules::getStd430();
-            case kIROp_ScalarBufferLayoutType:
-                return IRTypeLayoutRules::getNatural();
-            }
-            return IRTypeLayoutRules::getStd430();
+            return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRules::getStd430());
         }
     case kIROp_ConstantBufferType:
     case kIROp_ParameterBlockType:
@@ -1416,18 +1461,15 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
             auto layoutTypeOp = parameterGroupType->getDataLayout()
                                     ? parameterGroupType->getDataLayout()->getOp()
                                     : kIROp_DefaultBufferLayoutType;
-            switch (layoutTypeOp)
-            {
-            case kIROp_DefaultBufferLayoutType:
-                return IRTypeLayoutRules::getStd140();
-            case kIROp_Std140BufferLayoutType:
-                return IRTypeLayoutRules::getStd140();
-            case kIROp_Std430BufferLayoutType:
-                return IRTypeLayoutRules::getStd430();
-            case kIROp_ScalarBufferLayoutType:
-                return IRTypeLayoutRules::getNatural();
-            }
-            return IRTypeLayoutRules::getStd140();
+            return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRules::getStd140());
+        }
+    case kIROp_GLSLShaderStorageBufferType:
+        {
+            auto storageBufferType = as<IRGLSLShaderStorageBufferType>(bufferType);
+            auto layoutTypeOp = storageBufferType->getDataLayout()
+                                    ? storageBufferType->getDataLayout()->getOp()
+                                    : kIROp_Std430BufferLayoutType;
+            return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRules::getStd430());
         }
     case kIROp_PtrType:
         return IRTypeLayoutRules::getNatural();
@@ -1445,6 +1487,9 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
         case AddressSpace::Input:
         case AddressSpace::Output:
             addrSpace = AddressSpace::Input;
+            break;
+        case AddressSpace::UserPointer:
+            addrSpace = AddressSpace::UserPointer;
             break;
         }
     }

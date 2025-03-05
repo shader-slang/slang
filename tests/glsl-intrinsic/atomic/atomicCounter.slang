@@ -48,7 +48,7 @@ bool counterAsParam(atomic_uint param)
 bool testAtomicUint()
 {
 // ensure the code emits for `one` index into [3] for 12/4
-// CHECK_GLSL-DAG: {{.*}}_data_0[3]{{.*}}
+// CHECK_GLSL-DAG: {{.*}}_data_{{.*}}[3]{{.*}}
     return true
     
         && atomicCounterExchange(one, 5) != 100

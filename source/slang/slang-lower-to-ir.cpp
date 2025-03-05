@@ -870,8 +870,15 @@ LoweredValInfo emitCallToDeclRef(
             return LoweredValInfo::simple(args[0]);
         }
         auto intrinsicOp = getIntrinsicOp(funcDecl, intrinsicOpModifier);
-        return LoweredValInfo::simple(
-            builder->emitIntrinsicInst(type, IROp(intrinsicOp), argCount, args));
+        switch (IROp(intrinsicOp))
+        {
+        case kIROp_GetOffsetPtr:
+            SLANG_ASSERT(argCount == 2);
+            return LoweredValInfo::simple(builder->emitGetOffsetPtr(args[0], args[1]));
+        default:
+            return LoweredValInfo::simple(
+                builder->emitIntrinsicInst(type, IROp(intrinsicOp), argCount, args));
+        }
     }
 
     // Fallback case is to emit an actual call.
