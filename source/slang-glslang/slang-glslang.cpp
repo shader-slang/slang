@@ -1037,7 +1037,7 @@ extern "C"
             request->linkResultSize = linkedBinary.size();
         }
 
-        return success;
+        return success == SPV_SUCCESS;
     }
     catch (...)
     {
