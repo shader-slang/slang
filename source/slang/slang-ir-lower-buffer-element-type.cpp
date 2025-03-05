@@ -1396,12 +1396,12 @@ void lowerBufferElementTypeToStorageType(
     context.processModule(module);
 }
 
-IRTypeLayoutRules* getTypeLayoutRulesFromOp(IROp layoutTypeOp)
+IRTypeLayoutRules* getTypeLayoutRulesFromOp(IROp layoutTypeOp, IRTypeLayoutRules* defaultLayout)
 {
     switch (layoutTypeOp)
     {
     case kIROp_DefaultBufferLayoutType:
-        return IRTypeLayoutRules::getStd430();
+        return defaultLayout;
     case kIROp_Std140BufferLayoutType:
         return IRTypeLayoutRules::getStd140();
     case kIROp_Std430BufferLayoutType:
@@ -1409,7 +1409,7 @@ IRTypeLayoutRules* getTypeLayoutRulesFromOp(IROp layoutTypeOp)
     case kIROp_ScalarBufferLayoutType:
         return IRTypeLayoutRules::getNatural();
     }
-    return nullptr;
+    return defaultLayout;
 }
 
 IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* bufferType)
@@ -1451,9 +1451,7 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
             auto layoutTypeOp = structBufferType->getDataLayout()
                                     ? structBufferType->getDataLayout()->getOp()
                                     : kIROp_DefaultBufferLayoutType;
-            if (auto layout = getTypeLayoutRulesFromOp(layoutTypeOp))
-                return layout;
-            return IRTypeLayoutRules::getStd430();
+            return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRules::getStd430());
         }
     case kIROp_ConstantBufferType:
     case kIROp_ParameterBlockType:
@@ -1463,9 +1461,7 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
             auto layoutTypeOp = parameterGroupType->getDataLayout()
                                     ? parameterGroupType->getDataLayout()->getOp()
                                     : kIROp_DefaultBufferLayoutType;
-            if (auto layout = getTypeLayoutRulesFromOp(layoutTypeOp))
-                return layout;
-            return IRTypeLayoutRules::getStd140();
+            return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRules::getStd140());
         }
     case kIROp_GLSLShaderStorageBufferType:
         {
@@ -1473,9 +1469,7 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
             auto layoutTypeOp = storageBufferType->getDataLayout()
                                     ? storageBufferType->getDataLayout()->getOp()
                                     : kIROp_Std430BufferLayoutType;
-            if (auto layout = getTypeLayoutRulesFromOp(layoutTypeOp))
-                return layout;
-            return IRTypeLayoutRules::getStd430();
+            return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRules::getStd430());
         }
     case kIROp_PtrType:
         return IRTypeLayoutRules::getNatural();
