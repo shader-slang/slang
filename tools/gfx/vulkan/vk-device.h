@@ -223,6 +223,9 @@ public:
     VkSampler m_defaultSampler;
 
     RefPtr<FramebufferImpl> m_emptyFramebuffer;
+
+    // If true, slang will skip downstream linking, so we need to do it ourselves
+    bool m_skipsDownstreamLinking = false;
 };
 
 } // namespace vk
