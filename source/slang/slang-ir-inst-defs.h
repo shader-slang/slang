@@ -126,8 +126,8 @@ INST(Nop, nop, 0, 0)
             INST(OutType, Out, 1, HOISTABLE)
             INST(InOutType, InOut, 1, HOISTABLE)
         INST_RANGE(OutTypeBase, OutType, InOutType)
-        INST(HLSLConstBufferPointerType, ConstBufferPointerType, 2, HOISTABLE)
     INST_RANGE(PtrTypeBase, PtrType, InOutType)
+
 
     // A ComPtr<T> type is treated as a opaque type that represents a reference-counted handle to a COM object.
     INST(ComPtrType, ComPtr, 1, HOISTABLE)

@@ -1721,13 +1721,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
             return emitOpTypeHitObject(inst);
 
-        case kIROp_HLSLConstBufferPointerType:
-            requirePhysicalStorageAddressing();
-            return emitOpTypePointer(
-                inst,
-                SpvStorageClassPhysicalStorageBuffer,
-                inst->getOperand(0));
-
         case kIROp_FuncType:
             // > OpTypeFunction
             //
