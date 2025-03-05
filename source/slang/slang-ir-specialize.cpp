@@ -3030,7 +3030,7 @@ void finalizeSpecialization(IRModule* module)
 }
 
 // Returns true when "a" depends on "b".
-bool IsIRInstDependOn(IRInst *a, IRInst *b)
+bool IsIRInstDependOn(IRInst* a, IRInst* b)
 {
     if (a->getFullType() == b)
         return true;
