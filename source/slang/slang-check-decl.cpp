@@ -12412,7 +12412,7 @@ bool SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* struct
     // any constructors. see:
     // https://github.com/shader-slang/slang/blob/master/docs/proposals/004-initialization.md#inheritance-initialization
     if (_hasExplicitConstructor(structDecl, true))
-        return false;
+        return true;
 
     // synthesize the signature first.
     // The constructor's visibility level is the same as the struct itself.
