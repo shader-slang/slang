@@ -186,8 +186,8 @@ static Result _calcSizeAndAlignment(
                         builder.getIntValue(intType, (IRIntegerValue)rules->ruleName),
                         builder.getIntValue(intType, fieldOffset));
                 }
-
-                structLayout.size += fieldTypeLayout.size;
+                if (!seenFinalUnsizedArrayField)
+                    structLayout.size += fieldTypeLayout.size;
                 offset = structLayout.size;
                 if (as<IRMatrixType>(field->getFieldType()) ||
                     as<IRArrayTypeBase>(field->getFieldType()) ||

@@ -663,12 +663,14 @@ struct LoweredElementTypeContext
                 Index fieldId = 0;
                 for (auto field : structType->getFields())
                 {
-                    if (as<IRVoidType>(fieldLoweredTypeInfo[fieldId].loweredType))
+                    auto loweredFieldTypeInfo = fieldLoweredTypeInfo[fieldId];
+                    // When lowering type for user pointer, skip fields that are unsized array.
+                    if (config.addressSpace == AddressSpace::UserPointer &&
+                        as<IRUnsizedArrayType>(loweredFieldTypeInfo.loweredType))
                     {
                         fieldId++;
                         continue;
                     }
-                    auto loweredFieldTypeInfo = fieldLoweredTypeInfo[fieldId];
                     builder.createStructField(
                         loweredType,
                         field->getKey(),
@@ -1486,6 +1488,9 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
         case AddressSpace::Input:
         case AddressSpace::Output:
             addrSpace = AddressSpace::Input;
+            break;
+        case AddressSpace::UserPointer:
+            addrSpace = AddressSpace::UserPointer;
             break;
         }
     }
