@@ -32,6 +32,14 @@ struct SpirvDisDownstreamCompilerUtil
         DownstreamCompilerSet* set);
 };
 
+struct SpirvLinkDownstreamCompilerUtil
+{
+    static SlangResult locateCompilers(
+        const String& path,
+        ISlangSharedLibraryLoader* loader,
+        DownstreamCompilerSet* set);
+};
+
 } // namespace Slang
 
 #endif

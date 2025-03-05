@@ -1431,6 +1431,22 @@ Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
         auto module = findOrImportModule(name, SourceLoc(), &sink);
         sink.getBlobIfNeeded(outDiagnostics);
 
+        if (module->getInterface(slang::IModulePrecompileService_Experimental::getTypeGuid()))
+        {
+            auto interface = static_cast<slang::IModulePrecompileService_Experimental*>(module);
+            auto res = interface->precompileForTarget(SLANG_SPIRV, outDiagnostics);
+            // diagnose if needed
+            if (outDiagnostics)
+            {
+                sink.diagnoseRaw(Severity::Error, "Failed to precompile module for SPIRV");
+            }
+            if (SLANG_FAILED(res))
+            {
+                return nullptr;
+            }
+            
+        }
+
         return asExternal(module);
     }
     catch (const AbortCompilationException& e)
