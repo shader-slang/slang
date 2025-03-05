@@ -163,6 +163,12 @@ public:
         SeparateEntryPointCompilation
     };
 
+    enum class DownstreamLinkMode
+    {
+        None,
+        Deferred,
+    };
+
     struct Desc
     {
         // TODO: Tess doesn't like this but doesn't know what to do about it
@@ -180,6 +186,9 @@ public:
         // An array of Slang entry points. The size of the array must be `entryPointCount`.
         // Each element must define only 1 Slang EntryPoint.
         slang::IComponentType** slangEntryPoints = nullptr;
+
+        // Indicates whether the app is responsible for final downstream linking.
+        DownstreamLinkMode downstreamLinkMode = DownstreamLinkMode::None;
     };
 
     struct CreateDesc2
