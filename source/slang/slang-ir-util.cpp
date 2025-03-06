@@ -616,11 +616,6 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
     case kIROp_HitObjectType:
         sb << "HitObject";
         break;
-    case kIROp_HLSLConstBufferPointerType:
-        sb << "ConstantBufferPointer<";
-        getTypeNameHint(sb, as<IRHLSLConstBufferPointerType>(type)->getValueType());
-        sb << ">";
-        break;
     case kIROp_HLSLStructuredBufferType:
         sb << "StructuredBuffer<";
         getTypeNameHint(sb, as<IRHLSLStructuredBufferTypeBase>(type)->getElementType());
