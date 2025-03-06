@@ -8046,10 +8046,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             irWitnessTableBaseType,
                             irWitnessTable->getConcreteType());
 
-                        // Since IRWitnessTable is Hoistable, `createWitnessTable()` may return a
-                        // pre-existing one. We need to avoid adding the same decorations/children
-                        // when the IRWitnessTable already has them.
-                        //
+                        // Since IRWitnessTable is Hoistable, `createWitnessTable()` may return an
+                        // IRWitnessTable that already has decorations/children. We need to avoid
+                        // adding them more than once.
                         if (irSatisfyingWitnessTable->getFirstDecorationOrChild() == nullptr)
                         {
                             auto mangledName = getMangledNameForConformanceWitness(
@@ -8071,9 +8070,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                                 astReqWitnessTable,
                                 irSatisfyingWitnessTable,
                                 mapASTToIRWitnessTable);
-
-                            irSatisfyingWitnessTable->moveToEnd();
                         }
+
+                        irSatisfyingWitnessTable->moveToEnd();
                     }
                     irSatisfyingVal = irSatisfyingWitnessTable;
                 }
@@ -8194,17 +8193,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Create the IR-level witness table
         auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, irSubType);
 
-        // Since IRWitnessTable is Hoistable, `createWitnessTable()` may return a
-        // pre-existing one. We need to avoid adding the same decorations/children
-        // when the IRWitnessTable already has them.
+        // Override with the correct witness-table
+        context->setGlobalValue(
+            inheritanceDecl,
+            LoweredValInfo::simple(findOuterMostGeneric(irWitnessTable)));
+
+        // Since IRWitnessTable is Hoistable, `createWitnessTable()` may return an
+        // IRWitnessTable that already has decorations/children. We need to avoid adding them
+        // more than once.
         //
         if (irWitnessTable->getFirstDecorationOrChild() == nullptr)
         {
-            // Override with the correct witness-table
-            context->setGlobalValue(
-                inheritanceDecl,
-                LoweredValInfo::simple(findOuterMostGeneric(irWitnessTable)));
-
             // TODO(JS):
             // Should the mangled name take part in obfuscation if enabled?
 
@@ -8246,8 +8245,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     irWitnessTable,
                     mapASTToIRWitnessTable);
             }
-            irWitnessTable->moveToEnd();
         }
+
+        irWitnessTable->moveToEnd();
 
         return LoweredValInfo::simple(
             finishOuterGenerics(subBuilder, irWitnessTable, outerGeneric));
