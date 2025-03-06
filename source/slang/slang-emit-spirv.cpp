@@ -491,7 +491,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     /// The next destination `<id>` to allocate.
     SpvWord m_nextID = 1;
 
-    OrderedHashSet<IRPtrTypeBase*> m_forwardDeclaredPointers;
+    OrderedDictionary<SpvInst*, IRPtrTypeBase*> m_forwardDeclaredPointers;
 
     SpvInst* m_nullDwarfExpr = nullptr;
 
@@ -1568,7 +1568,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     // After everything has been emitted, we will move the pointer definition to the
                     // end of the Types & Constants section.
-                    if (m_forwardDeclaredPointers.add(ptrType))
+                    if (m_forwardDeclaredPointers.addIfNotExists(
+                            resultSpvType,
+                            (IRPtrTypeBase*)inst))
                         emitOpTypeForwardPointer(resultSpvType, storageClass);
                 }
                 if (storageClass == SpvStorageClassPhysicalStorageBuffer)
@@ -8383,11 +8385,11 @@ SlangResult emitSPIRVFromIR(
 
         for (auto ptrType : fwdPointers)
         {
-            auto spvPtrType = context.m_mapIRInstToSpvInst[ptrType];
+            auto spvPtrType = ptrType.key;
             // When we emit a pointee type, we may introduce new
             // forward-declared pointer types, so we need to
             // keep iterating until we have emitted all of them.
-            context.ensureInst(ptrType->getValueType());
+            context.ensureInst(ptrType.value->getValueType());
             auto parent = spvPtrType->parent;
             spvPtrType->removeFromParent();
             parent->addInst(spvPtrType);

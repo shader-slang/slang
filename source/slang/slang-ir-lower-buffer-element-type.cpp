@@ -58,14 +58,17 @@ struct LoweredElementTypeContext
             this->op = irop;
             return *this;
         }
-        IRInst* apply(IRBuilder& builder, IRType* resultType, IRInst* operand)
+        IRInst* apply(IRBuilder& builder, IRType* resultType, IRInst* operandAddr)
         {
             if (!*this)
-                return operand;
+                return builder.emitLoad(operandAddr);
             if (kind == ConversionMethodKind::Func)
-                return builder.emitCallInst(resultType, func, 1, &operand);
+                return builder.emitCallInst(resultType, func, 1, &operandAddr);
             else
-                return builder.emitIntrinsicInst(resultType, op, 1, &operand);
+            {
+                auto val = builder.emitLoad(operandAddr);
+                return builder.emitIntrinsicInst(resultType, op, 1, &val);
+            }
         }
         void applyDestinationDriven(IRBuilder& builder, IRInst* dest, IRInst* operand)
         {
@@ -153,21 +156,22 @@ struct LoweredElementTypeContext
     IRFunc* createMatrixUnpackFunc(
         IRMatrixType* matrixType,
         IRStructType* structType,
-        IRStructKey* dataKey,
-        IRArrayType* arrayType)
+        IRStructKey* dataKey)
     {
         IRBuilder builder(structType);
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
-        auto funcType = builder.getFuncType(1, (IRType**)&structType, matrixType);
+        auto refStructType = builder.getRefType(structType, AddressSpace::Generic);
+        auto funcType = builder.getFuncType(1, (IRType**)&refStructType, matrixType);
         func->setFullType(funcType);
         builder.addNameHintDecoration(func, UnownedStringSlice("unpackStorage"));
         builder.setInsertInto(func);
         builder.emitBlock();
         auto rowCount = (Index)getIntVal(matrixType->getRowCount());
         auto colCount = (Index)getIntVal(matrixType->getColumnCount());
-        auto packedParam = builder.emitParam(structType);
-        auto vectorArray = builder.emitFieldExtract(arrayType, packedParam, dataKey);
+        auto packedParamRef = builder.emitParam(refStructType);
+        auto packedParam = builder.emitLoad(packedParamRef);
+        auto vectorArray = builder.emitFieldExtract(packedParam, dataKey);
         List<IRInst*> args;
         args.setCount(rowCount * colCount);
         if (getIntVal(matrixType->getLayout()) == SLANG_MATRIX_LAYOUT_COLUMN_MAJOR)
@@ -289,19 +293,19 @@ struct LoweredElementTypeContext
         IRArrayType* arrayType,
         IRStructType* structType,
         IRStructKey* dataKey,
-        IRArrayType* innerArrayType,
         LoweredElementTypeInfo innerTypeInfo)
     {
         IRBuilder builder(structType);
         builder.setInsertAfter(structType);
         auto func = builder.createFunc();
-        auto funcType = builder.getFuncType(1, (IRType**)&structType, arrayType);
+        auto refStructType = builder.getRefType(structType, AddressSpace::Generic);
+        auto funcType = builder.getFuncType(1, (IRType**)&refStructType, arrayType);
         func->setFullType(funcType);
         builder.addNameHintDecoration(func, UnownedStringSlice("unpackStorage"));
         builder.setInsertInto(func);
         builder.emitBlock();
-        auto packedParam = builder.emitParam(structType);
-        auto packedArray = builder.emitFieldExtract(innerArrayType, packedParam, dataKey);
+        auto packedParam = builder.emitParam(refStructType);
+        auto packedArray = builder.emitFieldAddress(packedParam, dataKey);
         auto count = getIntVal(arrayType->getElementCount());
         IRInst* result = nullptr;
         if (count <= kMaxArraySizeToUnroll)
@@ -311,11 +315,11 @@ struct LoweredElementTypeContext
             args.setCount((Index)count);
             for (IRIntegerValue ii = 0; ii < count; ++ii)
             {
-                auto packedElement = builder.emitElementExtract(packedArray, ii);
+                auto packedElementAddr = builder.emitElementAddress(packedArray, ii);
                 auto originalElement = innerTypeInfo.convertLoweredToOriginal.apply(
                     builder,
                     innerTypeInfo.originalType,
-                    packedElement);
+                    packedElementAddr);
                 args[(Index)ii] = originalElement;
             }
             result = builder.emitMakeArray(arrayType, (UInt)args.getCount(), args.getBuffer());
@@ -334,11 +338,11 @@ struct LoweredElementTypeContext
                 loopBreakBlock);
 
             builder.setInsertBefore(loopBodyBlock->getFirstOrdinaryInst());
-            auto packedElement = builder.emitElementExtract(packedArray, loopParam);
+            auto packedElementAddr = builder.emitElementAddress(packedArray, loopParam);
             auto originalElement = innerTypeInfo.convertLoweredToOriginal.apply(
                 builder,
                 innerTypeInfo.originalType,
-                packedElement);
+                packedElementAddr);
             auto varPtr = builder.emitElementAddress(resultVar, loopParam);
             builder.emitStore(varPtr, originalElement);
             builder.setInsertInto(loopBreakBlock);
@@ -518,7 +522,7 @@ struct LoweredElementTypeContext
             info.loweredInnerArrayType = arrayType;
             info.loweredInnerStructKey = structKey;
             info.convertLoweredToOriginal =
-                createMatrixUnpackFunc(matrixType, loweredType, structKey, arrayType);
+                createMatrixUnpackFunc(matrixType, loweredType, structKey);
             info.convertOriginalToLowered =
                 createMatrixPackFunc(matrixType, loweredType, vectorType, arrayType);
             return info;
@@ -615,12 +619,8 @@ struct LoweredElementTypeContext
                 builder.createStructField(loweredType, structKey, innerArrayType);
                 info.loweredInnerArrayType = innerArrayType;
                 info.loweredInnerStructKey = structKey;
-                info.convertLoweredToOriginal = createArrayUnpackFunc(
-                    arrayType,
-                    loweredType,
-                    structKey,
-                    innerArrayType,
-                    loweredInnerTypeInfo);
+                info.convertLoweredToOriginal =
+                    createArrayUnpackFunc(arrayType, loweredType, structKey, loweredInnerTypeInfo);
                 info.convertOriginalToLowered =
                     createArrayPackFunc(arrayType, loweredType, structKey, loweredInnerTypeInfo);
             }
@@ -682,12 +682,13 @@ struct LoweredElementTypeContext
                 Index fieldId = 0;
                 for (auto field : structType->getFields())
                 {
-                    auto loweredFieldTypeInfo = fieldLoweredTypeInfo[fieldId];
+                    auto& loweredFieldTypeInfo = fieldLoweredTypeInfo[fieldId];
                     // When lowering type for user pointer, skip fields that are unsized array.
                     if (config.addressSpace == AddressSpace::UserPointer &&
                         as<IRUnsizedArrayType>(loweredFieldTypeInfo.loweredType))
                     {
                         fieldId++;
+                        loweredFieldTypeInfo.loweredType = builder.getVoidType();
                         continue;
                     }
                     builder.createStructField(
@@ -706,10 +707,11 @@ struct LoweredElementTypeContext
                 builder.addNameHintDecoration(
                     info.convertLoweredToOriginal.func,
                     UnownedStringSlice("unpackStorage"));
+                auto refLoweredType = builder.getRefType(loweredType, AddressSpace::Generic);
                 info.convertLoweredToOriginal.func->setFullType(
-                    builder.getFuncType(1, (IRType**)&loweredType, type));
+                    builder.getFuncType(1, (IRType**)&refLoweredType, type));
                 builder.emitBlock();
-                auto loweredParam = builder.emitParam(loweredType);
+                auto loweredParam = builder.emitParam(refLoweredType);
                 List<IRInst*> args;
                 Index fieldId = 0;
                 for (auto field : structType->getFields())
@@ -719,10 +721,7 @@ struct LoweredElementTypeContext
                         fieldId++;
                         continue;
                     }
-                    auto storageField = builder.emitFieldExtract(
-                        fieldLoweredTypeInfo[fieldId].loweredType,
-                        loweredParam,
-                        field->getKey());
+                    auto storageField = builder.emitFieldAddress(loweredParam, field->getKey());
                     auto unpackedField =
                         fieldLoweredTypeInfo[fieldId].convertLoweredToOriginal.apply(
                             builder,
@@ -795,37 +794,8 @@ struct LoweredElementTypeContext
                             info.loweredType = builder.getVectorType(
                                 info.loweredType,
                                 vectorType->getElementCount());
-                        // Create unpack func.
-                        {
-                            builder.setInsertAfter(type);
-                            info.convertLoweredToOriginal = builder.createFunc();
-                            builder.setInsertInto(info.convertLoweredToOriginal.func);
-                            builder.addNameHintDecoration(
-                                info.convertLoweredToOriginal.func,
-                                UnownedStringSlice("unpackStorage"));
-                            info.convertLoweredToOriginal.func->setFullType(
-                                builder.getFuncType(1, (IRType**)&info.loweredType, type));
-                            builder.emitBlock();
-                            auto loweredParam = builder.emitParam(info.loweredType);
-                            auto result = builder.emitCast(type, loweredParam);
-                            builder.emitReturn(result);
-                        }
-
-                        // Create pack func.
-                        {
-                            builder.setInsertAfter(info.convertLoweredToOriginal.func);
-                            info.convertOriginalToLowered = builder.createFunc();
-                            builder.setInsertInto(info.convertOriginalToLowered.func);
-                            builder.addNameHintDecoration(
-                                info.convertOriginalToLowered.func,
-                                UnownedStringSlice("packStorage"));
-                            info.convertOriginalToLowered.func->setFullType(
-                                builder.getFuncType(1, (IRType**)&type, info.loweredType));
-                            builder.emitBlock();
-                            auto param = builder.emitParam(type);
-                            auto result = builder.emitCast(info.loweredType, param);
-                            builder.emitReturn(result);
-                        }
+                        info.convertLoweredToOriginal = kIROp_BuiltinCast;
+                        info.convertOriginalToLowered = kIROp_BuiltinCast;
                         return info;
                     }
                 }
@@ -912,6 +882,26 @@ struct LoweredElementTypeContext
         TypeLoweringConfig config;
     };
 
+    IRInst* getBufferAddr(IRBuilder& builder, IRInst* loadStoreInst)
+    {
+        switch (loadStoreInst->getOp())
+        {
+        case kIROp_Load:
+        case kIROp_Store:
+            return loadStoreInst->getOperand(0);
+        case kIROp_StructuredBufferLoad:
+        case kIROp_StructuredBufferLoadStatus:
+        case kIROp_RWStructuredBufferLoad:
+        case kIROp_RWStructuredBufferLoadStatus:
+        case kIROp_RWStructuredBufferStore:
+            return builder.emitRWStructuredBufferGetElementPtr(
+                loadStoreInst->getOperand(0),
+                loadStoreInst->getOperand(1));
+        default:
+            return nullptr;
+        }
+    }
+
     void processModule(IRModule* module)
     {
         IRBuilder builder(module);
@@ -963,6 +953,10 @@ struct LoweredElementTypeContext
         {
             auto bufferType = bufferTypeInfo.bufferType;
             auto elementType = bufferTypeInfo.elementType;
+
+            if (elementType->findDecoration<IRPhysicalTypeDecoration>())
+                continue;
+
             auto config = getTypeLoweringConfigForBuffer(target, bufferType);
             auto loweredBufferElementTypeInfo = getLoweredTypeInfo(elementType, config);
 
@@ -1146,15 +1140,22 @@ struct LoweredElementTypeContext
                         case kIROp_RWStructuredBufferLoadStatus:
                         case kIROp_StructuredBufferConsume:
                             {
-                                IRCloneEnv cloneEnv = {};
                                 builder.setInsertBefore(user);
-                                auto newLoad = cloneInst(&cloneEnv, &builder, user);
-                                newLoad->setFullType(loweredElementTypeInfo.loweredType);
+                                auto addr = getBufferAddr(builder, user);
+                                if (!addr)
+                                {
+                                    IRCloneEnv cloneEnv = {};
+                                    builder.setInsertBefore(user);
+                                    auto newLoad = cloneInst(&cloneEnv, &builder, user);
+                                    newLoad->setFullType(loweredElementTypeInfo.loweredType);
+                                    addr = builder.emitVar(loweredElementTypeInfo.loweredType);
+                                    builder.emitStore(addr, newLoad);
+                                }
                                 auto unpackedVal =
                                     loweredElementTypeInfo.convertLoweredToOriginal.apply(
                                         builder,
                                         loweredElementTypeInfo.originalType,
-                                        newLoad);
+                                        addr);
                                 user->replaceUsesWith(unpackedVal);
                                 user->removeAndDeallocate();
                                 break;
@@ -1169,24 +1170,12 @@ struct LoweredElementTypeContext
                                 IRCloneEnv cloneEnv = {};
                                 builder.setInsertBefore(user);
                                 auto originalVal = getStoreVal(user);
-                                IRInst* addr = nullptr;
-                                if (auto store = as<IRStore>(user))
+                                IRInst* addr = getBufferAddr(builder, user);
+                                if (addr)
                                 {
-                                    builder.setInsertBefore(store);
-                                    addr = store->getPtr();
                                     loweredElementTypeInfo.convertOriginalToLowered
                                         .applyDestinationDriven(builder, addr, originalVal);
-                                    store->removeAndDeallocate();
-                                }
-                                else if (auto sbStore = as<IRRWStructuredBufferStore>(user))
-                                {
-                                    builder.setInsertBefore(store);
-                                    addr = builder.emitRWStructuredBufferGetElementPtr(
-                                        sbStore->getOperand(0),
-                                        sbStore->getOperand(1));
-                                    loweredElementTypeInfo.convertOriginalToLowered
-                                        .applyDestinationDriven(builder, addr, originalVal);
-                                    sbStore->removeAndDeallocate();
+                                    user->removeAndDeallocate();
                                 }
                                 else if (auto sbAppend = as<IRStructuredBufferAppend>(user))
                                 {
@@ -1258,13 +1247,11 @@ struct LoweredElementTypeContext
                                 // access, we need to materialize the object as a local variable,
                                 // and pass the address of the local variable to the function.
                                 builder.setInsertBefore(user);
-                                auto newLoad =
-                                    builder.emitLoad(loweredElementTypeInfo.loweredType, ptrVal);
                                 auto unpackedVal =
                                     loweredElementTypeInfo.convertLoweredToOriginal.apply(
                                         builder,
                                         (IRType*)originalElementType,
-                                        newLoad);
+                                        ptrVal);
                                 auto var = builder.emitVar((IRType*)originalElementType);
                                 builder.emitStore(var, unpackedVal);
                                 use->set(var);
