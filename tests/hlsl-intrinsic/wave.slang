@@ -4,6 +4,8 @@
 //TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0 -shaderobj
 //TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-cuda -compute -render-features cuda_sm_7_0 -shaderobj
+//TEST:COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE_EX:-metal -compute -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -29,7 +31,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     /// value |= (product << 8);    
         
     // TODO(JS): NOTE! This only works with uint, *NOT* int on HLSL/DXC. 
-    // We need to update the stdlib to reflect this.
+    // We need to update the core module to reflect this.
     uint xor = WaveActiveBitXor(uint(idx + 1));
     value |= int(xor << 12);
     

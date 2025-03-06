@@ -10,14 +10,14 @@
 // CHECK_GLSL_LINEAR_C: layout(derivative_group_linearNV)
 
 //TEST:SIMPLE(filecheck=CHECK_SPV_QUAD_C): -allow-glsl -stage compute -entry computeMain -target spirv -DQUAD -DCOMPUTE
-// CHECK_SPV_QUAD_C: DerivativeGroupQuadsNV
-// CHECK_SPV_QUAD_C-NOT: DerivativeGroupQuadsNV
+// CHECK_SPV_QUAD_C: DerivativeGroupQuads{{NV|KHR}}
+// CHECK_SPV_QUAD_C-NOT: DerivativeGroupQuads{{NV|KHR}}
 // CHECK_SPV_QUAD_C: "SPV_NV_compute_shader_derivatives"
 // CHECK_SPV_QUAD_C-NOT: "SPV_NV_compute_shader_derivatives"
 
 //TEST:SIMPLE(filecheck=CHECK_SPV_LINEAR_C): -allow-glsl -stage compute -entry computeMain -target spirv -DLINEAR -DCOMPUTE
-// CHECK_SPV_LINEAR_C: DerivativeGroupLinearNV
-// CHECK_SPV_LINEAR_C-NOT: DerivativeGroupLinearNV
+// CHECK_SPV_LINEAR_C: DerivativeGroupLinear{{NV|KHR}}
+// CHECK_SPV_LINEAR_C-NOT: DerivativeGroupLinear{{NV|KHR}}
 // CHECK_SPV_LINEAR_C: "SPV_NV_compute_shader_derivatives"
 // CHECK_SPV_LINEAR_C-NOT: "SPV_NV_compute_shader_derivatives"
 
@@ -28,11 +28,11 @@
 // CHECK_GLSL_F-NOT: GL_NV_compute_shader_derivatives
 
 //TEST:SIMPLE(filecheck=CHECK_SPV_QUAD_F): -allow-glsl -stage fragment -entry computeMain -target spirv -DQUAD
-// CHECK_SPV_QUAD_F-NOT: DerivativeGroupQuadsNV
+// CHECK_SPV_QUAD_F-NOT: DerivativeGroupQuads{{NV|KHR}}
 // CHECK_SPV_QUAD_F-NOT: "SPV_NV_compute_shader_derivatives"
 
 //TEST:SIMPLE(filecheck=CHECK_SPV_LINEAR_F): -allow-glsl -stage fragment -entry computeMain -target spirv -DLINEAR
-// CHECK_SPV_LINEAR_F-NOT: DerivativeGroupLinearNV
+// CHECK_SPV_LINEAR_F-NOT: DerivativeGroupLinear{{NV|KHR}}
 // CHECK_SPV_LINEAR_F-NOT: "SPV_NV_compute_shader_derivatives"
 
 //TEST:SIMPLE(filecheck=CHECK_GLSL_QUAD_F): -allow-glsl -stage fragment -entry computeMain -target glsl
@@ -49,10 +49,10 @@ buffer MyBlockName
 
 uniform sampler1D uniform_sampler1D;
 
-__generic<T : __BuiltinFloatingPointType, let N : int>
-bool textureFuncs(Sampler1D<vector<T,N>> gsampler1D)
+__generic<T : ITexelElement>
+bool textureFuncs(Sampler1D<T> gsampler1D)
 {
-    typealias gvec4 = vector<T,4>;
+    typealias gvec4 = vector<T.Element,4>;
 
     constexpr ivec2 ivec2_0 = ivec2(0);
 
@@ -61,32 +61,32 @@ bool textureFuncs(Sampler1D<vector<T,N>> gsampler1D)
         && int(0) == textureSize(gsampler1D, int(0))
         && vec2(0) == textureQueryLod(gsampler1D, float(0))
         && int(0) == textureQueryLevels(gsampler1D)
-        && gvec4(T(0)) == texture(gsampler1D, float(0))
-        && gvec4(T(0)) == texture(gsampler1D, float(0), float(0))
-        && gvec4(T(0)) == textureProj(gsampler1D, vec2(0))
-        && gvec4(T(0)) == textureProj(gsampler1D, vec2(0), float(0))
-        && gvec4(T(0)) == textureProj(gsampler1D, vec4(0))
-        && gvec4(T(0)) == textureProj(gsampler1D, vec4(0), float(0))
-        && gvec4(T(0)) == textureLod(gsampler1D, float(0), float(0))
-        && gvec4(T(0)) == textureOffset(gsampler1D, float(0), __LINE__)
-        && gvec4(T(0)) == textureOffset(gsampler1D, float(0), __LINE__, float(0))
-        && gvec4(T(0)) == texelFetch(gsampler1D, int(0), int(0))
-        && gvec4(T(0)) == texelFetchOffset(gsampler1D, int(0), int(0), __LINE__)
-        && gvec4(T(0)) == textureProjOffset(gsampler1D, vec2(0), __LINE__)
-        && gvec4(T(0)) == textureProjOffset(gsampler1D, vec2(0), __LINE__, float(0))
-        && gvec4(T(0)) == textureProjOffset(gsampler1D, vec4(0), __LINE__)
-        && gvec4(T(0)) == textureProjOffset(gsampler1D, vec4(0), __LINE__,float(0))
-        && gvec4(T(0)) == textureLodOffset(gsampler1D, float(0), float(0), __LINE__)
-        && gvec4(T(0)) == textureProjLod(gsampler1D, vec2(0), float(0))
-        && gvec4(T(0)) == textureProjLod(gsampler1D, vec4(0), float(0))
-        && gvec4(T(0)) == textureProjLodOffset(gsampler1D, vec2(0), float(0), __LINE__)
-        && gvec4(T(0)) == textureProjLodOffset(gsampler1D, vec4(0), float(0), __LINE__)
-        && gvec4(T(0)) == textureGrad(gsampler1D, float(0), float(0), float(0))
-        && gvec4(T(0)) == textureGradOffset(gsampler1D, float(0), float(0), float(0), __LINE__)
-        && gvec4(T(0)) == textureProjGrad(gsampler1D, vec2(0), float(0), float(0))
-        && gvec4(T(0)) == textureProjGrad(gsampler1D, vec4(0), float(0), float(0))
-        && gvec4(T(0)) == textureProjGradOffset(gsampler1D, vec2(0), float(0), float(0), __LINE__)
-        && gvec4(T(0)) == textureProjGradOffset(gsampler1D, vec4(0), float(0), float(0), __LINE__)
+        && gvec4(T.Element(0)) == texture(gsampler1D, float(0))
+        && gvec4(T.Element(0)) == texture(gsampler1D, float(0), float(0))
+        && gvec4(T.Element(0)) == textureProj(gsampler1D, vec2(0))
+        && gvec4(T.Element(0)) == textureProj(gsampler1D, vec2(0), float(0))
+        && gvec4(T.Element(0)) == textureProj(gsampler1D, vec4(0))
+        && gvec4(T.Element(0)) == textureProj(gsampler1D, vec4(0), float(0))
+        && gvec4(T.Element(0)) == textureLod(gsampler1D, float(0), float(0))
+        && gvec4(T.Element(0)) == textureOffset(gsampler1D, float(0), __LINE__)
+        && gvec4(T.Element(0)) == textureOffset(gsampler1D, float(0), __LINE__, float(0))
+        && gvec4(T.Element(0)) == texelFetch(gsampler1D, int(0), int(0))
+        && gvec4(T.Element(0)) == texelFetchOffset(gsampler1D, int(0), int(0), __LINE__)
+        && gvec4(T.Element(0)) == textureProjOffset(gsampler1D, vec2(0), __LINE__)
+        && gvec4(T.Element(0)) == textureProjOffset(gsampler1D, vec2(0), __LINE__, float(0))
+        && gvec4(T.Element(0)) == textureProjOffset(gsampler1D, vec4(0), __LINE__)
+        && gvec4(T.Element(0)) == textureProjOffset(gsampler1D, vec4(0), __LINE__,float(0))
+        && gvec4(T.Element(0)) == textureLodOffset(gsampler1D, float(0), float(0), __LINE__)
+        && gvec4(T.Element(0)) == textureProjLod(gsampler1D, vec2(0), float(0))
+        && gvec4(T.Element(0)) == textureProjLod(gsampler1D, vec4(0), float(0))
+        && gvec4(T.Element(0)) == textureProjLodOffset(gsampler1D, vec2(0), float(0), __LINE__)
+        && gvec4(T.Element(0)) == textureProjLodOffset(gsampler1D, vec4(0), float(0), __LINE__)
+        && gvec4(T.Element(0)) == textureGrad(gsampler1D, float(0), float(0), float(0))
+        && gvec4(T.Element(0)) == textureGradOffset(gsampler1D, float(0), float(0), float(0), __LINE__)
+        && gvec4(T.Element(0)) == textureProjGrad(gsampler1D, vec2(0), float(0), float(0))
+        && gvec4(T.Element(0)) == textureProjGrad(gsampler1D, vec4(0), float(0), float(0))
+        && gvec4(T.Element(0)) == textureProjGradOffset(gsampler1D, vec2(0), float(0), float(0), __LINE__)
+        && gvec4(T.Element(0)) == textureProjGradOffset(gsampler1D, vec4(0), float(0), float(0), __LINE__)
         && vec4(0) == texture1D(uniform_sampler1D, float(0))
         && vec4(0) == texture1D(uniform_sampler1D, float(0), float(0))
         && vec4(0) == texture1DProj(uniform_sampler1D, vec2(0))

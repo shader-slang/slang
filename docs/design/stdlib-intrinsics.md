@@ -1,17 +1,17 @@
-Stdlib Intrinsics
-=================
+Core Module Intrinsics
+======================
 
-The following document aims to cover a variety of systems used to add target specific features. They are most extensively used in the slang standard library (stdlib).
+The following document aims to cover a variety of systems used to add target specific features. They are most extensively used in the slang core module.
 
 **NOTE!** These features should *not* be considered stable! They can be used in regular slang code to add features, but they risk breaking with any Slang version change. Additionally the features implementation can be very particular to what is required for a specific feature set, so might not work as expected in all scenarios.
 
 As these features are in flux, it is quite possible this document is behind the current features available within the Slang code base.
 
-If you want to add support for a feature for a target to Slang, implementing it as part of the Slang standard library is typically a good way to progress. Depending on the extension/feature it may not be possible to add support exclusively via changes to the standard library alone. That said most support for target specific extensions and features involve at least some changes to the slang standard library, and typically using the mechanisms described here.
+If you want to add support for a feature for a target to Slang, implementing it as a part of the Slang standard modules is typically a good way to progress. Depending on the extension/feature it may not be possible to add support exclusively via changes to the standard module alone. That said most support for target specific extensions and features involve at least some changes to the slang standard modules including the core module, and typically using the mechanisms described here.
 
-## Standard Library
+## Core Module
 
-The main place these features are used are within the slang standard library (aka stdlib). This is implemented with a set of slang files within the slang project
+The main place these features are used are within the slang core module. This is implemented with a set of slang files within the slang project
 
 * core.meta.slang 
 * hlsl.meta.slang
@@ -21,7 +21,7 @@ Looking at these files will demonstrate the features in use.
 
 Most of the intrinsics and attributes have names that indicate that they are not for normal use. This is typically via a `__` prefix.
 
-The `.meta.slang` files look largely like Slang source files, but their contents can also be generated programatically with C++ code. A section of code can drop into `C++` code if it is proceeded by `${{{{`. The C++ section is closed with a closing `}}}}`. This mechanism is typically used to generate different versions of a similar code sequence. Values from the C++ code can be accessed via the `$()`, where the contents of the brackets specifies something that can be calculated from within the C++ code.
+The `.meta.slang` files look largely like Slang source files, but their contents can also be generated programmatically with C++ code. A section of code can drop into `C++` code if it is proceeded by `${{{{`. The C++ section is closed with a closing `}}}}`. This mechanism is typically used to generate different versions of a similar code sequence. Values from the C++ code can be accessed via the `$()`, where the contents of the brackets specifies something that can be calculated from within the C++ code.
 
 As an example, to produce an an array with values 0 to 9 we could write...
 
@@ -114,12 +114,6 @@ Sections of the `expansion` string that are to be replaced are prefixed by the `
 * $XH - Ray tracing hit object attribute
 * $P - Type-based prefix as used for CUDA and C++ targets (I8 for int8_t, F32 - float etc)
 
-## __specialized_for_target(target)
-
-Specialized for target allows defining an implementation *body* for a particular target. The target is the same as is used for [__target_intrinsic](#target-intrinsic). 
-
-A declaration can consist of multiple definitions with bodies (for each target) using, `specialized_for_target`, as well as having `target_intrinsic` if that is applicable for a target.
-
 ## __attributeTarget(astClassName)
 
 For an attribute, specifies the AST class (and derived class) the attribute can be applied to.
@@ -146,7 +140,7 @@ Used before a type declaration. The clsName is the name of the class that is use
 
 Used to specify the IR opcode associated with a type. The IR opcode is listed as something like `$(kIROp_HLSLByteAddressBufferType)`, which will expand to the integer value of the opcode (because the opcode value is an enum value that is visible from C++). It is possible to just write the opcode number, but that is generally inadvisable as the ids for ops are not stable. If a code change in Slang C++ adds or removes an opcode the number is likely to be incorrect.
 
-As an example from stdlib
+As an example from the core module
 
 ```slang
 __magic_type(HLSLByteAddressBufferType)

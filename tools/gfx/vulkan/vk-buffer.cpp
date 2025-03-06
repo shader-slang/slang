@@ -3,7 +3,7 @@
 
 #include "vk-util.h"
 #if SLANG_WINDOWS_FAMILY
-#    include <dxgi1_2.h>
+#include <dxgi1_2.h>
 #endif
 
 namespace gfx
@@ -28,20 +28,21 @@ Result VKBufferHandleRAII::init(
     m_memory = VK_NULL_HANDLE;
     m_buffer = VK_NULL_HANDLE;
 
-    VkBufferCreateInfo bufferCreateInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+    VkBufferCreateInfo bufferCreateInfo = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
     bufferCreateInfo.size = bufferSize;
     bufferCreateInfo.usage = usage;
     bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VkExternalMemoryBufferCreateInfo externalMemoryBufferCreateInfo = {
-        VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO };
+        VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO};
     if (isShared)
     {
         externalMemoryBufferCreateInfo.handleTypes = extMemHandleType;
         bufferCreateInfo.pNext = &externalMemoryBufferCreateInfo;
     }
 
-    SLANG_VK_RETURN_ON_FAIL(api.vkCreateBuffer(api.m_device, &bufferCreateInfo, nullptr, &m_buffer));
+    SLANG_VK_RETURN_ON_FAIL(
+        api.vkCreateBuffer(api.m_device, &bufferCreateInfo, nullptr, &m_buffer));
 
     VkMemoryRequirements memoryReqs = {};
     api.vkGetBufferMemoryRequirements(api.m_device, m_buffer, &memoryReqs);
@@ -51,15 +52,15 @@ Result VKBufferHandleRAII::init(
 
     VkMemoryPropertyFlags actualMemoryProperites =
         api.m_deviceMemoryProperties.memoryTypes[memoryTypeIndex].propertyFlags;
-    VkMemoryAllocateInfo allocateInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+    VkMemoryAllocateInfo allocateInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
     allocateInfo.allocationSize = memoryReqs.size;
     allocateInfo.memoryTypeIndex = memoryTypeIndex;
 #if SLANG_WINDOWS_FAMILY
     VkExportMemoryWin32HandleInfoKHR exportMemoryWin32HandleInfo = {
-        VK_STRUCTURE_TYPE_EXPORT_MEMORY_WIN32_HANDLE_INFO_KHR };
+        VK_STRUCTURE_TYPE_EXPORT_MEMORY_WIN32_HANDLE_INFO_KHR};
 #endif
     VkExportMemoryAllocateInfoKHR exportMemoryAllocateInfo = {
-        VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR };
+        VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR};
     if (isShared)
     {
 #if SLANG_WINDOWS_FAMILY
@@ -71,13 +72,13 @@ Result VKBufferHandleRAII::init(
 
         exportMemoryAllocateInfo.pNext =
             extMemHandleType & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR
-            ? &exportMemoryWin32HandleInfo
-            : nullptr;
+                ? &exportMemoryWin32HandleInfo
+                : nullptr;
 #endif
         exportMemoryAllocateInfo.handleTypes = extMemHandleType;
         allocateInfo.pNext = &exportMemoryAllocateInfo;
     }
-    VkMemoryAllocateFlagsInfo flagInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO };
+    VkMemoryAllocateFlagsInfo flagInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO};
     if (usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT)
     {
         flagInfo.deviceMask = 1;
@@ -94,8 +95,7 @@ Result VKBufferHandleRAII::init(
 }
 
 BufferResourceImpl::BufferResourceImpl(const IBufferResource::Desc& desc, DeviceImpl* renderer)
-    : Parent(desc)
-    , m_renderer(renderer)
+    : Parent(desc), m_renderer(renderer)
 {
     assert(renderer);
 }

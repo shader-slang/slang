@@ -1,8 +1,9 @@
 #include "slang-ir-util.h"
-#include "slang-ir-insts.h"
+
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
+#include "slang-ir-insts.h"
 
 namespace Slang
 {
@@ -20,6 +21,8 @@ IRType* getVectorElementType(IRType* type)
 {
     if (auto vectorType = as<IRVectorType>(type))
         return vectorType->getElementType();
+    if (auto coopVecType = as<IRCoopVectorType>(type))
+        return coopVecType->getElementType();
     return type;
 }
 
@@ -36,7 +39,8 @@ Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* inte
     for (UInt i = 0; i < interfaceType->getOperandCount(); i++)
     {
         auto entry = as<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
-        if (!entry) continue;
+        if (!entry)
+            continue;
         result[entry->getRequirementKey()] = entry->getRequirementVal();
     }
     return result;
@@ -46,7 +50,8 @@ bool isPointerOfType(IRInst* type, IRInst* elementType)
 {
     if (auto ptrType = as<IRPtrTypeBase>(type))
     {
-        return ptrType->getValueType() && isTypeEqual(ptrType->getValueType(), (IRType*)elementType);
+        return ptrType->getValueType() &&
+               isTypeEqual(ptrType->getValueType(), (IRType*)elementType);
     }
     return false;
 }
@@ -64,9 +69,9 @@ bool isPtrToArrayType(IRInst* type)
 
 bool isComInterfaceType(IRType* type)
 {
-    if (!type) return false;
-    if (type->findDecoration<IRComInterfaceDecoration>() ||
-        type->getOp() == kIROp_ComPtrType)
+    if (!type)
+        return false;
+    if (type->findDecoration<IRComInterfaceDecoration>() || type->getOp() == kIROp_ComPtrType)
     {
         return true;
     }
@@ -89,9 +94,9 @@ IROp getTypeStyle(IROp op)
     {
     case kIROp_VoidType:
     case kIROp_BoolType:
-    {
-        return op;
-    }
+        {
+            return op;
+        }
     case kIROp_Int8Type:
     case kIROp_Int16Type:
     case kIROp_IntType:
@@ -102,18 +107,19 @@ IROp getTypeStyle(IROp op)
     case kIROp_UInt64Type:
     case kIROp_IntPtrType:
     case kIROp_UIntPtrType:
-    {
-        // All int like 
-        return kIROp_IntType;
-    }
+        {
+            // All int like
+            return kIROp_IntType;
+        }
     case kIROp_HalfType:
     case kIROp_FloatType:
     case kIROp_DoubleType:
-    {
-        // All float like
-        return kIROp_FloatType;
-    }
-    default: return kIROp_Invalid;
+        {
+            // All float like
+            return kIROp_FloatType;
+        }
+    default:
+        return kIROp_Invalid;
     }
 }
 
@@ -146,7 +152,10 @@ IROp getTypeStyle(BaseType op)
     }
 }
 
-IRInst* specializeWithGeneric(IRBuilder& builder, IRInst* genericToSpecialize, IRGeneric* userGeneric)
+IRInst* specializeWithGeneric(
+    IRBuilder& builder,
+    IRInst* genericToSpecialize,
+    IRGeneric* userGeneric)
 {
     List<IRInst*> genArgs;
     for (auto param : userGeneric->getFirstBlock()->getParams())
@@ -160,7 +169,10 @@ IRInst* specializeWithGeneric(IRBuilder& builder, IRInst* genericToSpecialize, I
         genArgs.getBuffer());
 }
 
-IRInst* maybeSpecializeWithGeneric(IRBuilder& builder, IRInst* genericToSpecailize, IRInst* userGeneric)
+IRInst* maybeSpecializeWithGeneric(
+    IRBuilder& builder,
+    IRInst* genericToSpecailize,
+    IRInst* userGeneric)
 {
     if (auto gen = as<IRGeneric>(userGeneric))
     {
@@ -211,6 +223,17 @@ bool isValueType(IRInst* dataType)
     }
 }
 
+bool isScalarOrVectorType(IRInst* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_VectorType:
+        return true;
+    default:
+        return as<IRBasicType>(type) != nullptr;
+    }
+}
+
 bool isSimpleDataType(IRType* type)
 {
     type = (IRType*)unwrapAttributedType(type);
@@ -219,16 +242,16 @@ bool isSimpleDataType(IRType* type)
     switch (type->getOp())
     {
     case kIROp_StructType:
-    {
-        auto structType = as<IRStructType>(type);
-        for (auto field : structType->getFields())
         {
-            if (!isSimpleDataType(field->getFieldType()))
-                return false;
+            auto structType = as<IRStructType>(type);
+            for (auto field : structType->getFields())
+            {
+                if (!isSimpleDataType(field->getFieldType()))
+                    return false;
+            }
+            return true;
+            break;
         }
-        return true;
-        break;
-    }
     case kIROp_Param:
     case kIROp_VectorType:
     case kIROp_MatrixType:
@@ -239,6 +262,39 @@ bool isSimpleDataType(IRType* type)
     case kIROp_ArrayType:
     case kIROp_UnsizedArrayType:
         return isSimpleDataType((IRType*)type->getOperand(0));
+    default:
+        return false;
+    }
+}
+
+bool isSimpleHLSLDataType(IRInst* inst)
+{
+    // TODO: Add criteria
+    // https://github.com/shader-slang/slang/issues/4792
+    SLANG_UNUSED(inst);
+    return true;
+}
+
+bool isWrapperType(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_ArrayType:
+    case kIROp_TextureType:
+    case kIROp_VectorType:
+    case kIROp_MatrixType:
+    case kIROp_PtrType:
+    case kIROp_RefType:
+    case kIROp_ConstRefType:
+    case kIROp_HLSLStructuredBufferType:
+    case kIROp_HLSLRWStructuredBufferType:
+    case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+    case kIROp_HLSLAppendStructuredBufferType:
+    case kIROp_HLSLConsumeStructuredBufferType:
+    case kIROp_TupleType:
+    case kIROp_OptionalType:
+    case kIROp_TypePack:
+        return true;
     default:
         return false;
     }
@@ -256,10 +312,15 @@ SourceLoc findFirstUseLoc(IRInst* inst)
     return inst->sourceLoc;
 }
 
-IRInst* hoistValueFromGeneric(IRBuilder& inBuilder, IRInst* value, IRInst*& outSpecializedVal, bool replaceExistingValue)
+IRInst* hoistValueFromGeneric(
+    IRBuilder& inBuilder,
+    IRInst* value,
+    IRInst*& outSpecializedVal,
+    bool replaceExistingValue)
 {
     auto outerGeneric = as<IRGeneric>(findOuterGeneric(value));
-    if (!outerGeneric) return value;
+    if (!outerGeneric)
+        return value;
     IRBuilder builder = inBuilder;
     builder.setInsertBefore(outerGeneric);
     auto newGeneric = builder.emitGeneric();
@@ -284,7 +345,11 @@ IRInst* hoistValueFromGeneric(IRBuilder& inBuilder, IRInst* value, IRInst*& outS
     {
         IRBuilder subBuilder = builder;
         IRInst* subOutSpecialized = nullptr;
-        auto genericFuncType = hoistValueFromGeneric(subBuilder, newResultVal->getFullType(), subOutSpecialized, false);
+        auto genericFuncType = hoistValueFromGeneric(
+            subBuilder,
+            newResultVal->getFullType(),
+            subOutSpecialized,
+            false);
         newGeneric->setFullType((IRType*)genericFuncType);
     }
     else
@@ -304,13 +369,13 @@ IRInst* hoistValueFromGeneric(IRBuilder& inBuilder, IRInst* value, IRInst*& outS
 
 void moveInstChildren(IRInst* dest, IRInst* src)
 {
-    for (auto child = dest->getFirstDecorationOrChild(); child; )
+    for (auto child = dest->getFirstDecorationOrChild(); child;)
     {
         auto next = child->getNextInst();
         child->removeAndDeallocate();
         child = next;
     }
-    for (auto child = src->getFirstDecorationOrChild(); child; )
+    for (auto child = src->getFirstDecorationOrChild(); child;)
     {
         auto next = child->getNextInst();
         child->insertAtEnd(dest);
@@ -428,8 +493,8 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
     case kIROp_SubpassInputType:
         {
             auto textureType = as<IRSubpassInputType>(type);
-            sb <<"SubpassInput";
-            if(textureType->isMultisample())
+            sb << "SubpassInput";
+            if (textureType->isMultisample())
                 sb << "MS";
             break;
         }
@@ -603,7 +668,8 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
                     continue;
                 if (arg->getDataType()->getOp() == kIROp_WitnessTableType)
                     continue;
-                if (!isFirst) sb << ",";
+                if (!isFirst)
+                    sb << ",";
                 getTypeNameHint(sb, arg);
                 isFirst = false;
             }
@@ -701,15 +767,14 @@ bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IR
     if (!isChildInstOf(addr2, func))
         return true;
 
-    if (addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Var
-        && addr1 != addr2)
+    if (addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Var && addr1 != addr2)
         return false;
 
     // A param and a var can never alias.
     if (addr1->getOp() == kIROp_Param && addr1->getParent() == func->getFirstBlock() &&
-        addr2->getOp() == kIROp_Var ||
+            addr2->getOp() == kIROp_Var ||
         addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Param &&
-        addr2->getParent() == func->getFirstBlock())
+            addr2->getParent() == func->getFirstBlock())
         return false;
     return true;
 }
@@ -763,8 +828,7 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
             if (!isChildInstOf(getRootAddr(addr), func))
             {
                 auto callee = call->getCallee();
-                if (callee &&
-                    !doesCalleeHaveSideEffect(callee))
+                if (callee && !doesCalleeHaveSideEffect(callee))
                 {
                     // An exception is if the callee is side-effect free and is not reading from
                     // memory.
@@ -843,7 +907,8 @@ IRInst* getUndefInst(IRBuilder builder, IRModule* module)
 
     for (auto inst : module->getModuleInst()->getChildren())
     {
-        if (inst->getOp() == kIROp_undefined && inst->getDataType() && inst->getDataType()->getOp() == kIROp_VoidType)
+        if (inst->getOp() == kIROp_undefined && inst->getDataType() &&
+            inst->getDataType()->getOp() == kIROp_VoidType)
         {
             undefInst = inst;
             break;
@@ -879,7 +944,12 @@ IROp getSwapSideComparisonOp(IROp op)
     }
 }
 
-IRInst* emitLoopBlocks(IRBuilder* builder, IRInst* initVal, IRInst* finalVal, IRBlock*& loopBodyBlock, IRBlock*& loopBreakBlock)
+IRInst* emitLoopBlocks(
+    IRBuilder* builder,
+    IRInst* initVal,
+    IRInst* finalVal,
+    IRBlock*& loopBodyBlock,
+    IRBlock*& loopBreakBlock)
 {
     IRBuilder loopBuilder = *builder;
     auto loopHeadBlock = loopBuilder.emitBlock();
@@ -895,7 +965,10 @@ IRInst* emitLoopBlocks(IRBuilder* builder, IRInst* initVal, IRInst* finalVal, IR
     loopBuilder.setInsertInto(loopBodyBlock);
     loopBuilder.emitBranch(loopContinueBlock);
     loopBuilder.setInsertInto(loopContinueBlock);
-    auto newParam = loopBuilder.emitAdd(loopParam->getFullType(), loopParam, loopBuilder.getIntValue(loopBuilder.getIntType(), 1));
+    auto newParam = loopBuilder.emitAdd(
+        loopParam->getFullType(),
+        loopParam,
+        loopBuilder.getIntValue(loopBuilder.getIntType(), 1));
     loopBuilder.emitBranch(loopHeadBlock, 1, &newParam);
     loopBuilder.setInsertInto(ifBreakBlock);
     loopBuilder.emitBranch(loopBreakBlock);
@@ -963,12 +1036,42 @@ void setInsertAfterOrdinaryInst(IRBuilder* builder, IRInst* inst)
     }
 }
 
+IRInst* tryFindBasePtr(IRInst* inst, IRInst* parentFunc)
+{
+    // Keep going up the tree until we find a variable.
+    switch (inst->getOp())
+    {
+    case kIROp_Var:
+        return getParentFunc(inst) == parentFunc ? inst : nullptr;
+    case kIROp_Param:
+        return getParentFunc(inst) == parentFunc ? inst : nullptr;
+    case kIROp_GetElementPtr:
+        return tryFindBasePtr(as<IRGetElementPtr>(inst)->getBase(), parentFunc);
+    case kIROp_FieldAddress:
+        return tryFindBasePtr(as<IRFieldAddress>(inst)->getBase(), parentFunc);
+    default:
+        return nullptr;
+    }
+}
+
 bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions options)
 {
     // If the function has no side effect and is not writing to any outputs,
     // we can safely treat the call as a normal inst.
+
     IRFunc* parentFunc = nullptr;
-    for (UInt i = 0; i < call->getArgCount(); i++)
+
+    IRParam* param = nullptr;
+    if (auto calleeFunc = getResolvedInstForDecorations(call->getCallee()))
+    {
+        if (auto block = calleeFunc->getFirstBlock())
+        {
+            param = block->getFirstParam();
+        }
+    }
+
+    for (UInt i = 0; i < call->getArgCount();
+         i++, (param = param ? param->getNextParam() : nullptr))
     {
         auto arg = call->getArg(i);
         if (isValueType(arg->getDataType()))
@@ -999,7 +1102,7 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
             // This is a conservative test, but is sufficient to detect the most common case where
             // a temporary variable is used as the inout argument and the result stored in the temp
             // variable isn't being used elsewhere in the parent func.
-            // 
+            //
             // A more aggresive test can check all other address uses reachable from the call site
             // and see if any of them are aliasing with the argument.
             for (auto use = arg->firstUse; use; use = use->nextUse)
@@ -1014,47 +1117,55 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
                     // are not dependent on whatever we do in the call here.
                     continue;
                 default:
-                    // Skip the call itself if the var is used as an argument to an out parameter
-                    // since we are checking if the call has side effect.
-                    // We can't treat the call as side effect free if var is used as an inout parameter,
-                    // because if the call is inside a loop there will be a visible side effect after
-                    // the call.
+                    // Skip the call itself if the var is used as an argument to an out
+                    // parameter since we are checking if the call has side effect. We can't
+                    // treat the call as side effect free if var is used as an inout parameter,
+                    // because if the call is inside a loop there will be a visible side effect
+                    // after the call.
                     if (use->getUser() == call)
                     {
                         auto funcType = as<IRFuncType>(call->getCallee()->getDataType());
                         if (!funcType)
                             return false;
-                        if (funcType->getParamCount() > i && as<IROutType>(funcType->getParamType(i)))
+                        if (funcType->getParamCount() > i &&
+                            as<IROutType>(funcType->getParamType(i)))
                             continue;
 
                         // We are an argument to an inout parameter.
-                        // We can only treat the call as side effect free if the call is not inside a loop.
-                        // 
-                        // If we don't have the loop information here, we will conservatively return false.
+                        // We can only treat the call as side effect free if the call is not
+                        // inside a loop.
+                        //
+                        // If we don't have the loop information here, we will conservatively
+                        // return false.
                         //
                         if (!dom)
                             return false;
 
-                        // If we have dominator tree available, use it to check if the call is inside a loop.
+                        // If we have dominator tree available, use it to check if the call is
+                        // inside a loop.
                         auto callBlock = as<IRBlock>(call->getParent());
-                        if (!callBlock) return false;
+                        if (!callBlock)
+                            return false;
                         auto varBlock = as<IRBlock>(arg->getParent());
-                        if (!varBlock) return false;
+                        if (!varBlock)
+                            return false;
                         auto idom = callBlock;
                         while (idom != varBlock)
                         {
                             idom = dom->getImmediateDominator(idom);
                             if (!idom)
-                                return false; // If we are here, var does not dominate the call, which should never happen.
+                                return false; // If we are here, var does not dominate the call,
+                                              // which should never happen.
                             if (auto loop = as<IRLoop>(idom->getTerminator()))
                             {
                                 if (!dom->dominates(loop->getBreakBlock(), callBlock))
-                                    return false; // The var is used in a loop, must return false.
+                                    return false; // The var is used in a loop, must return
+                                                  // false.
                             }
                         }
-                        // If we reach here, the var is used as an inout parameter for the call, but the call
-                        // is not nested in a loop at an higher nesting level than where the var is defined,
-                        // so we can treat the use as DCE-able.
+                        // If we reach here, the var is used as an inout parameter for the call,
+                        // but the call is not nested in a loop at an higher nesting level than
+                        // where the var is defined, so we can treat the use as DCE-able.
                         continue;
                     }
                     // We have some other unknown use of the variable address, they can
@@ -1066,6 +1177,9 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
         }
         else
         {
+            if (param && param->findDecoration<IRIgnoreSideEffectsDecoration>())
+                continue;
+
             return false;
         }
     }
@@ -1091,18 +1205,97 @@ bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions opti
     return false;
 }
 
+// Enumerate any associated functions of 'func'
+// that might be used by a pass (e.g. auto-diff)
+//
+template<typename TFunc>
+void forEachAssociatedFunction(IRInst* func, TFunc callback)
+{
+    // Resolve the function to get all its decorations
+    auto resolvedFunc = getResolvedInstForDecorations(func);
+    if (!resolvedFunc)
+        return;
+
+    // We'll scan for appropriate decorations and return
+    // the function references.
+    //
+    // TODO: In the future, as we get more function transformation
+    // passes, we might want to create a parent class for such
+    // decorations that associate functions with each other.
+    //
+    for (auto decor : resolvedFunc->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+            if (as<IRUserDefinedBackwardDerivativeDecoration>(decor))
+            {
+                auto associatedCallee = as<IRUserDefinedBackwardDerivativeDecoration>(decor)
+                                            ->getBackwardDerivativeFunc();
+                callback(associatedCallee);
+            }
+            break;
+
+        case kIROp_ForwardDerivativeDecoration:
+            if (as<IRForwardDerivativeDecoration>(decor))
+            {
+                auto associatedCallee =
+                    as<IRForwardDerivativeDecoration>(decor)->getForwardDerivativeFunc();
+                callback(associatedCallee);
+            }
+            break;
+
+        case kIROp_PrimalSubstituteDecoration:
+            if (as<IRPrimalSubstituteDecoration>(decor))
+            {
+                auto associatedCallee =
+                    as<IRPrimalSubstituteDecoration>(decor)->getPrimalSubstituteFunc();
+                callback(associatedCallee);
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
+}
+
 bool doesCalleeHaveSideEffect(IRInst* callee)
 {
+    bool sideEffect = true;
+
     for (auto decor : getResolvedInstForDecorations(callee)->getDecorations())
     {
         switch (decor->getOp())
         {
         case kIROp_NoSideEffectDecoration:
         case kIROp_ReadNoneDecoration:
-            return false;
+        case kIROp_IgnoreSideEffectsDecoration:
+            sideEffect = false;
+            break;
+        default:
+            break;
         }
     }
-    return true;
+
+    // If the callee has no side effect, check if any of its associated functions have side effect.
+    // If so, we want to keep the callee around.
+    //
+    // Typically, once the relevant pass has completed, the association is removed,
+    // and at that point we can remove the function.
+    //
+    if (!sideEffect)
+    {
+        forEachAssociatedFunction(
+            callee,
+            [&](IRInst* associatedCallee)
+            {
+                sideEffect |= doesCalleeHaveSideEffect(associatedCallee);
+                return;
+            });
+    }
+
+    return sideEffect;
 }
 
 IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key)
@@ -1265,22 +1458,23 @@ bool isZero(IRInst* inst)
         return as<IRFloatLit>(inst)->getValue() == 0.0;
     case kIROp_BoolLit:
         return as<IRBoolLit>(inst)->getValue() == false;
+    case kIROp_MakeCoopVector:
     case kIROp_MakeVector:
     case kIROp_MakeVectorFromScalar:
     case kIROp_MakeMatrix:
     case kIROp_MakeMatrixFromScalar:
     case kIROp_MatrixReshape:
     case kIROp_VectorReshape:
-    {
-        for (UInt i = 0; i < inst->getOperandCount(); i++)
         {
-            if (!isZero(inst->getOperand(i)))
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
             {
-                return false;
+                if (!isZero(inst->getOperand(i)))
+                {
+                    return false;
+                }
             }
+            return true;
         }
-        return true;
-    }
     case kIROp_CastIntToFloat:
     case kIROp_CastFloatToInt:
         return isZero(inst->getOperand(0));
@@ -1299,28 +1493,39 @@ bool isOne(IRInst* inst)
         return as<IRFloatLit>(inst)->getValue() == 1.0;
     case kIROp_BoolLit:
         return as<IRBoolLit>(inst)->getValue();
+    case kIROp_MakeCoopVector:
     case kIROp_MakeVector:
     case kIROp_MakeVectorFromScalar:
     case kIROp_MakeMatrix:
     case kIROp_MakeMatrixFromScalar:
     case kIROp_MatrixReshape:
     case kIROp_VectorReshape:
-    {
-        for (UInt i = 0; i < inst->getOperandCount(); i++)
         {
-            if (!isOne(inst->getOperand(i)))
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
             {
-                return false;
+                if (!isOne(inst->getOperand(i)))
+                {
+                    return false;
+                }
             }
+            return true;
         }
-        return true;
-    }
     case kIROp_CastIntToFloat:
     case kIROp_CastFloatToInt:
         return isOne(inst->getOperand(0));
     default:
         return false;
     }
+}
+
+IRPtrTypeBase* asRelevantPtrType(IRInst* inst)
+{
+    if (auto ptrType = as<IRPtrTypeBase>(inst))
+    {
+        if (ptrType->getAddressSpace() != AddressSpace::UserPointer)
+            return ptrType;
+    }
+    return nullptr;
 }
 
 IRPtrTypeBase* isMutablePointerType(IRInst* inst)
@@ -1330,7 +1535,7 @@ IRPtrTypeBase* isMutablePointerType(IRInst* inst)
     case kIROp_ConstRefType:
         return nullptr;
     default:
-        return as<IRPtrTypeBase>(inst);
+        return asRelevantPtrType(inst);
     }
 }
 
@@ -1345,7 +1550,7 @@ void initializeScratchData(IRInst* inst)
         item->scratchData = 0;
         for (auto child = item->getLastDecorationOrChild(); child; child = child->getPrevInst())
             workList.add(child);
-    }   
+    }
 }
 
 void resetScratchDataBit(IRInst* inst, int bitIndex)
@@ -1363,7 +1568,7 @@ void resetScratchDataBit(IRInst* inst, int bitIndex)
 }
 
 ///
-/// IRBlock related common helper methods 
+/// IRBlock related common helper methods
 ///
 void moveParams(IRBlock* dest, IRBlock* src)
 {
@@ -1387,15 +1592,23 @@ List<IRBlock*> collectBlocksInRegion(
     IRLoop* loop,
     bool* outHasMultiLevelBreaks)
 {
-    return collectBlocksInRegion(dom, loop->getBreakBlock(), loop->getTargetBlock(), true, outHasMultiLevelBreaks);
+    return collectBlocksInRegion(
+        dom,
+        loop->getBreakBlock(),
+        loop->getTargetBlock(),
+        true,
+        outHasMultiLevelBreaks);
 }
 
-List<IRBlock*> collectBlocksInRegion(
-    IRDominatorTree* dom,
-    IRLoop* loop)
+List<IRBlock*> collectBlocksInRegion(IRDominatorTree* dom, IRLoop* loop)
 {
     bool hasMultiLevelBreaks = false;
-    return collectBlocksInRegion(dom, loop->getBreakBlock(), loop->getTargetBlock(), true, &hasMultiLevelBreaks);
+    return collectBlocksInRegion(
+        dom,
+        loop->getBreakBlock(),
+        loop->getTargetBlock(),
+        true,
+        &hasMultiLevelBreaks);
 }
 
 List<IRBlock*> collectBlocksInRegion(
@@ -1403,30 +1616,41 @@ List<IRBlock*> collectBlocksInRegion(
     IRSwitch* switchInst,
     bool* outHasMultiLevelBreaks)
 {
-    return collectBlocksInRegion(dom, switchInst->getBreakLabel(), as<IRBlock>(switchInst->getParent()), false, outHasMultiLevelBreaks);
+    return collectBlocksInRegion(
+        dom,
+        switchInst->getBreakLabel(),
+        as<IRBlock>(switchInst->getParent()),
+        false,
+        outHasMultiLevelBreaks);
 }
 
-List<IRBlock*> collectBlocksInRegion(
-    IRDominatorTree* dom,
-    IRSwitch* switchInst)
+List<IRBlock*> collectBlocksInRegion(IRDominatorTree* dom, IRSwitch* switchInst)
 {
     bool hasMultiLevelBreaks = false;
-    return collectBlocksInRegion(dom, switchInst->getBreakLabel(), as<IRBlock>(switchInst->getParent()), false, &hasMultiLevelBreaks);
+    return collectBlocksInRegion(
+        dom,
+        switchInst->getBreakLabel(),
+        as<IRBlock>(switchInst->getParent()),
+        false,
+        &hasMultiLevelBreaks);
 }
 
 HashSet<IRBlock*> getParentBreakBlockSet(IRDominatorTree* dom, IRBlock* block)
 {
     HashSet<IRBlock*> parentBreakBlocksSet;
-    for (IRBlock* currBlock = dom->getImmediateDominator(block); 
-        currBlock;
-        currBlock = dom->getImmediateDominator(currBlock))
+    for (IRBlock* currBlock = dom->getImmediateDominator(block); currBlock;
+         currBlock = dom->getImmediateDominator(currBlock))
     {
         if (auto loopInst = as<IRLoop>(currBlock->getTerminator()))
+        {
             if (!dom->dominates(loopInst->getBreakBlock(), block))
                 parentBreakBlocksSet.add(loopInst->getBreakBlock());
+        }
         else if (auto switchInst = as<IRSwitch>(currBlock->getTerminator()))
+        {
             if (!dom->dominates(switchInst->getBreakLabel(), block))
                 parentBreakBlocksSet.add(switchInst->getBreakLabel());
+        }
     }
 
     return parentBreakBlocksSet;
@@ -1448,10 +1672,10 @@ List<IRBlock*> collectBlocksInRegion(
     };
 
     // Use dominator tree heirarchy to find break blocks of
-    // all parent regions. We'll need to this to detect breaks 
-    // to outer regions (particularly when our region has no reachable 
+    // all parent regions. We'll need to this to detect breaks
+    // to outer regions (particularly when our region has no reachable
     // break block of its own)
-    // 
+    //
     HashSet<IRBlock*> parentBreakBlocksSet = getParentBreakBlockSet(dom, firstBlock);
 
     *outHasMultiLevelBreaks = false;
@@ -1491,7 +1715,10 @@ List<IRBlock*> collectBlocksInRegion(
     return regionBlocks;
 }
 
-List<IRBlock *> collectBlocksInRegion(IRGlobalValueWithCode *func, IRLoop *loopInst, bool* outHasMultiLevelBreaks)
+List<IRBlock*> collectBlocksInRegion(
+    IRGlobalValueWithCode* func,
+    IRLoop* loopInst,
+    bool* outHasMultiLevelBreaks)
 {
     auto dom = computeDominatorTree(func);
     return collectBlocksInRegion(dom, loopInst, outHasMultiLevelBreaks);
@@ -1526,7 +1753,6 @@ IRVarLayout* findVarLayout(IRInst* value)
     if (auto layoutDecoration = value->findDecoration<IRLayoutDecoration>())
         return as<IRVarLayout>(layoutDecoration->getLayout());
     return nullptr;
-
 }
 
 UnownedStringSlice getBuiltinFuncName(IRInst* callee)
@@ -1557,7 +1783,7 @@ void hoistInstOutOfASMBlocks(IRBlock* block)
 IRType* getSPIRVSampledElementType(IRInst* sampledType)
 {
     auto sampledElementType = getVectorElementType((IRType*)sampledType);
-    
+
     IRBuilder builder(sampledType);
     switch (sampledElementType->getOp())
     {
@@ -1606,40 +1832,40 @@ UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
 {
     switch (basicType->getOp())
     {
-        case kIROp_IntType:
-            return UnownedStringSlice::fromLiteral("int");
-        case kIROp_Int8Type:
-            return UnownedStringSlice::fromLiteral("int8");
-        case kIROp_Int16Type:
-            return UnownedStringSlice::fromLiteral("int16");
-        case kIROp_Int64Type:
-            return UnownedStringSlice::fromLiteral("int64");
-        case kIROp_IntPtrType:
-            return UnownedStringSlice::fromLiteral("intptr");
-        case kIROp_UIntType:
-            return UnownedStringSlice::fromLiteral("uint");
-        case kIROp_UInt8Type:
-            return UnownedStringSlice::fromLiteral("uint8");
-        case kIROp_UInt16Type:
-            return UnownedStringSlice::fromLiteral("uint16");
-        case kIROp_UInt64Type:
-            return UnownedStringSlice::fromLiteral("uint64");
-        case kIROp_UIntPtrType:
-            return UnownedStringSlice::fromLiteral("uintptr");
-        case kIROp_FloatType:
-            return UnownedStringSlice::fromLiteral("float");
-        case kIROp_HalfType:
-            return UnownedStringSlice::fromLiteral("half");
-        case kIROp_DoubleType:
-            return UnownedStringSlice::fromLiteral("double");
-        case kIROp_BoolType:
-            return UnownedStringSlice::fromLiteral("bool");
-        case kIROp_VoidType:
-            return UnownedStringSlice::fromLiteral("void");
-        case kIROp_CharType:
-            return UnownedStringSlice::fromLiteral("char");
-        default:
-            return UnownedStringSlice();
+    case kIROp_IntType:
+        return UnownedStringSlice::fromLiteral("int");
+    case kIROp_Int8Type:
+        return UnownedStringSlice::fromLiteral("int8");
+    case kIROp_Int16Type:
+        return UnownedStringSlice::fromLiteral("int16");
+    case kIROp_Int64Type:
+        return UnownedStringSlice::fromLiteral("int64");
+    case kIROp_IntPtrType:
+        return UnownedStringSlice::fromLiteral("intptr");
+    case kIROp_UIntType:
+        return UnownedStringSlice::fromLiteral("uint");
+    case kIROp_UInt8Type:
+        return UnownedStringSlice::fromLiteral("uint8");
+    case kIROp_UInt16Type:
+        return UnownedStringSlice::fromLiteral("uint16");
+    case kIROp_UInt64Type:
+        return UnownedStringSlice::fromLiteral("uint64");
+    case kIROp_UIntPtrType:
+        return UnownedStringSlice::fromLiteral("uintptr");
+    case kIROp_FloatType:
+        return UnownedStringSlice::fromLiteral("float");
+    case kIROp_HalfType:
+        return UnownedStringSlice::fromLiteral("half");
+    case kIROp_DoubleType:
+        return UnownedStringSlice::fromLiteral("double");
+    case kIROp_BoolType:
+        return UnownedStringSlice::fromLiteral("bool");
+    case kIROp_VoidType:
+        return UnownedStringSlice::fromLiteral("void");
+    case kIROp_CharType:
+        return UnownedStringSlice::fromLiteral("char");
+    default:
+        return UnownedStringSlice();
     }
 }
 
@@ -1671,10 +1897,10 @@ struct GenericChildrenMigrationContextImpl
         if (insertBefore)
         {
             for (auto inst = genericDst->getFirstBlock()->getFirstOrdinaryInst();
-                inst && inst != insertBefore;
-                inst = inst->getNextInst())
+                 inst && inst != insertBefore;
+                 inst = inst->getNextInst())
             {
-                IRInstKey key = { inst };
+                IRInstKey key = {inst};
                 deduplicateContext.deduplicateMap.addIfNotExists(key, inst);
             }
         }
@@ -1682,7 +1908,9 @@ struct GenericChildrenMigrationContextImpl
 
     IRInst* deduplicate(IRInst* value)
     {
-        return deduplicateContext.deduplicate(value, [this](IRInst* inst)
+        return deduplicateContext.deduplicate(
+            value,
+            [this](IRInst* inst)
             {
                 if (inst->getParent() != dstGeneric->getFirstBlock())
                     return false;
@@ -1695,6 +1923,7 @@ struct GenericChildrenMigrationContextImpl
                 case kIROp_ClassType:
                 case kIROp_Func:
                 case kIROp_Generic:
+                case kIROp_Expand:
                     return false;
                 default:
                     break;
@@ -1738,7 +1967,10 @@ IRCloneEnv* GenericChildrenMigrationContext::getCloneEnv()
     return &impl->cloneEnv;
 }
 
-void GenericChildrenMigrationContext::init(IRGeneric* genericSrc, IRGeneric* genericDst, IRInst* insertBefore)
+void GenericChildrenMigrationContext::init(
+    IRGeneric* genericSrc,
+    IRGeneric* genericDst,
+    IRInst* insertBefore)
 {
     impl->init(genericSrc, genericDst, insertBefore);
 }
@@ -1755,13 +1987,13 @@ IRInst* GenericChildrenMigrationContext::cloneInst(IRBuilder* builder, IRInst* s
 
 IRType* dropNormAttributes(IRType* const t)
 {
-    if(const auto a = as<IRAttributedType>(t))
+    if (const auto a = as<IRAttributedType>(t))
     {
-        switch(a->getAttr()->getOp())
+        switch (a->getAttr()->getOp())
         {
-            case kIROp_UNormAttr:
-            case kIROp_SNormAttr:
-                return dropNormAttributes(a->getBaseType());
+        case kIROp_UNormAttr:
+        case kIROp_SNormAttr:
+            return dropNormAttributes(a->getBaseType());
         }
     }
     return t;
@@ -1800,7 +2032,9 @@ void verifyComputeDerivativeGroupModifiers(
     else if (linearAttr)
     {
         if ((x * y * z) % 4 != 0)
-            sink->diagnose(errorLoc, Diagnostics::derivativeGroupLinearMustBeMultiple4ForTotalThreadCount);
+            sink->diagnose(
+                errorLoc,
+                Diagnostics::derivativeGroupLinearMustBeMultiple4ForTotalThreadCount);
     }
 }
 
@@ -1817,4 +2051,176 @@ IRType* getIRVectorBaseType(IRType* type)
     return as<IRVectorType>(type)->getElementType();
 }
 
+Int getSpecializationConstantId(IRGlobalParam* param)
+{
+    auto layout = findVarLayout(param);
+    if (!layout)
+        return 0;
+
+    auto offset = layout->findOffsetAttr(LayoutResourceKind::SpecializationConstant);
+    if (!offset)
+        return 0;
+
+    return offset->getOffset();
 }
+
+IRBlock* getLoopHeaderForConditionBlock(IRBlock* block)
+{
+    // Go through uses and check if any of them are a loop condition block.
+    for (auto use = block->firstUse; use; use = use->nextUse)
+    {
+        if (auto loop = as<IRLoop>(use->getUser()))
+        {
+            if (loop->getTargetBlock() == block)
+                return cast<IRBlock>(loop->getParent());
+        }
+    }
+    return nullptr;
+}
+
+void legalizeDefUse(IRGlobalValueWithCode* func)
+{
+    auto dom = computeDominatorTree(func);
+
+    // Make a map of loop condition blocks to their loop header.
+    // We need this because we'll be treating loop condition blocks as
+    // special cases (they are the special blocks since they "dominate" themselves,
+    // in the dominator tree sense)
+    //
+    Dictionary<IRBlock*, IRBlock*> loopHeaderBlockMap;
+    for (auto block : func->getBlocks())
+    {
+        if (auto header = getLoopHeaderForConditionBlock(block))
+            loopHeaderBlockMap.add(block, header);
+    }
+
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getModifiableChildren())
+        {
+            // Inspect all uses of `inst` and find the common dominator of all use sites.
+            IRBlock* commonDominator = block;
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                if (!userBlock)
+                    continue;
+                while (commonDominator && !dom->dominates(commonDominator, userBlock))
+                {
+                    commonDominator = dom->getImmediateDominator(commonDominator);
+                }
+            }
+            SLANG_ASSERT(commonDominator);
+
+            // If commonDominator is 'block' and if the inst is not a Var in
+            // a loop condition block, we can skip the legalization.
+            //
+            if (commonDominator == block &&
+                !(as<IRVar>(inst) && loopHeaderBlockMap.containsKey(block)))
+                continue;
+
+            // Normally, if the common dominator is not `block`, we can simply move the definition
+            // to the common dominator.
+            // An exception is when the common dominator is the target block of a
+            // loop.
+            // Another exception is when a var in the loop condition block is accessed both inside
+            // and outside the loop. It is technically visible, but effects on the 'var' are not
+            // visible outside the loop, so we'll need to hoist it out of the loop.
+            //
+            // Note that after normalization, loops are in the form of:
+            // ```
+            // loop { if (condition) block; else break; }
+            // ```
+            // If we find ourselves needing to make the inst available right before
+            // the `if`, it means we are seeing uses of the inst outside the loop.
+            // In this case, we should insert a var/move the inst before the loop
+            // instead of before the `if`. This situation can occur in the IR if
+            // the original code is lowered from a `do-while` loop.
+            //
+            bool shouldInitializeVar = false;
+            if (loopHeaderBlockMap.containsKey(commonDominator))
+            {
+                bool shouldMoveToHeader = false;
+
+                // Check that the break-block dominates any of the uses are past the break
+                // block
+                for (auto _use = inst->firstUse; _use; _use = _use->nextUse)
+                {
+                    if (dom->dominates(
+                            as<IRLoop>(loopHeaderBlockMap[commonDominator]->getTerminator())
+                                ->getBreakBlock(),
+                            _use->getUser()->getParent()))
+                    {
+                        shouldMoveToHeader = true;
+                        break;
+                    }
+                }
+                if (shouldMoveToHeader)
+                {
+                    commonDominator = loopHeaderBlockMap[commonDominator];
+                    shouldInitializeVar = true;
+                }
+            }
+
+            // Now we can legalize uses based on the type of `inst`.
+            if (auto var = as<IRVar>(inst))
+            {
+                // If inst is an var, this is easy, we just move it to the
+                // common dominator.
+                var->insertBefore(commonDominator->getTerminator());
+                if (shouldInitializeVar)
+                {
+                    IRBuilder builder(func);
+                    builder.setInsertAfter(var);
+                    builder.emitStore(
+                        var,
+                        builder.emitDefaultConstruct(
+                            as<IRPtrTypeBase>(var->getDataType())->getValueType()));
+                }
+            }
+            else
+            {
+                // For all other insts, we need to create a local var for it,
+                // and replace all uses with a load from the local var.
+                IRBuilder builder(func);
+                builder.setInsertBefore(commonDominator->getTerminator());
+                IRVar* tempVar = builder.emitVar(inst->getFullType());
+                auto defaultVal = builder.emitDefaultConstruct(inst->getFullType());
+                builder.emitStore(tempVar, defaultVal);
+
+                builder.setInsertAfter(inst);
+                builder.emitStore(tempVar, inst);
+
+                traverseUses(
+                    inst,
+                    [&](IRUse* use)
+                    {
+                        auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                        if (!userBlock)
+                            return;
+                        // Only fix the use of the current definition of `inst` does not
+                        // dominate it.
+                        if (!dom->dominates(block, userBlock))
+                        {
+                            // Replace the use with a load of tempVar.
+                            builder.setInsertBefore(use->getUser());
+                            auto load = builder.emitLoad(tempVar);
+                            builder.replaceOperand(use, load);
+                        }
+                    });
+            }
+        }
+    }
+}
+
+UnownedStringSlice getMangledName(IRInst* inst)
+{
+    for (auto decor : inst->getDecorations())
+    {
+        if (auto linkageDecor = as<IRLinkageDecoration>(decor))
+            return linkageDecor->getMangledName();
+    }
+    return UnownedStringSlice();
+}
+
+} // namespace Slang

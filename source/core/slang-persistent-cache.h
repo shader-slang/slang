@@ -1,8 +1,8 @@
 #pragma once
-#include "slang.h"
 #include "../core/slang-crypto.h"
 #include "../core/slang-io.h"
 #include "../core/slang-string.h"
+#include "slang.h"
 
 #include <mutex>
 
@@ -18,7 +18,7 @@ class PersistentCache : public RefObject
 {
 public:
     struct Desc
-    {   
+    {
         // The root directory for the cache.
         const char* directory = nullptr;
         // The maximum number of entries stored in the cache. By default, there is no limit.
@@ -49,7 +49,7 @@ public:
     /// Read an entry from the cache.
     /// Returns SLANG_OK if successful, SLANG_E_NOT_FOUND if the entry is not in the cache.
     SlangResult readEntry(const Key& key, ISlangBlob** outData);
-    
+
     /// Write an entry to the cache.
     /// Returns SLANG_OK if successful.
     SlangResult writeEntry(const Key& key, ISlangBlob* data);
@@ -88,4 +88,4 @@ private:
     friend struct PersistentCacheTest;
 };
 
-}
+} // namespace Slang

@@ -1,13 +1,13 @@
 // window.h
 #pragma once
 
-#include "slang-com-ptr.h"
-#include "source/core/slang-basic.h"
-#include "source/core/slang-func-ptr.h"
-
+#include "core/slang-basic.h"
+#include "core/slang-func-ptr.h"
 #include "platform-api.h"
+#include "slang-com-ptr.h"
 
-namespace platform {
+namespace platform
+{
 
 enum class KeyCode : uint32_t
 {
@@ -139,8 +139,13 @@ struct ButtonState
 {
     enum Enum
     {
-        None = 0, LeftButton = 1, RightButton = 2, MiddleButton = 4,
-        Shift = 8, Control = 16, Alt = 32
+        None = 0,
+        LeftButton = 1,
+        RightButton = 2,
+        MiddleButton = 4,
+        Shift = 8,
+        Control = 16,
+        Alt = 32
     };
 };
 
@@ -167,7 +172,8 @@ struct Rect
 
 enum class WindowStyle
 {
-    Default, FixedSize,
+    Default,
+    FixedSize,
 };
 
 struct WindowDesc
@@ -226,37 +232,24 @@ public:
 
 #ifdef _WIN32
 
-#    ifdef _MSC_VER
-#        ifdef _DEBUG
-#            define GFX_DUMP_LEAK _CrtDumpMemoryLeaks();
-#        endif
-#    endif
-#    ifndef GFX_DUMP_LEAK
-#        define GFX_DUMP_LEAK
-#    endif
-#    define PLATFORM_UI_MAIN(APPLICATION_ENTRY) \
-        int __stdcall wWinMain(                 \
-            void* /*instance*/,                 \
-            void* /* prevInstance */,           \
-            void* /* commandLine */,            \
-            int /*showCommand*/)                \
-        {                                       \
-            platform::Application::init();      \
-            auto result = APPLICATION_ENTRY();  \
-            platform::Application::dispose();   \
-            GFX_DUMP_LEAK                       \
-            return result;                      \
-        }
-
-#else
-
-#define PLATFORM_UI_MAIN(APPLICATION_ENTRY) \
-    int main()                              \
-    {                                       \
-        platform::Application::init();      \
-        auto rs = APPLICATION_ENTRY();      \
-        platform::Application::dispose();   \
-        return rs;                          \
-    }
+#ifdef _MSC_VER
+#ifdef _DEBUG
+#define GFX_DUMP_LEAK _CrtDumpMemoryLeaks();
+#endif
+#endif
 
 #endif
+
+#ifndef GFX_DUMP_LEAK
+#define GFX_DUMP_LEAK
+#endif
+
+#define PLATFORM_UI_MAIN(APPLICATION_ENTRY)      \
+    int exampleMain(int argc, char** argv)       \
+    {                                            \
+        platform::Application::init();           \
+        auto rs = APPLICATION_ENTRY(argc, argv); \
+        platform::Application::dispose();        \
+        GFX_DUMP_LEAK                            \
+        return rs;                               \
+    }

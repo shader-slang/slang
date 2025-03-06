@@ -1,45 +1,44 @@
 // lower.cpp
 #include "slang-lower-to-ir.h"
 
-#include "slang.h"
-
-#include "../core/slang-random-generator.h"
-#include "../core/slang-hash.h"
 #include "../core/slang-char-util.h"
+#include "../core/slang-hash.h"
 #include "../core/slang-performance-profiler.h"
-
+#include "../core/slang-random-generator.h"
 #include "slang-check.h"
+#include "slang-ir-autodiff.h"
 #include "slang-ir-bit-field-accessors.h"
-#include "slang-ir-loop-inversion.h"
-#include "slang-ir.h"
-#include "slang-ir-util.h"
+#include "slang-ir-check-differentiability.h"
+#include "slang-ir-check-recursion.h"
+#include "slang-ir-clone.h"
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-diff-call.h"
-#include "slang-ir-autodiff.h"
 #include "slang-ir-inline.h"
-#include "slang-ir-insts.h"
 #include "slang-ir-insert-debug-value-store.h"
-#include "slang-ir-check-differentiability.h"
-#include "slang-ir-check-recursive-type.h"
-#include "slang-ir-missing-return.h"
-#include "slang-ir-operator-shift-overflow.h"
-#include "slang-ir-sccp.h"
-#include "slang-ir-ssa.h"
-#include "slang-ir-strip.h"
-#include "slang-ir-simplify-cfg.h"
-#include "slang-ir-validate.h"
-#include "slang-ir-string-hash.h"
-#include "slang-ir-clone.h"
+#include "slang-ir-insts.h"
+#include "slang-ir-loop-inversion.h"
 #include "slang-ir-lower-error-handling.h"
+#include "slang-ir-lower-expand-type.h"
+#include "slang-ir-missing-return.h"
 #include "slang-ir-obfuscate-loc.h"
-#include "slang-ir-use-uninitialized-values.h"
+#include "slang-ir-operator-shift-overflow.h"
 #include "slang-ir-peephole.h"
+#include "slang-ir-sccp.h"
+#include "slang-ir-simplify-cfg.h"
+#include "slang-ir-ssa.h"
+#include "slang-ir-string-hash.h"
+#include "slang-ir-strip.h"
+#include "slang-ir-use-uninitialized-values.h"
+#include "slang-ir-util.h"
+#include "slang-ir-validate.h"
+#include "slang-ir.h"
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
+#include "slang.h"
 
-// Natural layout 
+// Natural layout
 #include "slang-ast-natural-layout.h"
 
 namespace Slang
@@ -83,7 +82,8 @@ namespace Slang
 // hierarchy:
 //
 struct ExtendedValueInfo : RefObject
-{};
+{
+};
 
 // This case is used to indicate a value that is a reference
 // to an AST-level subscript declaration.
@@ -152,18 +152,22 @@ struct LoweredValInfo
 
     union
     {
-        IRInst*             val;
-        ExtendedValueInfo*  ext;
+        IRInst* val;
+        ExtendedValueInfo* ext;
 
         // We can compare any of the pointers above by comparing this pointer. If the union
-        // ever becomes something other than a union of pointers, this would no longer be applicable.
-        void*               aliasPtr;
+        // ever becomes something other than a union of pointers, this would no longer be
+        // applicable.
+        void* aliasPtr;
     };
     Flavor flavor;
 
-        // NOTE! This relies on the union, allowing the comparison of any of the pointer type in the union.
-        // Assumes equality is the same as val pointer/or ext pointer being equal. 
-    bool operator==(const ThisType& rhs) const { return flavor == rhs.flavor && aliasPtr == rhs.aliasPtr; }
+    // NOTE! This relies on the union, allowing the comparison of any of the pointer type in the
+    // union. Assumes equality is the same as val pointer/or ext pointer being equal.
+    bool operator==(const ThisType& rhs) const
+    {
+        return flavor == rhs.flavor && aliasPtr == rhs.aliasPtr;
+    }
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
     LoweredValInfo()
@@ -194,8 +198,7 @@ struct LoweredValInfo
         return info;
     }
 
-    static LoweredValInfo boundMember(
-        BoundMemberInfo*    boundMemberInfo);
+    static LoweredValInfo boundMember(BoundMemberInfo* boundMemberInfo);
 
     BoundMemberInfo* getBoundMemberInfo()
     {
@@ -203,8 +206,7 @@ struct LoweredValInfo
         return (BoundMemberInfo*)ext;
     }
 
-    static LoweredValInfo subscript(
-        SubscriptInfo* subscriptInfo);
+    static LoweredValInfo subscript(SubscriptInfo* subscriptInfo);
 
     SubscriptInfo* getSubscriptInfo()
     {
@@ -212,8 +214,7 @@ struct LoweredValInfo
         return (SubscriptInfo*)ext;
     }
 
-    static LoweredValInfo boundStorage(
-        BoundStorageInfo* boundStorageInfo);
+    static LoweredValInfo boundStorage(BoundStorageInfo* boundStorageInfo);
 
     BoundStorageInfo* getBoundStorageInfo()
     {
@@ -221,14 +222,11 @@ struct LoweredValInfo
         return (BoundStorageInfo*)ext;
     }
 
-    static LoweredValInfo swizzledLValue(
-        SwizzledLValueInfo* extInfo);
+    static LoweredValInfo swizzledLValue(SwizzledLValueInfo* extInfo);
 
-    static LoweredValInfo swizzledMatrixLValue(
-        SwizzledMatrixLValueInfo* extInfo);
+    static LoweredValInfo swizzledMatrixLValue(SwizzledMatrixLValueInfo* extInfo);
 
-    static LoweredValInfo implicitCastedLValue(
-        ImplicitCastLValueInfo* extInfo);
+    static LoweredValInfo implicitCastedLValue(ImplicitCastLValueInfo* extInfo);
 
     SwizzledLValueInfo* getSwizzledLValueInfo()
     {
@@ -242,8 +240,7 @@ struct LoweredValInfo
         return (SwizzledMatrixLValueInfo*)ext;
     }
 
-    static LoweredValInfo extractedExistential(
-        ExtractedExistentialValInfo* extInfo);
+    static LoweredValInfo extractedExistential(ExtractedExistentialValInfo* extInfo);
 
     ExtractedExistentialValInfo* getExtractedExistentialValInfo()
     {
@@ -287,17 +284,17 @@ struct LoweredValInfo
 //
 struct BoundStorageInfo : ExtendedValueInfo
 {
-        /// The declaration of the abstract storage (subscript or property)
-    DeclRef<ContainerDecl>  declRef;
+    /// The declaration of the abstract storage (subscript or property)
+    DeclRef<ContainerDecl> declRef;
 
-        /// The IR-level type of the stored value
-    IRType*                 type;
+    /// The IR-level type of the stored value
+    IRType* type;
 
-        /// The base value/object on which storage is being accessed
-    LoweredValInfo          base;
+    /// The base value/object on which storage is being accessed
+    LoweredValInfo base;
 
-        /// Additional arguments required to reify a reference to the storage
-    List<IRInst*>           additionalArgs;
+    /// Additional arguments required to reify a reference to the storage
+    List<IRInst*> additionalArgs;
 };
 
 
@@ -313,7 +310,7 @@ struct BoundStorageInfo : ExtendedValueInfo
 struct BoundMemberInfo : ExtendedValueInfo
 {
     // The base object
-    LoweredValInfo  base;
+    LoweredValInfo base;
 
     // The (AST-level) declaration reference.
     DeclRef<Decl> declRef;
@@ -331,13 +328,13 @@ struct BoundMemberInfo : ExtendedValueInfo
 struct SwizzledLValueInfo : ExtendedValueInfo
 {
     // The type of the expression.
-    IRType*         type;
+    IRType* type;
 
     // The base expression (this should be an l-value)
-    LoweredValInfo  base;
+    LoweredValInfo base;
 
-    // THe indices for the elements being swizzled
-    ShortList<UInt, 4> elementIndices;
+    // The indices for the elements being swizzled
+    ShortList<uint32_t, 4> elementIndices;
 };
 
 // Represents the result of a matrix swizzle operation in an l-value context.
@@ -345,16 +342,16 @@ struct SwizzledLValueInfo : ExtendedValueInfo
 struct SwizzledMatrixLValueInfo : ExtendedValueInfo
 {
     // The type of the expression.
-    IRType*         type;
+    IRType* type;
 
     // The base expression (this should be an l-value)
-    LoweredValInfo  base;
+    LoweredValInfo base;
 
     // The number of elements in the swizzle
-    UInt            elementCount;
+    UInt elementCount;
 
     // The coords for the elements being swizzled, zero indexed
-    MatrixCoord     elementCoords[4];
+    MatrixCoord elementCoords[4];
 };
 
 // Represents the results of extractng a value of
@@ -384,14 +381,13 @@ struct ImplicitCastLValueInfo : ExtendedValueInfo
     IRType* type;
 
     // The base expression (this should be an l-value)
-    LoweredValInfo  base;
+    LoweredValInfo base;
 
     // The type of the lvalue (inout, out, ref, etc.)
     ParameterDirection lValueType;
 };
 
-LoweredValInfo LoweredValInfo::boundMember(
-    BoundMemberInfo*    boundMemberInfo)
+LoweredValInfo LoweredValInfo::boundMember(BoundMemberInfo* boundMemberInfo)
 {
     LoweredValInfo info;
     info.flavor = Flavor::BoundMember;
@@ -399,8 +395,7 @@ LoweredValInfo LoweredValInfo::boundMember(
     return info;
 }
 
-LoweredValInfo LoweredValInfo::subscript(
-    SubscriptInfo* subscriptInfo)
+LoweredValInfo LoweredValInfo::subscript(SubscriptInfo* subscriptInfo)
 {
     LoweredValInfo info;
     info.flavor = Flavor::Subscript;
@@ -408,8 +403,7 @@ LoweredValInfo LoweredValInfo::subscript(
     return info;
 }
 
-LoweredValInfo LoweredValInfo::boundStorage(
-    BoundStorageInfo* boundStorageInfo)
+LoweredValInfo LoweredValInfo::boundStorage(BoundStorageInfo* boundStorageInfo)
 {
     LoweredValInfo info;
     info.flavor = Flavor::BoundStorage;
@@ -417,8 +411,7 @@ LoweredValInfo LoweredValInfo::boundStorage(
     return info;
 }
 
-LoweredValInfo LoweredValInfo::swizzledLValue(
-        SwizzledLValueInfo* extInfo)
+LoweredValInfo LoweredValInfo::swizzledLValue(SwizzledLValueInfo* extInfo)
 {
     LoweredValInfo info;
     info.flavor = Flavor::SwizzledLValue;
@@ -426,8 +419,7 @@ LoweredValInfo LoweredValInfo::swizzledLValue(
     return info;
 }
 
-LoweredValInfo LoweredValInfo::swizzledMatrixLValue(
-        SwizzledMatrixLValueInfo* extInfo)
+LoweredValInfo LoweredValInfo::swizzledMatrixLValue(SwizzledMatrixLValueInfo* extInfo)
 {
     LoweredValInfo info;
     info.flavor = Flavor::SwizzledMatrixLValue;
@@ -435,8 +427,7 @@ LoweredValInfo LoweredValInfo::swizzledMatrixLValue(
     return info;
 }
 
-LoweredValInfo LoweredValInfo::implicitCastedLValue(
-    ImplicitCastLValueInfo* extInfo)
+LoweredValInfo LoweredValInfo::implicitCastedLValue(ImplicitCastLValueInfo* extInfo)
 {
     LoweredValInfo info;
     info.flavor = Flavor::ImplicitCastedLValue;
@@ -444,8 +435,7 @@ LoweredValInfo LoweredValInfo::implicitCastedLValue(
     return info;
 }
 
-LoweredValInfo LoweredValInfo::extractedExistential(
-    ExtractedExistentialValInfo* extInfo)
+LoweredValInfo LoweredValInfo::extractedExistential(ExtractedExistentialValInfo* extInfo)
 {
     LoweredValInfo info;
     info.flavor = Flavor::ExtractedExistential;
@@ -468,12 +458,12 @@ struct IRGenEnv
     Dictionary<Decl*, LoweredValInfo> mapDeclToValue;
 
     // The next outer env around this one
-    IRGenEnv*   outer = nullptr;
+    IRGenEnv* outer = nullptr;
 };
 
 struct SharedIRGenContext
 {
-    
+
     // The "global" environment for mapping declarations to their IR values.
     IRGenEnv globalEnv;
 
@@ -516,13 +506,14 @@ struct SharedIRGenContext
         , m_obfuscateCode(obfuscateCode)
         , m_mainModuleDecl(mainModuleDecl)
         , m_linkage(linkage)
-    {}
+    {
+    }
 
-    Session*        m_session = nullptr;
+    Session* m_session = nullptr;
     DiagnosticSink* m_sink = nullptr;
-    bool            m_obfuscateCode = false;
-    ModuleDecl*     m_mainModuleDecl = nullptr;
-    Linkage*        m_linkage = nullptr;
+    bool m_obfuscateCode = false;
+    ModuleDecl* m_mainModuleDecl = nullptr;
+    Linkage* m_linkage = nullptr;
 
     // List of all string literals used in user code, regardless
     // of how they were used (i.e., whether or not they were hashed).
@@ -545,12 +536,19 @@ struct AstOrIRType
     IRInst* irType = nullptr;
     IRInst* getIRType(IRGenContext* context);
 
-    AstOrIRType& operator=(Type* t) { astType = t; irType = nullptr; return *this; }
-    AstOrIRType& operator=(IRInst* t) { astType = nullptr; irType = t; return *this; }
-    explicit operator bool()
+    AstOrIRType& operator=(Type* t)
     {
-        return astType || irType;
+        astType = t;
+        irType = nullptr;
+        return *this;
     }
+    AstOrIRType& operator=(IRInst* t)
+    {
+        astType = nullptr;
+        irType = t;
+        return *this;
+    }
+    explicit operator bool() { return astType || irType; }
 };
 
 struct IRGenContext
@@ -561,7 +559,7 @@ struct IRGenContext
     SharedIRGenContext* shared;
 
     // environment for mapping AST decls to IR values
-    IRGenEnv*   env;
+    IRGenEnv* env;
 
     // IR builder to use when building code under this context
     IRBuilder* irBuilder;
@@ -594,42 +592,32 @@ struct IRGenContext
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
 
+    // Callback function to call when after lowering a type.
+    std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> lowerTypeCallback =
+        nullptr;
+
     explicit IRGenContext(SharedIRGenContext* inShared, ASTBuilder* inAstBuilder)
-        : shared(inShared)
-        , astBuilder(inAstBuilder)
-        , env(&inShared->globalEnv)
-        , irBuilder(nullptr)
-    {}
-
-    void setGlobalValue(Decl* decl, LoweredValInfo value)
+        : shared(inShared), astBuilder(inAstBuilder), env(&inShared->globalEnv), irBuilder(nullptr)
     {
-        shared->setGlobalValue(decl, value);
     }
 
-    void setValue(Decl* decl, LoweredValInfo value)
+    void registerTypeCallback(
+        std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> callback)
     {
-        env->mapDeclToValue[decl] = value;
+        lowerTypeCallback = callback;
     }
 
-    Session* getSession()
-    {
-        return shared->m_session;
-    }
+    void setGlobalValue(Decl* decl, LoweredValInfo value) { shared->setGlobalValue(decl, value); }
 
-    DiagnosticSink* getSink()
-    {
-        return shared->m_sink;
-    }
+    void setValue(Decl* decl, LoweredValInfo value) { env->mapDeclToValue[decl] = value; }
 
-    ModuleDecl* getMainModuleDecl()
-    {
-        return shared->m_mainModuleDecl;
-    }
+    Session* getSession() { return shared->m_session; }
 
-    Linkage* getLinkage()
-    {
-        return shared->m_linkage;
-    }
+    DiagnosticSink* getSink() { return shared->m_sink; }
+
+    ModuleDecl* getMainModuleDecl() { return shared->m_mainModuleDecl; }
+
+    Linkage* getLinkage() { return shared->m_linkage; }
 
     LoweredValInfo* findLoweredDecl(Decl* decl)
     {
@@ -654,11 +642,11 @@ ModuleDecl* findModuleDecl(Decl* decl)
     return nullptr;
 }
 
-bool isFromStdLib(Decl* decl)
+bool isFromCoreModule(Decl* decl)
 {
     for (auto dd = decl; dd; dd = dd->parentDecl)
     {
-        if (dd->hasModifier<FromStdLibModifier>())
+        if (dd->hasModifier<FromCoreModuleModifier>())
             return true;
     }
     return false;
@@ -701,25 +689,18 @@ bool isImportedDecl(IRGenContext* context, Decl* decl, bool& outIsExplicitExtern
     return false;
 }
 
-    /// Should the given `decl` nested in `parentDecl` be treated as a static rather than instance declaration?
-bool isEffectivelyStatic(
-    Decl*           decl,
-    ContainerDecl*  parentDecl);
+/// Should the given `decl` nested in `parentDecl` be treated as a static rather than instance
+/// declaration?
+bool isEffectivelyStatic(Decl* decl, ContainerDecl* parentDecl);
 
-bool isStdLibMemberFuncDecl(
-    Decl*   decl);
+bool isCoreModuleMemberFuncDecl(Decl* decl);
 
 // Ensure that a version of the given declaration has been emitted to the IR
-LoweredValInfo ensureDecl(
-    IRGenContext*   context,
-    Decl*           decl);
+LoweredValInfo ensureDecl(IRGenContext* context, Decl* decl);
 
 // Emit code as needed to construct a reference to the given declaration with
 // any needed specializations in place.
-LoweredValInfo emitDeclRef(
-    IRGenContext*   context,
-    DeclRef<Decl>   declRef,
-    IRType*         type);
+LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType* type);
 
 
 bool isFunctionVarDecl(VarDeclBase* decl)
@@ -748,12 +729,10 @@ bool isFunctionStaticVarDecl(VarDeclBase* decl)
 
 IRInst* getSimpleVal(IRGenContext* context, LoweredValInfo lowered);
 
-int32_t getIntrinsicOp(
-    Decl*                   decl,
-    IntrinsicOpModifier*    intrinsicOpMod)
+int32_t getIntrinsicOp(Decl* decl, IntrinsicOpModifier* intrinsicOpMod)
 {
     int32_t op = intrinsicOpMod->op;
-    if(op != 0)
+    if (op != 0)
         return op;
 
     // No specified modifier? Then we need to look it up
@@ -777,11 +756,11 @@ struct TryClauseEnvironment
 // Given a `LoweredValInfo` for something callable, along with a
 // bunch of arguments, emit an appropriate call to it.
 LoweredValInfo emitCallToVal(
-    IRGenContext*   context,
-    IRType*         type,
-    LoweredValInfo  funcVal,
-    UInt            argCount,
-    IRInst* const*  args,
+    IRGenContext* context,
+    IRType* type,
+    LoweredValInfo funcVal,
+    UInt argCount,
+    IRInst* const* args,
     const TryClauseEnvironment& tryEnv)
 {
     auto builder = context->irBuilder;
@@ -793,29 +772,32 @@ LoweredValInfo emitCallToVal(
         switch (tryEnv.clauseType)
         {
         case TryClauseType::None:
-        {
-            auto callee = getSimpleVal(context, funcVal);
-            if (auto dispatchKernel = as<IRDispatchKernel>(callee))
             {
-                // If callee is a dispatch kernel expr, don't emit call(dispatchKernel, ...), instead
-                // emit a dispatchKernel(high_order_args, actual_args).
-                auto result = LoweredValInfo::simple(builder->emitDispatchKernelInst(
-                    type,
-                    dispatchKernel->getBaseFn(),
-                    dispatchKernel->getThreadGroupSize(),
-                    dispatchKernel->getDispatchSize(),
-                    argCount,
-                    args));
-                SLANG_ASSERT(!dispatchKernel->hasUses());
-                dispatchKernel->removeAndDeallocate();
-                return result;
+                auto callee = getSimpleVal(context, funcVal);
+                if (auto dispatchKernel = as<IRDispatchKernel>(callee))
+                {
+                    // If callee is a dispatch kernel expr, don't emit call(dispatchKernel,
+                    // ...), instead emit a dispatchKernel(high_order_args, actual_args).
+                    auto result = LoweredValInfo::simple(builder->emitDispatchKernelInst(
+                        type,
+                        dispatchKernel->getBaseFn(),
+                        dispatchKernel->getThreadGroupSize(),
+                        dispatchKernel->getDispatchSize(),
+                        argCount,
+                        args));
+                    SLANG_ASSERT(!dispatchKernel->hasUses());
+                    dispatchKernel->removeAndDeallocate();
+                    return result;
+                }
+                else
+                {
+                    return LoweredValInfo::simple(builder->emitCallInst(
+                        type,
+                        getSimpleVal(context, funcVal),
+                        argCount,
+                        args));
+                }
             }
-            else
-            {
-                return LoweredValInfo::simple(
-                    builder->emitCallInst(type, getSimpleVal(context, funcVal), argCount, args));
-            }
-        }
 
         case TryClauseType::Standard:
             {
@@ -841,22 +823,13 @@ LoweredValInfo emitCallToVal(
     }
 }
 
-LoweredValInfo lowerRValueExpr(
-    IRGenContext*   context,
-    Expr*           expr);
+LoweredValInfo lowerRValueExpr(IRGenContext* context, Expr* expr);
 
-void lowerRValueExprWithDestination(
-    IRGenContext* context,
-    LoweredValInfo destination,
-    Expr* expr);
+void lowerRValueExprWithDestination(IRGenContext* context, LoweredValInfo destination, Expr* expr);
 
-IRType* lowerType(
-    IRGenContext*   context,
-    Type*           type);
+IRType* lowerType(IRGenContext* context, Type* type);
 
-static IRType* lowerType(
-    IRGenContext*   context,
-    QualType const& type)
+static IRType* lowerType(IRGenContext* context, QualType const& type)
 {
     return lowerType(context, type.type);
 }
@@ -872,12 +845,12 @@ IRInst* AstOrIRType::getIRType(IRGenContext* context)
 // Given a `DeclRef` for something callable, along with a bunch of
 // arguments, emit an appropriate call to it.
 LoweredValInfo emitCallToDeclRef(
-    IRGenContext*   context,
-    IRType*         type,
-    DeclRef<Decl>   funcDeclRef,
-    IRType*         funcType,
-    UInt            argCount,
-    IRInst* const*  args,
+    IRGenContext* context,
+    IRType* type,
+    DeclRef<Decl> funcDeclRef,
+    IRType* funcType,
+    UInt argCount,
+    IRInst* const* args,
     const TryClauseEnvironment& tryEnv)
 {
     SLANG_ASSERT(funcType);
@@ -885,7 +858,7 @@ LoweredValInfo emitCallToDeclRef(
     auto builder = context->irBuilder;
 
     auto funcDecl = funcDeclRef.getDecl();
-    if(auto intrinsicOpModifier = funcDecl->findModifier<IntrinsicOpModifier>())
+    if (auto intrinsicOpModifier = funcDecl->findModifier<IntrinsicOpModifier>())
     {
         // The intrinsic op maps to a single IR instruction,
         // so we will emit an instruction with the chosen
@@ -897,11 +870,8 @@ LoweredValInfo emitCallToDeclRef(
             return LoweredValInfo::simple(args[0]);
         }
         auto intrinsicOp = getIntrinsicOp(funcDecl, intrinsicOpModifier);
-        return LoweredValInfo::simple(builder->emitIntrinsicInst(
-            type,
-            IROp(intrinsicOp),
-            argCount,
-            args));
+        return LoweredValInfo::simple(
+            builder->emitIntrinsicInst(type, IROp(intrinsicOp), argCount, args));
     }
 
     // Fallback case is to emit an actual call.
@@ -911,11 +881,11 @@ LoweredValInfo emitCallToDeclRef(
 }
 
 LoweredValInfo emitCallToDeclRef(
-    IRGenContext*           context,
-    IRType*                 type,
-    DeclRef<Decl>           funcDeclRef,
-    IRType*                 funcType,
-    List<IRInst*> const&    args,
+    IRGenContext* context,
+    IRType* type,
+    DeclRef<Decl> funcDeclRef,
+    IRType* funcType,
+    List<IRInst*> const& args,
     const TryClauseEnvironment& tryEnv)
 {
     return emitCallToDeclRef(
@@ -928,57 +898,65 @@ LoweredValInfo emitCallToDeclRef(
         tryEnv);
 }
 
-    /// Emit a call to the given `accessorDeclRef`.
-    ///
-    /// The `base` value represents the object on which the accessor is being invoked.
-    /// The `args` represent any additional arguments to the accessor. This could be
-    /// because we are invoking a subscript accessor (so the args include any index value(s)),
-    /// and/or because we are invoking a setter (so that the args include the new value
-    /// to be set).
-    ///
+/// Emit a call to the given `accessorDeclRef`.
+///
+/// The `base` value represents the object on which the accessor is being invoked.
+/// The `args` represent any additional arguments to the accessor. This could be
+/// because we are invoking a subscript accessor (so the args include any index value(s)),
+/// and/or because we are invoking a setter (so that the args include the new value
+/// to be set).
+///
 static LoweredValInfo _emitCallToAccessor(
-    IRGenContext*           context,
-    IRType*                 type,
-    DeclRef<AccessorDecl>   accessorDeclRef,
-    LoweredValInfo          base,
-    UInt                    argCount,
-    IRInst* const*          args);
+    IRGenContext* context,
+    IRType* type,
+    DeclRef<AccessorDecl> accessorDeclRef,
+    LoweredValInfo base,
+    UInt argCount,
+    IRInst* const* args);
 
 static LoweredValInfo _emitCallToAccessor(
-    IRGenContext*           context,
-    IRType*                 type,
-    DeclRef<AccessorDecl>   accessorDeclRef,
-    LoweredValInfo          base,
-    List<IRInst*> const&    args)
+    IRGenContext* context,
+    IRType* type,
+    DeclRef<AccessorDecl> accessorDeclRef,
+    LoweredValInfo base,
+    List<IRInst*> const& args)
 {
-    return _emitCallToAccessor(context, type, accessorDeclRef, base, args.getCount(), args.getBuffer());
+    return _emitCallToAccessor(
+        context,
+        type,
+        accessorDeclRef,
+        base,
+        args.getCount(),
+        args.getBuffer());
 }
 
-    /// Lower a reference to abstract storage (a property or subscript).
-    ///
-    /// The given `storageDeclRef` is being accessed on some `base` value,
-    /// to yield a value of some expected `type`. The additional `args`
-    /// are only needed in the case of a subscript declaration (for
-    /// a property, `argCount` should be zero).
-    ///
-    /// In the case where there is only a `get` accessor, this function
-    /// will go ahead and invoke it to produce a value here and now.
-    /// Otherwise, it will produce an abstract `LoweredValInfo` that
-    /// encapsulates the reference to the storage so that downstream
-    /// code can decide which accessor(s) to invoke.
-    ///
-[[maybe_unused]]
-static LoweredValInfo lowerStorageReference(
-    IRGenContext*           context,
-    IRType*                 type,
-    DeclRef<ContainerDecl>  storageDeclRef,
-    LoweredValInfo          base,
-    UInt                    argCount,
-    IRInst* const*          args)
+/// Lower a reference to abstract storage (a property or subscript).
+///
+/// The given `storageDeclRef` is being accessed on some `base` value,
+/// to yield a value of some expected `type`. The additional `args`
+/// are only needed in the case of a subscript declaration (for
+/// a property, `argCount` should be zero).
+///
+/// In the case where there is only a `get` accessor, this function
+/// will go ahead and invoke it to produce a value here and now.
+/// Otherwise, it will produce an abstract `LoweredValInfo` that
+/// encapsulates the reference to the storage so that downstream
+/// code can decide which accessor(s) to invoke.
+///
+[[maybe_unused]] static LoweredValInfo lowerStorageReference(
+    IRGenContext* context,
+    IRType* type,
+    DeclRef<ContainerDecl> storageDeclRef,
+    LoweredValInfo base,
+    UInt argCount,
+    IRInst* const* args)
 {
     DeclRef<GetterDecl> getterDeclRef;
     bool justAGetter = true;
-    for (auto accessorDeclRef : getMembersOfType<AccessorDecl>(context->astBuilder, storageDeclRef, MemberFilterStyle::Instance))
+    for (auto accessorDeclRef : getMembersOfType<AccessorDecl>(
+             context->astBuilder,
+             storageDeclRef,
+             MemberFilterStyle::Instance))
     {
         // We want to track whether this storage has any accessors other than
         // `get` (assuming that everything except `get` can be used for setting...).
@@ -1024,18 +1002,16 @@ static LoweredValInfo lowerStorageReference(
     return _emitCallToAccessor(context, type, getterDeclRef, base, argCount, args);
 }
 
-IRInst* getFieldKey(
-    IRGenContext*   context,
-    DeclRef<Decl>   field)
+IRInst* getFieldKey(IRGenContext* context, DeclRef<Decl> field)
 {
     return getSimpleVal(context, emitDeclRef(context, field, context->irBuilder->getKeyType()));
 }
 
 LoweredValInfo extractField(
-    IRGenContext*   context,
-    IRType*         fieldType,
-    LoweredValInfo  base,
-    DeclRef<Decl>   field)
+    IRGenContext* context,
+    IRType* fieldType,
+    LoweredValInfo base,
+    DeclRef<Decl> field)
 {
     IRBuilder* builder = context->irBuilder;
 
@@ -1045,10 +1021,7 @@ LoweredValInfo extractField(
         {
             IRInst* irBase = getSimpleVal(context, base);
             return LoweredValInfo::simple(
-                builder->emitFieldExtract(
-                    fieldType,
-                    irBase,
-                    getFieldKey(context, field)));
+                builder->emitFieldExtract(fieldType, irBase, getFieldKey(context, field)));
         }
         break;
 
@@ -1074,24 +1047,21 @@ LoweredValInfo extractField(
             // which means we should just compute an lvalue
             // representing the field address.
             IRInst* irBasePtr = base.val;
-            return LoweredValInfo::ptr(
-                builder->emitFieldAddress(
-                    builder->getPtrType(fieldType),
-                    irBasePtr,
-                    getFieldKey(context, field)));
+            return LoweredValInfo::ptr(builder->emitFieldAddress(
+                builder->getPtrType(fieldType),
+                irBasePtr,
+                getFieldKey(context, field)));
         }
         break;
     }
 }
 
-LoweredValInfo materialize(
-    IRGenContext*   context,
-    LoweredValInfo  lowered)
+LoweredValInfo materialize(IRGenContext* context, LoweredValInfo lowered)
 {
     auto builder = context->irBuilder;
 
 top:
-    switch(lowered.flavor)
+    switch (lowered.flavor)
     {
     case LoweredValInfo::Flavor::None:
     case LoweredValInfo::Flavor::Simple:
@@ -1111,7 +1081,10 @@ top:
             // in case the `get` operation has a natural translation for
             // a target, while the general `ref` case does not...)
 
-            auto getters = getMembersOfType<GetterDecl>(context->astBuilder, boundStorageInfo->declRef, MemberFilterStyle::Instance);
+            auto getters = getMembersOfType<GetterDecl>(
+                context->astBuilder,
+                boundStorageInfo->declRef,
+                MemberFilterStyle::Instance);
             if (getters.getCount())
             {
                 auto getter = *getters.begin();
@@ -1124,8 +1097,11 @@ top:
                 goto top;
             }
 
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(context->astBuilder, boundStorageInfo->declRef, MemberFilterStyle::Instance);
-            if(refAccessors.getCount())
+            auto refAccessors = getMembersOfType<RefAccessorDecl>(
+                context->astBuilder,
+                boundStorageInfo->declRef,
+                MemberFilterStyle::Instance);
+            if (refAccessors.getCount())
             {
                 auto refAccessor = *refAccessors.begin();
 
@@ -1159,7 +1135,7 @@ top:
             auto base = materialize(context, boundMemberInfo->base);
 
             auto declRef = boundMemberInfo->declRef;
-            if( auto fieldDeclRef = declRef.as<VarDecl>() )
+            if (auto fieldDeclRef = declRef.as<VarDecl>())
             {
                 lowered = extractField(context, boundMemberInfo->type, base, fieldDeclRef);
                 goto top;
@@ -1188,21 +1164,23 @@ top:
         {
             auto swizzleInfo = lowered.getSwizzledMatrixLValueInfo();
             auto base = getSimpleVal(context, swizzleInfo->base);
-            if(const auto type = as<IRMatrixType>(base->getDataType()))
+            if (const auto type = as<IRMatrixType>(base->getDataType()))
             {
                 IRInst* components[4];
-                for(UInt i = 0; i < swizzleInfo->elementCount; ++i)
+                for (UInt i = 0; i < swizzleInfo->elementCount; ++i)
                 {
                     components[i] = builder->emitElementExtract(
-                        builder->emitElementExtract(base,swizzleInfo->elementCoords[i].row),
+                        builder->emitElementExtract(base, swizzleInfo->elementCoords[i].row),
                         swizzleInfo->elementCoords[i].col);
                 }
                 return swizzleInfo->elementCount == 1
-                    ? LoweredValInfo::simple(components[0])
-                    : LoweredValInfo::simple(builder->emitMakeVector(
-                        builder->getVectorType(type->getElementType(), swizzleInfo->elementCount),
-                        swizzleInfo->elementCount,
-                        components));
+                           ? LoweredValInfo::simple(components[0])
+                           : LoweredValInfo::simple(builder->emitMakeVector(
+                                 builder->getVectorType(
+                                     type->getElementType(),
+                                     swizzleInfo->elementCount),
+                                 swizzleInfo->elementCount,
+                                 components));
             }
             else
             {
@@ -1227,7 +1205,6 @@ top:
         SLANG_UNEXPECTED("unhandled value flavor");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
-
 }
 
 IRInst* getSimpleVal(IRGenContext* context, LoweredValInfo lowered)
@@ -1238,7 +1215,7 @@ IRInst* getSimpleVal(IRGenContext* context, LoweredValInfo lowered)
     // so that we are dealing with an ordinary value, or an l-value pointer.
     lowered = materialize(context, lowered);
 
-    switch(lowered.flavor)
+    switch (lowered.flavor)
     {
     case LoweredValInfo::Flavor::None:
         return nullptr;
@@ -1255,26 +1232,17 @@ IRInst* getSimpleVal(IRGenContext* context, LoweredValInfo lowered)
     }
 }
 
-LoweredValInfo lowerVal(
-    IRGenContext*   context,
-    Val*            val);
+LoweredValInfo lowerVal(IRGenContext* context, Val* val);
 
-IRInst* lowerSimpleVal(
-    IRGenContext*   context,
-    Val*            val)
+IRInst* lowerSimpleVal(IRGenContext* context, Val* val)
 {
     auto lowered = lowerVal(context, val);
     return getSimpleVal(context, lowered);
 }
 
-LoweredValInfo lowerLValueExpr(
-    IRGenContext*   context,
-    Expr*           expr);
+LoweredValInfo lowerLValueExpr(IRGenContext* context, Expr* expr);
 
-void assign(
-    IRGenContext*           context,
-    LoweredValInfo const&   left,
-    LoweredValInfo const&   right);
+void assign(IRGenContext* context, LoweredValInfo const& left, LoweredValInfo const& right);
 
 void assignExpr(
     IRGenContext* context,
@@ -1283,20 +1251,15 @@ void assignExpr(
     SourceLoc assignmentLoc);
 
 IRInst* getAddress(
-    IRGenContext*           context,
-    LoweredValInfo const&   inVal,
-    SourceLoc               diagnosticLocation);
+    IRGenContext* context,
+    LoweredValInfo const& inVal,
+    SourceLoc diagnosticLocation);
 
-void lowerStmt(
-    IRGenContext*   context,
-    Stmt*           stmt);
+void lowerStmt(IRGenContext* context, Stmt* stmt);
 
-LoweredValInfo lowerDecl(
-    IRGenContext*   context,
-    DeclBase*       decl);
+LoweredValInfo lowerDecl(IRGenContext* context, DeclBase* decl);
 
-IRType* getIntType(
-    IRGenContext* context)
+IRType* getIntType(IRGenContext* context)
 {
     return context->irBuilder->getBasicType(BaseType::Int);
 }
@@ -1304,17 +1267,18 @@ IRType* getIntType(
 static IRGeneric* getOuterGeneric(IRInst* gv)
 {
     auto parentBlock = as<IRBlock>(gv->getParent());
-    if (!parentBlock) return nullptr;
+    if (!parentBlock)
+        return nullptr;
 
     auto parentGeneric = as<IRGeneric>(parentBlock->getParent());
     return parentGeneric;
 }
 
 static void addLinkageDecoration(
-    IRGenContext*               context,
-    IRInst*                     inInst,
-    Decl*                       decl,
-    UnownedStringSlice const&   mangledName)
+    IRGenContext* context,
+    IRInst* inInst,
+    Decl* decl,
+    UnownedStringSlice const& mangledName)
 {
     // If the instruction is nested inside one or more generics,
     // then the mangled name should really apply to the outer-most
@@ -1358,8 +1322,8 @@ static void addLinkageDecoration(
         {
             auto libraryName = dllImportModifier->modulePath;
             auto functionName = dllImportModifier->functionName.getLength()
-                ? dllImportModifier->functionName.getUnownedSlice()
-                : decl->getName()->text.getUnownedSlice();
+                                    ? dllImportModifier->functionName.getUnownedSlice()
+                                    : decl->getName()->text.getUnownedSlice();
             builder->addDllImportDecoration(inst, libraryName.getUnownedSlice(), functionName);
         }
         else if (as<DllExportAttribute>(modifier))
@@ -1411,9 +1375,10 @@ static void addLinkageDecoration(
         }
         else if (auto pyExportModifier = as<PyExportAttribute>(modifier))
         {
-            builder->addPyExportDecoration(inst, pyExportModifier->name.getLength()
-                ? pyExportModifier->name.getUnownedSlice()
-                : decl->getName()->text.getUnownedSlice());
+            builder->addPyExportDecoration(
+                inst,
+                pyExportModifier->name.getLength() ? pyExportModifier->name.getUnownedSlice()
+                                                   : decl->getName()->text.getUnownedSlice());
             builder->addHLSLExportDecoration(inst);
         }
         else if (auto knownBuiltinModifier = as<KnownBuiltinAttribute>(modifier))
@@ -1421,7 +1386,9 @@ static void addLinkageDecoration(
             // We add this to the internal instruction, like other name-like
             // decorations, for instance "nameHint". This prevents it becoming
             // lost during specialization.
-            builder->addKnownBuiltinDecoration(inInst, knownBuiltinModifier->name.getUnownedSlice());
+            builder->addKnownBuiltinDecoration(
+                inInst,
+                knownBuiltinModifier->name.getUnownedSlice());
         }
     }
     if (as<InterfaceDecl>(decl->parentDecl) &&
@@ -1432,22 +1399,18 @@ static void addLinkageDecoration(
     }
 }
 
-static void addLinkageDecoration(
-    IRGenContext*               context,
-    IRInst*                     inst,
-    Decl*                       decl)
+static void addLinkageDecoration(IRGenContext* context, IRInst* inst, Decl* decl)
 {
     const String mangledName = getMangledName(context->astBuilder, decl);
 
     // Obfuscate the mangled names if necessary.
-    // 
-    // Care is needed around stdlib as it is only compiled once and *without* obfuscation, 
-    // so any linkage name to stdlib *shouldn't* have obfuscation applied to it.
-    if (context->shared->m_obfuscateCode && 
-        !isFromStdLib(decl))
+    //
+    // Care is needed around the core module as it is only compiled once and *without* obfuscation,
+    // so any linkage name to the core module *shouldn't* have obfuscation applied to it.
+    if (context->shared->m_obfuscateCode && !isFromCoreModule(decl))
     {
         const auto obfuscatedName = getHashedName(mangledName.getUnownedSlice());
-    
+
         addLinkageDecoration(context, inst, decl, obfuscatedName.getUnownedSlice());
     }
     else
@@ -1488,14 +1451,12 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
     return true;
 }
 
-IRStructKey* getInterfaceRequirementKey(
-    IRGenContext*   context,
-    Decl*           requirementDecl)
+IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirementDecl)
 {
-    // TODO: this special case logic can be removed if we also clean up `doesGenericSignatureMatchRequirement`
-    // Currently `doesGenericSignatureMatchRequirement` will use the inner func decl as the key
-    // in AST WitnessTable. Therefore we need to match this behavior by always using the inner
-    // decl as the requirement key.
+    // TODO: this special case logic can be removed if we also clean up
+    // `doesGenericSignatureMatchRequirement` Currently `doesGenericSignatureMatchRequirement` will
+    // use the inner func decl as the key in AST WitnessTable. Therefore we need to match this
+    // behavior by always using the inner decl as the requirement key.
     if (auto genericDecl = as<GenericDecl>(requirementDecl))
         return getInterfaceRequirementKey(context, genericDecl->inner);
 
@@ -1505,7 +1466,7 @@ IRStructKey* getInterfaceRequirementKey(
         return nullptr;
 
     IRStructKey* requirementKey = nullptr;
-    if(context->shared->interfaceRequirementKeys.tryGetValue(requirementDecl, requirementKey))
+    if (context->shared->interfaceRequirementKeys.tryGetValue(requirementDecl, requirementKey))
     {
         return requirementKey;
     }
@@ -1527,7 +1488,10 @@ IRStructKey* getInterfaceRequirementKey(
     return requirementKey;
 }
 
-void getGenericTypeConformances(IRGenContext* context, ShortList<IRType*>& supTypes, Decl* genericParamDecl)
+void getGenericTypeConformances(
+    IRGenContext* context,
+    ShortList<IRType*>& supTypes,
+    Decl* genericParamDecl)
 {
     auto parent = genericParamDecl->parentDecl;
     if (parent)
@@ -1591,7 +1555,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitGenericParamIntVal(GenericParamIntVal* val)
     {
-        return emitDeclRef(context, val->getDeclRef(),
+        return emitDeclRef(
+            context,
+            val->getDeclRef(),
             lowerType(context, getType(context->astBuilder, val->getDeclRef())));
     }
 
@@ -1627,8 +1593,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto witnessVal = lowerVal(context, val->getWitness());
         auto key = getInterfaceRequirementKey(context, val->getKey());
         auto type = lowerType(context, val->getType());
-        return LoweredValInfo::simple(getBuilder()->emitLookupInterfaceMethodInst(
-            type, witnessVal.val, key));
+        return LoweredValInfo::simple(
+            getBuilder()->emitLookupInterfaceMethodInst(type, witnessVal.val, key));
     }
 
     LoweredValInfo visitPolynomialIntVal(PolynomialIntVal* val)
@@ -1671,16 +1637,16 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             types.add(loweredType);
         }
         auto irBuilder = getBuilder();
-        IRType* irTypePack = irBuilder->getTypePack((UInt)types.getCount(), types.getArrayView().getBuffer());
+        IRType* irTypePack =
+            irBuilder->getTypePack((UInt)types.getCount(), types.getArrayView().getBuffer());
         return LoweredValInfo::simple(irTypePack);
     }
 
     LoweredValInfo visitEachType(EachType* eachType)
     {
         auto type = lowerType(context, eachType->getElementType());
-        return LoweredValInfo::simple(getBuilder()->emitEachInst(
-            getBuilder()->getTypeKind(),
-            type));
+        return LoweredValInfo::simple(
+            getBuilder()->emitEachInst(getBuilder()->getTypeKind(), type));
     }
 
     LoweredValInfo visitExpandType(ExpandType* expandType)
@@ -1694,7 +1660,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             capturedTypes.add(loweredType);
         }
         return LoweredValInfo::simple(irBuilder->getExpandTypeOrVal(
-            irBuilder->getTypeKind(), type, capturedTypes.getArrayView().arrayView));
+            irBuilder->getTypeKind(),
+            type,
+            capturedTypes.getArrayView().arrayView));
     }
 
     LoweredValInfo visitTypePackSubtypeWitness(TypePackSubtypeWitness* witnessPack)
@@ -1709,7 +1677,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             elementTypes.add(loweredWitness.val->getFullType());
         }
         auto irWitnessPack = irBuilder->emitMakeWitnessPack(
-            irBuilder->getTupleType((UInt)elementTypes.getCount(), elementTypes.getArrayView().getBuffer()),
+            irBuilder->getTupleType(
+                (UInt)elementTypes.getCount(),
+                elementTypes.getArrayView().getBuffer()),
             witnesses.getArrayView().arrayView);
         return LoweredValInfo::simple(irWitnessPack);
     }
@@ -1730,7 +1700,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 captures.add(expandType->getCaptureType(i));
             }
         }
-        return LoweredValInfo::simple(irBuilder->getExpandTypeOrVal(witnessTableType, patternWitnessVal.val, captures.getArrayView().arrayView));
+        return LoweredValInfo::simple(irBuilder->getExpandTypeOrVal(
+            witnessTableType,
+            patternWitnessVal.val,
+            captures.getArrayView().arrayView));
     }
 
     LoweredValInfo visitEachSubtypeWitness(EachSubtypeWitness* witness)
@@ -1739,7 +1712,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto irBuilder = getBuilder();
         auto subType = lowerType(context, witness->getSub());
         auto witnessTableType = irBuilder->getWitnessTableType(subType);
-        return LoweredValInfo::simple(irBuilder->emitEachInst(witnessTableType, getSimpleVal(context, elementWitness)));
+        return LoweredValInfo::simple(
+            irBuilder->emitEachInst(witnessTableType, getSimpleVal(context, elementWitness)));
     }
 
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
@@ -1747,13 +1721,30 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         if (as<ThisTypeConstraintDecl>(val->getDeclRef()))
             return LoweredValInfo::simple(context->thisTypeWitness);
 
-        return emitDeclRef(context, val->getDeclRef(),
-            context->irBuilder->getWitnessTableType(
-                lowerType(context, val->getSup())));
+        return emitDeclRef(
+            context,
+            val->getDeclRef(),
+            context->irBuilder->getWitnessTableType(lowerType(context, val->getSup())));
     }
 
-    LoweredValInfo visitTransitiveSubtypeWitness(
-        TransitiveSubtypeWitness* val)
+    LoweredValInfo visitTypeEqualityWitness(TypeEqualityWitness* val)
+    {
+        auto subType = lowerType(context, val->getSub());
+        auto supType = lowerType(context, val->getSup());
+        auto witnessType =
+            context->irBuilder->getWitnessTableType(lowerType(context, val->getSup()));
+        return LoweredValInfo::simple(
+            context->irBuilder->getTypeEqualityWitness(witnessType, subType, supType));
+    }
+
+    LoweredValInfo visitTypeCoercionWitness(TypeCoercionWitness*)
+    {
+        // When we fully support type coercion constraints, we should lower the witness into a
+        // function that does the conversion.
+        return LoweredValInfo();
+    }
+
+    LoweredValInfo visitTransitiveSubtypeWitness(TransitiveSubtypeWitness* val)
     {
         // The base (subToMid) will turn into a value with
         // witness-table type.
@@ -1780,7 +1771,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
         if (auto declaredMidToSup = as<DeclaredSubtypeWitness>(val->getMidToSup()))
         {
-            midToSup = getInterfaceRequirementKey(context, declaredMidToSup->getDeclRef().getDecl());
+            midToSup =
+                getInterfaceRequirementKey(context, declaredMidToSup->getDeclRef().getDecl());
         }
         else
         {
@@ -1796,12 +1788,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitForwardDifferentiateVal(ForwardDifferentiateVal* val)
     {
         // TODO: properly fill in type info here.
-        // We should consider fold all cases of witness table entries to `Val`, and make the `DeclRef` case a `DeclRefVal`.
-        // So that we can hold the type in `DeclRefVal`.
+        // We should consider fold all cases of witness table entries to `Val`, and make the
+        // `DeclRef` case a `DeclRefVal`. So that we can hold the type in `DeclRefVal`.
         auto funcVal = emitDeclRef(context, val->getFunc(), context->irBuilder->getTypeKind());
         SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
 
-        auto diff = getBuilder()->emitForwardDifferentiateInst(getBuilder()->getTypeKind(), funcVal.val);
+        auto diff =
+            getBuilder()->emitForwardDifferentiateInst(getBuilder()->getTypeKind(), funcVal.val);
         return LoweredValInfo::simple(diff);
     }
 
@@ -1810,7 +1803,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto funcVal = emitDeclRef(context, val->getFunc(), context->irBuilder->getTypeKind());
         SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
 
-        auto diff = getBuilder()->emitBackwardDifferentiateInst(getBuilder()->getTypeKind(), funcVal.val);
+        auto diff =
+            getBuilder()->emitBackwardDifferentiateInst(getBuilder()->getTypeKind(), funcVal.val);
         return LoweredValInfo::simple(diff);
     }
 
@@ -1819,7 +1813,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto funcVal = emitDeclRef(context, val->getFunc(), context->irBuilder->getTypeKind());
         SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
 
-        auto diff = getBuilder()->emitBackwardDifferentiatePropagateInst(getBuilder()->getTypeKind(), funcVal.val);
+        auto diff = getBuilder()->emitBackwardDifferentiatePropagateInst(
+            getBuilder()->getTypeKind(),
+            funcVal.val);
         return LoweredValInfo::simple(diff);
     }
 
@@ -1828,11 +1824,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto funcVal = emitDeclRef(context, val->getFunc(), context->irBuilder->getTypeKind());
         SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
 
-        auto diff = getBuilder()->emitBackwardDifferentiatePrimalInst(getBuilder()->getTypeKind(), funcVal.val);
+        auto diff = getBuilder()->emitBackwardDifferentiatePrimalInst(
+            getBuilder()->getTypeKind(),
+            funcVal.val);
         return LoweredValInfo::simple(diff);
     }
 
-    LoweredValInfo visitBackwardDifferentiateIntermediateTypeVal(BackwardDifferentiateIntermediateTypeVal* val)
+    LoweredValInfo visitBackwardDifferentiateIntermediateTypeVal(
+        BackwardDifferentiateIntermediateTypeVal* val)
     {
         auto funcVal = emitDeclRef(context, val->getFunc(), context->irBuilder->getTypeKind());
         SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
@@ -1841,7 +1840,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(diff);
     }
 
-    LoweredValInfo visitDynamicSubtypeWitness(DynamicSubtypeWitness * /*val*/)
+    LoweredValInfo visitDynamicSubtypeWitness(DynamicSubtypeWitness* /*val*/)
     {
         return LoweredValInfo::simple(nullptr);
     }
@@ -1865,7 +1864,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(getBuilder()->emitMakeTuple(componentWitnesses));
     }
 
-    LoweredValInfo visitExtractFromConjunctionSubtypeWitness(ExtractFromConjunctionSubtypeWitness* val)
+    LoweredValInfo visitExtractFromConjunctionSubtypeWitness(
+        ExtractFromConjunctionSubtypeWitness* val)
     {
         auto builder = getBuilder();
 
@@ -1894,16 +1894,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         // TODO: `IRTupleType` should really have `getElementCount()` and
         // `getElementType(index)` accessors.
         //
-        auto elementType = (IRType*) conjunctionTupleType->getOperand(indexInConjunction);
+        auto elementType = (IRType*)conjunctionTupleType->getOperand(indexInConjunction);
 
         // With the information we've extracted above, we now just need to
         // extract the appropriate element from the `(w_l, w_r)` tuple of
         // witnesses, and we will have our desired result.
         //
-        return LoweredValInfo::simple(builder->emitGetTupleElement(
-            elementType,
-            conjunctionWitness,
-            indexInConjunction));
+        return LoweredValInfo::simple(
+            builder->emitGetTupleElement(elementType, conjunctionWitness, indexInConjunction));
     }
 
 
@@ -1924,10 +1922,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
         if (type->getErrorType()->equals(context->astBuilder->getBottomType()))
         {
-            return getBuilder()->getFuncType(
-                paramCount,
-                paramTypes.getBuffer(),
-                resultType);
+            return getBuilder()->getFuncType(paramCount, paramTypes.getBuffer(), resultType);
         }
         else
         {
@@ -1935,7 +1930,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             auto irThrowFuncTypeAttribute =
                 getBuilder()->getAttr(kIROp_FuncThrowTypeAttr, 1, (IRInst**)&errorType);
             return getBuilder()->getFuncType(
-                paramCount, paramTypes.getBuffer(), resultType, irThrowFuncTypeAttribute);
+                paramCount,
+                paramTypes.getBuffer(),
+                resultType,
+                irThrowFuncTypeAttribute);
         }
     }
 
@@ -1951,7 +1949,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
         else
         {
-            addrSpace = getBuilder()->getIntValue(getBuilder()->getUInt64Type(), (IRIntegerValue)AddressSpace::Generic);
+            addrSpace = getBuilder()->getIntValue(
+                getBuilder()->getUInt64Type(),
+                (IRIntegerValue)AddressSpace::Generic);
         }
         return getBuilder()->getPtrType(kIROp_PtrType, irValueType, addrSpace);
     }
@@ -1962,16 +1962,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto decl = declRef.getDecl();
 
         // Check for types with teh `__intrinsic_type` modifier.
-        if(decl->findModifier<IntrinsicTypeModifier>())
+        if (decl->findModifier<IntrinsicTypeModifier>())
         {
             return lowerSimpleIntrinsicType(type);
         }
 
 
-        return (IRType*) getSimpleVal(
+        return (IRType*)getSimpleVal(
             context,
-            emitDeclRef(context, declRef,
-                context->irBuilder->getTypeKind()));
+            emitDeclRef(context, declRef, context->irBuilder->getTypeKind()));
     }
 
     IRType* visitTupleType(TupleType* type)
@@ -1987,7 +1986,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         }
         else
         {
-            return lowerType(context, type->getTypePack());
+            return context->irBuilder->getTupleType(lowerType(context, type->getTypePack()));
         }
     }
 
@@ -1998,8 +1997,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     IRType* visitBasicExpressionType(BasicExpressionType* type)
     {
-        return getBuilder()->getBasicType(
-            type->getBaseType());
+        return getBuilder()->getBasicType(type->getBaseType());
     }
 
     IRType* visitVectorExpressionType(VectorExpressionType* type)
@@ -2007,9 +2005,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto elementType = lowerType(context, type->getElementType());
         auto elementCount = lowerSimpleVal(context, type->getElementCount());
 
-        return getBuilder()->getVectorType(
-            elementType,
-            elementCount);
+        return getBuilder()->getVectorType(elementType, elementCount);
     }
 
     IRType* visitMatrixExpressionType(MatrixExpressionType* type)
@@ -2018,11 +2014,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto rowCount = lowerSimpleVal(context, type->getRowCount());
         auto columnCount = lowerSimpleVal(context, type->getColumnCount());
         auto layout = lowerSimpleVal(context, type->getLayout());
-        return getBuilder()->getMatrixType(
-            elementType,
-            rowCount,
-            columnCount,
-            layout);
+        return getBuilder()->getMatrixType(elementType, rowCount, columnCount, layout);
     }
 
     IRType* visitArrayExpressionType(ArrayExpressionType* type)
@@ -2031,14 +2023,11 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         if (!type->isUnsized())
         {
             auto elementCount = lowerSimpleVal(context, type->getElementCount());
-            return getBuilder()->getArrayType(
-                elementType,
-                elementCount);
+            return getBuilder()->getArrayType(elementType, elementCount);
         }
         else
         {
-            return getBuilder()->getUnsizedArrayType(
-                elementType);
+            return getBuilder()->getUnsizedArrayType(elementType);
         }
     }
 
@@ -2049,33 +2038,30 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         SLANG_ASSERT(getBuilder()->getInsertLoc().getMode() != IRInsertLoc::Mode::None);
 
-        auto intrinsicTypeModifier = type->getDeclRef().getDecl()->findModifier<IntrinsicTypeModifier>();
+        auto intrinsicTypeModifier =
+            type->getDeclRef().getDecl()->findModifier<IntrinsicTypeModifier>();
         SLANG_ASSERT(intrinsicTypeModifier);
         IROp op = IROp(intrinsicTypeModifier->irOp);
         List<IRInst*> operands;
         // If there are any substitutions attached to the declRef,
         // add them as operands of the IR type.
-        SubstitutionSet(type->getDeclRef()).forEachSubstitutionArg([&](Val* arg)
-            {
-                auto argVal = lowerVal(context, arg).val;
-                SLANG_ASSERT(argVal);
-                operands.add(argVal);
-            });
+        SubstitutionSet(type->getDeclRef())
+            .forEachSubstitutionArg(
+                [&](Val* arg)
+                {
+                    auto argVal = lowerVal(context, arg).val;
+                    SLANG_ASSERT(argVal);
+                    operands.add(argVal);
+                });
         return getBuilder()->getType(
             op,
             static_cast<UInt>(operands.getCount()),
             operands.getBuffer());
     }
 
-    IRType* visitResourceType(ResourceType* type)
-    {
-        return lowerSimpleIntrinsicType(type);
-    }
+    IRType* visitResourceType(ResourceType* type) { return lowerSimpleIntrinsicType(type); }
 
-    IRType* visitSamplerStateType(SamplerStateType* type)
-    {
-        return lowerSimpleIntrinsicType(type);
-    }
+    IRType* visitSamplerStateType(SamplerStateType* type) { return lowerSimpleIntrinsicType(type); }
 
     IRType* visitBuiltinGenericType(BuiltinGenericType* type)
     {
@@ -2087,21 +2073,16 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return lowerSimpleIntrinsicType(type);
     }
 
-    IRType* visitHLSLPatchType(HLSLPatchType* type)
-    {
-        return lowerSimpleIntrinsicType(type);
-    }
+    IRType* visitHLSLPatchType(HLSLPatchType* type) { return lowerSimpleIntrinsicType(type); }
 
-    IRType* visitMeshOutputType(MeshOutputType* type)
-    {
-        return lowerSimpleIntrinsicType(type);
-    }
+    IRType* visitMeshOutputType(MeshOutputType* type) { return lowerSimpleIntrinsicType(type); }
 
     IRType* visitExtractExistentialType(ExtractExistentialType* type)
     {
         auto declRef = type->getDeclRef();
         auto existentialType = lowerType(context, getType(context->astBuilder, declRef));
-        IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
+        IRInst* existentialVal =
+            getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
         return getBuilder()->emitExtractExistentialType(existentialVal);
     }
 
@@ -2109,8 +2090,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         auto declRef = witness->getDeclRef();
         auto existentialType = lowerType(context, getType(context->astBuilder, declRef));
-        IRInst* existentialVal = getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
-        return LoweredValInfo::simple(getBuilder()->emitExtractExistentialWitnessTable(existentialVal));
+        IRInst* existentialVal =
+            getSimpleVal(context, emitDeclRef(context, declRef, existentialType));
+        return LoweredValInfo::simple(
+            getBuilder()->emitExtractExistentialWitnessTable(existentialVal));
     }
 
     LoweredValInfo visitExistentialSpecializedType(ExistentialSpecializedType* type)
@@ -2124,14 +2107,17 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             auto irArgVal = lowerSimpleVal(context, arg.val);
             slotArgs.add(irArgVal);
 
-            if(auto witness = arg.witness)
+            if (auto witness = arg.witness)
             {
                 auto irArgWitness = lowerSimpleVal(context, witness);
                 slotArgs.add(irArgWitness);
             }
         }
 
-        auto irType = getBuilder()->getBindExistentialsType(irBaseType, slotArgs.getCount(), slotArgs.getBuffer());
+        auto irType = getBuilder()->getBindExistentialsType(
+            irBaseType,
+            slotArgs.getCount(),
+            slotArgs.getBuffer());
         return LoweredValInfo::simple(irType);
     }
 
@@ -2149,8 +2135,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         {
             return LoweredValInfo::simple(context->thisType.irType);
         }
-        auto interfaceType = emitDeclRef(context, type->getInterfaceDeclRef(), getBuilder()->getTypeKind());
-        auto result = LoweredValInfo::simple(getBuilder()->getThisType((IRType*)getSimpleVal(context, interfaceType)));
+        auto interfaceType =
+            emitDeclRef(context, type->getInterfaceDeclRef(), getBuilder()->getTypeKind());
+        auto result = LoweredValInfo::simple(
+            getBuilder()->getThisType((IRType*)getSimpleVal(context, interfaceType)));
         if (context->thisType.astType == type)
         {
             context->thisType = getSimpleVal(context, result);
@@ -2172,11 +2160,11 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         IRType* irBase = lowerType(context, astType->getBase());
 
         List<IRAttr*> irAttrs;
-        for(Index i = 0; i < astType->getModifierCount(); i++)
+        for (Index i = 0; i < astType->getModifierCount(); i++)
         {
             auto astModifier = astType->getModifier(i);
-            IRAttr* irAttr = (IRAttr*) lowerSimpleVal(context, astModifier);
-            if(irAttr)
+            IRAttr* irAttr = (IRAttr*)lowerSimpleVal(context, astModifier);
+            if (irAttr)
                 irAttrs.add(irAttr);
         }
 
@@ -2204,7 +2192,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     // We do not expect to encounter the following types in ASTs that have
     // passed front-end semantic checking.
-#define UNEXPECTED_CASE(NAME) IRType* visit##NAME(NAME*) { SLANG_UNEXPECTED(#NAME); UNREACHABLE_RETURN(nullptr); }
+#define UNEXPECTED_CASE(NAME)        \
+    IRType* visit##NAME(NAME*)       \
+    {                                \
+        SLANG_UNEXPECTED(#NAME);     \
+        UNREACHABLE_RETURN(nullptr); \
+    }
     UNEXPECTED_CASE(GenericDeclRefType)
     UNEXPECTED_CASE(TypeType)
     UNEXPECTED_CASE(ErrorType)
@@ -2214,9 +2207,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 #undef UNEXPECTED_CASE
 };
 
-LoweredValInfo lowerVal(
-    IRGenContext*   context,
-    Val*            val)
+LoweredValInfo lowerVal(IRGenContext* context, Val* val)
 {
     ValLoweringVisitor visitor;
     visitor.context = context;
@@ -2224,66 +2215,66 @@ LoweredValInfo lowerVal(
     return visitor.dispatch(resolvedVal);
 }
 
-IRType* lowerType(
-    IRGenContext*   context,
-    Type*           type)
+IRType* lowerType(IRGenContext* context, Type* type)
 {
     ValLoweringVisitor visitor;
     visitor.context = context;
-    return (IRType*) getSimpleVal(context, visitor.dispatchType(type));
+    IRType* loweredType = (IRType*)getSimpleVal(context, visitor.dispatchType(type));
+
+    if (context->lowerTypeCallback && loweredType)
+        context->lowerTypeCallback(context, type, loweredType);
+
+    return loweredType;
 }
 
-void addVarDecorations(
-    IRGenContext*   context,
-    IRInst*         inst,
-    Decl*           decl)
+void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
 {
     auto builder = context->irBuilder;
-    for(Modifier* mod : decl->modifiers)
+    for (Modifier* mod : decl->modifiers)
     {
-        if(as<HLSLNoInterpolationModifier>(mod))
+        if (as<HLSLNoInterpolationModifier>(mod))
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::NoInterpolation);
         }
-        else if(as<PerVertexModifier>(mod))
+        else if (as<PerVertexModifier>(mod))
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::PerVertex);
         }
-        else if(as<HLSLNoPerspectiveModifier>(mod))
+        else if (as<HLSLNoPerspectiveModifier>(mod))
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::NoPerspective);
         }
-        else if(as<HLSLLinearModifier>(mod))
+        else if (as<HLSLLinearModifier>(mod))
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::Linear);
         }
-        else if(as<HLSLSampleModifier>(mod))
+        else if (as<HLSLSampleModifier>(mod))
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::Sample);
         }
-        else if(as<HLSLCentroidModifier>(mod))
+        else if (as<HLSLCentroidModifier>(mod))
         {
             builder->addInterpolationModeDecoration(inst, IRInterpolationMode::Centroid);
         }
-        else if(auto rayPayloadAttr = as<VulkanRayPayloadAttribute>(mod))
+        else if (auto rayPayloadAttr = as<VulkanRayPayloadAttribute>(mod))
         {
             builder->addVulkanRayPayloadDecoration(inst, rayPayloadAttr->location);
             // may not be referenced; adding HLSL export modifier force emits
             builder->addHLSLExportDecoration(inst);
         }
-        else if(auto rayPayloadInAttr = as<VulkanRayPayloadInAttribute>(mod))
+        else if (auto rayPayloadInAttr = as<VulkanRayPayloadInAttribute>(mod))
         {
             builder->addVulkanRayPayloadInDecoration(inst, rayPayloadInAttr->location);
             // may not be referenced; adding HLSL export modifier force emits
             builder->addHLSLExportDecoration(inst);
         }
-        else if(auto callablePayloadAttr = as<VulkanCallablePayloadAttribute>(mod))
+        else if (auto callablePayloadAttr = as<VulkanCallablePayloadAttribute>(mod))
         {
             builder->addVulkanCallablePayloadDecoration(inst, callablePayloadAttr->location);
             // may not be referenced; adding HLSL export modifier force emits
             builder->addHLSLExportDecoration(inst);
         }
-        else if(auto callablePayloadInAttr = as<VulkanCallablePayloadInAttribute>(mod))
+        else if (auto callablePayloadInAttr = as<VulkanCallablePayloadInAttribute>(mod))
         {
             builder->addVulkanCallablePayloadInDecoration(inst, callablePayloadInAttr->location);
             // may not be referenced; adding HLSL export modifier force emits
@@ -2301,15 +2292,15 @@ void addVarDecorations(
             // may not be referenced; adding HLSL export modifier force emits
             builder->addHLSLExportDecoration(inst);
         }
-        else if(as<PreciseModifier>(mod))
+        else if (as<PreciseModifier>(mod))
         {
             builder->addSimpleDecoration<IRPreciseDecoration>(inst);
         }
-        else if(auto formatAttr = as<FormatAttribute>(mod))
+        else if (auto formatAttr = as<FormatAttribute>(mod))
         {
             builder->addFormatDecoration(inst, formatAttr->format);
         }
-        else if(as<HLSLPayloadModifier>(mod))
+        else if (as<HLSLPayloadModifier>(mod))
         {
             builder->addSimpleDecoration<IRHLSLMeshPayloadDecoration>(inst);
         }
@@ -2321,17 +2312,21 @@ void addVarDecorations(
         {
             builder->addSimpleDecoration<IRGlobalInputDecoration>(inst);
         }
-        else if (auto glslLocationMod = as<GLSLLocationLayoutModifier>(mod))
+        else if (auto glslLocationMod = as<GLSLLocationAttribute>(mod))
         {
-            builder->addDecoration(inst, kIROp_GLSLLocationDecoration,
-                builder->getIntValue(builder->getIntType(), stringToInt(glslLocationMod->valToken.getContent())));
+            builder->addDecoration(
+                inst,
+                kIROp_GLSLLocationDecoration,
+                builder->getIntValue(builder->getIntType(), glslLocationMod->value));
         }
         else if (auto glslOffsetMod = as<GLSLOffsetLayoutAttribute>(mod))
         {
-            builder->addDecoration(inst, kIROp_GLSLOffsetDecoration,
+            builder->addDecoration(
+                inst,
+                kIROp_GLSLOffsetDecoration,
                 builder->getIntValue(builder->getIntType(), glslOffsetMod->offset));
         }
-        else if (auto hlslSemantic = as< HLSLSimpleSemantic>(mod))
+        else if (auto hlslSemantic = as<HLSLSimpleSemantic>(mod))
         {
             builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
         }
@@ -2341,14 +2336,41 @@ void addVarDecorations(
         }
         else if (auto collection = as<MemoryQualifierSetModifier>(mod))
         {
-            builder->addMemoryQualifierSetDecoration(inst, IRIntegerValue(collection->getMemoryQualifierBit()));
+            builder->addMemoryQualifierSetDecoration(
+                inst,
+                IRIntegerValue(collection->getMemoryQualifierBit()));
+        }
+        else if (auto geometryModifier = as<HLSLGeometryShaderInputPrimitiveTypeModifier>(mod))
+        {
+            IROp op = kIROp_Invalid;
+            switch (geometryModifier->astNodeType)
+            {
+            case ASTNodeType::HLSLTriangleModifier:
+                op = kIROp_TriangleInputPrimitiveTypeDecoration;
+                break;
+            case ASTNodeType::HLSLPointModifier:
+                op = kIROp_PointInputPrimitiveTypeDecoration;
+                break;
+            case ASTNodeType::HLSLLineModifier:
+                op = kIROp_LineInputPrimitiveTypeDecoration;
+                break;
+            case ASTNodeType::HLSLLineAdjModifier:
+                op = kIROp_LineAdjInputPrimitiveTypeDecoration;
+                break;
+            case ASTNodeType::HLSLTriangleAdjModifier:
+                op = kIROp_TriangleAdjInputPrimitiveTypeDecoration;
+                break;
+            }
+            if (op != kIROp_Invalid)
+                builder->addDecoration(inst, op);
         }
         // TODO: what are other modifiers we need to propagate through?
     }
-    if(auto t = composeGetters<IRMeshOutputType>(inst->getFullType(), &IROutTypeBase::getValueType))
+    if (auto t =
+            composeGetters<IRMeshOutputType>(inst->getFullType(), &IROutTypeBase::getValueType))
     {
         IROp op;
-        switch(t->getOp())
+        switch (t->getOp())
         {
         case kIROp_VerticesType:
             op = kIROp_VerticesDecoration;
@@ -2369,50 +2391,43 @@ void addVarDecorations(
 
 /// If `decl` has a modifier that should turn into a
 /// rate qualifier, then apply it to `inst`.
-void maybeSetRate(
-    IRGenContext*   context,
-    IRInst*         inst,
-    Decl*           decl)
+void maybeSetRate(IRGenContext* context, IRInst* inst, Decl* decl)
 {
     auto builder = context->irBuilder;
 
     if (decl->hasModifier<HLSLGroupSharedModifier>())
     {
-        inst->setFullType(builder->getRateQualifiedType(
-            builder->getGroupSharedRate(),
-            inst->getFullType()));
+        inst->setFullType(
+            builder->getRateQualifiedType(builder->getGroupSharedRate(), inst->getFullType()));
     }
     else if (decl->hasModifier<ActualGlobalModifier>())
     {
-        inst->setFullType(builder->getRateQualifiedType(
-            builder->getActualGlobalRate(),
-            inst->getFullType()));
+        inst->setFullType(
+            builder->getRateQualifiedType(builder->getActualGlobalRate(), inst->getFullType()));
     }
 }
 
-static String getNameForNameHint(
-    IRGenContext*   context,
-    Decl*           decl)
+static String getNameForNameHint(IRGenContext* context, Decl* decl)
 {
     // We will use a bit of an ad hoc convention here for now.
 
     Name* leafName = decl->getName();
 
     // Handle custom name for a global parameter group (e.g., a `cbuffer`)
-    if(auto reflectionNameModifier = decl->findModifier<ParameterGroupReflectionName>())
+    if (auto reflectionNameModifier = decl->findModifier<ParameterGroupReflectionName>())
     {
         leafName = reflectionNameModifier->nameAndLoc.name;
     }
 
     // There is no point in trying to provide a name hint for something with no name,
     // or with an empty name
-    if(!leafName)
+    if (!leafName)
         return String();
-    if(leafName->text.getLength() == 0)
+    if (leafName->text.getLength() == 0)
         return String();
 
 
-    if(const auto varDecl = as<VarDeclBase>(decl))
+    if (const auto varDecl = as<VarDeclBase>(decl))
     {
         // For an ordinary local variable, global variable,
         // parameter, or field, we will just use the name
@@ -2430,7 +2445,7 @@ static String getNameForNameHint(
     auto parentDecl = decl->parentDecl;
 
     // Skip past a generic parent, if we are a declaration nested in a generic.
-    if(auto genericParentDecl = as<GenericDecl>(parentDecl))
+    if (auto genericParentDecl = as<GenericDecl>(parentDecl))
         parentDecl = genericParentDecl->parentDecl;
 
     // Skip past a FileDecl parent.
@@ -2448,16 +2463,16 @@ static String getNameForNameHint(
     //
     // For now we skip past a `ModuleDecl` parent.
     //
-    if(auto moduleParentDecl = as<ModuleDecl>(parentDecl))
+    if (auto moduleParentDecl = as<ModuleDecl>(parentDecl))
         parentDecl = moduleParentDecl->parentDecl;
 
-    if(!parentDecl)
+    if (!parentDecl)
     {
         return leafName->text;
     }
 
     auto parentName = getNameForNameHint(context, parentDecl);
-    if(parentName.getLength() == 0)
+    if (parentName.getLength() == 0)
     {
         return leafName->text;
     }
@@ -2475,22 +2490,16 @@ static String getNameForNameHint(
 
 /// Try to add an appropriate name hint to the instruction,
 /// that can be used for back-end code emission or debug info.
-static void addNameHint(
-    IRGenContext*   context,
-    IRInst*         inst,
-    Decl*           decl)
+static void addNameHint(IRGenContext* context, IRInst* inst, Decl* decl)
 {
     String name = getNameForNameHint(context, decl);
-    if(name.getLength() == 0)
+    if (name.getLength() == 0)
         return;
     context->irBuilder->addNameHintDecoration(inst, name.getUnownedSlice());
 }
 
 /// Add a name hint based on a fixed string.
-static void addNameHint(
-    IRGenContext*   context,
-    IRInst*         inst,
-    char const*     text)
+static void addNameHint(IRGenContext* context, IRInst* inst, char const* text)
 {
     if (context->shared->m_obfuscateCode)
     {
@@ -2500,10 +2509,7 @@ static void addNameHint(
     context->irBuilder->addNameHintDecoration(inst, UnownedTerminatedStringSlice(text));
 }
 
-LoweredValInfo createVar(
-    IRGenContext*   context,
-    IRType*         type,
-    Decl*           decl = nullptr)
+LoweredValInfo createVar(IRGenContext* context, IRType* type, Decl* decl = nullptr)
 {
     auto builder = context->irBuilder;
     auto irAlloc = builder->emitVar(type);
@@ -2554,16 +2560,13 @@ enum class TryGetAddressMode
 LoweredValInfo tryGetAddress(
     IRGenContext* context,
     LoweredValInfo const& inVal,
-    TryGetAddressMode       mode);
+    TryGetAddressMode mode);
 
-    /// Add a single `in` argument value to a list of arguments
-void addInArg(
-    IRGenContext*   context,
-    List<IRInst*>*  ioArgs,
-    LoweredValInfo  argVal)
+/// Add a single `in` argument value to a list of arguments
+void addInArg(IRGenContext* context, List<IRInst*>* ioArgs, LoweredValInfo argVal)
 {
     auto& args = *ioArgs;
-    switch( argVal.flavor )
+    switch (argVal.flavor)
     {
     case LoweredValInfo::Flavor::Simple:
     case LoweredValInfo::Flavor::Ptr:
@@ -2594,10 +2597,8 @@ struct OutArgumentFixup
     LoweredValInfo src;
 };
 
-    /// Apply any fixups that have been created for `out` and `inout` arguments.
-static void applyOutArgumentFixups(
-    IRGenContext*                   context,
-    List<OutArgumentFixup> const&   fixups)
+/// Apply any fixups that have been created for `out` and `inout` arguments.
+static void applyOutArgumentFixups(IRGenContext* context, List<OutArgumentFixup> const& fixups)
 {
     for (auto fixup : fixups)
     {
@@ -2605,18 +2606,18 @@ static void applyOutArgumentFixups(
     }
 }
 
-    /// Add one argument value to the argument list for a call being constructed
+/// Add one argument value to the argument list for a call being constructed
 void addArg(
-    IRGenContext*           context,
-    List<IRInst*>*          ioArgs,         //< The argument list being built
-    List<OutArgumentFixup>* ioFixups,       //< "Fixup" logic to apply for `out` or `inout` arguments
-    LoweredValInfo          argVal,         //< The lowered value of the argument to add
-    IRType*                 paramType,      //< The type of the corresponding parameter
-    ParameterDirection      paramDirection, //< The direction of the parameter (`in`, `out`, etc.)
-    Type*                   argType,        //< The AST-level type of the argument
-    SourceLoc               loc)            //< A location to use if we need to report an error
+    IRGenContext* context,
+    List<IRInst*>* ioArgs,             //< The argument list being built
+    List<OutArgumentFixup>* ioFixups,  //< "Fixup" logic to apply for `out` or `inout` arguments
+    LoweredValInfo argVal,             //< The lowered value of the argument to add
+    IRType* paramType,                 //< The type of the corresponding parameter
+    ParameterDirection paramDirection, //< The direction of the parameter (`in`, `out`, etc.)
+    Type* argType,                     //< The AST-level type of the argument
+    SourceLoc loc)                     //< A location to use if we need to report an error
 {
-    switch(paramDirection)
+    switch (paramDirection)
     {
     case kParameterDirection_Ref:
         {
@@ -2634,7 +2635,10 @@ void addArg(
                 // If arg can't be converted to a pointer, we have already
                 // reported an error, so just pass a null pointer to allow
                 // the remaining lowering steps to finish.
-                addInArg(context, ioArgs, LoweredValInfo::simple(context->irBuilder->getNullVoidPtrValue()));
+                addInArg(
+                    context,
+                    ioArgs,
+                    LoweredValInfo::simple(context->irBuilder->getNullVoidPtrValue()));
             }
         }
         break;
@@ -2653,7 +2657,7 @@ void addArg(
             // the bytes of the l-value are not contiguous).
             //
             LoweredValInfo argPtr = tryGetAddress(context, argVal, TryGetAddressMode::Default);
-            if(argPtr.flavor == LoweredValInfo::Flavor::Ptr)
+            if (argPtr.flavor == LoweredValInfo::Flavor::Ptr)
             {
                 addInArg(context, ioArgs, LoweredValInfo::simple(argPtr.val));
             }
@@ -2671,7 +2675,8 @@ void addArg(
                 if (auto refType = as<IRConstRefType>(paramType))
                 {
                     paramType = refType->getValueType();
-                    argVal = LoweredValInfo::simple(context->irBuilder->emitLoad(getSimpleVal(context, argPtr)));
+                    argVal = LoweredValInfo::simple(
+                        context->irBuilder->emitLoad(getSimpleVal(context, argPtr)));
                 }
 
                 LoweredValInfo tempVar = createVar(context, paramType);
@@ -2714,26 +2719,26 @@ void addArg(
     }
 }
 
-    /// Add argument(s) corresponding to one parameter to a call
-    ///
-    /// The `argExpr` is the AST-level expression being passed as an argument to the call.
-    /// The `paramType` and `paramDirection` represent what is known about the receiving
-    /// parameter of the callee (e.g., if the parameter `in`, `inout`, etc.).
-    /// The `ioArgs` array receives the IR-level argument(s) that are added for the given
-    /// argument expression.
-    /// The `ioFixups` array receives any "fixup" code that needs to be run *after* the
-    /// call completes (e.g., to move from a scratch variable used for an `inout` argument back
-    /// into the original location).
-    ///
+/// Add argument(s) corresponding to one parameter to a call
+///
+/// The `argExpr` is the AST-level expression being passed as an argument to the call.
+/// The `paramType` and `paramDirection` represent what is known about the receiving
+/// parameter of the callee (e.g., if the parameter `in`, `inout`, etc.).
+/// The `ioArgs` array receives the IR-level argument(s) that are added for the given
+/// argument expression.
+/// The `ioFixups` array receives any "fixup" code that needs to be run *after* the
+/// call completes (e.g., to move from a scratch variable used for an `inout` argument back
+/// into the original location).
+///
 void addCallArgsForParam(
-    IRGenContext*           context,
-    IRType*                 paramType,
-    ParameterDirection      paramDirection,
-    Expr*                   argExpr,
-    List<IRInst*>*          ioArgs,
+    IRGenContext* context,
+    IRType* paramType,
+    ParameterDirection paramDirection,
+    Expr* argExpr,
+    List<IRInst*>* ioArgs,
     List<OutArgumentFixup>* ioFixups)
 {
-    switch(paramDirection)
+    switch (paramDirection)
     {
     case kParameterDirection_Ref:
     case kParameterDirection_ConstRef:
@@ -2741,7 +2746,15 @@ void addCallArgsForParam(
     case kParameterDirection_InOut:
         {
             LoweredValInfo loweredArg = lowerLValueExpr(context, argExpr);
-            addArg(context, ioArgs, ioFixups, loweredArg, paramType, paramDirection, argExpr->type, argExpr->loc);
+            addArg(
+                context,
+                ioArgs,
+                ioFixups,
+                loweredArg,
+                paramType,
+                paramDirection,
+                argExpr->type,
+                argExpr->loc);
         }
         break;
 
@@ -2757,15 +2770,14 @@ void addCallArgsForParam(
 
 //
 
-    /// Compute the direction for a parameter based on its declaration
+/// Compute the direction for a parameter based on its declaration
 ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
 {
-    if( paramDecl->hasModifier<RefModifier>())
+    if (paramDecl->hasModifier<RefModifier>())
     {
         return kParameterDirection_Ref;
     }
-    if (paramDecl->hasModifier<ConstRefModifier>()
-        || paramDecl->hasModifier<HLSLPayloadModifier>() )
+    if (paramDecl->hasModifier<ConstRefModifier>() || paramDecl->hasModifier<HLSLPayloadModifier>())
     {
         // The payload types are a groupshared variable, and we really don't
         // want to copy that into registers in every invocation on platforms
@@ -2773,7 +2785,7 @@ ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
 
         return kParameterDirection_ConstRef;
     }
-    if( paramDecl->hasModifier<InOutModifier>() )
+    if (paramDecl->hasModifier<InOutModifier>())
     {
         // The AST specified `inout`:
         return kParameterDirection_InOut;
@@ -2782,7 +2794,7 @@ ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
     {
         // We saw an `out` modifier, so now we need
         // to check if there was a paired `in`.
-        if(paramDecl->hasModifier<InModifier>())
+        if (paramDecl->hasModifier<InModifier>())
             return kParameterDirection_InOut;
         else
             return kParameterDirection_Out;
@@ -2794,21 +2806,22 @@ ParameterDirection getParameterDirection(VarDeclBase* paramDecl)
     }
 }
 
-    /// Compute the direction for a `this` parameter based on the declaration of its parent function
-    ///
-    /// If the given declaration doesn't care about the direction of a `this` parameter, then
-    /// it will return the provided `defaultDirection` instead.
-    ///
+/// Compute the direction for a `this` parameter based on the declaration of its parent function
+///
+/// If the given declaration doesn't care about the direction of a `this` parameter, then
+/// it will return the provided `defaultDirection` instead.
+///
 ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection defaultDirection)
 {
-    auto parentParent = getParentDecl(parentDecl);
+    auto parentParent = getParentAggTypeDecl(parentDecl);
+
     // The `this` parameter for a `class` is always `in`.
     if (as<ClassDecl>(parentParent))
     {
         return kParameterDirection_In;
     }
 
-    if (parentParent->findModifier<NonCopyableTypeAttribute>())
+    if (parentParent && parentParent->findModifier<NonCopyableTypeAttribute>())
     {
         if (parentDecl->hasModifier<MutatingAttribute>())
             return kParameterDirection_Ref;
@@ -2820,7 +2833,7 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     // by applying the `[mutating]` attribute to their
     // declaration.
     //
-    if( parentDecl->hasModifier<MutatingAttribute>() )
+    if (parentDecl->hasModifier<MutatingAttribute>())
     {
         return kParameterDirection_InOut;
     }
@@ -2837,11 +2850,11 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     // defaults to a mutable `this` parameter, but the programmer
     // can opt out of this behavior using `[nonmutating]`
     //
-    if( parentDecl->hasModifier<NonmutatingAttribute>() )
+    if (parentDecl->hasModifier<NonmutatingAttribute>())
     {
         return kParameterDirection_In;
     }
-    else if( as<SetterDecl>(parentDecl) )
+    else if (as<SetterDecl>(parentDecl))
     {
         return kParameterDirection_InOut;
     }
@@ -2851,11 +2864,11 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     // the direction of an outer `this` parameter, since that
     // should be determined by their inner accessors.
     //
-    if( as<PropertyDecl>(parentDecl) )
+    if (as<PropertyDecl>(parentDecl))
     {
         return defaultDirection;
     }
-    if( as<SubscriptDecl>(parentDecl) )
+    if (as<SubscriptDecl>(parentDecl))
     {
         return defaultDirection;
     }
@@ -2863,7 +2876,7 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     // A parent generic declaration should not change the
     // mutating-ness of the inner declaration.
     //
-    if( as<GenericDecl>(parentDecl) )
+    if (as<GenericDecl>(parentDecl))
     {
         return defaultDirection;
     }
@@ -2873,31 +2886,36 @@ ParameterDirection getThisParamDirection(Decl* parentDecl, ParameterDirection de
     return kParameterDirection_In;
 }
 
-DeclRef<Decl> createDefaultSpecializedDeclRefImpl(IRGenContext* context, SemanticsVisitor* semantics, Decl* decl)
+DeclRef<Decl> createDefaultSpecializedDeclRefImpl(
+    IRGenContext* context,
+    SemanticsVisitor* semantics,
+    Decl* decl)
 {
-    DeclRef<Decl> declRef = createDefaultSubstitutionsIfNeeded(context->astBuilder, semantics,
-        makeDeclRef(decl));
+    DeclRef<Decl> declRef =
+        createDefaultSubstitutionsIfNeeded(context->astBuilder, semantics, makeDeclRef(decl));
     return declRef;
 }
 //
 // The client should actually call the templated wrapper, to preserve type information.
 template<typename D>
-DeclRef<D> createDefaultSpecializedDeclRef(IRGenContext* context, SemanticsVisitor* semantics, D* decl)
+DeclRef<D> createDefaultSpecializedDeclRef(
+    IRGenContext* context,
+    SemanticsVisitor* semantics,
+    D* decl)
 {
     DeclRef<Decl> declRef = createDefaultSpecializedDeclRefImpl(context, semantics, decl);
     return declRef.as<D>();
 }
 
-static Type* _findReplacementThisParamType(
-    IRGenContext*   context,
-    DeclRef<Decl>   parentDeclRef)
+static Type* _findReplacementThisParamType(IRGenContext* context, DeclRef<Decl> parentDeclRef)
 {
-    if( auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>() )
+    if (auto extensionDeclRef = parentDeclRef.as<ExtensionDecl>())
     {
         auto targetType = getTargetType(context->astBuilder, extensionDeclRef);
-        if(auto targetDeclRefType = as<DeclRefType>(targetType))
+        if (auto targetDeclRefType = as<DeclRefType>(targetType))
         {
-            if(auto replacementType = _findReplacementThisParamType(context, targetDeclRefType->getDeclRef()))
+            if (auto replacementType =
+                    _findReplacementThisParamType(context, targetDeclRefType->getDeclRef()))
                 return replacementType;
         }
         return targetType;
@@ -2907,31 +2925,31 @@ static Type* _findReplacementThisParamType(
     {
         auto thisType = DeclRefType::create(
             context->astBuilder,
-            context->astBuilder->getMemberDeclRef(interfaceDeclRef, interfaceDeclRef.getDecl()->getThisTypeDecl()));
+            context->astBuilder->getMemberDeclRef(
+                interfaceDeclRef,
+                interfaceDeclRef.getDecl()->getThisTypeDecl()));
         return thisType;
     }
 
     return nullptr;
 }
 
-    /// Get the type of the `this` parameter introduced by `parentDeclRef`, or null.
-    ///
-    /// E.g., if `parentDeclRef` is a `struct` declaration, then this will
-    /// return the type of that `struct`.
-    ///
-    /// If this function is called on a declaration that does not itself directly
-    /// introduce a notion of `this`, then null will be returned. Note that this
-    /// includes things like function declarations themselves, which inherit the
-    /// definition of `this` from their parent/outer declaration.
-    ///
-Type* getThisParamTypeForContainer(
-    IRGenContext*   context,
-    DeclRef<Decl>   parentDeclRef)
+/// Get the type of the `this` parameter introduced by `parentDeclRef`, or null.
+///
+/// E.g., if `parentDeclRef` is a `struct` declaration, then this will
+/// return the type of that `struct`.
+///
+/// If this function is called on a declaration that does not itself directly
+/// introduce a notion of `this`, then null will be returned. Note that this
+/// includes things like function declarations themselves, which inherit the
+/// definition of `this` from their parent/outer declaration.
+///
+Type* getThisParamTypeForContainer(IRGenContext* context, DeclRef<Decl> parentDeclRef)
 {
-    if(auto replacementType = _findReplacementThisParamType(context, parentDeclRef))
+    if (auto replacementType = _findReplacementThisParamType(context, parentDeclRef))
         return replacementType;
 
-    if( auto aggTypeDeclRef = parentDeclRef.as<AggTypeDecl>() )
+    if (auto aggTypeDeclRef = parentDeclRef.as<AggTypeDecl>())
     {
         return DeclRefType::create(context->astBuilder, aggTypeDeclRef);
     }
@@ -2939,9 +2957,7 @@ Type* getThisParamTypeForContainer(
     return nullptr;
 }
 
-Type* getThisParamTypeForCallable(
-    IRGenContext*   context,
-    DeclRef<Decl>   callableDeclRef)
+Type* getThisParamTypeForCallable(IRGenContext* context, DeclRef<Decl> callableDeclRef)
 {
     if (auto lookup = as<LookupDeclRef>((callableDeclRef.declRefBase)))
     {
@@ -2950,14 +2966,22 @@ Type* getThisParamTypeForCallable(
 
     auto parentDeclRef = callableDeclRef.getParent();
 
-    if(auto subscriptDeclRef = parentDeclRef.as<SubscriptDecl>())
+    if (auto subscriptDeclRef = parentDeclRef.as<SubscriptDecl>())
         parentDeclRef = subscriptDeclRef.getParent();
 
-    if(auto genericDeclRef = parentDeclRef.as<GenericDecl>())
+    if (auto genericDeclRef = parentDeclRef.as<GenericDecl>())
         parentDeclRef = genericDeclRef.getParent();
 
     return getThisParamTypeForContainer(context, parentDeclRef);
 }
+
+struct StmtLoweringVisitor;
+
+void maybeEmitDebugLine(
+    IRGenContext* context,
+    StmtLoweringVisitor& visitor,
+    Stmt* stmt,
+    SourceLoc loc = SourceLoc());
 
 // When lowering something callable (most commonly a function declaration),
 // we need to construct an appropriate parameter list for the IR function
@@ -3000,27 +3024,30 @@ Type* getThisParamTypeForCallable(
 struct IRLoweringParameterInfo
 {
     // This AST-level type of the parameter
-    Type*        type = nullptr;
+    Type* type = nullptr;
 
     // The direction (`in` vs `out` vs `in out`)
-    ParameterDirection  direction;
+    ParameterDirection direction;
+
+    // The direction declared in user code.
+    ParameterDirection declaredDirection = ParameterDirection::kParameterDirection_In;
 
     // The variable/parameter declaration for
     // this parameter (if any)
-    VarDeclBase*        decl = nullptr;
+    VarDeclBase* decl = nullptr;
 
     // Is this the representation of a `this` parameter?
-    bool                isThisParam = false;
+    bool isThisParam = false;
 
     // Is this the destination of address for non-copyable return val?
-    bool                isReturnDestination = false;
+    bool isReturnDestination = false;
 };
 //
 // We need a way to be able to create a `IRLoweringParameterInfo` given the declaration
 // of a parameter:
 //
 IRLoweringParameterInfo getParameterInfo(
-    IRGenContext*               context,
+    IRGenContext* context,
     DeclRef<VarDeclBase> const& paramDecl)
 {
     IRLoweringParameterInfo info;
@@ -3028,6 +3055,7 @@ IRLoweringParameterInfo getParameterInfo(
     info.type = getParamType(context->astBuilder, paramDecl);
     info.decl = paramDecl.getDecl();
     info.direction = getParameterDirection(paramDecl.getDecl());
+    info.declaredDirection = info.direction;
     info.isThisParam = false;
     return info;
 }
@@ -3054,13 +3082,11 @@ enum ParameterListCollectMode
 //
 // We also need to be able to detect whether a declaration is
 // either explicitly or implicitly treated as `static`:
-ParameterListCollectMode getModeForCollectingParentParameters(
-    Decl*           decl,
-    ContainerDecl*  parentDecl)
+ParameterListCollectMode getModeForCollectingParentParameters(Decl* decl, ContainerDecl* parentDecl)
 {
     // If we have a `static` parameter, then it is obvious
     // that we should use the `static` mode
-    if(isEffectivelyStatic(decl, parentDecl))
+    if (isEffectivelyStatic(decl, parentDecl))
         return kParameterListCollectMode_Static;
 
     // Otherwise, let's default to collecting everything
@@ -3070,15 +3096,13 @@ ParameterListCollectMode getModeForCollectingParentParameters(
 // When dealing with a member function, we need to be able to add the `this`
 // parameter for the enclosing type:
 //
-void addThisParameter(
-    ParameterDirection  direction,
-    Type*               type,
-    ParameterLists*     ioParameterLists)
+void addThisParameter(ParameterDirection direction, Type* type, ParameterLists* ioParameterLists)
 {
     IRLoweringParameterInfo info;
     info.type = type;
     info.decl = nullptr;
     info.direction = direction;
+    info.declaredDirection = direction;
     info.isThisParam = true;
 
     ioParameterLists->params.add(info);
@@ -3092,46 +3116,65 @@ void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resu
         info.type = resultType;
         info.decl = nullptr;
         info.direction = kParameterDirection_Ref;
+        info.declaredDirection = info.direction;
         info.isReturnDestination = true;
         ioParameterLists->params.add(info);
     }
 }
+
+void makeVaryingInputParamConstRef(IRLoweringParameterInfo& paramInfo)
+{
+    if (paramInfo.direction != kParameterDirection_In)
+        return;
+    if (paramInfo.decl->findModifier<HLSLUniformModifier>())
+        return;
+    if (as<HLSLPatchType>(paramInfo.type))
+        return;
+    paramInfo.direction = kParameterDirection_ConstRef;
+}
 //
 // And here is our function that will do the recursive walk:
 void collectParameterLists(
-    IRGenContext*               context,
-    DeclRef<Decl> const&        declRef,
-    ParameterLists*             ioParameterLists,
-    ParameterListCollectMode    mode,
-    ParameterDirection          thisParamDirection)
+    IRGenContext* context,
+    DeclRef<Decl> const& declRef,
+    ParameterLists* ioParameterLists,
+    ParameterListCollectMode mode,
+    ParameterDirection thisParamDirection)
 {
     // The parameters introduced by any "parent" declarations
     // will need to come first, so we'll deal with that
     // logic here.
-    if( auto parentDeclRef = declRef.getParent() )
+    if (auto parentDeclRef = declRef.getParent())
     {
         // Compute the mode to use when collecting parameters from
         // the outer declaration. The most important question here
         // is whether parameters of the outer declaration should
         // also count as parameters of the inner declaration.
-        ParameterListCollectMode innerMode = getModeForCollectingParentParameters(declRef.getDecl(), parentDeclRef.getDecl());
+        ParameterListCollectMode innerMode =
+            getModeForCollectingParentParameters(declRef.getDecl(), parentDeclRef.getDecl());
 
         // Don't down-grade our `static`-ness along the chain.
-        if(innerMode < mode)
+        if (innerMode < mode)
             innerMode = mode;
 
-        ParameterDirection innerThisParamDirection = getThisParamDirection(declRef.getDecl(), thisParamDirection);
+        ParameterDirection innerThisParamDirection =
+            getThisParamDirection(declRef.getDecl(), thisParamDirection);
 
 
         // Now collect any parameters from the parent declaration itself
-        collectParameterLists(context, parentDeclRef, ioParameterLists, innerMode, innerThisParamDirection);
+        collectParameterLists(
+            context,
+            parentDeclRef,
+            ioParameterLists,
+            innerMode,
+            innerThisParamDirection);
 
         // We also need to consider whether the inner declaration needs to have a `this`
         // parameter corresponding to the outer declaration.
-        if( innerMode != kParameterListCollectMode_Static )
+        if (innerMode != kParameterListCollectMode_Static)
         {
             auto thisType = getThisParamTypeForContainer(context, parentDeclRef);
-            if(thisType)
+            if (thisType)
             {
                 if (declRef.getDecl()->findModifier<NoDiffThisAttribute>())
                 {
@@ -3156,28 +3199,49 @@ void collectParameterLists(
     // Once we've added any parameters based on parent declarations,
     // we can see if this declaration itself introduces parameters.
     //
-    if( auto callableDeclRef = declRef.as<CallableDecl>() )
+    if (auto callableDeclRef = declRef.as<CallableDecl>())
     {
+        // We need a special case here when lowering the varying parameters of an entrypoint
+        // function. Due to the existence of `EvaluateAttributeAtSample` and friends, we need to
+        // always lower the varying inputs as `__constref` parameters so we can pass pointers to
+        // these intrinsics.
+        // This means that although these parameters are declared as "in" parameters in the source,
+        // we will actually treat them as __constref parameters when lowering to IR. A complication
+        // result from this is that if the original source code actually modifies the input
+        // parameter we still need to create a local var to hold the modified value. In the future
+        // when we are able to update our language spec to always assume input parameters are
+        // immutable, then we can remove this adhoc logic of introducing temporary variables. For
+        // For now we will rely on a follow up pass to remove unnecessary temporary variables if
+        // we can determine that they are never actually writtten to by the user.
+        //
+        bool lowerVaryingInputAsConstRef = declRef.getDecl()->hasModifier<EntryPointAttribute>() ||
+                                           declRef.getDecl()->hasModifier<NumThreadsAttribute>();
+
         // Don't collect parameters from the outer scope if
         // we are in a `static` context.
-        if( mode == kParameterListCollectMode_Default )
+        if (mode == kParameterListCollectMode_Default)
         {
-            for( auto paramDeclRef : getParameters(context->astBuilder, callableDeclRef) )
+            for (auto paramDeclRef : getParameters(context->astBuilder, callableDeclRef))
             {
-                ioParameterLists->params.add(getParameterInfo(context, paramDeclRef));
+                auto paramInfo = getParameterInfo(context, paramDeclRef);
+                if (lowerVaryingInputAsConstRef)
+                    makeVaryingInputParamConstRef(paramInfo);
+                ioParameterLists->params.add(paramInfo);
             }
-            maybeAddReturnDestinationParam(ioParameterLists, getResultType(context->astBuilder, callableDeclRef));
+            maybeAddReturnDestinationParam(
+                ioParameterLists,
+                getResultType(context->astBuilder, callableDeclRef));
         }
     }
 }
 
 bool isConstExprVar(Decl* decl)
 {
-    if( decl->hasModifier<ConstExprModifier>() )
+    if (decl->hasModifier<ConstExprModifier>())
     {
         return true;
     }
-    else if(decl->hasModifier<HLSLStaticModifier>() && decl->hasModifier<ConstModifier>())
+    else if (decl->hasModifier<HLSLStaticModifier>() && decl->hasModifier<ConstModifier>())
     {
         return true;
     }
@@ -3186,16 +3250,11 @@ bool isConstExprVar(Decl* decl)
 }
 
 
-IRType* maybeGetConstExprType(
-    IRBuilder*      builder,
-    IRType*         type,
-    Decl*           decl)
+IRType* maybeGetConstExprType(IRBuilder* builder, IRType* type, Decl* decl)
 {
-    if(isConstExprVar(decl))
+    if (isConstExprVar(decl))
     {
-        return builder->getRateQualifiedType(
-            builder->getConstExprRate(),
-            type);
+        return builder->getRateQualifiedType(builder->getConstExprRate(), type);
     }
 
     return type;
@@ -3204,20 +3263,20 @@ IRType* maybeGetConstExprType(
 
 struct FuncDeclBaseTypeInfo
 {
-    IRType*         type;
-    IRType*         resultType;
-    ParameterLists  parameterLists;
-    List<IRType*>   paramTypes;
+    IRType* type;
+    IRType* resultType;
+    ParameterLists parameterLists;
+    List<IRType*> paramTypes;
     // If the function returns a non-copyable value, this
     // flag is set to indicate that the result should be
     // returned via the last ref parameter.
-    bool            returnViaLastRefParam = false;
+    bool returnViaLastRefParam = false;
 };
 
 void _lowerFuncDeclBaseTypeInfo(
-    IRGenContext*               context,
-    DeclRef<FunctionDeclBase>   declRef,
-    FuncDeclBaseTypeInfo&       outInfo)
+    IRGenContext* context,
+    DeclRef<FunctionDeclBase> declRef,
+    FuncDeclBaseTypeInfo& outInfo)
 {
     auto builder = context->irBuilder;
 
@@ -3227,15 +3286,17 @@ void _lowerFuncDeclBaseTypeInfo(
         context,
 
         declRef,
-        &parameterLists, kParameterListCollectMode_Default, kParameterDirection_In);
+        &parameterLists,
+        kParameterListCollectMode_Default,
+        kParameterDirection_In);
 
     auto& paramTypes = outInfo.paramTypes;
 
-    for( auto paramInfo : parameterLists.params )
+    for (auto paramInfo : parameterLists.params)
     {
         IRType* irParamType = lowerType(context, paramInfo.type);
 
-        switch( paramInfo.direction )
+        switch (paramInfo.direction)
         {
         case kParameterDirection_In:
             // Simple case of a by-value input parameter.
@@ -3265,7 +3326,7 @@ void _lowerFuncDeclBaseTypeInfo(
         // If the parameter was explicitly marked as being a compile-time
         // constant (`constexpr`), then attach that information to its
         // IR-level type explicitly.
-        if( paramInfo.decl )
+        if (paramInfo.decl)
         {
             irParamType = maybeGetConstExprType(builder, irParamType, paramInfo.decl);
         }
@@ -3276,7 +3337,7 @@ void _lowerFuncDeclBaseTypeInfo(
         }
 
         // The 'payload' parameter is a read-only groupshared value
-        if(paramInfo.decl && paramInfo.decl->hasModifier<HLSLPayloadModifier>())
+        if (paramInfo.decl && paramInfo.decl->hasModifier<HLSLPayloadModifier>())
         {
             irParamType = builder->getRateQualifiedType(builder->getGroupSharedRate(), irParamType);
         }
@@ -3285,7 +3346,7 @@ void _lowerFuncDeclBaseTypeInfo(
     }
 
     auto& irResultType = outInfo.resultType;
-    
+
     if (parameterLists.params.getCount() && parameterLists.params.getLast().isReturnDestination)
     {
         irResultType = context->irBuilder->getVoidType();
@@ -3314,14 +3375,18 @@ void _lowerFuncDeclBaseTypeInfo(
             irResultType = builder->getPtrType(irResultType);
         }
     }
-  
-    if (!getErrorCodeType(context->astBuilder, declRef)->equals(context->astBuilder->getBottomType()))
+
+    if (!getErrorCodeType(context->astBuilder, declRef)
+             ->equals(context->astBuilder->getBottomType()))
     {
         auto errorType = lowerType(context, getErrorCodeType(context->astBuilder, declRef));
         IRAttr* throwTypeAttr = nullptr;
         throwTypeAttr = builder->getAttr(kIROp_FuncThrowTypeAttr, 1, (IRInst**)&errorType);
         outInfo.type = builder->getFuncType(
-            paramTypes.getCount(), paramTypes.getBuffer(), irResultType, throwTypeAttr);
+            paramTypes.getCount(),
+            paramTypes.getBuffer(),
+            irResultType,
+            throwTypeAttr);
     }
     else
     {
@@ -3331,12 +3396,12 @@ void _lowerFuncDeclBaseTypeInfo(
 }
 
 static LoweredValInfo _emitCallToAccessor(
-    IRGenContext*           context,
-    IRType*                 type,
-    DeclRef<AccessorDecl>   accessorDeclRef,
-    LoweredValInfo          base,
-    UInt                    argCount,
-    IRInst* const*          args)
+    IRGenContext* context,
+    IRType* type,
+    DeclRef<AccessorDecl> accessorDeclRef,
+    LoweredValInfo base,
+    UInt argCount,
+    IRInst* const* args)
 {
     FuncDeclBaseTypeInfo info;
     _lowerFuncDeclBaseTypeInfo(context, accessorDeclRef, info);
@@ -3344,7 +3409,7 @@ static LoweredValInfo _emitCallToAccessor(
     List<IRInst*> allArgs;
 
     List<OutArgumentFixup> fixups;
-    if(base.flavor != LoweredValInfo::Flavor::None)
+    if (base.flavor != LoweredValInfo::Flavor::None)
     {
         SLANG_ASSERT(info.parameterLists.params.getCount() >= 1);
         SLANG_ASSERT(info.parameterLists.params[0].isThisParam);
@@ -3352,7 +3417,15 @@ static LoweredValInfo _emitCallToAccessor(
         auto thisParam = info.parameterLists.params[0];
         auto thisParamType = lowerType(context, thisParam.type);
 
-        addArg(context, &allArgs, &fixups, base, thisParamType, thisParam.direction, thisParam.type, SourceLoc());
+        addArg(
+            context,
+            &allArgs,
+            &fixups,
+            base,
+            thisParamType,
+            thisParam.direction,
+            thisParam.type,
+            SourceLoc());
     }
 
     allArgs.addRange(args, argCount);
@@ -3384,7 +3457,7 @@ struct ExprLoweringContext
 
     struct ResolvedCallInfo
     {
-        DeclRef<Decl>   funcDeclRef;
+        DeclRef<Decl> funcDeclRef;
         Expr* baseExpr = nullptr;
     };
 
@@ -3392,9 +3465,7 @@ struct ExprLoweringContext
     // into a reference to a specific declaration, along
     // with some contextual information about the declaration
     // we are calling.
-    bool tryResolveDeclRefForCall(
-        Expr* funcExpr,
-        ResolvedCallInfo* outInfo)
+    bool tryResolveDeclRefForCall(Expr* funcExpr, ResolvedCallInfo* outInfo)
     {
         // TODO: unwrap any "identity" expressions that might
         // be wrapping the callee.
@@ -3445,7 +3516,7 @@ struct ExprLoweringContext
         {
             // Seems to be a case of declaration-reference we don't know about.
             SLANG_UNEXPECTED("unknown declaration reference kind");
-            //return false;
+            // return false;
         }
     }
 
@@ -3501,10 +3572,10 @@ struct ExprLoweringContext
     ///
     void addDirectCallArgs(
         InvokeExpr* expr,
-        Index                   argIndex,
+        Index argIndex,
         IRType* paramType,
-        ParameterDirection      paramDirection,
-        DeclRef<ParamDecl>      paramDeclRef,
+        ParameterDirection paramDirection,
+        DeclRef<ParamDecl> paramDeclRef,
         List<IRInst*>* ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
@@ -3541,9 +3612,17 @@ struct ExprLoweringContext
             IRGenContext* subContext = &subContextStorage;
             subContext->env = subEnv;
 
-            _lowerSubstitutionEnv(subContext, argExpr.getSubsts() ? argExpr.getSubsts().declRef : nullptr);
+            _lowerSubstitutionEnv(
+                subContext,
+                argExpr.getSubsts() ? argExpr.getSubsts().declRef : nullptr);
 
-            addCallArgsForParam(subContext, paramType, paramDirection, argExpr.getExpr(), ioArgs, ioFixups);
+            addCallArgsForParam(
+                subContext,
+                paramType,
+                paramDirection,
+                argExpr.getExpr(),
+                ioArgs,
+                ioFixups);
 
             // TODO: The approach we are taking here to default arguments
             // is simplistic, and has consequences for the front-end as
@@ -3577,13 +3656,20 @@ struct ExprLoweringContext
         {
             IRType* paramType = lowerType(context, funcType->getParamType(i));
             ParameterDirection paramDirection = funcType->getParamDirection(i);
-            addDirectCallArgs(expr, i, paramType, paramDirection, DeclRef<ParamDecl>(), ioArgs, ioFixups);
+            addDirectCallArgs(
+                expr,
+                i,
+                paramType,
+                paramDirection,
+                DeclRef<ParamDecl>(),
+                ioArgs,
+                ioFixups);
         }
     }
 
     void addDirectCallArgs(
         InvokeExpr* expr,
-        DeclRef<CallableDecl>   funcDeclRef,
+        DeclRef<CallableDecl> funcDeclRef,
         List<IRInst*>* ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
@@ -3595,7 +3681,14 @@ struct ExprLoweringContext
             auto paramDirection = getParameterDirection(paramDecl);
 
             Index argIndex = argCounter++;
-            addDirectCallArgs(expr, argIndex, paramType, paramDirection, paramDeclRef, ioArgs, ioFixups);
+            addDirectCallArgs(
+                expr,
+                argIndex,
+                paramType,
+                paramDirection,
+                paramDeclRef,
+                ioArgs,
+                ioFixups);
         }
     }
 
@@ -3603,7 +3696,7 @@ struct ExprLoweringContext
     // to the list of argument values for a call.
     void addDirectCallArgs(
         InvokeExpr* expr,
-        DeclRef<Decl>           funcDeclRef,
+        DeclRef<Decl> funcDeclRef,
         List<IRInst*>* ioArgs,
         List<OutArgumentFixup>* ioFixups)
     {
@@ -3617,9 +3710,7 @@ struct ExprLoweringContext
         }
     }
 
-    void addFuncBaseArgs(
-        LoweredValInfo funcVal,
-        List<IRInst*>* /*ioArgs*/)
+    void addFuncBaseArgs(LoweredValInfo funcVal, List<IRInst*>* /*ioArgs*/)
     {
         switch (funcVal.flavor)
         {
@@ -3629,7 +3720,11 @@ struct ExprLoweringContext
     }
 
 
-    void _lowerSubstitutionArg(IRGenContext* subContext, GenericAppDeclRef* subst, Decl* paramDecl, Index argIndex)
+    void _lowerSubstitutionArg(
+        IRGenContext* subContext,
+        GenericAppDeclRef* subst,
+        Decl* paramDecl,
+        Index argIndex)
     {
         SLANG_ASSERT(argIndex < subst->getArgs().getCount());
         auto argVal = lowerVal(subContext, subst->getArgs()[argIndex]);
@@ -3638,7 +3733,8 @@ struct ExprLoweringContext
 
     void _lowerSubstitutionEnv(IRGenContext* subContext, DeclRefBase* subst)
     {
-        if (!subst) return;
+        if (!subst)
+            return;
         _lowerSubstitutionEnv(subContext, subst->getBase());
 
         if (auto genSubst = as<GenericAppDeclRef>(subst))
@@ -3673,19 +3769,29 @@ struct ExprLoweringContext
         FunctionDeclBase* decl,
         List<IRInst*>& irArgs)
     {
-        if (auto glslRequireShaderInputParameter = decl->findModifier<GLSLRequireShaderInputParameterAttribute>())
+        if (auto glslRequireShaderInputParameter =
+                decl->findModifier<GLSLRequireShaderInputParameterAttribute>())
         {
-            if (!irArgs[glslRequireShaderInputParameter->parameterNumber]->findDecoration<IRGlobalInputDecoration>())
+            if (!irArgs[glslRequireShaderInputParameter->parameterNumber]
+                     ->findDecoration<IRGlobalInputDecoration>())
             {
-                this->context->getSink()->diagnose(expr, Diagnostics::requireInputDecoratedVarForParameter, decl, glslRequireShaderInputParameter->parameterNumber);
+                this->context->getSink()->diagnose(
+                    expr,
+                    Diagnostics::requireInputDecoratedVarForParameter,
+                    decl,
+                    glslRequireShaderInputParameter->parameterNumber);
             }
             return;
         }
     }
 
     /// Lower an invoke expr, and attempt to fuse a store of the expr's result into destination.
-    /// If the store is fused, returns LoweredValInfo::None. Otherwise, returns the IR val representing the RValue.
-    LoweredValInfo visitInvokeExprImpl(InvokeExpr* expr, LoweredValInfo destination, const TryClauseEnvironment& tryEnv)
+    /// If the store is fused, returns LoweredValInfo::None. Otherwise, returns the IR val
+    /// representing the RValue.
+    LoweredValInfo visitInvokeExprImpl(
+        InvokeExpr* expr,
+        LoweredValInfo destination,
+        const TryClauseEnvironment& tryEnv)
     {
         auto type = lowerType(context, expr->type);
 
@@ -3746,7 +3852,13 @@ struct ExprLoweringContext
                 //
                 auto loweredBase = lowerSubExpr(baseExpr);
                 addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
-                auto result = lowerStorageReference(context, type, subscriptDeclRef, loweredBase, irArgs.getCount(), irArgs.getBuffer());
+                auto result = lowerStorageReference(
+                    context,
+                    type,
+                    subscriptDeclRef,
+                    loweredBase,
+                    irArgs.getCount(),
+                    irArgs.getBuffer());
 
                 // TODO: Applying the fixups for arguments to the subscript at this point
                 // won't technically be correct, since the call to the subscript may
@@ -3795,12 +3907,18 @@ struct ExprLoweringContext
             // require "fixup" work on the other side.
             //
             FuncDeclBaseTypeInfo funcTypeInfo;
-            _lowerFuncDeclBaseTypeInfo(context, funcDeclRef.template as<FunctionDeclBase>(), funcTypeInfo);
+            _lowerFuncDeclBaseTypeInfo(
+                context,
+                funcDeclRef.template as<FunctionDeclBase>(),
+                funcTypeInfo);
 
             auto funcType = funcTypeInfo.type;
             addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
 
-            validateInvokeExprArgsWithFunctionModifiers(expr, as<FunctionDeclBase>(funcDeclRef.getDecl()), irArgs);
+            validateInvokeExprArgsWithFunctionModifiers(
+                expr,
+                as<FunctionDeclBase>(funcDeclRef.getDecl()),
+                irArgs);
 
             LoweredValInfo result;
             if (funcTypeInfo.returnViaLastRefParam)
@@ -3810,7 +3928,8 @@ struct ExprLoweringContext
                 //
                 if (destination.flavor != LoweredValInfo::Flavor::None)
                 {
-                    // If we have a known destination, we can use it directly as argument to the call.
+                    // If we have a known destination, we can use it directly as argument to the
+                    // call.
                     irArgs.add(destination.val);
                     result = LoweredValInfo();
                 }
@@ -3818,21 +3937,17 @@ struct ExprLoweringContext
                 {
                     // Otherwise, we need to create a temporary variable to hold the result.
                     //
-                    auto tempVar = context->irBuilder->emitVar(tryGetPointedToType(context->irBuilder, funcTypeInfo.paramTypes.getLast()));
+                    auto tempVar = context->irBuilder->emitVar(
+                        tryGetPointedToType(context->irBuilder, funcTypeInfo.paramTypes.getLast()));
                     irArgs.add(tempVar);
                     result = LoweredValInfo::ptr(tempVar);
                 }
             }
 
-            auto callResult = emitCallToDeclRef(
-                context,
-                type,
-                funcDeclRef,
-                funcType,
-                irArgs,
-                tryEnv);
+            auto callResult =
+                emitCallToDeclRef(context, type, funcDeclRef, funcType, irArgs, tryEnv);
             applyOutArgumentFixups(context, argFixups);
-            
+
             if (funcTypeInfo.returnViaLastRefParam)
                 return result;
             return callResult;
@@ -3842,7 +3957,13 @@ struct ExprLoweringContext
             auto funcVal = lowerRValueExpr(context, expr->functionExpr);
             addDirectCallArgs(expr, funcType, &irArgs, &argFixups);
 
-            auto result = emitCallToVal(context, type, funcVal, irArgs.getCount(), irArgs.getBuffer(), tryEnv);
+            auto result = emitCallToVal(
+                context,
+                type,
+                funcVal,
+                irArgs.getCount(),
+                irArgs.getBuffer(),
+                tryEnv);
 
             applyOutArgumentFixups(context, argFixups);
             return result;
@@ -3865,7 +3986,6 @@ struct ExprLoweringContext
         SLANG_UNEXPECTED("could not resolve target declaration for call");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
-
 };
 
 template<typename Derived>
@@ -3884,10 +4004,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     IRBuilder* getBuilder() { return context->irBuilder; }
     ASTBuilder* getASTBuilder() { return context->astBuilder; }
-    LoweredValInfo lowerSubExpr(Expr* expr)
-    {
-        return sharedLoweringContext.lowerSubExpr(expr);
-    }
+    LoweredValInfo lowerSubExpr(Expr* expr) { return sharedLoweringContext.lowerSubExpr(expr); }
 
     LoweredValInfo visitIncompleteExpr(IncompleteExpr*)
     {
@@ -3903,29 +4020,40 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             // A reference to a property is a special case, because
             // we must translate the reference to the property
-            // into a reference to one of its accessors.   
-            return lowerStorageReference(context, lowerTypeOfExpr, propertyDeclRef, LoweredValInfo(), 0, nullptr);
+            // into a reference to one of its accessors.
+            return lowerStorageReference(
+                context,
+                lowerTypeOfExpr,
+                propertyDeclRef,
+                LoweredValInfo(),
+                0,
+                nullptr);
         }
-        LoweredValInfo info = emitDeclRef(
-            context,
-            declRef,
-            lowerTypeOfExpr);
+        LoweredValInfo info = emitDeclRef(context, declRef, lowerTypeOfExpr);
         return info;
     }
 
     // Emit IR to denote the forward-mode derivative
-    // of the inner func-expr. This will be resolved 
-    // to a concrete function during the derivative 
+    // of the inner func-expr. This will be resolved
+    // to a concrete function during the derivative
     // pass.
     LoweredValInfo visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr)
     {
         auto baseVal = lowerSubExpr(expr->baseFunction);
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
 
-        return LoweredValInfo::simple(
-            getBuilder()->emitForwardDifferentiateInst(
-                lowerType(context, expr->type),
-                baseVal.val));
+        return LoweredValInfo::simple(getBuilder()->emitForwardDifferentiateInst(
+            lowerType(context, expr->type),
+            baseVal.val));
+    }
+
+    LoweredValInfo visitDetachExpr(DetachExpr* expr)
+    {
+        auto baseVal = lowerRValueExpr(context, expr->inner);
+
+        return LoweredValInfo::simple(getBuilder()->emitDetachDerivative(
+            lowerType(context, expr->type),
+            getSimpleVal(context, baseVal)));
     }
 
     LoweredValInfo visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr)
@@ -3934,9 +4062,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
 
         return LoweredValInfo::simple(
-            getBuilder()->emitPrimalSubstituteInst(
-                lowerType(context, expr->type),
-                baseVal.val));
+            getBuilder()->emitPrimalSubstituteInst(lowerType(context, expr->type), baseVal.val));
     }
 
     LoweredValInfo visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
@@ -3953,36 +4079,44 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 // TODO(Sai): We might be missing the case where a single materialize could create
                 // multiple calls (multiple index operations?). Not quite sure what the right way
                 // to handle that case might be.
-                // 
+                //
                 if (as<IRCall>(materializedVal.val))
                 {
                     if (expr->flavor == TreatAsDifferentiableExpr::Flavor::NoDiff)
-                        getBuilder()->addDecoration(materializedVal.val, kIROp_TreatCallAsDifferentiableDecoration);
+                        getBuilder()->addDecoration(
+                            materializedVal.val,
+                            kIROp_TreatCallAsDifferentiableDecoration);
                     else if (expr->flavor == TreatAsDifferentiableExpr::Flavor::Differentiable)
-                        getBuilder()->addDecoration(materializedVal.val, kIROp_DifferentiableCallDecoration);
+                        getBuilder()->addDecoration(
+                            materializedVal.val,
+                            kIROp_DifferentiableCallDecoration);
                     else
                         SLANG_UNEXPECTED("Unknown TreatAsDifferentiableExpr::Flavor");
                 }
 
                 innerInst = getSimpleVal(context, materializedVal);
-                
-                // We'll special case handle 'loads' here in order to allow TreatAsDifferentiable to be 
-                // used on array index operations. (This is to avoid a discrepancy between using no_diff
-                // on local variable indexing vs. resource indexing.)
-                // 
+
+                // We'll special case handle 'loads' here in order to allow TreatAsDifferentiable to
+                // be used on array index operations. (This is to avoid a discrepancy between using
+                // no_diff on local variable indexing vs. resource indexing.)
+                //
                 if (as<IRLoad>(innerInst))
-                    innerInst = getBuilder()->emitDetachDerivative(innerInst->getDataType(), innerInst);
+                    innerInst =
+                        getBuilder()->emitDetachDerivative(innerInst->getDataType(), innerInst);
             }
             else
             {
-                SLANG_UNEXPECTED("TreatAsDifferentiableExpr on non-simple l-values not properly defined.");
+                SLANG_UNEXPECTED(
+                    "TreatAsDifferentiableExpr on non-simple l-values not properly defined.");
             }
         }
         else
         {
             if (auto callInst = as<IRCall>(baseVal.val))
                 if (expr->flavor == TreatAsDifferentiableExpr::Flavor::NoDiff)
-                    getBuilder()->addDecoration(callInst, kIROp_TreatCallAsDifferentiableDecoration);
+                    getBuilder()->addDecoration(
+                        callInst,
+                        kIROp_TreatCallAsDifferentiableDecoration);
                 else if (expr->flavor == TreatAsDifferentiableExpr::Flavor::Differentiable)
                     getBuilder()->addDecoration(callInst, kIROp_DifferentiableCallDecoration);
                 else
@@ -3992,23 +4126,22 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
 
         SLANG_ASSERT(innerInst);
-        
+
         return LoweredValInfo::simple(innerInst);
     }
 
     // Emit IR to denote the forward-mode derivative
-    // of the inner func-expr. This will be resolved 
-    // to a concrete function during the derivative 
+    // of the inner func-expr. This will be resolved
+    // to a concrete function during the derivative
     // pass.
     LoweredValInfo visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr)
     {
         auto baseVal = lowerSubExpr(expr->baseFunction);
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
 
-        return LoweredValInfo::simple(
-            getBuilder()->emitBackwardDifferentiateInst(
-                lowerType(context, expr->type),
-                baseVal.val));
+        return LoweredValInfo::simple(getBuilder()->emitBackwardDifferentiateInst(
+            lowerType(context, expr->type),
+            baseVal.val));
     }
 
     LoweredValInfo visitDispatchKernelExpr(DispatchKernelExpr* expr)
@@ -4064,17 +4197,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             }
             else
             {
-                
+
                 inst = builder->emitCountOf(resultType, sizedType);
             }
 
             return LoweredValInfo::simple(inst);
         }
 
-        const auto value = 
-            as<SizeOfExpr>(sizeOfLikeExpr) ? 
-                size.size : 
-                size.alignment;
+        const auto value = as<SizeOfExpr>(sizeOfLikeExpr) ? size.size : size.alignment;
 
         return LoweredValInfo::simple(getBuilder()->getIntValue(resultType, value));
     }
@@ -4101,7 +4231,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         // Although the surface syntax can have an empty ASM block, the IR asm
         // block must have at least one inst
-        if(!expr->insts.getCount())
+        if (!expr->insts.getCount())
             return LoweredValInfo{};
 
         auto builder = context->irBuilder;
@@ -4109,19 +4239,20 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         const auto type = lowerType(context, expr->type);
         const auto spirvAsmInst = builder->emitSPIRVAsm(type);
 
-        const auto lowerOperand = [&](const SPIRVAsmOperand& operand) -> IRSPIRVAsmOperand* {
-            switch(operand.flavor)
+        const auto lowerOperand = [&](const SPIRVAsmOperand& operand) -> IRSPIRVAsmOperand*
+        {
+            switch (operand.flavor)
             {
             case SPIRVAsmOperand::Literal:
                 {
-                    if(operand.token.type == TokenType::IntegerLiteral)
+                    if (operand.token.type == TokenType::IntegerLiteral)
                     {
                         // TODO: we should sign-extend these where appropriate,
                         // difficult because it requires information on usage...
                         return builder->emitSPIRVAsmOperandLiteral(
                             builder->getIntValue(builder->getUIntType(), operand.knownValue));
                     }
-                    else if(operand.token.type == TokenType::StringLiteral)
+                    else if (operand.token.type == TokenType::StringLiteral)
                     {
                         const auto v = getStringLiteralTokenValue(operand.token);
                         return builder->emitSPIRVAsmOperandLiteral(
@@ -4132,8 +4263,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             case SPIRVAsmOperand::Id:
                 {
                     const auto id = operand.token.getContent();
-                    return builder->emitSPIRVAsmOperandId(
-                        builder->getStringValue(id));
+                    return builder->emitSPIRVAsmOperandId(builder->getStringValue(id));
                 }
             case SPIRVAsmOperand::ResultMarker:
                 {
@@ -4143,7 +4273,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 {
                     const auto v = operand.knownValue;
                     const auto i = builder->getIntValue(builder->getUIntType(), v);
-                    if(operand.wrapInId)
+                    if (operand.wrapInId)
                         return builder->emitSPIRVAsmOperandEnum(i, builder->getUIntType());
                     else
                         return builder->emitSPIRVAsmOperandEnum(i);
@@ -4174,15 +4304,15 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     return builder->emitSPIRVAsmOperandInst(i);
                 }
             case SPIRVAsmOperand::SlangImmediateValue:
-            {
-                IRInst* i;
                 {
-                    IRBuilderInsertLocScope insertScope(builder);
-                    builder->setInsertBefore(spirvAsmInst);
-                    i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    IRInst* i;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(spirvAsmInst);
+                        i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    }
+                    return builder->emitSPIRVAsmOperandEnum(i);
                 }
-                return builder->emitSPIRVAsmOperandEnum(i);
-            }
             case SPIRVAsmOperand::SlangValueAddr:
                 {
                     IRInst* i;
@@ -4192,9 +4322,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                         const auto addr = tryGetAddress(
                             context,
                             lowerLValueExpr(context, operand.expr),
-                            TryGetAddressMode::Default
-                        );
-                        if(addr.flavor == LoweredValInfo::Flavor::Ptr)
+                            TryGetAddressMode::Default);
+                        if (addr.flavor == LoweredValInfo::Flavor::Ptr)
                             i = addr.val;
                         else
                         {
@@ -4225,25 +4354,25 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                     return builder->emitSPIRVAsmOperandSampledType(i);
                 }
             case SPIRVAsmOperand::ImageType:
-            {
-                IRInst* i;
                 {
-                    IRBuilderInsertLocScope insertScope(builder);
-                    builder->setInsertBefore(spirvAsmInst);
-                    i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    IRInst* i;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(spirvAsmInst);
+                        i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    }
+                    return builder->emitSPIRVAsmOperandImageType(i);
                 }
-                return builder->emitSPIRVAsmOperandImageType(i);
-            }
             case SPIRVAsmOperand::SampledImageType:
-            {
-                IRInst* i;
                 {
-                    IRBuilderInsertLocScope insertScope(builder);
-                    builder->setInsertBefore(spirvAsmInst);
-                    i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    IRInst* i;
+                    {
+                        IRBuilderInsertLocScope insertScope(builder);
+                        builder->setInsertBefore(spirvAsmInst);
+                        i = getSimpleVal(context, lowerRValueExpr(context, operand.expr));
+                    }
+                    return builder->emitSPIRVAsmOperandSampledImageType(i);
                 }
-                return builder->emitSPIRVAsmOperandSampledImageType(i);
-            }
             case SPIRVAsmOperand::TruncateMarker:
                 {
                     return builder->emitSPIRVAsmOperandTruncate();
@@ -4297,11 +4426,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         };
         IRBuilderInsertLocScope insertScope(builder);
         builder->setInsertInto(spirvAsmInst);
-        for(const auto& inst : expr->insts)
+        for (const auto& inst : expr->insts)
         {
             const auto opcode = lowerOperand(inst.opcode);
             List<IRInst*> operands;
-            for(const auto& operand : inst.operands)
+            for (const auto& operand : inst.operands)
                 operands.add(lowerOperand(operand));
             builder->emitSPIRVAsmInst(opcode, operands);
         }
@@ -4320,15 +4449,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return subscriptValue(type, baseVal, indexVal);
     }
 
-    LoweredValInfo visitThisExpr(ThisExpr* /*expr*/)
-    {
-        return context->thisVal;
-    }
+    LoweredValInfo visitThisExpr(ThisExpr* /*expr*/) { return context->thisVal; }
 
-    LoweredValInfo visitReturnValExpr(ReturnValExpr*)
-    {
-        return context->returnDestination;
-    }
+    LoweredValInfo visitReturnValExpr(ReturnValExpr*) { return context->returnDestination; }
 
     LoweredValInfo visitMemberExpr(MemberExpr* expr)
     {
@@ -4352,13 +4475,19 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             boundMemberInfo->declRef = callableDeclRef;
             return LoweredValInfo::boundMember(boundMemberInfo);
         }
-        else if(auto propertyDeclRef = declRef.as<PropertyDecl>())
+        else if (auto propertyDeclRef = declRef.as<PropertyDecl>())
         {
             // A reference to a property is a special case, because
             // we must translate the reference to the property
             // into a reference to one of its accessors.
             //
-            return lowerStorageReference(context, loweredType, propertyDeclRef, loweredBase, 0, nullptr);
+            return lowerStorageReference(
+                context,
+                loweredType,
+                propertyDeclRef,
+                loweredBase,
+                0,
+                nullptr);
         }
 
         SLANG_UNIMPLEMENTED_X("codegen for member expression");
@@ -4380,8 +4509,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         IRInst* loweredBaseVal = getSimpleVal(context, loweredBase);
         IRType* loweredBaseType = loweredBaseVal->getDataType();
 
-        if (as<IRPointerLikeType>(loweredBaseType)
-            || as<IRPtrTypeBase>(loweredBaseType))
+        if (as<IRPointerLikeType>(loweredBaseType) || as<IRPtrTypeBase>(loweredBaseType))
         {
             // Note that we do *not* perform an actual `load` operation
             // here, but rather just use the pointer value to construct
@@ -4422,10 +4550,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return loweredBase;
     }
 
-    LoweredValInfo visitParenExpr(ParenExpr* expr)
-    {
-        return lowerSubExpr(expr->base);
-    }
+    LoweredValInfo visitParenExpr(ParenExpr* expr) { return lowerSubExpr(expr->base); }
 
     LoweredValInfo visitPackExpr(PackExpr* expr)
     {
@@ -4434,7 +4559,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             irArgs.add(getSimpleVal(context, lowerSubExpr(arg)));
         }
-        auto irMakeTuple = getBuilder()->emitMakeValuePack((UInt)irArgs.getCount(), irArgs.getBuffer());
+        auto irMakeTuple =
+            getBuilder()->emitMakeValuePack((UInt)irArgs.getCount(), irArgs.getBuffer());
         return LoweredValInfo::simple(irMakeTuple);
     }
 
@@ -4442,7 +4568,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         auto subVal = lowerSubExpr(expr->baseExpr);
         SLANG_ASSERT(context->expandIndex);
-        auto irEach = getBuilder()->emitGetTupleElement(lowerType(context, expr->type), getSimpleVal(context, subVal), context->expandIndex);
+        auto irEach = getBuilder()->emitGetTupleElement(
+            lowerType(context, expr->type),
+            getSimpleVal(context, subVal),
+            context->expandIndex);
         return LoweredValInfo::simple(irEach);
     }
 
@@ -4465,7 +4594,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             // In this case, the captured type is just the DeclRefType itself.
             irCapturedPacks.add(irType);
         }
-        auto expandInst = irBuilder->emitExpandInst(irType, (UInt)irCapturedPacks.getCount(), irCapturedPacks.getBuffer());
+        auto expandInst = irBuilder->emitExpandInst(
+            irType,
+            (UInt)irCapturedPacks.getCount(),
+            irCapturedPacks.getBuffer());
         irBuilder->setInsertInto(expandInst);
         irBuilder->emitBlock();
         auto eachIndex = irBuilder->emitParam(irBuilder->getIntType());
@@ -4480,9 +4612,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo getSimpleDefaultVal(IRType* type)
     {
         type = (IRType*)unwrapAttributedType(type);
-        if(auto basicType = as<IRBasicType>(type))
+        if (auto basicType = as<IRBasicType>(type))
         {
-            switch( basicType->getBaseType() )
+            switch (basicType->getBaseType())
             {
             default:
                 SLANG_UNEXPECTED("missing case for getting IR default value");
@@ -4534,12 +4666,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto vectorType = as<VectorExpressionType>(type))
         {
-            UInt elementCount = (UInt) getIntVal(vectorType->getElementCount());
+            UInt elementCount = (UInt)getIntVal(vectorType->getElementCount());
 
-            auto irDefaultValue = getSimpleVal(context, getDefaultVal(vectorType->getElementType()));
+            auto irDefaultValue =
+                getSimpleVal(context, getDefaultVal(vectorType->getElementType()));
 
             List<IRInst*> args;
-            for(UInt ee = 0; ee < elementCount; ++ee)
+            for (UInt ee = 0; ee < elementCount; ++ee)
             {
                 args.add(irDefaultValue);
             }
@@ -4548,14 +4681,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
-            UInt rowCount = (UInt) getIntVal(matrixType->getRowCount());
+            UInt rowCount = (UInt)getIntVal(matrixType->getRowCount());
 
             auto rowType = matrixType->getRowType();
 
             auto irDefaultValue = getSimpleVal(context, getDefaultVal(rowType));
 
             List<IRInst*> args;
-            for(UInt rr = 0; rr < rowCount; ++rr)
+            for (UInt rr = 0; rr < rowCount; ++rr)
             {
                 args.add(irDefaultValue);
             }
@@ -4564,7 +4697,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            auto irDefaultElement = getSimpleVal(context, getDefaultVal(arrayType->getElementType()));
+            auto irDefaultElement =
+                getSimpleVal(context, getDefaultVal(arrayType->getElementType()));
 
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeArrayFromElement(irType, irDefaultElement));
@@ -4572,6 +4706,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         else if (auto ptrType = as<PtrType>(type))
         {
             return LoweredValInfo::simple(getBuilder()->getNullPtrValue(irType));
+        }
+        else if (auto tupleType = as<TupleType>(type))
+        {
+            List<IRInst*> args;
+            for (Index i = 0; i < tupleType->getMemberCount(); i++)
+            {
+                args.add(getSimpleVal(context, getDefaultVal(tupleType->getMember(i))));
+            }
+            return LoweredValInfo::simple(
+                getBuilder()->emitMakeTuple(irType, args.getCount(), args.getBuffer()));
         }
         else if (auto declRefType = as<DeclRefType>(type))
         {
@@ -4590,14 +4734,18 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
                 if (auto structTypeDeclRef = aggTypeDeclRef.as<StructDecl>())
                 {
-                    if (auto baseStructType = findBaseStructType(getASTBuilder(), structTypeDeclRef))
+                    if (auto baseStructType =
+                            findBaseStructType(getASTBuilder(), structTypeDeclRef))
                     {
                         auto irBaseVal = getSimpleVal(context, getDefaultVal(baseStructType));
                         args.add(irBaseVal);
                     }
                 }
 
-                for (auto ff : getMembersOfType<VarDecl>(getASTBuilder(), aggTypeDeclRef, MemberFilterStyle::Instance))
+                for (auto ff : getMembersOfType<VarDecl>(
+                         getASTBuilder(),
+                         aggTypeDeclRef,
+                         MemberFilterStyle::Instance))
                 {
                     auto irFieldVal = getSimpleVal(context, getDefaultVal(ff));
                     args.add(irFieldVal);
@@ -4612,12 +4760,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitDefaultConstructExpr(DefaultConstructExpr* expr)
     {
-        return LoweredValInfo::simple(getBuilder()->emitDefaultConstruct(lowerType(context, expr->type)));
+        return LoweredValInfo::simple(
+            getBuilder()->emitDefaultConstruct(lowerType(context, expr->type)));
     }
 
     LoweredValInfo getDefaultVal(DeclRef<VarDeclBase> decl)
     {
-        if(auto initExpr = decl.getDecl()->initExpr)
+        if (auto initExpr = decl.getDecl()->initExpr)
         {
             return lowerRValueExpr(context, initExpr);
         }
@@ -4642,7 +4791,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // asking for default initialization, which should apply
         // to (almost) any type.
         //
-        if(argCount == 0)
+        if (argCount == 0)
         {
             return getDefaultVal(type.type);
         }
@@ -4651,7 +4800,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // fill in the appropriate field of the result
         if (auto arrayType = as<ArrayExpressionType>(type))
         {
-            UInt elementCount = (UInt) getIntVal(arrayType->getElementCount());
+            UInt elementCount = (UInt)getIntVal(arrayType->getElementCount());
 
             for (UInt ee = 0; ee < argCount; ++ee)
             {
@@ -4659,10 +4808,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
                 args.add(getSimpleVal(context, argVal));
             }
-            if(elementCount > argCount)
+            if (elementCount > argCount)
             {
-                auto irDefaultValue = getSimpleVal(context, getDefaultVal(arrayType->getElementType()));
-                for(UInt ee = argCount; ee < elementCount; ++ee)
+                auto irDefaultValue =
+                    getSimpleVal(context, getDefaultVal(arrayType->getElementType()));
+                for (UInt ee = argCount; ee < elementCount; ++ee)
                 {
                     args.add(irDefaultValue);
                 }
@@ -4673,7 +4823,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto vectorType = as<VectorExpressionType>(type))
         {
-            UInt elementCount = (UInt) getIntVal(vectorType->getElementCount());
+            UInt elementCount = (UInt)getIntVal(vectorType->getElementCount());
 
             for (UInt ee = 0; ee < argCount; ++ee)
             {
@@ -4681,10 +4831,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
                 args.add(getSimpleVal(context, argVal));
             }
-            if(elementCount > argCount)
+            if (elementCount > argCount)
             {
-                auto irDefaultValue = getSimpleVal(context, getDefaultVal(vectorType->getElementType()));
-                for(UInt ee = argCount; ee < elementCount; ++ee)
+                auto irDefaultValue =
+                    getSimpleVal(context, getDefaultVal(vectorType->getElementType()));
+                for (UInt ee = argCount; ee < elementCount; ++ee)
                 {
                     args.add(irDefaultValue);
                 }
@@ -4695,7 +4846,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto matrixType = as<MatrixExpressionType>(type))
         {
-            UInt rowCount = (UInt) getIntVal(matrixType->getRowCount());
+            UInt rowCount = (UInt)getIntVal(matrixType->getRowCount());
 
             for (UInt rr = 0; rr < argCount; ++rr)
             {
@@ -4703,12 +4854,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
                 args.add(getSimpleVal(context, argVal));
             }
-            if(rowCount > argCount)
+            if (rowCount > argCount)
             {
                 auto rowType = matrixType->getRowType();
                 auto irDefaultValue = getSimpleVal(context, getDefaultVal(rowType));
 
-                for(UInt rr = argCount; rr < rowCount; ++rr)
+                for (UInt rr = argCount; rr < rowCount; ++rr)
                 {
                     args.add(irDefaultValue);
                 }
@@ -4716,6 +4867,29 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeMatrix(irType, args.getCount(), args.getBuffer()));
+        }
+        else if (auto coopVecType = as<CoopVectorExpressionType>(type))
+        {
+            UInt elementCount = (UInt)getIntVal(coopVecType->getElementCount());
+
+            for (UInt ee = 0; ee < argCount; ++ee)
+            {
+                auto argExpr = expr->args[ee];
+                LoweredValInfo argVal = lowerRValueExpr(context, argExpr);
+                args.add(getSimpleVal(context, argVal));
+            }
+            if (elementCount > argCount)
+            {
+                auto irDefaultValue =
+                    getSimpleVal(context, getDefaultVal(coopVecType->getElementType()));
+                for (UInt ee = argCount; ee < elementCount; ++ee)
+                {
+                    args.add(irDefaultValue);
+                }
+            }
+
+            return LoweredValInfo::simple(
+                getBuilder()->emitMakeCoopVector(irType, args.getCount(), args.getBuffer()));
         }
         else if (auto declRefType = as<DeclRefType>(type))
         {
@@ -4728,9 +4902,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 // structure type, then we need to treat the base type as
                 // an implicit first field.
                 //
-                if(auto structTypeDeclRef = aggTypeDeclRef.as<StructDecl>())
+                if (auto structTypeDeclRef = aggTypeDeclRef.as<StructDecl>())
                 {
-                    if (auto baseStructType = findBaseStructType(getASTBuilder(), structTypeDeclRef))
+                    if (auto baseStructType =
+                            findBaseStructType(getASTBuilder(), structTypeDeclRef))
                     {
                         UInt argIndex = argCounter++;
                         if (argIndex < argCount)
@@ -4741,13 +4916,17 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                         }
                         else
                         {
-                            auto irDefaultValue = getSimpleVal(context, getDefaultVal(baseStructType));
+                            auto irDefaultValue =
+                                getSimpleVal(context, getDefaultVal(baseStructType));
                             args.add(irDefaultValue);
                         }
                     }
                 }
 
-                for (auto ff : getMembersOfType<VarDecl>(getASTBuilder(), aggTypeDeclRef, MemberFilterStyle::Instance))
+                for (auto ff : getMembersOfType<VarDecl>(
+                         getASTBuilder(),
+                         aggTypeDeclRef,
+                         MemberFilterStyle::Instance))
                 {
                     UInt argIndex = argCounter++;
                     if (argIndex < argCount)
@@ -4762,9 +4941,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                         args.add(irDefaultValue);
                     }
                 }
-
-                return LoweredValInfo::simple(
-                    getBuilder()->emitMakeStruct(irType, args.getCount(), args.getBuffer()));
+                if (as<TupleType>(type))
+                {
+                    return LoweredValInfo::simple(
+                        getBuilder()->emitMakeTuple(irType, args.getCount(), args.getBuffer()));
+                }
+                else
+                {
+                    return LoweredValInfo::simple(
+                        getBuilder()->emitMakeStruct(irType, args.getCount(), args.getBuffer()));
+                }
             }
         }
 
@@ -4886,9 +5072,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // true-block: nonconditionalBranch(%after-block, true) for ||
         builder->insertBlock(thenBlock);
         builder->setInsertInto(thenBlock);
-        auto trueVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And ?
-            getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1])) :
-            LoweredValInfo::simple(context->irBuilder->getBoolValue(true)).val;
+        auto trueVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
+                           ? getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]))
+                           : LoweredValInfo::simple(context->irBuilder->getBoolValue(true)).val;
 
         builder->emitBranch(afterBlock, 1, &trueVal);
 
@@ -4896,9 +5082,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // false-block: nonconditionalBranch(%after-block, <second param>: Bool) for ||
         builder->insertBlock(elseBlock);
         builder->setInsertInto(elseBlock);
-        auto falseVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And ?
-            LoweredValInfo::simple(context->irBuilder->getBoolValue(false)).val :
-            getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]));
+        auto falseVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
+                            ? LoweredValInfo::simple(context->irBuilder->getBoolValue(false)).val
+                            : getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]));
 
         builder->emitBranch(afterBlock, 1, &falseVal);
 
@@ -4913,10 +5099,20 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitInvokeExpr(InvokeExpr* expr)
     {
-        return sharedLoweringContext.visitInvokeExprImpl(expr, LoweredValInfo(), TryClauseEnvironment());
+        return sharedLoweringContext.visitInvokeExprImpl(
+            expr,
+            LoweredValInfo(),
+            TryClauseEnvironment());
     }
 
-        /// Emit code for a `try` invoke.
+    LoweredValInfo visitBuiltinCastExpr(BuiltinCastExpr* expr)
+    {
+        auto irType = lowerType(context, expr->type);
+        auto irVal = getSimpleVal(context, lowerRValueExpr(context, expr->base));
+        return LoweredValInfo::simple(context->irBuilder->emitCast(irType, irVal));
+    }
+
+    /// Emit code for a `try` invoke.
     LoweredValInfo visitTryExpr(TryExpr* expr)
     {
         auto invokeExpr = as<InvokeExpr>(expr->base);
@@ -4926,18 +5122,18 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return sharedLoweringContext.visitInvokeExprImpl(invokeExpr, LoweredValInfo(), tryEnv);
     }
 
-        /// Emit code to cast `value` to a concrete `superType` (e.g., a `struct`).
-        ///
-        /// The `subTypeWitness` is expected to witness the sub-type relationship
-        /// by naming a field (or chain of fields) that leads from the type of
-        /// `value` to the field that stores its members for `superType`.
-        ///
+    /// Emit code to cast `value` to a concrete `superType` (e.g., a `struct`).
+    ///
+    /// The `subTypeWitness` is expected to witness the sub-type relationship
+    /// by naming a field (or chain of fields) that leads from the type of
+    /// `value` to the field that stores its members for `superType`.
+    ///
     LoweredValInfo emitCastToConcreteSuperTypeRec(
-        LoweredValInfo const&   value,
-        IRType*                 superType,
-        Val*                    subTypeWitness)
+        LoweredValInfo const& value,
+        IRType* superType,
+        Val* subTypeWitness)
     {
-        if( auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subTypeWitness) )
+        if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subTypeWitness))
         {
             // Drop the specialization info on inheritance decl struct keys, as it makes no
             // sense to specialize a key.
@@ -4945,12 +5141,15 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto transitiveSubtypeWitness = as<TransitiveSubtypeWitness>(subTypeWitness))
         {
-            // Try to resolve the inheritance situation which may show-up with 2+ levels of inheritance.
-            // We will recursivly follow through the subType->midType & midType->superType witnesses until 
-            // we resolve DeclaredSubtypeWitness's
+            // Try to resolve the inheritance situation which may show-up with 2+ levels of
+            // inheritance. We will recursivly follow through the subType->midType &
+            // midType->superType witnesses until we resolve DeclaredSubtypeWitness's
             LoweredValInfo subToMid;
             if (auto witness = as<SubtypeWitness>(transitiveSubtypeWitness->getSubToMid()))
-                subToMid = emitCastToConcreteSuperTypeRec(value, lowerType(context, witness->getSup()), witness);
+                subToMid = emitCastToConcreteSuperTypeRec(
+                    value,
+                    lowerType(context, witness->getSup()),
+                    witness);
             else
             {
                 SLANG_ASSERT(!"unhandled");
@@ -4972,11 +5171,24 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
-    LoweredValInfo visitCastToSuperTypeExpr(
-        CastToSuperTypeExpr* expr)
+    LoweredValInfo visitCastToSuperTypeExpr(CastToSuperTypeExpr* expr)
     {
         auto superType = lowerType(context, expr->type);
         auto value = lowerRValueExpr(context, expr->valueArg);
+
+        // First, we check if the witness is a type equality witness.
+        // If so, we can simply emit a bit cast to the target type that should eventually
+        // fold out to a no-op.
+        // Note: if we are going to equivalent but not identical types in the future,
+        // then the cast between equivalent types shouldn't be as simple as a bit cast
+        // and will require actual coercion logic between the two types.
+        // For now, we don't support type equivalence witness so this is safe for
+        // equal types.
+        if (isTypeEqualityWitness(expr->witnessArg))
+        {
+            return LoweredValInfo::simple(
+                getBuilder()->emitBitCast(superType, getSimpleVal(context, value)));
+        }
 
         // The actual operation that we need to perform here
         // depends on the kind of subtype relationship we
@@ -4988,10 +5200,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // type that binds together the concrete value and the
         // witness table that represents the subtype relationship.
         //
-        if( auto declRefType = as<DeclRefType>(expr->type) )
+        if (auto declRefType = as<DeclRefType>(expr->type))
         {
             auto declRef = declRefType->getDeclRef();
-            if( auto interfaceDeclRef = declRef.as<InterfaceDecl>() )
+            if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
             {
                 // We have an expression that is "up-casting" some concrete value
                 // to an existential type (aka interface type), using a subtype witness
@@ -5012,13 +5224,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 // a sequence of witness tables.
                 //
                 auto concreteValue = getSimpleVal(context, value);
-                auto existentialValue = getBuilder()->emitMakeExistential(
-                    superType,
-                    concreteValue,
-                    witnessTable);
+                auto existentialValue =
+                    getBuilder()->emitMakeExistential(superType, concreteValue, witnessTable);
                 return LoweredValInfo::simple(existentialValue);
             }
-            else if( auto structDeclRef = declRef.as<StructDecl>() )
+            else if (auto structDeclRef = declRef.as<StructDecl>())
             {
                 // We are up-casting to a concrete `struct` super-type,
                 // such that the witness will represent a field of the super-type
@@ -5028,7 +5238,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 return emitCastToConcreteSuperTypeRec(value, superType, expr->witnessArg);
             }
         }
-
         SLANG_UNEXPECTED("unexpected case of subtype relationship");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
@@ -5047,13 +5256,17 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         {
             auto witness = lowerSimpleVal(context, expr->witnessArg);
             existentialInfo = value.getExtractedExistentialValInfo();
-            isType = builder->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, targetType, witness);
+            isType = builder->emitIsType(
+                existentialInfo->extractedVal,
+                existentialInfo->witnessTable,
+                targetType,
+                witness);
         }
         else
         {
             SLANG_ASSERT(value.val);
             auto leftType = lowerType(context, expr->value->type);
-            IRInst* args[] = { leftType, targetType };
+            IRInst* args[] = {leftType, targetType};
             isType = builder->emitIntrinsicInst(builder->getBoolType(), kIROp_TypeEquals, 2, args);
         }
         IRBlock* trueBlock;
@@ -5061,7 +5274,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         IRBlock* afterBlock;
         builder->emitIfElseWithBlocks(isType, trueBlock, falseBlock, afterBlock);
         builder->setInsertInto(trueBlock);
-        auto irVal = builder->emitReinterpret(targetType, existentialInfo ? existentialInfo->extractedVal : getSimpleVal(context, value));
+        auto irVal = builder->emitReinterpret(
+            targetType,
+            existentialInfo ? existentialInfo->extractedVal : getSimpleVal(context, value));
         auto optionalVal = builder->emitMakeOptionalValue(optType, irVal);
         builder->emitStore(var, optionalVal);
         builder->emitBranch(afterBlock);
@@ -5088,7 +5303,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             auto type = lowerType(context, expr->typeExpr.type);
             auto witness = lowerSimpleVal(context, expr->witnessArg);
             auto existentialInfo = value.getExtractedExistentialValInfo();
-            auto irVal = getBuilder()->emitIsType(existentialInfo->extractedVal, existentialInfo->witnessTable, type, witness);
+            auto irVal = getBuilder()->emitIsType(
+                existentialInfo->extractedVal,
+                existentialInfo->witnessTable,
+                type,
+                witness);
             return LoweredValInfo::simple(irVal);
         }
         // For all other cases, we map to a simple type equality check in the IR.
@@ -5102,21 +5321,18 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             leftType = lowerType(context, expr->value->type);
         }
         auto rightType = lowerType(context, expr->typeExpr.type);
-        IRInst* args[] = { leftType, rightType };
-        auto irVal = getBuilder()->emitIntrinsicInst(getBuilder()->getBoolType(), kIROp_TypeEquals, 2, args);
+        IRInst* args[] = {leftType, rightType};
+        auto irVal =
+            getBuilder()->emitIntrinsicInst(getBuilder()->getBoolType(), kIROp_TypeEquals, 2, args);
         return LoweredValInfo::simple(irVal);
     }
 
-    LoweredValInfo visitModifierCastExpr(
-        ModifierCastExpr* expr)
+    LoweredValInfo visitModifierCastExpr(ModifierCastExpr* expr)
     {
         return this->dispatch(expr->valueArg);
     }
 
-    LoweredValInfo subscriptValue(
-        IRType*         type,
-        LoweredValInfo  baseVal,
-        IRInst*         indexVal)
+    LoweredValInfo subscriptValue(IRType* type, LoweredValInfo baseVal, IRInst* indexVal)
     {
         auto builder = getBuilder();
 
@@ -5133,37 +5349,26 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         switch (baseVal.flavor)
         {
         case LoweredValInfo::Flavor::Simple:
-                return LoweredValInfo::simple(
-                    builder->emitElementExtract(
-                        type,
-                        getSimpleVal(context, baseVal),
-                        indexVal));
+            return LoweredValInfo::simple(
+                builder->emitElementExtract(type, getSimpleVal(context, baseVal), indexVal));
 
         case LoweredValInfo::Flavor::Ptr:
-            return LoweredValInfo::ptr(
-                builder->emitElementAddress(
-                    baseVal.val,
-                    indexVal));
+            return LoweredValInfo::ptr(builder->emitElementAddress(baseVal.val, indexVal));
 
         default:
             SLANG_UNIMPLEMENTED_X("subscript expr");
             UNREACHABLE_RETURN(LoweredValInfo());
         }
-
     }
 
-    LoweredValInfo extractField(
-        IRType*         fieldType,
-        LoweredValInfo  base,
-        DeclRef<Decl>   field)
+    LoweredValInfo extractField(IRType* fieldType, LoweredValInfo base, DeclRef<Decl> field)
     {
         return Slang::extractField(context, fieldType, base, field);
     }
 
     LoweredValInfo visitStaticMemberExpr(StaticMemberExpr* expr)
     {
-        return emitDeclRef(context, expr->declRef,
-            lowerType(context, expr->type));
+        return emitDeclRef(context, expr->declRef, lowerType(context, expr->type));
     }
 
     LoweredValInfo visitGenericAppExpr(GenericAppExpr* /*expr*/)
@@ -5279,10 +5484,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
         auto openedType = lowerType(context, expr->type);
 
-        auto extractedVal = getBuilder()->emitExtractExistentialValue(
-            openedType, existentialValCopy);
+        auto extractedVal =
+            getBuilder()->emitExtractExistentialValue(openedType, existentialValCopy);
 
-        if(!isLValueContext())
+        if (!isLValueContext())
         {
             // If we are in an r-value context, we can directly use the `extractExistentialValue`
             // instruction as the result, and life is simple.
@@ -5384,11 +5589,13 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
         // Assign to 'bs' the elements from 'as' according to the first 'n' indices in 'is'
         auto backpermute = [](UInt n, const auto as, const auto is, auto bs)
         {
-            for(UInt i = 0; i < n; ++i)
+            for (UInt i = 0; i < n; ++i)
             {
                 bs[i] = as[is[i]];
             }
         };
+
+        LoweredValInfo result;
 
         // As required by the implementation of 'assign' and as a small
         // optimization, we will detect if the base expression has also lowered
@@ -5397,7 +5604,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
         //
         // E.g., if we have input like `foo[i].zw.y` we should optimize it
         // down to just `foo[i].w`.
-        if(loweredBase.flavor == LoweredValInfo::Flavor::SwizzledLValue)
+        if (loweredBase.flavor == LoweredValInfo::Flavor::SwizzledLValue)
         {
             auto baseSwizzleInfo = loweredBase.getSwizzledLValueInfo();
 
@@ -5409,7 +5616,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
             RefPtr<SwizzledLValueInfo> swizzledLValue = new SwizzledLValueInfo;
             swizzledLValue->type = irType;
             swizzledLValue->base = baseSwizzleInfo->base;
-            swizzledLValue->elementIndices = elementCount;
+            swizzledLValue->elementIndices.add((uint32_t)elementCount);
 
             // Take the swizzle element of the "outer" swizzle, as it was
             // written by the user. In our running example of `foo[i].zw.y`
@@ -5424,9 +5631,9 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
                 swizzledLValue->elementIndices);
 
             context->shared->extValues.add(swizzledLValue);
-            return LoweredValInfo::swizzledLValue(swizzledLValue);
+            result = LoweredValInfo::swizzledLValue(swizzledLValue);
         }
-        else if(loweredBase.flavor == LoweredValInfo::Flavor::SwizzledMatrixLValue)
+        else if (loweredBase.flavor == LoweredValInfo::Flavor::SwizzledMatrixLValue)
         {
             auto baseSwizzleInfo = loweredBase.getSwizzledMatrixLValueInfo();
 
@@ -5444,7 +5651,7 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
                 swizzledLValue->elementCoords);
 
             context->shared->extValues.add(swizzledLValue);
-            return LoweredValInfo::swizzledMatrixLValue(swizzledLValue);
+            result = LoweredValInfo::swizzledMatrixLValue(swizzledLValue);
         }
         else
         {
@@ -5453,8 +5660,20 @@ struct LValueExprLoweringVisitor : ExprLoweringVisitorBase<LValueExprLoweringVis
             swizzledLValue->base = loweredBase;
             swizzledLValue->elementIndices = expr->elementIndices;
             context->shared->extValues.add(swizzledLValue);
-            return LoweredValInfo::swizzledLValue(swizzledLValue);
+            result = LoweredValInfo::swizzledLValue(swizzledLValue);
         }
+
+        // For a one-element swizzle on a tuple, we can just return the pointer to the member
+        // instead of a SwizzledLValue because they can't follow the same folding logic as
+        // vectors and matrices.
+        //
+        bool shouldUseSimpleLVal = elementCount == 1 && as<TupleType>(expr->base->type) != nullptr;
+        if (shouldUseSimpleLVal)
+        {
+            auto addr = getAddress(context, result, expr->loc);
+            return LoweredValInfo::ptr(addr);
+        }
+        return result;
     }
 };
 
@@ -5480,28 +5699,16 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
         IRInst* irExtracts[4];
         for (UInt ii = 0; ii < elementCount; ++ii)
         {
-            auto index1 = builder->getIntValue(
-                irIntType,
-                (IRIntegerValue)expr->elementCoords[ii].row);
-            auto index2 = builder->getIntValue(
-                irIntType,
-                (IRIntegerValue)expr->elementCoords[ii].col);
+            auto index1 =
+                builder->getIntValue(irIntType, (IRIntegerValue)expr->elementCoords[ii].row);
+            auto index2 =
+                builder->getIntValue(irIntType, (IRIntegerValue)expr->elementCoords[ii].col);
             // First index expression
-            auto irExtract1 = subscriptValue(
-                subscript1,
-                base,
-                index1);
+            auto irExtract1 = subscriptValue(subscript1, base, index1);
             // Second index expression
-            irExtracts[ii] = getSimpleVal(context, subscriptValue(
-                subscript2,
-                irExtract1,
-                index2));
+            irExtracts[ii] = getSimpleVal(context, subscriptValue(subscript2, irExtract1, index2));
         }
-        auto irVector = builder->emitMakeVector(
-            resultType,
-            elementCount,
-            irExtracts
-        );
+        auto irVector = builder->emitMakeVector(resultType, elementCount, irExtracts);
 
         return LoweredValInfo::simple(irVector);
     }
@@ -5521,9 +5728,8 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
         irElementIndices.setCount(expr->elementIndices.getCount());
         for (UInt ii = 0; ii < (UInt)expr->elementIndices.getCount(); ++ii)
         {
-            irElementIndices[ii] = builder->getIntValue(
-                irIntType,
-                (IRIntegerValue)expr->elementIndices[ii]);
+            irElementIndices[ii] =
+                builder->getIntValue(irIntType, (IRIntegerValue)expr->elementIndices[ii]);
         }
 
         auto irSwizzle = builder->emitSwizzle(
@@ -5538,15 +5744,13 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
     LoweredValInfo visitOpenRefExpr(OpenRefExpr* expr)
     {
         auto inner = lowerLValueExpr(context, expr->innerExpr);
-        auto builder = getBuilder();
-        auto irLoad = builder->emitLoad(inner.val);
-        return LoweredValInfo::simple(irLoad);
+        return LoweredValInfo::ptr(inner.val);
     }
 };
 
 // ExprLoweringVisitor that fuses the destination assignment.
 //
-struct DestinationDrivenRValueExprLoweringVisitor 
+struct DestinationDrivenRValueExprLoweringVisitor
     : ExprVisitor<DestinationDrivenRValueExprLoweringVisitor>
 {
     ExprLoweringContext<DestinationDrivenRValueExprLoweringVisitor> sharedLoweringContext;
@@ -5555,7 +5759,8 @@ struct DestinationDrivenRValueExprLoweringVisitor
     IRGenContext*& context;
     DestinationDrivenRValueExprLoweringVisitor()
         : context(sharedLoweringContext.context)
-    {}
+    {
+    }
 
     static bool _isLValueContext() { return false; }
 
@@ -5583,7 +5788,10 @@ struct DestinationDrivenRValueExprLoweringVisitor
         LoweredValInfo resultRVal;
         {
             IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, expr->loc);
-            resultRVal = sharedLoweringContext.visitInvokeExprImpl(expr, destination, TryClauseEnvironment{});
+            resultRVal = sharedLoweringContext.visitInvokeExprImpl(
+                expr,
+                destination,
+                TryClauseEnvironment{});
         }
         if (resultRVal.flavor != LoweredValInfo::Flavor::None)
         {
@@ -5602,12 +5810,9 @@ struct DestinationDrivenRValueExprLoweringVisitor
         tryEnv.clauseType = expr->tryClauseType;
         return sharedLoweringContext.visitInvokeExprImpl(invokeExpr, destination, tryEnv);
     }
-
 };
 
-LoweredValInfo lowerLValueExpr(
-    IRGenContext*   context,
-    Expr*           expr)
+LoweredValInfo lowerLValueExpr(IRGenContext* context, Expr* expr)
 {
     IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, expr->loc);
 
@@ -5617,9 +5822,7 @@ LoweredValInfo lowerLValueExpr(
     return info;
 }
 
-LoweredValInfo lowerRValueExpr(
-    IRGenContext*   context,
-    Expr*           expr)
+LoweredValInfo lowerRValueExpr(IRGenContext* context, Expr* expr)
 {
     IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, expr->loc);
 
@@ -5629,10 +5832,7 @@ LoweredValInfo lowerRValueExpr(
     return info;
 }
 
-void lowerRValueExprWithDestination(
-    IRGenContext* context,
-    LoweredValInfo destination,
-    Expr* expr)
+void lowerRValueExprWithDestination(IRGenContext* context, LoweredValInfo destination, Expr* expr)
 {
     DestinationDrivenRValueExprLoweringVisitor visitor;
     visitor.context = context;
@@ -5651,20 +5851,14 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // Nothing to do.
     }
 
-    void visitUnparsedStmt(UnparsedStmt*)
-    {
-        SLANG_UNEXPECTED("UnparsedStmt not supported by IR");
-    }
+    void visitUnparsedStmt(UnparsedStmt*) { SLANG_UNEXPECTED("UnparsedStmt not supported by IR"); }
 
     void visitCaseStmtBase(CaseStmtBase*)
     {
         SLANG_UNEXPECTED("`case` or `default` not under `switch`");
     }
 
-    void visitLabelStmt(LabelStmt* stmt)
-    {
-        lowerStmt(context, stmt->innerStmt);
-    }
+    void visitLabelStmt(LabelStmt* stmt) { lowerStmt(context, stmt->innerStmt); }
 
     void visitCompileTimeForStmt(CompileTimeForStmt* stmt)
     {
@@ -5696,12 +5890,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         subContext->env = subEnv;
 
 
-
         for (IntegerLiteralValue ii = rangeBeginVal; ii < rangeEndVal; ++ii)
         {
-            auto constVal = getBuilder()->getIntValue(
-                varType,
-                ii);
+            auto constVal = getBuilder()->getIntValue(varType, ii);
 
             subEnv->mapDeclToValue[varDecl] = LoweredValInfo::simple(constVal);
 
@@ -5711,16 +5902,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     // Create a basic block in the current function,
     // so that it can be used for a label.
-    IRBlock* createBlock()
-    {
-        return getBuilder()->createBlock();
-    }
+    IRBlock* createBlock() { return getBuilder()->createBlock(); }
 
     /// Does the given block have a terminator?
-    bool isBlockTerminated(IRBlock* block)
-    {
-        return block->getTerminator() != nullptr;
-    }
+    bool isBlockTerminated(IRBlock* block) { return block->getTerminator() != nullptr; }
 
     /// Emit a branch to the target block if the current
     /// block being inserted into is not already terminated.
@@ -5730,11 +5915,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto currentBlock = builder->getBlock();
 
         // Don't emit if there is no current block.
-        if(!currentBlock)
+        if (!currentBlock)
             return;
 
         // Don't emit if the block already has a terminator.
-        if(isBlockTerminated(currentBlock))
+        if (isBlockTerminated(currentBlock))
             return;
 
         // The block is unterminated, so cap it off with
@@ -5785,7 +5970,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // If there is a current block and it hasn't
         // been terminated, then we can just use that.
-        if(currentBlock && !isBlockTerminated(currentBlock))
+        if (currentBlock && !isBlockTerminated(currentBlock))
         {
             return;
         }
@@ -5815,8 +6000,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto thenStmt = stmt->positiveStatement;
         auto elseStmt = stmt->negativeStatement;
 
-        auto irCond = getSimpleVal(context,
-            lowerRValueExpr(context, condExpr));
+        auto irCond = getSimpleVal(context, lowerRValueExpr(context, condExpr));
 
         IRInst* ifInst = nullptr;
 
@@ -5860,22 +6044,21 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         }
     }
 
-    void addLoopDecorations(
-        IRInst* inst,
-        Stmt*   stmt)
+    void addLoopDecorations(IRInst* inst, Stmt* stmt)
     {
-        if( stmt->findModifier<UnrollAttribute>() )
+        if (stmt->findModifier<UnrollAttribute>())
         {
             getBuilder()->addLoopControlDecoration(inst, kIRLoopControl_Unroll);
         }
-        else if( stmt->findModifier<LoopAttribute>() )
+        else if (stmt->findModifier<LoopAttribute>())
         {
             getBuilder()->addLoopControlDecoration(inst, kIRLoopControl_Loop);
         }
 
-        if( auto maxItersAttr = stmt->findModifier<MaxItersAttribute>() )
+        if (auto maxItersAttr = stmt->findModifier<MaxItersAttribute>())
         {
-            getBuilder()->addLoopMaxItersDecoration(inst, maxItersAttr->value);
+            auto iters = lowerVal(context, maxItersAttr->value);
+            getBuilder()->addLoopMaxItersDecoration(inst, getSimpleVal(context, iters));
         }
         else if (auto inferredMaxItersAttr = stmt->findModifier<InferredMaxItersAttribute>())
         {
@@ -5918,10 +6101,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
 
-        auto loopInst = builder->emitLoop(
-            loopHead,
-            breakLabel,
-            continueLabel);
+        auto loopInst = builder->emitLoop(loopHead, breakLabel, continueLabel);
 
         insertBlock(loopHead);
 
@@ -5929,14 +6109,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // want to emit the expression for the loop condition:
         if (const auto condExpr = stmt->predicateExpression)
         {
-            auto irCondition = getSimpleVal(context,
-                lowerRValueExpr(context, stmt->predicateExpression));
+            maybeEmitDebugLine(context, *this, stmt, condExpr->loc);
+
+            auto irCondition =
+                getSimpleVal(context, lowerRValueExpr(context, stmt->predicateExpression));
 
             // Now we want to `break` if the loop condition is false.
-            builder->emitLoopTest(
-                irCondition,
-                bodyLabel,
-                breakLabel);
+            builder->emitLoopTest(irCondition, bodyLabel, breakLabel);
         }
 
         // Emit the body of the loop
@@ -5947,11 +6126,18 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             // We only use inferred max iters attribute when the loop body
             // does not modify induction var.
-            auto inductionVar = emitDeclRef(context, inferredMaxIters->inductionVar, builder->getIntType());
+            auto inductionVar =
+                emitDeclRef(context, inferredMaxIters->inductionVar, builder->getIntType());
             if (inductionVar.val)
             {
                 int writes = 0;
-                traverseUsers(inductionVar.val, [&](IRInst* user) {if (user->getOp() != kIROp_Load) writes++; });
+                traverseUsers(
+                    inductionVar.val,
+                    [&](IRInst* user)
+                    {
+                        if (user->getOp() != kIROp_Load)
+                            writes++;
+                    });
                 if (writes > 1)
                 {
                     removeModifier(stmt, inferredMaxIters);
@@ -5962,12 +6148,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             if (auto maxIters = stmt->findModifier<MaxItersAttribute>())
             {
-                if (inferredMaxIters->value < maxIters->value)
+                if (auto constIntVal = as<ConstantIntVal>(maxIters->value))
                 {
-                    context->getSink()->diagnose(
-                        maxIters,
-                        Diagnostics::forLoopTerminatesInFewerIterationsThanMaxIters,
-                        inferredMaxIters->value);
+                    if (inferredMaxIters->value < constIntVal->getValue())
+                    {
+                        context->getSink()->diagnose(
+                            maxIters,
+                            Diagnostics::forLoopTerminatesInFewerIterationsThanMaxIters,
+                            inferredMaxIters->value);
+                    }
                 }
             }
         }
@@ -5978,6 +6167,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         insertBlock(continueLabel);
         if (auto incrExpr = stmt->sideEffectExpression)
         {
+            maybeEmitDebugLine(context, *this, stmt, incrExpr->loc);
             lowerRValueExpr(context, incrExpr);
         }
 
@@ -6016,10 +6206,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
 
-        auto loopInst = builder->emitLoop(
-            loopHead,
-            breakLabel,
-            continueLabel);
+        auto loopInst = builder->emitLoop(loopHead, breakLabel, continueLabel);
 
         addLoopDecorations(loopInst, stmt);
 
@@ -6029,14 +6216,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // want to emit the expression for the loop condition:
         if (auto condExpr = stmt->predicate)
         {
-            auto irCondition = getSimpleVal(context,
-                lowerRValueExpr(context, condExpr));
+            maybeEmitDebugLine(context, *this, stmt, condExpr->loc);
+
+            auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
 
             // Now we want to `break` if the loop condition is false.
-            builder->emitLoopTest(
-                irCondition,
-                bodyLabel,
-                breakLabel);
+            builder->emitLoopTest(irCondition, bodyLabel, breakLabel);
         }
 
         // Emit the body of the loop
@@ -6078,10 +6263,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
 
-        auto loopInst = builder->emitLoop(
-            loopHead,
-            breakLabel,
-            continueLabel);
+        auto loopInst = builder->emitLoop(loopHead, breakLabel, continueLabel);
 
         addLoopDecorations(loopInst, stmt);
 
@@ -6096,37 +6278,34 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // want to emit the expression for the loop condition:
         if (auto condExpr = stmt->predicate)
         {
-            auto irCondition = getSimpleVal(context,
-                lowerRValueExpr(context, condExpr));
+            maybeEmitDebugLine(context, *this, stmt, stmt->predicate->loc);
+
+            auto irCondition = getSimpleVal(context, lowerRValueExpr(context, condExpr));
 
             // One thing to be careful here is that lowering irCondition
             // may create additional blocks due to short circuiting, so
             // the block we are current inserting into is not necessarily
             // the same as `testLabel`.
-            // 
+            //
             auto invCondition = builder->emitNot(irCondition->getDataType(), irCondition);
 
             // Now we want to `break` if the loop condition is false,
             // otherwise we will jump back to the head of the loop.
-            // 
+            //
             // We need to make sure not to reuse the break block of the loop as
             // the break/merge block of the ifelse test.
             // Therefore, we introduce a separate merge block for the loop test.
-            // 
+            //
             // Emit the following structure:
-            // 
+            //
             // [merge(mergeBlock)]
             // if (cond) goto loopHead;
             // else goto mergeBlock;
-            // 
+            //
             // mergeBlock:
             //   goto breakLabel;
             auto mergeBlock = builder->createBlock();
-            builder->emitIfElse(
-                invCondition,
-                breakLabel,
-                mergeBlock,
-                mergeBlock);
+            builder->emitIfElse(invCondition, breakLabel, mergeBlock, mergeBlock);
 
             insertBlock(mergeBlock);
             builder->emitBranch(loopHead);
@@ -6268,7 +6447,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // If the AST `return` statement was returning a non-`void`
             // value, then we need to emit an IR `return` of that value.
             //
-            if(!expr->type.type->equals(context->astBuilder->getVoidType()))
+            if (!expr->type.type->equals(context->astBuilder->getVoidType()))
             {
                 getBuilder()->emitReturn(getSimpleVal(context, loweredExpr));
             }
@@ -6365,17 +6544,17 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         IRBlock* initialBlock = nullptr;
 
         // The label for the `default` case, if any.
-        IRBlock*    defaultLabel = nullptr;
+        IRBlock* defaultLabel = nullptr;
 
         // The label of the current "active" case block.
-        IRBlock*    currentCaseLabel = nullptr;
+        IRBlock* currentCaseLabel = nullptr;
 
         // Has anything been emitted to the current "active" case block?
         bool anythingEmittedToCurrentCaseBlock = false;
 
         // The collected (value, label) pairs for
         // all the `case` statements.
-        List<IRInst*>  cases;
+        List<IRInst*> cases;
     };
 
     // We need a label to use for a `case` or `default` statement,
@@ -6390,7 +6569,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // then it is still a viable target (we are in
         // a case of "trivial fall-through" from the previous
         // block).
-        if(currentCaseLabel && !info->anythingEmittedToCurrentCaseBlock)
+        if (currentCaseLabel && !info->anythingEmittedToCurrentCaseBlock)
         {
             return currentCaseLabel;
         }
@@ -6438,7 +6617,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         }
         else if (const auto defaultStmt = as<DefaultStmt>(stmt))
         {
-            // A 'default:' is a kind of case. 
+            // A 'default:' is a kind of case.
             return true;
         }
 
@@ -6465,21 +6644,21 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Unwrap any surrounding `{ ... }` so we can look
         // at the statement inside.
-        while(auto blockStmt = as<BlockStmt>(stmt))
+        while (auto blockStmt = as<BlockStmt>(stmt))
         {
             stmt = blockStmt->body;
             continue;
         }
 
-        if(auto seqStmt = as<SeqStmt>(stmt))
+        if (auto seqStmt = as<SeqStmt>(stmt))
         {
             // Walk through teh children and process each.
-            for(auto childStmt : seqStmt->stmts)
+            for (auto childStmt : seqStmt->stmts)
             {
                 lowerSwitchCases(childStmt, info);
             }
         }
-        else if(auto caseStmt = as<CaseStmt>(stmt))
+        else if (auto caseStmt = as<CaseStmt>(stmt))
         {
             // A full `case` statement has a value we need
             // to test against. It is expected to be a
@@ -6507,7 +6686,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             info->cases.add(caseVal);
             info->cases.add(label);
         }
-        else if(const auto defaultStmt = as<DefaultStmt>(stmt))
+        else if (const auto defaultStmt = as<DefaultStmt>(stmt))
         {
             auto label = getLabelForCase(info);
 
@@ -6516,7 +6695,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             info->defaultLabel = label;
         }
-        else if(const auto emptyStmt = as<EmptyStmt>(stmt))
+        else if (const auto emptyStmt = as<EmptyStmt>(stmt))
         {
             // Special-case empty statements so they don't
             // mess up our "trivial fall-through" optimization.
@@ -6525,7 +6704,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             // We have an ordinary statement, that needs to get
             // emitted to the current case block.
-            if(!info->currentCaseLabel)
+            if (!info->currentCaseLabel)
             {
                 // It possible in full C/C++ to have statements
                 // before the first `case`. Usually these are
@@ -6544,6 +6723,102 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 info->anythingEmittedToCurrentCaseBlock = true;
             }
         }
+    }
+
+    void visitStageSwitchStmt(StageSwitchStmt* stmt)
+    {
+        if (!stmt->targetCases.getCount())
+            return;
+
+        // We will lower stage switch as a normal switch statement, so they can participate in all
+        // optimizations.
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+
+        // First emit code to get the current stage to switch on:
+        auto conditionVal = builder->emitGetCurrentStage();
+
+        // Remember the initial block so that we can add to it
+        // after we've collected all the `case`s
+        auto initialBlock = builder->getBlock();
+
+        // Next, create a block to use as the target for any `break` statements
+        auto breakLabel = createBlock();
+
+        // Register the `break` label so
+        // that we can find it for nested statements.
+        context->shared->breakLabels.add(stmt, breakLabel);
+
+        builder->setInsertInto(initialBlock->getParent());
+
+        // Iterate over the body of the statement, looking
+        // for `case` or `default` statements:
+        SwitchStmtInfo info;
+        info.initialBlock = initialBlock;
+        info.defaultLabel = nullptr;
+
+        Dictionary<Stmt*, IRBlock*> mapCaseStmtToBlock;
+        for (auto targetCase : stmt->targetCases)
+        {
+            IRBlock* caseBlock = nullptr;
+            if (!mapCaseStmtToBlock.tryGetValue(targetCase->body, caseBlock))
+            {
+                caseBlock = builder->emitBlock();
+                lowerStmt(context, targetCase->body);
+                mapCaseStmtToBlock.add(targetCase->body, caseBlock);
+                if (!builder->getBlock()->getTerminator())
+                    builder->emitBranch(breakLabel);
+            }
+            if (targetCase->capability == 0)
+            {
+                info.defaultLabel = caseBlock;
+            }
+            else
+            {
+                auto stage = getStageFromAtom((CapabilityAtom)targetCase->capability);
+                info.cases.add(builder->getIntValue(builder->getIntType(), (IRIntegerValue)stage));
+                info.cases.add(caseBlock);
+            }
+        }
+
+        // If the current block (the end of the last
+        // `case`) is not terminated, then terminate with a
+        // `break` operation.
+        //
+        // Double check that we aren't in the initial
+        // block, so we don't get tripped up on an
+        // empty `switch`.
+        auto curBlock = builder->getBlock();
+        if (curBlock != initialBlock)
+        {
+            // Is the block already terminated?
+            if (!curBlock->getTerminator())
+            {
+                // Not terminated, so add one.
+                builder->emitBreak(breakLabel);
+            }
+        }
+
+        // If there was no `default` statement, then the
+        // default case will just branch directly to the end.
+        auto defaultLabel = info.defaultLabel ? info.defaultLabel : breakLabel;
+
+        // Now that we've collected the cases, we are
+        // prepared to emit the `switch` instruction
+        // itself.
+        builder->setInsertInto(initialBlock);
+        builder->emitSwitch(
+            conditionVal,
+            breakLabel,
+            defaultLabel,
+            info.cases.getCount(),
+            info.cases.getBuffer());
+
+        // Finally we insert the label that a `break` will jump to
+        // (and that control flow will fall through to otherwise).
+        // This is the block that subsequent code will go into.
+        insertBlock(breakLabel);
+        context->shared->breakLabels.remove(stmt);
     }
 
     void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
@@ -6576,14 +6851,20 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         }
         context->shared->breakLabels.remove(stmt);
         builder->setInsertInto(initialBlock);
-        builder->emitIntrinsicInst(nullptr, kIROp_TargetSwitch, (UInt)args.getCount(), args.getBuffer());
-        insertBlock(breakLabel);
+
+        auto parentFunc = initialBlock->getParent();
+        parentFunc->addBlock(breakLabel);
+
+        builder->emitIntrinsicInst(
+            nullptr,
+            kIROp_TargetSwitch,
+            (UInt)args.getCount(),
+            args.getBuffer());
+
+        builder->setInsertInto(breakLabel);
     }
 
-    void visitTargetCaseStmt(TargetCaseStmt*)
-    {
-        SLANG_UNREACHABLE("lowering target case");
-    }
+    void visitTargetCaseStmt(TargetCaseStmt*) { SLANG_UNREACHABLE("lowering target case"); }
 
     void visitIntrinsicAsmStmt(IntrinsicAsmStmt* stmt)
     {
@@ -6603,7 +6884,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 args.add(argVal.val);
             }
         }
-        builder->emitIntrinsicInst(nullptr, kIROp_GenericAsm, args.getCount(), args.getArrayView().getBuffer());
+        builder->emitIntrinsicInst(
+            nullptr,
+            kIROp_GenericAsm,
+            args.getCount(),
+            args.getArrayView().getBuffer());
     }
 
     void visitSwitchStmt(SwitchStmt* stmt)
@@ -6647,11 +6932,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // First emit code to compute the condition:
         auto conditionVal = getSimpleVal(context, lowerRValueExpr(context, stmt->condition));
 
-        // Check for any cases or default. 
+        // Check for any cases or default.
         if (!hasSwitchCases(stmt->body))
         {
-            // If we don't have any case/default then nothing inside switch can be executed (other than condition)
-            // so we are done.
+            // If we don't have any case/default then nothing inside switch can be executed (other
+            // than condition) so we are done.
             return;
         }
 
@@ -6688,10 +6973,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // block, so we don't get tripped up on an
         // empty `switch`.
         auto curBlock = builder->getBlock();
-        if(curBlock != initialBlock)
+        if (curBlock != initialBlock)
         {
             // Is the block already terminated?
-            if(!curBlock->getTerminator())
+            if (!curBlock->getTerminator())
             {
                 // Not terminated, so add one.
                 builder->emitBreak(breakLabel);
@@ -6735,7 +7020,9 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
     ComPtr<ISlangBlob> outBlob;
     if (path.hasFileFoundPath())
     {
-        context->getLinkage()->getFileSystemExt()->loadFile(path.foundPath.getBuffer(), outBlob.writeRef());
+        context->getLinkage()->getFileSystemExt()->loadFile(
+            path.foundPath.getBuffer(),
+            outBlob.writeRef());
     }
     UnownedStringSlice content;
     if (outBlob)
@@ -6747,22 +7034,29 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
     return debugSrcInst;
 }
 
-void maybeEmitDebugLine(IRGenContext* context, StmtLoweringVisitor& visitor, Stmt* stmt)
+void maybeEmitDebugLine(
+    IRGenContext* context,
+    StmtLoweringVisitor& visitor,
+    Stmt* stmt,
+    SourceLoc loc)
 {
     if (!context->includeDebugInfo)
         return;
     if (as<EmptyStmt>(stmt))
         return;
+    if (!loc.isValid())
+        loc = stmt->loc;
     auto sourceManager = context->getLinkage()->getSourceManager();
-    auto sourceView = context->getLinkage()->getSourceManager()->findSourceView(stmt->loc);
+    auto sourceView = context->getLinkage()->getSourceManager()->findSourceView(loc);
     if (!sourceView)
         return;
 
     IRInst* debugSourceInst = nullptr;
-    auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(stmt->loc, SourceLocType::Emit);
+    auto humaneLoc =
+        context->getLinkage()->getSourceManager()->getHumaneLoc(loc, SourceLocType::Emit);
 
     // Do a best-effort attempt to retrieve the nominal source file.
-    auto pathInfo = sourceView->getPathInfo(stmt->loc, SourceLocType::Emit);
+    auto pathInfo = sourceView->getPathInfo(loc, SourceLocType::Emit);
 
     // If the source file path correspond to an existing SourceFile in the source manager, use it.
     auto source = sourceManager->findSourceFileByPathRecursively(pathInfo.foundPath);
@@ -6772,14 +7066,19 @@ void maybeEmitDebugLine(IRGenContext* context, StmtLoweringVisitor& visitor, Stm
     {
         context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst);
     }
-    // If the source manager does not have an entry for the corresponding file name, make sure we still emit
-    // an source file entry in the spirv module.
+    // If the source manager does not have an entry for the corresponding file name, make sure we
+    // still emit an source file entry in the spirv module.
     if (!debugSourceInst)
     {
         debugSourceInst = getOrEmitDebugSource(context, pathInfo);
     }
     visitor.startBlockIfNeeded(stmt);
-    context->irBuilder->emitDebugLine(debugSourceInst, humaneLoc.line, humaneLoc.line, humaneLoc.column, humaneLoc.column + 1);
+    context->irBuilder->emitDebugLine(
+        debugSourceInst,
+        humaneLoc.line,
+        humaneLoc.line,
+        humaneLoc.column,
+        humaneLoc.column + 1);
 }
 
 void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
@@ -6793,14 +7092,15 @@ void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
     IRInst* debugSourceInst = nullptr;
     if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
     {
-        auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(inst->sourceLoc, SourceLocType::Emit);
-        context->irBuilder->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
+        auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(
+            inst->sourceLoc,
+            SourceLocType::Emit);
+        context->irBuilder
+            ->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
     }
 }
 
-void lowerStmt(
-    IRGenContext*   context,
-    Stmt*           stmt)
+void lowerStmt(IRGenContext* context, Stmt* stmt)
 {
     IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, stmt->loc);
 
@@ -6809,13 +7109,16 @@ void lowerStmt(
 
     try
     {
-        maybeEmitDebugLine(context, visitor, stmt);
+        maybeEmitDebugLine(context, visitor, stmt, stmt->loc);
         visitor.dispatch(stmt);
     }
     // Don't emit any context message for an explicit `AbortCompilationException`
     // because it should only happen when an error is already emitted.
-    catch(const AbortCompilationException&) { throw; }
-    catch(...)
+    catch (const AbortCompilationException&)
+    {
+        throw;
+    }
+    catch (...)
     {
         context->getSink()->noteInternalErrorLoc(stmt->loc);
         throw;
@@ -6823,9 +7126,7 @@ void lowerStmt(
 }
 
 /// Create and return a mutable temporary initialized with `val`
-static LoweredValInfo moveIntoMutableTemp(
-    IRGenContext*           context,
-    LoweredValInfo const&   val)
+static LoweredValInfo moveIntoMutableTemp(IRGenContext* context, LoweredValInfo const& val)
 {
     IRInst* irVal = getSimpleVal(context, val);
     auto type = irVal->getDataType();
@@ -6836,13 +7137,13 @@ static LoweredValInfo moveIntoMutableTemp(
 }
 
 LoweredValInfo tryGetAddress(
-    IRGenContext*           context,
-    LoweredValInfo const&   inVal,
-    TryGetAddressMode       mode)
+    IRGenContext* context,
+    LoweredValInfo const& inVal,
+    TryGetAddressMode mode)
 {
     LoweredValInfo val = inVal;
 
-    switch(val.flavor)
+    switch (val.flavor)
     {
     case LoweredValInfo::Flavor::Ptr:
         // The `Ptr` case means that we already have an IR value with
@@ -6861,16 +7162,22 @@ LoweredValInfo tryGetAddress(
             // a `set` accessor available, unless we are in an "aggressive" mode
             // where we really want/need a pointer to be able to make progress.
             //
-            if(mode != TryGetAddressMode::Aggressive
-                && getMembersOfType<SetterDecl>(context->astBuilder, subscriptInfo->declRef, MemberFilterStyle::Instance).isNonEmpty())
+            if (mode != TryGetAddressMode::Aggressive && getMembersOfType<SetterDecl>(
+                                                             context->astBuilder,
+                                                             subscriptInfo->declRef,
+                                                             MemberFilterStyle::Instance)
+                                                             .isNonEmpty())
             {
                 // There is a setter that we should consider using,
                 // so don't go and aggressively collapse things just yet.
                 return val;
             }
 
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(context->astBuilder, subscriptInfo->declRef, MemberFilterStyle::Instance);
-            if(refAccessors.isNonEmpty())
+            auto refAccessors = getMembersOfType<RefAccessorDecl>(
+                context->astBuilder,
+                subscriptInfo->declRef,
+                MemberFilterStyle::Instance);
+            if (refAccessors.isNonEmpty())
             {
                 auto refAccessor = *refAccessors.begin();
 
@@ -6910,14 +7217,13 @@ LoweredValInfo tryGetAddress(
             // we care about, and then write it back.
 
             auto declRef = boundMemberInfo->declRef;
-            if( auto fieldDeclRef = declRef.as<VarDecl>() )
+            if (auto fieldDeclRef = declRef.as<VarDecl>())
             {
                 auto baseVal = boundMemberInfo->base;
                 auto basePtr = tryGetAddress(context, baseVal, TryGetAddressMode::Aggressive);
 
                 return extractField(context, boundMemberInfo->type, basePtr, fieldDeclRef);
             }
-
         }
         break;
 
@@ -6933,17 +7239,19 @@ LoweredValInfo tryGetAddress(
             {
                 // A special case is when we have a single element swizzle,
                 // we can just emit an element address.
-                auto elementPtr = context->irBuilder->emitElementAddress(newBase.val, originalSwizzleInfo->elementIndices[0]);
+                auto elementPtr = context->irBuilder->emitElementAddress(
+                    newBase.val,
+                    originalSwizzleInfo->elementIndices[0]);
                 return LoweredValInfo::ptr(elementPtr);
             }
-            
+
             RefPtr<SwizzledLValueInfo> newSwizzleInfo = new SwizzledLValueInfo();
             context->shared->extValues.add(newSwizzleInfo);
 
             newSwizzleInfo->base = newBase;
             newSwizzleInfo->type = originalSwizzleInfo->type;
             newSwizzleInfo->elementIndices.setCount(elementCount);
-            for(UInt ee = 0; ee < elementCount; ++ee)
+            for (UInt ee = 0; ee < elementCount; ++ee)
                 newSwizzleInfo->elementIndices[ee] = originalSwizzleInfo->elementIndices[ee];
 
             return LoweredValInfo::swizzledLValue(newSwizzleInfo);
@@ -6965,7 +7273,7 @@ LoweredValInfo tryGetAddress(
             newSwizzleInfo->base = newBase;
             newSwizzleInfo->type = originalSwizzleInfo->type;
             newSwizzleInfo->elementCount = elementCount;
-            for(UInt ee = 0; ee < elementCount; ++ee)
+            for (UInt ee = 0; ee < elementCount; ++ee)
             {
                 newSwizzleInfo->elementCoords[ee] = originalSwizzleInfo->elementCoords[ee];
             }
@@ -6981,14 +7289,18 @@ LoweredValInfo tryGetAddress(
             {
                 IRInst* result = nullptr;
                 if (info->lValueType == kParameterDirection_InOut)
-                    result = context->irBuilder->emitInOutImplicitCast(context->irBuilder->getPtrType(info->type), baseAddr.val);
+                    result = context->irBuilder->emitInOutImplicitCast(
+                        context->irBuilder->getPtrType(info->type),
+                        baseAddr.val);
                 else
-                    result = context->irBuilder->emitOutImplicitCast(context->irBuilder->getPtrType(info->type), baseAddr.val);
+                    result = context->irBuilder->emitOutImplicitCast(
+                        context->irBuilder->getPtrType(info->type),
+                        baseAddr.val);
                 return LoweredValInfo::ptr(result);
             }
         }
         break;
-    // TODO: are there other cases we need to handled here?
+        // TODO: are there other cases we need to handled here?
 
     default:
         break;
@@ -6999,14 +7311,11 @@ LoweredValInfo tryGetAddress(
     return val;
 }
 
-IRInst* getAddress(
-    IRGenContext*           context,
-    LoweredValInfo const&   inVal,
-    SourceLoc               diagnosticLocation)
+IRInst* getAddress(IRGenContext* context, LoweredValInfo const& inVal, SourceLoc diagnosticLocation)
 {
     LoweredValInfo val = tryGetAddress(context, inVal, TryGetAddressMode::Aggressive);
 
-    if( val.flavor == LoweredValInfo::Flavor::Ptr )
+    if (val.flavor == LoweredValInfo::Flavor::Ptr)
     {
         return val.val;
     }
@@ -7039,10 +7348,7 @@ void assignExpr(
     }
 }
 
-void assign(
-    IRGenContext*           context,
-    LoweredValInfo const&   inLeft,
-    LoweredValInfo const&   inRight)
+void assign(IRGenContext* context, LoweredValInfo const& inLeft, LoweredValInfo const& inRight)
 {
     LoweredValInfo left = inLeft;
     LoweredValInfo right = inRight;
@@ -7058,22 +7364,14 @@ void assign(
 
     // If there's a single element, just emit a regular store, otherwise
     // proceed with a swizzle store
-    auto swizzledStore = [builder](
-        IRInst*         dest,
-        IRInst*         source,
-        UInt            elementCount,
-        UInt const*     elementIndices){
-        if(elementCount == 1)
+    auto swizzledStore =
+        [builder](IRInst* dest, IRInst* source, UInt elementCount, uint32_t const* elementIndices)
+    {
+        if (elementCount == 1)
         {
-            return builder->emitStore(
-                builder->emitElementAddress(dest, elementIndices[0]),
-                source);
+            return builder->emitStore(builder->emitElementAddress(dest, elementIndices[0]), source);
         }
-        return builder->emitSwizzledStore(
-            dest,
-            source,
-            elementCount,
-            elementIndices);
+        return builder->emitSwizzledStore(dest, source, elementCount, elementIndices);
     };
 
 top:
@@ -7084,9 +7382,17 @@ top:
             // The `left` value is just a pointer, so we can emit
             // a store to it directly.
             //
-            builder->emitStore(
-                left.val,
-                getSimpleVal(context, right));
+            if (as<IRAtomicType>(tryGetPointedToType(builder, left.val->getDataType())))
+            {
+                builder->emitAtomicStore(
+                    left.val,
+                    getSimpleVal(context, right),
+                    builder->getIntValue(builder->getIntType(), kIRMemoryOrder_Relaxed));
+            }
+            else
+            {
+                builder->emitStore(left.val, getSimpleVal(context, right));
+            }
         }
         break;
 
@@ -7102,7 +7408,7 @@ top:
             // possible (e.g., if it is possible to turn it into a
             // `LoweredValInfo::ptr()` then that will have been done).
 
-            switch( loweredBase.flavor )
+            switch (loweredBase.flavor)
             {
             default:
                 {
@@ -7185,47 +7491,45 @@ top:
             // The number of element writes in each row
             UInt rowSizes[maxRowIndex] = {};
             // The columns being written to in each row
-            UInt rowWrites[maxRowIndex][maxCols];
+            uint32_t rowWrites[maxRowIndex][maxCols];
             // The RHS element indices being written in each row
             UInt rowIndices[maxRowIndex][maxCols];
-            for(UInt i = 0; i < swizzleInfo->elementCount; ++i)
+            for (UInt i = 0; i < swizzleInfo->elementCount; ++i)
             {
                 const auto& c = swizzleInfo->elementCoords[i];
                 auto& rowSize = rowSizes[c.row];
-                rowWrites[c.row][rowSize] = c.col;
+                rowWrites[c.row][rowSize] = (uint32_t)c.col;
                 rowIndices[c.row][rowSize] = i;
                 ++rowSize;
             }
 
-            const auto rElemType =
-                composeGetters<IRType>(irRightVal, &IRInst::getDataType, &IRVectorType::getElementType);
+            const auto rElemType = composeGetters<IRType>(
+                irRightVal,
+                &IRInst::getDataType,
+                &IRVectorType::getElementType);
 
-            switch( loweredBase.flavor )
+            switch (loweredBase.flavor)
             {
             case LoweredValInfo::Flavor::Ptr:
                 {
                     // Matrix swizzle writes are implemented as several vector swizzle writes
-                    for(UInt r = 0; r < maxRowIndex; ++r)
+                    for (UInt r = 0; r < maxRowIndex; ++r)
                     {
                         // Skip if we have nothing in this row
-                        if(rowSizes[r] == 0)
+                        if (rowSizes[r] == 0)
                         {
                             continue;
                         }
                         const auto rowAddr = builder->emitElementAddress(loweredBase.val, r);
                         // Only select the RHS elements if it's a vector
-                        const auto rSwizzled = rElemType
-                            ? builder->emitSwizzle(
-                                builder->getVectorType(rElemType, rowSizes[r]),
-                                irRightVal,
-                                rowSizes[r],
-                                rowIndices[r])
-                            : irRightVal;
-                        swizzledStore(
-                            rowAddr,
-                            rSwizzled,
-                            rowSizes[r],
-                            rowWrites[r]);
+                        const auto rSwizzled =
+                            rElemType ? builder->emitSwizzle(
+                                            builder->getVectorType(rElemType, rowSizes[r]),
+                                            irRightVal,
+                                            rowSizes[r],
+                                            rowIndices[r])
+                                      : irRightVal;
+                        swizzledStore(rowAddr, rSwizzled, rowSizes[r], rowWrites[r]);
                     }
                 }
                 break;
@@ -7282,7 +7586,10 @@ top:
             auto subscriptInfo = left.getBoundStorageInfo();
 
             // Search for an appropriate "setter" declaration
-            auto setters = getMembersOfType<SetterDecl>(context->astBuilder, subscriptInfo->declRef, MemberFilterStyle::Instance);
+            auto setters = getMembersOfType<SetterDecl>(
+                context->astBuilder,
+                subscriptInfo->declRef,
+                MemberFilterStyle::Instance);
             if (setters.isNonEmpty())
             {
                 auto setter = *setters.begin();
@@ -7308,8 +7615,11 @@ top:
                 return;
             }
 
-            auto refAccessors = getMembersOfType<RefAccessorDecl>(context->astBuilder, subscriptInfo->declRef, MemberFilterStyle::Instance);
-            if(refAccessors.isNonEmpty())
+            auto refAccessors = getMembersOfType<RefAccessorDecl>(
+                context->astBuilder,
+                subscriptInfo->declRef,
+                MemberFilterStyle::Instance);
+            if (refAccessors.isNonEmpty())
             {
                 auto refAccessor = *refAccessors.begin();
 
@@ -7351,7 +7661,7 @@ top:
             // we care about, and then write it back.
 
             auto declRef = boundMemberInfo->declRef;
-            if( auto fieldDeclRef = declRef.as<VarDecl>() )
+            if (auto fieldDeclRef = declRef.as<VarDecl>())
             {
                 // materialize the base value and move it into
                 // a mutable temporary if needed
@@ -7359,7 +7669,8 @@ top:
                 auto tempVal = moveIntoMutableTemp(context, baseVal);
 
                 // extract the field l-value out of the temporary
-                auto tempFieldVal = extractField(context, boundMemberInfo->type, tempVal, fieldDeclRef);
+                auto tempFieldVal =
+                    extractField(context, boundMemberInfo->type, tempVal, fieldDeclRef);
 
                 // assign to the field of the temporary l-value
                 assign(context, tempFieldVal, right);
@@ -7373,7 +7684,6 @@ top:
             {
                 SLANG_UNEXPECTED("handled member flavor");
             }
-
         }
         break;
 
@@ -7421,14 +7731,11 @@ top:
 
 struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 {
-    IRGenContext*   context;
+    IRGenContext* context;
 
     DiagnosticSink* getSink() { return context->getSink(); }
 
-    IRBuilder* getBuilder()
-    {
-        return context->irBuilder;
-    }
+    IRBuilder* getBuilder() { return context->irBuilder; }
 
     LoweredValInfo visitDeclBase(DeclBase* /*decl*/)
     {
@@ -7444,7 +7751,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitExtensionDecl(ExtensionDecl* decl)
     {
-        for (auto & member : decl->members)
+        for (auto& member : decl->members)
             ensureDecl(context, member);
         return LoweredValInfo();
     }
@@ -7467,55 +7774,71 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     void getAllEntryPointsNoOverride(List<IRInst*>& entryPoints)
     {
-        if(entryPoints.getCount() != 0 )
+        if (entryPoints.getCount() != 0)
             return;
-        for(const auto d : context->irBuilder->getModule()->getModuleInst()->getGlobalInsts())
-            if(d->findDecoration<IREntryPointDecoration>())
+        for (const auto d : context->irBuilder->getModule()->getModuleInst()->getGlobalInsts())
+            if (d->findDecoration<IREntryPointDecoration>())
                 entryPoints.add(d);
     }
 
     LoweredValInfo visitEmptyDecl(EmptyDecl* decl)
     {
         bool verifyComputeDerivativeGroupModifier = false;
-        List<IRInst*> entryPoints {};
-        for(const auto modifier : decl->modifiers)
+        List<IRInst*> entryPoints{};
+        for (const auto modifier : decl->modifiers)
         {
-            if(const auto layoutLocalSizeAttr = as<GLSLLayoutLocalSizeAttribute>(modifier))
+            if (const auto layoutLocalSizeAttr = as<GLSLLayoutLocalSizeAttribute>(modifier))
             {
                 verifyComputeDerivativeGroupModifier = true;
                 getAllEntryPointsNoOverride(entryPoints);
-                for(auto d : entryPoints)
+
+                LoweredValInfo extents[3];
+
+                for (int i = 0; i < 3; ++i)
+                {
+                    extents[i] = layoutLocalSizeAttr->specConstExtents[i]
+                                     ? emitDeclRef(
+                                           context,
+                                           layoutLocalSizeAttr->specConstExtents[i],
+                                           lowerType(
+                                               context,
+                                               getType(
+                                                   context->astBuilder,
+                                                   layoutLocalSizeAttr->specConstExtents[i])))
+                                     : lowerVal(context, layoutLocalSizeAttr->extents[i]);
+                }
+
+                for (auto d : entryPoints)
                     as<IRNumThreadsDecoration>(getBuilder()->addNumThreadsDecoration(
-                            d,
-                            getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->x)),
-                            getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->y)),
-                            getSimpleVal(context, lowerVal(context, layoutLocalSizeAttr->z))
-                        ));
+                        d,
+                        getSimpleVal(context, extents[0]),
+                        getSimpleVal(context, extents[1]),
+                        getSimpleVal(context, extents[2])));
             }
-            else if(as<GLSLLayoutDerivativeGroupQuadAttribute>(modifier))
+            else if (as<GLSLLayoutDerivativeGroupQuadAttribute>(modifier))
             {
                 verifyComputeDerivativeGroupModifier = true;
                 getAllEntryPointsNoOverride(entryPoints);
-                for(auto d : entryPoints)
+                for (auto d : entryPoints)
                     getBuilder()->addSimpleDecoration<IRDerivativeGroupQuadDecoration>(d);
             }
-            else if(as<GLSLLayoutDerivativeGroupLinearAttribute>(modifier))
+            else if (as<GLSLLayoutDerivativeGroupLinearAttribute>(modifier))
             {
                 verifyComputeDerivativeGroupModifier = true;
                 getAllEntryPointsNoOverride(entryPoints);
-                for(auto d : entryPoints)
+                for (auto d : entryPoints)
                     getBuilder()->addSimpleDecoration<IRDerivativeGroupLinearDecoration>(d);
             }
         }
-        
-        if(!verifyComputeDerivativeGroupModifier)
+
+        if (!verifyComputeDerivativeGroupModifier)
             return LoweredValInfo();
-        for(auto d : entryPoints)
+        for (auto d : entryPoints)
         {
             verifyComputeDerivativeGroupModifiers(
                 getSink(),
                 decl->loc,
-                d->findDecoration<IRDerivativeGroupQuadDecoration>(), 
+                d->findDecoration<IRDerivativeGroupQuadDecoration>(),
                 d->findDecoration<IRDerivativeGroupLinearDecoration>(),
                 d->findDecoration<IRNumThreadsDecoration>());
         }
@@ -7558,7 +7881,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         // For now, we can only attach a name *if* the type
         // alias is somehow generic.
-        if(outerGeneric)
+        if (outerGeneric)
         {
             addLinkageDecoration(context, outerGeneric, decl);
         }
@@ -7578,13 +7901,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // This might be a type constraint on an associated type,
         // in which case it should lower as the key for that
         // interface requirement.
-        if(auto assocTypeDecl = as<AssocTypeDecl>(decl->parentDecl))
+        if (auto assocTypeDecl = as<AssocTypeDecl>(decl->parentDecl))
         {
             // TODO: might need extra steps if we ever allow
             // generic associated types.
 
 
-            if(const auto interfaceDecl = as<InterfaceDecl>(assocTypeDecl->parentDecl))
+            if (const auto interfaceDecl = as<InterfaceDecl>(assocTypeDecl->parentDecl))
             {
                 // Okay, this seems to be an interface rquirement, and
                 // we should lower it as such.
@@ -7592,7 +7915,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        if(const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
+        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
         {
             // This is a constraint on a global generic type parameters,
             // and so it should lower as a parameter of its own.
@@ -7638,32 +7961,36 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     }
 
     void lowerWitnessTable(
-        IRGenContext*                               subContext,
-        WitnessTable*                               astWitnessTable,
-        IRWitnessTable*                             irWitnessTable,
-        Dictionary<WitnessTable*, IRWitnessTable*>  &mapASTToIRWitnessTable)
+        IRGenContext* subContext,
+        WitnessTable* astWitnessTable,
+        IRWitnessTable* irWitnessTable,
+        Dictionary<WitnessTable*, IRWitnessTable*>& mapASTToIRWitnessTable)
     {
         auto subBuilder = subContext->irBuilder;
 
-        for(auto entry : astWitnessTable->getRequirementDictionary())
+        for (auto entry : astWitnessTable->getRequirementDictionary())
         {
             auto requiredMemberDecl = entry.key;
             auto satisfyingWitness = entry.value;
 
             auto irRequirementKey = getInterfaceRequirementKey(requiredMemberDecl);
-            if (!irRequirementKey) continue;
+            if (!irRequirementKey)
+                continue;
 
             IRInst* irSatisfyingVal = nullptr;
 
-            switch(satisfyingWitness.getFlavor())
+            switch (satisfyingWitness.getFlavor())
             {
             case RequirementWitness::Flavor::declRef:
                 {
                     auto satisfyingDeclRef = satisfyingWitness.getDeclRef();
-                    irSatisfyingVal = getSimpleVal(subContext,
-                        emitDeclRef(subContext, satisfyingDeclRef,
-                        // TODO: we need to know what type to plug in here...
-                        nullptr));
+                    irSatisfyingVal = getSimpleVal(
+                        subContext,
+                        emitDeclRef(
+                            subContext,
+                            satisfyingDeclRef,
+                            // TODO: we need to know what type to plug in here...
+                            nullptr));
                 }
                 break;
 
@@ -7678,16 +8005,23 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     auto astReqWitnessTable = satisfyingWitness.getWitnessTable();
                     IRWitnessTable* irSatisfyingWitnessTable = nullptr;
-                    if(!mapASTToIRWitnessTable.tryGetValue(astReqWitnessTable, irSatisfyingWitnessTable))
+                    if (!mapASTToIRWitnessTable.tryGetValue(
+                            astReqWitnessTable,
+                            irSatisfyingWitnessTable))
                     {
                         // Need to construct a sub-witness-table
-                        auto irWitnessTableBaseType = lowerType(subContext, astReqWitnessTable->baseType);
-                        irSatisfyingWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, irWitnessTable->getConcreteType());
+                        auto irWitnessTableBaseType =
+                            lowerType(subContext, astReqWitnessTable->baseType);
+                        irSatisfyingWitnessTable = subBuilder->createWitnessTable(
+                            irWitnessTableBaseType,
+                            irWitnessTable->getConcreteType());
                         auto mangledName = getMangledNameForConformanceWitness(
                             subContext->astBuilder,
                             astReqWitnessTable->witnessedType,
                             astReqWitnessTable->baseType);
-                        subBuilder->addExportDecoration(irSatisfyingWitnessTable, mangledName.getUnownedSlice());
+                        subBuilder->addExportDecoration(
+                            irSatisfyingWitnessTable,
+                            mangledName.getUnownedSlice());
                         if (isExportedType(astReqWitnessTable->witnessedType))
                         {
                             subBuilder->addHLSLExportDecoration(irSatisfyingWitnessTable);
@@ -7713,10 +8047,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
 
 
-            subBuilder->createWitnessTableEntry(
-                irWitnessTable,
-                irRequirementKey,
-                irSatisfyingVal);
+            subBuilder->createWitnessTableEntry(irWitnessTable, irRequirementKey, irSatisfyingVal);
         }
     }
 
@@ -7737,12 +8068,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // declaration is being used to add a conformance to
         // an existing `interface`:
         //
-        if(auto parentExtensionDecl = as<ExtensionDecl>(parentDecl))
+        if (auto parentExtensionDecl = as<ExtensionDecl>(parentDecl))
         {
             auto targetType = parentExtensionDecl->targetType;
-            if(auto targetDeclRefType = as<DeclRefType>(targetType))
+            if (auto targetDeclRefType = as<DeclRefType>(targetType))
             {
-                if(auto targetInterfaceDeclRef = targetDeclRefType->getDeclRef().as<InterfaceDecl>())
+                if (auto targetInterfaceDeclRef =
+                        targetDeclRefType->getDeclRef().as<InterfaceDecl>())
                 {
                     return LoweredValInfo::simple(getInterfaceRequirementKey(inheritanceDecl));
                 }
@@ -7768,9 +8100,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // What is the super-type that we have declared we inherit from?
         Type* superType = inheritanceDecl->base.type;
 
-        if(auto superDeclRefType = as<DeclRefType>(superType))
+        if (auto superDeclRefType = as<DeclRefType>(superType))
         {
-            if( superDeclRefType->getDeclRef().as<StructDecl>() || superDeclRefType->getDeclRef().as<ClassDecl>() )
+            if (superDeclRefType->getDeclRef().as<StructDecl>() ||
+                superDeclRefType->getDeclRef().as<ClassDecl>())
             {
                 // TODO: the witness that a type inherits from a `struct`
                 // type should probably be a key that will be used for
@@ -7789,9 +8122,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // on the type that is conforming, and the type that it conforms to.
         //
         // TODO: This approach doesn't really make sense for generic `extension` conformances.
-        auto mangledName = getMangledNameForConformanceWitness(context->astBuilder, subType, superType);
+        auto mangledName =
+            getMangledNameForConformanceWitness(context->astBuilder, subType, superType);
 
-        
+
         // A witness table may need to be generic, if the outer
         // declaration (either a type declaration or an `extension`)
         // is generic.
@@ -7814,40 +8148,57 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, nullptr);
 
         // Register the value now, rather than later, to avoid any possible infinite recursion.
-        context->setGlobalValue(inheritanceDecl, LoweredValInfo::simple(findOuterMostGeneric(irWitnessTable)));
+        context->setGlobalValue(
+            inheritanceDecl,
+            LoweredValInfo::simple(findOuterMostGeneric(irWitnessTable)));
 
         auto irSubType = lowerType(subContext, subType);
         irWitnessTable->setConcreteType(irSubType);
 
-        // TODO(JS): 
+        // TODO(JS):
         // Should the mangled name take part in obfuscation if enabled?
 
-        addLinkageDecoration(context, irWitnessTable, inheritanceDecl, mangledName.getUnownedSlice());
+        addLinkageDecoration(
+            context,
+            irWitnessTable,
+            inheritanceDecl,
+            mangledName.getUnownedSlice());
 
         // If the witness table is for a COM interface, always keep it alive.
         if (irWitnessTableBaseType->findDecoration<IRComInterfaceDecoration>())
         {
-            subBuilder->addPublicDecoration(irWitnessTable);
+            subBuilder->addHLSLExportDecoration(irWitnessTable);
         }
 
-        if (parentDecl->findModifier<HLSLExportModifier>())
+        for (auto mod : parentDecl->modifiers)
         {
-            subBuilder->addHLSLExportDecoration(irWitnessTable);
-            subBuilder->addKeepAliveDecoration(irWitnessTable);
+            if (as<HLSLExportModifier>(mod))
+            {
+                subBuilder->addHLSLExportDecoration(irWitnessTable);
+                subBuilder->addKeepAliveDecoration(irWitnessTable);
+            }
+            else if (as<AutoDiffBuiltinAttribute>(mod))
+            {
+                subBuilder->addAutoDiffBuiltinDecoration(irWitnessTable);
+            }
         }
 
         // Make sure that all the entries in the witness table have been filled in,
         // including any cases where there are sub-witness-tables for conformances
-        Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
-        lowerWitnessTable(
-            subContext,
-            inheritanceDecl->witnessTable,
-            irWitnessTable,
-            mapASTToIRWitnessTable);
-
+        bool isExplicitExtern = false;
+        if (!isImportedDecl(context, parentDecl, isExplicitExtern))
+        {
+            Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
+            lowerWitnessTable(
+                subContext,
+                inheritanceDecl->witnessTable,
+                irWitnessTable,
+                mapASTToIRWitnessTable);
+        }
         irWitnessTable->moveToEnd();
 
-        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, irWitnessTable, outerGeneric));
+        return LoweredValInfo::simple(
+            finishOuterGenerics(subBuilder, irWitnessTable, outerGeneric));
     }
 
     LoweredValInfo visitDeclGroup(DeclGroup* declGroup)
@@ -7895,15 +8246,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo();
     }
 
-    LoweredValInfo visitSubscriptDecl(SubscriptDecl* decl)
-    {
-        return visitStorageDeclCommon(decl);
-    }
+    LoweredValInfo visitSubscriptDecl(SubscriptDecl* decl) { return visitStorageDeclCommon(decl); }
 
-    LoweredValInfo visitPropertyDecl(PropertyDecl* decl)
-    {
-        return visitStorageDeclCommon(decl);
-    }
+    LoweredValInfo visitPropertyDecl(PropertyDecl* decl) { return visitStorageDeclCommon(decl); }
 
     bool isGlobalVarDecl(VarDecl* decl)
     {
@@ -7918,9 +8263,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // Variable declared at file scope? -> Global.
             return true;
         }
-        else if(as<AggTypeDeclBase>(parent))
+        else if (as<AggTypeDeclBase>(parent))
         {
-            if(decl->hasModifier<HLSLStaticModifier>())
+            if (decl->hasModifier<HLSLStaticModifier>())
             {
                 // A `static` member variable is effectively global.
                 return true;
@@ -7950,13 +8295,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     struct NestedContext
     {
-        IRGenEnv        subEnvStorage;
-        IRBuilder       subBuilderStorage;
-        IRGenContext    subContextStorage;
+        IRGenEnv subEnvStorage;
+        IRBuilder subBuilderStorage;
+        IRGenContext subContextStorage;
 
         NestedContext(DeclLoweringVisitor* outer)
-            : subBuilderStorage(*outer->getBuilder())
-            , subContextStorage(*outer->context)
+            : subBuilderStorage(*outer->getBuilder()), subContextStorage(*outer->context)
         {
             auto outerContext = outer->context;
 
@@ -7969,6 +8313,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContextStorage.thisTypeWitness = outerContext->thisTypeWitness;
 
             subContextStorage.returnDestination = LoweredValInfo();
+            subContextStorage.lowerTypeCallback = nullptr;
         }
 
         IRBuilder* getBuilder() { return &subBuilderStorage; }
@@ -7996,20 +8341,41 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         addTargetIntrinsicDecorations(nullptr, irParam, decl);
-        if (decl->findModifier<HLSLLayoutSemantic>())
+
+        bool hasLayoutSemantic = false;
+        bool isSpecializationConstant = false;
+        for (auto modifier : decl->modifiers)
         {
-            builder->addHasExplicitHLSLBindingDecoration(irParam);
+            if (as<HLSLLayoutSemantic>(modifier))
+            {
+                hasLayoutSemantic = true;
+            }
+            else if (
+                as<SpecializationConstantAttribute>(modifier) ||
+                as<VkConstantIdAttribute>(modifier))
+            {
+                isSpecializationConstant = true;
+            }
         }
+        if (hasLayoutSemantic)
+            builder->addHasExplicitHLSLBindingDecoration(irParam);
+
         // A global variable's SSA value is a *pointer* to
         // the underlying storage.
         context->setGlobalValue(decl, paramVal);
+
+        if (isSpecializationConstant && decl->initExpr)
+        {
+            auto initVal = getSimpleVal(context, lowerRValueExpr(context, decl->initExpr));
+            builder->addDefaultValueDecoration(irParam, initVal);
+        }
 
         irParam->moveToEnd();
 
         return paramVal;
     }
 
-    LoweredValInfo lowerConstantDeclCommon(VarDeclBase* decl) 
+    LoweredValInfo lowerConstantDeclCommon(VarDeclBase* decl)
     {
         // It's constant, so shoul dhave this modifier
         SLANG_ASSERT(decl->hasModifier<ConstModifier>());
@@ -8021,7 +8387,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRGeneric* outerGeneric = nullptr;
 
         // If we are static, then we need to insert the declaration before the parent.
-        // This tries to match the behavior of previous `lowerFunctionStaticConstVarDecl` functionality
+        // This tries to match the behavior of previous `lowerFunctionStaticConstVarDecl`
+        // functionality
         if (isFunctionStaticVarDecl(decl))
         {
             // We need to insert the constant at a level above
@@ -8055,7 +8422,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // to the module we are lowering.
 
         IRInst* irConstant = nullptr;
-        if(!initExpr)
+        if (!initExpr)
         {
             // If we don't know the value we want to use, then we just create
             // a global constant IR node with the right type.
@@ -8077,9 +8444,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // We construct a distinct IR instruction to represent the
             // constant itself, with the value as an operand.
             //
-            irConstant = subBuilder->emitGlobalConstant(
-                irInitVal->getFullType(),
-                irInitVal);
+            irConstant = subBuilder->emitGlobalConstant(irInitVal->getFullType(), irInitVal);
         }
 
         // All of the attributes/decorations we can attach
@@ -8087,7 +8452,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
 
         addLinkageDecoration(context, irConstant, decl);
-        
+
         addNameHint(context, irConstant, decl);
         addVarDecorations(context, irConstant, decl);
 
@@ -8095,7 +8460,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // Finish of generic
 
-        auto loweredValue = LoweredValInfo::simple(finishOuterGenerics(subBuilder, irConstant, outerGeneric));
+        auto loweredValue =
+            LoweredValInfo::simple(finishOuterGenerics(subBuilder, irConstant, outerGeneric));
 
         // Register the value that was emitted as the value
         // for any references to the constant from elsewhere
@@ -8106,10 +8472,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return loweredValue;
     }
 
-    LoweredValInfo lowerGlobalConstantDecl(VarDecl* decl)
-    {
-        return lowerConstantDeclCommon(decl);
-    }
+    LoweredValInfo lowerGlobalConstantDecl(VarDecl* decl) { return lowerConstantDeclCommon(decl); }
 
     LoweredValInfo lowerGlobalVarDecl(VarDecl* decl)
     {
@@ -8119,7 +8482,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // level as well, since global shader parameters are fairly
         // different from global variables.
         //
-        if(isGlobalShaderParameter(decl))
+        if (isGlobalShaderParameter(decl))
         {
             return lowerGlobalShaderParam(decl);
         }
@@ -8138,7 +8501,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRGeneric* outerGeneric = nullptr;
 
         // If we are static, then we need to insert the declaration before the parent.
-        // This tries to match the behavior of previous `lowerFunctionStaticConstVarDecl` functionality
+        // This tries to match the behavior of previous `lowerFunctionStaticConstVarDecl`
+        // functionality
         if (isFunctionStaticVarDecl(decl))
         {
             // We need to insert the constant at a level above
@@ -8154,7 +8518,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         IRType* varType = lowerType(subContext, decl->getType());
 
-        // TODO(JS): Do we create something derived from IRGlobalVar? Or do we use 
+        // TODO(JS): Do we create something derived from IRGlobalVar? Or do we use
         // a decoration to identify an *actual* global?
 
         IRGlobalValueWithCode* irGlobal = subBuilder->createGlobalVar(varType);
@@ -8172,7 +8536,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subBuilder->addHighLevelDeclDecoration(irGlobal, decl);
         }
 
-        if( auto initExpr = decl->initExpr )
+        if (auto initExpr = decl->initExpr)
         {
             subBuilder->setInsertInto(irGlobal);
 
@@ -8185,23 +8549,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // A global variable's SSA value is a *pointer* to
         // the underlying storage.
-        auto loweredValue = LoweredValInfo::ptr(finishOuterGenerics(subBuilder, irGlobal, outerGeneric));
+        auto loweredValue =
+            LoweredValInfo::ptr(finishOuterGenerics(subBuilder, irGlobal, outerGeneric));
         context->setGlobalValue(decl, loweredValue);
 
         return loweredValue;
     }
 
-    LoweredValInfo lowerFunctionStaticConstVarDecl(
-        VarDeclBase* decl)
+    LoweredValInfo lowerFunctionStaticConstVarDecl(VarDeclBase* decl)
     {
         return lowerConstantDeclCommon(decl);
     }
 
-    LoweredValInfo lowerFunctionStaticVarDecl(
-        VarDeclBase*    decl)
+    LoweredValInfo lowerFunctionStaticVarDecl(VarDeclBase* decl)
     {
         // We know the variable is `static`, but it might also be `const.
-        if(decl->hasModifier<ConstModifier>())
+        if (decl->hasModifier<ConstModifier>())
             return lowerFunctionStaticConstVarDecl(decl);
 
         // A function-scope `static` variable is effectively a global,
@@ -8219,7 +8582,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // function.
         //
         auto parent = getBuilder()->getInsertLoc().getParent();
-        if(auto block = as<IRBlock>(parent))
+        if (auto block = as<IRBlock>(parent))
             parent = block->getParent();
 
         NestedContext nestedContext(this);
@@ -8241,7 +8604,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // A `static` variable with an initializer needs special handling,
         // at least if the initializer isn't a compile-time constant.
-        if( auto initExpr = decl->initExpr )
+        if (auto initExpr = decl->initExpr)
         {
             // We must create another global `bool isInitialized = false`
             // to represent whether we've initialized this before.
@@ -8287,8 +8650,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitGenericValueParamDecl(GenericValueParamDecl* decl)
     {
-        return emitDeclRef(context, makeDeclRef(decl),
-            lowerType(context, decl->type));
+        return emitDeclRef(context, makeDeclRef(decl), lowerType(context, decl->type));
     }
 
     LoweredValInfo visitVarDecl(VarDecl* decl)
@@ -8300,12 +8662,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             return lowerGlobalVarDecl(decl);
         }
 
-        if(isFunctionStaticVarDecl(decl))
+        if (isFunctionStaticVarDecl(decl))
         {
             return lowerFunctionStaticVarDecl(decl);
         }
 
-        if(isMemberVarDecl(decl))
+        if (isMemberVarDecl(decl))
         {
             return lowerMemberVarDecl(decl);
         }
@@ -8319,9 +8681,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // As a special case, an immutable local variable with an
         // initializer can just lower to the SSA value of its initializer.
         //
-        if(as<LetDecl>(decl))
+        if (as<LetDecl>(decl))
         {
-            if(auto initExpr = decl->initExpr)
+            if (auto initExpr = decl->initExpr)
             {
                 auto initVal = lowerRValueExpr(context, initExpr);
                 initVal = LoweredValInfo::simple(getSimpleVal(context, initVal));
@@ -8334,7 +8696,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         LoweredValInfo varVal = createVar(context, varType, decl);
         maybeAddDebugLocationDecoration(context, varVal.val);
 
-        if( auto initExpr = decl->initExpr )
+        if (auto initExpr = decl->initExpr)
         {
             assignExpr(context, varVal, initExpr, decl->loc);
         }
@@ -8348,7 +8710,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         return Slang::getInterfaceRequirementKey(context, requirementDecl);
     }
-    
+
     LoweredValInfo visitAssocTypeDecl(AssocTypeDecl* decl)
     {
         SLANG_ASSERT(decl->parentDecl != nullptr);
@@ -8356,16 +8718,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         for (auto constraintDecl : decl->getMembersOfType<GenericTypeConstraintDecl>())
         {
             auto baseType = lowerType(context, constraintDecl->sup.type);
-            SLANG_ASSERT(baseType && baseType->getOp() == kIROp_InterfaceType);
-            constraintInterfaces.add((IRInterfaceType*)baseType);
+            if (baseType && baseType->getOp() == kIROp_InterfaceType)
+                constraintInterfaces.add((IRInterfaceType*)baseType);
         }
-        auto assocType = context->irBuilder->getAssociatedType(
-            constraintInterfaces.getArrayView().arrayView);
-        context->setValue(decl, assocType); 
+        auto assocType =
+            context->irBuilder->getAssociatedType(constraintInterfaces.getArrayView().arrayView);
+        context->setValue(decl, assocType);
         return LoweredValInfo::simple(assocType);
     }
 
-    void insertRequirementKeyAssociation(Decl* requirementDecl, IRInst* originalKey, IRInst* associatedKey)
+    void insertRequirementKeyAssociation(
+        Decl* requirementDecl,
+        IRInst* originalKey,
+        IRInst* associatedKey)
     {
         IROp op = kIROp_Nop;
         if (as<BackwardDerivativeRequirementDecl>(requirementDecl))
@@ -8383,9 +8748,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         context->irBuilder->addDecoration(originalKey, op, associatedKey);
     }
 
-    // Given `value` defined as an independent generic of `outerGeneric`, emit IR that specializes it using
-    // the generic params defined in `outerGeneric`.
-    // For example:
+    // Given `value` defined as an independent generic of `outerGeneric`, emit IR that specializes
+    // it using the generic params defined in `outerGeneric`. For example:
     // ```
     //  interface IFoo<T> { void f(); }
     // ```
@@ -8395,7 +8759,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     // %IFoo = IRGeneric(T1) { return IRInterfaceType(???); )
     // ```
     // We want the `???` to be `specialize(%f, T1)`.
-    // To do so, we will call `specializeWithOuterGeneric` with `value` = `%f`, and `outerGeneric` = %IFoo.
+    // To do so, we will call `specializeWithOuterGeneric` with `value` = `%f`, and `outerGeneric` =
+    // %IFoo.
     //
     IRInst* specializeWithOuterGeneric(IRBuilder* irBuilder, IRInst* value, IRGeneric* outerGeneric)
     {
@@ -8444,6 +8809,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         UInt operandCount = 0;
         for (auto requirementDecl : decl->members)
         {
+            if (as<GenericDecl>(requirementDecl))
+                requirementDecl = getInner(requirementDecl);
+
             if (as<SubscriptDecl>(requirementDecl) || as<PropertyDecl>(requirementDecl))
             {
                 for (auto accessorDecl : as<ContainerDecl>(requirementDecl)->members)
@@ -8463,7 +8831,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // into requirement keys for this interface.
             if (auto associatedTypeDecl = as<AssocTypeDecl>(requirementDecl))
             {
-                operandCount += associatedTypeDecl->getMembersOfType<TypeConstraintDecl>().getCount();
+                operandCount +=
+                    associatedTypeDecl->getMembersOfType<TypeConstraintDecl>().getCount();
             }
         }
 
@@ -8472,13 +8841,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto finalVal = finishOuterGenerics(subBuilder, irInterface, outerGeneric);
 
         // Add `irInterface` to decl mapping now to prevent cyclic lowering.
-        context->setValue(decl, LoweredValInfo::simple(finalVal));
+        context->setGlobalValue(decl, LoweredValInfo::simple(finalVal));
 
         subBuilder->setInsertBefore(irInterface);
 
         // Setup subContext for proper lowering `ThisType`, associated types and
         // the interface decl's self reference.
-        
+
         auto thisType = DeclRefType::create(
             context->astBuilder,
             createDefaultSpecializedDeclRef(subContext, nullptr, decl->getThisTypeDecl()));
@@ -8494,92 +8863,111 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         UInt entryIndex = 0;
         auto addEntry = [&](IRStructKey* requirementKey, DeclRef<Decl> requirementDeclRef)
+        {
+            auto entry = subBuilder->createInterfaceRequirementEntry(requirementKey, nullptr);
+            if (auto inheritance = requirementDeclRef.as<InheritanceDecl>())
             {
-                auto entry = subBuilder->createInterfaceRequirementEntry(
-                    requirementKey,
-                    nullptr);
-                if (auto inheritance = requirementDeclRef.as<InheritanceDecl>())
+                auto irBaseType =
+                    lowerType(subContext, getSup(subContext->astBuilder, inheritance));
+                auto irWitnessTableType = subBuilder->getWitnessTableType(irBaseType);
+                entry->setRequirementVal(irWitnessTableType);
+            }
+            else
+            {
+                auto requirementVal = ensureDecl(subContext, requirementDeclRef.getDecl()).val;
+
+                switch (requirementVal->getOp())
                 {
-                    auto irBaseType = lowerType(subContext, getSup(subContext->astBuilder, inheritance));
-                    auto irWitnessTableType = subBuilder->getWitnessTableType(irBaseType);
-                    entry->setRequirementVal(irWitnessTableType);
+                default:
+                    // For the majority of requirements, we only care about its type in an
+                    // interface definition, so we store only the type from the lowered IR
+                    // in the interface entry.
+                    // We need to make sure the type is specialized with the outer generic
+                    // parameters in case the interface itself is inside a generic.
+                    //
+                    requirementVal = specializeWithOuterGeneric(
+                        context->irBuilder,
+                        requirementVal->getFullType(),
+                        outerGeneric);
+                    entry->setRequirementVal(requirementVal);
+                    break;
+
+                case kIROp_AssociatedType:
+                    // For associated types, we will store it directly inside the interface
+                    // type.
+                    entry->setRequirementVal(requirementVal);
+                    break;
                 }
+                if (requirementDeclRef.getDecl()->findModifier<HLSLStaticModifier>())
+                {
+                    getBuilder()->addStaticRequirementDecoration(requirementKey);
+                }
+            }
+            irInterface->setOperand(entryIndex, entry);
+            entryIndex++;
+            // Add addtional requirements for type constraints placed
+            // on an associated types.
+            if (auto associatedTypeDeclRef = requirementDeclRef.as<AssocTypeDecl>())
+            {
+                for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(
+                         subContext->astBuilder,
+                         associatedTypeDeclRef))
+                {
+                    auto constraintKey = getInterfaceRequirementKey(constraintDeclRef.getDecl());
+                    auto constraintInterfaceType =
+                        lowerType(subContext, getSup(subContext->astBuilder, constraintDeclRef));
+                    auto witnessTableType =
+                        getBuilder()->getWitnessTableType(constraintInterfaceType);
+
+                    auto constraintEntry = subBuilder->createInterfaceRequirementEntry(
+                        constraintKey,
+                        witnessTableType);
+                    irInterface->setOperand(entryIndex, constraintEntry);
+                    entryIndex++;
+
+                    context->setValue(
+                        constraintDeclRef.getDecl(),
+                        LoweredValInfo::simple(constraintEntry));
+                }
+            }
+            else
+            {
+                CallableDecl* callableDecl = nullptr;
+                if (auto genDecl = as<GenericDecl>(requirementDeclRef.getDecl()))
+                    callableDecl = as<CallableDecl>(genDecl->inner);
                 else
+                    callableDecl = as<CallableDecl>(requirementDeclRef.getDecl());
+                if (callableDecl)
                 {
-                    auto requirementVal = ensureDecl(subContext, requirementDeclRef.getDecl()).val;
-
-                    switch (requirementVal->getOp())
+                    // Differentiable functions has additional requirements for the derivatives.
+                    for (auto diffDecl :
+                         callableDecl->getMembersOfType<DerivativeRequirementReferenceDecl>())
                     {
-                    default:
-                        // For the majority of requirements, we only care about its type in an
-                        // interface definition, so we store only the type from the lowered IR
-                        // in the interface entry.
-                        // We need to make sure the type is specialized with the outer generic
-                        // parameters in case the interface itself is inside a generic.
-                        //
-                        requirementVal = specializeWithOuterGeneric(context->irBuilder, requirementVal->getFullType(), outerGeneric);
-                        entry->setRequirementVal(requirementVal);
-                        break;
-
-                    case kIROp_AssociatedType:
-                        // For associated types, we will store it directly inside the interface type.
-                        entry->setRequirementVal(requirementVal);
-                        break;
-                    }
-                    if (requirementDeclRef.getDecl()->findModifier<HLSLStaticModifier>())
-                    {
-                        getBuilder()->addStaticRequirementDecoration(requirementKey);
+                        auto diffKey = getInterfaceRequirementKey(diffDecl->referencedDecl);
+                        insertRequirementKeyAssociation(
+                            diffDecl->referencedDecl,
+                            requirementKey,
+                            diffKey);
                     }
                 }
-                irInterface->setOperand(entryIndex, entry);
-                entryIndex++;
-                // Add addtional requirements for type constraints placed
-                // on an associated types.
-                if (auto associatedTypeDeclRef = requirementDeclRef.as<AssocTypeDecl>())
-                {
-                    for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(subContext->astBuilder, associatedTypeDeclRef))
-                    {
-                        auto constraintKey = getInterfaceRequirementKey(constraintDeclRef.getDecl());
-                        auto constraintInterfaceType =
-                            lowerType(context, getSup(subContext->astBuilder, constraintDeclRef));
-                        auto witnessTableType =
-                            getBuilder()->getWitnessTableType(constraintInterfaceType);
-
-                        auto constraintEntry = subBuilder->createInterfaceRequirementEntry(constraintKey,
-                            witnessTableType);
-                        irInterface->setOperand(entryIndex, constraintEntry);
-                        entryIndex++;
-
-                        context->setValue(constraintDeclRef.getDecl(), LoweredValInfo::simple(constraintEntry));
-                    }
-                }
-                else
-                {
-                    CallableDecl* callableDecl = nullptr;
-                    if (auto genDecl = as<GenericDecl>(requirementDeclRef.getDecl()))
-                        callableDecl = as<CallableDecl>(genDecl->inner);
-                    else
-                        callableDecl = as<CallableDecl>(requirementDeclRef.getDecl());
-                    if (callableDecl)
-                    {
-                        // Differentiable functions has additional requirements for the derivatives.
-                        for (auto diffDecl : callableDecl->getMembersOfType<DerivativeRequirementReferenceDecl>())
-                        {
-                            auto diffKey = getInterfaceRequirementKey(diffDecl->referencedDecl);
-                            insertRequirementKeyAssociation(diffDecl->referencedDecl, requirementKey, diffKey);
-                        }
-                    }
-                    // Add lowered requirement entry to current decl mapping to prevent
-                    // the function requirements from being lowered again when we get to
-                    // `ensureAllDeclsRec`.
-                    context->setValue(requirementDeclRef.getDecl(), LoweredValInfo::simple(entry));
-                }
-            };
+                // Add lowered requirement entry to current decl mapping to prevent
+                // the function requirements from being lowered again when we get to
+                // `ensureAllDeclsRec`.
+                context->setValue(requirementDeclRef.getDecl(), LoweredValInfo::simple(entry));
+            }
+        };
         for (auto requirementDecl : decl->members)
         {
             auto requirementKey = getInterfaceRequirementKey(requirementDecl);
             if (!requirementKey)
             {
+                if (auto genericDecl = as<GenericDecl>(requirementDecl))
+                {
+                    // We need to form a declref into the inner decls in case of a generic
+                    // requirement.
+                    requirementDecl = getInner(genericDecl);
+                }
+
                 if (as<PropertyDecl>(requirementDecl) || as<SubscriptDecl>(requirementDecl))
                 {
                     for (auto member : as<ContainerDecl>(requirementDecl)->members)
@@ -8589,7 +8977,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             auto accessorKey = getInterfaceRequirementKey(accessorDecl);
                             if (accessorKey)
                             {
-                                auto accessorDeclRef = createDefaultSpecializedDeclRef(subContext, nullptr, accessorDecl);
+                                auto accessorDeclRef = createDefaultSpecializedDeclRef(
+                                    subContext,
+                                    nullptr,
+                                    accessorDecl);
                                 addEntry(accessorKey, accessorDeclRef);
                             }
                         }
@@ -8601,14 +8992,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 if (auto genericDecl = as<GenericDecl>(requirementDecl))
                 {
-                    // We need to form a declref into the inner decls in case of a generic requirement.
+                    // We need to form a declref into the inner decls in case of a generic
+                    // requirement.
                     requirementDecl = getInner(genericDecl);
                 }
-                auto requirementDeclRef = createDefaultSpecializedDeclRef(subContext, nullptr, requirementDecl);
+                auto requirementDeclRef =
+                    createDefaultSpecializedDeclRef(subContext, nullptr, requirementDecl);
                 addEntry(requirementKey, requirementDeclRef);
             }
         }
-
 
         addNameHint(context, irInterface, decl);
         addLinkageDecoration(context, irInterface, decl);
@@ -8622,7 +9014,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         if (auto comInterfaceAttr = decl->findModifier<ComInterfaceAttribute>())
         {
-            subBuilder->addComInterfaceDecoration(irInterface, comInterfaceAttr->guid.getUnownedSlice());
+            subBuilder->addComInterfaceDecoration(
+                irInterface,
+                comInterfaceAttr->guid.getUnownedSlice());
         }
         if (const auto builtinAttr = decl->findModifier<BuiltinAttribute>())
         {
@@ -8663,7 +9057,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Given a declaration of a type, we need to make sure
         // to output "witness tables" for any interfaces this
         // type has declared conformance to.
-        for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
+        for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
         {
             ensureDecl(context, inheritanceDecl);
         }
@@ -8683,7 +9077,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         IRType* loweredTagType = lowerType(subContext, decl->tagType);
 
-        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, loweredTagType, outerGeneric));
+        return LoweredValInfo::simple(
+            finishOuterGenerics(subBuilder, loweredTagType, outerGeneric));
     }
 
     LoweredValInfo visitThisTypeDecl(ThisTypeDecl* decl)
@@ -8701,7 +9096,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visitAggTypeDecl(AggTypeDecl* decl)
     {
         // Don't generate an IR `struct` for intrinsic types
-        if(decl->findModifier<IntrinsicTypeModifier>() || decl->findModifier<BuiltinTypeModifier>())
+        if (decl->findModifier<IntrinsicTypeModifier>() ||
+            decl->findModifier<BuiltinTypeModifier>())
         {
             return LoweredValInfo();
         }
@@ -8711,8 +9107,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             SLANG_UNREACHABLE("associatedtype should have been handled by visitAssocTypeDecl.");
         }
 
-        // TODO(JS): 
-        // Not clear what to do around HLSLExportModifier. 
+        // TODO(JS):
+        // Not clear what to do around HLSLExportModifier.
         // The HLSL spec says it only applies to functions, so we ignore for now.
 
         // We are going to create nested IR building state
@@ -8736,7 +9132,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         else if (as<GLSLInterfaceBlockDecl>(decl))
         {
-            if(decl->findModifier<GLSLBufferModifier>())
+            if (decl->findModifier<GLSLBufferModifier>())
             {
                 irAggType = subBuilder->createStructType();
             }
@@ -8747,15 +9143,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         else
         {
-            getSink()->diagnose(decl->loc, Diagnostics::unimplemented, "lower unknown AggType to IR");
+            getSink()->diagnose(
+                decl->loc,
+                Diagnostics::unimplemented,
+                "lower unknown AggType to IR");
             return LoweredValInfo::simple(subBuilder->getVoidType());
         }
-        
+
         maybeAddDebugLocationDecoration(context, irAggType);
 
         auto finalFinishedVal = finishOuterGenerics(subBuilder, irAggType, outerGeneric);
 
-        // We add the decl now such that if there are Ptr or other references 
+        // We add the decl now such that if there are Ptr or other references
         // to this type they can still complete
         context->setValue(decl, LoweredValInfo::simple(finalFinishedVal));
 
@@ -8772,7 +9171,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addNameHint(context, irAggType, decl);
         addLinkageDecoration(context, irAggType, decl);
 
-        if( const auto payloadAttribute = decl->findModifier<PayloadAttribute>() )
+        if (const auto payloadAttribute = decl->findModifier<PayloadAttribute>())
         {
             subBuilder->addDecoration(irAggType, kIROp_PayloadDecoration);
         }
@@ -8782,21 +9181,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // A `struct` that inherits from another `struct` must start
         // with a member for the direct base type.
         //
-        for( auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>() )
+        for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
         {
             auto superType = inheritanceDecl->base;
-            if(auto superDeclRefType = as<DeclRefType>(superType))
+            if (auto superDeclRefType = as<DeclRefType>(superType))
             {
                 if (superDeclRefType->getDeclRef().as<StructDecl>() ||
                     superDeclRefType->getDeclRef().as<ClassDecl>() ||
                     superDeclRefType->getDeclRef().as<GLSLInterfaceBlockDecl>())
                 {
-                    auto superKey = (IRStructKey*) getSimpleVal(context, ensureDecl(context, inheritanceDecl));
+                    auto superKey =
+                        (IRStructKey*)getSimpleVal(context, ensureDecl(context, inheritanceDecl));
                     auto irSuperType = lowerType(subContext, superType.type);
-                    subBuilder->createStructField(
-                        irAggType,
-                        superKey,
-                        irSuperType);
+                    subBuilder->createStructField(irAggType, superKey, irSuperType);
                 }
             }
         }
@@ -8814,24 +9211,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             // Each ordinary field will need to turn into a struct "key"
             // that is used for fetching the field.
-            IRInst* fieldKeyInst = getSimpleVal(subContext,
-                ensureDecl(subContext, fieldDecl));
+            IRInst* fieldKeyInst = getSimpleVal(subContext, ensureDecl(subContext, fieldDecl));
             auto fieldKey = as<IRStructKey>(fieldKeyInst);
             SLANG_ASSERT(fieldKey);
 
             // Note: we lower the type of the field in the "sub"
             // context, so that any generic parameters that were
             // set up for the type can be referenced by the field type.
-            IRType* fieldType = lowerType(
-                subContext,
-                fieldDecl->getType());
+            IRType* fieldType = lowerType(subContext, fieldDecl->getType());
 
             // Then, the parent `struct` instruction itself will have
             // a "field" instruction.
-            subBuilder->createStructField(
-                irAggType,
-                fieldKey,
-                fieldType);
+            subBuilder->createStructField(irAggType, fieldKey, fieldType);
 
             for (auto mod : fieldDecl->modifiers)
             {
@@ -8858,8 +9249,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             if (as<NonCopyableTypeAttribute>(modifier))
                 subBuilder->addNonCopyableTypeDecoration(irAggType);
+            else if (as<AutoDiffBuiltinAttribute>(modifier))
+                subBuilder->addAutoDiffBuiltinDecoration(irAggType);
         }
-     
+
+        addTargetRequirementDecorations(irAggType, decl);
 
         return LoweredValInfo::simple(finalFinishedVal);
     }
@@ -8867,7 +9261,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     void lowerPackOffsetModifier(IRInst* inst, HLSLPackOffsetSemantic* semantic)
     {
         auto builder = getBuilder();
-        int registerOffset = stringToInt(semantic->registerName.getName()->text.getUnownedSlice().tail(1));
+        int registerOffset =
+            stringToInt(semantic->registerName.getName()->text.getUnownedSlice().tail(1));
         int componentOffset = 0;
         if (semantic->componentMask.getContentLength() != 0)
         {
@@ -8899,7 +9294,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto builder = getBuilder();
 
         List<IRInst*> operands;
-        for(auto stageNameToken : semantic->stageNameTokens)
+        for (auto stageNameToken : semantic->stageNameTokens)
         {
             IRInst* stageName = builder->getStringValue(stageNameToken.getContent());
             operands.add(stageName);
@@ -8908,7 +9303,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         builder->addDecoration(inst, op, operands.getBuffer(), operands.getCount());
     }
 
-    void lowerDerivativeMemberModifier(IRInst* inst, Decl* memberDecl, DerivativeMemberAttribute* derivativeMember)
+    void lowerDerivativeMemberModifier(
+        IRInst* inst,
+        Decl* memberDecl,
+        DerivativeMemberAttribute* derivativeMember)
     {
         IRInst* key = nullptr;
         if (derivativeMember->memberDeclRef->declRef.getDecl() == memberDecl)
@@ -8925,7 +9323,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         builder->addDecoration(inst, kIROp_DerivativeMemberDecoration, key);
     }
 
-    void lowerDifferentiableAttribute(IRGenContext* subContext, IRInst* inst, DifferentiableAttribute* attr)
+    void lowerDifferentiableAttribute(
+        IRGenContext* subContext,
+        IRInst* inst,
+        DifferentiableAttribute* attr)
     {
         auto irDict = getBuilder()->addDifferentiableTypeDictionaryDecoration(inst);
         for (auto& entry : attr->getMapTypeToIDifferentiableWitness())
@@ -8938,7 +9339,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             // If the witness can be lowered, and the differentiable type entry exists,
             // add an entry to the context.
-            // 
+            //
             if (irWitness)
             {
                 getBuilder()->addDifferentiableTypeEntry(irDict, irType, irWitness);
@@ -8976,16 +9377,24 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if (auto semanticModifier = fieldDecl->findModifier<HLSLSimpleSemantic>())
         {
-            builder->addSemanticDecoration(irFieldKey, semanticModifier->name.getName()->text.getUnownedSlice());
+            builder->addSemanticDecoration(
+                irFieldKey,
+                semanticModifier->name.getName()->text.getUnownedSlice());
         }
 
-        if( auto readModifier = fieldDecl->findModifier<RayPayloadReadSemantic>() )
+        if (auto readModifier = fieldDecl->findModifier<RayPayloadReadSemantic>())
         {
-            lowerRayPayloadAccessModifier(irFieldKey, readModifier, kIROp_StageReadAccessDecoration);
+            lowerRayPayloadAccessModifier(
+                irFieldKey,
+                readModifier,
+                kIROp_StageReadAccessDecoration);
         }
-        if( auto writeModifier = fieldDecl->findModifier<RayPayloadWriteSemantic>())
+        if (auto writeModifier = fieldDecl->findModifier<RayPayloadWriteSemantic>())
         {
-            lowerRayPayloadAccessModifier(irFieldKey, writeModifier, kIROp_StageWriteAccessDecoration);
+            lowerRayPayloadAccessModifier(
+                irFieldKey,
+                writeModifier,
+                kIROp_StageWriteAccessDecoration);
         }
         if (auto derivativeMemberModifier = fieldDecl->findModifier<DerivativeMemberAttribute>())
         {
@@ -9005,20 +9414,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return Slang::maybeGetConstExprType(getBuilder(), type, decl);
     }
 
-        /// Emit appropriate generic parameters for a constraint, and return the value of that constraint.
-        ///
-        /// The `supType` paramete represents the super-type that a parameter is constrained to.
+    /// Emit appropriate generic parameters for a constraint, and return the value of that
+    /// constraint.
+    ///
+    /// The `supType` paramete represents the super-type that a parameter is constrained to.
     IRInst* emitGenericConstraintValue(
-        IRGenContext*               subContext,
-        GenericTypeConstraintDecl*  constraintDecl,
-        IRType*                     supType)
+        IRGenContext* subContext,
+        GenericTypeConstraintDecl* constraintDecl,
+        IRType* supType)
     {
 
         auto subBuilder = subContext->irBuilder;
 
         // There are two cases we care about here.
         //
-        if(auto andType = as<IRConjunctionType>(supType))
+        if (auto andType = as<IRConjunctionType>(supType))
         {
             // The non-trivial case is when the constraint on a generic parameter
             // was of the form `T : A & B`. In this case, we really want to
@@ -9031,7 +9441,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             //
             List<IRInst*> caseVals;
             auto caseCount = andType->getCaseCount();
-            for(Int i = 0; i < caseCount; ++i)
+            for (Int i = 0; i < caseCount; ++i)
             {
                 auto caseType = andType->getCaseType(i);
                 auto caseVal = emitGenericConstraintValue(subContext, constraintDecl, caseType);
@@ -9059,9 +9469,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // should handle propgation of value-size information from constraints
             // back to generic parameters?
             //
-            if (auto declRefType = as<DeclRefType>(constraintDecl->sub.type))
+            if (auto genParamDeclRef =
+                    isDeclRefTypeOf<GenericTypeParamDeclBase>(constraintDecl->sub.type))
             {
-                auto typeParamDeclVal = subContext->findLoweredDecl(declRefType->getDeclRef().getDecl());
+                auto typeParamDeclVal = subContext->findLoweredDecl(genParamDeclRef.getDecl());
                 SLANG_ASSERT(typeParamDeclVal && typeParamDeclVal->val);
                 subBuilder->addTypeConstraintDecoration(typeParamDeclVal->val, supType);
             }
@@ -9071,18 +9482,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     }
 
     void emitGenericConstraintDecl(
-        IRGenContext*               subContext,
-        GenericTypeConstraintDecl*  constraintDecl)
+        IRGenContext* subContext,
+        GenericTypeConstraintDecl* constraintDecl)
     {
         auto supType = lowerType(subContext, constraintDecl->sup.type);
         auto value = emitGenericConstraintValue(subContext, constraintDecl, supType);
         subContext->setValue(constraintDecl, LoweredValInfo::simple(value));
     }
 
-    IRGeneric* emitOuterGeneric(
-        IRGenContext*   subContext,
-        GenericDecl*    genericDecl,
-        Decl*           leafDecl)
+    IRGeneric* emitOuterGeneric(IRGenContext* subContext, GenericDecl* genericDecl, Decl* leafDecl)
     {
         auto subBuilder = subContext->irBuilder;
 
@@ -9136,10 +9544,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     }
 
     IRGeneric* emitOuterInterfaceGeneric(
-        IRGenContext*   subContext,
-        ContainerDecl*  parentDecl,
-        DeclRefType*    interfaceType,
-        Decl*           leafDecl)
+        IRGenContext* subContext,
+        ContainerDecl* parentDecl,
+        DeclRefType* interfaceType,
+        Decl* leafDecl)
     {
         auto subBuilder = subContext->irBuilder;
 
@@ -9161,7 +9569,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto irThisTypeParam = subBuilder->emitParam(subBuilder->getTypeType());
 
         auto irInterfaceType = lowerType(context, interfaceType);
-        auto irWitnessTableParam = subBuilder->emitParam(subBuilder->getWitnessTableType(irInterfaceType));
+        auto irWitnessTableParam =
+            subBuilder->emitParam(subBuilder->getWitnessTableType(irInterfaceType));
         subBuilder->addTypeConstraintDecoration(irThisTypeParam, irInterfaceType);
 
         // Now we need to wire up the IR parameters
@@ -9181,9 +9590,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     //
     IRGeneric* emitOuterGenerics(IRGenContext* subContext, Decl* decl, Decl* leafDecl)
     {
-        for(auto pp = decl->parentDecl; pp; pp = pp->parentDecl)
+        for (auto pp = decl->parentDecl; pp; pp = pp->parentDecl)
         {
-            if(auto genericAncestor = as<GenericDecl>(pp))
+            if (auto genericAncestor = as<GenericDecl>(pp))
             {
                 return emitOuterGeneric(subContext, genericAncestor, leafDecl);
             }
@@ -9194,13 +9603,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // definition needs to be generic on a parameter to represent
             // the `ThisType` of the interface.
             //
-            if(auto extensionAncestor = as<ExtensionDecl>(pp))
+            if (auto extensionAncestor = as<ExtensionDecl>(pp))
             {
-                if(auto targetDeclRefType = as<DeclRefType>(extensionAncestor->targetType))
+                if (auto targetDeclRefType = as<DeclRefType>(extensionAncestor->targetType))
                 {
-                    if(auto interfaceDeclRef = targetDeclRefType->getDeclRef().as<InterfaceDecl>())
+                    if (auto interfaceDeclRef = targetDeclRefType->getDeclRef().as<InterfaceDecl>())
                     {
-                        return emitOuterInterfaceGeneric(subContext, extensionAncestor, targetDeclRefType, leafDecl);
+                        return emitOuterInterfaceGeneric(
+                            subContext,
+                            extensionAncestor,
+                            targetDeclRefType,
+                            leafDecl);
                     }
                 }
             }
@@ -9247,10 +9660,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     // value (if there were no generics), which should be the IR-level
     // representation of the original declaration.
     //
-    IRInst* finishOuterGenerics(
-        IRBuilder*  subBuilder,
-        IRInst*     val,
-        IRGeneric*  parentGeneric)
+    IRInst* finishOuterGenerics(IRBuilder* subBuilder, IRInst* val, IRGeneric* parentGeneric)
     {
         IRInst* v = val;
 
@@ -9281,12 +9691,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), returnType);
                 // For Function Types, we always clone all generic parameters regardless of whether
                 // the generic parameter appears in the function signature or not.
-                if (returnType->getOp() == kIROp_FuncType ||
-                    returnType->getOp() == kIROp_Generic)
+                if (returnType->getOp() == kIROp_FuncType || returnType->getOp() == kIROp_Generic)
                 {
                     for (auto genericParam : parentGeneric->getParams())
                     {
-                        markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), genericParam);
+                        markInstsToClone(
+                            valuesToClone,
+                            parentGeneric->getFirstBlock(),
+                            genericParam);
                     }
                 }
                 if (valuesToClone.getCount() == 0)
@@ -9305,7 +9717,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     typeGeneric->setFullType(typeBuilder.getGenericKind());
                     typeBuilder.setInsertInto(typeGeneric);
                     auto block = typeBuilder.emitBlock();
-                    
+
                     struct ParamCloneInfo
                     {
                         IRParam* originalParam;
@@ -9324,7 +9736,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                                 // in this first pass.
                                 IRParam* clonedParam = typeBuilder.emitParam(nullptr);
                                 cloneEnv.mapOldValToNew[child] = clonedParam;
-                                paramCloneInfos.add({ (IRParam*)child, clonedParam });
+                                paramCloneInfos.add({(IRParam*)child, clonedParam});
                             }
                             else
                             {
@@ -9338,8 +9750,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     for (auto param : paramCloneInfos)
                     {
                         typeBuilder.setInsertInto(param.clonedParam);
-                        param.clonedParam->setFullType((IRType*)cloneInst(&cloneEnv, &typeBuilder, param.originalParam->getFullType()));
-                        cloneInstDecorationsAndChildren(&cloneEnv, typeBuilder.getModule(), param.originalParam, param.clonedParam);
+                        param.clonedParam->setFullType((IRType*)cloneInst(
+                            &cloneEnv,
+                            &typeBuilder,
+                            param.originalParam->getFullType()));
+                        cloneInstDecorationsAndChildren(
+                            &cloneEnv,
+                            typeBuilder.getModule(),
+                            param.originalParam,
+                            param.clonedParam);
                     }
 
                     typeBuilder.setInsertInto(block);
@@ -9398,11 +9817,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // so we need to loop until we run out.
             v = parentGeneric;
             auto parentBlock = as<IRBlock>(v->getParent());
-            if (!parentBlock) break;
+            if (!parentBlock)
+                break;
 
             parentGeneric = as<IRGeneric>(parentBlock->getParent());
-            if (!parentGeneric) break;
-
+            if (!parentGeneric)
+                break;
         }
         return v;
     }
@@ -9427,17 +9847,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     // Attach target-intrinsic decorations to an instruction,
     // based on modifiers on an AST declaration.
-    void addTargetIntrinsicDecorations(
-        IRGenContext* subContext,
-        IRInst* irInst,
-        Decl*   decl)
+    void addTargetIntrinsicDecorations(IRGenContext* subContext, IRInst* irInst, Decl* decl)
     {
         auto builder = getBuilder();
 
         for (auto targetMod : decl->getModifiersOfType<TargetIntrinsicModifier>())
         {
             String definition;
-            if(targetMod->isString)
+            if (targetMod->isString)
             {
                 definition = targetMod->definitionString;
             }
@@ -9447,7 +9864,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else
             {
-                if( isStdLibMemberFuncDecl(decl) )
+                if (isCoreModuleMemberFuncDecl(decl))
                 {
                     // We will mark member functions by appending a `.` to the
                     // start of their name.
@@ -9460,13 +9877,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             UnownedStringSlice targetName;
             auto& targetToken = targetMod->targetToken;
-            if( targetToken.type != TokenType::Unknown )
+            if (targetToken.type != TokenType::Unknown)
             {
                 targetName = targetToken.getContent();
             }
 
             CapabilitySet targetCaps;
-            if( targetName.getLength() == 0 )
+            if (targetName.getLength() == 0)
             {
                 targetCaps = CapabilitySet::makeEmpty();
             }
@@ -9479,26 +9896,70 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             IRInst* scrutinee = nullptr;
             UnownedStringSlice predicate;
-            if(targetMod->scrutineeDeclRef)
+            if (targetMod->scrutineeDeclRef)
             {
                 const auto s = subContext->findLoweredDecl(targetMod->scrutineeDeclRef.getDecl());
-                if(s && s->flavor == LoweredValInfo::Flavor::Simple)
+                if (s && s->flavor == LoweredValInfo::Flavor::Simple)
                 {
                     scrutinee = s->val;
                     predicate = targetMod->predicateToken.getContent();
                 }
             }
 
-            builder->addTargetIntrinsicDecoration(irInst, targetCaps, definition.getUnownedSlice(), predicate, scrutinee);
+            builder->addTargetIntrinsicDecoration(
+                irInst,
+                targetCaps,
+                definition.getUnownedSlice(),
+                predicate,
+                scrutinee);
         }
 
-        if(const auto nvapiMod = decl->findModifier<NVAPIMagicModifier>())
+        if (const auto nvapiMod = decl->findModifier<NVAPIMagicModifier>())
         {
             builder->addNVAPIMagicDecoration(irInst, decl->getName()->text.getUnownedSlice());
         }
         if (const auto requirePrelude = decl->findModifier<RequirePreludeAttribute>())
         {
-            builder->addRequirePreludeDecoration(irInst, requirePrelude->capabilitySet, requirePrelude->prelude.getUnownedSlice());
+            builder->addRequirePreludeDecoration(
+                irInst,
+                requirePrelude->capabilitySet,
+                requirePrelude->prelude.getUnownedSlice());
+        }
+    }
+
+    void addTargetRequirementDecorations(IRInst* inst, Decl* decl)
+    {
+        // If this declaration requires certain GLSL extension (or a particular GLSL version)
+        // for it to be usable, then declare that here. Similarly for SPIR-V or CUDA
+        //
+        // TODO: We should wrap this an `SpecializedForTargetModifier` together into a single
+        // case for enumerating the "capabilities" that a declaration requires.
+        //
+        for (auto extensionMod : decl->getModifiersOfType<RequiredGLSLExtensionModifier>())
+        {
+            getBuilder()->addRequireGLSLExtensionDecoration(
+                inst,
+                extensionMod->extensionNameToken.getContent());
+        }
+        for (auto versionMod : decl->getModifiersOfType<RequiredGLSLVersionModifier>())
+        {
+            getBuilder()->addRequireGLSLVersionDecoration(
+                inst,
+                Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+        }
+        for (auto versionMod : decl->getModifiersOfType<RequiredSPIRVVersionModifier>())
+        {
+            getBuilder()->addRequireSPIRVVersionDecoration(inst, versionMod->version);
+        }
+        for (auto extensionMod : decl->getModifiersOfType<RequiredWGSLExtensionModifier>())
+        {
+            getBuilder()->addRequireWGSLExtensionDecoration(
+                inst,
+                extensionMod->extensionNameToken.getContent());
+        }
+        for (auto versionMod : decl->getModifiersOfType<RequiredCUDASMVersionModifier>())
+        {
+            getBuilder()->addRequireCUDASMVersionDecoration(inst, versionMod->version);
         }
     }
 
@@ -9506,32 +9967,31 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         // If this is an accessor and the parent is describing some bitfield,
         // we can move the bitfield modifiers to the accessor function.
-        if(as<AccessorDecl>(decl))
+        if (as<AccessorDecl>(decl))
         {
-            if(const auto bfm = decl->parentDecl->findModifier<BitFieldModifier>())
+            if (const auto bfm = decl->parentDecl->findModifier<BitFieldModifier>())
             {
                 getBuilder()->addDecoration(
                     irFunc,
                     kIROp_BitFieldAccessorDecoration,
                     getSimpleVal(context, ensureDecl(context, bfm->backingDeclRef.getDecl())),
                     getBuilder()->getIntValue(getBuilder()->getIntType(), bfm->width),
-                    getBuilder()->getIntValue(getBuilder()->getIntType(), bfm->offset)
-                );
+                    getBuilder()->getIntValue(getBuilder()->getIntType(), bfm->offset));
             }
         }
     }
 
-        /// Is `decl` a member function (or effectively a member function) when considered as a stdlib declaration?
-    bool isStdLibMemberFuncDecl(
-        Decl*   inDecl)
+    /// Is `decl` a member function (or effectively a member function) when considered as a core
+    /// module declaration?
+    bool isCoreModuleMemberFuncDecl(Decl* inDecl)
     {
         auto decl = as<CallableDecl>(inDecl);
-        if(!decl)
+        if (!decl)
             return false;
 
         // Constructors aren't really member functions, insofar
         // as they aren't called with a `this` parameter.
-        if(as<ConstructorDecl>(decl))
+        if (as<ConstructorDecl>(decl))
             return false;
 
         // Exclude `static` functions for same reason.
@@ -9541,15 +10001,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
 
         auto dd = decl->parentDecl;
-        for(;;)
+        for (;;)
         {
-            if(auto genericDecl = as<GenericDecl>(dd))
+            if (auto genericDecl = as<GenericDecl>(dd))
             {
                 dd = genericDecl->parentDecl;
                 continue;
             }
 
-            if( auto subscriptDecl = as<SubscriptDecl>(dd) )
+            if (auto subscriptDecl = as<SubscriptDecl>(dd))
             {
                 dd = subscriptDecl->parentDecl;
             }
@@ -9562,62 +10022,60 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // is under a `struct` *or* an `extension` to be a member
         // function for our purposes.
         //
-        if(as<AggTypeDeclBase>(dd))
+        if (as<AggTypeDeclBase>(dd))
             return true;
 
         return false;
     }
 
-        /// Add a "catch-all" decoration for a stdlib function if it would be needed
-    void addCatchAllIntrinsicDecorationIfNeeded(
-        IRInst*             irInst,
-        FunctionDeclBase*   decl)
+    /// Add a "catch-all" decoration for a core module function if it would be needed
+    void addCatchAllIntrinsicDecorationIfNeeded(IRInst* irInst, FunctionDeclBase* decl)
     {
         // We don't need an intrinsic decoration on a function that has a body,
         // since the body can be used as the "catch-all" case.
         //
-        if(decl->body)
+        if (decl->body)
             return;
 
-        // Only standard library declarations should get any kind of catch-all
+        // Only core module declarations should get any kind of catch-all
         // treatment by default. Declarations in user case are responsible
         // for marking things as target intrinsics if they want to go down
         // that (unsupported) route.
         //
-        if(!isFromStdLib(decl))
+        if (!isFromCoreModule(decl))
             return;
 
         // No need to worry about functions that lower to intrinsic IR opcodes
         // (or pseudo-ops).
         //
-        if(decl->findModifier<IntrinsicOpModifier>())
+        if (decl->findModifier<IntrinsicOpModifier>())
             return;
 
         // We also don't need an intrinsic decoration if the function already
         // had a catch-all case on one of its target overloads.
         //
-        for( auto f = decl->primaryDecl; f; f = f->nextDecl )
+        for (auto f = decl->primaryDecl; f; f = f->nextDecl)
         {
-            for(auto targetMod : f->getModifiersOfType<TargetIntrinsicModifier>())
+            for (auto targetMod : f->getModifiersOfType<TargetIntrinsicModifier>())
             {
                 // If we find a catch-all case (marked as either *no* target
                 // token or an empty target name), then we should bail out.
                 //
-                if(targetMod->targetToken.type == TokenType::Unknown)
+                if (targetMod->targetToken.type == TokenType::Unknown)
                     return;
-                else if(!targetMod->targetToken.hasContent())
+                else if (!targetMod->targetToken.hasContent())
                     return;
             }
         }
 
         String definition;
-        
+
         // If we have a member function, then we want the default intrinsic
         // definition to reflect this fact so that we can emit it correctly
         // (the assumption is that a catch-all definition of a member function
         // is itself implemented as a member function).
         //
-        if( isStdLibMemberFuncDecl(decl) )
+        if (isCoreModuleMemberFuncDecl(decl))
         {
             // We will mark member functions by appending a `.` to the
             // start of their name.
@@ -9634,7 +10092,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // have a name, but its parent should.
         //
         Decl* declForName = decl;
-        if(const auto accessorDecl = as<AccessorDecl>(decl))
+        if (const auto accessorDecl = as<AccessorDecl>(decl))
             declForName = decl->parentDecl;
 
         definition.append(getText(declForName->getName()));
@@ -9642,20 +10100,37 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         getBuilder()->addTargetIntrinsicDecoration(
             irInst,
             CapabilitySet(CapabilityName::textualTarget),
-            definition.getUnownedSlice()
-        );
+            definition.getUnownedSlice());
     }
 
     void addParamNameHint(IRInst* inst, IRLoweringParameterInfo const& info)
     {
-        if(auto decl = info.decl)
+        if (auto decl = info.decl)
         {
             addNameHint(context, inst, decl);
         }
-        else if( info.isThisParam )
+        else if (info.isThisParam)
         {
             addNameHint(context, inst, "this");
         }
+    }
+
+    IRFloatLit* _getFloatFromAttribute(IRBuilder* builder, Attribute* attrib, Index index = 0)
+    {
+        SLANG_ASSERT(attrib->args.getCount() > index);
+        Expr* expr = attrib->args[index];
+
+        if (auto floatLitExpr = as<FloatingPointLiteralExpr>(expr))
+        {
+            return as<IRFloatLit>(
+                builder->getFloatValue(builder->getFloatType(), floatLitExpr->value));
+        }
+
+        auto intLitExpr = as<IntegerLiteralExpr>(expr);
+        SLANG_ASSERT(intLitExpr);
+        return as<IRFloatLit>(builder->getFloatValue(
+            builder->getFloatType(),
+            (IRFloatingPointValue)(intLitExpr->value)));
     }
 
     IRIntLit* _getIntLitFromAttribute(IRBuilder* builder, Attribute* attrib, Index index = 0)
@@ -9691,15 +10166,64 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return type->getOp() == kIROp_ClassType;
     }
 
-    LoweredValInfo lowerFuncDeclInContext(IRGenContext* subContext, IRBuilder* subBuilder, FunctionDeclBase* decl, bool emitBody = true)
+    LoweredValInfo lowerFuncDeclInContext(
+        IRGenContext* subContext,
+        IRBuilder* subBuilder,
+        FunctionDeclBase* decl,
+        bool emitBody = true)
     {
         IRGeneric* outerGeneric = nullptr;
         subContext->funcDecl = decl;
 
         if (auto derivativeRequirement = as<DerivativeRequirementDecl>(decl))
-            outerGeneric = emitOuterGenerics(subContext, derivativeRequirement->originalRequirementDecl, derivativeRequirement->originalRequirementDecl);
+            outerGeneric = emitOuterGenerics(
+                subContext,
+                derivativeRequirement->originalRequirementDecl,
+                derivativeRequirement->originalRequirementDecl);
         else
             outerGeneric = emitOuterGenerics(subContext, decl, decl);
+
+        // If our function is differentiable, register a callback so the derivative
+        // annotations for types can be lowered.
+        //
+        if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
+        {
+            auto diffTypeWitnessMap = diffAttr->getMapTypeToIDifferentiableWitness();
+            OrderedDictionary<DeclRefBase*, SubtypeWitness*> resolveddiffTypeWitnessMap;
+
+            // Go through each entry in the map and resolve the key.
+            for (auto& entry : diffTypeWitnessMap)
+            {
+                auto resolvedKey = as<DeclRefBase>(entry.key->resolve());
+                resolveddiffTypeWitnessMap[resolvedKey] =
+                    as<SubtypeWitness>(as<Val>(entry.value)->resolve());
+            }
+
+            subContext->registerTypeCallback(
+                [=](IRGenContext* context, Type* type, IRType* irType)
+                {
+                    if (!as<DeclRefType>(type))
+                        return irType;
+
+                    DeclRefBase* declRefBase = as<DeclRefType>(type)->getDeclRefBase();
+                    if (resolveddiffTypeWitnessMap.containsKey(declRefBase))
+                    {
+                        auto irWitness =
+                            lowerVal(subContext, resolveddiffTypeWitnessMap[declRefBase]).val;
+                        if (irWitness)
+                        {
+                            IRInst* args[] = {irType, irWitness};
+                            context->irBuilder->emitIntrinsicInst(
+                                context->irBuilder->getVoidType(),
+                                kIROp_DifferentiableTypeAnnotation,
+                                2,
+                                args);
+                        }
+                    }
+
+                    return irType;
+                });
+        }
 
         FuncDeclBaseTypeInfo info;
         _lowerFuncDeclBaseTypeInfo(
@@ -9714,7 +10238,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addLinkageDecoration(subContext, irFunc, decl);
         maybeAddDebugLocationDecoration(subContext, irFunc);
 
-        // Register the value now, to avoid any possible infinite recursion when lowering the body or attributes.
+        // Register the value now, to avoid any possible infinite recursion when lowering the body
+        // or attributes.
         context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
 
         // Always force inline diff setter accessor to prevent downstream compiler from complaining
@@ -9764,7 +10289,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         else if (isDeclInDifferentModule(context, decl) && !isForceInlineEarly(decl))
         {
-
         }
         else if (emitBody)
         {
@@ -9785,88 +10309,106 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 switch (paramInfo.direction)
                 {
                 default:
-                {
-                    // The parameter is being used for input/output purposes,
-                    // so it will lower to an actual parameter with a pointer type.
-                    //
-                    // TODO: Is this the best representation we can use?
-
-                    irParam = subBuilder->emitParam(irParamType);
-                    if (auto paramDecl = paramInfo.decl)
                     {
-                        addVarDecorations(context, irParam, paramDecl);
-                        subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
+                        // The parameter is being used for input/output purposes,
+                        // so it will lower to an actual parameter with a pointer type.
+                        //
+                        // TODO: Is this the best representation we can use?
+
+                        irParam = subBuilder->emitParam(irParamType);
+                        if (auto paramDecl = paramInfo.decl)
+                        {
+                            addVarDecorations(context, irParam, paramDecl);
+                            subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
+                            irParam->sourceLoc = paramDecl->loc;
+                        }
+                        addParamNameHint(irParam, paramInfo);
+
+                        paramVal = LoweredValInfo::ptr(irParam);
+
+                        if (paramInfo.isReturnDestination)
+                            subContext->returnDestination = paramVal;
+
+                        if (paramInfo.declaredDirection == kParameterDirection_In &&
+                            paramInfo.direction == kParameterDirection_ConstRef)
+                        {
+                            // If the parameter is originally declared as "in", but we are
+                            // lowering it as constref for any reason (e.g. it is a varying input),
+                            // then we need to emit a local variable to hold the original value, so
+                            // that we can still generate correct code when the user trys to mutate
+                            // the variable.
+                            // The local variable introduced here is cleaned up by the SSA pass, if
+                            // we can determine that there are no actual writes into the local var.
+                            auto irLocal =
+                                subBuilder->emitVar(tryGetPointedToType(subBuilder, irParamType));
+                            auto localVal = LoweredValInfo::ptr(irLocal);
+                            assign(subContext, localVal, paramVal);
+                            paramVal = localVal;
+                        }
+                        // TODO: We might want to copy the pointed-to value into
+                        // a temporary at the start of the function, and then copy
+                        // back out at the end, so that we don't have to worry
+                        // about things like aliasing in the function body.
+                        //
+                        // For now we will just use the storage that was passed
+                        // in by the caller, knowing that our current lowering
+                        // at call sites will guarantee a fresh/unique location.
                     }
-                    addParamNameHint(irParam, paramInfo);
-
-                    paramVal = LoweredValInfo::ptr(irParam);
-
-                    if (paramInfo.isReturnDestination)
-                        subContext->returnDestination = paramVal;
-
-                    // TODO: We might want to copy the pointed-to value into
-                    // a temporary at the start of the function, and then copy
-                    // back out at the end, so that we don't have to worry
-                    // about things like aliasing in the function body.
-                    //
-                    // For now we will just use the storage that was passed
-                    // in by the caller, knowing that our current lowering
-                    // at call sites will guarantee a fresh/unique location.
-                }
-                break;
+                    break;
 
                 case kParameterDirection_In:
-                {
-                    // Simple case of a by-value input parameter.
-                    //
-                    // We start by declaring an IR parameter of the same type.
-                    //
-                    auto paramDecl = paramInfo.decl;
-                    irParam = subBuilder->emitParam(irParamType);
-                    if (paramDecl)
                     {
-                        addVarDecorations(context, irParam, paramDecl);
-                        subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
-                    }
-                    addParamNameHint(irParam, paramInfo);
-                    paramVal = LoweredValInfo::simple(irParam);
-                    //
-                    // HLSL allows a function parameter to be used as a local
-                    // variable in the function body (just like C/C++), so
-                    // we need to support that case as well.
-                    //
-                    // However, if we notice that the parameter was marked
-                    // `const`, then we can skip this step.
-                    //
-                    // TODO: we should consider having all parameter be implicitly
-                    // immutable except in a specific "compatibility mode."
-                    //
-                    if (paramDecl && paramDecl->findModifier<ConstModifier>())
-                    {
-                        // This parameter was declared to be immutable,
-                        // so there should be no assignment to it in the
-                        // function body, and we don't need a temporary.
-                    }
-                    else
-                    {
-                        // The parameter migth get used as a temporary in
-                        // the function body. We will allocate a mutable
-                        // local variable for is value, and then assign
-                        // from the parameter to the local at the start
-                        // of the function.
+                        // Simple case of a by-value input parameter.
                         //
-                        auto irLocal = subBuilder->emitVar(irParamType);
-                        auto localVal = LoweredValInfo::ptr(irLocal);
-                        assign(subContext, localVal, paramVal);
+                        // We start by declaring an IR parameter of the same type.
                         //
-                        // When code later in the body of the function refers
-                        // to the parameter declaration, it will actually refer
-                        // to the value stored in the local variable.
+                        auto paramDecl = paramInfo.decl;
+                        irParam = subBuilder->emitParam(irParamType);
+                        if (paramDecl)
+                        {
+                            addVarDecorations(context, irParam, paramDecl);
+                            subBuilder->addHighLevelDeclDecoration(irParam, paramDecl);
+                            irParam->sourceLoc = paramDecl->loc;
+                        }
+                        addParamNameHint(irParam, paramInfo);
+                        paramVal = LoweredValInfo::simple(irParam);
                         //
-                        paramVal = localVal;
+                        // HLSL allows a function parameter to be used as a local
+                        // variable in the function body (just like C/C++), so
+                        // we need to support that case as well.
+                        //
+                        // However, if we notice that the parameter was marked
+                        // `const`, then we can skip this step.
+                        //
+                        // TODO: we should consider having all parameter be implicitly
+                        // immutable except in a specific "compatibility mode."
+                        //
+                        if (paramDecl && paramDecl->findModifier<ConstModifier>())
+                        {
+                            // This parameter was declared to be immutable,
+                            // so there should be no assignment to it in the
+                            // function body, and we don't need a temporary.
+                        }
+                        else
+                        {
+                            // The parameter migth get used as a temporary in
+                            // the function body. We will allocate a mutable
+                            // local variable for is value, and then assign
+                            // from the parameter to the local at the start
+                            // of the function.
+                            //
+                            auto irLocal = subBuilder->emitVar(irParamType);
+                            auto localVal = LoweredValInfo::ptr(irLocal);
+                            assign(subContext, localVal, paramVal);
+                            //
+                            // When code later in the body of the function refers
+                            // to the parameter declaration, it will actually refer
+                            // to the value stored in the local variable.
+                            //
+                            paramVal = localVal;
+                        }
                     }
-                }
-                break;
+                    break;
                 }
 
                 if (auto paramDecl = paramInfo.decl)
@@ -9885,9 +10427,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 auto attr = decl->findModifier<PatchConstantFuncAttribute>();
 
                 // I needed to test for patchConstantFuncDecl here
-                // because it is only set if validateEntryPoint is called with Hull as the required stage
-                // If I just build domain shader, and then the attribute exists, but patchConstantFuncDecl is not set
-                // and thus leads to a crash.
+                // because it is only set if validateEntryPoint is called with Hull as the required
+                // stage If I just build domain shader, and then the attribute exists, but
+                // patchConstantFuncDecl is not set and thus leads to a crash.
                 if (attr && attr->patchConstantFuncDecl)
                 {
                     // We need to lower the function
@@ -9895,7 +10437,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     assert(patchConstantFunc);
 
                     // Convert the patch constant function into IRInst
-                    IRInst* irPatchConstantFunc = getSimpleVal(context, ensureDecl(subContext, patchConstantFunc));
+                    IRInst* irPatchConstantFunc =
+                        getSimpleVal(context, ensureDecl(subContext, patchConstantFunc));
 
                     // Attach a decoration so that our IR function references
                     // the patch constant function.
@@ -9903,7 +10446,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     subContext->irBuilder->addPatchConstantFuncDecoration(
                         irFunc,
                         irPatchConstantFunc);
-
                 }
             }
 
@@ -9935,7 +10477,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 }
 
                 // Used for diagnostics
-                getBuilder()->addConstructorDecoration(irFunc, constructorDecl->isSynthesized);
+                getBuilder()->addConstructorDecoration(
+                    irFunc,
+                    constructorDecl->containsFlavor(
+                        ConstructorDecl::ConstructorFlavor::SynthesizedDefault));
             }
 
             // We lower whatever statement was stored on the declaration
@@ -9993,6 +10538,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
+        subContext->registerTypeCallback(nullptr);
+
         getBuilder()->addHighLevelDeclDecoration(irFunc, decl);
 
         addSpecializedForTargetDecorations(irFunc, decl);
@@ -10002,6 +10549,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addTargetIntrinsicDecorations(subContext, irFunc, decl);
 
         addCatchAllIntrinsicDecorationIfNeeded(irFunc, decl);
+
+        addTargetRequirementDecorations(irFunc, decl);
 
         bool isInline = false;
 
@@ -10026,11 +10575,25 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (as<DerivativeGroupQuadAttribute>(modifier))
             {
-                derivativeGroupQuadDecor = getBuilder()->addSimpleDecoration<IRDerivativeGroupQuadDecoration>(irFunc);
+                derivativeGroupQuadDecor =
+                    getBuilder()->addSimpleDecoration<IRDerivativeGroupQuadDecoration>(irFunc);
             }
             else if (as<DerivativeGroupLinearAttribute>(modifier))
             {
-                derivativeGroupLinearDecor = getBuilder()->addSimpleDecoration<IRDerivativeGroupLinearDecoration>(irFunc);
+                derivativeGroupLinearDecor =
+                    getBuilder()->addSimpleDecoration<IRDerivativeGroupLinearDecoration>(irFunc);
+            }
+            else if (as<MaximallyReconvergesAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRMaximallyReconvergesDecoration>(irFunc);
+            }
+            else if (as<QuadDerivativesAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRQuadDerivativesDecoration>(irFunc);
+            }
+            else if (as<RequireFullQuadsAttribute>(modifier))
+            {
+                getBuilder()->addSimpleDecoration<IRRequireFullQuadsDecoration>(irFunc);
             }
             else if (as<NoRefInlineAttribute>(modifier))
             {
@@ -10048,20 +10611,34 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
             else if (auto numThreadsAttr = as<NumThreadsAttribute>(modifier))
             {
-                numThreadsDecor = as<IRNumThreadsDecoration>(
-                    getBuilder()->addNumThreadsDecoration(
-                        irFunc,
-                        getSimpleVal(context, lowerVal(context, numThreadsAttr->x)),
-                        getSimpleVal(context, lowerVal(context, numThreadsAttr->y)),
-                        getSimpleVal(context, lowerVal(context, numThreadsAttr->z))
-                    ));
+                LoweredValInfo extents[3];
+
+                for (int i = 0; i < 3; ++i)
+                {
+                    extents[i] = numThreadsAttr->specConstExtents[i]
+                                     ? emitDeclRef(
+                                           context,
+                                           numThreadsAttr->specConstExtents[i],
+                                           lowerType(
+                                               context,
+                                               getType(
+                                                   context->astBuilder,
+                                                   numThreadsAttr->specConstExtents[i])))
+                                     : lowerVal(context, numThreadsAttr->extents[i]);
+                }
+
+                numThreadsDecor = as<IRNumThreadsDecoration>(getBuilder()->addNumThreadsDecoration(
+                    irFunc,
+                    getSimpleVal(context, extents[0]),
+                    getSimpleVal(context, extents[1]),
+                    getSimpleVal(context, extents[2])));
+                numThreadsDecor->sourceLoc = numThreadsAttr->loc;
             }
             else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
             {
                 getBuilder()->addWaveSizeDecoration(
                     irFunc,
-                    getSimpleVal(context, lowerVal(context, waveSizeAttr->numLanes))
-                );
+                    getSimpleVal(context, lowerVal(context, waveSizeAttr->numLanes)));
             }
             else if (as<ReadNoneAttribute>(modifier))
             {
@@ -10090,6 +10667,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), outputTopAttr);
                 getBuilder()->addDecoration(irFunc, kIROp_OutputTopologyDecoration, stringLit);
             }
+            else if (auto maxTessFactortAttr = as<MaxTessFactorAttribute>(modifier))
+            {
+                IRFloatLit* floatLit = _getFloatFromAttribute(getBuilder(), maxTessFactortAttr);
+                getBuilder()->addDecoration(irFunc, kIROp_MaxTessFactorDecoration, floatLit);
+            }
             else if (auto outputCtrlPtAttr = as<OutputControlPointsAttribute>(modifier))
             {
                 IRIntLit* intLit = _getIntLitFromAttribute(getBuilder(), outputCtrlPtAttr);
@@ -10103,7 +10685,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 IRStringLit* setStringLit = nullptr;
                 if (spvInstOpAttr->args.getCount() > 1)
                 {
-                    IRStringLit* checkSetStringLit = _getStringLitFromAttribute(builder, spvInstOpAttr, 1);
+                    IRStringLit* checkSetStringLit =
+                        _getStringLitFromAttribute(builder, spvInstOpAttr, 1);
                     if (checkSetStringLit && checkSetStringLit->getStringSlice().getLength() > 0)
                     {
                         setStringLit = checkSetStringLit;
@@ -10140,7 +10723,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addDecoration(irFunc, kIROp_IntrinsicOpDecoration, op);
                 isInline = true;
             }
-            else if (as<UserDefinedDerivativeAttribute>(modifier) || as<PrimalSubstituteAttribute>(modifier))
+            else if (
+                as<UserDefinedDerivativeAttribute>(modifier) ||
+                as<PrimalSubstituteAttribute>(modifier))
             {
                 // We need to lower the decl ref to the custom derivative function to IR.
                 // The IR insts correspond to the decl ref is not part of the function we
@@ -10157,11 +10742,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     funcExpr = primalAttr->funcExpr;
                 DeclRefExpr* declRefExpr = as<DeclRefExpr>(funcExpr);
                 auto funcType = lowerType(subContext, funcExpr->type);
-                auto loweredVal = emitDeclRef(
-                    subContext,
-                    declRefExpr->declRef,
-                    funcType);
-                
+                auto loweredVal = emitDeclRef(subContext, declRefExpr->declRef, funcType);
+
                 SLANG_RELEASE_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
 
                 IRInst* derivativeFunc = loweredVal.val;
@@ -10169,7 +10751,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 if (as<ForwardDerivativeAttribute>(modifier))
                     getBuilder()->addForwardDerivativeDecoration(irFunc, derivativeFunc);
                 else if (as<BackwardDerivativeAttribute>(modifier))
-                    getBuilder()->addUserDefinedBackwardDerivativeDecoration(irFunc, derivativeFunc);
+                    getBuilder()->addUserDefinedBackwardDerivativeDecoration(
+                        irFunc,
+                        derivativeFunc);
                 else
                     getBuilder()->addPrimalSubstituteDecoration(irFunc, derivativeFunc);
 
@@ -10192,16 +10776,29 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addDecoration(irFunc, kIROp_PreferCheckpointDecoration);
             }
-            else if (as<PreferRecomputeAttribute>(modifier))
+            else if (auto attr = as<PreferRecomputeAttribute>(modifier))
             {
-                getBuilder()->addDecoration(irFunc, kIROp_PreferRecomputeDecoration);
+                getBuilder()->addDecoration(
+                    irFunc,
+                    kIROp_PreferRecomputeDecoration,
+                    getBuilder()->getIntValue(
+                        getBuilder()->getIntType(),
+                        attr->sideEffectBehavior));
             }
             else if (auto extensionMod = as<RequiredGLSLExtensionModifier>(modifier))
-                getBuilder()->addRequireGLSLExtensionDecoration(irFunc, extensionMod->extensionNameToken.getContent());
+                getBuilder()->addRequireGLSLExtensionDecoration(
+                    irFunc,
+                    extensionMod->extensionNameToken.getContent());
             else if (auto versionMod = as<RequiredGLSLVersionModifier>(modifier))
-                getBuilder()->addRequireGLSLVersionDecoration(irFunc, Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+                getBuilder()->addRequireGLSLVersionDecoration(
+                    irFunc,
+                    Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
             else if (auto spvVersion = as<RequiredSPIRVVersionModifier>(modifier))
                 getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
+            else if (auto wgslExtensionMod = as<RequiredWGSLExtensionModifier>(modifier))
+                getBuilder()->addRequireWGSLExtensionDecoration(
+                    irFunc,
+                    wgslExtensionMod->extensionNameToken.getContent());
             else if (auto cudasmVersion = as<RequiredCUDASMVersionModifier>(modifier))
                 getBuilder()->addRequireCUDASMVersionDecoration(irFunc, cudasmVersion->version);
             else if (as<NonDynamicUniformAttribute>(modifier))
@@ -10227,16 +10824,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     isInline = true;
                     break;
                 }
-            }
-        }
-
-        if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
-        {
-            if (decl->body)
-            {
-                subContext->irBuilder->setInsertInto(irFunc->getParent());
-                lowerDifferentiableAttribute(subContext, irFunc, diffAttr);
-                subContext->irBuilder->setInsertInto(irFunc);
             }
         }
 
@@ -10276,10 +10863,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         originalSubBuilder->setInsertBefore(outterGeneric);
                     else
                         originalSubBuilder->setInsertBefore(irFunc);
-                    auto originalFuncDecl = as<FunctionDeclBase>(originalDeclRefExpr->declRef.getDecl());
+                    auto originalFuncDecl =
+                        as<FunctionDeclBase>(originalDeclRefExpr->declRef.getDecl());
                     SLANG_RELEASE_ASSERT(originalFuncDecl);
 
-                    auto originalFuncVal = lowerFuncDeclInContext(originalSubContext, originalSubBuilder, originalFuncDecl, false).val;
+                    auto originalFuncVal = lowerFuncDeclInContext(
+                                               originalSubContext,
+                                               originalSubBuilder,
+                                               originalFuncDecl,
+                                               false)
+                                               .val;
                     if (auto originalFuncGeneric = as<IRGeneric>(originalFuncVal))
                     {
                         originalFuncVal = findGenericReturnVal(originalFuncGeneric);
@@ -10288,16 +10881,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     auto derivativeFuncVal = lowerRValueExpr(originalSubContext, backDeclRef);
                     if (as<ForwardDerivativeOfAttribute>(modifier))
                     {
-                        originalSubBuilder->addForwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
+                        originalSubBuilder->addForwardDerivativeDecoration(
+                            originalFuncVal,
+                            derivativeFuncVal.val);
                         getBuilder()->addForwardDifferentiableDecoration(irFunc);
                     }
                     else if (as<BackwardDerivativeOfAttribute>(modifier))
                     {
-                        originalSubBuilder->addUserDefinedBackwardDerivativeDecoration(originalFuncVal, derivativeFuncVal.val);
+                        originalSubBuilder->addUserDefinedBackwardDerivativeDecoration(
+                            originalFuncVal,
+                            derivativeFuncVal.val);
                     }
                     else
                     {
-                        originalSubBuilder->addPrimalSubstituteDecoration(originalFuncVal, derivativeFuncVal.val);
+                        originalSubBuilder->addPrimalSubstituteDecoration(
+                            originalFuncVal,
+                            derivativeFuncVal.val);
                     }
                 }
                 subContext->irBuilder->setInsertInto(irFunc);
@@ -10318,7 +10917,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return lowerFuncDeclInContext(subContext, subBuilder, decl);
     }
 
-    LoweredValInfo visitGenericDecl(GenericDecl * genDecl)
+    LoweredValInfo visitGenericDecl(GenericDecl* genDecl)
     {
         // TODO: Should this just always visit/lower the inner decl?
 
@@ -10329,7 +10928,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             ensureDecl(context, innerStructDecl);
             return LoweredValInfo();
         }
-        else if( auto extensionDecl = as<ExtensionDecl>(genDecl->inner) )
+        else if (auto extensionDecl = as<ExtensionDecl>(genDecl->inner))
         {
             return ensureDecl(context, extensionDecl);
         }
@@ -10399,9 +10998,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     }
 };
 
-LoweredValInfo lowerDecl(
-    IRGenContext*   context,
-    DeclBase*       decl)
+LoweredValInfo lowerDecl(IRGenContext* context, DeclBase* decl)
 {
     IRBuilderSourceLocRAII sourceLocInfo(context->irBuilder, decl->loc);
 
@@ -10414,25 +11011,26 @@ LoweredValInfo lowerDecl(
     }
     // Don't emit any context message for an explicit `AbortCompilationException`
     // because it should only happen when an error is already emitted.
-    catch(const AbortCompilationException&) { throw; }
-    catch(...)
+    catch (const AbortCompilationException&)
+    {
+        throw;
+    }
+    catch (...)
     {
         context->getSink()->noteInternalErrorLoc(decl->loc);
         throw;
     }
 }
 
-// We will probably want to put the 
+// We will probably want to put the
 
-LoweredValInfo* _findLoweredValInfo(
-    IRGenContext* context,
-    Decl* decl)
+LoweredValInfo* _findLoweredValInfo(IRGenContext* context, Decl* decl)
 {
     // Look for an existing value installed in this context
     auto env = context->env;
-    while(env)
+    while (env)
     {
-        if(auto result = env->mapDeclToValue.tryGetValue(decl))
+        if (auto result = env->mapDeclToValue.tryGetValue(decl))
             return result;
 
         env = env->outer;
@@ -10441,9 +11039,7 @@ LoweredValInfo* _findLoweredValInfo(
 }
 
 // Ensure that a version of the given declaration has been emitted to the IR
-LoweredValInfo ensureDecl(
-    IRGenContext*   context,
-    Decl*           decl)
+LoweredValInfo ensureDecl(IRGenContext* context, Decl* decl)
 {
     if (auto valInfoPtr = _findLoweredValInfo(context, decl))
     {
@@ -10488,17 +11084,21 @@ LoweredValInfo ensureDecl(
 bool canDeclLowerToAGeneric(Decl* decl)
 {
     // A callable decl lowers to an `IRFunc`, and can be generic
-    if(as<CallableDecl>(decl)) return true;
+    if (as<CallableDecl>(decl))
+        return true;
 
     // An aggregate type decl lowers to an `IRStruct`, and can be generic
-    if(as<AggTypeDecl>(decl)) return true;
+    if (as<AggTypeDecl>(decl))
+        return true;
 
     // An inheritance decl lowers to an `IRWitnessTable`, and can be generic
-    if(as<InheritanceDecl>(decl)) return true;
+    if (as<InheritanceDecl>(decl))
+        return true;
 
     // A `typedef` declaration nested under a generic will turn into
     // a generic that returns a type (a simple type-level function).
-    if(as<TypeDefDecl>(decl)) return true;
+    if (as<TypeDefDecl>(decl))
+        return true;
 
     // A static member variable declaration can be lowered into a generic.
     if (auto varDecl = as<VarDecl>(decl))
@@ -10508,20 +11108,18 @@ bool canDeclLowerToAGeneric(Decl* decl)
             return !isFunctionVarDecl(varDecl);
         }
     }
-    
+
     return false;
 }
 
-    /// Add flattened "leaf" elements from `val` to the `ioArgs` list
-static void _addFlattenedTupleArgs(
-    List<IRInst*>&  ioArgs,
-    IRInst*         val)
+/// Add flattened "leaf" elements from `val` to the `ioArgs` list
+static void _addFlattenedTupleArgs(List<IRInst*>& ioArgs, IRInst* val)
 {
-    if( auto tupleVal = as<IRMakeTuple>(val) )
+    if (auto tupleVal = as<IRMakeTuple>(val))
     {
         // If the value is a tuple, we can add its element directly.
         auto elementCount = tupleVal->getOperandCount();
-        for( UInt i = 0; i < elementCount; ++i )
+        for (UInt i = 0; i < elementCount; ++i)
         {
             _addFlattenedTupleArgs(ioArgs, tupleVal->getOperand(i));
         }
@@ -10547,11 +11145,7 @@ bool isAbstractWitnessTable(IRInst* inst)
     return false;
 }
 
-LoweredValInfo emitDeclRef(
-    IRGenContext*           context,
-    Decl*            decl,
-    DeclRefBase*     subst,
-    IRType*                 type)
+LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst, IRType* type)
 {
     const auto initialSubst = subst;
     SLANG_UNUSED(initialSubst);
@@ -10570,7 +11164,8 @@ LoweredValInfo emitDeclRef(
         }
         else
         {
-            parentInterfaceType = lowerType(context, DeclRefType::create(context->astBuilder, subst->getParent()));
+            parentInterfaceType =
+                lowerType(context, DeclRefType::create(context->astBuilder, subst->getParent()));
         }
         auto thisType = context->irBuilder->getThisType(parentInterfaceType);
         return LoweredValInfo::simple(thisType);
@@ -10583,23 +11178,23 @@ LoweredValInfo emitDeclRef(
     // If the declaration would not get wrapped in a `IRGeneric`,
     // even if it is nested inside of an AST `GenericDecl`, then
     // we should also ignore any generic substitutions.
-    if(!canDeclLowerToAGeneric(decl))
+    if (!canDeclLowerToAGeneric(decl))
     {
-        while(auto genericSubst = SubstitutionSet(subst).findGenericAppDeclRef())
+        while (auto genericSubst = SubstitutionSet(subst).findGenericAppDeclRef())
             subst = genericSubst->getBase();
     }
 
     // In the simplest case, there is no specialization going
     // on, and the decl-ref turns into a reference to the
     // lowered IR value for the declaration.
-    if(!SubstitutionSet(subst) || _isTrivialLookupFromInterfaceThis(context, subst))
+    if (!SubstitutionSet(subst) || _isTrivialLookupFromInterfaceThis(context, subst))
     {
         LoweredValInfo loweredDecl = ensureDecl(context, decl);
         return loweredDecl;
     }
 
     // Otherwise, we look at the kind of substitution, and let it guide us.
-    if(auto genericSubst = as<GenericAppDeclRef>(subst))
+    if (auto genericSubst = as<GenericAppDeclRef>(subst))
     {
         // A generic substitution means we will need to output
         // a `specialize` instruction to specialize the generic.
@@ -10635,7 +11230,8 @@ LoweredValInfo emitDeclRef(
         for (auto argVal : genericSubst->getArgs())
         {
             auto irArgVal = lowerSimpleVal(context, argVal);
-            SLANG_ASSERT(irArgVal);
+            if (!irArgVal)
+                continue;
 
             // It is possible that some of the arguments to the generic
             // represent conformances to conjunction types like `A & B`.
@@ -10670,16 +11266,16 @@ LoweredValInfo emitDeclRef(
             UNREACHABLE_RETURN(LoweredValInfo());
         }
     }
-    else if(auto thisTypeSubst = as<LookupDeclRef>(subst))
+    else if (auto thisTypeSubst = as<LookupDeclRef>(subst))
     {
-        if( as<ThisTypeDecl>(decl))
+        if (as<ThisTypeDecl>(decl))
         {
             // This is a reference to the ThisType from the interface,
             // therefore we should just lower it as the sub type.
             return lowerType(context, thisTypeSubst->getWitness()->getSub());
         }
 
-        if(isInterfaceRequirement(decl))
+        if (isInterfaceRequirement(decl))
         {
             // If we reach here, somebody is trying to look up an interface
             // requirement "through" some concrete type. We need to lower this
@@ -10743,7 +11339,11 @@ LoweredValInfo emitDeclRef(
             // are lowered as generics, where the generic parameter represents
             // the `ThisType`.
             //
-            auto genericVal = emitDeclRef(context, decl, thisTypeSubst->getBase(), context->irBuilder->getGenericKind());
+            auto genericVal = emitDeclRef(
+                context,
+                decl,
+                thisTypeSubst->getBase(),
+                context->irBuilder->getGenericKind());
             auto irGenericVal = getSimpleVal(context, genericVal);
 
             // In order to reference the member for a particular type, we
@@ -10752,12 +11352,9 @@ LoweredValInfo emitDeclRef(
             IRInst* irSubType = lowerType(context, thisTypeSubst->getWitness()->getSub());
             IRInst* irSubTypeWitness = lowerSimpleVal(context, thisTypeSubst->getWitness());
 
-            IRInst* irSpecializeArgs[] = { irSubType, irSubTypeWitness };
-            auto irSpecializedVal = context->irBuilder->emitSpecializeInst(
-                type,
-                irGenericVal,
-                2,
-                irSpecializeArgs);
+            IRInst* irSpecializeArgs[] = {irSubType, irSubTypeWitness};
+            auto irSpecializedVal =
+                context->irBuilder->emitSpecializeInst(type, irGenericVal, 2, irSpecializeArgs);
             return LoweredValInfo::simple(irSpecializedVal);
         }
     }
@@ -10768,21 +11365,14 @@ LoweredValInfo emitDeclRef(
     }
 }
 
-LoweredValInfo emitDeclRef(
-    IRGenContext*   context,
-    DeclRef<Decl>   declRef,
-    IRType*         type)
+LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType* type)
 {
-    return emitDeclRef(
-        context,
-        declRef.getDecl(),
-        declRef.declRefBase,
-        type);
+    return emitDeclRef(context, declRef.getDecl(), declRef.declRefBase, type);
 }
 
 static void lowerFrontEndEntryPointToIR(
-    IRGenContext*   context,
-    EntryPoint*     entryPoint,
+    IRGenContext* context,
+    EntryPoint* entryPoint,
     String moduleName)
 {
     // TODO: We should emit an entry point as a dedicated IR function
@@ -10797,17 +11387,26 @@ static void lowerFrontEndEntryPointToIR(
 
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
 
+    if (!entryPointFuncDecl->findModifier<EntryPointAttribute>())
+    {
+        // If the entry point doesn't have an explicit `[shader("...")]` attribute,
+        // then we make sure to add one here, so the lowering logic knows it is an
+        // entry point.
+        auto entryPointAttr = context->astBuilder->create<EntryPointAttribute>();
+        entryPointAttr->capabilitySet = entryPoint->getProfile().getCapabilityName();
+        addModifier(entryPointFuncDecl, entryPointAttr);
+    }
+
     auto builder = context->irBuilder;
     builder->setInsertInto(builder->getModule()->getModuleInst());
 
-    auto loweredEntryPointFunc = getSimpleVal(context,
-        ensureDecl(context, entryPointFuncDecl));
+    auto loweredEntryPointFunc = getSimpleVal(context, ensureDecl(context, entryPointFuncDecl));
 
     // Attach a marker decoration so that we recognize
     // this as an entry point.
     //
     IRInst* instToDecorate = loweredEntryPointFunc;
-    if(auto irGeneric = as<IRGeneric>(instToDecorate))
+    if (auto irGeneric = as<IRGeneric>(instToDecorate))
     {
         instToDecorate = findGenericReturnVal(irGeneric);
     }
@@ -10820,104 +11419,69 @@ static void lowerFrontEndEntryPointToIR(
     {
 
         Name* entryPointName = entryPoint->getFuncDecl()->getName();
-        builder->addEntryPointDecoration(instToDecorate, entryPoint->getProfile(), entryPointName->text.getUnownedSlice(), moduleName.getUnownedSlice());
-    }
-
-    // Go through the entry point parameters creating decorations from layout as appropriate
-    // But only if this is a definition not a declaration
-    if (isDefinition(instToDecorate))
-    {
-        FilteredMemberList<ParamDecl> params = entryPointFuncDecl->getParameters();
-
-        IRGlobalValueWithParams* valueWithParams = as<IRGlobalValueWithParams>(instToDecorate);
-        if (valueWithParams)
-        {
-            IRParam* irParam = valueWithParams->getFirstParam();
-
-            for (auto param : params)
-            {
-                if (auto modifier = param->findModifier<HLSLGeometryShaderInputPrimitiveTypeModifier>())
-                {
-                    IROp op = kIROp_Invalid;
-
-                    if (as<HLSLTriangleModifier>(modifier))
-                        op = kIROp_TriangleInputPrimitiveTypeDecoration;
-                    else if (as<HLSLPointModifier>(modifier))
-                        op = kIROp_PointInputPrimitiveTypeDecoration;
-                    else if (as<HLSLLineModifier>(modifier))
-                        op = kIROp_LineInputPrimitiveTypeDecoration; 
-                    else if (as<HLSLLineAdjModifier>(modifier))
-                        op = kIROp_LineAdjInputPrimitiveTypeDecoration;
-                    else if (as<HLSLTriangleAdjModifier>(modifier))
-                        op = kIROp_TriangleAdjInputPrimitiveTypeDecoration;
-
-                    if (op != kIROp_Invalid)
-                    {
-                        builder->addDecoration(irParam, op);
-                    }
-                    else
-                    {
-                        SLANG_UNEXPECTED("unhandled primitive type");
-                    }
-                }
-
-                irParam = irParam->getNextParam();
-            }
-        }
+        builder->addEntryPointDecoration(
+            instToDecorate,
+            entryPoint->getProfile(),
+            entryPointName->text.getUnownedSlice(),
+            moduleName.getUnownedSlice());
     }
 }
 
 static void lowerProgramEntryPointToIR(
-    IRGenContext*                               context,
-    EntryPoint*                                 entryPoint,
-    EntryPoint::EntryPointSpecializationInfo*   specializationInfo)
+    IRGenContext* context,
+    EntryPoint* entryPoint,
+    EntryPoint::EntryPointSpecializationInfo* specializationInfo)
 {
     auto entryPointFuncDeclRef = entryPoint->getFuncDeclRef();
-    if(specializationInfo)
+    if (specializationInfo)
         entryPointFuncDeclRef = specializationInfo->specializedFuncDeclRef;
 
     // First, lower the entry point like an ordinary function
 
-    auto entryPointFuncType = lowerType(context, getFuncType(context->astBuilder, entryPointFuncDeclRef));
+    auto entryPointFuncType =
+        lowerType(context, getFuncType(context->astBuilder, entryPointFuncDeclRef));
 
     auto builder = context->irBuilder;
     builder->setInsertInto(builder->getModule()->getModuleInst());
 
-    auto loweredEntryPointFunc = getSimpleVal(context,
-        emitDeclRef(context, entryPointFuncDeclRef, entryPointFuncType));
+    auto loweredEntryPointFunc =
+        getSimpleVal(context, emitDeclRef(context, entryPointFuncDeclRef, entryPointFuncType));
 
-    if(!loweredEntryPointFunc->findDecoration<IRLinkageDecoration>())
+    if (!loweredEntryPointFunc->findDecoration<IRLinkageDecoration>())
     {
-        builder->addExportDecoration(loweredEntryPointFunc, getMangledName(context->astBuilder, entryPointFuncDeclRef).getUnownedSlice());
+        builder->addExportDecoration(
+            loweredEntryPointFunc,
+            getMangledName(context->astBuilder, entryPointFuncDeclRef).getUnownedSlice());
     }
 
     // We may have shader parameters of interface/existential type,
     // which need us to supply concrete type information for specialization.
     //
-    if(specializationInfo && specializationInfo->existentialSpecializationArgs.getCount() != 0)
+    if (specializationInfo && specializationInfo->existentialSpecializationArgs.getCount() != 0)
     {
         List<IRInst*> existentialSlotArgs;
-        for(auto arg : specializationInfo->existentialSpecializationArgs )
+        for (auto arg : specializationInfo->existentialSpecializationArgs)
         {
 
             auto irArgType = lowerSimpleVal(context, arg.val);
             existentialSlotArgs.add(irArgType);
 
-            if(auto witness = arg.witness)
+            if (auto witness = arg.witness)
             {
                 auto irWitnessTable = lowerSimpleVal(context, witness);
                 existentialSlotArgs.add(irWitnessTable);
             }
         }
 
-        builder->addBindExistentialSlotsDecoration(loweredEntryPointFunc, existentialSlotArgs.getCount(), existentialSlotArgs.getBuffer());
+        builder->addBindExistentialSlotsDecoration(
+            loweredEntryPointFunc,
+            existentialSlotArgs.getCount(),
+            existentialSlotArgs.getBuffer());
     }
 }
 
-    /// Ensure that `decl` and all relevant declarations under it get emitted.
-static void ensureAllDeclsRec(
-    IRGenContext*   context,
-    Decl*           decl)
+/// Ensure that `decl` and all relevant declarations under it get emitted.
+static void ensureAllDeclsRec(IRGenContext* context, Decl* decl)
 {
     ensureDecl(context, decl);
 
@@ -10930,7 +11494,7 @@ static void ensureAllDeclsRec(
     // Aggregate types are the main case where we can emit an outer declaration
     // and not the stuff nested inside of it.
     //
-    if(auto containerDecl = as<AggTypeDeclBase>(decl))
+    if (auto containerDecl = as<AggTypeDeclBase>(decl))
     {
         for (auto memberDecl : containerDecl->members)
         {
@@ -10981,11 +11545,14 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     RefPtr<IRModule> module = IRModule::create(session);
 
+    module->setName(translationUnit->getModuleDecl()->getName());
+
     IRBuilder builderStorage(module);
     IRBuilder* builder = &builderStorage;
 
     context->irBuilder = builder;
-    context->includeDebugInfo = compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel() != DebugInfoLevel::None;
+    context->includeDebugInfo =
+        compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel() != DebugInfoLevel::None;
 
     // We need to emit IR for all public/exported symbols
     // in the translation unit.
@@ -10996,7 +11563,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         builder->setInsertInto(module->getModuleInst());
         for (auto source : translationUnit->getSourceFiles())
         {
-            auto debugSource = builder->emitDebugSource(source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(), source->getContent());
+            auto debugSource = builder->emitDebugSource(
+                source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
+                source->getContent());
             context->shared->mapSourceFileToDebugSourceInst.add(source, debugSource);
         }
     }
@@ -11028,14 +11597,19 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     {
         auto& stringLits = sharedContext->m_stringLiterals;
         auto stringLitCount = stringLits.getCount();
-        if(stringLitCount != 0)
+        if (stringLitCount != 0)
         {
             builder->setInsertInto(module->getModuleInst());
-            builder->emitIntrinsicInst(builder->getVoidType(), kIROp_GlobalHashedStringLiterals, stringLitCount, stringLits.getBuffer());
+            builder->emitIntrinsicInst(
+                builder->getVoidType(),
+                kIROp_GlobalHashedStringLiterals,
+                stringLitCount,
+                stringLits.getBuffer());
         }
     }
 
-    if(auto nvapiSlotModifier = translationUnit->getModuleDecl()->findModifier<NVAPISlotModifier>())
+    if (auto nvapiSlotModifier =
+            translationUnit->getModuleDecl()->findModifier<NVAPISlotModifier>())
     {
         builder->addNVAPISlotDecoration(
             module->getModuleInst(),
@@ -11080,6 +11654,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // Synthesize some code we want to make sure is inlined and simplified
     synthesizeBitFieldAccessors(module);
 
+    // Lower `IRExpandType` types to use `IRExpand`, where the pattern type
+    // is nested inside the `IRExpand` as its children, instead of being same
+    // level entities as the ExpandType itself.
+    // This will unify the specialization logic for both type and value level
+    // expansion.
+    lowerExpandType(module);
+
     // Generate DebugValue insts to store values into debug variables,
     // if debug symbols are enabled.
     if (context->includeDebugInfo)
@@ -11093,8 +11674,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     //
     constructSSA(module);
     applySparseConditionalConstantPropagation(module, compileRequest->getSink());
-    
-    bool minimumOptimizations = linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
+
+    bool minimumOptimizations =
+        linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
     if (!minimumOptimizations)
     {
         simplifyCFG(module, CFGSimplificationOptions::getDefault());
@@ -11160,7 +11742,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                 {
                     auto codeInst = as<IRGlobalValueWithCode>(func);
                     changed |= constructSSA(func);
-                    changed |= applySparseConditionalConstantPropagation(func, compileRequest->getSink());
+                    changed |=
+                        applySparseConditionalConstantPropagation(func, compileRequest->getSink());
                     changed |= peepholeOptimize(nullptr, func);
                     changed |= simplifyCFG(codeInst, CFGSimplificationOptions::getFast());
                     eliminateDeadCode(func, dceOptions);
@@ -11173,21 +11756,23 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     if (compileRequest->getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
     {
+        // We don't allow recursive types.
+        checkForRecursiveTypes(module, compileRequest->getSink());
+
+        if (compileRequest->getSink()->getErrorCount() != 0)
+            return module;
+
         // Propagate `constexpr`-ness through the dataflow graph (and the
         // call graph) based on constraints imposed by different instructions.
         propagateConstExpr(module, compileRequest->getSink());
 
         // Check for using uninitialized values
         checkForUsingUninitializedValues(module, compileRequest->getSink());
-        
+
         // TODO: give error messages if any `undefined` or
         // instructions remain.
 
         checkForMissingReturns(module, compileRequest->getSink());
-
-        // We don't allow recursive types.
-        checkForRecursiveTypes(module, compileRequest->getSink());
-
         // Check for invalid differentiable function body.
         checkAutoDiffUsages(module, compileRequest->getSink());
 
@@ -11220,16 +11805,18 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
         stripOptions.shouldStripNameHints = linkage->m_optionSet.shouldObfuscateCode();
 
-        // If we are generating an obfuscated source map, we don't want to strip locs, 
+        // If we are generating an obfuscated source map, we don't want to strip locs,
         // we want to generate *new* locs that can be mapped (via source map)
         // back to *actual* source.
-        // 
-        // We don't do the obfuscation remapping here, because DCE and other passes may 
-        // change what locs are actually needed, we need to be sure 
+        //
+        // We don't do the obfuscation remapping here, because DCE and other passes may
+        // change what locs are actually needed, we need to be sure
         // that if we have obfuscation enabled we don't forget to obfuscate.
         stripOptions.stripSourceLocs = false;
         stripFrontEndOnlyInstructions(module, stripOptions);
-    
+
+        stripImportedWitnessTable(module);
+
         // Stripping out decorations could leave some dead code behind
         // in the module, and in some cases that extra code is also
         // undesirable (e.g., the string literals referenced by name-hint
@@ -11261,17 +11848,24 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     // If we are being asked to dump IR during compilation,
     // then we can dump the initial IR for the module here.
-    if(compileRequest->optionSet.shouldDumpIR())
+    if (compileRequest->optionSet.shouldDumpIR())
     {
         DiagnosticSinkWriter writer(compileRequest->getSink());
 
-        dumpIR(module, compileRequest->m_irDumpOptions, "LOWER-TO-IR", compileRequest->getSourceManager(), &writer);
+        dumpIR(
+            module,
+            compileRequest->m_irDumpOptions,
+            "LOWER-TO-IR",
+            compileRequest->getSourceManager(),
+            &writer);
     }
+
+    module->buildMangledNameToGlobalInstMap();
 
     return module;
 }
 
-    /// Context for generating IR code to represent a `SpecializedComponentType`
+/// Context for generating IR code to represent a `SpecializedComponentType`
 struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
 {
     DiagnosticSink* sink;
@@ -11280,9 +11874,7 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
     IRGenContext* context;
     IRBuilder* builder;
 
-    RefPtr<IRModule> process(
-        SpecializedComponentType*   componentType,
-        DiagnosticSink*             inSink)
+    RefPtr<IRModule> process(SpecializedComponentType* componentType, DiagnosticSink* inSink)
     {
         sink = inSink;
 
@@ -11290,13 +11882,8 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
         session = linkage->getSessionImpl();
         auto option = linkage->m_optionSet;
         option.overrideWith(componentType->getOptionSet());
-        SharedIRGenContext sharedContextStorage(
-            session,
-            sink,
-            option.shouldObfuscateCode(),
-            nullptr,
-            linkage
-        );
+        SharedIRGenContext
+            sharedContextStorage(session, sink, option.shouldObfuscateCode(), nullptr, linkage);
         SharedIRGenContext* sharedContext = &sharedContextStorage;
 
         IRGenContext contextStorage(sharedContext, linkage->getASTBuilder());
@@ -11312,11 +11899,13 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
         context->irBuilder = builder;
 
         componentType->acceptVisitor(this, nullptr);
-
+        module->buildMangledNameToGlobalInstMap();
         return module;
     }
 
-    void visitEntryPoint(EntryPoint* entryPoint, EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    void visitEntryPoint(
+        EntryPoint* entryPoint,
+        EntryPoint::EntryPointSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         // We need to emit symbols for all of the entry
         // points in the program; this is especially
@@ -11333,16 +11922,18 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
         entryPoint->getBase()->acceptVisitor(this, specializationInfo);
     }
 
-    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    void visitModule(Module* module, Module::ModuleSpecializationInfo* specializationInfo)
+        SLANG_OVERRIDE
     {
         // We've hit a leaf module, so we should be able to bind any global
         // generic type parameters here...
         //
-        if( specializationInfo )
+        if (specializationInfo)
         {
-            for( auto genericArgInfo : specializationInfo->genericArgs )
+            for (auto genericArgInfo : specializationInfo->genericArgs)
             {
-                IRInst* irParam = getSimpleVal(context, ensureDecl(context, genericArgInfo.paramDecl));
+                IRInst* irParam =
+                    getSimpleVal(context, ensureDecl(context, genericArgInfo.paramDecl));
                 IRInst* irVal = lowerSimpleVal(context, genericArgInfo.argVal);
 
                 // bind `irParam` to `irVal`
@@ -11352,18 +11943,20 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
             auto shaderParamCount = module->getShaderParamCount();
             Index existentialArgOffset = 0;
 
-            for( Index ii = 0; ii < shaderParamCount; ++ii )
+            for (Index ii = 0; ii < shaderParamCount; ++ii)
             {
                 auto shaderParam = module->getShaderParam(ii);
                 auto specializationArgCount = shaderParam.specializationParamCount;
 
-                IRInst* irParam = getSimpleVal(context, ensureDecl(context, shaderParam.paramDeclRef.getDecl()));
+                IRInst* irParam =
+                    getSimpleVal(context, ensureDecl(context, shaderParam.paramDeclRef.getDecl()));
                 List<IRInst*> irSlotArgs;
                 // Tracks if there are any type args that is not an IRDynamicType.
                 bool hasConcreteTypeArg = false;
-                for( Index jj = 0; jj < specializationArgCount; ++jj )
+                for (Index jj = 0; jj < specializationArgCount; ++jj)
                 {
-                    auto& specializationArg = specializationInfo->existentialArgs[existentialArgOffset++];
+                    auto& specializationArg =
+                        specializationInfo->existentialArgs[existentialArgOffset++];
 
                     auto irType = lowerSimpleVal(context, specializationArg.val);
                     auto irWitness = lowerSimpleVal(context, specializationArg.witness);
@@ -11387,7 +11980,9 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
         }
     }
 
-    void visitComposite(CompositeComponentType* composite, CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
+    void visitComposite(
+        CompositeComponentType* composite,
+        CompositeComponentType::CompositeSpecializationInfo* specializationInfo) SLANG_OVERRIDE
     {
         visitChildren(composite, specializationInfo);
     }
@@ -11404,8 +11999,8 @@ struct SpecializedComponentTypeIRGenContext : ComponentTypeVisitor
 };
 
 RefPtr<IRModule> generateIRForSpecializedComponentType(
-    SpecializedComponentType*   componentType,
-    DiagnosticSink*             sink)
+    SpecializedComponentType* componentType,
+    DiagnosticSink* sink)
 {
     SLANG_AST_BUILDER_RAII(componentType->getLinkage()->getASTBuilder());
 
@@ -11413,7 +12008,7 @@ RefPtr<IRModule> generateIRForSpecializedComponentType(
     return context.process(componentType, sink);
 }
 
-    /// Context for generating IR code to represent a `TypeConformance`
+/// Context for generating IR code to represent a `TypeConformance`
 struct TypeConformanceIRGenContext
 {
     DiagnosticSink* sink;
@@ -11432,7 +12027,12 @@ struct TypeConformanceIRGenContext
         linkage = typeConformance->getLinkage();
         session = linkage->getSessionImpl();
 
-        SharedIRGenContext sharedContextStorage(session, sink, linkage->m_optionSet.shouldObfuscateCode(), nullptr, linkage);
+        SharedIRGenContext sharedContextStorage(
+            session,
+            sink,
+            linkage->m_optionSet.shouldObfuscateCode(),
+            nullptr,
+            linkage);
         SharedIRGenContext* sharedContext = &sharedContextStorage;
 
         IRGenContext contextStorage(sharedContext, linkage->getASTBuilder());
@@ -11455,6 +12055,7 @@ struct TypeConformanceIRGenContext
         {
             builder->addSequentialIDDecoration(witness, conformanceIdOverride);
         }
+        module->buildMangledNameToGlobalInstMap();
         return module;
     }
 };
@@ -11476,54 +12077,48 @@ RefPtr<IRModule> TargetProgram::getOrCreateIRModuleForLayout(DiagnosticSink* sin
     return m_irModuleForLayout;
 }
 
-    /// Specialized IR generation context for when generating IR for layouts.
+/// Specialized IR generation context for when generating IR for layouts.
 struct IRLayoutGenContext : IRGenContext
 {
     IRLayoutGenContext(SharedIRGenContext* shared, ASTBuilder* astBuilder)
         : IRGenContext(shared, astBuilder)
-    {}
+    {
+    }
 
-        /// Cache for custom key instructions used for entry-point parameter layout information.
+    /// Cache for custom key instructions used for entry-point parameter layout information.
     Dictionary<ParamDecl*, IRInst*> mapEntryPointParamToKey;
 };
 
-    /// Lower an AST-level type layout to an IR-level type layout.
-IRTypeLayout* lowerTypeLayout(
-    IRLayoutGenContext* context,
-    TypeLayout*         typeLayout);
+/// Lower an AST-level type layout to an IR-level type layout.
+IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayout);
 
-    /// Lower an AST-level variable layout to an IR-level variable layout.
-IRVarLayout* lowerVarLayout(
-    IRLayoutGenContext* context,
-    VarLayout*          varLayout);
+/// Lower an AST-level variable layout to an IR-level variable layout.
+IRVarLayout* lowerVarLayout(IRLayoutGenContext* context, VarLayout* varLayout);
 
-    /// Shared code for most `lowerTypeLayout` cases.
-    ///
-    /// Handles copying of resource usage and pending data type layout
-    /// from the AST `typeLayout` to the specified `builder`.
-    ///
+/// Shared code for most `lowerTypeLayout` cases.
+///
+/// Handles copying of resource usage and pending data type layout
+/// from the AST `typeLayout` to the specified `builder`.
+///
 static IRTypeLayout* _lowerTypeLayoutCommon(
-    IRLayoutGenContext*     context,
-    IRTypeLayout::Builder*  builder,
-    TypeLayout*             typeLayout)
+    IRLayoutGenContext* context,
+    IRTypeLayout::Builder* builder,
+    TypeLayout* typeLayout)
 {
-    for( auto resInfo : typeLayout->resourceInfos )
+    for (auto resInfo : typeLayout->resourceInfos)
     {
         builder->addResourceUsage(resInfo.kind, resInfo.count);
     }
 
-    if( auto pendingTypeLayout = typeLayout->pendingDataTypeLayout )
+    if (auto pendingTypeLayout = typeLayout->pendingDataTypeLayout)
     {
-        builder->setPendingTypeLayout(
-            lowerTypeLayout(context, pendingTypeLayout));
+        builder->setPendingTypeLayout(lowerTypeLayout(context, pendingTypeLayout));
     }
 
     return builder->build();
 }
 
-IRTypeLayout* lowerTypeLayout(
-    IRLayoutGenContext* context,
-    TypeLayout*         typeLayout)
+IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayout)
 {
     // TODO: We chould consider caching the layouts we create based on `typeLayout`
     // and re-using them. This isn't strictly necessary because we emit the
@@ -11534,7 +12129,7 @@ IRTypeLayout* lowerTypeLayout(
     // one of the cases that requires a dedicated sub-type
     // of IR type layout.
     //
-    if( auto paramGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout) )
+    if (auto paramGroupTypeLayout = as<ParameterGroupTypeLayout>(typeLayout))
     {
         IRParameterGroupTypeLayout::Builder builder(context->irBuilder);
 
@@ -11547,22 +12142,23 @@ IRTypeLayout* lowerTypeLayout(
 
         return _lowerTypeLayoutCommon(context, &builder, paramGroupTypeLayout);
     }
-    else if( auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
+    else if (auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
     {
-        auto irElementTypeLayout = lowerTypeLayout(context, structuredBufferTypeLayout->elementTypeLayout);
+        auto irElementTypeLayout =
+            lowerTypeLayout(context, structuredBufferTypeLayout->elementTypeLayout);
         IRStructuredBufferTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
         return _lowerTypeLayoutCommon(context, &builder, structuredBufferTypeLayout);
     }
-    else if( auto structTypeLayout = as<StructTypeLayout>(typeLayout) )
+    else if (auto structTypeLayout = as<StructTypeLayout>(typeLayout))
     {
         IRStructTypeLayout::Builder builder(context->irBuilder);
         int fieldIndex = 0;
-        for( auto fieldLayout : structTypeLayout->fields )
+        for (auto fieldLayout : structTypeLayout->fields)
         {
             auto fieldDecl = fieldLayout->varDecl;
 
             IRInst* irFieldKey = nullptr;
-            if(auto paramDecl = as<ParamDecl>(fieldDecl) )
+            if (auto paramDecl = as<ParamDecl>(fieldDecl))
             {
                 // There is a subtle special case here.
                 //
@@ -11584,7 +12180,7 @@ IRTypeLayout* lowerTypeLayout(
                 // so that if we run into another type layout for the
                 // same entry point we will re-use the same keys.
                 //
-                if( !context->mapEntryPointParamToKey.tryGetValue(paramDecl.getDecl(), irFieldKey))
+                if (!context->mapEntryPointParamToKey.tryGetValue(paramDecl.getDecl(), irFieldKey))
                 {
                     irFieldKey = context->irBuilder->createStructKey();
 
@@ -11606,8 +12202,7 @@ IRTypeLayout* lowerTypeLayout(
             }
             else if (fieldDecl.getDecl())
             {
-                irFieldKey = getSimpleVal(context,
-                    ensureDecl(context, fieldDecl.getDecl()));
+                irFieldKey = getSimpleVal(context, ensureDecl(context, fieldDecl.getDecl()));
             }
             else
             {
@@ -11630,7 +12225,7 @@ IRTypeLayout* lowerTypeLayout(
 
         return _lowerTypeLayoutCommon(context, &builder, structTypeLayout);
     }
-    else if( auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout) )
+    else if (auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
     {
         auto irElementTypeLayout = lowerTypeLayout(context, arrayTypeLayout->elementTypeLayout);
         IRArrayTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
@@ -11638,22 +12233,23 @@ IRTypeLayout* lowerTypeLayout(
     }
     else if (auto ptrTypeLayout = as<PointerTypeLayout>(typeLayout))
     {
-        // TODO(JS): 
-        // For now we don't lower the value/target type because this could lead to inifinte recursion
-        // in the way this is currently implemented.
+        // TODO(JS):
+        // For now we don't lower the value/target type because this could lead to inifinte
+        // recursion in the way this is currently implemented.
 
-        //auto irValueTypeLayout = lowerTypeLayout(context, ptrTypeLayout->valueTypeLayout);
-        IRPointerTypeLayout::Builder builder(context->irBuilder); 
+        // auto irValueTypeLayout = lowerTypeLayout(context, ptrTypeLayout->valueTypeLayout);
+        IRPointerTypeLayout::Builder builder(context->irBuilder);
         return _lowerTypeLayoutCommon(context, &builder, ptrTypeLayout);
     }
-    else if( auto streamOutputTypeLayout = as<StreamOutputTypeLayout>(typeLayout) )
+    else if (auto streamOutputTypeLayout = as<StreamOutputTypeLayout>(typeLayout))
     {
-        auto irElementTypeLayout = lowerTypeLayout(context, streamOutputTypeLayout->elementTypeLayout);
+        auto irElementTypeLayout =
+            lowerTypeLayout(context, streamOutputTypeLayout->elementTypeLayout);
 
         IRStreamOutputTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
         return _lowerTypeLayoutCommon(context, &builder, streamOutputTypeLayout);
     }
-    else if( auto matrixTypeLayout = as<MatrixTypeLayout>(typeLayout) )
+    else if (auto matrixTypeLayout = as<MatrixTypeLayout>(typeLayout))
     {
         // TODO: Our support for explicit layouts on matrix types is minimal, so whether
         // or not we even include `IRMatrixTypeLayout` doesn't impact any behavior we
@@ -11666,7 +12262,7 @@ IRTypeLayout* lowerTypeLayout(
         IRMatrixTypeLayout::Builder builder(context->irBuilder, matrixTypeLayout->mode);
         return _lowerTypeLayoutCommon(context, &builder, matrixTypeLayout);
     }
-    else if( auto existentialTypeLayout = as<ExistentialTypeLayout>(typeLayout) )
+    else if (auto existentialTypeLayout = as<ExistentialTypeLayout>(typeLayout))
     {
         IRExistentialTypeLayout::Builder builder(context->irBuilder);
         return _lowerTypeLayoutCommon(context, &builder, existentialTypeLayout);
@@ -11682,22 +12278,21 @@ IRTypeLayout* lowerTypeLayout(
 
 IRVarLayout* lowerVarLayout(
     IRLayoutGenContext* context,
-    VarLayout*          varLayout,
-    IRTypeLayout*       irTypeLayout)
+    VarLayout* varLayout,
+    IRTypeLayout* irTypeLayout)
 {
     IRVarLayout::Builder irLayoutBuilder(context->irBuilder, irTypeLayout);
 
-    for( auto resInfo : varLayout->resourceInfos )
+    for (auto resInfo : varLayout->resourceInfos)
     {
         auto irResInfo = irLayoutBuilder.findOrAddResourceInfo(resInfo.kind);
         irResInfo->offset = resInfo.index;
         irResInfo->space = resInfo.space;
     }
 
-    if( auto pendingVarLayout = varLayout->pendingVarLayout )
+    if (auto pendingVarLayout = varLayout->pendingVarLayout)
     {
-        irLayoutBuilder.setPendingVarLayout(
-            lowerVarLayout(context, pendingVarLayout));
+        irLayoutBuilder.setPendingVarLayout(lowerVarLayout(context, pendingVarLayout));
     }
 
     // We will only generate layout information with *either* a system-value
@@ -11705,20 +12300,18 @@ IRVarLayout* lowerVarLayout(
     // the system-value semantic first because the AST-level representation
     // seems to encode both when a system-value semantic is present.
     //
-    if( varLayout->systemValueSemantic.getLength() )
+    if (varLayout->systemValueSemantic.getLength())
     {
         irLayoutBuilder.setSystemValueSemantic(
             varLayout->systemValueSemantic,
             varLayout->systemValueSemanticIndex);
     }
-    else if( varLayout->semanticName.getLength() )
+    else if (varLayout->semanticName.getLength())
     {
-        irLayoutBuilder.setUserSemantic(
-            varLayout->semanticName,
-            varLayout->semanticIndex);
+        irLayoutBuilder.setUserSemantic(varLayout->semanticName, varLayout->semanticIndex);
     }
 
-    if( varLayout->stage != Stage::Unknown )
+    if (varLayout->stage != Stage::Unknown)
     {
         irLayoutBuilder.setStage(varLayout->stage);
     }
@@ -11726,23 +12319,19 @@ IRVarLayout* lowerVarLayout(
     return irLayoutBuilder.build();
 }
 
-IRVarLayout* lowerVarLayout(
-    IRLayoutGenContext* context,
-    VarLayout*          varLayout)
+IRVarLayout* lowerVarLayout(IRLayoutGenContext* context, VarLayout* varLayout)
 {
     auto irTypeLayout = lowerTypeLayout(context, varLayout->typeLayout);
     return lowerVarLayout(context, varLayout, irTypeLayout);
 }
 
-    /// Handle the lowering of an entry-point result layout to the IR
-IRVarLayout* lowerEntryPointResultLayout(
-    IRLayoutGenContext* context,
-    VarLayout*          layout)
+/// Handle the lowering of an entry-point result layout to the IR
+IRVarLayout* lowerEntryPointResultLayout(IRLayoutGenContext* context, VarLayout* layout)
 {
     // The easy case is when there is a non-null `layout`, because we
     // can handle it like any other var layout.
     //
-    if(layout)
+    if (layout)
         return lowerVarLayout(context, layout);
 
     // Right now the AST-level layout logic will leave a null layout
@@ -11762,29 +12351,27 @@ IRVarLayout* lowerEntryPointResultLayout(
     return varLayoutBuilder.build();
 }
 
-    /// Lower AST-level layout information for an entry point to the IR
+/// Lower AST-level layout information for an entry point to the IR
 IREntryPointLayout* lowerEntryPointLayout(
     IRLayoutGenContext* context,
-    EntryPointLayout*   entryPointLayout)
+    EntryPointLayout* entryPointLayout)
 {
     auto irParamsLayout = lowerVarLayout(context, entryPointLayout->parametersLayout);
     auto irResultLayout = lowerEntryPointResultLayout(context, entryPointLayout->resultLayout);
 
-    return context->irBuilder->getEntryPointLayout(
-        irParamsLayout,
-        irResultLayout);
+    return context->irBuilder->getEntryPointLayout(irParamsLayout, irResultLayout);
 }
 
 RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 {
-    if(m_irModuleForLayout)
+    if (m_irModuleForLayout)
         return m_irModuleForLayout;
 
 
     // Okay, now we need to fill it in.
 
     auto programLayout = getOrCreateLayout(sink);
-    if(!programLayout)
+    if (!programLayout)
         return nullptr;
 
     auto program = getProgram();
@@ -11822,7 +12409,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
     IRStructTypeLayout::Builder globalStructTypeLayoutBuilder(builder);
 
-    for(auto varLayout : globalStructLayout->fields)
+    for (auto varLayout : globalStructLayout->fields)
     {
         auto varDecl = varLayout->varDecl;
 
@@ -11830,7 +12417,9 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         // has been emitted to this module, so that we will have something
         // to decorate.
         //
-        auto irVar = getSimpleVal(context, ensureDecl(context, varDecl.getDecl()));
+        auto irVar = materialize(context, ensureDecl(context, varDecl.getDecl())).val;
+        if (!irVar)
+            SLANG_UNEXPECTED("unhandled value flavor");
 
         auto irLayout = lowerVarLayout(context, varLayout);
 
@@ -11841,17 +12430,19 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         // Also add this to our mapping for the global-scope structure type
         globalStructTypeLayoutBuilder.addField(irVar, irLayout);
     }
-    auto irGlobalStructTypeLayout = _lowerTypeLayoutCommon(context, &globalStructTypeLayoutBuilder, globalStructLayout);
+    auto irGlobalStructTypeLayout =
+        _lowerTypeLayoutCommon(context, &globalStructTypeLayoutBuilder, globalStructLayout);
 
     auto globalScopeVarLayout = programLayout->parametersLayout;
     auto globalScopeTypeLayout = globalScopeVarLayout->typeLayout;
     IRTypeLayout* irGlobalScopeTypeLayout = irGlobalStructTypeLayout;
-    if( auto paramGroupTypeLayout = as<ParameterGroupTypeLayout>(globalScopeTypeLayout) )
+    if (auto paramGroupTypeLayout = as<ParameterGroupTypeLayout>(globalScopeTypeLayout))
     {
         IRParameterGroupTypeLayout::Builder globalParameterGroupTypeLayoutBuilder(builder);
 
         auto irElementTypeLayout = irGlobalStructTypeLayout;
-        auto irElementVarLayout = lowerVarLayout(context, paramGroupTypeLayout->elementVarLayout, irElementTypeLayout);
+        auto irElementVarLayout =
+            lowerVarLayout(context, paramGroupTypeLayout->elementVarLayout, irElementTypeLayout);
 
         globalParameterGroupTypeLayoutBuilder.setContainerVarLayout(
             lowerVarLayout(context, paramGroupTypeLayout->containerVarLayout));
@@ -11859,37 +12450,44 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         globalParameterGroupTypeLayoutBuilder.setOffsetElementTypeLayout(
             lowerTypeLayout(context, paramGroupTypeLayout->offsetElementTypeLayout));
 
-        auto irParamGroupTypeLayout = _lowerTypeLayoutCommon(context, &globalParameterGroupTypeLayoutBuilder, paramGroupTypeLayout);
+        auto irParamGroupTypeLayout = _lowerTypeLayoutCommon(
+            context,
+            &globalParameterGroupTypeLayoutBuilder,
+            paramGroupTypeLayout);
 
         irGlobalScopeTypeLayout = irParamGroupTypeLayout;
     }
 
-    auto irGlobalScopeVarLayout = lowerVarLayout(context, globalScopeVarLayout, irGlobalScopeTypeLayout);
+    auto irGlobalScopeVarLayout =
+        lowerVarLayout(context, globalScopeVarLayout, irGlobalScopeTypeLayout);
 
     builder->addLayoutDecoration(irModule->getModuleInst(), irGlobalScopeVarLayout);
 
     auto latestSpirvAtom = getLatestSpirvAtom();
     auto latestMetalAtom = getLatestMetalAtom();
 
-    for( auto entryPointLayout : programLayout->entryPoints )
+    for (auto entryPointLayout : programLayout->entryPoints)
     {
         auto funcDeclRef = entryPointLayout->entryPoint;
 
         // HACK: skip over entry points that came from deserialization,
         // and thus don't have AST-level information for us to work with.
         //
-        if(!funcDeclRef)
+        if (!funcDeclRef)
             continue;
 
         auto irFuncType = lowerType(context, getFuncType(astBuilder, funcDeclRef));
         auto irFunc = getSimpleVal(context, emitDeclRef(context, funcDeclRef, irFuncType));
 
-        if( !irFunc->findDecoration<IRLinkageDecoration>() )
+        if (!irFunc->findDecoration<IRLinkageDecoration>())
         {
-            builder->addImportDecoration(irFunc, getMangledName(astBuilder, funcDeclRef).getUnownedSlice());
+            builder->addImportDecoration(
+                irFunc,
+                getMangledName(astBuilder, funcDeclRef).getUnownedSlice());
         }
 
-        for (auto atomSet : as<FuncDecl>(funcDeclRef.getDecl())->inferredCapabilityRequirements.getAtomSets())
+        for (auto atomSet :
+             as<FuncDecl>(funcDeclRef.getDecl())->inferredCapabilityRequirements.getAtomSets())
         {
             for (auto atomVal : atomSet)
             {
@@ -11913,7 +12511,8 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         IRStripOptions stripOptions;
 
         stripOptions.shouldStripNameHints = true;
-        stripOptions.stripSourceLocs = true;;
+        stripOptions.stripSourceLocs = true;
+        ;
 
         stripFrontEndOnlyInstructions(irModule, stripOptions);
 
@@ -11924,11 +12523,10 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         // Eliminate any dead code
         eliminateDeadCode(irModule, options);
     }
-
+    irModule->buildMangledNameToGlobalInstMap();
     m_irModuleForLayout = irModule;
     return irModule;
 }
-
 
 
 } // namespace Slang

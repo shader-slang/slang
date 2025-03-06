@@ -1,10 +1,9 @@
 #include "slang-memory-file-system.h"
 
 // For Path::
-#include "slang-io.h"
 #include "slang-blob.h"
-
 #include "slang-implicit-directory-collector.h"
+#include "slang-io.h"
 
 namespace Slang
 {
@@ -16,11 +15,9 @@ MemoryFileSystem::MemoryFileSystem()
 
 void* MemoryFileSystem::getInterface(const Guid& guid)
 {
-    if  (   guid == ISlangUnknown::getTypeGuid() || 
-            guid == ISlangCastable::getTypeGuid() || 
-            guid == ISlangFileSystem::getTypeGuid() || 
-            guid == ISlangFileSystemExt::getTypeGuid() || 
-            guid == ISlangMutableFileSystem::getTypeGuid())
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ISlangCastable::getTypeGuid() ||
+        guid == ISlangFileSystem::getTypeGuid() || guid == ISlangFileSystemExt::getTypeGuid() ||
+        guid == ISlangMutableFileSystem::getTypeGuid())
     {
         return static_cast<ISlangMutableFileSystem*>(this);
     }
@@ -42,9 +39,9 @@ void* MemoryFileSystem::castAs(const Guid& guid)
     return getObject(guid);
 }
 
-void MemoryFileSystem::_clear() 
-{ 
-    m_entries = Dictionary<String, Entry>(); 
+void MemoryFileSystem::_clear()
+{
+    m_entries = Dictionary<String, Entry>();
 }
 
 MemoryFileSystem::Entry* MemoryFileSystem::_getEntryFromCanonicalPath(const String& canonicalPath)
@@ -90,7 +87,7 @@ SlangResult MemoryFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
 {
     Entry* entry;
     SLANG_RETURN_ON_FAIL(_loadFile(path, &entry));
-    
+
     ISlangBlob* contents = entry->m_contents;
     contents->addRef();
     *outBlob = contents;
@@ -98,22 +95,28 @@ SlangResult MemoryFileSystem::loadFile(char const* path, ISlangBlob** outBlob)
     return SLANG_OK;
 }
 
-SlangResult MemoryFileSystem::getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity)
+SlangResult MemoryFileSystem::getFileUniqueIdentity(
+    const char* path,
+    ISlangBlob** outUniqueIdentity)
 {
     return getPath(PathKind::Canonical, path, outUniqueIdentity);
 }
 
-SlangResult MemoryFileSystem::calcCombinedPath(SlangPathType fromPathType, const char* fromPath, const char* path, ISlangBlob** pathOut)
+SlangResult MemoryFileSystem::calcCombinedPath(
+    SlangPathType fromPathType,
+    const char* fromPath,
+    const char* path,
+    ISlangBlob** pathOut)
 {
     String combinedPath;
     switch (fromPathType)
     {
-        case SLANG_PATH_TYPE_FILE:
+    case SLANG_PATH_TYPE_FILE:
         {
             combinedPath = Path::combine(Path::getParentDirectory(fromPath), path);
             break;
         }
-        case SLANG_PATH_TYPE_DIRECTORY:
+    case SLANG_PATH_TYPE_DIRECTORY:
         {
             combinedPath = Path::combine(fromPath, path);
             break;
@@ -139,26 +142,30 @@ SlangResult MemoryFileSystem::getPath(PathKind kind, const char* path, ISlangBlo
 {
     switch (kind)
     {
-        case PathKind::Simplified:
+    case PathKind::Simplified:
         {
             String simplifiedPath = Path::simplify(path);
             *outPath = StringBlob::moveCreate(simplifiedPath).detach();
             return SLANG_OK;
         }
-        case PathKind::Display:
-        case PathKind::Canonical:
+    case PathKind::Display:
+    case PathKind::Canonical:
         {
             StringBuilder buffer;
             SLANG_RETURN_ON_FAIL(_getCanonical(path, buffer));
             *outPath = StringBlob::moveCreate(buffer).detach();
             return SLANG_OK;
         }
-        default: break;
+    default:
+        break;
     }
     return SLANG_E_NOT_AVAILABLE;
 }
 
-SlangResult MemoryFileSystem::enumeratePathContents(const char* path, FileSystemContentsCallBack callback, void* userData)
+SlangResult MemoryFileSystem::enumeratePathContents(
+    const char* path,
+    FileSystemContentsCallBack callback,
+    void* userData)
 {
     String canonicalPath;
     Entry* entry = _getEntryFromPath(path, &canonicalPath);
@@ -204,11 +211,16 @@ SlangResult MemoryFileSystem::saveFileBlob(const char* path, ISlangBlob* dataBlo
 SlangResult MemoryFileSystem::_getCanonical(const char* path, StringBuilder& outCanonicalPath)
 {
     StringBuilder canonicalPath;
-    SLANG_RETURN_ON_FAIL(Path::simplify(UnownedStringSlice(path), Path::SimplifyStyle::AbsoluteOnlyAndNoRoot, outCanonicalPath));
+    SLANG_RETURN_ON_FAIL(Path::simplify(
+        UnownedStringSlice(path),
+        Path::SimplifyStyle::AbsoluteOnlyAndNoRoot,
+        outCanonicalPath));
     return SLANG_OK;
 }
 
-SlangResult MemoryFileSystem::_getCanonicalWithExistingParent(const char* path, StringBuilder& outCanonicalPath)
+SlangResult MemoryFileSystem::_getCanonicalWithExistingParent(
+    const char* path,
+    StringBuilder& outCanonicalPath)
 {
     SLANG_RETURN_ON_FAIL(_getCanonical(path, outCanonicalPath));
 
@@ -224,7 +236,7 @@ SlangResult MemoryFileSystem::_getCanonicalWithExistingParent(const char* path, 
             return SLANG_E_NOT_FOUND;
         }
     }
-    
+
     return SLANG_OK;
 }
 
@@ -255,7 +267,9 @@ SlangResult MemoryFileSystem::_requireFile(const char* path, Entry** outEntry)
     }
 
     // It must be found and be a file
-    SLANG_ASSERT(foundEntry && foundEntry->m_type == SLANG_PATH_TYPE_FILE && foundEntry->m_canonicalPath == canonicalPath);
+    SLANG_ASSERT(
+        foundEntry && foundEntry->m_type == SLANG_PATH_TYPE_FILE &&
+        foundEntry->m_canonicalPath == canonicalPath);
 
     *outEntry = foundEntry;
     return SLANG_OK;

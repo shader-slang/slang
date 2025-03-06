@@ -4,12 +4,13 @@
 
 namespace Slang
 {
-    struct IRModule;
-    class DiagnosticSink;
+struct CodeGenContext;
+struct IRModule;
+class DiagnosticSink;
 
-    // Lower combined texture sampler types to structs.
-    void lowerCombinedTextureSamplers(
-        IRModule* module,
-        DiagnosticSink* sink
-    );
-}
+// Lower combined texture sampler types to structs.
+void lowerCombinedTextureSamplers(
+    CodeGenContext* codeGenContext,
+    IRModule* module,
+    DiagnosticSink* sink);
+} // namespace Slang

@@ -1,14 +1,16 @@
 // slang-ir-eliminate-multilevel-break.cpp
 #include "slang-ir-eliminate-multilevel-break.h"
-#include "slang-ir.h"
+
 #include "slang-ir-clone.h"
-#include "slang-ir-insts.h"
-#include "slang-ir-eliminate-phis.h"
 #include "slang-ir-dominators.h"
+#include "slang-ir-eliminate-phis.h"
+#include "slang-ir-insts.h"
+#include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
-    
+
 bool isUnreachableRootBlock(IRBlock* block)
 {
     return block->getPredecessors().getCount() == 0;
@@ -44,12 +46,10 @@ struct EliminateMultiLevelBreakContext
             switch (headerInst->getOp())
             {
             case kIROp_loop:
-                builder->replaceOperand(
-                    &(as<IRLoop>(headerInst)->breakBlock), block);
+                builder->replaceOperand(&(as<IRLoop>(headerInst)->breakBlock), block);
                 break;
             case kIROp_Switch:
-                builder->replaceOperand(
-                    &(as<IRSwitch>(headerInst)->breakLabel), block);
+                builder->replaceOperand(&(as<IRSwitch>(headerInst)->breakLabel), block);
                 break;
             default:
                 SLANG_UNREACHABLE("Unknown breakable inst");
@@ -86,7 +86,7 @@ struct EliminateMultiLevelBreakContext
             // Push break block to a stack so we can easily check if a block is a break block in its
             // parent regions.
             breakBlocks.add(info.getBreakBlock());
-            
+
             auto successors = as<IRBlock>(info.headerInst->getParent())->getSuccessors();
             for (auto successor : successors)
             {
@@ -164,7 +164,7 @@ struct EliminateMultiLevelBreakContext
                 l->forEach(
                     [&](BreakableRegionInfo* region)
                     {
-                        if(!isUnreachableRootBlock(region->getBreakBlock()))
+                        if (!isUnreachableRootBlock(region->getBreakBlock()))
                             mapBreakBlockToRegion.add(region->getBreakBlock(), region);
                         for (auto block : region->blocks)
                             mapBlockToRegion.add(block, region);
@@ -180,7 +180,9 @@ struct EliminateMultiLevelBreakContext
                         continue;
                     BreakableRegionInfo* breakTargetRegion = nullptr;
                     BreakableRegionInfo* currentRegion = nullptr;
-                    if (!mapBreakBlockToRegion.tryGetValue(branch->getTargetBlock(), breakTargetRegion))
+                    if (!mapBreakBlockToRegion.tryGetValue(
+                            branch->getTargetBlock(),
+                            breakTargetRegion))
                         continue;
                     if (mapBlockToRegion.tryGetValue(block, currentRegion))
                     {
@@ -198,7 +200,7 @@ struct EliminateMultiLevelBreakContext
         }
     };
 
-    
+
     void insertBlockBetween(IRBlock* block, IRBlock* successor)
     {
         IRBuilder builder(block->getModule());
@@ -212,9 +214,9 @@ struct EliminateMultiLevelBreakContext
                 {
                     // Don't double count instructions like
                     // ifElse(cond, true, after, after)
-                    if(const auto ifElse = as<IRIfElse>(terminator))
+                    if (const auto ifElse = as<IRIfElse>(terminator))
                     {
-                        if(&ifElse->afterBlock == use)
+                        if (&ifElse->afterBlock == use)
                             continue;
                     }
 
@@ -231,18 +233,18 @@ struct EliminateMultiLevelBreakContext
     bool normalizeBranchesIntoBreakBlocks(IRGlobalValueWithCode* func)
     {
         bool changed = false;
-        
+
         List<IRBlock*> workList;
 
         for (auto block : func->getBlocks())
             workList.add(block);
-        
+
         for (auto block : workList)
         {
             if (auto loop = as<IRLoop>(block->getTerminator()))
             {
                 auto breakBlock = loop->getBreakBlock();
-                
+
                 for (auto predecessor : breakBlock->getPredecessors())
                 {
                     if (!as<IRUnconditionalBranch>(predecessor->getTerminator()))
@@ -263,7 +265,7 @@ struct EliminateMultiLevelBreakContext
 
         // If we already have a region mapped for a break block, and the break block
         // is unreachable, create a new unreachable block and map it.
-        // 
+        //
         for (auto& l : context->regions)
         {
             l->forEach(
@@ -277,10 +279,10 @@ struct EliminateMultiLevelBreakContext
                             {
                                 // We have a break block that is unreachable, and we have already
                                 // mapped it to a region, and that region is not the current region.
-                                // 
+                                //
                                 // We need to create a new unreachable block, and map it to the
                                 // current region.
-                                // 
+                                //
                                 IRBuilder builder(irModule);
                                 builder.setInsertInto(region->getBreakBlock()->getParent());
                                 auto newBreakBlock = builder.createBlock();
@@ -300,11 +302,11 @@ struct EliminateMultiLevelBreakContext
                 });
         }
     }
-    
+
     void processFunc(IRGlobalValueWithCode* func)
     {
         normalizeBranchesIntoBreakBlocks(func);
-        
+
         // If func does not have any multi-level breaks, return.
         {
             FuncContext funcInfo;
@@ -315,7 +317,11 @@ struct EliminateMultiLevelBreakContext
         }
 
         // To make things easy, eliminate Phis before perform transformations.
-        eliminatePhisInFunc(LivenessMode::Disabled, irModule, func, PhiEliminationOptions::getFast());
+        eliminatePhisInFunc(
+            LivenessMode::Disabled,
+            irModule,
+            func,
+            PhiEliminationOptions::getFast());
 
         // Before modifying the cfg, we gather all required info from the existing cfg.
         FuncContext funcInfo;
@@ -348,7 +354,8 @@ struct EliminateMultiLevelBreakContext
                     break;
             }
             builder.setInsertBefore(breakInfo.breakInst);
-            auto targetLevelInst = builder.getIntValue(builder.getIntType(), breakInfo.breakTargetRegion->level);
+            auto targetLevelInst =
+                builder.getIntValue(builder.getIntType(), breakInfo.breakTargetRegion->level);
             builder.emitBranch(breakInfo.currentRegion->getBreakBlock(), 1, &targetLevelInst);
             breakInfo.breakInst->removeAndDeallocate();
         }
@@ -370,7 +377,7 @@ struct EliminateMultiLevelBreakContext
             // branch. We need this separation to avoid introducing critical edge to the CFG (blocks
             // cannot have more than 1 predecessors and more than 1 successors at the same time).
             auto jumpToOuterBlock = builder.createBlock();
-            
+
             auto newBreakBlock = builder.createBlock();
             newBreakBlock->insertBefore(breakBlock);
             jumpToOuterBlock->insertAfter(newBreakBlock);
@@ -391,14 +398,19 @@ struct EliminateMultiLevelBreakContext
                 newBreakBodyBlock->insertAfter(breakBlock);
                 builder.emitBranch(newBreakBodyBlock);
                 builder.setInsertInto(newBreakBodyBlock);
-                auto levelNeq = builder.emitNeq(targetLevelParam, builder.getIntValue(builder.getIntType(), skippedRegion->level));
+                auto levelNeq = builder.emitNeq(
+                    targetLevelParam,
+                    builder.getIntValue(builder.getIntType(), skippedRegion->level));
                 builder.emitIfElse(levelNeq, jumpToOuterBlock, breakBlock, breakBlock);
             }
-            
+
             builder.setInsertInto(jumpToOuterBlock);
             if (skippedOverRegions.contains(skippedRegion->parent))
             {
-                builder.emitBranch(skippedRegion->parent->getBreakBlock(), 1, (IRInst**)&targetLevelParam);
+                builder.emitBranch(
+                    skippedRegion->parent->getBreakBlock(),
+                    1,
+                    (IRInst**)&targetLevelParam);
             }
             else
             {
@@ -428,10 +440,11 @@ struct EliminateMultiLevelBreakContext
                     // For complex branches, insert an intermediate block so we can specify the
                     // target index argument.
                     {
-                        if (user->getOp() == kIROp_Switch && &(as<IRSwitch>(user)->breakLabel) == use)
+                        if (user->getOp() == kIROp_Switch &&
+                            &(as<IRSwitch>(user)->breakLabel) == use)
                         {
-                            // If this is the "breakLabel" operand of the original switch inst, don't do anything
-                            // since it is not an actual branch.
+                            // If this is the "breakLabel" operand of the original switch inst,
+                            // don't do anything since it is not an actual branch.
                             continue;
                         }
                         builder.setInsertInto(func);
@@ -461,9 +474,10 @@ struct EliminateMultiLevelBreakContext
                     }
                     break;
                 }
-                
             }
         }
+
+        legalizeDefUse(func);
     }
 };
 

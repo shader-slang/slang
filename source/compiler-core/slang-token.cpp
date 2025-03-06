@@ -1,19 +1,22 @@
 // slang-token.cpp
 #include "slang-token.h"
 
-//#include <assert.h>
+// #include <assert.h>
 
-namespace Slang {
+namespace Slang
+{
 
 char const* TokenTypeToString(TokenType type)
 {
-    switch( type )
+    switch (type)
     {
     default:
         SLANG_ASSERT(!"unexpected");
         return "<uknown>";
 
-#define TOKEN(NAME, DESC) case TokenType::NAME: return DESC;
+#define TOKEN(NAME, DESC) \
+    case TokenType::NAME: \
+        return DESC;
 #include "slang-token-defs.h"
     }
 }

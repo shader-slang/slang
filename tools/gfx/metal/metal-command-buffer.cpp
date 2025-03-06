@@ -1,10 +1,10 @@
 // metal-command-buffer.cpp
 #include "metal-command-buffer.h"
 
-#include "metal-device.h"
 #include "metal-command-encoder.h"
-#include "metal-shader-object.h"
 #include "metal-command-queue.h"
+#include "metal-device.h"
+#include "metal-shader-object.h"
 
 namespace gfx
 {
@@ -29,7 +29,9 @@ Result CommandBufferImpl::init(DeviceImpl* device, TransientResourceHeapImpl* tr
 }
 
 void CommandBufferImpl::encodeRenderCommands(
-    IRenderPassLayout* renderPass, IFramebuffer* framebuffer, IRenderCommandEncoder** outEncoder)
+    IRenderPassLayout* renderPass,
+    IFramebuffer* framebuffer,
+    IRenderCommandEncoder** outEncoder)
 {
     if (!m_renderCommandEncoder)
     {
@@ -72,7 +74,7 @@ void CommandBufferImpl::encodeRayTracingCommands(IRayTracingCommandEncoder** out
 
 void CommandBufferImpl::close()
 {
-    //m_commandBuffer->commit();
+    // m_commandBuffer->commit();
 }
 
 Result CommandBufferImpl::getNativeHandle(InteropHandle* outHandle)
@@ -82,12 +84,14 @@ Result CommandBufferImpl::getNativeHandle(InteropHandle* outHandle)
     return SLANG_OK;
 }
 
-MTL::RenderCommandEncoder* CommandBufferImpl::getMetalRenderCommandEncoder(MTL::RenderPassDescriptor* renderPassDesc)
+MTL::RenderCommandEncoder* CommandBufferImpl::getMetalRenderCommandEncoder(
+    MTL::RenderPassDescriptor* renderPassDesc)
 {
     if (!m_metalRenderCommandEncoder)
     {
         endMetalCommandEncoder();
-        m_metalRenderCommandEncoder = NS::RetainPtr(m_commandBuffer->renderCommandEncoder(renderPassDesc));
+        m_metalRenderCommandEncoder =
+            NS::RetainPtr(m_commandBuffer->renderCommandEncoder(renderPassDesc));
     }
     return m_metalRenderCommandEncoder.get();
 }

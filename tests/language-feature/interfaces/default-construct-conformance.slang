@@ -36,22 +36,18 @@ struct TestAny : ITest
     uint getValue() { return value; }
 }
 
-// CHECK: Tuple{{.*}} makeTest0{{.*}}()
-// CHECK: Tuple{{.*}} = { uint2(0U, 0U), uint2(0U, 0U), packAnyValue4{{.*}} };
 ITest makeTest0()
 {
     return Test0();
 }
 
-// CHECK: Tuple{{.*}} makeTest1{{.*}}()
-// CHECK: Tuple{{.*}} = { uint2(0U, 0U), uint2(1U, 0U), packAnyValue4{{.*}} };
 ITest makeTest1()
 {
     return Test1();
 }
 
-// CHECK: Tuple{{.*}} makeTestAny{{.*}}()
-// CHECK: Tuple{{.*}} = { uint2(0U, 0U), uint2(2U, 0U), packAnyValue4{{.*}} };
+// CHECK: TestAny{{.*}} makeTestAny{{.*}}()
+// CHECK: return TestAny_{{.*}}init{{.*}}()
 ITest makeTestAny()
 {
     return TestAny();

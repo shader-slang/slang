@@ -21,7 +21,6 @@ public:
     {
     }
     ComPtr<ID3D11Resource> m_resource;
-
 };
 
 } // namespace d3d11

@@ -1,8 +1,7 @@
 // unit-test-command-line-args.cpp
 
 #include "../../source/compiler-core/slang-command-line-args.h"
-
-#include "tools/unit-test/slang-unit-test.h"
+#include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
@@ -17,9 +16,8 @@ SLANG_UNIT_TEST(commandLineArgs)
         DownstreamArgs downstreamArgs(context);
 
         DiagnosticSink sink(context->getSourceManager(), nullptr);
-        
-        const char* inArgs[] =
-        {
+
+        const char* inArgs[] = {
             "-Xa...",
             "-blah",
             "10",
@@ -28,13 +26,10 @@ SLANG_UNIT_TEST(commandLineArgs)
 
         args.setArgs(inArgs, SLANG_COUNT_OF(inArgs));
 
-        SLANG_CHECK(SLANG_SUCCEEDED(downstreamArgs.stripDownstreamArgs(args, DownstreamArgs::Flag::AllowNewNames, &sink)));
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            downstreamArgs.stripDownstreamArgs(args, DownstreamArgs::Flag::AllowNewNames, &sink)));
 
-        const char* aArgs[] =
-        {
-            "-blah",
-            "10"
-        };
+        const char* aArgs[] = {"-blah", "10"};
 
         SLANG_CHECK(downstreamArgs.getArgsByName("a").hasArgs(aArgs, SLANG_COUNT_OF(aArgs)));
         SLANG_CHECK(args.getArgCount() == 0 && sink.getErrorCount() == 0);
@@ -47,8 +42,7 @@ SLANG_UNIT_TEST(commandLineArgs)
 
         DiagnosticSink sink(context->getSourceManager(), nullptr);
 
-        const char* inArgs[] =
-        {
+        const char* inArgs[] = {
             "-Xa...",
             "-blah",
             "10",
@@ -56,13 +50,10 @@ SLANG_UNIT_TEST(commandLineArgs)
 
         args.setArgs(inArgs, SLANG_COUNT_OF(inArgs));
 
-        SLANG_CHECK(SLANG_SUCCEEDED(downstreamArgs.stripDownstreamArgs(args, DownstreamArgs::Flag::AllowNewNames, &sink)));
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            downstreamArgs.stripDownstreamArgs(args, DownstreamArgs::Flag::AllowNewNames, &sink)));
 
-        const char* aArgs[] =
-        {
-            "-blah",
-            "10"
-        };
+        const char* aArgs[] = {"-blah", "10"};
 
         SLANG_CHECK(downstreamArgs.getArgsByName("a").hasArgs(aArgs, SLANG_COUNT_OF(aArgs)));
         SLANG_CHECK(args.getArgCount() == 0 && sink.getErrorCount() == 0);
@@ -76,8 +67,7 @@ SLANG_UNIT_TEST(commandLineArgs)
 
         DiagnosticSink sink(context->getSourceManager(), nullptr);
 
-        const char* inArgs[] =
-        {
+        const char* inArgs[] = {
             "-something",
             "andAnother",
             "-Xa...",
@@ -93,24 +83,16 @@ SLANG_UNIT_TEST(commandLineArgs)
 
         args.setArgs(inArgs, SLANG_COUNT_OF(inArgs));
 
-        SLANG_CHECK(SLANG_SUCCEEDED(downstreamArgs.stripDownstreamArgs(args, DownstreamArgs::Flag::AllowNewNames, &sink)));
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            downstreamArgs.stripDownstreamArgs(args, DownstreamArgs::Flag::AllowNewNames, &sink)));
 
-        const char* aArgs[] =
-        {
-            "-blah",
-            "-Xb...",
-            "-hey",
-            "-X.",
-            "10"
-        };
+        const char* aArgs[] = {"-blah", "-Xb...", "-hey", "-X.", "10"};
 
-        const char* cArgs[] =
-        {
+        const char* cArgs[] = {
             "somethingForC",
         };
 
-        const char* mainArgs[] =
-        {
+        const char* mainArgs[] = {
             "-something",
             "andAnother",
         };
@@ -120,6 +102,4 @@ SLANG_UNIT_TEST(commandLineArgs)
 
         SLANG_CHECK(args.hasArgs(mainArgs, SLANG_COUNT_OF(mainArgs)) && sink.getErrorCount() == 0);
     }
-
 }
-

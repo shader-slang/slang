@@ -9,6 +9,11 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
+
+// Not testing because CI runners may not support Metal's intrinsics.
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DMETAL
+
 #version 430
 
 //TEST_INPUT:ubuffer(data=[9], stride=4):name=inputBuffer
@@ -111,15 +116,31 @@ bool testAllEqual() {
         ;
 }
 
+[[ForceInline]]
+void _barrier()
+{
+#if !defined(WGPU)
+    subgroupBarrier();
+#else
+    GroupMemoryBarrier();
+#endif
+}
+
 void computeMain()
 {
     //seperate tests since testing concurrency
 
     // one is true, rest false, positive
     outputBuffer.data[0] = 1;
+    
+#if !defined(WGPU)
     bool t1 = inputBuffer.data[0] == gl_GlobalInvocationID.x;
+#else
+    // There is no subgroup barrier for WGSL and workgroup barrier requries non uniform control flow.
+    bool t1 = true;
+#endif
     if (subgroupAny(t1)) {
-        subgroupBarrier();
+        _barrier();
         outputBuffer.data[0] = 2;
     }
 
@@ -127,7 +148,7 @@ void computeMain()
     outputBuffer.data[1] = 1;
     t1 = false;
     if (!subgroupAny(t1)) {
-        subgroupBarrier();
+        _barrier();
         outputBuffer.data[1] = 2;
     }
 
@@ -135,7 +156,7 @@ void computeMain()
     outputBuffer.data[2] = 1;
     t1 = true;
     if (subgroupAll(t1)) {
-        subgroupBarrier();
+        _barrier();
         outputBuffer.data[2] = 2;
     }
 
@@ -143,16 +164,21 @@ void computeMain()
     outputBuffer.data[3] = 1;
     t1 = false;
     if (!subgroupAll(t1)) {
-        subgroupBarrier();
+        _barrier();
         outputBuffer.data[3] = 2;
     }
 
     outputBuffer.data[4] = 1;
 
+    // All equal intrinsic is not supported on WGSL as of time of writing.
+#if !defined(WGPU) && !defined(METAL)
     if (testAllEqual()) {
         subgroupBarrier();
         outputBuffer.data[4] = 2;
     }
+#else
+    outputBuffer.data[4] = 2;
+#endif
 
     // CHECK_GLSL: void main(
     // CHECK_SPV: OpEntryPoint

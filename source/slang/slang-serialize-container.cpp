@@ -1,24 +1,26 @@
 // slang-serialize-container.cpp
 #include "slang-serialize-container.h"
 
-#include "../core/slang-text-io.h"
 #include "../core/slang-byte-encode-util.h"
-
 #include "../core/slang-math.h"
-
+#include "../core/slang-stream.h"
+#include "../core/slang-text-io.h"
+#include "slang-check-impl.h"
 #include "slang-compiler.h"
+#include "slang-mangled-lexer.h"
+#include "slang-parser.h"
 #include "slang-serialize-ast.h"
+#include "slang-serialize-factory.h"
 #include "slang-serialize-ir.h"
 #include "slang-serialize-source-loc.h"
-#include "slang-serialize-factory.h"
-#include "../core/slang-stream.h"
-#include "slang-parser.h"
 
-#include "slang-mangled-lexer.h"
+namespace Slang
+{
 
-namespace Slang {
-
-/* static */SlangResult SerialContainerUtil::write(Module* module, const WriteOptions& options, Stream* stream)
+/* static */ SlangResult SerialContainerUtil::write(
+    Module* module,
+    const WriteOptions& options,
+    Stream* stream)
 {
     RiffContainer container;
     {
@@ -31,12 +33,16 @@ namespace Slang {
     return SLANG_OK;
 }
 
-/* static */SlangResult SerialContainerUtil::write(FrontEndCompileRequest* frontEndReq, const WriteOptions& options, Stream* stream)
+/* static */ SlangResult SerialContainerUtil::write(
+    FrontEndCompileRequest* frontEndReq,
+    const WriteOptions& options,
+    Stream* stream)
 {
     RiffContainer container;
     {
         SerialContainerData data;
-        SLANG_RETURN_ON_FAIL(SerialContainerUtil::addFrontEndRequestToData(frontEndReq, options, data));
+        SLANG_RETURN_ON_FAIL(
+            SerialContainerUtil::addFrontEndRequestToData(frontEndReq, options, data));
         SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(data, options, &container));
     }
     // We now write the RiffContainer to the stream
@@ -44,7 +50,10 @@ namespace Slang {
     return SLANG_OK;
 }
 
-/* static */SlangResult SerialContainerUtil::write(EndToEndCompileRequest* request, const WriteOptions& options, Stream* stream)
+/* static */ SlangResult SerialContainerUtil::write(
+    EndToEndCompileRequest* request,
+    const WriteOptions& options,
+    Stream* stream)
 {
     RiffContainer container;
     {
@@ -57,14 +66,17 @@ namespace Slang {
     return SLANG_OK;
 }
 
-/* static */SlangResult SerialContainerUtil::addModuleToData(Module* module, const WriteOptions& options, SerialContainerData& outData)
+/* static */ SlangResult SerialContainerUtil::addModuleToData(
+    Module* module,
+    const WriteOptions& options,
+    SerialContainerData& outData)
 {
     if (options.optionFlags & (SerialOptionFlag::ASTModule | SerialOptionFlag::IRModule))
     {
         SerialContainerData::Module dstModule;
 
-        // NOTE: The astBuilder is not set here, as not needed to be scoped for serialization (it is assumed the
-        // TranslationUnitRequest stays in scope)
+        // NOTE: The astBuilder is not set here, as not needed to be scoped for serialization (it is
+        // assumed the TranslationUnitRequest stays in scope)
 
         if (options.optionFlags & SerialOptionFlag::ASTModule)
         {
@@ -97,7 +109,10 @@ namespace Slang {
                 module->getLinkage()->getSourceManager());
             PathInfo outFoundSourcePath;
             // If we can find the first file, use that as the module's path.
-            if (SLANG_SUCCEEDED(includeSystem.findFile(fileDependencies[0]->getPathInfo().foundPath, "", outFoundSourcePath)))
+            if (SLANG_SUCCEEDED(includeSystem.findFile(
+                    fileDependencies[0]->getPathInfo().foundPath,
+                    "",
+                    outFoundSourcePath)))
             {
                 canonicalModulePath = outFoundSourcePath.foundPath;
                 Path::getCanonical(canonicalModulePath, canonicalModulePath);
@@ -147,13 +162,14 @@ namespace Slang {
                 String canonicalFilePath = file->getPathInfo().foundPath;
                 Path::getCanonical(file->getPathInfo().foundPath, canonicalFilePath);
 
-                // If the dependnet file is the same as the module's file path, store it as a relative path
-                // with respect to the search directory discovered above.
+                // If the dependnet file is the same as the module's file path, store it as a
+                // relative path with respect to the search directory discovered above.
                 if (file->getPathInfo().hasFileFoundPath())
                 {
                     if (canonicalFilePath == canonicalModulePath)
                     {
-                        auto relativeModulePath = Path::getRelativePath(linkageRoot, canonicalModulePath);
+                        auto relativeModulePath =
+                            Path::getRelativePath(linkageRoot, canonicalModulePath);
                         dstModule.dependentFiles.add(relativeModulePath);
                     }
                     else
@@ -166,7 +182,8 @@ namespace Slang {
                 }
                 else
                 {
-                    // If the module is coming from string instead of an actual file, store it as is.
+                    // If the module is coming from string instead of an actual file, store it as
+                    // is.
                     dstModule.dependentFiles.add(canonicalModulePath);
                 }
             }
@@ -182,18 +199,24 @@ namespace Slang {
     return SLANG_OK;
 }
 
-/* static */SlangResult SerialContainerUtil::addFrontEndRequestToData(FrontEndCompileRequest* frontEndReq, const WriteOptions& options, SerialContainerData& outData)
+/* static */ SlangResult SerialContainerUtil::addFrontEndRequestToData(
+    FrontEndCompileRequest* frontEndReq,
+    const WriteOptions& options,
+    SerialContainerData& outData)
 {
     // Go through translation units, adding modules
     for (TranslationUnitRequest* translationUnit : frontEndReq->translationUnits)
     {
-        SLANG_RETURN_ON_FAIL(addModuleToData(translationUnit->module, options, outData));        
+        SLANG_RETURN_ON_FAIL(addModuleToData(translationUnit->module, options, outData));
     }
 
     return SLANG_OK;
 }
 
-/* static */SlangResult SerialContainerUtil::addEndToEndRequestToData(EndToEndCompileRequest* request, const WriteOptions& options, SerialContainerData& out)
+/* static */ SlangResult SerialContainerUtil::addEndToEndRequestToData(
+    EndToEndCompileRequest* request,
+    const WriteOptions& options,
+    SerialContainerData& out)
 {
     auto linkage = request->getLinkage();
     auto sink = request->getSink();
@@ -202,7 +225,7 @@ namespace Slang {
     addFrontEndRequestToData(request->getFrontEndReq(), options, out);
 
     // If we are skipping code generation, then we are done.
-    if(request->getOptionSet().getBoolOption(CompilerOptionName::SkipCodeGen))
+    if (request->getOptionSet().getBoolOption(CompilerOptionName::SkipCodeGen))
     {
         return SLANG_OK;
     }
@@ -252,14 +275,20 @@ namespace Slang {
     return SLANG_OK;
 }
 
-/* static */SlangResult SerialContainerUtil::write(const SerialContainerData& data, const WriteOptions& options, RiffContainer* container)
+/* static */ SlangResult SerialContainerUtil::write(
+    const SerialContainerData& data,
+    const WriteOptions& options,
+    RiffContainer* container)
 {
     RefPtr<SerialSourceLocWriter> sourceLocWriter;
 
     // The string pool used across the whole of the container
     StringSlicePool containerStringPool(StringSlicePool::Style::Default);
 
-    RiffContainer::ScopeChunk scopeModule(container, RiffContainer::Chunk::Kind::List, SerialBinary::kContainerFourCc);
+    RiffContainer::ScopeChunk scopeModule(
+        container,
+        RiffContainer::Chunk::Kind::List,
+        SerialBinary::kContainerFourCc);
 
     // Write the header
     {
@@ -267,14 +296,21 @@ namespace Slang {
         // Save the compression type if used - as can only serialize with a single compression type
         containerHeader.compressionType = uint32_t(options.compressionType);
 
-        RiffContainer::ScopeChunk scopeHeader(container, RiffContainer::Chunk::Kind::Data, SerialBinary::kContainerHeaderFourCc);
+        RiffContainer::ScopeChunk scopeHeader(
+            container,
+            RiffContainer::Chunk::Kind::Data,
+            SerialBinary::kContainerHeaderFourCc);
         container->write(&containerHeader, sizeof(containerHeader));
     }
 
-    if (data.modules.getCount() && (options.optionFlags & (SerialOptionFlag::IRModule | SerialOptionFlag::ASTModule)))
+    if (data.modules.getCount() &&
+        (options.optionFlags & (SerialOptionFlag::IRModule | SerialOptionFlag::ASTModule)))
     {
         // Module list
-        RiffContainer::ScopeChunk moduleListScope(container, RiffContainer::Chunk::Kind::List, SerialBinary::kModuleListFourCc);
+        RiffContainer::ScopeChunk moduleListScope(
+            container,
+            RiffContainer::Chunk::Kind::List,
+            SerialBinary::kModuleListFourCc);
 
         if (options.optionFlags & SerialOptionFlag::SourceLocation)
         {
@@ -288,13 +324,15 @@ namespace Slang {
             // Okay, we need to serialize this module to our container file.
             // We currently don't serialize it's name..., but support for that could be added.
 
-            // First, we write a header that can be used to verify if the precompiled module is up-to-date.
-            // The header has:
-            // 1) a digest of all compile options and dependent source files.
-            // 2) a list of source file paths.
+            // First, we write a header that can be used to verify if the precompiled module is
+            // up-to-date. The header has: 1) a digest of all compile options and dependent source
+            // files. 2) a list of source file paths.
             //
             {
-                RiffContainer::ScopeChunk scopeHeader(container, RiffContainer::Chunk::Kind::Data, SerialBinary::kModuleHeaderFourCc);
+                RiffContainer::ScopeChunk scopeHeader(
+                    container,
+                    RiffContainer::Chunk::Kind::Data,
+                    SerialBinary::kModuleHeaderFourCc);
                 OwnedMemoryStream headerMemStream(FileAccess::Write);
                 StringBuilder filePathsSB;
                 for (auto fileDependency : module.dependentFiles)
@@ -303,7 +341,9 @@ namespace Slang {
                 uint32_t fileListLength = (uint32_t)filePathsSB.getLength();
                 headerMemStream.write(&fileListLength, sizeof(uint32_t));
                 headerMemStream.write(filePathsSB.getBuffer(), fileListLength);
-                container->write(headerMemStream.getContents().getBuffer(), headerMemStream.getContents().getCount());
+                container->write(
+                    headerMemStream.getContents().getBuffer(),
+                    headerMemStream.getContents().getCount());
             }
 
             // Write the IR information
@@ -311,8 +351,13 @@ namespace Slang {
             {
                 IRSerialData serialData;
                 IRSerialWriter writer;
-                SLANG_RETURN_ON_FAIL(writer.write(module.irModule, sourceLocWriter, options.optionFlags, &serialData));
-                SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, options.compressionType, container));
+                SLANG_RETURN_ON_FAIL(writer.write(
+                    module.irModule,
+                    sourceLocWriter,
+                    options.optionFlags,
+                    &serialData));
+                SLANG_RETURN_ON_FAIL(
+                    IRSerialWriter::writeContainer(serialData, options.compressionType, container));
             }
 
             // Write the AST information
@@ -322,7 +367,10 @@ namespace Slang {
                 if (ModuleDecl* moduleDecl = as<ModuleDecl>(module.astRootNode))
                 {
                     // Put in AST module
-                    RiffContainer::ScopeChunk scopeASTModule(container, RiffContainer::Chunk::Kind::List, ASTSerialBinary::kSlangASTModuleFourCC);
+                    RiffContainer::ScopeChunk scopeASTModule(
+                        container,
+                        RiffContainer::Chunk::Kind::List,
+                        ASTSerialBinary::kSlangASTModuleFourCC);
 
                     if (!serialClasses)
                     {
@@ -332,27 +380,30 @@ namespace Slang {
                     ModuleSerialFilter filter(moduleDecl);
                     auto astWriterFlag = SerialWriter::Flag::ZeroInitialize;
                     if ((options.optionFlags & SerialOptionFlag::ASTFunctionBody) == 0)
-                        astWriterFlag = (SerialWriter::Flag::Enum)(astWriterFlag | SerialWriter::Flag::SkipFunctionBody);
+                        astWriterFlag = (SerialWriter::Flag::Enum)(
+                            astWriterFlag | SerialWriter::Flag::SkipFunctionBody);
 
                     SerialWriter writer(serialClasses, &filter, astWriterFlag);
 
                     writer.getExtraObjects().set(sourceLocWriter);
-                    
+
                     // Add the module and everything that isn't filtered out in the filter.
                     writer.addPointer(moduleDecl);
 
 
                     // We can now serialize it into the riff container.
-                    SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(ASTSerialBinary::kSlangASTModuleDataFourCC, container));
+                    SLANG_RETURN_ON_FAIL(writer.writeIntoContainer(
+                        ASTSerialBinary::kSlangASTModuleDataFourCC,
+                        container));
                 }
             }
         }
 
-	// TODO:
-	// Serialization of target component IR is causing the embedded precompiled binary
-	// feature to fail. The resulting data modules contain both TU IR and TC IR, with only
-	// one module header. Yong suggested to ignore the TC IR for now, though also that
-	// OV was using the feature, so disabling this might cause problems.
+        // TODO:
+        // Serialization of target component IR is causing the embedded precompiled binary
+        // feature to fail. The resulting data modules contain both TU IR and TC IR, with only
+        // one module header. Yong suggested to ignore the TC IR for now, though also that
+        // OV was using the feature, so disabling this might cause problems.
 #if 0
         if (data.targetComponents.getCount() && (options.optionFlags & SerialOptionFlag::IRModule))
         {
@@ -378,7 +429,10 @@ namespace Slang {
     {
         for (const auto& entryPoint : data.entryPoints)
         {
-            RiffContainer::ScopeChunk entryPointScope(container, RiffContainer::Chunk::Kind::Data, SerialBinary::kEntryPointFourCc);
+            RiffContainer::ScopeChunk entryPointScope(
+                container,
+                RiffContainer::Chunk::Kind::Data,
+                SerialBinary::kEntryPointFourCc);
 
             SerialContainerBinary::EntryPoint dst;
 
@@ -390,7 +444,7 @@ namespace Slang {
         }
     }
 
-    // We can now output the debug information. This is for all IR and AST 
+    // We can now output the debug information. This is for all IR and AST
     if (sourceLocWriter)
     {
         // Write out the debug info
@@ -403,11 +457,14 @@ namespace Slang {
     // Write the container string table
     if (containerStringPool.getAdded().getCount() > 0)
     {
-        RiffContainer::ScopeChunk stringTableScope(container, RiffContainer::Chunk::Kind::Data, SerialBinary::kStringTableFourCc);
+        RiffContainer::ScopeChunk stringTableScope(
+            container,
+            RiffContainer::Chunk::Kind::Data,
+            SerialBinary::kStringTableFourCc);
 
         List<char> encodedTable;
         SerialStringTableUtil::encodeStringTable(containerStringPool, encodedTable);
-        
+
         container->write(encodedTable.getBuffer(), encodedTable.getCount());
     }
 
@@ -428,31 +485,43 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
     return entry->candidateExtensions;
 }
 
-/* static */Result SerialContainerUtil::read(RiffContainer* container, const ReadOptions& options, const LoadedModuleDictionary* additionalLoadedModules, SerialContainerData& out)
+/* static */ Result SerialContainerUtil::read(
+    RiffContainer* container,
+    const ReadOptions& options,
+    const LoadedModuleDictionary* additionalLoadedModules,
+    SerialContainerData& out)
 {
     out.clear();
 
-    RiffContainer::ListChunk* containerChunk = container->getRoot()->findListRec(SerialBinary::kContainerFourCc);
+    RiffContainer::ListChunk* containerChunk =
+        container->getRoot()->findListRec(SerialBinary::kContainerFourCc);
     if (!containerChunk)
     {
         // Must be a container
         return SLANG_FAIL;
     }
 
-    SerialBinary::ContainerHeader* containerHeader = containerChunk->findContainedData<SerialBinary::ContainerHeader>(SerialBinary::kContainerHeaderFourCc);
+    SerialBinary::ContainerHeader* containerHeader =
+        containerChunk->findContainedData<SerialBinary::ContainerHeader>(
+            SerialBinary::kContainerHeaderFourCc);
     if (!containerHeader)
     {
         // Didn't find the header
         return SLANG_FAIL;
     }
 
-    const SerialCompressionType containerCompressionType = SerialCompressionType(containerHeader->compressionType);
+    const SerialCompressionType containerCompressionType =
+        SerialCompressionType(containerHeader->compressionType);
 
     StringSlicePool containerStringPool(StringSlicePool::Style::Default);
 
-    if (RiffContainer::Data* stringTableData = containerChunk->findContainedData(SerialBinary::kStringTableFourCc))
+    if (RiffContainer::Data* stringTableData =
+            containerChunk->findContainedData(SerialBinary::kStringTableFourCc))
     {
-        SerialStringTableUtil::decodeStringTable((const char*)stringTableData->getPayload(), stringTableData->getSize(), containerStringPool);
+        SerialStringTableUtil::decodeStringTable(
+            (const char*)stringTableData->getPayload(),
+            stringTableData->getSize(),
+            containerStringPool);
     }
 
     RefPtr<SerialSourceLocReader> sourceLocReader;
@@ -488,7 +557,8 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
     }
 
     // Add modules
-    if (RiffContainer::ListChunk* moduleList = containerChunk->findContainedList(SerialBinary::kModuleListFourCc))
+    if (RiffContainer::ListChunk* moduleList =
+            containerChunk->findContainedList(SerialBinary::kModuleListFourCc))
     {
         RiffContainer::Chunk* chunk = moduleList->getFirstContainedChunk();
         while (chunk)
@@ -499,7 +569,8 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
             NodeBase* astRootNode = nullptr;
             RefPtr<IRModule> irModule;
             SerialContainerData::Module module;
-            if (auto headerChunk = as<RiffContainer::DataChunk>(chunk, SerialBinary::kModuleHeaderFourCc))
+            if (auto headerChunk =
+                    as<RiffContainer::DataChunk>(chunk, SerialBinary::kModuleHeaderFourCc))
             {
                 MemoryStreamBase memStream(
                     FileAccess::Read,
@@ -518,7 +589,9 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                 memStream.read(fileListContent.getBuffer(), fileListContent.getCount(), readSize);
                 if (readSize != (size_t)fileListContent.getCount())
                     return SLANG_FAIL;
-                UnownedStringSlice fileListString((const char*)fileListContent.getBuffer(), fileListContent.getCount());
+                UnownedStringSlice fileListString(
+                    (const char*)fileListContent.getBuffer(),
+                    fileListContent.getCount());
                 List<UnownedStringSlice> fileList;
                 StringUtil::split(fileListString, '\n', fileList);
                 for (auto file : fileList)
@@ -537,22 +610,28 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                 if (!options.readHeaderOnly)
                 {
                     IRSerialData serialData;
-                    SLANG_RETURN_ON_FAIL(IRSerialReader::readContainer(irChunk, containerCompressionType, &serialData));
+                    SLANG_RETURN_ON_FAIL(IRSerialReader::readContainer(
+                        irChunk,
+                        containerCompressionType,
+                        &serialData));
 
                     // Read IR back from serialData
                     IRSerialReader reader;
-                    SLANG_RETURN_ON_FAIL(reader.read(serialData, options.session, sourceLocReader, irModule));
+                    SLANG_RETURN_ON_FAIL(
+                        reader.read(serialData, options.session, sourceLocReader, irModule));
                 }
 
                 // Onto next chunk
                 chunk = chunk->m_next;
             }
 
-            if (auto astChunk = as<RiffContainer::ListChunk>(chunk, ASTSerialBinary::kSlangASTModuleFourCC))
+            if (auto astChunk =
+                    as<RiffContainer::ListChunk>(chunk, ASTSerialBinary::kSlangASTModuleFourCC))
             {
                 if (!options.readHeaderOnly)
                 {
-                    RiffContainer::Data* astData = astChunk->findContainedData(ASTSerialBinary::kSlangASTModuleDataFourCC);
+                    RiffContainer::Data* astData =
+                        astChunk->findContainedData(ASTSerialBinary::kSlangASTModuleDataFourCC);
 
                     if (astData)
                     {
@@ -561,18 +640,20 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                             SLANG_RETURN_ON_FAIL(SerialClassesUtil::create(serialClasses));
                         }
 
-                        // TODO(JS): We probably want to store off better information about each of the translation unit
-                        // including some kind of 'name'.
-                        // For now we just generate a name.
+                        // TODO(JS): We probably want to store off better information about each of
+                        // the translation unit including some kind of 'name'. For now we just
+                        // generate a name.
 
                         StringBuilder buf;
                         buf << "tu" << out.modules.getCount();
                         if (!astBuilder)
                         {
-                            astBuilder = new ASTBuilder(options.sharedASTBuilder, buf.produceString());
+                            astBuilder =
+                                new ASTBuilder(options.sharedASTBuilder, buf.produceString());
                         }
 
-                        /// We need to make the current ASTBuilder available for access via thread_local global.
+                        /// We need to make the current ASTBuilder available for access via
+                        /// thread_local global.
                         SetASTBuilderContextRAII astBuilderRAII(astBuilder);
 
                         DefaultSerialObjectFactory objectFactory(astBuilder);
@@ -581,11 +662,14 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
 
                         // Sets up the entry table - one entry for each 'object'.
                         // No native objects are constructed. No objects are deserialized.
-                        SLANG_RETURN_ON_FAIL(reader.loadEntries((const uint8_t*)astData->getPayload(), astData->getSize()));
+                        SLANG_RETURN_ON_FAIL(reader.loadEntries(
+                            (const uint8_t*)astData->getPayload(),
+                            astData->getSize()));
 
                         // Construct a native object for each table entry (where appropriate).
-                        // Note that this *doesn't* set all object pointers - some are special cased and created on demand (strings)
-                        // and imported symbols will have their object pointers unset (they are resolved in next step)
+                        // Note that this *doesn't* set all object pointers - some are special cased
+                        // and created on demand (strings) and imported symbols will have their
+                        // object pointers unset (they are resolved in next step)
                         SLANG_RETURN_ON_FAIL(reader.constructObjects(options.namePool));
 
                         // Resolve external references if the linkage is specified
@@ -604,12 +688,13 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                 const SerialInfo::Entry* entry = entries[i];
                                 if (entry->typeKind == SerialTypeKind::ImportSymbol)
                                 {
-                                    // Import symbols are always serialized with a mangled name in the form of
-                                    // <module_name>!<symbol_mangled_name>.
-                                    // As symbol_mangled_name may not contain the name of its parent module
-                                    // in the case of an `extern` or `export` symbol.
+                                    // Import symbols are always serialized with a mangled name in
+                                    // the form of <module_name>!<symbol_mangled_name>. As
+                                    // symbol_mangled_name may not contain the name of its parent
+                                    // module in the case of an `extern` or `export` symbol.
                                     //
-                                    UnownedStringSlice mangledName = reader.getStringSlice(SerialIndex(i));
+                                    UnownedStringSlice mangledName =
+                                        reader.getStringSlice(SerialIndex(i));
                                     List<UnownedStringSlice> slicesOut;
                                     StringUtil::split(mangledName, '!', slicesOut);
                                     if (slicesOut.getCount() != 2)
@@ -617,9 +702,11 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                     auto moduleName = slicesOut[0];
                                     mangledName = slicesOut[1];
 
-                                    // If we already have looked up this module and it has the same name just use what we have
+                                    // If we already have looked up this module and it has the same
+                                    // name just use what we have
                                     Module* readModule = nullptr;
-                                    if (currentModule && moduleName == currentModuleName.getUnownedSlice())
+                                    if (currentModule &&
+                                        moduleName == currentModuleName.getUnownedSlice())
                                     {
                                         readModule = currentModule;
                                     }
@@ -630,7 +717,11 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
 
                                         NamePool* namePool = linkage->getNamePool();
                                         Name* moduleNameName = namePool->getName(moduleName);
-                                        readModule = linkage->findOrImportModule(moduleNameName, binaryModuleLoc, options.sink, additionalLoadedModules);
+                                        readModule = linkage->findOrImportModule(
+                                            moduleNameName,
+                                            binaryModuleLoc,
+                                            options.sink,
+                                            additionalLoadedModules);
                                         if (!readModule)
                                         {
                                             return SLANG_FAIL;
@@ -642,16 +733,22 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                     }
 
                                     // Look up the symbol
-                                    NodeBase* nodeBase = readModule->findExportFromMangledName(mangledName);
+                                    NodeBase* nodeBase =
+                                        readModule->findExportFromMangledName(mangledName);
 
                                     if (!nodeBase)
                                     {
                                         if (options.sink)
                                         {
-                                            options.sink->diagnose(SourceLoc::fromRaw(0), Diagnostics::unableToFindSymbolInModule, mangledName, moduleName);
+                                            options.sink->diagnose(
+                                                SourceLoc::fromRaw(0),
+                                                Diagnostics::unableToFindSymbolInModule,
+                                                mangledName,
+                                                moduleName);
                                         }
 
-                                        // If didn't find the export then we create an UnresolvedDecl node to represent the error.
+                                        // If didn't find the export then we create an
+                                        // UnresolvedDecl node to represent the error.
                                         auto unresolved = astBuilder->create<UnresolvedDecl>();
                                         unresolved->nameAndLoc.name =
                                             options.linkage->getNamePool()->getName(mangledName);
@@ -664,21 +761,22 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                             }
                         }
 
-                        // Set the sourceLocReader before doing de-serialize, such can lookup the remapped sourceLocs
+                        // Set the sourceLocReader before doing de-serialize, such can lookup the
+                        // remapped sourceLocs
                         reader.getExtraObjects().set(sourceLocReader);
 
                         // TODO(JS):
-                        // If modules can have more complicated relationships (like a two modules can refer to symbols
-                        // from each other), then we can make this work by
-                        // 1) deserialize *without* the external symbols being set up
-                        // 2) calculate the symbols
-                        // 3) deserialize the other module (in the same way)
-                        // 4) run deserializeObjects *again* on each module
-                        // This is less efficient than it might be (because deserialize phase is done twice) so if this is necessary
-                        // may want a mechanism that *just* does reference lookups.
+                        // If modules can have more complicated relationships (like a two modules
+                        // can refer to symbols from each other), then we can make this work by 1)
+                        // deserialize *without* the external symbols being set up 2) calculate the
+                        // symbols 3) deserialize the other module (in the same way) 4) run
+                        // deserializeObjects *again* on each module This is less efficient than it
+                        // might be (because deserialize phase is done twice) so if this is
+                        // necessary may want a mechanism that *just* does reference lookups.
                         //
-                        // For now if we assume a module can only access symbols from another module, and not the reverse.
-                        // So we just need to deserialize and we are done
+                        // For now if we assume a module can only access symbols from another
+                        // module, and not the reverse. So we just need to deserialize and we are
+                        // done
                         SLANG_RETURN_ON_FAIL(reader.deserializeObjects());
 
                         // Get the root node. It's at index 1 (0 is the null value).
@@ -710,20 +808,29 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                     NodeBase* nodeBase = (NodeBase*)obj.m_ptr;
                                     SLANG_ASSERT(nodeBase);
 
-                                    if (ExtensionDecl* extensionDecl = dynamicCast<ExtensionDecl>(nodeBase))
+                                    if (ExtensionDecl* extensionDecl =
+                                            dynamicCast<ExtensionDecl>(nodeBase))
                                     {
-                                        if (auto targetDeclRefType = as<DeclRefType>(extensionDecl->targetType))
+                                        if (auto targetDeclRefType =
+                                                as<DeclRefType>(extensionDecl->targetType))
                                         {
-                                            // Attach our extension to that type as a candidate...
-                                            if (auto aggTypeDeclRef = targetDeclRefType->getDeclRef().as<AggTypeDecl>())
+                                            ShortList<AggTypeDecl*> baseDecls;
+                                            getExtensionTargetDeclList(
+                                                astBuilder,
+                                                targetDeclRefType,
+                                                extensionDecl,
+                                                baseDecls);
+                                            for (auto baseDecl : baseDecls)
                                             {
-                                                auto aggTypeDecl = aggTypeDeclRef.getDecl();
-
-                                                _getCandidateExtensionList(aggTypeDecl, moduleDecl->mapTypeToCandidateExtensions).add(extensionDecl);
+                                                _getCandidateExtensionList(
+                                                    baseDecl,
+                                                    moduleDecl->mapTypeToCandidateExtensions)
+                                                    .add(extensionDecl);
                                             }
                                         }
                                     }
-                                    else if (SyntaxDecl* syntaxDecl = dynamicCast<SyntaxDecl>(nodeBase))
+                                    else if (
+                                        SyntaxDecl* syntaxDecl = dynamicCast<SyntaxDecl>(nodeBase))
                                     {
                                         // Set up the dictionary lazily
                                         if (syntaxKeywordDict.getCount() == 0)
@@ -732,28 +839,35 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                                             for (Index i = 0; i < syntaxParseInfos.getCount(); ++i)
                                             {
                                                 const auto& entry = syntaxParseInfos[i];
-                                                syntaxKeywordDict.add(namePool->getName(entry.keywordName), i);
+                                                syntaxKeywordDict.add(
+                                                    namePool->getName(entry.keywordName),
+                                                    i);
                                             }
                                             // Must have something in it at this point
                                             SLANG_ASSERT(syntaxKeywordDict.getCount());
                                         }
 
-                                        // Look up the index 
-                                        Index* entryIndexPtr = syntaxKeywordDict.tryGetValue(syntaxDecl->getName());
+                                        // Look up the index
+                                        Index* entryIndexPtr =
+                                            syntaxKeywordDict.tryGetValue(syntaxDecl->getName());
                                         if (entryIndexPtr)
                                         {
                                             // Set up SyntaxDecl based on the ParseSyntaxIndo
                                             auto& info = syntaxParseInfos[*entryIndexPtr];
                                             syntaxDecl->parseCallback = *info.callback;
-                                            syntaxDecl->parseUserData = const_cast<ReflectClassInfo*>(info.classInfo);
+                                            syntaxDecl->parseUserData =
+                                                const_cast<ReflectClassInfo*>(info.classInfo);
                                         }
                                         else
                                         {
-                                            // If we don't find a setup entry, we use `parseSimpleSyntax`, and set
-                                            // the parseUserData to the ReflectClassInfo (as parseSimpleSyntax needs this)
+                                            // If we don't find a setup entry, we use
+                                            // `parseSimpleSyntax`, and set the parseUserData to the
+                                            // ReflectClassInfo (as parseSimpleSyntax needs this)
                                             syntaxDecl->parseCallback = &parseSimpleSyntax;
                                             SLANG_ASSERT(syntaxDecl->syntaxClass.classInfo);
-                                            syntaxDecl->parseUserData = const_cast<ReflectClassInfo*>(syntaxDecl->syntaxClass.classInfo);
+                                            syntaxDecl->parseUserData =
+                                                const_cast<ReflectClassInfo*>(
+                                                    syntaxDecl->syntaxClass.classInfo);
                                         }
                                     }
                                     else if (Val* val = dynamicCast<Val>(nodeBase))
@@ -798,9 +912,11 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
 
             SerialContainerData::EntryPoint dstEntryPoint;
 
-            dstEntryPoint.name = options.namePool->getName(containerStringPool.getSlice(StringSlicePool::Handle(srcEntryPoint.name)));
+            dstEntryPoint.name = options.namePool->getName(
+                containerStringPool.getSlice(StringSlicePool::Handle(srcEntryPoint.name)));
             dstEntryPoint.profile.raw = srcEntryPoint.profile;
-            dstEntryPoint.mangledName = containerStringPool.getSlice(StringSlicePool::Handle(srcEntryPoint.mangledName));
+            dstEntryPoint.mangledName =
+                containerStringPool.getSlice(StringSlicePool::Handle(srcEntryPoint.mangledName));
 
             out.entryPoints.add(dstEntryPoint);
         }
@@ -809,7 +925,10 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
     return SLANG_OK;
 }
 
-/* static */SlangResult SerialContainerUtil::verifyIRSerialize(IRModule* module, Session* session, const WriteOptions& options)
+/* static */ SlangResult SerialContainerUtil::verifyIRSerialize(
+    IRModule* module,
+    Session* session,
+    const WriteOptions& options)
 {
     // Verify if we can stream out with raw source locs
 
@@ -823,8 +942,11 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
     {
         RiffContainer riffContainer;
 
-        // Need to put all of this in a container 
-        RiffContainer::ScopeChunk containerScope(&riffContainer, RiffContainer::Chunk::Kind::List, SerialBinary::kContainerFourCc);
+        // Need to put all of this in a container
+        RiffContainer::ScopeChunk containerScope(
+            &riffContainer,
+            RiffContainer::Chunk::Kind::List,
+            SerialBinary::kContainerFourCc);
 
         RefPtr<SerialSourceLocWriter> sourceLocWriter;
 
@@ -832,21 +954,24 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
         {
             sourceLocWriter = new SerialSourceLocWriter(options.sourceManager);
         }
-        
+
         {
             // Write IR out to serialData - copying over SourceLoc information directly
             IRSerialWriter writer;
-            SLANG_RETURN_ON_FAIL(writer.write(module, sourceLocWriter, options.optionFlags, &irData));
+            SLANG_RETURN_ON_FAIL(
+                writer.write(module, sourceLocWriter, options.optionFlags, &irData));
         }
-        SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(irData, options.compressionType, &riffContainer));
-    
+        SLANG_RETURN_ON_FAIL(
+            IRSerialWriter::writeContainer(irData, options.compressionType, &riffContainer));
+
         // Write the debug info Riff container
         if (sourceLocWriter)
         {
             SerialSourceLocData serialData;
             sourceLocWriter->write(&serialData);
 
-            SLANG_RETURN_ON_FAIL(serialData.writeContainer(options.compressionType, &riffContainer));
+            SLANG_RETURN_ON_FAIL(
+                serialData.writeContainer(options.compressionType, &riffContainer));
         }
 
         SLANG_RETURN_ON_FAIL(RiffUtil::write(&riffContainer, &memoryStream));
@@ -871,7 +996,8 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
         // If we have debug info then find and read it
         if (options.optionFlags & SerialOptionFlag::SourceLocation)
         {
-            RiffContainer::ListChunk* debugList = rootList->findContainedList(SerialSourceLocData::kDebugFourCc);
+            RiffContainer::ListChunk* debugList =
+                rootList->findContainedList(SerialSourceLocData::kDebugFourCc);
             if (!debugList)
             {
                 return SLANG_FAIL;
@@ -884,7 +1010,8 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
         }
 
         {
-            RiffContainer::ListChunk* irList = rootList->findContainedList(IRSerialBinary::kIRModuleFourCc);
+            RiffContainer::ListChunk* irList =
+                rootList->findContainedList(IRSerialBinary::kIRModuleFourCc);
             if (!irList)
             {
                 return SLANG_FAIL;
@@ -893,7 +1020,8 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
             {
                 IRSerialData irReadData;
                 IRSerialReader reader;
-                SLANG_RETURN_ON_FAIL(reader.readContainer(irList, options.compressionType, &irReadData));
+                SLANG_RETURN_ON_FAIL(
+                    reader.readContainer(irList, options.compressionType, &irReadData));
 
                 // Check the stream read data is the same
                 if (irData != irReadData)
@@ -957,8 +1085,10 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
             SLANG_ASSERT(origSourceView && readSourceView);
 
             // The offset should be the same
-            Index origOffset = origInst->sourceLoc.getRaw() - origSourceView->getRange().begin.getRaw();
-            Index readOffset = readInst->sourceLoc.getRaw() - readSourceView->getRange().begin.getRaw();
+            Index origOffset =
+                origInst->sourceLoc.getRaw() - origSourceView->getRange().begin.getRaw();
+            Index readOffset =
+                readInst->sourceLoc.getRaw() - readSourceView->getRange().begin.getRaw();
 
             if (origOffset != readOffset)
             {
@@ -967,25 +1097,31 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
             }
 
             {
-                auto origInfo = origSourceView->getHumaneLoc(origInst->sourceLoc, SourceLocType::Actual);
-                auto readInfo = readSourceView->getHumaneLoc(readInst->sourceLoc, SourceLocType::Actual);
+                auto origInfo =
+                    origSourceView->getHumaneLoc(origInst->sourceLoc, SourceLocType::Actual);
+                auto readInfo =
+                    readSourceView->getHumaneLoc(readInst->sourceLoc, SourceLocType::Actual);
 
-                if (!(origInfo.line == readInfo.line && origInfo.column == readInfo.column && origInfo.pathInfo.foundPath == readInfo.pathInfo.foundPath))
+                if (!(origInfo.line == readInfo.line && origInfo.column == readInfo.column &&
+                      origInfo.pathInfo.foundPath == readInfo.pathInfo.foundPath))
                 {
                     SLANG_ASSERT(!"Debug data didn't match");
                     return SLANG_FAIL;
                 }
             }
 
-            // We may have adjusted line numbers -> but they may not match, because we only reconstruct one view
-            // So for now disable this test
+            // We may have adjusted line numbers -> but they may not match, because we only
+            // reconstruct one view So for now disable this test
 
             if (false)
             {
-                auto origInfo = origSourceView->getHumaneLoc(origInst->sourceLoc, SourceLocType::Nominal);
-                auto readInfo = readSourceView->getHumaneLoc(readInst->sourceLoc, SourceLocType::Nominal);
+                auto origInfo =
+                    origSourceView->getHumaneLoc(origInst->sourceLoc, SourceLocType::Nominal);
+                auto readInfo =
+                    readSourceView->getHumaneLoc(readInst->sourceLoc, SourceLocType::Nominal);
 
-                if (!(origInfo.line == readInfo.line && origInfo.column == readInfo.column && origInfo.pathInfo.foundPath == readInfo.pathInfo.foundPath))
+                if (!(origInfo.line == readInfo.line && origInfo.column == readInfo.column &&
+                      origInfo.pathInfo.foundPath == readInfo.pathInfo.foundPath))
                 {
                     SLANG_ASSERT(!"Debug data didn't match");
                     return SLANG_FAIL;

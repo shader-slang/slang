@@ -1,30 +1,36 @@
 // test-server.cpp
 
+#include "../../source/compiler-core/slang-json-rpc-connection.h"
+#include "../../source/compiler-core/slang-test-server-protocol.h"
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-process-util.h"
+#include "../../source/core/slang-secure-crt.h"
+#include "../../source/core/slang-shared-library.h"
+#include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-string.h"
+#include "../../source/core/slang-test-tool-util.h"
+#include "../../source/core/slang-writer.h"
+#include "slang-com-helper.h"
+#include "test-server-diagnostics.h"
+#include "unit-test/slang-unit-test.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "../../source/core/slang-secure-crt.h"
+#if defined(_WIN32)
+// https://devblogs.microsoft.com/directx/gettingstarted-dx12agility/#2.-set-agility-sdk-parameters
 
-#include "slang-com-helper.h"
+extern "C"
+{
+    __declspec(dllexport) extern const uint32_t D3D12SDKVersion = 711;
+}
 
-#include "../../source/core/slang-string.h"
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-writer.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-process-util.h"
-
-#include "../../source/core/slang-shared-library.h"
-
-#include "../../source/core/slang-test-tool-util.h"
-
-#include "../../source/compiler-core/slang-json-rpc-connection.h"
-
-#include "../../source/compiler-core/slang-test-server-protocol.h"
-
-#include "test-server-diagnostics.h"
-
-#include "tools/unit-test/slang-unit-test.h"
+extern "C"
+{
+    __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\";
+}
+#endif
 
 namespace TestServer
 {
@@ -34,13 +40,18 @@ class TestReporter : public ITestReporter
 {
 public:
     // ITestReporter
-    virtual SLANG_NO_THROW void SLANG_MCALL startTest(const char* testName) SLANG_OVERRIDE { }
-    virtual SLANG_NO_THROW void SLANG_MCALL addResult(TestResult result)SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL addResultWithLocation(TestResult result, const char* testText, const char* file, int line) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL addResultWithLocation(bool testSucceeded, const char* testText, const char* file, int line) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL addExecutionTime(double time) SLANG_OVERRIDE { }
-    virtual SLANG_NO_THROW void SLANG_MCALL message(TestMessageType type, const char* message) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW void SLANG_MCALL endTest() SLANG_OVERRIDE { }
+    virtual SLANG_NO_THROW void SLANG_MCALL startTest(const char* testName) SLANG_OVERRIDE {}
+    virtual SLANG_NO_THROW void SLANG_MCALL addResult(TestResult result) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+    addResultWithLocation(TestResult result, const char* testText, const char* file, int line)
+        SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL
+    addResultWithLocation(bool testSucceeded, const char* testText, const char* file, int line)
+        SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL addExecutionTime(double time) SLANG_OVERRIDE {}
+    virtual SLANG_NO_THROW void SLANG_MCALL message(TestMessageType type, const char* message)
+        SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW void SLANG_MCALL endTest() SLANG_OVERRIDE {}
 
     StringBuilder m_buf;
     Index m_failCount = 0;
@@ -54,22 +65,22 @@ public:
 
     SlangResult init(int argc, const char* const* argv);
 
-        /// Can return nullptr if cannot create the session
+    /// Can return nullptr if cannot create the session
     slang::IGlobalSession* getOrCreateGlobalSession();
 
-        /// Can return nullptr if cannot load the tool
+    /// Can return nullptr if cannot load the tool
     ISlangSharedLibrary* loadSharedLibrary(const String& name, DiagnosticSink* sink = nullptr);
 
-        /// Get a unit test module. Returns nullptr if not found.
+    /// Get a unit test module. Returns nullptr if not found.
     IUnitTestModule* getUnitTestModule(const String& name, DiagnosticSink* sink = nullptr);
 
-        /// Given a tool name return it's function pointer. Or nullptr on failure.
+    /// Given a tool name return it's function pointer. Or nullptr on failure.
     InnerMainFunc getToolFunction(const String& name, DiagnosticSink* sink = nullptr);
 
-        /// Execute the server
+    /// Execute the server
     SlangResult execute();
 
-        /// Dtor
+    /// Dtor
     ~TestServer();
 
 protected:
@@ -79,20 +90,23 @@ protected:
 
     bool m_quit = false;
 
-    ComPtr<slang::IGlobalSession> m_session;                        /// The slang session. Is created on demand
+    ComPtr<slang::IGlobalSession> m_session; /// The slang session. Is created on demand
 
-    Dictionary<String, ComPtr<ISlangSharedLibrary>> m_sharedLibraryMap;     ///< Maps tool names to the dll
-    Dictionary<String, IUnitTestModule*> m_unitTestModules;                 ///< All the unit test modules. 
+    Dictionary<String, ComPtr<ISlangSharedLibrary>>
+        m_sharedLibraryMap;                                 ///< Maps tool names to the dll
+    Dictionary<String, IUnitTestModule*> m_unitTestModules; ///< All the unit test modules.
 
-    String m_exePath;                                               ///< Path to executable (including exe name)
-    String m_exeDirectory;                                          ///< The directory that holds the exe
+    String m_exePath;      ///< Path to executable (including exe name)
+    String m_exeDirectory; ///< The directory that holds the exe
 
-    RefPtr<JSONRPCConnection> m_connection;                         ///< RPC connection, recieves calls to execute and returns results via JSON-RPC
+    RefPtr<JSONRPCConnection> m_connection; ///< RPC connection, recieves calls to execute and
+                                            ///< returns results via JSON-RPC
 };
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-namespace SlangCTool {
+namespace SlangCTool
+{
 
 static void _diagnosticCallback(char const* message, void* userData)
 {
@@ -100,21 +114,29 @@ static void _diagnosticCallback(char const* message, void* userData)
     writer->write(message, strlen(message));
 }
 
-SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSession, int argc, const char* const* argv)
+SlangResult innerMain(
+    StdWriters* stdWriters,
+    slang::IGlobalSession* sharedSession,
+    int argc,
+    const char* const* argv)
 {
     // Assume we will used the shared session
     ComPtr<slang::IGlobalSession> session(sharedSession);
 
-    // The sharedSession always has a pre-loaded stdlib.
-    // This differed test checks if the command line has an option to setup the stdlib.
-    // If so we *don't* use the sharedSession, and create a new stdlib-less session just for this compilation. 
-    if (TestToolUtil::hasDeferredStdLib(Index(argc - 1), argv + 1))
+    // The sharedSession always has a pre-loaded core module.
+    // This differed test checks if the command line has an option to setup the core module.
+    // If so we *don't* use the sharedSession, and create a new session without the core module just
+    // for this compilation.
+    if (TestToolUtil::hasDeferredCoreModule(Index(argc - 1), argv + 1))
     {
-        SLANG_RETURN_ON_FAIL(slang_createGlobalSessionWithoutStdLib(SLANG_API_VERSION, session.writeRef()));
+        SLANG_RETURN_ON_FAIL(
+            slang_createGlobalSessionWithoutCoreModule(SLANG_API_VERSION, session.writeRef()));
     }
 
     ComPtr<slang::ICompileRequest> compileRequest;
+    SLANG_ALLOW_DEPRECATED_BEGIN
     SLANG_RETURN_ON_FAIL(session->createCompileRequest(compileRequest.writeRef()));
+    SLANG_ALLOW_DEPRECATED_END
 
     // Do any app specific configuration
     for (int i = 0; i < int{SLANG_WRITER_CHANNEL_COUNT_OF}; ++i)
@@ -123,7 +145,9 @@ SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSessi
         compileRequest->setWriter(channel, stdWriters->getWriter(channel));
     }
 
-    compileRequest->setDiagnosticCallback(&_diagnosticCallback, stdWriters->getWriter(SLANG_WRITER_CHANNEL_STD_ERROR));
+    compileRequest->setDiagnosticCallback(
+        &_diagnosticCallback,
+        stdWriters->getWriter(SLANG_WRITER_CHANNEL_STD_ERROR));
     compileRequest->setCommandLineCompilerMode();
 
     {
@@ -141,11 +165,13 @@ SlangResult innerMain(StdWriters* stdWriters, slang::IGlobalSession* sharedSessi
     try
 #endif
     {
-        // Run the compiler (this will produce any diagnostics through SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC).
+        // Run the compiler (this will produce any diagnostics through
+        // SLANG_WRITER_TARGET_TYPE_DIAGNOSTIC).
         compileRes = compileRequest->compile();
 
         // If the compilation failed, then get out of here...
-        // Turn into an internal Result -> such that return code can be used to vary result to match previous behavior
+        // Turn into an internal Result -> such that return code can be used to vary result to match
+        // previous behavior
         compileRes = SLANG_FAILED(compileRes) ? SLANG_E_INTERNAL_FAIL : compileRes;
     }
 #ifndef _DEBUG
@@ -194,7 +220,9 @@ slang::IGlobalSession* TestServer::getOrCreateGlobalSession()
     if (!m_session)
     {
         // Just create the global session in the regular way if there isn't one set
-        if (SLANG_FAILED(slang_createGlobalSession(SLANG_API_VERSION, m_session.writeRef())))
+        SlangGlobalSessionDesc desc = {};
+        desc.enableGLSL = true;
+        if (SLANG_FAILED(slang_createGlobalSession2(&desc, m_session.writeRef())))
         {
             return nullptr;
         }
@@ -246,12 +274,16 @@ IUnitTestModule* TestServer::getUnitTestModule(const String& name, DiagnosticSin
     const char funcName[] = "slangUnitTestGetModule";
 
     // get the unit test export name
-    UnitTestGetModuleFunc getModuleFunc = (UnitTestGetModuleFunc)sharedLibrary->findFuncByName(funcName);
+    UnitTestGetModuleFunc getModuleFunc =
+        (UnitTestGetModuleFunc)sharedLibrary->findFuncByName(funcName);
     if (!getModuleFunc)
     {
         if (sink)
         {
-            sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindFunctionInSharedLibrary, funcName);
+            sink->diagnose(
+                SourceLoc(),
+                ServerDiagnostics::unableToFindFunctionInSharedLibrary,
+                funcName);
         }
         return nullptr;
     }
@@ -292,9 +324,12 @@ TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, Diagno
     auto func = (InnerMainFunc)sharedLibrary->findFuncByName(funcName);
     if (!func && sink)
     {
-        sink->diagnose(SourceLoc(), ServerDiagnostics::unableToFindFunctionInSharedLibrary, funcName);
+        sink->diagnose(
+            SourceLoc(),
+            ServerDiagnostics::unableToFindFunctionInSharedLibrary,
+            funcName);
     }
-    
+
     return func;
 }
 
@@ -313,7 +348,7 @@ SlangResult TestServer::_executeSingle()
 
     switch (msgType)
     {
-        case JSONRPCMessageType::Call:
+    case JSONRPCMessageType::Call:
         {
             JSONRPCCall call;
             SLANG_RETURN_ON_FAIL(m_connection->getRPCOrSendError(&call));
@@ -339,9 +374,11 @@ SlangResult TestServer::_executeSingle()
                 return m_connection->sendError(JSONRPC::ErrorCode::MethodNotFound, call.id);
             }
         }
-        default:
+    default:
         {
-            return m_connection->sendError(JSONRPC::ErrorCode::InvalidRequest, m_connection->getCurrentMessageId());
+            return m_connection->sendError(
+                JSONRPC::ErrorCode::InvalidRequest,
+                m_connection->getCurrentMessageId());
         }
     }
 
@@ -389,7 +426,7 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     TestReporter testReporter;
 
     testModule->setTestReporter(&testReporter);
-    
+
     // Assume we will used the shared session
     slang::IGlobalSession* session = getOrCreateGlobalSession();
     if (!session)
@@ -439,7 +476,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     auto id = m_connection->getPersistentValue(call.id);
 
     TestServerProtocol::ExecuteToolTestArgs args;
-    
+
     SLANG_RETURN_ON_FAIL(m_connection->toNativeArgsOrSendError(call.params, &args, id));
 
     auto sink = m_connection->getSink();
@@ -460,7 +497,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     // Work out the args sent to the shared library
     List<const char*> toolArgs;
 
-    // Add the 'exe' name 
+    // Add the 'exe' name
     toolArgs.add(args.toolName.getBuffer());
 
     // Add the args
@@ -481,12 +518,13 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, stdOutWriter);
 
     // HACK, to make behavior the same as previously
-    if (args.toolName== "slangc")
+    if (args.toolName == "slangc")
     {
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, stdErrorWriter);
     }
 
-    const SlangResult funcRes = func(&stdWriters, session, int(toolArgs.getCount()), toolArgs.begin());
+    const SlangResult funcRes =
+        func(&stdWriters, session, int(toolArgs.getCount()), toolArgs.begin());
 
     TestServerProtocol::ExecutionResult result;
     result.result = funcRes;
@@ -502,8 +540,7 @@ SlangResult TestServer::execute()
     while (m_connection->isActive() && !m_quit)
     {
         // Failure doesn't make the execution terminate
-        [[maybe_unused]]
-        const SlangResult res = _executeSingle();
+        [[maybe_unused]] const SlangResult res = _executeSingle();
     }
 
     return SLANG_OK;
@@ -513,8 +550,7 @@ SlangResult TestServer::execute()
 
 void TestReporter::message(TestMessageType type, const char* message)
 {
-    if (type == TestMessageType::RunError ||
-        type == TestMessageType::TestFailure)
+    if (type == TestMessageType::RunError || type == TestMessageType::TestFailure)
     {
         m_failCount++;
     }
@@ -522,7 +558,11 @@ void TestReporter::message(TestMessageType type, const char* message)
     m_buf << message << "\n";
 }
 
-void TestReporter::addResultWithLocation(TestResult result, const char* testText, const char* file, int line)
+void TestReporter::addResultWithLocation(
+    TestResult result,
+    const char* testText,
+    const char* file,
+    int line)
 {
     if (result == TestResult::Fail)
     {
@@ -534,7 +574,11 @@ void TestReporter::addResultWithLocation(TestResult result, const char* testText
     }
 }
 
-void TestReporter::addResultWithLocation(bool testSucceeded, const char* testText, const char* file, int line)
+void TestReporter::addResultWithLocation(
+    bool testSucceeded,
+    const char* testText,
+    const char* file,
+    int line)
 {
     m_testCount++;
 
@@ -571,5 +615,5 @@ SlangResult _execute(int argc, const char* const* argv)
 
 int main(int argc, const char* const* argv)
 {
-    return (int)Slang::TestToolUtil::getReturnCode(TestServer:: _execute(argc, argv));
+    return (int)Slang::TestToolUtil::getReturnCode(TestServer::_execute(argc, argv));
 }

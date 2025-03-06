@@ -5,19 +5,15 @@ namespace Slang
 
 struct DiffPairLoweringPass : InstPassBase
 {
-    DiffPairLoweringPass(AutoDiffSharedContext* context) :
-        InstPassBase(context->moduleInst->getModule()), 
-        pairBuilderStorage(context)
-    { 
+    DiffPairLoweringPass(AutoDiffSharedContext* context)
+        : InstPassBase(context->moduleInst->getModule()), pairBuilderStorage(context)
+    {
         pairBuilder = &pairBuilderStorage;
     }
 
     IRInst* lowerPairType(IRBuilder* builder, IRType* pairType)
     {
-        builder->setInsertBefore(pairType);
-        auto loweredPairType = pairBuilder->lowerDiffPairType(
-            builder,
-            pairType);
+        auto loweredPairType = pairBuilder->lowerDiffPairType(builder, pairType);
         return loweredPairType;
     }
 
@@ -25,24 +21,81 @@ struct DiffPairLoweringPass : InstPassBase
     {
         if (auto makePairInst = as<IRMakeDifferentialPairBase>(inst))
         {
-            bool isTrivial = false;
             auto pairType = as<IRDifferentialPairTypeBase>(makePairInst->getDataType());
-            if (auto loweredPairType = lowerPairType(builder, pairType))
+            builder->setInsertBefore(makePairInst);
+            if (auto loweredPairType = (IRType*)lowerPairType(builder, pairType))
             {
-                builder->setInsertBefore(makePairInst);
-                IRInst* result = nullptr;
-                if (isTrivial)
+                if (isRuntimeType(pairType->getValueType()))
                 {
-                    result = makePairInst->getPrimalValue();
+                    auto result = pairBuilder->emitExistentialMakePair(
+                        builder,
+                        loweredPairType,
+                        makePairInst->getPrimalValue(),
+                        makePairInst->getDifferentialValue());
+
+                    makePairInst->replaceUsesWith(result);
+                    makePairInst->removeAndDeallocate();
+                    return result;
+                }
+                else if (auto typePack = as<IRTypePack>(pairType->getValueType()))
+                {
+                    // TODO: Do we need to flatten the packs here?
+
+                    // If the type is a type pack, then the value must be in
+                    // MakePair(MakeValuePack(p_0, p_1, ...), MakeValuePack(d_0, d_1, ...)) form
+                    // Convert it to MakeValuePack(MakePair(p_0, d_0), MakePair(p_1, d_1), ...)
+                    // and lower each MakePair.
+                    //
+
+                    // Primal pack
+                    auto primalValue = as<IRMakeValuePack>(makePairInst->getPrimalValue());
+                    SLANG_ASSERT(primalValue);
+
+                    // Differential pack
+                    auto diffValue = as<IRMakeValuePack>(makePairInst->getDifferentialValue());
+                    SLANG_ASSERT(diffValue);
+
+                    // Expect the lowered pair type to be a type pack of pair types.
+                    SLANG_ASSERT(as<IRTypePack>(loweredPairType));
+
+                    List<IRInst*> newValues;
+                    for (UInt i = 0; i < typePack->getOperandCount(); i++)
+                    {
+                        auto primalElement = primalValue->getOperand(i);
+                        auto diffElement = diffValue->getOperand(i);
+
+                        auto loweredElementPairType = (IRType*)loweredPairType->getOperand(i);
+
+                        IRInst* operands[] = {primalElement, diffElement};
+
+                        auto loweredMakePair =
+                            builder->emitMakeStruct((IRType*)loweredElementPairType, 2, operands);
+
+                        newValues.add(loweredMakePair);
+                    }
+
+                    auto newPack = builder->emitMakeValuePack(
+                        loweredPairType,
+                        newValues.getCount(),
+                        newValues.getBuffer());
+
+                    makePairInst->replaceUsesWith(newPack);
+                    makePairInst->removeAndDeallocate();
+                    return newPack;
                 }
                 else
                 {
-                    IRInst* operands[2] = { makePairInst->getPrimalValue(), makePairInst->getDifferentialValue() };
+                    IRInst* result = nullptr;
+
+                    IRInst* operands[2] = {
+                        makePairInst->getPrimalValue(),
+                        makePairInst->getDifferentialValue()};
                     result = builder->emitMakeStruct((IRType*)(loweredPairType), 2, operands);
+
+                    makePairInst->replaceUsesWith(result);
+                    makePairInst->removeAndDeallocate();
+                    return result;
                 }
-                makePairInst->replaceUsesWith(result);
-                makePairInst->removeAndDeallocate();
-                return result;
             }
         }
 
@@ -59,11 +112,14 @@ struct DiffPairLoweringPass : InstPassBase
                 pairType = pairPtrType->getValueType();
             }
 
-            if (lowerPairType(builder, pairType))
+            builder->setInsertBefore(getDiffInst);
+            if (auto loweredType = lowerPairType(builder, pairType))
             {
-                builder->setInsertBefore(getDiffInst);
                 IRInst* diffFieldExtract = nullptr;
-                diffFieldExtract = pairBuilder->emitDiffFieldAccess(builder, getDiffInst->getBase());
+                diffFieldExtract = pairBuilder->emitDiffFieldAccess(
+                    builder,
+                    (IRType*)loweredType,
+                    getDiffInst->getBase());
                 getDiffInst->replaceUsesWith(diffFieldExtract);
                 getDiffInst->removeAndDeallocate();
                 return diffFieldExtract;
@@ -77,12 +133,14 @@ struct DiffPairLoweringPass : InstPassBase
                 pairType = pairPtrType->getValueType();
             }
 
-            if (lowerPairType(builder, pairType))
+            builder->setInsertBefore(getPrimalInst);
+            if (auto loweredType = lowerPairType(builder, pairType))
             {
-                builder->setInsertBefore(getPrimalInst);
-
                 IRInst* primalFieldExtract = nullptr;
-                primalFieldExtract = pairBuilder->emitPrimalFieldAccess(builder, getPrimalInst->getBase());
+                primalFieldExtract = pairBuilder->emitPrimalFieldAccess(
+                    builder,
+                    (IRType*)loweredType,
+                    getPrimalInst->getBase());
                 getPrimalInst->replaceUsesWith(primalFieldExtract);
                 getPrimalInst->removeAndDeallocate();
                 return primalFieldExtract;
@@ -96,7 +154,8 @@ struct DiffPairLoweringPass : InstPassBase
     {
         bool modified = false;
 
-        processAllInsts([&](IRInst* inst)
+        processAllInsts(
+            [&](IRInst* inst)
             {
                 // Make sure the builder is at the right level.
                 builder->setInsertInto(instWithChildren);
@@ -107,10 +166,13 @@ struct DiffPairLoweringPass : InstPassBase
                 case kIROp_DifferentialPairGetPrimal:
                 case kIROp_DifferentialPairGetDifferentialUserCode:
                 case kIROp_DifferentialPairGetPrimalUserCode:
+                case kIROp_DifferentialPtrPairGetDifferential:
+                case kIROp_DifferentialPtrPairGetPrimal:
                     lowerPairAccess(builder, inst);
                     break;
 
                 case kIROp_MakeDifferentialPairUserCode:
+                case kIROp_MakeDifferentialPtrPair:
                     lowerMakePair(builder, inst);
                     break;
 
@@ -120,7 +182,8 @@ struct DiffPairLoweringPass : InstPassBase
             });
 
         OrderedDictionary<IRInst*, IRInst*> pendingReplacements;
-        processAllInsts([&](IRInst* inst)
+        processAllInsts(
+            [&](IRInst* inst)
             {
                 if (auto pairType = as<IRDifferentialPairTypeBase>(inst))
                 {
@@ -146,12 +209,10 @@ struct DiffPairLoweringPass : InstPassBase
         return processInstWithChildren(&builder, module->getModuleInst());
     }
 
-    private: 
-    
+private:
     DifferentialPairTypeBuilder* pairBuilder;
 
     DifferentialPairTypeBuilder pairBuilderStorage;
-
 };
 
 bool processPairTypes(AutoDiffSharedContext* context)
@@ -163,14 +224,17 @@ bool processPairTypes(AutoDiffSharedContext* context)
 struct DifferentialPairUserCodeTranscribePass : public InstPassBase
 {
     DifferentialPairUserCodeTranscribePass(IRModule* module)
-        :InstPassBase(module)
-    {}
+        : InstPassBase(module)
+    {
+    }
 
     IRInst* rewritePairType(IRBuilder* builder, IRType* pairType)
     {
         builder->setInsertBefore(pairType);
         auto originalPairType = as<IRDifferentialPairType>(pairType);
-        return builder->getDifferentialPairUserCodeType(originalPairType->getValueType(), originalPairType->getWitness());
+        return builder->getDifferentialPairUserCodeType(
+            originalPairType->getValueType(),
+            originalPairType->getWitness());
     }
 
     IRInst* rewriteMakePair(IRBuilder* builder, IRMakeDifferentialPair* inst)
@@ -178,7 +242,9 @@ struct DifferentialPairUserCodeTranscribePass : public InstPassBase
         auto pairType = as<IRDifferentialPairType>(inst->getFullType());
         builder->setInsertBefore(inst);
         auto newInst = builder->emitMakeDifferentialPairUserCode(
-            (IRType*)pairType, inst->getPrimalValue(), inst->getDifferentialValue());
+            (IRType*)pairType,
+            inst->getPrimalValue(),
+            inst->getDifferentialValue());
         inst->replaceUsesWith(newInst);
         inst->removeAndDeallocate();
         return newInst;
@@ -191,7 +257,8 @@ struct DifferentialPairUserCodeTranscribePass : public InstPassBase
             builder->setInsertBefore(inst);
 
             auto newInst = builder->emitDifferentialPairGetDifferentialUserCode(
-                (IRType*)inst->getFullType(), getDiffInst->getBase());
+                (IRType*)inst->getFullType(),
+                getDiffInst->getBase());
             inst->replaceUsesWith(newInst);
             inst->removeAndDeallocate();
         }
@@ -211,7 +278,8 @@ struct DifferentialPairUserCodeTranscribePass : public InstPassBase
 
         bool modified = false;
 
-        processAllInsts([&](IRInst* inst)
+        processAllInsts(
+            [&](IRInst* inst)
             {
                 switch (inst->getOp())
                 {
@@ -230,7 +298,9 @@ struct DifferentialPairUserCodeTranscribePass : public InstPassBase
             });
 
         OrderedDictionary<IRInst*, IRInst*> pendingReplacements;
-        processInstsOfType<IRDifferentialPairType>(kIROp_DifferentialPairType, [&](IRDifferentialPairType* inst)
+        processInstsOfType<IRDifferentialPairType>(
+            kIROp_DifferentialPairType,
+            [&](IRDifferentialPairType* inst)
             {
                 if (auto loweredType = rewritePairType(builder, inst))
                 {
@@ -260,4 +330,4 @@ void rewriteDifferentialPairToUserCode(IRModule* module)
     pairRewritePass.processModule();
 }
 
-}
+} // namespace Slang

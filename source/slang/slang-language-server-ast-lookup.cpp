@@ -1,4 +1,5 @@
 #include "slang-language-server-ast-lookup.h"
+
 #include "slang-visitor.h"
 #include "slang-workspace-version.h"
 
@@ -38,7 +39,11 @@ struct PushNode
         context = ctx;
         context->nodePath.add(node);
     }
-    ~PushNode() { if (context) context->nodePath.removeLast(); }
+    ~PushNode()
+    {
+        if (context)
+            context->nodePath.removeLast();
+    }
 };
 
 static Index _getDeclNameLength(Name* name, Decl* optionalDecl = nullptr)
@@ -89,14 +94,15 @@ bool _isLocInRange(ASTLookupContext* context, SourceLoc start, SourceLoc end)
 
 bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node);
 
-struct ASTLookupExprVisitor: public ExprVisitor<ASTLookupExprVisitor, bool>
+struct ASTLookupExprVisitor : public ExprVisitor<ASTLookupExprVisitor, bool>
 {
 public:
     ASTLookupContext* context;
 
     ASTLookupExprVisitor(ASTLookupContext* ctx)
         : context(ctx)
-    {}
+    {
+    }
     bool dispatchIfNotNull(Expr* expr)
     {
         if (!expr)
@@ -139,10 +145,9 @@ public:
         return dispatchIfNotNull(expr->value);
     }
 
-    bool visitParenExpr(ParenExpr* expr)
-    {
-        return dispatchIfNotNull(expr->base);
-    }
+    bool visitParenExpr(ParenExpr* expr) { return dispatchIfNotNull(expr->base); }
+
+    bool visitBuiltinCastExpr(BuiltinCastExpr* expr) { return dispatchIfNotNull(expr->base); }
 
     bool visitAssignExpr(AssignExpr* expr)
     {
@@ -200,15 +205,15 @@ public:
             Int declLength = 0;
             if (const auto ctorDecl = as<ConstructorDecl>(expr->declRef.getDecl()))
             {
-                auto humaneLoc = context->sourceManager->getHumaneLoc(expr->loc, SourceLocType::Actual);
+                auto humaneLoc =
+                    context->sourceManager->getHumaneLoc(expr->loc, SourceLocType::Actual);
                 declLength = context->doc->getTokenLength(humaneLoc.line, humaneLoc.column);
             }
             else
             {
                 declLength = _getDeclNameLength(expr->name, expr->declRef.getDecl());
             }
-            if (_isLocInRange(
-                context, expr->loc, declLength))
+            if (_isLocInRange(context, expr->loc, declLength))
             {
                 ASTLookupResult result;
                 result.path = context->nodePath;
@@ -272,10 +277,7 @@ public:
                 return true;
         }
         if (expr->lookupResult2.getName() &&
-            _isLocInRange(
-                context,
-                expr->loc,
-                _getDeclNameLength(expr->lookupResult2.getName())))
+            _isLocInRange(context, expr->loc, _getDeclNameLength(expr->lookupResult2.getName())))
         {
             ASTLookupResult result;
             result.path = context->nodePath;
@@ -322,8 +324,7 @@ public:
     bool visitExtractExistentialValueExpr(ExtractExistentialValueExpr* expr)
     {
         if (expr->declRef.getDecl() && expr->declRef.getName() &&
-            _isLocInRange(
-                context, expr->loc, _getDeclNameLength(expr->declRef.getName())))
+            _isLocInRange(context, expr->loc, _getDeclNameLength(expr->declRef.getName())))
         {
             ASTLookupResult result;
             result.path = context->nodePath;
@@ -378,14 +379,12 @@ public:
             context->results.add(result);
             return true;
         }
-        if (visitDeclRefExpr(expr)) return true;
+        if (visitDeclRefExpr(expr))
+            return true;
         return dispatchIfNotNull(expr->baseExpression);
     }
 
-    bool visitOpenRefExpr(OpenRefExpr* expr)
-    {
-        return dispatchIfNotNull(expr->innerExpr);
-    }
+    bool visitOpenRefExpr(OpenRefExpr* expr) { return dispatchIfNotNull(expr->innerExpr); }
 
     bool visitInitializerListExpr(InitializerListExpr* expr)
     {
@@ -400,8 +399,7 @@ public:
     bool visitThisExpr(ThisExpr* expr)
     {
         static const int thisTokenLength = 4;
-        if (_isLocInRange(
-            context, expr->loc, thisTokenLength))
+        if (_isLocInRange(context, expr->loc, thisTokenLength))
         {
             ASTLookupResult result;
             result.path = context->nodePath;
@@ -455,12 +453,12 @@ public:
     }
     bool visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     {
-        for(const auto& i : expr->insts)
+        for (const auto& i : expr->insts)
         {
-            if(dispatchIfNotNull(i.opcode.expr))
+            if (dispatchIfNotNull(i.opcode.expr))
                 return true;
-            for(const auto& o : i.operands)
-                if(dispatchIfNotNull(o.expr))
+            for (const auto& o : i.operands)
+                if (dispatchIfNotNull(o.expr))
                     return true;
         }
         return false;
@@ -468,18 +466,18 @@ public:
     bool visitModifiedTypeExpr(ModifiedTypeExpr* expr) { return dispatchIfNotNull(expr->base.exp); }
     bool visitFuncTypeExpr(FuncTypeExpr* expr)
     {
-        for(const auto& t : expr->parameters)
+        for (const auto& t : expr->parameters)
         {
-            if(!dispatchIfNotNull(t.exp))
+            if (!dispatchIfNotNull(t.exp))
                 return false;
         }
         return dispatchIfNotNull(expr->result.exp);
     }
     bool visitTupleTypeExpr(TupleTypeExpr* expr)
     {
-        for(auto t : expr->members)
+        for (auto t : expr->members)
         {
-            if(dispatchIfNotNull(t.exp))
+            if (dispatchIfNotNull(t.exp))
                 return true;
         }
         return false;
@@ -489,7 +487,7 @@ public:
     {
         for (auto arg : expr->args)
         {
-            if(dispatchIfNotNull(arg))
+            if (dispatchIfNotNull(arg))
                 return true;
         }
         return false;
@@ -538,7 +536,8 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     ASTLookupStmtVisitor(ASTLookupContext* ctx)
         : context(ctx)
-    {}
+    {
+    }
 
     bool dispatchIfNotNull(Stmt* stmt)
     {
@@ -601,10 +600,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
         return dispatchIfNotNull(stmt->statement);
     }
 
-    bool visitCompileTimeForStmt(CompileTimeForStmt*)
-    {
-        return false;
-    }
+    bool visitCompileTimeForStmt(CompileTimeForStmt*) { return false; }
 
     bool visitSwitchStmt(SwitchStmt* stmt)
     {
@@ -623,10 +619,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
         return false;
     }
 
-    bool visitTargetCaseStmt(TargetCaseStmt* stmt)
-    {
-        return dispatchIfNotNull(stmt->body);
-    }
+    bool visitTargetCaseStmt(TargetCaseStmt* stmt) { return dispatchIfNotNull(stmt->body); }
 
     bool visitIntrinsicAsmStmt(IntrinsicAsmStmt*) { return false; }
 
@@ -658,10 +651,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitGpuForeachStmt(GpuForeachStmt*) { return false; }
 
-    bool visitExpressionStmt(ExpressionStmt* stmt)
-    {
-        return checkExpr(stmt->expression);
-    }
+    bool visitExpressionStmt(ExpressionStmt* stmt) { return checkExpr(stmt->expression); }
 };
 
 bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
@@ -673,11 +663,15 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
     {
         if (decl->getName())
         {
-            if (_isLocInRange(
-                    &context,
-                    decl->nameAndLoc.loc,
-                    _getDeclNameLength(decl->getName())))
+            if (_isLocInRange(&context, decl->nameAndLoc.loc, _getDeclNameLength(decl->getName())))
             {
+                for (auto modifier : decl->modifiers)
+                {
+                    if (as<SynthesizedModifier>(modifier))
+                        return false;
+                    if (as<ImplicitParameterGroupElementTypeModifier>(modifier))
+                        return false;
+                }
                 ASTLookupResult result;
                 result.path = context.nodePath;
                 context.results.add(_Move(result));
@@ -717,6 +711,14 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
             ASTLookupExprVisitor visitor(&context);
             if (visitor.dispatchIfNotNull(typeConstraint->getSup().exp))
                 return true;
+            if (auto genTypeConstraint = as<GenericTypeConstraintDecl>(node))
+            {
+                if (genTypeConstraint->whereTokenLoc.isValid())
+                {
+                    if (visitor.dispatchIfNotNull(genTypeConstraint->sub.exp))
+                        return true;
+                }
+            }
         }
         else if (auto typedefDecl = as<TypeDefDecl>(node))
         {
@@ -752,7 +754,9 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
             if (auto hlslSemantic = as<HLSLSemantic>(modifier))
             {
                 if (_isLocInRange(
-                        &context, hlslSemantic->loc, hlslSemantic->name.getContentLength()))
+                        &context,
+                        hlslSemantic->loc,
+                        hlslSemantic->name.getContentLength()))
                 {
                     ASTLookupResult result;
                     result.path = context.nodePath;
@@ -787,10 +791,12 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
         {
             bool shouldInspectChildren = true;
             if (const auto genericDecl = as<GenericDecl>(node))
-            {}
+            {
+            }
             else if (container->closingSourceLoc.getRaw() >= container->loc.getRaw())
             {
-                if (!_isLocInRange(&context, container->loc, container->closingSourceLoc) && !as<NamespaceDeclBase>(container))
+                if (!_isLocInRange(&context, container->loc, container->closingSourceLoc) &&
+                    !as<NamespaceDeclBase>(container))
                 {
                     shouldInspectChildren = false;
                 }
@@ -815,7 +821,13 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
 }
 
 List<ASTLookupResult> findASTNodesAt(
-    DocumentVersion* doc, SourceManager* sourceManager, ModuleDecl* moduleDecl, ASTLookupType findType, UnownedStringSlice fileName, Int line, Int col)
+    DocumentVersion* doc,
+    SourceManager* sourceManager,
+    ModuleDecl* moduleDecl,
+    ASTLookupType findType,
+    UnownedStringSlice fileName,
+    Int line,
+    Int col)
 {
     ASTLookupContext context;
     context.sourceManager = sourceManager;

@@ -1,5 +1,6 @@
 // metal-helper-functions.cpp
 #include "metal-helper-functions.h"
+
 #include "metal-device.h"
 #include "metal-util.h"
 

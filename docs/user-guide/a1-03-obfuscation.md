@@ -169,13 +169,13 @@ slangc module-source.slang -o module.zip -g -obfuscate
 
 This will compile "module-source.slang" into SlangIR module (aka `slang-module`) and places the `.slang-module` inside of the zip. As obfuscation is enabled the .zip will also contain the obfuscated source map for the module. 
 
-The `.zip` file can now be used and referenced as a library 
+The `.zip` file can now be used and referenced as a module 
 
 ```
 slangc source.slang -target dxil -stage compute -entry computeMain -obfuscate -r module.zip
 ```
 
-Notice here that the `-r` library reference is to the `.zip` file rather than the more usual `.slang-module` that is contained in the zip file. By referencing the library in this way Slang will automatically associate the contained obfuscated source map with the module. It will use that mapping for outputting diagnostics.
+Notice here that the `-r` module reference is to the `.zip` file rather than the more usual `.slang-module` that is contained in the zip file. By referencing the module in this way Slang will automatically associate the contained obfuscated source map with the module. It will use that mapping for outputting diagnostics.
 
 It is also worth noticing that in this second compilation, using `module.zip`, we need the `-obfuscate` flag set. If this isn't set linking will not work correctly.
 
@@ -193,7 +193,7 @@ This method is currently only available on the `ICompileRequest` and not on the 
 
 The file system returned is held in memory, and the blob data held in the file system typically shared, so accessing items this way is typically very low overhead. 
 
-The conventions used for the file system representation could best be described as a work in progress, and may change in the future. Internally Slang stores compilation results as a hierarchy of "artifacts". An artifact consists of the main result, plus associated artifacts. An artifact can also be a container which can additionally hold children artifacts. In the current directory structure each artifact is a directory, with the root directory of the `ISlangMultableFileSystem` being the root artifact. 
+The conventions used for the file system representation could best be described as a work in progress, and may change in the future. Internally Slang stores compilation results as a hierarchy of "artifacts". An artifact consists of the main result, plus associated artifacts. An artifact can also be a container which can additionally hold children artifacts. In the current directory structure each artifact is a directory, with the root directory of the `ISlangMutableFileSystem` being the root artifact. 
 
 Given a directory representing an artifact it can contain 2 special directories `children` and `associated`. The `children` directory contains the artifacts that are children of the current directories artifact. Similarly `associated` contains directories for artifacts that are associated with the current artifact.
 
@@ -256,7 +256,7 @@ Why you might not want to use an emit source map
 * The `#line` mechanism doesn't require any special handling, and the mapping back is embedded directly into the emitted source/output binary
 * There is more housekeeping in getting keeping and using source maps
 * Currently Slang doesn't directly expose a source map processing API directly  
-  * We do support source maps in library files, or produced as part of a compilation
+  * We do support source maps in module files, or produced as part of a compilation
   * A developer could use the slang `compiler-core` implementation
   * In the future the project could provide some API support 
 

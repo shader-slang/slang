@@ -1,11 +1,13 @@
 // slang-name.cpp
 #include "slang-name.h"
 
-namespace Slang {
+namespace Slang
+{
 
 String getText(Name* name)
 {
-    if (!name) return String();
+    if (!name)
+        return String();
     return name->text;
 }
 

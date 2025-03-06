@@ -1,15 +1,15 @@
 // slang-ast-dump.cpp
 #include "slang-ast-dump.h"
+
+#include "../core/slang-string.h"
+#include "slang-compiler.h"
+#include "slang-generated-ast-macro.h"
+
 #include <assert.h>
 #include <limits>
 
-#include "slang-compiler.h"
-
-#include "../core/slang-string.h"
-
-#include "slang-generated-ast-macro.h"
-
-namespace Slang {
+namespace Slang
+{
 
 
 struct ASTDumpContext
@@ -23,8 +23,8 @@ struct ASTDumpContext
 
     struct ScopeWrite
     {
-        ScopeWrite(ASTDumpContext* context):
-            m_context(context)
+        ScopeWrite(ASTDumpContext* context)
+            : m_context(context)
         {
             if (m_context->m_scopeWriteCount == 0)
             {
@@ -148,7 +148,7 @@ struct ASTDumpContext
                 cur = cur->parent;
             }
 
-            for (Index i = scopes.getCount() - 1; i >= 0 ; --i)
+            for (Index i = scopes.getCount() - 1; i >= 0; --i)
             {
                 buf << "::";
                 const Scope* curScope = scopes[i];
@@ -182,7 +182,7 @@ struct ASTDumpContext
         }
     }
 
-    template <typename T>
+    template<typename T>
     void dump(const List<T>& list)
     {
         m_writer->emit(" { \n");
@@ -203,7 +203,7 @@ struct ASTDumpContext
         m_writer->emit("}");
     }
 
-    template <typename T, int n>
+    template<typename T, int n>
     void dump(const ShortList<T, n>& list)
     {
         m_writer->emit(" { \n");
@@ -241,14 +241,12 @@ struct ASTDumpContext
         if (manager && sourceLoc.isValid())
         {
             HumaneSourceLoc humaneLoc = manager->getHumaneLoc(sourceLoc);
-            ScopeWrite(this).getBuf() << " " << humaneLoc.pathInfo.foundPath << ":" << humaneLoc.line;   
+            ScopeWrite(this).getBuf()
+                << " " << humaneLoc.pathInfo.foundPath << ":" << humaneLoc.line;
         }
     }
 
-    static char _getHexDigit(UInt32 v)
-    {
-        return (v < 10) ? char(v + '0') : char('a' + v - 10);
-    }
+    static char _getHexDigit(UInt32 v) { return (v < 10) ? char(v + '0') : char('a' + v - 10); }
 
     static bool _charNeedsEscaping(char c)
     {
@@ -258,7 +256,7 @@ struct ASTDumpContext
 
     void dump(const UnownedStringSlice& slice)
     {
-        
+
         ScopeWrite scope(this);
         auto& buf = scope.getBuf();
         buf.appendChar('\"');
@@ -270,12 +268,12 @@ struct ASTDumpContext
             }
             else
             {
-                buf << "\\0x" <<  _getHexDigit(UInt32(c) >> 4) << _getHexDigit(c & 0xf);
+                buf << "\\0x" << _getHexDigit(UInt32(c) >> 4) << _getHexDigit(c & 0xf);
             }
         }
         buf.appendChar('\"');
     }
-    
+
     void dump(const Token& token)
     {
         ScopeWrite(this).getBuf() << " { " << TokenTypeToString(token.type) << ", ";
@@ -302,35 +300,18 @@ struct ASTDumpContext
         return m_objects.getCount() - 1;
     }
 
-    void dump(uint32_t v)
-    {
-        m_writer->emit(UInt(v));
-    }
-    void dump(UInt v)
-    {
-        m_writer->emit(v);
-    }
-    void dump(int32_t v)
-    {
-        m_writer->emit(v);
-    }
-    void dump(FloatingPointLiteralValue v)
-    {
-        m_writer->emit(v);
-    }
+    void dump(uint32_t v) { m_writer->emit((uint64_t)v); }
+    void dump(uint64_t v) { m_writer->emit(v); }
+    void dump(int32_t v) { m_writer->emit(v); }
+    void dump(FloatingPointLiteralValue v) { m_writer->emit(v); }
 
-    void dump(IntegerLiteralValue v)
-    {
-        m_writer->emit(v);
-    }
-    void dump(CapabilityName v)
-    {
-        m_writer->emit(capabilityNameToString(v));
-    }
+    void dump(IntegerLiteralValue v) { m_writer->emit(v); }
+    void dump(CapabilityName v) { m_writer->emit(capabilityNameToString(v)); }
 
     void dump(const SemanticVersion& version)
     {
-        ScopeWrite(this).getBuf() << UInt(version.m_major) << "." << UInt(version.m_minor) << "." << UInt(version.m_patch);
+        ScopeWrite(this).getBuf() << UInt(version.m_major) << "." << UInt(version.m_minor) << "."
+                                  << UInt(version.m_patch);
     }
     void dump(const NameLoc& nameLoc)
     {
@@ -347,38 +328,14 @@ struct ASTDumpContext
         dump(nameLoc.loc);
         m_writer->emit(" }");
     }
-    void dump(BaseType baseType)
-    {
-        m_writer->emit(BaseTypeInfo::asText(baseType));
-    }
-    void dump(Stage stage)
-    {
-        m_writer->emit(getStageName(stage));
-    }
-    void dump(ImageFormat imageFormat)
-    {
-        m_writer->emit(getGLSLNameForImageFormat(imageFormat));
-    }
-    void dump(TryClauseType clauseType)
-    {
-        m_writer->emit(getTryClauseTypeName(clauseType));
-    }
-    void dump(BuiltinRequirementKind kind)
-    {
-        m_writer->emit((int)kind);
-    }
-    void dump(MarkupVisibility v)
-    {
-        m_writer->emit((int)v);
-    }
-    void dump(TypeTag tag)
-    {
-        m_writer->emit((int)tag);
-    }
-    void dump(const String& string)
-    {
-        dump(string.getUnownedSlice());
-    }
+    void dump(BaseType baseType) { m_writer->emit(BaseTypeInfo::asText(baseType)); }
+    void dump(Stage stage) { m_writer->emit(getStageName(stage)); }
+    void dump(ImageFormat imageFormat) { m_writer->emit(getGLSLNameForImageFormat(imageFormat)); }
+    void dump(TryClauseType clauseType) { m_writer->emit(getTryClauseTypeName(clauseType)); }
+    void dump(BuiltinRequirementKind kind) { m_writer->emit((int)kind); }
+    void dump(MarkupVisibility v) { m_writer->emit((int)v); }
+    void dump(TypeTag tag) { m_writer->emit((int)tag); }
+    void dump(const String& string) { dump(string.getUnownedSlice()); }
 
     void dump(const DiagnosticInfo* info)
     {
@@ -406,13 +363,13 @@ struct ASTDumpContext
         m_writer->emit("}");
     }
 
-    template <typename T>
+    template<typename T>
     void dump(const SyntaxClass<T>& cls)
     {
         m_writer->emit(cls.classInfo->m_name);
     }
 
-    template <typename KEY, typename VALUE>
+    template<typename KEY, typename VALUE>
     void dump(const Dictionary<KEY, VALUE>& dict)
     {
         m_writer->emit(" { \n");
@@ -431,7 +388,7 @@ struct ASTDumpContext
         m_writer->emit("}");
     }
 
-    template <typename KEY, typename VALUE>
+    template<typename KEY, typename VALUE>
     void dump(const OrderedDictionary<KEY, VALUE>& dict)
     {
         m_writer->emit(" { \n");
@@ -463,8 +420,9 @@ struct ASTDumpContext
     void dump(const DeclCheckStateExt& extState)
     {
         auto state = extState.getState();
-      
-        ScopeWrite(this).getBuf() << "DeclCheckStateExt{" << extState.isBeingChecked() << ", " << Index(state) << "}";
+
+        ScopeWrite(this).getBuf() << "DeclCheckStateExt{" << extState.isBeingChecked() << ", "
+                                  << Index(state) << "}";
     }
 
     void dump(FeedbackType::Kind kind)
@@ -473,8 +431,12 @@ struct ASTDumpContext
         const char* name = nullptr;
         switch (kind)
         {
-            case FeedbackType::Kind::MinMip: name = "MinMip"; break;
-            case FeedbackType::Kind::MipRegionUsed: name = "MipRegionUsed"; break;
+        case FeedbackType::Kind::MinMip:
+            name = "MinMip";
+            break;
+        case FeedbackType::Kind::MipRegionUsed:
+            name = "MipRegionUsed";
+            break;
         }
 
         m_buf << "FeedbackType::Kind{" << name << "}";
@@ -486,11 +448,37 @@ struct ASTDumpContext
     {
         switch (flavor)
         {
-            case SamplerStateFlavor::SamplerState: m_writer->emit("sampler"); break;
-            case SamplerStateFlavor::SamplerComparisonState: m_writer->emit("samplerComparison"); break;
-            default: m_writer->emit("unknown"); break;
+        case SamplerStateFlavor::SamplerState:
+            m_writer->emit("sampler");
+            break;
+        case SamplerStateFlavor::SamplerComparisonState:
+            m_writer->emit("samplerComparison");
+            break;
+        default:
+            m_writer->emit("unknown");
+            break;
         }
     }
+
+    void dump(DeclVisibility vis)
+    {
+        switch (vis)
+        {
+        case DeclVisibility::Private:
+            m_writer->emit("private");
+            break;
+        case DeclVisibility::Internal:
+            m_writer->emit("internal");
+            break;
+        case DeclVisibility::Public:
+            m_writer->emit("public");
+            break;
+        default:
+            m_writer->emit(String((int)vis).getUnownedSlice());
+            break;
+        }
+    }
+
 
     void dump(const QualType& qualType)
     {
@@ -505,9 +493,12 @@ struct ASTDumpContext
         dump(qualType.type);
     }
 
-    void dump(SyntaxParseCallback callback) { _dumpPtr(UnownedStringSlice::fromLiteral("SyntaxParseCallback"), (const void*)callback); }
+    void dump(SyntaxParseCallback callback)
+    {
+        _dumpPtr(UnownedStringSlice::fromLiteral("SyntaxParseCallback"), (const void*)callback);
+    }
 
-    template <typename T, int SIZE>
+    template<typename T, int SIZE>
     void dump(const T (&in)[SIZE])
     {
         m_writer->emit(" { \n");
@@ -565,15 +556,9 @@ struct ASTDumpContext
         m_writer->dedent();
         m_writer->emit("}");
     }
-    void dump(const ExpandedSpecializationArg& arg)
-    {
-        dump(arg.witness);
-    }
+    void dump(const ExpandedSpecializationArg& arg) { dump(arg.witness); }
 
-    void dump(const TransparentMemberInfo& memInfo)
-    {
-        dump(memInfo.decl);
-    }
+    void dump(const TransparentMemberInfo& memInfo) { dump(memInfo.decl); }
 
     void dumpRemaining()
     {
@@ -609,7 +594,7 @@ struct ASTDumpContext
         }
     }
 
-    template <typename T>
+    template<typename T>
     void dumpField(const char* name, const T& value)
     {
         m_writer->emit(name);
@@ -660,6 +645,8 @@ struct ASTDumpContext
         m_writer->emit(info->m_name);
     }
 
+    void dump(SourceLanguage language) { m_writer->emit((int)language); }
+
     void dump(KeyValuePair<DeclRefBase*, SubtypeWitness*> pair)
     {
         m_writer->emit("(");
@@ -671,7 +658,7 @@ struct ASTDumpContext
 
     void dump(const SPIRVAsmOperand& operand)
     {
-        switch(operand.flavor)
+        switch (operand.flavor)
         {
         case SPIRVAsmOperand::Id:
             m_writer->emit("%");
@@ -709,7 +696,7 @@ struct ASTDumpContext
         default:
             SLANG_UNREACHABLE("Unhandled case in ast dump for SPIRVAsmOperand");
         }
-        if(operand.expr)
+        if (operand.expr)
             dump(operand.expr);
         else
             dump(operand.token);
@@ -718,7 +705,7 @@ struct ASTDumpContext
     void dump(const SPIRVAsmInst& inst)
     {
         dump(inst.opcode);
-        for(const auto& o : inst.operands)
+        for (const auto& o : inst.operands)
             dump(o);
     }
 
@@ -727,7 +714,7 @@ struct ASTDumpContext
         m_writer->emit("spirv_asm\n");
         m_writer->emit("{\n");
         m_writer->indent();
-        for(const auto& i : expr.insts)
+        for (const auto& i : expr.insts)
         {
             dump(i);
             m_writer->emit(";\n");
@@ -764,11 +751,8 @@ struct ASTDumpContext
 
     void dumpObjectFull(NodeBase* node);
 
-    ASTDumpContext(SourceWriter* writer, ASTDumpUtil::Flags flags, ASTDumpUtil::Style dumpStyle):
-        m_writer(writer),
-        m_scopeWriteCount(0),
-        m_dumpStyle(dumpStyle),
-        m_dumpFlags(flags)
+    ASTDumpContext(SourceWriter* writer, ASTDumpUtil::Flags flags, ASTDumpUtil::Style dumpStyle)
+        : m_writer(writer), m_scopeWriteCount(0), m_dumpStyle(dumpStyle), m_dumpFlags(flags)
     {
     }
 
@@ -780,7 +764,7 @@ struct ASTDumpContext
     // Using the SourceWriter, for automatic indentation.
     SourceWriter* m_writer;
 
-    Dictionary<NodeBase*, Index> m_objectMap;  ///< Object index
+    Dictionary<NodeBase*, Index> m_objectMap; ///< Object index
     List<ObjectInfo> m_objects;
 
     StringBuilder m_buf;
@@ -792,26 +776,28 @@ struct ASTDumpContext
 struct ASTDumpAccess
 {
 
-#define SLANG_AST_DUMP_FIELD(FIELD_NAME, TYPE, param) context.dumpField(#FIELD_NAME, static_cast<param*>(base)->FIELD_NAME); 
+#define SLANG_AST_DUMP_FIELD(FIELD_NAME, TYPE, param) \
+    context.dumpField(#FIELD_NAME, static_cast<param*>(base)->FIELD_NAME);
 
 #define SLANG_AST_DUMP_FIELDS_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-case ASTNodeType::NAME: \
-{ \
-    SLANG_FIELDS_ASTNode_##NAME(SLANG_AST_DUMP_FIELD, NAME) \
-    break; \
-}
+    case ASTNodeType::NAME:                                                        \
+        {                                                                          \
+            SLANG_FIELDS_ASTNode_##NAME(SLANG_AST_DUMP_FIELD, NAME) break;         \
+        }
 
     static void dump(ASTNodeType type, NodeBase* base, ASTDumpContext& context)
     {
         switch (type)
         {
-            SLANG_ALL_ASTNode_NodeBase(SLANG_AST_DUMP_FIELDS_IMPL, _)
-            default: break;
+            SLANG_ALL_ASTNode_NodeBase(SLANG_AST_DUMP_FIELDS_IMPL, _) default : break;
         }
     }
 };
 
-void ASTDumpContext::dumpObjectReference(const ReflectClassInfo& type, NodeBase* obj, Index objIndex)
+void ASTDumpContext::dumpObjectReference(
+    const ReflectClassInfo& type,
+    NodeBase* obj,
+    Index objIndex)
 {
     SLANG_UNUSED(obj);
     ScopeWrite(this).getBuf() << type.m_name << ":" << objIndex;
@@ -878,7 +864,7 @@ void ASTDumpContext::dumpObjectFull(NodeBase* node)
     }
 }
 
-/* static */void ASTDumpUtil::dump(NodeBase* node, Style style, Flags flags, SourceWriter* writer)
+/* static */ void ASTDumpUtil::dump(NodeBase* node, Style style, Flags flags, SourceWriter* writer)
 {
     ASTDumpContext context(writer, flags, style);
     context.dumpObjectFull(node);

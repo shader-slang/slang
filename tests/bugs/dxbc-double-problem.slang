@@ -4,6 +4,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-dx12 -compute -use-dxil -output-using-type -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-dx12 -compute -output-using-type -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+// Not supported in WGSL: Double and other unsupported scalar types
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // The problem this test shows is around handling of double with dxbc on D3D12. In that combination
 // this code does not write the correct value into the first element - it appears as 0, where 

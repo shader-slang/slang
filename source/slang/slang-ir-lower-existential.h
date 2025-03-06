@@ -3,11 +3,9 @@
 
 namespace Slang
 {
-    struct SharedGenericsLoweringContext;
+struct SharedGenericsLoweringContext;
 
-    /// Lower existential types and related instructions to Tuple types.
-    void lowerExistentials(
-        SharedGenericsLoweringContext* sharedContext);
+/// Lower existential types and related instructions to Tuple types.
+void lowerExistentials(SharedGenericsLoweringContext* sharedContext);
 
-}
-
+} // namespace Slang

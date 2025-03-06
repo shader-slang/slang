@@ -39,6 +39,7 @@ namespace Slang
 struct MoveGlobalVarInitializationToEntryPointsPass
 {
     IRModule* m_module;
+    TargetProgram* m_targetProgram;
 
     // In the Slang IR, a global variable represents a pointer
     // to the storage for the variable but it *also* encodes
@@ -61,14 +62,15 @@ struct MoveGlobalVarInitializationToEntryPointsPass
     //
     struct GlobalVarInfo
     {
-        IRGlobalVar*    globalVar   = nullptr;
-        IRFunc*         initFunc    = nullptr;
+        IRGlobalVar* globalVar = nullptr;
+        IRFunc* initFunc = nullptr;
     };
     List<GlobalVarInfo> m_globalVarsWithInit;
 
-    void processModule(IRModule* module)
+    void processModule(IRModule* module, TargetProgram* targetProgram)
     {
         m_module = module;
+        m_targetProgram = targetProgram;
 
         // We start by looking for global variables with
         // initialization logic in the IR, and processing
@@ -76,10 +78,10 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         // initialization) and function (to compute the
         // initial value).
         //
-        for( auto inst : m_module->getGlobalInsts() )
+        for (auto inst : m_module->getGlobalInsts())
         {
             auto globalVar = as<IRGlobalVar>(inst);
-            if(!globalVar)
+            if (!globalVar)
                 continue;
 
             // If it's an `Actual Global` we don't want to move initialization
@@ -87,9 +89,9 @@ struct MoveGlobalVarInitializationToEntryPointsPass
             {
                 continue;
             }
-        
+
             auto firstBlock = globalVar->getFirstBlock();
-            if(!firstBlock)
+            if (!firstBlock)
                 continue;
 
             processGlobalVarWithInit(globalVar, firstBlock);
@@ -100,21 +102,45 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         // all the global variables that were identified
         // and processed in the first pass.
         //
-        for( auto inst : m_module->getGlobalInsts() )
+        for (auto inst : m_module->getGlobalInsts())
         {
             auto func = as<IRFunc>(inst);
-            if(!func)
+            if (!func)
                 continue;
 
-            if(!func->findDecoration<IREntryPointDecoration>())
+            if (!func->findDecoration<IREntryPointDecoration>())
                 continue;
 
             processEntryPoint(func);
         }
     }
 
+    bool shouldMoveGlobalVarInitialization(IRGlobalVar* globalVar)
+    {
+        // Currently CoopVector for DXC cannot be created from
+        // constructors with arguments. When CoopVector is used as a
+        // global variable, its initialization has to happen at the
+        // beginning of the entry point.
+        //
+        // At the same time, we don't want to apply
+        // "moveGlobalVarInitializationToEntryPoints" to the rest of
+        // the global variables when targeting HLSL.
+        //
+        if (isD3DTarget(m_targetProgram->getTargetReq()))
+        {
+            auto valueType = globalVar->getDataType()->getValueType();
+            if (as<IRCoopVectorType>(valueType))
+                return true;
+            return false;
+        }
+        return true;
+    }
+
     void processGlobalVarWithInit(IRGlobalVar* globalVar, IRBlock* firstBlock)
     {
+        if (!shouldMoveGlobalVarInitialization(globalVar))
+            return;
+
         IRBuilder builder(m_module);
         builder.setInsertBefore(globalVar);
 
@@ -140,7 +166,7 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         // needed to guarantee.
         //
         IRBlock* nextBlock = nullptr;
-        for( IRBlock* block = firstBlock; block; block = nextBlock )
+        for (IRBlock* block = firstBlock; block; block = nextBlock)
         {
             nextBlock = block->getNextBlock();
 
@@ -163,7 +189,7 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         // We can only process entry point definitions, not declarations.
         //
         auto firstBlock = entryPointFunc->getFirstBlock();
-        if(!firstBlock)
+        if (!firstBlock)
             return;
 
         // We are going to insert initiailization logic at the start
@@ -172,7 +198,7 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         IRBuilder builder(m_module);
         builder.setInsertBefore(firstBlock->getFirstOrdinaryInst());
 
-        for( auto globalVarInfo : m_globalVarsWithInit )
+        for (auto globalVarInfo : m_globalVarsWithInit)
         {
             // The earlier step split each global variable into
             // a variable with no initialization logic, plus a function
@@ -195,7 +221,8 @@ struct MoveGlobalVarInitializationToEntryPointsPass
             {
                 if (auto returnInst = as<IRReturn>(initFirstBlock->getTerminator()))
                 {
-                    if (returnInst->getVal() && returnInst->getVal()->getParent() == m_module->getModuleInst())
+                    if (returnInst->getVal() &&
+                        returnInst->getVal()->getParent() == m_module->getModuleInst())
                     {
                         initVal = returnInst->getVal();
                     }
@@ -214,12 +241,11 @@ struct MoveGlobalVarInitializationToEntryPointsPass
     }
 };
 
-    /// Move initialization logic off of global variables and onto each entry point
-void moveGlobalVarInitializationToEntryPoints(
-    IRModule* module)
+/// Move initialization logic off of global variables and onto each entry point
+void moveGlobalVarInitializationToEntryPoints(IRModule* module, TargetProgram* targetProgram)
 {
     MoveGlobalVarInitializationToEntryPointsPass pass;
-    pass.processModule(module);
+    pass.processModule(module, targetProgram);
 }
 
-}
+} // namespace Slang

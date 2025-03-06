@@ -26,7 +26,7 @@ ShaderCursor ShaderCursor::getExplicitCounter() const
 
     // The alternative to handling this here would be to augment IResourceView
     // with a `getCounterResourceView()`, and set that also in `setResource`
-    if(const auto counterVarLayout = m_typeLayout->getExplicitCounter())
+    if (const auto counterVarLayout = m_typeLayout->getExplicitCounter())
     {
         ShaderCursor counterCursor;
 
@@ -38,10 +38,11 @@ ShaderCursor ShaderCursor::getExplicitCounter() const
 
         // The byte offset is the current offset plus the relative offset of the counter.
         // The offset in binding ranges is computed similarly.
-        counterCursor.m_offset.uniformOffset
-            = m_offset.uniformOffset + SlangInt(counterVarLayout->getOffset());
-        counterCursor.m_offset.bindingRangeIndex
-            = m_offset.bindingRangeIndex + GfxIndex(m_typeLayout->getExplicitCounterBindingRangeOffset());
+        counterCursor.m_offset.uniformOffset =
+            m_offset.uniformOffset + SlangInt(counterVarLayout->getOffset());
+        counterCursor.m_offset.bindingRangeIndex =
+            m_offset.bindingRangeIndex +
+            GfxIndex(m_typeLayout->getExplicitCounterBindingRangeOffset());
 
         // The index of the counter within any binding ranges will be the same
         // as the index computed for the parent structure.
@@ -118,7 +119,8 @@ Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCurso
             //
             fieldCursor.m_offset.uniformOffset = m_offset.uniformOffset + fieldLayout->getOffset();
             fieldCursor.m_offset.bindingRangeIndex =
-                m_offset.bindingRangeIndex + (GfxIndex)m_typeLayout->getFieldBindingRangeOffset(fieldIndex);
+                m_offset.bindingRangeIndex +
+                (GfxIndex)m_typeLayout->getFieldBindingRangeOffset(fieldIndex);
 
             // The index of the field within any binding ranges will be the same
             // as the index computed for the parent structure.
@@ -178,8 +180,8 @@ Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCurso
     //
     // TODO: figure out whether we should support this long-term.
     //
-    auto entryPointCount = (GfxIndex) m_baseObject->getEntryPointCount();
-    for( GfxIndex e = 0; e < entryPointCount; ++e )
+    auto entryPointCount = (GfxIndex)m_baseObject->getEntryPointCount();
+    for (GfxIndex e = 0; e < entryPointCount; ++e)
     {
         ComPtr<IShaderObject> entryPoint;
         m_baseObject->getEntryPoint(e, entryPoint.writeRef());
@@ -187,7 +189,7 @@ Result ShaderCursor::getField(const char* name, const char* nameEnd, ShaderCurso
         ShaderCursor entryPointCursor(entryPoint);
 
         auto result = entryPointCursor.getField(name, nameEnd, outCursor);
-        if(SLANG_SUCCEEDED(result))
+        if (SLANG_SUCCEEDED(result))
             return result;
     }
 
@@ -208,7 +210,7 @@ ShaderCursor ShaderCursor::getElement(GfxIndex index) const
         return elementCursor;
     }
 
-    switch( m_typeLayout->getKind() )
+    switch (m_typeLayout->getKind())
     {
     case slang::TypeReflection::Kind::Array:
         {
@@ -233,7 +235,7 @@ ShaderCursor ShaderCursor::getElement(GfxIndex index) const
             auto fieldIndex = index;
             slang::VariableLayoutReflection* fieldLayout =
                 m_typeLayout->getFieldByIndex((unsigned int)fieldIndex);
-            if(!fieldLayout)
+            if (!fieldLayout)
                 return ShaderCursor();
 
             ShaderCursor fieldCursor;
@@ -241,7 +243,8 @@ ShaderCursor ShaderCursor::getElement(GfxIndex index) const
             fieldCursor.m_typeLayout = fieldLayout->getTypeLayout();
             fieldCursor.m_offset.uniformOffset = m_offset.uniformOffset + fieldLayout->getOffset();
             fieldCursor.m_offset.bindingRangeIndex =
-                m_offset.bindingRangeIndex + (GfxIndex)m_typeLayout->getFieldBindingRangeOffset(fieldIndex);
+                m_offset.bindingRangeIndex +
+                (GfxIndex)m_typeLayout->getFieldBindingRangeOffset(fieldIndex);
             fieldCursor.m_offset.bindingArrayIndex = m_offset.bindingArrayIndex;
 
             return fieldCursor;
@@ -254,7 +257,9 @@ ShaderCursor ShaderCursor::getElement(GfxIndex index) const
             ShaderCursor fieldCursor;
             fieldCursor.m_baseObject = m_baseObject;
             fieldCursor.m_typeLayout = m_typeLayout->getElementTypeLayout();
-            fieldCursor.m_offset.uniformOffset = m_offset.uniformOffset + m_typeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM) * index;
+            fieldCursor.m_offset.uniformOffset =
+                m_offset.uniformOffset +
+                m_typeLayout->getElementStride(SLANG_PARAMETER_CATEGORY_UNIFORM) * index;
             fieldCursor.m_offset.bindingRangeIndex = m_offset.bindingRangeIndex;
             fieldCursor.m_offset.bindingArrayIndex = m_offset.bindingArrayIndex;
             return fieldCursor;

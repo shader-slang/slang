@@ -4,6 +4,8 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -render-feature double
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+// Not supported in WGSL: Double and other unsupported scalar types
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 // inf, -inf, nan, finite
 //TEST_INPUT:ubuffer(data=[ 0 0x7ff00000 0 0xfff00000 0xffffffff 0x7fffffff 1 0], stride=4):name inputBuffer

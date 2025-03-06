@@ -3,22 +3,37 @@
 
 #include "core/slang-list.h"
 
-namespace gfx {
+namespace gfx
+{
 using namespace Slang;
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VulkanApi !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-#define VK_API_CHECK_FUNCTION(x) && (x != nullptr)
-#define  VK_API_CHECK_FUNCTIONS(FUNCTION_LIST) true FUNCTION_LIST(VK_API_CHECK_FUNCTION)
+#define VK_API_CHECK_FUNCTION(x) &&hasFunction(#x, (void*)x)
+#define VK_API_CHECK_FUNCTIONS(FUNCTION_LIST) true FUNCTION_LIST(VK_API_CHECK_FUNCTION)
+
+static bool hasFunction(const char* name, void* ptr)
+{
+    if (ptr)
+        return true;
+#if 0
+    fprintf(stderr, "Missing required Vulkan function: %s\n", name);
+#endif
+    return false;
+}
 
 bool VulkanApi::areDefined(ProcType type) const
 {
     switch (type)
     {
-        case ProcType::Global:          return VK_API_CHECK_FUNCTIONS(VK_API_ALL_GLOBAL_PROCS);
-        case ProcType::Instance:        return VK_API_CHECK_FUNCTIONS(VK_API_ALL_INSTANCE_PROCS);
-        case ProcType::Device:          return VK_API_CHECK_FUNCTIONS(VK_API_DEVICE_PROCS);
-        default:
+    case ProcType::Global:
+        return VK_API_CHECK_FUNCTIONS(VK_API_ALL_GLOBAL_PROCS);
+    case ProcType::Instance:
+        return VK_API_CHECK_FUNCTIONS(VK_API_ALL_INSTANCE_PROCS) &&
+               VK_API_CHECK_FUNCTIONS(VK_API_INSTANCE_KHR_PROCS);
+    case ProcType::Device:
+        return VK_API_CHECK_FUNCTIONS(VK_API_DEVICE_PROCS);
+    default:
         {
             assert(!"Unhandled type");
             return false;
@@ -49,7 +64,7 @@ Slang::Result VulkanApi::initInstanceProcs(VkInstance instance)
 
     VK_API_ALL_INSTANCE_PROCS(VK_API_GET_INSTANCE_PROC)
 
-    // Get optional 
+    // Get optional
     VK_API_INSTANCE_PROCS_OPT(VK_API_GET_INSTANCE_PROC)
 
     if (!areDefined(ProcType::Instance))
@@ -70,6 +85,17 @@ Slang::Result VulkanApi::initPhysicalDevice(VkPhysicalDevice physicalDevice)
     vkGetPhysicalDeviceProperties(m_physicalDevice, &m_deviceProperties);
     vkGetPhysicalDeviceFeatures(m_physicalDevice, &m_deviceFeatures);
     vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &m_deviceMemoryProperties);
+
+    if (vkGetPhysicalDeviceCooperativeVectorPropertiesNV)
+    {
+        uint32_t nProps = 0;
+        vkGetPhysicalDeviceCooperativeVectorPropertiesNV(m_physicalDevice, &nProps, nullptr);
+        m_cooperativeVectorProperties.setCount(nProps);
+        vkGetPhysicalDeviceCooperativeVectorPropertiesNV(
+            m_physicalDevice,
+            &nProps,
+            m_cooperativeVectorProperties.getBuffer());
+    }
 
     return SLANG_OK;
 }
@@ -108,7 +134,7 @@ int VulkanApi::findMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags prop
     // bit holds current test bit against typeBits. Ie bit == 1 << typeBits
 
     uint32_t bit = 1;
-    for (int i = 0;  i < numMemoryTypes; ++i, bit += bit)
+    for (int i = 0; i < numMemoryTypes; ++i, bit += bit)
     {
         auto const& memoryType = m_deviceMemoryProperties.memoryTypes[i];
         if ((typeBits & bit) && (memoryType.propertyFlags & properties) == properties)
@@ -117,7 +143,7 @@ int VulkanApi::findMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags prop
         }
     }
 
-    //assert(!"failed to find a usable memory type");
+    // assert(!"failed to find a usable memory type");
     return -1;
 }
 
@@ -130,10 +156,13 @@ int VulkanApi::findQueue(VkQueueFlags reqFlags) const
 
     Slang::List<VkQueueFamilyProperties> queueFamilies;
     queueFamilies.setCount(numQueueFamilies);
-    vkGetPhysicalDeviceQueueFamilyProperties(m_physicalDevice, &numQueueFamilies, queueFamilies.getBuffer());
+    vkGetPhysicalDeviceQueueFamilyProperties(
+        m_physicalDevice,
+        &numQueueFamilies,
+        queueFamilies.getBuffer());
 
     // Find a queue that can service our needs
-    //VkQueueFlags reqQueueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
+    // VkQueueFlags reqQueueFlags = VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT;
 
     int queueFamilyIndex = -1;
     for (int i = 0; i < int(numQueueFamilies); ++i)
@@ -147,4 +176,4 @@ int VulkanApi::findQueue(VkQueueFlags reqFlags) const
     return -1;
 }
 
-} // renderer_test
+} // namespace gfx

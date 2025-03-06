@@ -1,5 +1,7 @@
 // slang-ir-inst-defs.h
 
+// clang-format off
+
 #ifndef INST
 #error Must #define `INST` before including `ir-inst-defs.h`
 #endif
@@ -61,14 +63,17 @@ INST(Nop, nop, 0, 0)
 
     INST(DifferentialPairType, DiffPair, 1, HOISTABLE)
     INST(DifferentialPairUserCodeType, DiffPairUserCode, 1, HOISTABLE)
-    INST_RANGE(DifferentialPairTypeBase, DifferentialPairType, DifferentialPairUserCodeType)
+    INST(DifferentialPtrPairType, DiffRefPair, 1, HOISTABLE)
+    INST_RANGE(DifferentialPairTypeBase, DifferentialPairType, DifferentialPtrPairType)
 
     INST(BackwardDiffIntermediateContextType, BwdDiffIntermediateCtxType, 1, HOISTABLE)
 
     INST(TensorViewType, TensorView, 1, HOISTABLE)
     INST(TorchTensorType, TorchTensor, 0, HOISTABLE)
     INST(ArrayListType, ArrayListVector, 1, HOISTABLE)
-    
+
+    INST(AtomicType, Atomic, 1, HOISTABLE)
+
     /* BindExistentialsTypeBase */
 
         // A `BindExistentials<B, T0,w0, T1,w1, ...>` represents
@@ -128,6 +133,10 @@ INST(Nop, nop, 0, 0)
     INST(ComPtrType, ComPtr, 1, HOISTABLE)
     // A NativePtr<T> type represents a native pointer to a managed resource.
     INST(NativePtrType, NativePtr, 1, HOISTABLE)
+
+    // A DescriptorHandle<T> type represents a bindless handle to an opaue resource type.
+    INST(DescriptorHandleType, DescriptorHandle, 1, HOISTABLE)
+
     // An AtomicUint is a placeholder type for a storage buffer, and will be mangled during compiling.
     INST(GLSLAtomicUintType, GLSLAtomicUint, 0, HOISTABLE)
 
@@ -193,6 +202,8 @@ INST(Nop, nop, 0, 0)
             INST(PrimitivesType, Primitives, 2, HOISTABLE)
         INST_RANGE(MeshOutputType, VerticesType, PrimitivesType)
 
+        /* Metal Mesh Type */
+            INST(MetalMeshType, metal::mesh, 5, HOISTABLE)
         /* Metal Mesh Grid Properties */
             INST(MetalMeshGridPropertiesType, mesh_grid_properties, 0, HOISTABLE)
 
@@ -223,6 +234,7 @@ INST(Nop, nop, 0, 0)
 
 INST(RayQueryType, RayQuery, 1, HOISTABLE)
 INST(HitObjectType, HitObject, 0, HOISTABLE)
+INST(CoopVectorType, CoopVectorType, 2, HOISTABLE)
 
 // Opaque type that can be dynamically cast to other resource types.
 INST(DynamicResourceType, DynamicResource, 0, HOISTABLE)
@@ -243,9 +255,11 @@ INST(AssociatedType, associated_type, 0, HOISTABLE)
 INST(ThisType, this_type, 0, HOISTABLE)
 INST(RTTIType, rtti_type, 0, HOISTABLE)
 INST(RTTIHandleType, rtti_handle_type, 0, HOISTABLE)
-INST(TupleType, tuple_type, 0, HOISTABLE)
+/*TupleTypeBase*/
+    INST(TupleType, tuple_type, 0, HOISTABLE)
+    INST(TypePack, TypePack, 0, HOISTABLE)
+INST_RANGE(TupleTypeBase, TupleType, TypePack)
 INST(TargetTupleType, TargetTuple, 0, HOISTABLE)
-INST(TypePack, TypePack, 0, HOISTABLE)
 INST(ExpandTypeOrVal, ExpandTypeOrVal, 1, HOISTABLE)
 
 // A type that identifies it's contained type as being emittable as `spirv_literal.
@@ -287,6 +301,10 @@ INST(IndexedFieldKey, indexedFieldKey, 2, HOISTABLE)
 // A placeholder witness that ThisType implements the enclosing interface.
 // Used only in interface definitions.
 INST(ThisTypeWitness, thisTypeWitness, 1, 0)
+
+// A placeholder witness for the fact that two types are equal.
+INST(TypeEqualityWitness, TypeEqualityWitness, 2, HOISTABLE)
+
 INST(GlobalHashedStringLiterals, global_hashed_string_literals, 0, 0)
 
 INST(Module, module, 0, PARENT)
@@ -317,15 +335,18 @@ INST(DefaultConstruct, defaultConstruct, 0, 0)
 
 INST(MakeDifferentialPair, MakeDiffPair, 2, 0)
 INST(MakeDifferentialPairUserCode, MakeDiffPairUserCode, 2, 0)
-INST_RANGE(MakeDifferentialPairBase, MakeDifferentialPair, MakeDifferentialPairUserCode)
+INST(MakeDifferentialPtrPair, MakeDiffRefPair, 2, 0)
+INST_RANGE(MakeDifferentialPairBase, MakeDifferentialPair, MakeDifferentialPtrPair)
 
 INST(DifferentialPairGetDifferential, GetDifferential, 1, 0)
 INST(DifferentialPairGetDifferentialUserCode, GetDifferentialUserCode, 1, 0)
-INST_RANGE(DifferentialPairGetDifferentialBase, DifferentialPairGetDifferential, DifferentialPairGetDifferentialUserCode)
+INST(DifferentialPtrPairGetDifferential, GetDifferentialPtr, 1, 0)
+INST_RANGE(DifferentialPairGetDifferentialBase, DifferentialPairGetDifferential, DifferentialPtrPairGetDifferential)
 
 INST(DifferentialPairGetPrimal, GetPrimal, 1, 0)
 INST(DifferentialPairGetPrimalUserCode, GetPrimalUserCode, 1, 0)
-INST_RANGE(DifferentialPairGetPrimalBase, DifferentialPairGetPrimal, DifferentialPairGetPrimalUserCode)
+INST(DifferentialPtrPairGetPrimal, GetPrimalRef, 1, 0)
+INST_RANGE(DifferentialPairGetPrimalBase, DifferentialPairGetPrimal, DifferentialPtrPairGetPrimal)
 
 INST(Specialize, specialize, 2, HOISTABLE)
 INST(LookupWitness, lookupWitness, 2, HOISTABLE)
@@ -343,12 +364,17 @@ INST(MatrixReshape, matrixReshape, 1, 0)
 INST(VectorReshape, vectorReshape, 1, 0)
 INST(MakeArray, makeArray, 0, 0)
 INST(MakeArrayFromElement, makeArrayFromElement, 1, 0)
+INST(MakeCoopVector, makeCoopVector, 0, 0)
+INST(MakeCoopVectorFromValuePack, makeCoopVectorFromValuePack, 1, 0)
 INST(MakeStruct, makeStruct, 0, 0)
 INST(MakeTuple, makeTuple, 0, 0)
 INST(MakeTargetTuple, makeTuple, 0, 0)
 INST(MakeValuePack, makeValuePack, 0, 0)
 INST(GetTargetTupleElement, getTargetTupleElement, 0, 0)
 INST(GetTupleElement, getTupleElement, 2, 0)
+INST(LoadResourceDescriptorFromHeap, LoadResourceDescriptorFromHeap, 1, 0)
+INST(LoadSamplerDescriptorFromHeap, LoadSamplerDescriptorFromHeap, 1, 0)
+INST(MakeCombinedTextureSamplerFromHandle, MakeCombinedTextureSamplerFromHandle, 1, 0)
 INST(MakeWitnessPack, MakeWitnessPack, 0, HOISTABLE)
 INST(Expand, Expand, 1, 0)
 INST(Each, Each, 1, HOISTABLE)
@@ -371,6 +397,9 @@ INST(Alloca, alloca, 1, 0)
 INST(UpdateElement, updateElement, 2, 0)
 INST(DetachDerivative, detachDerivative, 1, 0)
 
+INST(BitfieldExtract, bitfieldExtract, 3, 0)
+INST(BitfieldInsert, bitfieldInsert, 4, 0)
+
 INST(PackAnyValue, packAnyValue, 1, 0)
 INST(UnpackAnyValue, unpackAnyValue, 1, 0)
 
@@ -378,8 +407,11 @@ INST(WitnessTableEntry, witness_table_entry, 2, 0)
 INST(InterfaceRequirementEntry, interface_req_entry, 2, GLOBAL)
 
 // An inst to represent the workgroup size of the calling entry point.
-// We will materialize this inst during `translateGLSLGlobalVar`.
+// We will materialize this inst during `translateGlobalVaryingVar`.
 INST(GetWorkGroupSize, GetWorkGroupSize, 0, HOISTABLE)
+
+// An inst that returns the current stage of the calling entry point.
+INST(GetCurrentStage, GetCurrentStage, 0, 0)
 
 INST(Param, param, 0, 0)
 INST(StructField, field, 2, 0)
@@ -387,6 +419,21 @@ INST(Var, var, 0, 0)
 
 INST(Load, load, 1, 0)
 INST(Store, store, 2, 0)
+
+// Atomic Operations
+INST(AtomicLoad, atomicLoad, 1, 0)
+INST(AtomicStore, atomicStore, 2, 0)
+INST(AtomicExchange, atomicExchange, 2, 0)
+INST(AtomicCompareExchange, atomicCompareExchange, 3, 0)
+INST(AtomicAdd, atomicAdd, 2, 0)
+INST(AtomicSub, atomicSub, 2, 0)
+INST(AtomicAnd, atomicAnd, 2, 0)
+INST(AtomicOr, atomicOr, 2, 0)
+INST(AtomicXor, atomicXor, 2, 0)
+INST(AtomicMin, atomicMin, 2, 0)
+INST(AtomicMax, atomicMax, 2, 0)
+INST(AtomicInc, atomicInc, 1, 0)
+INST(AtomicDec, atomicDec, 1, 0)
 
 // Produced and removed during backward auto-diff pass as a temporary placeholder representing the
 // currently accumulated derivative to pass to some dOut argument in a nested call.
@@ -503,13 +550,18 @@ INST(StructuredBufferGetDimensions, StructuredBufferGetDimensions, 1, 0)
 // Resource qualifiers for dynamically varying index
 INST(NonUniformResourceIndex, nonUniformResourceIndex, 1, 0)
 
-INST(AtomicCounterIncrement, AtomicCounterIncrement, 1, 0)
-INST(AtomicCounterDecrement, AtomicCounterDecrement, 1, 0)
-
 INST(GetNaturalStride, getNaturalStride, 1, 0)
 
 INST(MeshOutputRef, meshOutputRef, 2, 0)
 INST(MeshOutputSet, meshOutputSet, 3, 0)
+
+// only two parameters as they are effectively static
+// TODO: make them reference the _slang_mesh object directly
+INST(MetalSetVertex, metalSetVertex, 2, 0)
+INST(MetalSetPrimitive, metalSetPrimitive, 2, 0)
+INST(MetalSetIndices, metalSetIndices, 2, 0)
+
+INST(MetalCastToDepthTexture, MetalCastToDepthTexture, 1, 0)
 
 // Construct a vector from a scalar
 //
@@ -614,9 +666,14 @@ INST_RANGE(TerminatorInst, Return, Unreachable)
 INST(discard, discard, 0, 0)
 
 INST(RequirePrelude, RequirePrelude, 1, 0)
-INST(RequireGLSLExtension, RequireGLSLExtension, 1, 0)
+INST(RequireTargetExtension, RequireTargetExtension, 1, 0)
 INST(RequireComputeDerivative, RequireComputeDerivative, 0, 0)
 INST(StaticAssert, StaticAssert, 2, 0)
+INST(Printf, Printf, 1, 0)
+
+// Quad control execution modes.
+INST(RequireMaximallyReconverges, RequireMaximallyReconverges, 0, 0)
+INST(RequireQuadDerivatives, RequireQuadDerivatives, 0, 0)
 
 // TODO: We should consider splitting the basic arithmetic/comparison
 // ops into cases for signed integers, unsigned integers, and floating-point
@@ -659,6 +716,8 @@ INST(BitNot, bitnot, 1, 0)
 
 INST(Select, select, 3, 0)
 
+INST(CheckpointObject, checkpointObj, 1, 0)
+
 INST(GetStringHash, getStringHash, 1, 0)
 
 INST(WaveGetActiveMask, waveGetActiveMask, 0, 0)
@@ -698,9 +757,13 @@ INST(GetVulkanRayTracingPayloadLocation, GetVulkanRayTracingPayloadLocation, 1, 
 
 INST(GetLegalizedSPIRVGlobalParamAddr, GetLegalizedSPIRVGlobalParamAddr, 1, 0)
 
-INST(GetPerVertexInputArray, GetPerVertexInputArray, 1, 0)
+INST(GetPerVertexInputArray, GetPerVertexInputArray, 1, HOISTABLE)
+INST(ResolveVaryingInputRef, ResolveVaryingInputRef, 1, HOISTABLE)
 
 INST(ForceVarIntoStructTemporarily, ForceVarIntoStructTemporarily, 1, 0)
+INST(ForceVarIntoRayPayloadStructTemporarily, ForceVarIntoRayPayloadStructTemporarily, 1, 0)
+INST_RANGE(ForceVarIntoStructTemporarily, ForceVarIntoStructTemporarily, ForceVarIntoRayPayloadStructTemporarily)
+
 INST(MetalAtomicCast, MetalAtomicCast, 1, 0)
 
 INST(IsTextureAccess, IsTextureAccess, 1, 0)
@@ -758,6 +821,11 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         needs to be special cased for lookup. */
     INST(TransitoryDecoration,              transitory,             0, 0)
 
+    // The result witness table that the functon's return type is a subtype of an interface.
+    // This is used to keep track of the original witness table in a function that used to
+    // return an existential value but now returns a concrete type after specialization.
+    INST(ResultWitnessDecoration,           ResultWitness,          1, 0)
+
     INST(VulkanRayPayloadDecoration,        vulkanRayPayload,       0, 0)
     INST(VulkanRayPayloadInDecoration,      vulkanRayPayloadIn,       0, 0)
     INST(VulkanHitAttributesDecoration,     vulkanHitAttributes,    0, 0)
@@ -768,11 +836,13 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(RequireSPIRVVersionDecoration,     requireSPIRVVersion,    1, 0)
     INST(RequireGLSLVersionDecoration,      requireGLSLVersion,     1, 0)
     INST(RequireGLSLExtensionDecoration,    requireGLSLExtension,   1, 0)
+    INST(RequireWGSLExtensionDecoration,    requireWGSLExtension,   1, 0)
     INST(RequireCUDASMVersionDecoration,    requireCUDASMVersion,   1, 0)
     INST(RequireCapabilityAtomDecoration,   requireCapabilityAtom, 1, 0)
 
     INST(HasExplicitHLSLBindingDecoration, HasExplicitHLSLBinding, 0, 0)
 
+    INST(DefaultValueDecoration,            DefaultValue,           1, 0)
     INST(ReadNoneDecoration,                readNone,               0, 0)
     INST(VulkanCallablePayloadDecoration,   vulkanCallablePayload,  0, 0)
     INST(VulkanCallablePayloadInDecoration, vulkanCallablePayloadIn,  0, 0)
@@ -780,7 +850,10 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(PreciseDecoration,                 precise,                0, 0)
     INST(PublicDecoration,                  public,                 0, 0)
     INST(HLSLExportDecoration,              hlslExport,             0, 0)
+    INST(DownstreamModuleExportDecoration,  downstreamModuleExport, 0, 0)
+    INST(DownstreamModuleImportDecoration,  downstreamModuleImport, 0, 0)
     INST(PatchConstantFuncDecoration,       patchConstantFunc,      1, 0)
+    INST(MaxTessFactorDecoration,           maxTessFactor,          1, 0)
     INST(OutputControlPointsDecoration,     outputControlPoints,    1, 0)
     INST(OutputTopologyDecoration,          outputTopology,         1, 0)
     INST(PartitioningDecoration,            partioning,             1, 0)
@@ -789,6 +862,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(InstanceDecoration,                instance,               1, 0)
     INST(NumThreadsDecoration,              numThreads,             3, 0)
     INST(WaveSizeDecoration,                waveSize,               1, 0)
+
+    INST(AvailableInDownstreamIRDecoration, availableInDownstreamIR, 1, 0)
 
         // Added to IRParam parameters to an entry point
     /* GeometryInputPrimitiveTypeDecoration */
@@ -851,6 +926,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         INST(ExportDecoration, export, 1, 0)
     INST_RANGE(LinkageDecoration, ImportDecoration, ExportDecoration)
 
+        /// Mark a global variable as a target builtin variable.
+    INST(TargetBuiltinVarDecoration, TargetBuiltinVar, 1, 0)
+
         /// Marks an inst as coming from an `extern` symbol defined in the user code.
     INST(UserExternDecoration, UserExtern, 0, 0)
 
@@ -904,6 +982,10 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(DerivativeGroupQuadDecoration, DerivativeGroupQuad, 0, 0)
     INST(DerivativeGroupLinearDecoration, DerivativeGroupLinear, 0, 0)
 
+    INST(MaximallyReconvergesDecoration, MaximallyReconverges, 0, 0)
+    INST(QuadDerivativesDecoration, QuadDerivatives, 0, 0)
+    INST(RequireFullQuadsDecoration, RequireFullQuads, 0, 0)
+
         // Marks a type to be non copyable, causing SSA pass to skip turning variables of the the type into SSA values.
     INST(NonCopyableTypeDecoration, nonCopyable, 0, 0)
 
@@ -918,6 +1000,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
+    INST(RayPayloadDecoration, raypayload, 0, 0)
 
     /* Mesh Shader outputs */
         INST(VerticesDecoration, vertices, 1, 0)
@@ -943,6 +1026,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(ConstructorDecoration, constructor, 1, 0)
     INST(MethodDecoration, method, 0, 0)
     INST(PackOffsetDecoration, packoffset, 2, 0)
+    INST(SpecializationConstantDecoration, SpecializationConstantDecoration, 1, 0)
 
         // Reflection metadata for a shader parameter that provides the original type name.
     INST(UserTypeNameDecoration, UserTypeName, 1, 0)
@@ -957,6 +1041,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
         /// Decorates a auto-diff transcribed value with the original value that the inst is transcribed from.
     INST(AutoDiffOriginalValueDecoration, AutoDiffOriginalValueDecoration, 1, 0)
+
+        /// Decorates a type as auto-diff builtin type.
+    INST(AutoDiffBuiltinDecoration, AutoDiffBuiltinDecoration, 0, 0)
 
         /// Used by the auto-diff pass to hold a reference to the
         /// generated derivative function.
@@ -980,6 +1067,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(BackwardDerivativePrimalContextDecoration, BackwardDerivativePrimalContextDecoration, 1, 0)
     INST(BackwardDerivativePrimalReturnDecoration, BackwardDerivativePrimalReturnDecoration, 1, 0)
 
+        // Mark a parameter as autodiff primal context.
+    INST(PrimalContextDecoration, PrimalContextDecoration, 0, 0)
     INST(LoopCounterDecoration, loopCounterDecoration, 0, 0)
     INST(LoopCounterUpdateDecoration, loopCounterUpdateDecoration, 0, 0)
 
@@ -1023,11 +1112,26 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         /// Mark a call as explicitly calling a differentiable function.
     INST(DifferentiableCallDecoration, differentiableCallDecoration, 0, 0)
 
+        /// Mark a type as being eligible for trimming if necessary. If
+        /// any fields don't have any effective loads from them, they can be 
+        /// removed.
+        ///
+    INST(OptimizableTypeDecoration, optimizableTypeDecoration, 0, 0)
+
+        /// Informs the DCE pass to ignore side-effects on this call for
+        /// the purposes of dead code elimination, even if the call does have
+        /// side-effects.
+        ///
+    INST(IgnoreSideEffectsDecoration, ignoreSideEffectsDecoration, 0, 0)
+
         /// Hint that the result from a call to the decorated function should be stored in backward prop function.
     INST(PreferCheckpointDecoration, PreferCheckpointDecoration, 0, 0)
 
         /// Hint that the result from a call to the decorated function should be recomputed in backward prop function.
     INST(PreferRecomputeDecoration, PreferRecomputeDecoration, 0, 0)
+
+        /// Hint that a struct is used for reverse mode checkpointing
+    INST(CheckpointIntermediateDecoration, CheckpointIntermediateDecoration, 1, 0)
 
     INST_RANGE(CheckpointHintDecoration, PreferCheckpointDecoration, PreferRecomputeDecoration)
 
@@ -1103,6 +1207,7 @@ INST(ExtractExistentialWitnessTable,    extractExistentialWitnessTable, 1, HOIST
 INST(ExtractTaggedUnionTag,             extractTaggedUnionTag,      1, 0)
 INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 
+INST(BuiltinCast,                       BuiltinCast,                1, 0)
 INST(BitCast,                           bitCast,                    1, 0)
 INST(Reinterpret,                       reinterpret,                1, 0)
 INST(Unmodified,                        unmodified,                1, 0)
@@ -1117,6 +1222,12 @@ INST(CastPtrToInt, CastPtrToInt, 1, 0)
 INST(CastIntToPtr, CastIntToPtr, 1, 0)
 INST(CastToVoid, castToVoid, 1, 0)
 INST(PtrCast, PtrCast, 1, 0)
+INST(CastUInt2ToDescriptorHandle, CastUInt2ToDescriptorHandle, 1, 0)
+INST(CastDescriptorHandleToUInt2, CastDescriptorHandleToUInt2, 1, 0)
+
+// Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are already concrete types.
+INST(CastDescriptorHandleToResource, CastDescriptorHandleToResource, 1, 0)
+
 INST(TreatAsDynamicUniform, TreatAsDynamicUniform, 1, 0)
 
 INST(SizeOf,                            sizeOf,                     1, 0)
@@ -1133,6 +1244,7 @@ INST(IsHalf, IsHalf, 1, 0)
 INST(IsUnsignedInt, IsUnsignedInt, 1, 0)
 INST(IsSignedInt, IsSignedInt, 1, 0)
 INST(IsVector, IsVector, 1, 0)
+INST(GetDynamicResourceHeap, GetDynamicResourceHeap, 0, HOISTABLE)
 
 INST(ForwardDifferentiate,                   ForwardDifferentiate,            1, 0)
 
@@ -1155,6 +1267,11 @@ INST(CudaKernelLaunch, CudaKernelLaunch, 6, 0)
 
 // Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer
 INST(GetEquivalentStructuredBuffer,     getEquivalentStructuredBuffer, 1, 0)
+
+// Gets a T[] pointer to the underlying data of a StructuredBuffer etc...
+INST(GetStructuredBufferPtr,     getStructuredBufferPtr, 1, 0)
+// Gets a uint[] pointer to the underlying data of a ByteAddressBuffer etc...
+INST(GetUntypedBufferPtr,     getUntypedBufferPtr, 1, 0)
 
 /* Layout */
     INST(VarLayout, varLayout, 1, HOISTABLE)
@@ -1186,6 +1303,7 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
     INST(SNormAttr, snorm, 0, HOISTABLE)
     INST(NoDiffAttr, no_diff, 0, HOISTABLE)
     INST(NonUniformAttr, nonuniform, 0, HOISTABLE)
+    INST(AlignedAttr, Aligned, 1, HOISTABLE)
 
     /* SemanticAttr */
         INST(UserSemanticAttr, userSemantic, 2, HOISTABLE)
@@ -1196,6 +1314,7 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
         INST(VarOffsetAttr, offset, 2, HOISTABLE)
     INST_RANGE(LayoutResourceInfoAttr, TypeSizeAttr, VarOffsetAttr)
     INST(FuncThrowTypeAttr, FuncThrowType, 1, HOISTABLE)
+    
 INST_RANGE(Attr, PendingLayoutAttr, FuncThrowTypeAttr)
 
 /* Liveness */
@@ -1212,6 +1331,9 @@ INST(ExistentialTypeSpecializationDictionary, ExistentialTypeSpecializationDicti
 /* Differentiable Type Dictionary */
 INST(DifferentiableTypeDictionaryItem, DifferentiableTypeDictionaryItem, 0, 0)
 
+/* Differentiable Type Annotation (for run-time types)*/
+INST(DifferentiableTypeAnnotation, DifferentiableTypeAnnotation, 2, HOISTABLE)
+
 INST(BeginFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)
 INST(EndFragmentShaderInterlock, BeginFragmentShaderInterlock, 0, 0)
 
@@ -1222,7 +1344,7 @@ INST(DebugVar, DebugVar, 4, 0)
 INST(DebugValue, DebugValue, 2, 0)
 
 /* Embedded Precompiled Libraries */
-INST(EmbeddedDXIL, EmbeddedDXIL, 1, 0)
+INST(EmbeddedDownstreamIR, EmbeddedDownstreamIR, 2, 0)
 
 /* Inline assembly */
 

@@ -1,17 +1,18 @@
 // d3d12-helper-functions.h
 #pragma once
 
-#include "slang-gfx.h"
+#include "../../../source/core/slang-list.h"
+#include "../../../source/core/slang-short-list.h"
 #include "d3d12-base.h"
 #include "d3d12-shader-object-layout.h"
 #include "d3d12-submitter.h"
-#include "../../../source/core/slang-short-list.h"
-#include "../../../source/core/slang-list.h"
+#include "slang-gfx.h"
 
 #ifndef __ID3D12GraphicsCommandList1_FWD_DEFINED__
 // If can't find a definition of CommandList1, just use an empty definition
 struct ID3D12GraphicsCommandList1
-{};
+{
+};
 #endif
 
 namespace gfx
@@ -35,7 +36,7 @@ struct BindingContext
     TransientResourceHeapImpl* transientHeap;
     DeviceImpl* device;
     D3D12_DESCRIPTOR_HEAP_TYPE
-        outOfMemoryHeap; // The type of descriptor heap that is OOM during binding.
+    outOfMemoryHeap; // The type of descriptor heap that is OOM during binding.
     ShortList<PendingDescriptorTableBinding>* pendingTableBindings;
 };
 
@@ -62,7 +63,8 @@ void initSrvDesc(
     SubresourceRange subresourceRange,
     D3D12_SHADER_RESOURCE_VIEW_DESC& descOut);
 Result initTextureResourceDesc(
-    D3D12_RESOURCE_DESC& resourceDesc, const ITextureResource::Desc& srcDesc);
+    D3D12_RESOURCE_DESC& resourceDesc,
+    const ITextureResource::Desc& srcDesc);
 void initBufferResourceDesc(Size bufferSize, D3D12_RESOURCE_DESC& out);
 Result uploadBufferDataImpl(
     ID3D12Device* device,

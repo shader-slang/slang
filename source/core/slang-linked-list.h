@@ -1,20 +1,22 @@
 #ifndef SLANG_CORE_LINKED_LIST_H
 #define SLANG_CORE_LINKED_LIST_H
 
+#include "slang-allocator.h"
+#include "slang-list.h"
 #include "slang.h"
 
-#include "slang-allocator.h"
 #include <type_traits>
 
 namespace Slang
 {
-template <typename T>
+template<typename T>
 class LinkedList;
 
-template <typename T>
+template<typename T>
 class LinkedNode
 {
-    template <typename T1> friend class LinkedList;
+    template<typename T1>
+    friend class LinkedList;
 
 private:
     LinkedNode<T>* prev = nullptr;
@@ -24,9 +26,7 @@ private:
 public:
     T value;
     LinkedNode(LinkedList<T>* lnk)
-        : list(lnk)
-    {
-    };
+        : list(lnk){};
     LinkedNode<T>* getPrevious() { return prev; };
     LinkedNode<T>* getNext() { return next; };
     const LinkedNode<T>* getNext() const { return next; };
@@ -81,12 +81,14 @@ public:
     }
 };
 
-template <typename T> class LinkedList
+template<typename T>
+class LinkedList
 {
-    template <typename T1> friend class LinkedNode;
+    template<typename T1>
+    friend class LinkedNode;
 
 private:
-    LinkedNode<T>* head, *tail;
+    LinkedNode<T>*head, *tail;
     int count;
 
 public:
@@ -95,7 +97,7 @@ public:
     {
     public:
         using Node = std::conditional_t<Const, const LinkedNode<T>, LinkedNode<T>>;
-        Node* current, *next;
+        Node *current, *next;
         void setCurrent(Node* cur)
         {
             current = cur;
@@ -106,8 +108,7 @@ public:
         }
         GenIterator() { current = next = nullptr; }
         GenIterator(Node* cur) { setCurrent(cur); }
-        std::conditional_t<Const, const T&, T&>
-            operator*() const { return current->value; }
+        std::conditional_t<Const, const T&, T&> operator*() const { return current->value; }
         GenIterator& operator++()
         {
             setCurrent(next);
@@ -133,22 +134,17 @@ public:
 
 public:
     LinkedList()
-        : head(0)
-        , tail(0)
-        , count(0)
-    {}
+        : head(0), tail(0), count(0)
+    {
+    }
     ~LinkedList() { clear(); }
     LinkedList(const LinkedList<T>& link)
-        : head(0)
-        , tail(0)
-        , count(0)
+        : head(0), tail(0), count(0)
     {
         this->operator=(link);
     }
     LinkedList(LinkedList<T>&& link)
-        : head(0)
-        , tail(0)
-        , count(0)
+        : head(0), tail(0), count(0)
     {
         this->operator=(_Move(link));
     }
@@ -178,7 +174,8 @@ public:
         }
         return *this;
     }
-    template <typename IteratorFunc> void forEach(const IteratorFunc& f)
+    template<typename IteratorFunc>
+    void forEach(const IteratorFunc& f)
     {
         auto p = head;
         while (p)

@@ -3,8 +3,9 @@
 
 #include "../renderer-shared.h"
 
-namespace gfx {
+namespace gfx
+{
 
 SlangResult SLANG_MCALL createGLDevice(const IDevice::Desc* desc, IDevice** outDevice);
 
-} // gfx
+} // namespace gfx

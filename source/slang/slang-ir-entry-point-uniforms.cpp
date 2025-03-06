@@ -1,10 +1,9 @@
 // slang-ir-entry-point-uniforms.cpp
 #include "slang-ir-entry-point-uniforms.h"
 
-#include "slang-ir.h"
-#include "slang-ir-insts.h"
 #include "slang-ir-entry-point-pass.h"
-
+#include "slang-ir-insts.h"
+#include "slang-ir.h"
 #include "slang-mangle.h"
 
 namespace Slang
@@ -109,7 +108,7 @@ namespace Slang
 //
 bool isVaryingResourceKind(LayoutResourceKind kind)
 {
-    switch( kind )
+    switch (kind)
     {
     default:
         return false;
@@ -151,9 +150,9 @@ bool isVaryingParameter(IRTypeLayout* typeLayout)
     // adding `LayoutResourceKind`s for system-value inputs
     // and outputs would allow for simpler logic here.
     //
-    for(auto sizeAttr : typeLayout->getSizeAttrs())
+    for (auto sizeAttr : typeLayout->getSizeAttrs())
     {
-        if(!isVaryingResourceKind(sizeAttr->getResourceKind()))
+        if (!isVaryingResourceKind(sizeAttr->getResourceKind()))
             return false;
     }
     return true;
@@ -200,13 +199,20 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         // defensive and bail out in the failure case in release builds.
         //
         auto funcLayoutDecoration = entryPointFunc->findDecoration<IRLayoutDecoration>();
-        SLANG_ASSERT(funcLayoutDecoration);
-        if(!funcLayoutDecoration)
+
+        // If the module contains two functions with entrypoint decorations,
+        // and one entrypoint calls the other entrypoint, and the user
+        // tells us to compile the caller entrypoint but not the callee
+        // entrypoint, we will not have the layout decoration created for
+        // the callee entrypoint. In this case, we should simply treat the
+        // callee entrypoint as if it is an ordinary function and skip the
+        // rest of the logic here.
+        if (!funcLayoutDecoration)
             return;
 
         auto entryPointLayout = as<IREntryPointLayout>(funcLayoutDecoration->getLayout());
         SLANG_ASSERT(entryPointLayout);
-        if(!entryPointLayout)
+        if (!entryPointLayout)
             return;
 
         // The parameter layout for an entry point will either be a structure
@@ -214,10 +220,11 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         // wrapped around such a structure.
         //
         // If we are in the latter case we will need to make sure to allocate
-        // an explicit IR constant buffer for that wrapper, 
+        // an explicit IR constant buffer for that wrapper,
         //
         entryPointParamsLayout = entryPointLayout->getParamsLayout();
-        needConstantBuffer = as<IRParameterGroupTypeLayout>(entryPointParamsLayout->getTypeLayout()) != nullptr; 
+        needConstantBuffer =
+            as<IRParameterGroupTypeLayout>(entryPointParamsLayout->getTypeLayout()) != nullptr;
 
         auto entryPointParamsStructLayout = getScopeStructLayout(entryPointLayout);
 
@@ -226,7 +233,7 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         IRBuilder builderStorage(m_module);
         auto builder = &builderStorage;
 
-        if(m_options.alwaysCreateCollectedParam)
+        if (m_options.alwaysCreateCollectedParam)
             ensureCollectedParamAndTypeHaveBeenCreated();
 
         // We will be removing any uniform parameters we run into, so we
@@ -235,7 +242,7 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         //
         IRParam* nextParam = nullptr;
         UInt paramCounter = 0;
-        for( IRParam* param = entryPointFunc->getFirstParam(); param; param = nextParam )
+        for (IRParam* param = entryPointFunc->getFirstParam(); param; param = nextParam)
         {
             nextParam = param->getNextParam();
             UInt paramIndex = paramCounter++;
@@ -246,18 +253,18 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             //
             auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
             SLANG_ASSERT(layoutDecoration);
-            if(!layoutDecoration)
+            if (!layoutDecoration)
                 continue;
             auto paramLayout = as<IRVarLayout>(layoutDecoration->getLayout());
             SLANG_ASSERT(paramLayout);
-            if(!paramLayout)
+            if (!paramLayout)
                 continue;
 
             // A parameter that has varying input/output behavior should be left alone,
             // since this pass is only supposed to apply to uniform (non-varying)
             // parameters.
             //
-            if(isVaryingParameter(paramLayout))
+            if (isVaryingParameter(paramLayout))
                 continue;
 
             // At this point we know that `param` is not a varying shader parameter,
@@ -290,7 +297,8 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             // the linker. After all, this pass is traversing the same information
             // anyway, so it could do the work while it is here...
             //
-            auto paramFieldKey = cast<IRStructKey>(entryPointParamsStructLayout->getFieldLayoutAttrs()[paramIndex]->getFieldKey());
+            auto paramFieldKey = cast<IRStructKey>(
+                entryPointParamsStructLayout->getFieldLayoutAttrs()[paramIndex]->getFieldKey());
 
             auto paramField = builder->createStructField(paramStructType, paramFieldKey, paramType);
             SLANG_UNUSED(paramField);
@@ -316,7 +324,7 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             //
             // We are therefore going to replace the uses one at a time.
             //
-            while(auto use = param->firstUse )
+            while (auto use = param->firstUse)
             {
                 // Given a `use` of the paramter, we will insert
                 // the replacement code right before the instruction
@@ -329,7 +337,7 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
                 // we generated a constant buffer.
                 //
                 IRInst* fieldVal = nullptr;
-                if( needConstantBuffer )
+                if (needConstantBuffer)
                 {
                     // A constant buffer behaves like a pointer
                     // at the IR level, so we first do a pointer
@@ -348,10 +356,7 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
                     // has an ordinary `struct` type (not a pointer),
                     // so we just extract the field directly.
                     //
-                    fieldVal = builder->emitFieldExtract(
-                        paramType,
-                        collectedParam,
-                        paramFieldKey);
+                    fieldVal = builder->emitFieldExtract(paramType, collectedParam, paramFieldKey);
                 }
 
                 // We replace the value used at this use site, which
@@ -369,7 +374,7 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
             param->removeAndDeallocate();
         }
 
-        if( collectedParam )
+        if (collectedParam)
         {
             collectedParam->insertBefore(entryPointFunc->getFirstBlock()->getFirstChild());
         }
@@ -379,7 +384,7 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
 
     void ensureCollectedParamAndTypeHaveBeenCreated()
     {
-        if(paramStructType)
+        if (paramStructType)
             return;
 
         IRBuilder builder(m_module);
@@ -388,15 +393,26 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         //
         builder.setInsertBefore(m_entryPoint.func);
         paramStructType = builder.createStructType();
-        builder.addNameHintDecoration(paramStructType, UnownedTerminatedStringSlice("EntryPointParams"));
+        builder.addNameHintDecoration(
+            paramStructType,
+            UnownedTerminatedStringSlice("EntryPointParams"));
         builder.addBinaryInterfaceTypeDecoration(paramStructType);
 
-        if( needConstantBuffer )
+        if (needConstantBuffer)
         {
             // If we need a constant buffer, then the global
             // shader parameter will be a `ConstantBuffer<paramStructType>`
             //
-            auto constantBufferType = builder.getConstantBufferType(paramStructType);
+            IRType* layoutType = nullptr;
+
+            if (m_options.targetReq->getOptionSet().getBoolOption(
+                    CompilerOptionName::GLSLForceScalarLayout))
+                layoutType = builder.getType(kIROp_ScalarBufferLayoutType);
+            else if (isKhronosTarget(m_options.targetReq))
+                layoutType = builder.getType(kIROp_Std430BufferLayoutType);
+            else
+                layoutType = builder.getType(kIROp_DefaultBufferLayoutType);
+            auto constantBufferType = builder.getConstantBufferType(paramStructType, layoutType);
             collectedParam = builder.createParam(constantBufferType);
         }
         else
@@ -418,7 +434,9 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         // We add a name hint to the global parameter so that it will
         // emit to more readable code when referenced.
         //
-        builder.addNameHintDecoration(collectedParam, UnownedTerminatedStringSlice("entryPointParams"));
+        builder.addNameHintDecoration(
+            collectedParam,
+            UnownedTerminatedStringSlice("entryPointParams"));
     }
 };
 
@@ -440,7 +458,7 @@ struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
         // us modifying it along the way.
         //
         IRParam* nextParam = nullptr;
-        for( IRParam* param = entryPointFunc->getFirstParam(); param; param = nextParam )
+        for (IRParam* param = entryPointFunc->getFirstParam(); param; param = nextParam)
         {
             nextParam = param->getNextParam();
 
@@ -450,18 +468,18 @@ struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
             //
             auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
             SLANG_ASSERT(layoutDecoration);
-            if(!layoutDecoration)
+            if (!layoutDecoration)
                 continue;
             auto paramLayout = as<IRVarLayout>(layoutDecoration->getLayout());
             SLANG_ASSERT(paramLayout);
-            if(!paramLayout)
+            if (!paramLayout)
                 continue;
 
             // A parameter that has varying input/output behavior should be left alone,
             // since this pass is only supposed to apply to uniform (non-varying)
             // parameters.
             //
-            if(isVaryingParameter(paramLayout))
+            if (isVaryingParameter(paramLayout))
                 continue;
 
             auto paramType = param->getFullType();
@@ -476,19 +494,27 @@ struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
             // for CPU/CUDA) that might want to treat entry-point parameters
             // different from other cases.
             //
-            // TODO: Once we have support for multiple entry points to be emitted
-            // at once, we need a way to associate these per-entry-point parameters
-            // more closely with the original entry point. The two easiest options
-            // are:
+            // We need a way to associate these per-entry-point parameters
+            // more closely with the original entry point. The two current
+            // methods are:
             //
             // 1. Don't move the new aggregate parameter to the global scope
             // on those targets, and instead keep it as a parameter of the
-            // entry point.
+            // entry point. This is used for CPU/CUDA targets.
             //
-            // 2. Use a decoration on the entry point itself to point at the
-            // global parameter for its per-entry-point parameter data.
+            // 2. Use a decoration on the global param itself to point at the
+            // entry point for its per-entry-point parameter data, without moving
+            // the parameter to the global scope. This is used for Metal targets, as
+            // Metal does not have global parameters at the global scope.
             //
-            builder->addDecoration(globalParam, kIROp_EntryPointParamDecoration);
+            // Method (1) is not used because Metal contains shading language concepts
+            // such as binding offets, similar to other shading language targets.
+            // We want to reuse code from other shading language targets for Metal, hence
+            // we move parameters to the global scope, and then move the parameters back to
+            // the entry points that they originate from. The originating entry points are
+            // tracked through this decoration.
+            //
+            builder->addEntryPointParamDecoration(globalParam, entryPointFunc);
 
             param->replaceUsesWith(globalParam);
             param->removeAndDeallocate();
@@ -499,19 +525,18 @@ struct MoveEntryPointUniformParametersToGlobalScope : PerEntryPointPass
 };
 
 void collectEntryPointUniformParams(
-    IRModule*                                       module,
-    CollectEntryPointUniformParamsOptions const&    options)
+    IRModule* module,
+    CollectEntryPointUniformParamsOptions const& options)
 {
     CollectEntryPointUniformParams context;
     context.m_options = options;
     context.processModule(module);
 }
 
-void moveEntryPointUniformParamsToGlobalScope(
-    IRModule*   module)
+void moveEntryPointUniformParamsToGlobalScope(IRModule* module)
 {
     MoveEntryPointUniformParametersToGlobalScope context;
     context.processModule(module);
 }
 
-}
+} // namespace Slang

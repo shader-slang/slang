@@ -3,14 +3,20 @@
 // CHECK-DAG: OpEntryPoint Vertex
 // CHECK-DAG: OpEntryPoint Fragment
 
-// we should only have 1 'BuiltIn InstanceIndex' since the `Output` and `Input` semantic
-// for `InstanceIndex` should be converted to a non-builtin
-// CHECK-DAG: BuiltIn InstanceIndex
-// CHECK-NOT: BuiltIn InstanceIndex
-
 // We require 1 `Flat` for the fragment input `uint`
-// SPIRV: Flat
-// SPIRV-NOT: Flat
+// CHECK-DAG: OpDecorate %{{[1-9][0-9]*}} Flat
+
+// CHECK-DAG: OpDecorate %gl_InstanceIndex BuiltIn InstanceIndex
+
+// The vertex shader should be using the builtin InstanceIndex var.
+// CHECK: %vmain = OpFunction
+// CHECK: InstanceIndex
+// CHECK: OpFunctionEnd
+
+// The fragment shader should not be using the builtin InstanceIndex var.
+// CHECK: %pmain = OpFunction
+// CHECK-NOT: InstanceIndex
+// CHECK: OpFunctionEnd
 
 struct VIn
 {

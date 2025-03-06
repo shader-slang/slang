@@ -22,9 +22,7 @@ Result TransientResourceHeapImpl::init(const ITransientResourceHeap::Desc& desc,
     return SLANG_OK;
 }
 
-TransientResourceHeapImpl::~TransientResourceHeapImpl()
-{
-}
+TransientResourceHeapImpl::~TransientResourceHeapImpl() {}
 
 Result TransientResourceHeapImpl::createCommandBuffer(ICommandBuffer** outCmdBuffer)
 {

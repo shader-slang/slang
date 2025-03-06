@@ -1,33 +1,32 @@
 // slang-ir-clone.cpp
 #include "slang-ir-clone.h"
 
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
 
 IRInst* lookUp(IRCloneEnv* env, IRInst* oldVal)
 {
-    for( auto ee = env; ee; ee = ee->parent )
+    for (auto ee = env; ee; ee = ee->parent)
     {
         IRInst* newVal = nullptr;
-        if(ee->mapOldValToNew.tryGetValue(oldVal, newVal))
+        if (ee->mapOldValToNew.tryGetValue(oldVal, newVal))
             return newVal;
     }
     return nullptr;
 }
 
-IRInst* findCloneForOperand(
-    IRCloneEnv*     env,
-    IRInst*         oldOperand)
+IRInst* findCloneForOperand(IRCloneEnv* env, IRInst* oldOperand)
 {
-    if(!oldOperand) return nullptr;
+    if (!oldOperand)
+        return nullptr;
 
     // If there is a registered replacement for
     // the existing operand, then use it.
     //
-    if( IRInst* newVal = lookUp(env, oldOperand) )
+    if (IRInst* newVal = lookUp(env, oldOperand))
         return newVal;
 
     // Otherwise, we assume that the caller wants
@@ -46,14 +45,25 @@ IRInst* findCloneForOperand(
     return oldOperand;
 }
 
-IRInst* cloneInstAndOperands(
-    IRCloneEnv*     env,
-    IRBuilder*      builder,
-    IRInst*         oldInst)
+IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldInst)
 {
     SLANG_ASSERT(env);
     SLANG_ASSERT(builder);
     SLANG_ASSERT(oldInst);
+
+    // We start by mapping the type of the orignal instruction
+    // to its replacement value, if any.
+    //
+    auto oldType = oldInst->getFullType();
+    auto newType = (IRType*)findCloneForOperand(env, oldType);
+
+    // Pointer literals need to be handled separately, as they carry other data
+    // than just the operands.
+    if (oldInst->getOp() == kIROp_PtrLit)
+    {
+        auto oldPtr = as<IRPtrLit>(oldInst);
+        return builder->getPtrValue(newType, oldPtr->value.ptrVal);
+    }
 
     // This logic will not handle any instructions
     // with special-case data attached, but that only
@@ -65,12 +75,6 @@ IRInst* cloneInstAndOperands(
     // to handle constants gracefully, if it ever comes up.
     //
     SLANG_ASSERT(!as<IRConstant>(oldInst));
-
-    // We start by mapping the type of the orignal instruction
-    // to its replacement value, if any.
-    //
-    auto oldType = oldInst->getFullType();
-    auto newType = (IRType*) findCloneForOperand(env, oldType);
 
     // Next we will iterate over the operands of `oldInst`
     // to find their replacements and install them as
@@ -123,10 +127,10 @@ struct IRCloningOldNewPair
 // lines of the nesting of instructions isn't sufficient.
 //
 static void _cloneInstDecorationsAndChildren(
-    IRCloneEnv*         env,
-    IRModule*           module,
-    IRInst*             oldInst,
-    IRInst*             newInst)
+    IRCloneEnv* env,
+    IRModule* module,
+    IRInst* oldInst,
+    IRInst* newInst)
 {
     SLANG_ASSERT(env);
     SLANG_ASSERT(oldInst);
@@ -154,7 +158,7 @@ static void _cloneInstDecorationsAndChildren(
     List<IRCloningOldNewPair> pairs;
     ShortList<IRCloningOldNewPair> paramPairs;
 
-    for( auto oldChild : oldInst->getDecorationsAndChildren() )
+    for (auto oldChild : oldInst->getDecorationsAndChildren())
     {
         // As a very subtle special case, if one of the children
         // of our `oldInst` already has a registered replacement,
@@ -166,7 +170,7 @@ static void _cloneInstDecorationsAndChildren(
         // seeded before cloning begain (e.g., function
         // parameters that are to be replaced).
         //
-        if(lookUp(env, oldChild))
+        if (lookUp(env, oldChild))
             continue;
 
         // Now we can perform the first phase of cloning
@@ -180,7 +184,7 @@ static void _cloneInstDecorationsAndChildren(
             // the type might be a forward reference to things defined
             // later in the block that we haven't cloned and registered yet.
             newChild = builder->emitParam(nullptr);
-            paramPairs.add({ oldChild, newChild });
+            paramPairs.add({oldChild, newChild});
         }
         else
         {
@@ -192,9 +196,9 @@ static void _cloneInstDecorationsAndChildren(
         // or children, we will register it into our
         // list for processing in the second phase.
         //
-        if( oldChild->getFirstDecorationOrChild() )
+        if (oldChild->getFirstDecorationOrChild())
         {
-            pairs.add({ oldChild, newChild });
+            pairs.add({oldChild, newChild});
         }
     }
 
@@ -203,7 +207,7 @@ static void _cloneInstDecorationsAndChildren(
     // in the list that required second-phase processing,
     // and clone their decorations and/or children recursively.
     //
-    for( auto pair : pairs )
+    for (auto pair : pairs)
     {
         auto oldChild = pair.oldInst;
         auto newChild = pair.newInst;
@@ -220,6 +224,7 @@ static void _cloneInstDecorationsAndChildren(
         auto oldType = oldParam->getFullType();
         auto newType = (IRType*)findCloneForOperand(env, oldType);
         newParam->setFullType(newType);
+        newParam->sourceLoc = oldParam->sourceLoc;
     }
 }
 
@@ -230,10 +235,10 @@ static void _cloneInstDecorationsAndChildren(
 // explicitly asks for it.
 //
 void cloneInstDecorationsAndChildren(
-    IRCloneEnv*         env,
-    IRModule*           module,
-    IRInst*             oldInst,
-    IRInst*             newInst)
+    IRCloneEnv* env,
+    IRModule* module,
+    IRInst* oldInst,
+    IRInst* newInst)
 {
     SLANG_ASSERT(module);
     SLANG_ASSERT(oldInst);
@@ -256,17 +261,14 @@ void cloneInstDecorationsAndChildren(
 // The convenience function `cloneInst` just sequences the
 // operations that have already been defined.
 //
-IRInst* cloneInst(
-    IRCloneEnv*     env,
-    IRBuilder*      builder,
-    IRInst*         oldInst)
+IRInst* cloneInst(IRCloneEnv* env, IRBuilder* builder, IRInst* oldInst)
 {
     SLANG_ASSERT(env);
     SLANG_ASSERT(builder);
     SLANG_ASSERT(oldInst);
 
     IRInst* newInst = nullptr;
-    if( env->mapOldValToNew.tryGetValue(oldInst, newInst) )
+    if (env->mapOldValToNew.tryGetValue(oldInst, newInst))
     {
         // In this case, somebody is trying to clone an
         // instruction that already had been cloned
@@ -284,34 +286,32 @@ IRInst* cloneInst(
         return newInst;
     }
 
-    newInst = cloneInstAndOperands(
-        env, builder, oldInst);
+    newInst = cloneInstAndOperands(env, builder, oldInst);
 
     env->mapOldValToNew.add(oldInst, newInst);
-    
+
     // For hoistable insts, its possible that the cloned inst is the same
     // as the original inst.
-    // Skip the decoration/children cloning in that case (which will end up 
+    // Skip the decoration/children cloning in that case (which will end up
     // in an infinite loop)
-    // 
+    //
     if (newInst == oldInst)
         return newInst;
-    
-    cloneInstDecorationsAndChildren(
-        env, builder->getModule(), oldInst, newInst);
+
+    cloneInstDecorationsAndChildren(env, builder->getModule(), oldInst, newInst);
 
     return newInst;
 }
 
 void cloneDecoration(
-    IRCloneEnv*     cloneEnv,
-    IRDecoration*   oldDecoration,
-    IRInst*         newParent,
-    IRModule*       module)
+    IRCloneEnv* cloneEnv,
+    IRDecoration* oldDecoration,
+    IRInst* newParent,
+    IRModule* module)
 {
     IRBuilder builder(module);
 
-    if(auto first = newParent->getFirstDecorationOrChild())
+    if (auto first = newParent->getFirstDecorationOrChild())
         builder.setInsertBefore(first);
     else
         builder.setInsertInto(newParent);
@@ -321,24 +321,20 @@ void cloneDecoration(
     cloneInst(&env, &builder, oldDecoration);
 }
 
-void cloneDecoration(
-    IRDecoration*   oldDecoration,
-    IRInst*         newParent)
+void cloneDecoration(IRDecoration* oldDecoration, IRInst* newParent)
 {
-    cloneDecoration(
-        nullptr,
-        oldDecoration,
-        newParent,
-        newParent->getModule());
+    cloneDecoration(nullptr, oldDecoration, newParent, newParent->getModule());
 }
 
 bool IRSimpleSpecializationKey::operator==(IRSimpleSpecializationKey const& other) const
 {
     auto valCount = vals.getCount();
-    if(valCount != other.vals.getCount()) return false;
-    for( Index ii = 0; ii < valCount; ++ii )
+    if (valCount != other.vals.getCount())
+        return false;
+    for (Index ii = 0; ii < valCount; ++ii)
     {
-        if(vals[ii] != other.vals[ii]) return false;
+        if (vals[ii] != other.vals[ii])
+            return false;
     }
     return true;
 }
@@ -347,7 +343,7 @@ HashCode IRSimpleSpecializationKey::getHashCode() const
 {
     auto valCount = vals.getCount();
     HashCode hash = Slang::getHashCode(valCount);
-    for( Index ii = 0; ii < valCount; ++ii )
+    for (Index ii = 0; ii < valCount; ++ii)
     {
         hash = combineHash(hash, Slang::getHashCode(vals[ii]));
     }

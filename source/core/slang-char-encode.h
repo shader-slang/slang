@@ -1,13 +1,13 @@
 #ifndef SLANG_CORE_CHAR_ENCODE_H
 #define SLANG_CORE_CHAR_ENCODE_H
 
-#include "slang-secure-crt.h"
 #include "slang-basic.h"
+#include "slang-secure-crt.h"
 
 namespace Slang
 {
 
-// NOTE! Order must be kept the same to match up with 
+// NOTE! Order must be kept the same to match up with
 enum class CharEncodeType
 {
     UTF8,
@@ -17,7 +17,7 @@ enum class CharEncodeType
     CountOf,
 };
 
-template <typename ReadByteFunc>
+template<typename ReadByteFunc>
 Char32 getUnicodePointFromUTF8(const ReadByteFunc& readByte)
 {
     Char32 codePoint = 0;
@@ -38,7 +38,7 @@ Char32 getUnicodePointFromUTF8(const ReadByteFunc& readByte)
     return codePoint;
 }
 
-template <typename ReadByteFunc>
+template<typename ReadByteFunc>
 Char32 getUnicodePointFromUTF16(const ReadByteFunc& readByte)
 {
     uint32_t byte0 = Byte(readByte());
@@ -55,7 +55,7 @@ Char32 getUnicodePointFromUTF16(const ReadByteFunc& readByte)
         return Char32(word0);
 }
 
-template <typename ReadByteFunc>
+template<typename ReadByteFunc>
 Char32 getUnicodePointFromUTF16Reversed(const ReadByteFunc& readByte)
 {
     uint32_t byte0 = Byte(readByte());
@@ -72,7 +72,7 @@ Char32 getUnicodePointFromUTF16Reversed(const ReadByteFunc& readByte)
         return Char32(word0);
 }
 
-template <typename ReadByteFunc>
+template<typename ReadByteFunc>
 Char32 getUnicodePointFromUTF32(const ReadByteFunc& readByte)
 {
     uint32_t byte0 = Byte(readByte());
@@ -163,52 +163,55 @@ static const Char16 kUTF16ReversedHeader = 0xFFFE;
 class CharEncoding
 {
 public:
-    static CharEncoding* UTF8,* UTF16,* UTF16Reversed,* UTF32;
+    static CharEncoding *UTF8, *UTF16, *UTF16Reversed, *UTF32;
 
-        /// Encode Utf8 held in slice append into ioBuffer
+    /// Encode Utf8 held in slice append into ioBuffer
     virtual void encode(const UnownedStringSlice& str, List<Byte>& ioBuffer) = 0;
-        /// Decode buffer into Utf8 held in ioBuffer
+    /// Decode buffer into Utf8 held in ioBuffer
     virtual void decode(const Byte* buffer, int length, List<char>& ioBuffer) = 0;
 
-    virtual ~CharEncoding()    {}
+    virtual ~CharEncoding() {}
 
-        /// Get the encoding type
+    /// Get the encoding type
     CharEncodeType getEncodingType() const { return m_encodingType; }
 
-        /// Given some bytes determines a character encoding type, based on the initial bytes.
-        /// If can't be determined will assume UTF8.
-        /// Outputs the offset to the first non mark in outOffset
-    static CharEncodeType determineEncoding(const Byte* bytes, size_t bytesCount, size_t& outOffset);
+    /// Given some bytes determines a character encoding type, based on the initial bytes.
+    /// If can't be determined will assume UTF8.
+    /// Outputs the offset to the first non mark in outOffset
+    static CharEncodeType determineEncoding(
+        const Byte* bytes,
+        size_t bytesCount,
+        size_t& outOffset);
 
-        /// Get the 
+    /// Get the
     static CharEncoding* getEncoding(CharEncodeType type) { return g_encoding[Index(type)]; }
 
-    CharEncoding(CharEncodeType encodingType) :
-        m_encodingType(encodingType)
+    CharEncoding(CharEncodeType encodingType)
+        : m_encodingType(encodingType)
     {
     }
 
 protected:
-
     CharEncodeType m_encodingType;
 
-    static CharEncoding*const g_encoding[Index(CharEncodeType::CountOf)];
+    static CharEncoding* const g_encoding[Index(CharEncodeType::CountOf)];
 };
 
 struct UTF8Util
 {
-        /// Given a slice calculate the number of code points (unicode chars)
-        ///
-        /// NOTE! This doesn't check the *validity* of code points/encoding. 
-        /// Non valid utf8 input or ending starting in partial characters, will produce 
-        /// undefined results without error.
+    /// Given a slice calculate the number of code points (unicode chars)
+    ///
+    /// NOTE! This doesn't check the *validity* of code points/encoding.
+    /// Non valid utf8 input or ending starting in partial characters, will produce
+    /// undefined results without error.
     static Index calcCodePointCount(const UnownedStringSlice& in);
 
 
-        /// Given a slice in UTF8, calculate the number of UTF16 characters needed to represent the string.
+    /// Given a slice in UTF8, calculate the number of UTF16 characters needed to represent the
+    /// string.
     static Index calcUTF16CharCount(const UnownedStringSlice& in);
 };
 
-}
+} // namespace Slang
 
 #endif

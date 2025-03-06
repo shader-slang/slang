@@ -1,7 +1,6 @@
 // cpu-shader-object.h
 #pragma once
 #include "cpu-base.h"
-
 #include "cpu-shader-object-layout.h"
 
 namespace gfx
@@ -36,38 +35,43 @@ public:
 class ShaderObjectImpl
     : public ShaderObjectBaseImpl<ShaderObjectImpl, ShaderObjectLayoutImpl, CPUShaderObjectData>
 {
-    typedef ShaderObjectBaseImpl<ShaderObjectImpl, ShaderObjectLayoutImpl, CPUShaderObjectData> Super;
+    typedef ShaderObjectBaseImpl<ShaderObjectImpl, ShaderObjectLayoutImpl, CPUShaderObjectData>
+        Super;
 
 public:
     List<RefPtr<ResourceViewImpl>> m_resources;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        init(IDevice* device, ShaderObjectLayoutImpl* typeLayout);
+    init(IDevice* device, ShaderObjectLayoutImpl* typeLayout);
 
     virtual SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
+    getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
 
     virtual SLANG_NO_THROW const void* SLANG_MCALL getRawData() override;
 
     virtual SLANG_NO_THROW size_t SLANG_MCALL getSize() override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setData(ShaderOffset const& offset, void const* data, size_t size) override;
+    setData(ShaderOffset const& offset, void const* data, size_t size) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setResource(ShaderOffset const& offset, IResourceView* inView) override;
+    setResource(ShaderOffset const& offset, IResourceView* inView) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setObject(ShaderOffset const& offset, IShaderObject* object) override;
+    setObject(ShaderOffset const& offset, IShaderObject* object) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        setSampler(ShaderOffset const& offset, ISamplerState* sampler) override;
+    setSampler(ShaderOffset const& offset, ISamplerState* sampler) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL setCombinedTextureSampler(
-        ShaderOffset const& offset, IResourceView* textureView, ISamplerState* sampler) override;
+        ShaderOffset const& offset,
+        IResourceView* textureView,
+        ISamplerState* sampler) override;
 
     char* getDataBuffer();
 };
 
-class MutableShaderObjectImpl : public MutableShaderObject<MutableShaderObjectImpl, ShaderObjectLayoutImpl>
-{};
+class MutableShaderObjectImpl
+    : public MutableShaderObject<MutableShaderObjectImpl, ShaderObjectLayoutImpl>
+{
+};
 
 class EntryPointShaderObjectImpl : public ShaderObjectImpl
 {
@@ -92,7 +96,7 @@ public:
 
     virtual SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
+    getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
     virtual Result collectSpecializationArgs(ExtendedShaderObjectTypeList& args) override;
 };
 

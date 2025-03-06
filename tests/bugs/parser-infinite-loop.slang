@@ -1,5 +1,6 @@
-//DIAGNOSTIC_TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 
+// CHECK: error 20001:
 struct test
 {
     float3 field;

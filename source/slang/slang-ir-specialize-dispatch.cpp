@@ -2,17 +2,20 @@
 
 #include "slang-ir-generics-lowering-context.h"
 #include "slang-ir-insts.h"
-#include "slang-ir.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
-IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext, IRFunc* dispatchFunc)
+IRFunc* specializeDispatchFunction(
+    SharedGenericsLoweringContext* sharedContext,
+    IRFunc* dispatchFunc)
 {
     auto witnessTableType = cast<IRFuncType>(dispatchFunc->getDataType())->getParamType(0);
     auto conformanceType = cast<IRWitnessTableTypeBase>(witnessTableType)->getConformanceType();
     // Collect all witness tables of `witnessTableType` in current module.
-    List<IRWitnessTable*> witnessTables = sharedContext->getWitnessTablesFromInterfaceType(conformanceType);
+    List<IRWitnessTable*> witnessTables =
+        sharedContext->getWitnessTablesFromInterfaceType(conformanceType);
 
     SLANG_ASSERT(dispatchFunc->getFirstBlock() == dispatchFunc->getLastBlock());
     auto block = dispatchFunc->getFirstBlock();
@@ -56,7 +59,8 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
         paramTypes.add(paramInst->getFullType());
     }
 
-    // Modify the first paramter from IRWitnessTable to IRWitnessTableID representing the sequential ID.
+    // Modify the first paramter from IRWitnessTable to IRWitnessTableID representing the sequential
+    // ID.
     paramTypes[0] = builder->getWitnessTableIDType((IRType*)conformanceType);
 
     auto newDipsatchFuncType = builder->getFuncType(paramTypes, dispatchFunc->getResultType());
@@ -95,7 +99,10 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
         auto seqIdDecoration = witnessTable->findDecoration<IRSequentialIDDecoration>();
         if (!seqIdDecoration)
         {
-            sharedContext->sink->diagnose(witnessTable->getConcreteType(), Diagnostics::typeCannotBeUsedInDynamicDispatch, witnessTable->getConcreteType());
+            sharedContext->sink->diagnose(
+                witnessTable->getConcreteType(),
+                Diagnostics::typeCannotBeUsedInDynamicDispatch,
+                witnessTable->getConcreteType());
         }
 
         if (i != witnessTables.getCount() - 1)
@@ -170,39 +177,6 @@ IRFunc* specializeDispatchFunction(SharedGenericsLoweringContext* sharedContext,
     return newDispatchFunc;
 }
 
-// Returns true if the witness table is transitively referenced through a witness table with
-// linkage.
-bool _isWitnessTableTransitivelyVisible(IRInst* witness)
-{
-    if (witness->findDecoration<IRLinkageDecoration>())
-        return true;
-
-    OrderedHashSet<IRInst*> workSet;
-    List<IRInst*> workList;
-    workList.add(witness);
-    for (int i = 0; i < workList.getCount(); i++)
-    {
-        auto item = workList[i];
-        if (item->findDecoration<IRLinkageDecoration>())
-            return true;
-        for (auto use = item->firstUse; use; use = use->nextUse)
-        {
-            auto user = use->getUser();
-            if (user->getOp() == kIROp_WitnessTableEntry)
-            {
-                if (user->getParent())
-                {
-                    if (workSet.add(user->getParent()))
-                    {
-                        workList.add(user->getParent());
-                    }
-                }
-            }
-        }
-    }
-    return false;
-}
-
 // Ensures every witness table object has been assigned a sequential ID.
 // All witness tables will have a SequentialID decoration after this function is run.
 // The sequantial ID in the decoration will be the same as the one specified in the Linkage.
@@ -226,35 +200,24 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
             else
             {
                 auto witnessTableType = as<IRWitnessTableType>(inst->getDataType());
-                if (witnessTableType && witnessTableType->getConformanceType()->findDecoration<IRSpecializeDecoration>())
+                if (witnessTableType && witnessTableType->getConformanceType()
+                                            ->findDecoration<IRSpecializeDecoration>())
                 {
-                    // The interface is for specialization only, it would be an error if dynamic dispatch is used
-                    // through the interface.
-                    // Skip assigning ID for the witness table.
+                    // The interface is for specialization only, it would be an error if dynamic
+                    // dispatch is used through the interface. Skip assigning ID for the witness
+                    // table.
                     continue;
                 }
 
-                // If this witness table entry does not have a linkage,
-                // we need to check if it is transitively visible via
-                // associatedtypes from an existing witness table with linkage.
-                // If so we still need to include this witness talbe, otherwise
-                // don't assign sequential ID for it.
-                if (_isWitnessTableTransitivelyVisible(inst))
+                // generate a unique linkage for it.
+                static int32_t uniqueId = 0;
+                uniqueId++;
+                if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
                 {
-                    // generate a unique linkage for it.
-                    static int32_t uniqueId = 0;
-                    uniqueId++;
-                    if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
-                    {
-                        generatedMangledName << nameHint->getName();
-                    }
-                    generatedMangledName << "_generated_witness_uuid_" << uniqueId;
-                    witnessTableMangledName = generatedMangledName.getUnownedSlice();
+                    generatedMangledName << nameHint->getName();
                 }
-                else
-                {
-                    continue;
-                }
+                generatedMangledName << "_generated_witness_uuid_" << uniqueId;
+                witnessTableMangledName = generatedMangledName.getUnownedSlice();
             }
 
             // If the inst already has a SequentialIDDecoration, stop now.
@@ -264,7 +227,8 @@ void ensureWitnessTableSequentialIDs(SharedGenericsLoweringContext* sharedContex
             // Get a sequential ID for the witness table using the map from the Linkage.
             uint32_t seqID = 0;
             if (!linkage->mapMangledNameToRTTIObjectIndex.tryGetValue(
-                witnessTableMangledName, seqID))
+                    witnessTableMangledName,
+                    seqID))
             {
                 auto interfaceType =
                     cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();

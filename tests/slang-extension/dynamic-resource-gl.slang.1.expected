@@ -51,7 +51,7 @@ standard output = {
     "entryPoints": [
         {
             "name": "computeMain",
-            "stage:": "compute",
+            "stage": "compute",
             "parameters": [
                 {
                     "name": "tid",
@@ -70,23 +70,23 @@ standard output = {
             "bindings": [
                 {
                     "name": "g_TextureHeap",
-                    "binding": {"kind": "descriptorTableSlot", "space": 1, "index": 0}
+                    "binding": {"kind": "descriptorTableSlot", "space": 1, "index": 0, "used": 1}
                 },
                 {
                     "name": "g_SamplerHeap",
-                    "binding": {"kind": "descriptorTableSlot", "space": 1, "index": 2}
+                    "binding": {"kind": "descriptorTableSlot", "space": 1, "index": 2, "used": 1}
                 },
                 {
                     "name": "g_SingleDynamicResourceA",
-                    "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 0}
+                    "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 0, "used": 1}
                 },
                 {
                     "name": "g_SingleDynamicResourceB",
-                    "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 1}
+                    "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 1, "used": 1}
                 },
                 {
                     "name": "g_SingleDynamicResourceC",
-                    "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 2}
+                    "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 2, "used": 1}
                 }
             ]
         }

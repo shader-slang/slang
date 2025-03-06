@@ -5,10 +5,10 @@
 #include "slang-compiler.h"
 #include "slang-profile.h"
 #include "slang-syntax.h"
-
 #include "slang.h"
 
-namespace Slang {
+namespace Slang
+{
 
 // Forward declarations
 
@@ -36,7 +36,8 @@ struct LayoutSize
 
     LayoutSize()
         : raw(0)
-    {}
+    {
+    }
 
     LayoutSize(RawValue size)
         : raw(size)
@@ -61,17 +62,15 @@ struct LayoutSize
     bool isInfinite() const { return raw == RawValue(-1); }
 
     bool isFinite() const { return raw != RawValue(-1); }
-    RawValue getFiniteValue() const { SLANG_ASSERT(isFinite()); return raw; }
-
-    bool operator==(LayoutSize that) const
+    RawValue getFiniteValue() const
     {
-        return raw == that.raw;
+        SLANG_ASSERT(isFinite());
+        return raw;
     }
 
-    bool operator!=(LayoutSize that) const
-    {
-        return raw != that.raw;
-    }
+    bool operator==(LayoutSize that) const { return raw == that.raw; }
+
+    bool operator!=(LayoutSize that) const { return raw != that.raw; }
 
     bool operator>(LayoutSize that) const
     {
@@ -80,7 +79,6 @@ struct LayoutSize
             if (this->isFinite())
                 return this->raw > that.raw;
             return true;
-
         }
         else
         {
@@ -92,8 +90,10 @@ struct LayoutSize
 
     void operator+=(LayoutSize right)
     {
-        if( isInfinite() ) {}
-        else if( right.isInfinite() )
+        if (isInfinite())
+        {
+        }
+        else if (right.isInfinite())
         {
             *this = LayoutSize::infinite();
         }
@@ -106,24 +106,24 @@ struct LayoutSize
     void operator*=(LayoutSize right)
     {
         // Deal with zero first, so that anything (even the "infinite" value) times zero is zero.
-        if( raw == 0 )
+        if (raw == 0)
         {
             return;
         }
 
-        if( right.raw == 0 )
+        if (right.raw == 0)
         {
             raw = 0;
             return;
         }
 
         // Next we deal with infinite cases, so that infinite times anything non-zero is infinite
-        if( isInfinite() )
+        if (isInfinite())
         {
             return;
         }
 
-        if( right.isInfinite() )
+        if (right.isInfinite())
         {
             *this = LayoutSize::infinite();
             return;
@@ -135,7 +135,9 @@ struct LayoutSize
 
     void operator-=(RawValue right)
     {
-        if( isInfinite() ) {}
+        if (isInfinite())
+        {
+        }
         else
         {
             *this = LayoutSize(raw - right);
@@ -144,7 +146,9 @@ struct LayoutSize
 
     void operator/=(RawValue right)
     {
-        if( isInfinite() ) {}
+        if (isInfinite())
+        {
+        }
         else
         {
             *this = LayoutSize(raw / right);
@@ -183,12 +187,10 @@ inline LayoutSize operator/(LayoutSize left, LayoutSize::RawValue right)
 
 inline LayoutSize maximum(LayoutSize left, LayoutSize right)
 {
-    if(left.isInfinite() || right.isInfinite())
+    if (left.isInfinite() || right.isInfinite())
         return LayoutSize::infinite();
 
-    return LayoutSize(Math::Max(
-            left.getFiniteValue(),
-            right.getFiniteValue()));
+    return LayoutSize(Math::Max(left.getFiniteValue(), right.getFiniteValue()));
 }
 
 inline bool operator>(LayoutSize left, LayoutSize::RawValue right)
@@ -205,20 +207,18 @@ inline bool operator<=(LayoutSize left, LayoutSize::RawValue right)
 // such as laying out the members of a constant buffer.
 struct UniformLayoutInfo
 {
-    LayoutSize  size;
-    size_t      alignment;
+    LayoutSize size;
+    size_t alignment;
 
     UniformLayoutInfo()
-        : size(0)
-        , alignment(1)
-    {}
+        : size(0), alignment(1)
+    {
+    }
 
-    UniformLayoutInfo(
-        LayoutSize  size,
-        size_t      alignment)
-        : size(size)
-        , alignment(alignment)
-    {}
+    UniformLayoutInfo(LayoutSize size, size_t alignment)
+        : size(size), alignment(alignment)
+    {
+    }
 };
 
 // Extended information required for an array of uniform data,
@@ -230,20 +230,19 @@ struct UniformArrayLayoutInfo : UniformLayoutInfo
 
     UniformArrayLayoutInfo()
         : elementStride(0)
-    {}
+    {
+    }
 
-    UniformArrayLayoutInfo(
-        LayoutSize  size,
-        size_t      alignment,
-        size_t      elementStride)
-        : UniformLayoutInfo(size, alignment)
-        , elementStride(elementStride)
-    {}
+    UniformArrayLayoutInfo(LayoutSize size, size_t alignment, size_t elementStride)
+        : UniformLayoutInfo(size, alignment), elementStride(elementStride)
+    {
+    }
 };
 
 typedef slang::ParameterCategory LayoutResourceKind;
 
 // Any change to slang::ParameterCategory, requires a change to this macro.
+// clang-format off
 #define SLANG_PARAMETER_CATEGORIES(x) \
     x(None) \
     x(Mixed) \
@@ -277,8 +276,9 @@ typedef slang::ParameterCategory LayoutResourceKind;
     x(MetalBuffer) \
     x(MetalTexture) \
     x(MetalArgumentBufferElement)
+// clang-format on
 
-#define SLANG_PARAMETER_CATEGORY_FLAG(x) x = ParameterCategoryFlags(1) << int(slang::x), 
+#define SLANG_PARAMETER_CATEGORY_FLAG(x) x = ParameterCategoryFlags(1) << int(slang::x),
 
 typedef uint32_t ParameterCategoryFlags;
 struct ParameterCategoryFlag
@@ -288,8 +288,11 @@ struct ParameterCategoryFlag
         SLANG_PARAMETER_CATEGORIES(SLANG_PARAMETER_CATEGORY_FLAG)
     };
 
-        /// Make a flag from a category
-    SLANG_FORCE_INLINE static Enum make(slang::ParameterCategory cat) { return Enum(ParameterCategoryFlags(1) << int(cat)); }
+    /// Make a flag from a category
+    SLANG_FORCE_INLINE static Enum make(slang::ParameterCategory cat)
+    {
+        return Enum(ParameterCategoryFlags(1) << int(cat));
+    }
 };
 
 typedef ParameterCategoryFlags LayoutResourceKindFlags;
@@ -304,37 +307,36 @@ struct SimpleLayoutInfo
 
     // How many resources of that kind?
     //
-    // For uniform, the size is the number of bytes "reserved" exclusively for an instance of that type.
-    // In *general* it is not necessary for a size to be rounded up to the alignment. Some targets do
-    // though - for example C++ and CUDA targets always have size as a multiple of alignment.
+    // For uniform, the size is the number of bytes "reserved" exclusively for an instance of that
+    // type. In *general* it is not necessary for a size to be rounded up to the alignment. Some
+    // targets do though - for example C++ and CUDA targets always have size as a multiple of
+    // alignment.
     LayoutSize size;
 
     // only useful in the uniform case
     size_t alignment;
 
     SimpleLayoutInfo()
-        : kind(LayoutResourceKind::None)
-        , size(0)
-        , alignment(1)
-    {}
+        : kind(LayoutResourceKind::None), size(0), alignment(1)
+    {
+    }
 
-    SimpleLayoutInfo(
-        UniformLayoutInfo uniformInfo)
+    SimpleLayoutInfo(UniformLayoutInfo uniformInfo)
         : kind(LayoutResourceKind::Uniform)
         , size(uniformInfo.size)
         , alignment(uniformInfo.alignment)
-    {}
+    {
+    }
 
-    SimpleLayoutInfo(LayoutResourceKind kind, LayoutSize size, size_t alignment=1)
-        : kind(kind)
-        , size(size)
-        , alignment(alignment)
-    {}
+    SimpleLayoutInfo(LayoutResourceKind kind, LayoutSize size, size_t alignment = 1)
+        : kind(kind), size(size), alignment(alignment)
+    {
+    }
 
     // Convert to layout for uniform data
     UniformLayoutInfo getUniformLayout()
     {
-        if(kind == LayoutResourceKind::Uniform)
+        if (kind == LayoutResourceKind::Uniform)
         {
             return UniformLayoutInfo(size, alignment);
         }
@@ -354,7 +356,7 @@ struct SimpleArrayLayoutInfo : SimpleLayoutInfo
     // Convert to layout for uniform data
     UniformArrayLayoutInfo getUniformLayout()
     {
-        if(kind == LayoutResourceKind::Uniform)
+        if (kind == LayoutResourceKind::Uniform)
         {
             return UniformArrayLayoutInfo(size, alignment, elementStride);
         }
@@ -369,10 +371,7 @@ struct ObjectLayoutInfo
 {
     ShortList<SimpleLayoutInfo, 2> layoutInfos;
     ObjectLayoutInfo() = default;
-    ObjectLayoutInfo(SimpleLayoutInfo layoutInfo)
-    {
-        layoutInfos.add(layoutInfo);
-    }
+    ObjectLayoutInfo(SimpleLayoutInfo layoutInfo) { layoutInfos.add(layoutInfo); }
     SimpleLayoutInfo getSimple()
     {
         SLANG_ASSERT(layoutInfos.getCount() == 1);
@@ -393,22 +392,22 @@ class TypeLayout : public Layout
 {
 public:
     // The type that was laid out
-    Type*  type = nullptr;
+    Type* type = nullptr;
     Type* getType() { return type; }
 
     // The layout rules that were used to produce this type
-    LayoutRulesImpl*        rules;
+    LayoutRulesImpl* rules;
 
     struct ResourceInfo
     {
         // What kind of register was it?
-        LayoutResourceKind  kind = LayoutResourceKind::None;
+        LayoutResourceKind kind = LayoutResourceKind::None;
 
         // How many registers of the above kind did we use?
-        LayoutSize          count;
+        LayoutSize count;
     };
 
-    List<ResourceInfo>      resourceInfos;
+    List<ResourceInfo> resourceInfos;
 
     // For uniform data, alignment matters, but not for
     // any other resource category, so we don't waste
@@ -416,25 +415,25 @@ public:
     UInt uniformAlignment = 1;
 
 
-        /// The layout for data that is conceptually owned by this type, but which is pending layout.
-        ///
-        /// When a type contains interface/existential fields (recursively), the
-        /// actual data referenced by these fields needs to get allocated somewhere,
-        /// but it cannot go inline at the point where the interface/existential
-        /// type appears, or else the layout of a composite object would change
-        /// when the concrete type(s) we plug in change.
-        ///
-        /// We solve this problem by tracking this data that is "pending" layout,
-        /// and then "flushing" the pending data at appropriate places during
-        /// the layout process.
-        ///
+    /// The layout for data that is conceptually owned by this type, but which is pending layout.
+    ///
+    /// When a type contains interface/existential fields (recursively), the
+    /// actual data referenced by these fields needs to get allocated somewhere,
+    /// but it cannot go inline at the point where the interface/existential
+    /// type appears, or else the layout of a composite object would change
+    /// when the concrete type(s) we plug in change.
+    ///
+    /// We solve this problem by tracking this data that is "pending" layout,
+    /// and then "flushing" the pending data at appropriate places during
+    /// the layout process.
+    ///
     RefPtr<TypeLayout> pendingDataTypeLayout;
 
     ResourceInfo* FindResourceInfo(LayoutResourceKind kind)
     {
-        for(auto& rr : resourceInfos)
+        for (auto& rr : resourceInfos)
         {
-            if(rr.kind == kind)
+            if (rr.kind == kind)
                 return &rr;
         }
         return nullptr;
@@ -443,7 +442,8 @@ public:
     ResourceInfo* findOrAddResourceInfo(LayoutResourceKind kind)
     {
         auto existing = FindResourceInfo(kind);
-        if(existing) return existing;
+        if (existing)
+            return existing;
 
         ResourceInfo info;
         info.kind = kind;
@@ -454,7 +454,8 @@ public:
 
     void addResourceUsage(ResourceInfo info)
     {
-        if(info.count == 0) return;
+        if (info.count == 0)
+            return;
 
         findOrAddResourceInfo(info.kind)->count += info.count;
     }
@@ -471,47 +472,47 @@ public:
 
     void addResourceUsageFrom(TypeLayout* otherTypeLayout);
 
-        /// "Unwrap" any layers of array-ness from this type layout.
-        ///
-        /// If this is an `ArrayTypeLayout`, returns the result of unwrapping the element type layout.
-        /// Otherwise, returns this type layout.
-        ///
+    /// "Unwrap" any layers of array-ness from this type layout.
+    ///
+    /// If this is an `ArrayTypeLayout`, returns the result of unwrapping the element type layout.
+    /// Otherwise, returns this type layout.
+    ///
     RefPtr<TypeLayout> unwrapArray();
 
 
-        /// Extended information about type layout, used for "flat" reflection API
+    /// Extended information about type layout, used for "flat" reflection API
     struct ExtendedInfo : public RefObject
     {
         struct DescriptorRangeInfo
         {
-            SlangBindingType    bindingType;
-            LayoutResourceKind  kind;
-            LayoutSize          count;
-            Int                 indexOffset;
+            SlangBindingType bindingType;
+            LayoutResourceKind kind;
+            LayoutSize count;
+            Int indexOffset;
         };
 
         struct DescriptorSetInfo : public RefObject
         {
-            Int                         spaceOffset;
-            List<DescriptorRangeInfo>   descriptorRanges;
+            Int spaceOffset;
+            List<DescriptorRangeInfo> descriptorRanges;
         };
 
         struct BindingRangeInfo
         {
-            VarDeclBase*        leafVariable;
-            TypeLayout*         leafTypeLayout;
-            SlangBindingType    bindingType;
-            LayoutSize          count;
-            Int                 descriptorSetIndex;
-            Int                 firstDescriptorRangeIndex;
-            Int                 descriptorRangeCount;
+            VarDeclBase* leafVariable;
+            TypeLayout* leafTypeLayout;
+            SlangBindingType bindingType;
+            LayoutSize count;
+            Int descriptorSetIndex;
+            Int firstDescriptorRangeIndex;
+            Int descriptorRangeCount;
         };
 
         struct SubObjectRangeInfo
         {
-            Int                 bindingRangeIndex = 0;
-            Int                 spaceOffset = 0;
-            RefPtr<VarLayout>   offsetVarLayout;
+            Int bindingRangeIndex = 0;
+            Int spaceOffset = 0;
+            RefPtr<VarLayout> offsetVarLayout;
         };
 
         List<RefPtr<DescriptorSetInfo>> m_descriptorSets;
@@ -533,7 +534,7 @@ class VarLayout : public Layout
 {
 public:
     // The variable we are laying out
-    DeclRef<Decl>          varDecl;
+    DeclRef<Decl> varDecl;
     VarDeclBase* getVariable() { return varDecl.as<VarDeclBase>().getDecl(); }
 
     Name* getName() { return getVariable()->getName(); }
@@ -546,15 +547,15 @@ public:
     VarLayoutFlags flags = 0;
 
     // System-value semantic (and index) if this is a system value
-    String  systemValueSemantic;
-    int     systemValueSemanticIndex;
+    String systemValueSemantic;
+    int systemValueSemanticIndex;
 
     // General case semantic name and index
     // TODO: this and the system-value field are redundant
     // TODO: the `VarLayout` type is getting bloated; we need to not store this
     // information unless actually required.
-    String  semanticName;
-    int     semanticIndex;
+    String semanticName;
+    int semanticIndex;
 
     // The stage this variable belongs to, in case it is
     // stage-specific.
@@ -566,23 +567,23 @@ public:
     struct ResourceInfo
     {
         // What kind of register was it?
-        LayoutResourceKind  kind = LayoutResourceKind::None;
+        LayoutResourceKind kind = LayoutResourceKind::None;
 
         // What binding space (HLSL) or set (Vulkan) are we placed in?
-        UInt                space;
+        UInt space;
 
         // What is our starting register in that space?
         //
         // (In the case of uniform data, this is a byte offset)
-        UInt                index;
+        UInt index;
     };
-    List<ResourceInfo>      resourceInfos;
+    List<ResourceInfo> resourceInfos;
 
     ResourceInfo* FindResourceInfo(LayoutResourceKind kind)
     {
-        for(auto& rr : resourceInfos)
+        for (auto& rr : resourceInfos)
         {
-            if(rr.kind == kind)
+            if (rr.kind == kind)
                 return &rr;
         }
         return nullptr;
@@ -602,7 +603,8 @@ public:
     ResourceInfo* findOrAddResourceInfo(LayoutResourceKind kind)
     {
         auto existing = FindResourceInfo(kind);
-        if(existing) return existing;
+        if (existing)
+            return existing;
 
         return AddResourceInfo(kind);
     }
@@ -611,10 +613,10 @@ public:
 
     RefPtr<VarLayout> pendingVarLayout;
 
-        /// Offset in binding ranges within the parent type
-        ///
-        /// Note: only usable when extended layout information has been calculated.
-        ///
+    /// Offset in binding ranges within the parent type
+    ///
+    /// Note: only usable when extended layout information has been calculated.
+    ///
     Index bindingRangeOffset = -1;
 };
 
@@ -628,7 +630,7 @@ public:
     // the element type factored in. All of the offsets
     // for this variable should be zero, but it is included
     // for completeness.
-    RefPtr<VarLayout>  containerVarLayout;
+    RefPtr<VarLayout> containerVarLayout;
 
     // A variable layout for the element of the container.
     // The offsets of the variable layout will reflect
@@ -636,12 +638,12 @@ public:
     // container types resource usage, while the actual
     // type layout won't have offsets applied (unlike
     // `offsetElementTypeLayout` below).
-    RefPtr<VarLayout>   elementVarLayout;
+    RefPtr<VarLayout> elementVarLayout;
 
     // The layout of the element type, with offsets applied
     // so that any fields (if the element type is a `struct`)
     // will be offset by the resource usage of the container.
-    RefPtr<TypeLayout>  offsetElementTypeLayout;
+    RefPtr<TypeLayout> offsetElementTypeLayout;
 };
 
 // type layout for a variable that has a constant-buffer type
@@ -655,32 +657,32 @@ public:
     RefPtr<VarLayout> counterVarLayout;
 };
 
-    /// Type layout for a logical sequence type
+/// Type layout for a logical sequence type
 class SequenceTypeLayout : public TypeLayout
 {
 public:
-        /// The layout of the element type.
-        ///
-        /// This layout may include adjustments to make lookups in elements
-        /// of the array Just Work, and may not be the same as the layout
-        /// of the element type when used in a non-array context.
-        ///
-    RefPtr<TypeLayout>  elementTypeLayout;
+    /// The layout of the element type.
+    ///
+    /// This layout may include adjustments to make lookups in elements
+    /// of the array Just Work, and may not be the same as the layout
+    /// of the element type when used in a non-array context.
+    ///
+    RefPtr<TypeLayout> elementTypeLayout;
 
-        /// The stride in bytes between elements.
-    size_t              uniformStride = 0;
+    /// The stride in bytes between elements.
+    size_t uniformStride = 0;
 };
 
-    /// Type layout for an array type
+/// Type layout for an array type
 class ArrayTypeLayout : public SequenceTypeLayout
 {
 public:
-        /// The original layout of the element type.
-        ///
-        /// This layout does not include any adjustments that
-        /// were made to the element type in order to make
-        /// lookup into array elements Just Work.
-        ///
+    /// The original layout of the element type.
+    ///
+    /// This layout does not include any adjustments that
+    /// were made to the element type in order to make
+    /// lookup into array elements Just Work.
+    ///
     RefPtr<TypeLayout> originalElementTypeLayout;
 };
 
@@ -688,10 +690,16 @@ public:
 class PointerTypeLayout : public TypeLayout
 {
 public:
-    // TODO(JS): 
+    // TODO(JS):
     // Should this derive from SequenceTypeLayout? A pointer is kind of like an array without
     // bounds - in that it can be indexed. Of it it can be looked at as an indirection to a value.
     // Is the "Just Work"iness applicable?
+    // TODO(Yong):
+    // This reference can lead to memory leak when we have `struct S{  S* f; };`
+    // where `f` will have a var layout whose type layout is a pointer type layout
+    // whose valueTypeLayout is the layout for `S` itself, forming a cycle.
+    // We need to stop using reference pointers for layouts and instead allocate all
+    // type layout object from MemoryArena on the linkage.
     RefPtr<TypeLayout> valueTypeLayout;
 };
 
@@ -711,14 +719,14 @@ public:
 class MatrixTypeLayout : public SequenceTypeLayout
 {
 public:
-        /// Is this matrix laid out as row-major or column-major?
-        ///
-        /// Note that this does *not* affect the interpretation
-        /// of the `elementTypeLayout` field, which always represents
-        /// the logical elements of the matrix type, which are its
-        /// rows.
-        ///
-    MatrixLayoutMode            mode;
+    /// Is this matrix laid out as row-major or column-major?
+    ///
+    /// Note that this does *not* affect the interpretation
+    /// of the `elementTypeLayout` field, which always represents
+    /// the logical elements of the matrix type, which are its
+    /// rows.
+    ///
+    MatrixLayoutMode mode;
 };
 
 // Specific case of type layout for a struct
@@ -739,7 +747,7 @@ public:
     //
     // TODO: This should map from a declaration to the *index*
     // in the array above, rather than to the actual pointer,
-    // so that we 
+    // so that we
     Dictionary<Decl*, RefPtr<VarLayout>> mapVarToLayout;
 };
 
@@ -750,35 +758,35 @@ public:
     Index paramIndex = 0;
 };
 
-    /// Layout information for an interface/existential type
-    ///
-    /// This class is used to represent the layout of an interface type
-    /// such as `IThing`, including both the information about the
-    /// space consumed by the existential itself (including, e.g., the
-    /// RTTI and witness-table infromation), along with any
-    /// "pending" data related to legacy static specialization.
-    ///
+/// Layout information for an interface/existential type
+///
+/// This class is used to represent the layout of an interface type
+/// such as `IThing`, including both the information about the
+/// space consumed by the existential itself (including, e.g., the
+/// RTTI and witness-table infromation), along with any
+/// "pending" data related to legacy static specialization.
+///
 class ExistentialTypeLayout : public TypeLayout
 {
 public:
 };
 
-    /// Layout information for a type with existential (sub-)field types specialized.
-    ///
-    /// This class is used to represent a type like `SomeStruct` that
-    /// contains nested existential-type fields, and which has been explicitly
-    /// specialized with concrete type information for those fields.
-    ///
-    /// Note that the front-end language should not ever produce types that
-    /// make use of layouts like this. The only way such a type layout can
-    /// arise is if a user explicitly specialized a type with existential-type
-    /// fields using the Slang API, and then used that specialized type as
-    /// a type argument for a shader. This type layout class serves to remember
-    /// the specialization information (and resulting layout) for the type.
-    ///
-    /// TODO: Given our changes to how layout for existential types is being
-    /// handled, the details of this type probably need to be re-thought.
-    ///
+/// Layout information for a type with existential (sub-)field types specialized.
+///
+/// This class is used to represent a type like `SomeStruct` that
+/// contains nested existential-type fields, and which has been explicitly
+/// specialized with concrete type information for those fields.
+///
+/// Note that the front-end language should not ever produce types that
+/// make use of layouts like this. The only way such a type layout can
+/// arise is if a user explicitly specialized a type with existential-type
+/// fields using the Slang API, and then used that specialized type as
+/// a type argument for a shader. This type layout class serves to remember
+/// the specialization information (and resulting layout) for the type.
+///
+/// TODO: Given our changes to how layout for existential types is being
+/// handled, the details of this type probably need to be re-thought.
+///
 class ExistentialSpecializedTypeLayout : public TypeLayout
 {
 public:
@@ -786,7 +794,7 @@ public:
     RefPtr<VarLayout> pendingDataVarLayout;
 };
 
-    /// Layout for a scoped entity like a program, module, or entry point
+/// Layout for a scoped entity like a program, module, or entry point
 class ScopeLayout : public Layout
 {
 public:
@@ -795,8 +803,7 @@ public:
     RefPtr<VarLayout> parametersLayout;
 };
 
-StructTypeLayout* getScopeStructLayout(
-    ScopeLayout*  programLayout);
+StructTypeLayout* getScopeStructLayout(ScopeLayout* programLayout);
 
 // Layout information for a single shader entry point
 // within a program
@@ -821,7 +828,8 @@ public:
     // The shader profile that was used to compile the entry point
     Profile profile;
 
-    // The name of the entry point. Always available even if entryPoint is nullptr (for example when it came from a library)
+    // The name of the entry point. Always available even if entryPoint is nullptr (for example when
+    // it came from a library)
     Name* name = nullptr;
 
     // The overrided name of the entry point.
@@ -836,37 +844,37 @@ public:
     };
     unsigned flags = 0;
 
-//    EntryPointLayout* getAbsoluteLayout(VarLayout* parentLayout);
+    //    EntryPointLayout* getAbsoluteLayout(VarLayout* parentLayout);
 
-//    RefPtr<EntryPointLayout> m_absoluteLayout;
+    //    RefPtr<EntryPointLayout> m_absoluteLayout;
 };
 
-    /// Reflection/layout information about a specialization parameter
+/// Reflection/layout information about a specialization parameter
 class SpecializationParamLayout : public Layout
 {
 public:
     Index index;
 };
 
-    /// Reflection/layout information about a generic specialization parameter
+/// Reflection/layout information about a generic specialization parameter
 class GenericSpecializationParamLayout : public SpecializationParamLayout
 {
 public:
-        /// The declaration of the generic parameter.
-        ///
-        /// Could be any subclass of `Decl` that represents a generic value or type parameter.
+    /// The declaration of the generic parameter.
+    ///
+    /// Could be any subclass of `Decl` that represents a generic value or type parameter.
     Decl* decl = nullptr;
 };
 
-    /// Reflection/layout information about an existential/interface specialization parameter.
+/// Reflection/layout information about an existential/interface specialization parameter.
 class ExistentialSpecializationParamLayout : public SpecializationParamLayout
 {
 public:
-        /// The type that needs to be specialized.
-        ///
-        /// Currently, this will be an `interface` type that any concrete
-        /// type argument getting plugged in must conform to.
-        ///
+    /// The type that needs to be specialized.
+    ///
+    /// Currently, this will be an `interface` type that any concrete
+    /// type argument getting plugged in must conform to.
+    ///
     Type* type = nullptr;
 };
 
@@ -891,15 +899,15 @@ public:
     RefPtr<VarLayout> globalScopeLayout;
     */
 
-        /// The target and program for which layout was computed
+    /// The target and program for which layout was computed
     TargetProgram* targetProgram;
 
     TargetProgram* getTargetProgram() { return targetProgram; }
     TargetRequest* getTargetReq() { return targetProgram->getTargetReq(); }
     ComponentType* getProgram() { return targetProgram->getProgram(); }
 
-    ProgramLayout():
-        hashedStringLiteralPool(StringSlicePool::Style::Empty)
+    ProgramLayout()
+        : hashedStringLiteralPool(StringSlicePool::Style::Empty)
     {
     }
 
@@ -908,21 +916,20 @@ public:
     // will (eventually) belong there...
     List<RefPtr<EntryPointLayout>> entryPoints;
 
-        /// Reflection information on (unspecialized) specialization parameters.
+    /// Reflection information on (unspecialized) specialization parameters.
     List<RefPtr<SpecializationParamLayout>> specializationParams;
 
-        /// Concrete argument values that were provided to specific global generic parameters.
-        ///
-        /// Not useful for reflection, but valuable for code generation.
-        ///
+    /// Concrete argument values that were provided to specific global generic parameters.
+    ///
+    /// Not useful for reflection, but valuable for code generation.
+    ///
     Dictionary<GlobalGenericParamDecl*, Val*> globalGenericArgs;
 
-        /// Holds all of the string literals that have been hashed
+    /// Holds all of the string literals that have been hashed
     StringSlicePool hashedStringLiteralPool;
 };
 
-StructTypeLayout* getGlobalStructLayout(
-    ProgramLayout*  programLayout);
+StructTypeLayout* getGlobalStructLayout(ProgramLayout* programLayout);
 
 struct LayoutRulesFamilyImpl;
 
@@ -968,6 +975,8 @@ enum class ShaderParameterKind
     AtomicUint,
 
     SubpassInput,
+    AccelerationStructure,
+    ParameterBlock,
 };
 
 struct SimpleLayoutRulesImpl
@@ -976,20 +985,31 @@ struct SimpleLayoutRulesImpl
     virtual SimpleLayoutInfo GetScalarLayout(BaseType baseType) = 0;
 
     // Get size and alignment for an array of elements
-    virtual SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount) = 0;
+    virtual SimpleArrayLayoutInfo GetArrayLayout(
+        SimpleLayoutInfo elementInfo,
+        LayoutSize elementCount) = 0;
 
     /// Get pointer layout
     virtual SimpleLayoutInfo GetPointerLayout() = 0;
 
     // Get layout for a vector or matrix type
-    virtual SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t elementCount) = 0;
-    virtual SimpleArrayLayoutInfo GetMatrixLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount) = 0;
+    virtual SimpleLayoutInfo GetVectorLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t elementCount) = 0;
+    virtual SimpleArrayLayoutInfo GetMatrixLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t rowCount,
+        size_t columnCount) = 0;
 
     // Begin doing layout on a `struct` type
     virtual UniformLayoutInfo BeginStructLayout() = 0;
 
     // Add a field to a `struct` type, and return the offset for the field
-    virtual LayoutSize AddStructField(UniformLayoutInfo* ioStructInfo, UniformLayoutInfo fieldInfo) = 0;
+    virtual LayoutSize AddStructField(
+        UniformLayoutInfo* ioStructInfo,
+        UniformLayoutInfo fieldInfo) = 0;
 
     // End layout for a struct, and finalize its size/alignment.
     virtual void EndStructLayout(UniformLayoutInfo* ioStructInfo) = 0;
@@ -1012,9 +1032,9 @@ struct ObjectLayoutRulesImpl
 
 struct LayoutRulesImpl
 {
-    LayoutRulesFamilyImpl*  family;
-    SimpleLayoutRulesImpl*  simpleRules;
-    ObjectLayoutRulesImpl*  objectRules;
+    LayoutRulesFamilyImpl* family;
+    SimpleLayoutRulesImpl* simpleRules;
+    ObjectLayoutRulesImpl* objectRules;
 
     // Forward `SimpleLayoutRulesImpl` interface
 
@@ -1022,21 +1042,25 @@ struct LayoutRulesImpl
     {
         return simpleRules->GetScalarLayout(baseType);
     }
-    SimpleLayoutInfo GetPointerLayout()
-    {
-        return simpleRules->GetPointerLayout();
-    }
+    SimpleLayoutInfo GetPointerLayout() { return simpleRules->GetPointerLayout(); }
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
     {
         return simpleRules->GetArrayLayout(elementInfo, elementCount);
     }
 
-    SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t elementCount)
+    SimpleLayoutInfo GetVectorLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t elementCount)
     {
         return simpleRules->GetVectorLayout(elementType, elementInfo, elementCount);
     }
 
-    SimpleArrayLayoutInfo GetMatrixLayout(BaseType elementType, SimpleLayoutInfo elementInfo, size_t rowCount, size_t columnCount)
+    SimpleArrayLayoutInfo GetMatrixLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t rowCount,
+        size_t columnCount)
     {
         return simpleRules->GetMatrixLayout(elementType, elementInfo, rowCount, columnCount);
     }
@@ -1068,7 +1092,9 @@ struct LayoutRulesImpl
 
     // Forward `ObjectLayoutRulesImpl` interface
 
-    ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const ObjectLayoutRulesImpl::Options& options)
+    ObjectLayoutInfo GetObjectLayout(
+        ShaderParameterKind kind,
+        const ObjectLayoutRulesImpl::Options& options)
     {
         return objectRules->GetObjectLayout(kind, options);
     }
@@ -1080,47 +1106,48 @@ struct LayoutRulesImpl
 
 struct LayoutRulesFamilyImpl
 {
-    virtual LayoutRulesImpl* getAnyValueRules()             = 0;
-    virtual LayoutRulesImpl* getConstantBufferRules(CompilerOptionSet& compilerOptions) = 0;
-    virtual LayoutRulesImpl* getPushConstantBufferRules()   = 0;
+    virtual LayoutRulesImpl* getAnyValueRules() = 0;
+    virtual LayoutRulesImpl* getConstantBufferRules(
+        CompilerOptionSet& compilerOptions,
+        Type* containerType) = 0;
+    virtual LayoutRulesImpl* getPushConstantBufferRules() = 0;
     virtual LayoutRulesImpl* getTextureBufferRules(CompilerOptionSet& compilerOptions) = 0;
-    virtual LayoutRulesImpl* getVaryingInputRules()         = 0;
-    virtual LayoutRulesImpl* getVaryingOutputRules()        = 0;
-    virtual LayoutRulesImpl* getSpecializationConstantRules()= 0;
-    virtual LayoutRulesImpl* getShaderStorageBufferRules(CompilerOptionSet& compilerOptions)  = 0;
+    virtual LayoutRulesImpl* getVaryingInputRules() = 0;
+    virtual LayoutRulesImpl* getVaryingOutputRules() = 0;
+    virtual LayoutRulesImpl* getSpecializationConstantRules() = 0;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules(CompilerOptionSet& compilerOptions) = 0;
     virtual LayoutRulesImpl* getParameterBlockRules(CompilerOptionSet& compilerOptions) = 0;
 
-    virtual LayoutRulesImpl* getRayPayloadParameterRules()  = 0;
-    virtual LayoutRulesImpl* getCallablePayloadParameterRules()  = 0;
-    virtual LayoutRulesImpl* getHitAttributesParameterRules()= 0;
+    virtual LayoutRulesImpl* getRayPayloadParameterRules() = 0;
+    virtual LayoutRulesImpl* getCallablePayloadParameterRules() = 0;
+    virtual LayoutRulesImpl* getHitAttributesParameterRules() = 0;
 
     virtual LayoutRulesImpl* getShaderRecordConstantBufferRules() = 0;
 
     virtual LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) = 0;
 };
 
-    /// A custom tuple to capture the outputs of type layout
+/// A custom tuple to capture the outputs of type layout
 struct TypeLayoutResult
 {
-        /// The actual heap-allocated layout object with all the details
-    RefPtr<TypeLayout>  layout;
+    /// The actual heap-allocated layout object with all the details
+    RefPtr<TypeLayout> layout;
 
-        /// A simplified representation of layout information.
-        ///
-        /// This information is suitable for the case where a type only
-        /// consumes a single resource.
-        ///
-    SimpleLayoutInfo    info;
+    /// A simplified representation of layout information.
+    ///
+    /// This information is suitable for the case where a type only
+    /// consumes a single resource.
+    ///
+    SimpleLayoutInfo info;
 
-        /// Default constructor.
-    TypeLayoutResult()
-    {}
+    /// Default constructor.
+    TypeLayoutResult() {}
 
-        /// Construct a result from the given layout object and simple layout info.
+    /// Construct a result from the given layout object and simple layout info.
     TypeLayoutResult(RefPtr<TypeLayout> inLayout, SimpleLayoutInfo const& inInfo)
-        : layout(inLayout)
-        , info(inInfo)
-    {}
+        : layout(inLayout), info(inInfo)
+    {
+    }
 };
 
 struct TypeLayoutContext
@@ -1130,10 +1157,10 @@ struct TypeLayoutContext
     // The layout rules to use (e.g., we compute
     // layout differently in a `cbuffer` vs. the
     // parameter list of a fragment shader).
-    LayoutRulesImpl*    rules;
+    LayoutRulesImpl* rules;
 
     // The target request that is triggering layout
-    TargetRequest*  targetReq;
+    TargetRequest* targetReq;
 
     // A parent program layout that will establish the ordering
     // of all global generic type parameters.
@@ -1142,19 +1169,26 @@ struct TypeLayoutContext
 
     // Whether to lay out matrices column-major
     // or row-major.
-    MatrixLayoutMode    matrixLayoutMode;
+    MatrixLayoutMode matrixLayoutMode;
 
     // The concrete types (if any) to plug into the currently in-scope
     // specialization params.
     //
-    Int                                 specializationArgCount = 0;
-    ExpandedSpecializationArg const*    specializationArgs = nullptr;
+    Int specializationArgCount = 0;
+    ExpandedSpecializationArg const* specializationArgs = nullptr;
 
     // Map types to their type layout
-    Dictionary<Type*, TypeLayoutResult>      layoutMap;
+    Dictionary<Type*, TypeLayoutResult> layoutMap;
 
     // Options passed to object layout
     ObjectLayoutRulesImpl::Options objectLayoutOptions;
+
+    // Mangled names to DeclRefType, this is used to match up 'extern' types to
+    // their linked in definitions during layout generation
+    std::optional<Dictionary<String, DeclRefType*>> externTypeMap;
+
+    DeclRefType* lookupExternDeclRefType(DeclRefType* declRefType);
+    void buildExternTypeMap();
 
     LayoutRulesImpl* getRules() { return rules; }
     LayoutRulesFamilyImpl* getRulesFamily() const { return rules->getLayoutRulesFamily(); }
@@ -1173,107 +1207,95 @@ struct TypeLayoutContext
         return result;
     }
 
-    TypeLayoutContext withSpecializationArgs(
-        ExpandedSpecializationArg const*    args,
-        Int                                 argCount) const
+    TypeLayoutContext withSpecializationArgs(ExpandedSpecializationArg const* args, Int argCount)
+        const
     {
         TypeLayoutContext result = *this;
-        result.specializationArgCount  = argCount;
-        result.specializationArgs      = args;
+        result.specializationArgCount = argCount;
+        result.specializationArgs = args;
         return result;
     }
 
-    TypeLayoutContext withSpecializationArgsOffsetBy(
-        Int offset) const
+    TypeLayoutContext withSpecializationArgsOffsetBy(Int offset) const
     {
         TypeLayoutContext result = *this;
-        if( specializationArgCount > offset )
+        if (specializationArgCount > offset)
         {
-            result.specializationArgCount  = specializationArgCount - offset;
-            result.specializationArgs      = specializationArgs + offset;
+            result.specializationArgCount = specializationArgCount - offset;
+            result.specializationArgs = specializationArgs + offset;
         }
         else
         {
-            result.specializationArgCount  = 0;
-            result.specializationArgs      = nullptr;
+            result.specializationArgCount = 0;
+            result.specializationArgs = nullptr;
         }
         return result;
-
     }
 };
 
 //
 
 
-
-    /// Helper type for building `struct` type layouts
+/// Helper type for building `struct` type layouts
 struct StructTypeLayoutBuilder
 {
 public:
-        /// Begin the layout process for `type`, using `rules`
-    void beginLayout(
-        Type*               type,
-        LayoutRulesImpl*    rules);
+    /// Begin the layout process for `type`, using `rules`
+    void beginLayout(Type* type, LayoutRulesImpl* rules);
 
-        /// Begin the layout process for `type`, using `rules`, if it hasn't already been begun.
-        ///
-        /// This functions allows for a `StructTypeLayoutBuilder` to be use lazily,
-        /// only allocating a type layout object if it is actaully needed.
-        ///
-    void beginLayoutIfNeeded(
-        Type*               type,
-        LayoutRulesImpl*    rules);
+    /// Begin the layout process for `type`, using `rules`, if it hasn't already been begun.
+    ///
+    /// This functions allows for a `StructTypeLayoutBuilder` to be use lazily,
+    /// only allocating a type layout object if it is actaully needed.
+    ///
+    void beginLayoutIfNeeded(Type* type, LayoutRulesImpl* rules);
 
-        /// Add a field to the struct type layout.
-        ///
-        /// One of the `beginLayout*()` functions must have been called previously.
-        ///
-    RefPtr<VarLayout> addField(
-        DeclRef<Decl>    field,
-        TypeLayoutResult        fieldResult);
+    /// Add a field to the struct type layout.
+    ///
+    /// One of the `beginLayout*()` functions must have been called previously.
+    ///
+    RefPtr<VarLayout> addField(DeclRef<Decl> field, TypeLayoutResult fieldResult);
 
     RefPtr<VarLayout> addExplicitUniformField(
-        DeclRef<VarDeclBase>    field,
-        TypeLayoutResult        fieldResult);
+        DeclRef<VarDeclBase> field,
+        TypeLayoutResult fieldResult);
 
-        /// Add a field to the struct type layout.
-        ///
-        /// One of the `beginLayout*()` functions must have been called previously.
-        ///
-    RefPtr<VarLayout> addField(
-        DeclRef<VarDeclBase>    field,
-        RefPtr<TypeLayout>      fieldTypeLayout);
+    /// Add a field to the struct type layout.
+    ///
+    /// One of the `beginLayout*()` functions must have been called previously.
+    ///
+    RefPtr<VarLayout> addField(DeclRef<VarDeclBase> field, RefPtr<TypeLayout> fieldTypeLayout);
 
-        /// Complete layout.
-        ///
-        /// If layout was begun, ensures that the result of `getTypeLayout()` is usable.
-        /// If layout was never begin, does nothing.
-        ///
+    /// Complete layout.
+    ///
+    /// If layout was begun, ensures that the result of `getTypeLayout()` is usable.
+    /// If layout was never begin, does nothing.
+    ///
     void endLayout();
 
-        /// Get the type layout.
-        ///
-        /// This can be called any time after `beginLayout*()`.
-        /// In particular, it can be called before `endLayout`.
-        ///
+    /// Get the type layout.
+    ///
+    /// This can be called any time after `beginLayout*()`.
+    /// In particular, it can be called before `endLayout`.
+    ///
     RefPtr<StructTypeLayout> getTypeLayout();
 
-        /// The the type layout result.
-        ///
-        /// This is primarily useful for implementation code in `_createTypeLayout`.
-        ///
+    /// The the type layout result.
+    ///
+    /// This is primarily useful for implementation code in `_createTypeLayout`.
+    ///
     TypeLayoutResult getTypeLayoutResult();
 
     UniformLayoutInfo* getStructLayoutInfo() { return &m_info; }
 
 private:
-        /// The layout rules being used, if layout has begun.
+    /// The layout rules being used, if layout has begun.
     LayoutRulesImpl* m_rules = nullptr;
 
-        /// The type layout being computed, if layout has begun.
+    /// The type layout being computed, if layout has begun.
     RefPtr<StructTypeLayout> m_typeLayout;
 
-        /// Uniform offset/alignment statte used when computing offset for uniform fields.
+    /// Uniform offset/alignment statte used when computing offset for uniform fields.
     UniformLayoutInfo m_info;
 };
 
@@ -1287,112 +1309,109 @@ private:
 // the ordering of all global generic type paramters.
 //
 TypeLayoutContext getInitialLayoutContextForTarget(
-    TargetRequest*  targetRequest,
+    TargetRequest* targetRequest,
     ProgramLayout* programLayout,
     slang::LayoutRules rules);
 
-    /// Direction(s) of a varying shader parameter
+/// Direction(s) of a varying shader parameter
 typedef unsigned int EntryPointParameterDirectionMask;
 enum
 {
-    kEntryPointParameterDirection_Input  = 0x1,
+    kEntryPointParameterDirection_Input = 0x1,
     kEntryPointParameterDirection_Output = 0x2,
 };
 
 
-    /// Get layout information for a simple varying parameter type.
-    ///
-    /// A simple varying parameter is a scalar, vector, or matrix.
-    ///
+/// Get layout information for a simple varying parameter type.
+///
+/// A simple varying parameter is a scalar, vector, or matrix.
+///
 RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
-    TypeLayoutContext const&            context,
-    Type*                               type,
-    EntryPointParameterDirectionMask    directionMask);
+    TypeLayoutContext const& context,
+    Type* type,
+    EntryPointParameterDirectionMask directionMask);
 
 // Create a full type-layout object for a type,
 // according to the layout rules in `context`.
-RefPtr<TypeLayout> createTypeLayout(
-    TypeLayoutContext&          context,
-    Type*                       type);
+RefPtr<TypeLayout> createTypeLayout(TypeLayoutContext& context, Type* type);
 
 // A wrapper for createTypeLayout which copies the context applying the
 // provided rules with TypeLayoutContext::with
 RefPtr<TypeLayout> createTypeLayoutWith(
-    const TypeLayoutContext&    context,
-    LayoutRulesImpl*            rules,
-    Type*                       type);
+    const TypeLayoutContext& context,
+    LayoutRulesImpl* rules,
+    Type* type);
 
 //
 
-    /// Create a layout for a parameter-group type (a `ConstantBuffer` or `ParameterBlock`).
+/// Create a layout for a parameter-group type (a `ConstantBuffer` or `ParameterBlock`).
 RefPtr<TypeLayout> createParameterGroupTypeLayout(
-    TypeLayoutContext const&    context,
-    ParameterGroupType*  parameterGroupType);
+    TypeLayoutContext const& context,
+    ParameterGroupType* parameterGroupType);
 
-    /// Create a wrapper constant buffer type layout, if needed.
-    ///
-    /// When dealing with entry-point `uniform` and global-scope parameters,
-    /// we want to create a wrapper constant buffer for all the parameters
-    /// if and only if there exist some parameters that use "ordinary" data
-    /// (`LayoutResourceKind::Uniform`).
-    ///
-    /// This function determines whether such a wrapper is needed, based
-    /// on the `elementTypeLayout` given, and either creates and returns
-    /// the layout for the wrapper, or the unmodified `elementTypeLayout`.
-    ///
+/// Create a wrapper constant buffer type layout, if needed.
+///
+/// When dealing with entry-point `uniform` and global-scope parameters,
+/// we want to create a wrapper constant buffer for all the parameters
+/// if and only if there exist some parameters that use "ordinary" data
+/// (`LayoutResourceKind::Uniform`).
+///
+/// This function determines whether such a wrapper is needed, based
+/// on the `elementTypeLayout` given, and either creates and returns
+/// the layout for the wrapper, or the unmodified `elementTypeLayout`.
+///
 RefPtr<TypeLayout> createConstantBufferTypeLayoutIfNeeded(
-    TypeLayoutContext const&    context,
-    RefPtr<TypeLayout>          elementTypeLayout);
+    TypeLayoutContext const& context,
+    RefPtr<TypeLayout> elementTypeLayout);
 
 // Create a type layout for a structured buffer type.
-RefPtr<StructuredBufferTypeLayout>
-createStructuredBufferTypeLayout(
-    TypeLayoutContext const&    context,
-    ShaderParameterKind         kind,
-    Type*                structuredBufferType,
-    Type*                elementType);
-
-RefPtr<StructuredBufferTypeLayout>
-createStructuredBufferTypeLayout(
+RefPtr<StructuredBufferTypeLayout> createStructuredBufferTypeLayout(
     TypeLayoutContext const& context,
-    ShaderParameterKind      kind,
-    Type*                    structuredBufferType,
-    RefPtr<TypeLayout>       elementTypeLayout);
+    ShaderParameterKind kind,
+    Type* structuredBufferType,
+    Type* elementType);
 
-    /// Create a type layout for an unspecialized `globalGenericParamDecl`.
+RefPtr<StructuredBufferTypeLayout> createStructuredBufferTypeLayout(
+    TypeLayoutContext const& context,
+    ShaderParameterKind kind,
+    Type* structuredBufferType,
+    RefPtr<TypeLayout> elementTypeLayout);
+
+/// Create a type layout for an unspecialized `globalGenericParamDecl`.
 RefPtr<TypeLayout> createTypeLayoutForGlobalGenericTypeParam(
-    TypeLayoutContext const&    context,
-    Type*                       type,
-    GlobalGenericParamDecl*     globalGenericParamDecl);
+    TypeLayoutContext const& context,
+    Type* type,
+    GlobalGenericParamDecl* globalGenericParamDecl);
 
-    /// Find the concrete type (if any) that was plugged in for the global generic type parameter `decl`.
+/// Find the concrete type (if any) that was plugged in for the global generic type parameter
+/// `decl`.
 Type* findGlobalGenericSpecializationArg(
-    TypeLayoutContext const&    context,
-    GlobalGenericParamDecl*     decl);
+    TypeLayoutContext const& context,
+    GlobalGenericParamDecl* decl);
 
 // Given an existing type layout `oldTypeLayout`, apply offsets
 // to any contained fields based on the resource infos in `offsetVarLayout`.
 RefPtr<TypeLayout> applyOffsetToTypeLayout(
-    RefPtr<TypeLayout>  oldTypeLayout,
-    RefPtr<VarLayout>   offsetVarLayout);
+    RefPtr<TypeLayout> oldTypeLayout,
+    RefPtr<VarLayout> offsetVarLayout);
 
 struct IRBuilder;
 struct IRTypeLayout;
 struct IRVarLayout;
 
 IRTypeLayout* applyOffsetToTypeLayout(
-    IRBuilder*      irBuilder,
-    IRTypeLayout*   oldTypeLayout,
-    IRVarLayout*    offsetVarLayout);
+    IRBuilder* irBuilder,
+    IRTypeLayout* oldTypeLayout,
+    IRVarLayout* offsetVarLayout);
 
-    /// Create a layout like `baseLayout`, but offset by `offsetLayout`
+/// Create a layout like `baseLayout`, but offset by `offsetLayout`
 IRVarLayout* applyOffsetToVarLayout(
-    IRBuilder*      irBuilder,
-    IRVarLayout*    baseLayout,
-    IRVarLayout*    offsetLayout);
+    IRBuilder* irBuilder,
+    IRVarLayout* baseLayout,
+    IRVarLayout* offsetLayout);
 
 bool canTypeDirectlyUseRegisterSpace(TypeLayout* layout);
 
-}
+} // namespace Slang
 
 #endif

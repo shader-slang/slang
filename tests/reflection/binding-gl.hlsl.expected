@@ -90,7 +90,15 @@ standard output = {
             "binding": {"kind": "descriptorTableSlot", "space": 2, "index": 1},
             "type": {
                 "kind": "resource",
-                "baseShape": "texture2D"
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         },
         {
@@ -98,7 +106,15 @@ standard output = {
             "binding": {"kind": "descriptorTableSlot", "space": 3, "index": 2},
             "type": {
                 "kind": "resource",
-                "baseShape": "texture2D"
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         },
         {
@@ -106,7 +122,15 @@ standard output = {
             "binding": {"kind": "descriptorTableSlot", "index": 0},
             "type": {
                 "kind": "resource",
-                "baseShape": "texture2D"
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         },
         {
@@ -138,8 +162,8 @@ standard output = {
     "entryPoints": [
         {
             "name": "main",
-            "stage:": "fragment",
-            "result:": {
+            "stage": "fragment",
+            "result": {
                 "stage": "fragment",
                 "binding": {"kind": "varyingOutput", "index": 0},
                 "semanticName": "SV_TARGET",

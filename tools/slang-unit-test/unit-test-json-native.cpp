@@ -1,21 +1,20 @@
 // unit-test-json-native.cpp
 
-#include "../../source/core/slang-rtti-info.h"
-
 #include "../../source/compiler-core/slang-json-native.h"
 #include "../../source/compiler-core/slang-json-parser.h"
-
-#include "tools/unit-test/slang-unit-test.h"
+#include "../../source/core/slang-rtti-info.h"
+#include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
-namespace { // anonymous 
+namespace
+{ // anonymous
 
 struct OtherStruct
 {
     typedef OtherStruct ThisType;
 
-    bool operator==(const ThisType& rhs) const { return f == rhs.f && value == rhs.value;  }
+    bool operator==(const ThisType& rhs) const { return f == rhs.f && value == rhs.value; }
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
     float f = 1.0f;
@@ -32,7 +31,7 @@ static const StructRttiInfo _makeOtherStructRtti()
     builder.addField("value", &obj.value);
     return builder.make();
 }
-/* static */const StructRttiInfo OtherStruct::g_rttiInfo = _makeOtherStructRtti();
+/* static */ const StructRttiInfo OtherStruct::g_rttiInfo = _makeOtherStructRtti();
 
 struct SomeStruct
 {
@@ -40,13 +39,9 @@ struct SomeStruct
 
     bool operator==(const ThisType& rhs) const
     {
-        return a == rhs.a &&
-            b == rhs.b &&
-            s == rhs.s &&
-            list == rhs.list &&
-            boolValue == rhs.boolValue &&
-            structList == rhs.structList &&
-            makeConstArrayView(fixedArray) == makeConstArrayView(rhs.fixedArray);
+        return a == rhs.a && b == rhs.b && s == rhs.s && list == rhs.list &&
+               boolValue == rhs.boolValue && structList == rhs.structList &&
+               makeConstArrayView(fixedArray) == makeConstArrayView(rhs.fixedArray);
     }
     bool operator!=(const ThisType& rhs) const { return !(*this == rhs); }
 
@@ -58,7 +53,7 @@ struct SomeStruct
 
     List<OtherStruct> structList;
 
-    int fixedArray[2] = { 0, 0 };
+    int fixedArray[2] = {0, 0};
 
     static const StructRttiInfo g_rttiInfo;
 };
@@ -78,9 +73,9 @@ static const StructRttiInfo _makeSomeStructRtti()
 
     return builder.make();
 }
-/* static */const StructRttiInfo SomeStruct::g_rttiInfo = _makeSomeStructRtti();
+/* static */ const StructRttiInfo SomeStruct::g_rttiInfo = _makeSomeStructRtti();
 
-} // anonymous
+} // namespace
 
 
 static SlangResult _check()
@@ -107,7 +102,7 @@ static SlangResult _check()
 
     DiagnosticSink sink(&sourceManager, &JSONLexer::calcLexemeLocation);
 
-    auto typeMap = JSONNativeUtil::getTypeFuncsMap(); 
+    auto typeMap = JSONNativeUtil::getTypeFuncsMap();
 
     RefPtr<JSONContainer> container(new JSONContainer(&sourceManager));
 
@@ -129,7 +124,8 @@ static SlangResult _check()
     {
         // Now need to parse as JSON
         String contents(json);
-        SourceFile* sourceFile = sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
+        SourceFile* sourceFile =
+            sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
         SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
 
         JSONLexer lexer;
@@ -149,7 +145,8 @@ static SlangResult _check()
 
         {
             SomeStruct readS;
-            SLANG_RETURN_ON_FAIL(converter.convert(readValue, GetRttiInfo<SomeStruct>::get(), &readS));
+            SLANG_RETURN_ON_FAIL(
+                converter.convert(readValue, GetRttiInfo<SomeStruct>::get(), &readS));
 
             // Should be equal
             SLANG_CHECK(readS == s);
@@ -162,5 +159,4 @@ static SlangResult _check()
 SLANG_UNIT_TEST(JSONNative)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_check()));
-
 }

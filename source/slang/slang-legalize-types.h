@@ -23,12 +23,11 @@
 // of an aggregate (containing the legal/legalized fields),
 // and some extra tuple-ified fields.
 
+#include "../compiler-core/slang-name.h"
 #include "../core/slang-basic.h"
 #include "slang-ir-insts.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
-
-#include "../compiler-core/slang-name.h"
 
 namespace Slang
 {
@@ -45,25 +44,25 @@ struct PairInfo;
 struct LegalElementWrapping;
 struct WrappedBufferPseudoType;
 
-    /// A flavor for types or values that arise during legalization.
+/// A flavor for types or values that arise during legalization.
 enum class LegalFlavor
 {
-        /// Nothing: an empty type or value. Equivalent to `void`.
+    /// Nothing: an empty type or value. Equivalent to `void`.
     none,
 
-        /// A simple type/value that can be represented as an `IRType*` or `IRInst*`
+    /// A simple type/value that can be represented as an `IRType*` or `IRInst*`
     simple,
 
-        /// Logically, a pointer-like type/value, but represented as the type/value being pointed type.
+    /// Logically, a pointer-like type/value, but represented as the type/value being pointed type.
     implicitDeref,
 
-        /// A compound type/value made up of the constituent fields of some original value.
+    /// A compound type/value made up of the constituent fields of some original value.
     tuple,
 
-        /// A type/value that was split into "ordinary" and "special" parts.
+    /// A type/value that was split into "ordinary" and "special" parts.
     pair,
 
-        /// A type/value that represents, e.g., `ConstantBuffer<T>` where `T` needed legalization.
+    /// A type/value that represents, e.g., `ConstantBuffer<T>` where `T` needed legalization.
     wrappedBuffer,
 };
 
@@ -71,9 +70,9 @@ struct LegalType
 {
     typedef LegalFlavor Flavor;
 
-    Flavor              flavor = Flavor::none;
-    RefPtr<RefObject>   obj;
-    IRType*             irType = nullptr;
+    Flavor flavor = Flavor::none;
+    RefPtr<RefObject> obj;
+    IRType* irType = nullptr;
 
     static LegalType simple(IRType* type)
     {
@@ -89,8 +88,7 @@ struct LegalType
         return irType;
     }
 
-    static LegalType implicitDeref(
-        LegalType const& valueType);
+    static LegalType implicitDeref(LegalType const& valueType);
 
     RefPtr<ImplicitDerefType> getImplicitDeref() const
     {
@@ -98,8 +96,7 @@ struct LegalType
         return obj.as<ImplicitDerefType>();
     }
 
-    static LegalType tuple(
-        RefPtr<TuplePseudoType>   tupleType);
+    static LegalType tuple(RefPtr<TuplePseudoType> tupleType);
 
     RefPtr<TuplePseudoType> getTuple() const
     {
@@ -107,13 +104,12 @@ struct LegalType
         return obj.as<TuplePseudoType>();
     }
 
-    static LegalType pair(
-        RefPtr<PairPseudoType> pairType);
+    static LegalType pair(RefPtr<PairPseudoType> pairType);
 
     static LegalType pair(
-        LegalType const&    ordinaryType,
-        LegalType const&    specialType,
-        RefPtr<PairInfo>    pairInfo);
+        LegalType const& ordinaryType,
+        LegalType const& specialType,
+        RefPtr<PairInfo> pairInfo);
 
     RefPtr<PairPseudoType> getPair() const
     {
@@ -121,9 +117,7 @@ struct LegalType
         return obj.as<PairPseudoType>();
     }
 
-    static LegalType makeWrappedBuffer(
-        IRType*             simpleType,
-        LegalElementWrapping const&   elementInfo);
+    static LegalType makeWrappedBuffer(IRType* simpleType, LegalElementWrapping const& elementInfo);
 
     RefPtr<WrappedBufferPseudoType> getWrappedBuffer() const
     {
@@ -141,7 +135,7 @@ struct ImplicitDerefLegalElementWrappingObj;
 struct PairLegalElementWrappingObj;
 struct TupleLegalElementWrappingObj;
 
-    /// Information on how the element type of a buffer needs to be wrapped.
+/// Information on how the element type of a buffer needs to be wrapped.
 struct LegalElementWrapping
 {
     typedef LegalFlavor Flavor;
@@ -166,8 +160,8 @@ struct LegalElementWrapping
 
 struct SimpleLegalElementWrappingObj : LegalElementWrappingObj
 {
-    IRStructKey*    key;
-    IRType*         type;
+    IRStructKey* key;
+    IRType* type;
 };
 
 struct ImplicitDerefLegalElementWrappingObj : LegalElementWrappingObj
@@ -186,8 +180,8 @@ struct TupleLegalElementWrappingObj : LegalElementWrappingObj
 {
     struct Element
     {
-        IRStructKey*    key;
-        LegalElementWrapping      field;
+        IRStructKey* key;
+        LegalElementWrapping field;
     };
 
     List<Element> elements;
@@ -230,14 +224,14 @@ struct TuplePseudoType : LegalTypeImpl
     struct Element
     {
         // The field that this element replaces
-        IRStructKey*    key;
+        IRStructKey* key;
 
         // The legalized type of the element
-        LegalType       type;
+        LegalType type;
     };
 
     // All of the elements of the tuple pseduo-type.
-    List<Element>   elements;
+    List<Element> elements;
 };
 
 struct IRStructKey;
@@ -262,12 +256,12 @@ struct PairInfo : RefObject
         // `hasSpecial` bits are set, then
         // this is expected to be a
         // `LegalType::Flavor::pair`
-        LegalType   type;
+        LegalType type;
 
         // Is the value represented on
         // the ordinary side, the special
         // side, or both?
-        Flags       flags;
+        Flags flags;
 
         // If the type of this element is
         // itself a pair type (that is,
@@ -285,7 +279,7 @@ struct PairInfo : RefObject
     {
         for (auto& ee : elements)
         {
-            if(ee.key == key)
+            if (ee.key == key)
                 return &ee;
         }
         return nullptr;
@@ -314,126 +308,122 @@ struct PairPseudoType : LegalTypeImpl
 struct WrappedBufferPseudoType : LegalTypeImpl
 {
     // The actual IR type that was used for the buffer.
-    IRType*     simpleType;
+    IRType* simpleType;
 
     // Adjustments that need to be made when fetching
     // an element from this buffer type.
     //
-    LegalElementWrapping  elementInfo;
+    LegalElementWrapping elementInfo;
 };
 
 //
 
-IRTypeLayout* getDerefTypeLayout(
-    IRTypeLayout* typeLayout);
+IRTypeLayout* getDerefTypeLayout(IRTypeLayout* typeLayout);
 
-IRVarLayout* getFieldLayout(
-    IRTypeLayout*     typeLayout,
-    IRInst*         fieldKey);
+IRVarLayout* getFieldLayout(IRTypeLayout* typeLayout, IRInst* fieldKey);
 
-    /// Represents a "chain" of variables leading to some leaf field.
-    ///
-    /// Consider code like:
-    ///
-    ///     struct Branch { int leaf; }
-    ///     struct Tree { Branch left; Branch right; }
-    ///     cbuffer Forest
-    ///     {
-    ///         int maxTreeHeight;
-    ///         Tree tree;
-    ///     }
-    ///
-    /// If we ask "what is the offset of `leaf`" the simple answer is zero,
-    /// but sometimes we are talking about `Forest.tree.right.leaf` which
-    /// will have a very different offset. In Slang parameters can consume
-    /// various (and multiple) resource kinds, so a single offset can't
-    /// be tunneled down through most recursive procedures.
-    ///
-    /// Instead we use a "chain" that works up through the stack, and
-    /// records the path from leaf field like `leaf` up to whatever
-    /// variable is the root for the curent operation.
-    ///
-    /// Operations like computing an offset can then be encoded by
-    /// starting with zero and then walking up the chain and adding in
-    /// offsets as encountered.
-    ///
+/// Represents a "chain" of variables leading to some leaf field.
+///
+/// Consider code like:
+///
+///     struct Branch { int leaf; }
+///     struct Tree { Branch left; Branch right; }
+///     cbuffer Forest
+///     {
+///         int maxTreeHeight;
+///         Tree tree;
+///     }
+///
+/// If we ask "what is the offset of `leaf`" the simple answer is zero,
+/// but sometimes we are talking about `Forest.tree.right.leaf` which
+/// will have a very different offset. In Slang parameters can consume
+/// various (and multiple) resource kinds, so a single offset can't
+/// be tunneled down through most recursive procedures.
+///
+/// Instead we use a "chain" that works up through the stack, and
+/// records the path from leaf field like `leaf` up to whatever
+/// variable is the root for the curent operation.
+///
+/// Operations like computing an offset can then be encoded by
+/// starting with zero and then walking up the chain and adding in
+/// offsets as encountered.
+///
 struct SimpleLegalVarChain
 {
     // The next link up the chain, or null if this is the end.
-    SimpleLegalVarChain*    next = nullptr;
+    SimpleLegalVarChain* next = nullptr;
 
     // The layout for the variable at this link in thain.
-    IRVarLayout*            varLayout = nullptr;
+    IRVarLayout* varLayout = nullptr;
 };
 
-    /// A "chain" of variable declarations that can handle both primary and "pending" data.
-    ///
-    /// In the presence of interface-type fields, a single variable may
-    /// have data that sits in two distinct allocations, and may have
-    /// `VarLayout`s that represent offseting into each of those
-    /// allocations.
-    ///
-    /// A `LegalVarChain` tracks two distinct `SimpleVarChain`s: one for
-    /// the primary/ordinary data allocation, and one for any pending
-    /// data.
-    ///
-    /// It is okay if the primary/pending chains have different numbers
-    /// of links in them.
-    ///
-    /// Offsets for particular resource kinds in the primary or pending
-    /// data allocation can be queried on the appropriate sub-chain.
-    ///
+/// A "chain" of variable declarations that can handle both primary and "pending" data.
+///
+/// In the presence of interface-type fields, a single variable may
+/// have data that sits in two distinct allocations, and may have
+/// `VarLayout`s that represent offseting into each of those
+/// allocations.
+///
+/// A `LegalVarChain` tracks two distinct `SimpleVarChain`s: one for
+/// the primary/ordinary data allocation, and one for any pending
+/// data.
+///
+/// It is okay if the primary/pending chains have different numbers
+/// of links in them.
+///
+/// Offsets for particular resource kinds in the primary or pending
+/// data allocation can be queried on the appropriate sub-chain.
+///
 struct LegalVarChain
 {
     // The chain of variables that represents the primary allocation.
-    SimpleLegalVarChain*    primaryChain = nullptr;
+    SimpleLegalVarChain* primaryChain = nullptr;
 
     // The chain of variables that represents the pending allocation.
-    SimpleLegalVarChain*    pendingChain = nullptr;
+    SimpleLegalVarChain* pendingChain = nullptr;
 };
 
-    /// RAII type for adding a link to a `LegalVarChain` as needed.
-    ///
-    /// This type handles the bookkeeping for creating a `LegalVarChain`
-    /// that links in one more variable. It will add a link to each of
-    /// the primary and pending sub-chains if and only if there is non-null
-    /// layout information for the primary/pending case.
-    ///
-    /// Typical usage in a recursive function is:
-    ///
-    ///     void someRecursiveFunc(LegalVarChain const& outerChain, ...)
-    ///     {
-    ///         if(auto subVar = needToRecurse(...))
-    ///         {
-    ///             LegalVarChainLink subChain(outerChain, subVar);
-    ///             someRecursiveFunc(subChain, ...);
-    ///         }
-    ///         ...
-    ///     }
-    ///
+/// RAII type for adding a link to a `LegalVarChain` as needed.
+///
+/// This type handles the bookkeeping for creating a `LegalVarChain`
+/// that links in one more variable. It will add a link to each of
+/// the primary and pending sub-chains if and only if there is non-null
+/// layout information for the primary/pending case.
+///
+/// Typical usage in a recursive function is:
+///
+///     void someRecursiveFunc(LegalVarChain const& outerChain, ...)
+///     {
+///         if(auto subVar = needToRecurse(...))
+///         {
+///             LegalVarChainLink subChain(outerChain, subVar);
+///             someRecursiveFunc(subChain, ...);
+///         }
+///         ...
+///     }
+///
 struct LegalVarChainLink : LegalVarChain
 {
-        /// Default constructor: yields an empty chain.
-    LegalVarChainLink()
+    /// Default constructor: yields an empty chain.
+    LegalVarChainLink() {}
+
+    /// Copy constructor: yields a copy of the `parent` chain.
+    LegalVarChainLink(LegalVarChain const& parent)
+        : LegalVarChain(parent)
     {
     }
 
-        /// Copy constructor: yields a copy of the `parent` chain.
-    LegalVarChainLink(LegalVarChain const& parent)
-        : LegalVarChain(parent)
-    {}
-
-        /// Construct a chain that extends `parent` with `varLayout`, if it is non-null.
+    /// Construct a chain that extends `parent` with `varLayout`, if it is non-null.
     LegalVarChainLink(LegalVarChain const& parent, IRVarLayout* varLayout)
         : LegalVarChain(parent)
     {
-        if( varLayout )
+        if (varLayout)
         {
             primaryLink.next = parent.primaryChain;
             primaryLink.varLayout = varLayout;
             primaryChain = &primaryLink;
 
-            if( auto pendingVarLayout = varLayout->getPendingVarLayout() )
+            if (auto pendingVarLayout = varLayout->getPendingVarLayout())
             {
                 pendingLink.next = parent.pendingChain;
                 pendingLink.varLayout = pendingVarLayout;
@@ -447,14 +437,14 @@ struct LegalVarChainLink : LegalVarChain
 };
 
 IRVarLayout* createVarLayout(
-    IRBuilder*              irBuilder,
-    LegalVarChain const&    varChain,
-    IRTypeLayout*           typeLayout);
+    IRBuilder* irBuilder,
+    LegalVarChain const& varChain,
+    IRTypeLayout* typeLayout);
 
 IRVarLayout* createSimpleVarLayout(
-    IRBuilder*              irBuilder,
-    SimpleLegalVarChain*    varChain,
-    IRTypeLayout*           typeLayout);
+    IRBuilder* irBuilder,
+    SimpleLegalVarChain* varChain,
+    IRTypeLayout* typeLayout);
 
 //
 // The result of legalizing an IR value will be
@@ -482,9 +472,9 @@ struct LegalVal
 {
     typedef LegalFlavor Flavor;
 
-    Flavor              flavor = Flavor::none;
-    RefPtr<RefObject>   obj;
-    IRInst*             irValue = nullptr;
+    Flavor flavor = Flavor::none;
+    RefPtr<RefObject> obj;
+    IRInst* irValue = nullptr;
 
     static LegalVal simple(IRInst* irValue)
     {
@@ -513,9 +503,9 @@ struct LegalVal
 
     static LegalVal pair(RefPtr<PairPseudoVal> pairInfo);
     static LegalVal pair(
-        LegalVal const&     ordinaryVal,
-        LegalVal const&     specialVal,
-        RefPtr<PairInfo>    pairInfo);
+        LegalVal const& ordinaryVal,
+        LegalVal const& specialVal,
+        RefPtr<PairInfo> pairInfo);
 
     RefPtr<PairPseudoVal> getPair() const
     {
@@ -523,9 +513,7 @@ struct LegalVal
         return obj.as<PairPseudoVal>();
     }
 
-    static LegalVal wrappedBuffer(
-        LegalVal const& baseVal,
-        LegalElementWrapping const& elementInfo);
+    static LegalVal wrappedBuffer(LegalVal const& baseVal, LegalElementWrapping const& elementInfo);
 
     RefPtr<WrappedBufferPseudoVal> getWrappedBuffer() const
     {
@@ -538,11 +526,11 @@ struct TuplePseudoVal : LegalValImpl
 {
     struct Element
     {
-        IRStructKey*    key;
-        LegalVal        val;
+        IRStructKey* key;
+        LegalVal val;
     };
 
-    List<Element>   elements;
+    List<Element> elements;
 };
 
 struct PairPseudoVal : LegalValImpl
@@ -552,7 +540,7 @@ struct PairPseudoVal : LegalValImpl
 
     // The info to tell us which fields
     // are on which side(s)
-    RefPtr<PairInfo>  pairInfo;
+    RefPtr<PairInfo> pairInfo;
 };
 
 struct ImplicitDerefVal : LegalValImpl
@@ -562,52 +550,51 @@ struct ImplicitDerefVal : LegalValImpl
 
 struct WrappedBufferPseudoVal : LegalValImpl
 {
-    LegalVal                base;
-    LegalElementWrapping    elementInfo;
+    LegalVal base;
+    LegalElementWrapping elementInfo;
 };
 
 //
 
-    /// Information about a function that has been legalized
-    ///
-    /// This type is used to track any information about the function
-    /// and its signature that might be relevant to the legalization
-    /// of instructions inside the function body.
-    ///
+/// Information about a function that has been legalized
+///
+/// This type is used to track any information about the function
+/// and its signature that might be relevant to the legalization
+/// of instructions inside the function body.
+///
 struct LegalFuncInfo : RefObject
 {
-        /// Any parameters that were added to the function signature
-        /// to represent the function result after legalization.
-        ///
-        /// It is possible that the result type of a function needed
-        /// to be split into multiple types, and as a result a single
-        /// function result couldn't return all of them.
-        ///
-        /// This array is a list of `out` parameters created to represent
-        /// additional function results. Because they are `out` parameters,
-        /// each is a *pointer* to a value of the relevant type.
-        ///
+    /// Any parameters that were added to the function signature
+    /// to represent the function result after legalization.
+    ///
+    /// It is possible that the result type of a function needed
+    /// to be split into multiple types, and as a result a single
+    /// function result couldn't return all of them.
+    ///
+    /// This array is a list of `out` parameters created to represent
+    /// additional function results. Because they are `out` parameters,
+    /// each is a *pointer* to a value of the relevant type.
+    ///
     List<IRInst*> resultParamVals;
 };
 
 //
 
-    /// Context that drives type legalization
-    ///
-    /// This type is an abstract base class, and there are
-    /// customization points that a concrete pass needs to
-    /// override (e.g., to specify what needs to be legalized).
+/// Context that drives type legalization
+///
+/// This type is an abstract base class, and there are
+/// customization points that a concrete pass needs to
+/// override (e.g., to specify what needs to be legalized).
 struct IRTypeLegalizationContext
 {
-    Session*    session;
-    IRModule*   module;
-    IRBuilder*  builder;
+    Session* session;
+    IRModule* module;
+    IRBuilder* builder;
     TargetProgram* targetProgram;
     IRBuilder builderStorage;
+    DiagnosticSink* m_sink;
 
-    IRTypeLegalizationContext(
-        TargetProgram* target,
-        IRModule* inModule);
+    IRTypeLegalizationContext(TargetProgram* target, IRModule* inModule, DiagnosticSink* sink);
 
     // When inserting new globals, put them before this one.
     IRInst* insertBeforeGlobal = nullptr;
@@ -625,22 +612,22 @@ struct IRTypeLegalizationContext
 
     Dictionary<IRType*, LegalType> mapTypeToLegalType;
 
-        /// Map a function to information about how it was legalized.
-        ///
-        /// Note that entries are only created if there is somehting for them
-        /// to represent, so many functions may lack entries in this map even
-        /// after legalization.
-        ///
+    /// Map a function to information about how it was legalized.
+    ///
+    /// Note that entries are only created if there is somehting for them
+    /// to represent, so many functions may lack entries in this map even
+    /// after legalization.
+    ///
     Dictionary<IRFunc*, RefPtr<LegalFuncInfo>> mapFuncToInfo;
 
-        /// 
-        /// Special handling for pointer types. If we have a situation where 
-        /// a type could end up in a loop pointing to itself, the activePointerValues
-        /// stack records which pointer value types (ie the thing being pointed to)
-        /// are "active". The usedCount is to indicate how many times the type was
-        /// used whilst active. If it's !=0, we should check the assumption about what 
-        /// should have been produced.
-        /// 
+    ///
+    /// Special handling for pointer types. If we have a situation where
+    /// a type could end up in a loop pointing to itself, the activePointerValues
+    /// stack records which pointer value types (ie the thing being pointed to)
+    /// are "active". The usedCount is to indicate how many times the type was
+    /// used whilst active. If it's !=0, we should check the assumption about what
+    /// should have been produced.
+    ///
     struct PointerValue
     {
         IRType* type = nullptr;
@@ -651,26 +638,27 @@ struct IRTypeLegalizationContext
 
     IRBuilder* getBuilder() { return builder; }
 
-        /// Customization point to decide what types are "special."
-        ///
-        /// When legalizing a `struct` type, any fields that have "special"
-        /// types will get moved out of the `struc` itself.
+    /// Customization point to decide what types are "special."
+    ///
+    /// When legalizing a `struct` type, any fields that have "special"
+    /// types will get moved out of the `struc` itself.
     virtual bool isSpecialType(IRType* type) = 0;
 
-        /// Customization point to decide what types are "simple."
-        ///
-        /// When a type is "simple" it means that it should not be changed
-        /// during legalization.
+    /// Customization point to decide what types are "simple."
+    ///
+    /// When a type is "simple" it means that it should not be changed
+    /// during legalization.
     virtual bool isSimpleType(IRType* type) = 0;
 
-        /// Customization point to construct uniform-buffer/block types.
-        ///
-        /// This function will only be called if `legalElementType` is
-        /// somehow non-trivial.
-        ///
+    /// Customization point to construct uniform-buffer/block types.
+    ///
+    /// This function will only be called if `legalElementType` is
+    /// somehow non-trivial.
+    ///
     virtual LegalType createLegalUniformBufferType(
-        IROp        op,
-        LegalType   legalElementType) = 0;
+        IROp op,
+        LegalType legalElementType,
+        IRInst* layoutOperand) = 0;
 };
 
 // This typedef exists to support pre-existing code from when
@@ -678,56 +666,44 @@ struct IRTypeLegalizationContext
 // two different types that had to coordinate.
 typedef struct IRTypeLegalizationContext TypeLegalizationContext;
 
-LegalType legalizeType(
-    TypeLegalizationContext*    context,
-    IRType*                     type);
+LegalType legalizeType(TypeLegalizationContext* context, IRType* type);
 
 /// Try to find the module that (recursively) contains a given declaration.
-ModuleDecl* findModuleForDecl(
-    Decl*   decl);
+ModuleDecl* findModuleForDecl(Decl* decl);
 
-    /// Create a uniform buffer type suitable for resource legalization.
-    ///
-    /// This will allocate a real buffer for the ordinary data (if any),
-    /// and leave the special data (if any) as a tuple.
-    ///
+/// Create a uniform buffer type suitable for resource legalization.
+///
+/// This will allocate a real buffer for the ordinary data (if any),
+/// and leave the special data (if any) as a tuple.
+///
 LegalType createLegalUniformBufferTypeForResources(
-    TypeLegalizationContext*    context,
-    IROp                        op,
-    LegalType                   legalElementType);
+    TypeLegalizationContext* context,
+    IROp op,
+    LegalType legalElementType,
+    IRInst* layoutOperand);
 
-    /// Create a uniform buffer type suitable for existential legalization.
-    ///
-    /// This will allocate a real uniform buffer for *all* the data, by
-    /// declaring an intermediate `struct` type to hold the ordinary and
-    /// special (existential-box) fields, if required.
-    ///
+/// Create a uniform buffer type suitable for existential legalization.
+///
+/// This will allocate a real uniform buffer for *all* the data, by
+/// declaring an intermediate `struct` type to hold the ordinary and
+/// special (existential-box) fields, if required.
+///
 LegalType createLegalUniformBufferTypeForExistentials(
-    TypeLegalizationContext*    context,
-    IROp                        op,
-    LegalType                   legalElementType);
+    TypeLegalizationContext* context,
+    IROp op,
+    LegalType legalElementType,
+    IRInst* layoutOperand);
 
 
+void legalizeExistentialTypeLayout(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
 
+void legalizeResourceTypes(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
 
-void legalizeExistentialTypeLayout(
-    TargetProgram* target,
-    IRModule*       module,
-    DiagnosticSink* sink);
-
-void legalizeResourceTypes(
-    TargetProgram* target,
-    IRModule*       module,
-    DiagnosticSink* sink);
-
-void legalizeEmptyTypes(
-    TargetProgram* target,
-    IRModule* module,
-    DiagnosticSink* sink);
+void legalizeEmptyTypes(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
 
 bool isResourceType(IRType* type);
 
-
-}
+SourceLoc findBestSourceLocFromUses(IRInst* inst);
+} // namespace Slang
 
 #endif

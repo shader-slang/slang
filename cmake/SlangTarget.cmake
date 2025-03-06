@@ -1,5 +1,5 @@
 #
-# A function to make target creation a little more declarative
+# A function to make target specification a little more declarative
 #
 # See the comments on the options below for usage
 #
@@ -18,6 +18,11 @@ function(slang_add_target dir type)
         WIN32_EXECUTABLE
         # Install this target for a non-component install
         INSTALL
+        # Don't include any source in this target, this is a complement to
+        # EXPLICIT_SOURCE, and doesn't interact with EXTRA_SOURCE_DIRS
+        NO_SOURCE
+        # Don't generate split debug info for this target
+        NO_SPLIT_DEBUG_INFO
     )
     set(single_value_args
         # Set the target name, useful for multiple targets from the same
@@ -35,6 +40,10 @@ function(slang_add_target dir type)
         # ${EXPORT_MACRO_PREFIX}_DYNAMIC_EXPORT macros are set for using and
         # building respectively
         EXPORT_MACRO_PREFIX
+        # Ignore target type and use a particular style of export macro
+        # _DYNAMIC or _STATIC, this is useful when the target type is OBJECT 
+        # pass in STATIC or SHARED
+        EXPORT_TYPE_AS
         # The folder in which to place this target for IDE-based generators (VS
         # and XCode)
         FOLDER
@@ -42,6 +51,12 @@ function(slang_add_target dir type)
         DEBUG_DIR
         # Install this target as part of a component
         INSTALL_COMPONENT
+        # Override the debug info component name for installation
+        # explicit name instead, used for externally built things such as
+        # slang-glslang and slang-llvm which have large pdb files
+        DEBUG_INFO_INSTALL_COMPONENT
+        # The name of the Export set to associate with this installed target
+        EXPORT_SET_NAME
     )
     set(multi_value_args
         # Use exactly these sources, instead of globbing from the directory
@@ -55,10 +70,16 @@ function(slang_add_target dir type)
         EXTRA_COMPILE_OPTIONS_PRIVATE
         # Targets with which to link privately
         LINK_WITH_PRIVATE
+        # Targets with which to link publicly, for example if their headers
+        # appear in our headers
+        LINK_WITH_PUBLIC
         # Frameworks with which to link privately
         LINK_WITH_FRAMEWORK
         # Targets whose headers we use, but don't link with
         INCLUDE_FROM_PRIVATE
+        # Targets whose headers we use in our headers, so need to make sure
+        # dependencies of this target also include them
+        INCLUDE_FROM_PUBLIC
         # Any include directories other targets need to use this target
         INCLUDE_DIRECTORIES_PUBLIC
         # Any include directories this target only needs
@@ -109,7 +130,8 @@ function(slang_add_target dir type)
     #
     # Find the source for this target
     #
-    if(ARG_EXPLICIT_SOURCE)
+    if(ARG_NO_SOURCE)
+    elseif(ARG_EXPLICIT_SOURCE)
         list(APPEND source ${ARG_EXPLICIT_SOURCE})
     else()
         slang_glob_sources(source ${dir})
@@ -142,6 +164,17 @@ function(slang_add_target dir type)
         return()
     endif()
 
+    # Enable link-time optimization for release builds
+    # See: https://cmake.org/cmake/help/latest/prop_tgt/INTERPROCEDURAL_OPTIMIZATION.html
+    if(SLANG_ENABLE_RELEASE_LTO)
+        set_target_properties(
+            ${target}
+            PROPERTIES
+                INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE
+                INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE
+        )
+    endif()
+
     #
     # Set the output directory
     #
@@ -171,6 +204,29 @@ function(slang_add_target dir type)
             PDB_OUTPUT_DIRECTORY "${output_dir}/${runtime_subdir}"
     )
 
+    set(debug_configs "Debug,RelWithDebInfo")
+    if(SLANG_ENABLE_RELEASE_DEBUG_INFO)
+        set(debug_configs "Debug,RelWithDebInfo,Release")
+    endif()
+
+    set_target_properties(
+        ${target}
+        PROPERTIES
+            MSVC_DEBUG_INFORMATION_FORMAT
+                "$<$<CONFIG:${debug_configs}>:Embedded>"
+    )
+    if(MSVC)
+        target_link_options(
+            ${target}
+            PRIVATE "$<$<CONFIG:${debug_configs}>:/DEBUG>"
+        )
+    else()
+        target_compile_options(
+            ${target}
+            PRIVATE "$<$<CONFIG:${debug_configs}>:-g>"
+        )
+    endif()
+
     #
     # Set common compile options and properties
     #
@@ -180,6 +236,61 @@ function(slang_add_target dir type)
         set_default_compile_options(${target} USE_FEWER_WARNINGS)
     else()
         set_default_compile_options(${target})
+    endif()
+
+    # Set debug info options if not disabled
+    # Determine if this target produces a binary that can have debug info
+    if(
+        NOT ARG_NO_SPLIT_DEBUG_INFO
+        AND type MATCHES "^(EXECUTABLE|SHARED|MODULE)$"
+        AND SLANG_ENABLE_SPLIT_DEBUG_INFO
+    )
+        set(generate_split_debug_info TRUE)
+    else()
+        set(generate_split_debug_info FALSE)
+    endif()
+
+    if(generate_split_debug_info)
+        if(MSVC)
+            set_target_properties(
+                ${target}
+                PROPERTIES
+                    COMPILE_PDB_NAME "${target}"
+                    COMPILE_PDB_OUTPUT_DIRECTORY "${output_dir}"
+            )
+        else()
+            if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+                # macOS - use dsymutil with --flat to create separate debug file
+                add_custom_command(
+                    TARGET ${target}
+                    POST_BUILD
+                    COMMAND
+                        dsymutil --flat $<TARGET_FILE:${target}> -o
+                        $<TARGET_FILE:${target}>.dwarf
+                    COMMAND chmod 644 $<TARGET_FILE:${target}>.dwarf
+                    COMMAND ${CMAKE_STRIP} -S $<TARGET_FILE:${target}>
+                    WORKING_DIRECTORY ${output_dir}
+                    VERBATIM
+                )
+            else()
+                add_custom_command(
+                    TARGET ${target}
+                    POST_BUILD
+                    COMMAND
+                        ${CMAKE_OBJCOPY} --only-keep-debug
+                        $<TARGET_FILE:${target}> $<TARGET_FILE:${target}>.dwarf
+                    COMMAND chmod 644 $<TARGET_FILE:${target}>.dwarf
+                    COMMAND
+                        ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:${target}>
+                    COMMAND
+                        ${CMAKE_OBJCOPY}
+                        --add-gnu-debuglink=$<TARGET_FILE:${target}>.dwarf
+                        $<TARGET_FILE:${target}>
+                    WORKING_DIRECTORY ${output_dir}
+                    VERBATIM
+                )
+            endif()
+        endif()
     endif()
 
     set_target_properties(
@@ -214,10 +325,14 @@ function(slang_add_target dir type)
     # Link and include from dependencies
     #
     target_link_libraries(${target} PRIVATE ${ARG_LINK_WITH_PRIVATE})
+    target_link_libraries(${target} PUBLIC ${ARG_LINK_WITH_PUBLIC})
 
     if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
         foreach(link_framework ${ARG_LINK_WITH_FRAMEWORK})
-            target_link_libraries(${target} PRIVATE "-framework ${link_framework}")
+            target_link_libraries(
+                ${target}
+                PRIVATE "-framework ${link_framework}"
+            )
         endforeach()
     endif()
 
@@ -225,6 +340,13 @@ function(slang_add_target dir type)
         target_include_directories(
             ${target}
             PRIVATE
+                $<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>
+        )
+    endforeach()
+    foreach(include_from ${ARG_INCLUDE_FROM_PUBLIC})
+        target_include_directories(
+            ${target}
+            PUBLIC
                 $<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>
         )
     endforeach()
@@ -255,6 +377,8 @@ function(slang_add_target dir type)
         if(
             target_type STREQUAL SHARED_LIBRARY
             OR target_type STREQUAL MODULE_LIBRARY
+            OR ARG_EXPORT_TYPE_AS STREQUAL SHARED
+            OR ARG_EXPORT_TYPE_AS STREQUAL MODULE
         )
             target_compile_definitions(
                 ${target}
@@ -263,10 +387,16 @@ function(slang_add_target dir type)
             )
         elseif(
             target_type STREQUAL STATIC_LIBRARY
+            OR ARG_EXPORT_TYPE_AS STREQUAL STATIC
         )
             target_compile_definitions(
                 ${target}
                 PUBLIC "${ARG_EXPORT_MACRO_PREFIX}_STATIC"
+            )
+        else()
+            message(
+                WARNING
+                "unhandled case in slang_add_target while setting export macro"
             )
         endif()
     endif()
@@ -363,34 +493,63 @@ function(slang_add_target dir type)
     #
     # Mark for installation
     #
-    if(ARG_INSTALL OR ARG_INSTALL_COMPONENT)
-        set(component_args)
-        if(ARG_INSTALL_COMPONENT)
-            set(component_args COMPONENT ${ARG_INSTALL_COMPONENT})
-        endif()
-        set(exclude_arg)
-        if(NOT ARG_INSTALL)
-            set(exclude_arg EXCLUDE_FROM_ALL)
+    macro(i)
+        if(ARG_EXPORT_SET_NAME)
+            set(export_args EXPORT ${ARG_EXPORT_SET_NAME})
+        else()
+            if(type MATCHES "^(EXECUTABLE|SHARED|MODULE)$")
+                message(
+                    WARNING
+                    "Target ${target} is set to be INSTALLED but EXPORT_SET_NAME wasn't specified"
+                )
+            endif()
+            set(export_args)
         endif()
         install(
-            TARGETS ${target}
-            EXPORT SlangTargets
-            ARCHIVE
-            DESTINATION ${archive_subdir}
-            ${component_args}
-            ${exclude_arg}
-            LIBRARY
-            DESTINATION ${library_subdir}
-            ${component_args}
-            ${exclude_arg}
-            RUNTIME
-            DESTINATION ${runtime_subdir}
-            ${component_args}
-            ${exclude_arg}
-            PUBLIC_HEADER
-            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-            ${component_args}
-            ${exclude_arg}
+            TARGETS ${target} ${export_args}
+            ARCHIVE DESTINATION ${archive_subdir}
+            ${ARGN}
+            LIBRARY DESTINATION ${library_subdir}
+            ${ARGN}
+            RUNTIME DESTINATION ${runtime_subdir}
+            ${ARGN}
+            PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+            ${ARGN}
+        )
+    endmacro()
+
+    if(ARG_INSTALL_COMPONENT)
+        i(EXCLUDE_FROM_ALL COMPONENT ${ARG_INSTALL_COMPONENT})
+        set(debug_component "${ARG_INSTALL_COMPONENT}-debug-info")
+    elseif(ARG_INSTALL)
+        i()
+        set(debug_component "debug-info")
+    endif()
+
+    if(DEFINED ARG_DEBUG_INFO_INSTALL_COMPONENT)
+        set(debug_component "${ARG_DEBUG_INFO_INSTALL_COMPONENT}")
+    endif()
+
+    # Install debug info only if target is being installed
+    if((ARG_INSTALL OR ARG_INSTALL_COMPONENT) AND generate_split_debug_info)
+        if(type STREQUAL "EXECUTABLE" OR WIN32)
+            set(debug_dest ${runtime_subdir})
+        else()
+            set(debug_dest ${library_subdir})
+        endif()
+
+        if(MSVC)
+            set(debug_file $<TARGET_PDB_FILE:${target}>)
+        else()
+            set(debug_file "$<TARGET_FILE:${target}>.dwarf")
+        endif()
+
+        install(
+            FILES ${debug_file}
+            DESTINATION ${debug_dest}
+            COMPONENT ${debug_component}
+            EXCLUDE_FROM_ALL
+            OPTIONAL
         )
     endif()
 endfunction()

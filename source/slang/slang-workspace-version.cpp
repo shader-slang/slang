@@ -1,10 +1,11 @@
 #include "slang-workspace-version.h"
-#include "../core/slang-io.h"
-#include "../core/slang-file-system.h"
+
 #include "../compiler-core/slang-lexer.h"
-#include "slang-serialize-container.h"
-#include "slang-mangle.h"
+#include "../core/slang-file-system.h"
+#include "../core/slang-io.h"
 #include "slang-check-impl.h"
+#include "slang-mangle.h"
+#include "slang-serialize-container.h"
 
 namespace Slang
 {
@@ -39,7 +40,10 @@ DocumentVersion* Workspace::openDoc(String path, String text)
     return doc.Ptr();
 }
 
-void Workspace::changeDoc(const String& path, LanguageServerProtocol::Range range, const String& text)
+void Workspace::changeDoc(
+    const String& path,
+    LanguageServerProtocol::Range range,
+    const String& text)
 {
     RefPtr<DocumentVersion> doc;
     if (openedDocuments.tryGetValue(path, doc))
@@ -90,7 +94,7 @@ bool Workspace::updatePredefinedMacros(List<String> macros)
         }
         newDefs.add(def);
     }
-    
+
     bool changed = false;
     if (newDefs.getCount() != predefinedMacros.getCount())
         changed = true;
@@ -176,7 +180,9 @@ void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
                             return;
                         dirContext->workList.add(Path::combine(dirContext->currentPath, name));
                     }
-                    else if (nameSlice.endsWithCaseInsensitive(".slang") || nameSlice.endsWithCaseInsensitive(".hlsl"))
+                    else if (
+                        nameSlice.endsWithCaseInsensitive(".slang") ||
+                        nameSlice.endsWithCaseInsensitive(".hlsl"))
                     {
                         dirContext->addSearchPath(dirContext->currentPath);
                     }
@@ -188,7 +194,10 @@ void Workspace::init(List<URI> rootDirURI, slang::IGlobalSession* globalSession)
     slangGlobalSession = globalSession;
 }
 
-void Workspace::invalidate() { currentVersion = nullptr; }
+void Workspace::invalidate()
+{
+    currentVersion = nullptr;
+}
 
 void WorkspaceVersion::parseDiagnostics(String compilerOutput)
 {
@@ -244,7 +253,7 @@ void WorkspaceVersion::parseDiagnostics(String compilerOutput)
         pos = line.indexOf(' ');
         diagnostic.code = StringUtil::parseIntAndAdvancePos(line, pos);
         diagnostic.message = line.tail(colonIndex + 2);
-        if (lineIndex + 1 < lines.getCount() && lines[lineIndex+1].startsWith("^+"))
+        if (lineIndex + 1 < lines.getCount() && lines[lineIndex + 1].startsWith("^+"))
         {
             lineIndex++;
             pos = 2;
@@ -257,11 +266,17 @@ void WorkspaceVersion::parseDiagnostics(String compilerOutput)
             // If the file is open, translate to UTF16 positions using the document.
             Index lineUTF16, colUTF16;
             doc->Ptr()->oneBasedUTF8LocToZeroBasedUTF16Loc(
-                diagnostic.range.start.line, diagnostic.range.start.character, lineUTF16, colUTF16);
+                diagnostic.range.start.line,
+                diagnostic.range.start.character,
+                lineUTF16,
+                colUTF16);
             diagnostic.range.start.line = (int)lineUTF16;
             diagnostic.range.start.character = (int)colUTF16;
             doc->Ptr()->oneBasedUTF8LocToZeroBasedUTF16Loc(
-                diagnostic.range.end.line, diagnostic.range.end.character, lineUTF16, colUTF16);
+                diagnostic.range.end.line,
+                diagnostic.range.end.character,
+                lineUTF16,
+                colUTF16);
             diagnostic.range.end.line = (int)lineUTF16;
             diagnostic.range.end.character = (int)colUTF16;
         }
@@ -374,8 +389,7 @@ void* Workspace::getObject(const Guid& uuid)
 
 void* Workspace::getInterface(const Guid& uuid)
 {
-    if (uuid == ISlangUnknown::getTypeGuid() || 
-        uuid == ISlangCastable::getTypeGuid() ||
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == ISlangCastable::getTypeGuid() ||
         uuid == ISlangFileSystem::getTypeGuid())
     {
         return static_cast<ISlangFileSystem*>(this);
@@ -442,8 +456,9 @@ ArrayView<Index> DocumentVersion::getUTF16Boundaries(Index line)
     {
         ensureUTFBoundsAvailable();
     }
-    return line >= 1 && line <= mapUTF16CharIndexToCodePointIndex.getCount() ? mapUTF16CharIndexToCodePointIndex[line - 1].getArrayView()
-                                                           : ArrayView<Index>();
+    return line >= 1 && line <= mapUTF16CharIndexToCodePointIndex.getCount()
+               ? mapUTF16CharIndexToCodePointIndex[line - 1].getArrayView()
+               : ArrayView<Index>();
 }
 
 ArrayView<Index> DocumentVersion::getUTF8Boundaries(Index line)
@@ -452,12 +467,16 @@ ArrayView<Index> DocumentVersion::getUTF8Boundaries(Index line)
     {
         ensureUTFBoundsAvailable();
     }
-    return line >= 1 && line <= mapCodePointIndexToUTF8ByteOffset.getCount() ? mapCodePointIndexToUTF8ByteOffset[line - 1].getArrayView()
-        : ArrayView<Index>();
+    return line >= 1 && line <= mapCodePointIndexToUTF8ByteOffset.getCount()
+               ? mapCodePointIndexToUTF8ByteOffset[line - 1].getArrayView()
+               : ArrayView<Index>();
 }
 
 void DocumentVersion::oneBasedUTF8LocToZeroBasedUTF16Loc(
-    Index inLine, Index inCol, Index& outLine, Index& outCol)
+    Index inLine,
+    Index inCol,
+    int64_t& outLine,
+    int64_t& outCol)
 {
     if (inLine <= 0)
     {
@@ -472,20 +491,26 @@ void DocumentVersion::oneBasedUTF8LocToZeroBasedUTF16Loc(
 }
 
 void DocumentVersion::oneBasedUTF8LocToZeroBasedUTF16Loc(
-    Index inLine, Index inCol, int& outLine, int& outCol)
+    Index inLine,
+    Index inCol,
+    int32_t& outLine,
+    int32_t& outCol)
 {
-    Index ioutLine, ioutCol;
+    int64_t ioutLine, ioutCol;
     oneBasedUTF8LocToZeroBasedUTF16Loc(inLine, inCol, ioutLine, ioutCol);
-    outLine = (int)ioutLine;
-    outCol = (int)ioutCol;
+    outLine = (int32_t)ioutLine;
+    outCol = (int32_t)ioutCol;
 }
 
 void DocumentVersion::zeroBasedUTF16LocToOneBasedUTF8Loc(
-    Index inLine, Index inCol, Index& outLine, Index& outCol)
+    Index inLine,
+    Index inCol,
+    Index& outLine,
+    Index& outCol)
 {
     outLine = inLine + 1;
     auto bounds = getUTF16Boundaries(inLine + 1);
-    outCol = inCol >=0 && inCol < bounds.getCount()? bounds[inCol] + 1 : 0;
+    outCol = inCol >= 0 && inCol < bounds.getCount() ? bounds[inCol] + 1 : 0;
 }
 
 static bool _isIdentifierChar(char ch)
@@ -590,7 +615,7 @@ Module* WorkspaceVersion::getOrLoadModule(String path)
 
     ensureWorkspaceFlavor(path.getUnownedSlice());
 
-    // Note: 
+    // Note:
     // The module at `path` may have already been loaded into the linkage previously
     // due to an `import`. However that module won't get fully checked in when the checker
     // is in language server mode to speed things up.

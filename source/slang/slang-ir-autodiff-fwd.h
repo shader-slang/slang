@@ -19,12 +19,12 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     // Returns "d<var-name>" to use as a name hint for variables and parameters.
     // If no primal name is available, returns a blank string.
-    // 
+    //
     String getJVPVarName(IRInst* origVar);
 
     // Returns "dp<var-name>" to use as a name hint for parameters.
     // If no primal name is available, returns a blank string.
-    // 
+    //
     String makeDiffPairName(IRInst* origVar);
 
     InstPair transcribeUndefined(IRBuilder* builder, IRInst* origInst);
@@ -48,10 +48,12 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     InstPair transcribeConstruct(IRBuilder* builder, IRInst* origConstruct);
     InstPair transcribeMakeStruct(IRBuilder* builder, IRInst* origMakeStruct);
 
+    InstPair transcribeMakeTuple(IRBuilder* builder, IRInst* origMakeTuple);
+
     // Differentiating a call instruction here is primarily about generating
-    // an appropriate call list based on whichever parameters have differentials 
+    // an appropriate call list based on whichever parameters have differentials
     // in the current transcription context.
-    // 
+    //
     InstPair transcribeCall(IRBuilder* builder, IRCall* origCall);
 
     InstPair transcribeSwizzle(IRBuilder* builder, IRSwizzle* origSwizzle);
@@ -68,13 +70,17 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeGetElement(IRBuilder* builder, IRInst* origGetElementPtr);
 
+    InstPair transcribeGetTupleElement(IRBuilder* builder, IRInst* origInst);
+
     InstPair transcribeUpdateElement(IRBuilder* builder, IRInst* originalInst);
 
     InstPair transcribeIfElse(IRBuilder* builder, IRIfElse* origIfElse);
 
     InstPair transcribeSwitch(IRBuilder* builder, IRSwitch* origSwitch);
 
-    InstPair transcribeMakeDifferentialPair(IRBuilder* builder, IRMakeDifferentialPairUserCode* origInst);
+    InstPair transcribeMakeDifferentialPair(
+        IRBuilder* builder,
+        IRMakeDifferentialPairUserCode* origInst);
 
     InstPair transcribeMakeExistential(IRBuilder* builder, IRMakeExistential* origMakeExistential);
 
@@ -88,7 +94,12 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeReinterpret(IRBuilder* builder, IRInst* origInst);
 
-    virtual IRFuncType* differentiateFunctionType(IRBuilder* builder, IRInst* func, IRFuncType* funcType) override;
+    InstPair transcribeDifferentiableTypeAnnotation(IRBuilder* builder, IRInst* origInst);
+
+    virtual IRFuncType* differentiateFunctionType(
+        IRBuilder* builder,
+        IRInst* func,
+        IRFuncType* funcType) override;
 
     void generateTrivialFwdDiffFunc(IRFunc* primalFunc, IRFunc* diffFunc);
 
@@ -107,13 +118,13 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     virtual InstPair transcribeInstImpl(IRBuilder* builder, IRInst* origInst) override;
 
-    virtual InstPair transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType) override;
+    virtual InstPair transcribeFuncParam(IRBuilder* builder, IRParam* origParam, IRInst* primalType)
+        override;
 
     virtual IROp getInterfaceRequirementDerivativeDecorationOp() override
     {
         return kIROp_ForwardDerivativeDecoration;
     }
-
 };
 
-}
+} // namespace Slang

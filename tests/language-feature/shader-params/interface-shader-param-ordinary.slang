@@ -9,6 +9,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+// Slang-RHI/WGPU: Too small buffer is bound #5604
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
 interface IModifier
 {

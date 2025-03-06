@@ -1,16 +1,14 @@
 // slang-support.h
 #pragma once
 
-#include "slang-gfx.h"
-
+#include "options.h"
+#include "shader-input-layout.h"
 #include "slang.h"
 
-#include "shader-input-layout.h"
-#include "options.h"
+#include <slang-rhi.h>
 
-namespace renderer_test {
-
-gfx::StageType translateStage(SlangStage slangStage);
+namespace renderer_test
+{
 
 struct ShaderCompileRequest
 {
@@ -38,7 +36,7 @@ struct ShaderCompileRequest
     public:
         Slang::String derivedTypeName;
         Slang::String baseTypeName;
-        Int idOverride;
+        Slang::Int idOverride;
     };
 
     SourceInfo source;
@@ -54,36 +52,24 @@ struct ShaderCompilerUtil
 {
     struct Input
     {
-        SlangCompileTarget          target;
-        SlangSourceLanguage         sourceLanguage;
-        SlangPassThrough            passThrough;
-        Slang::String               profile;
+        SlangCompileTarget target;
+        SlangSourceLanguage sourceLanguage;
+        SlangPassThrough passThrough;
+        Slang::String profile;
     };
 
     struct Output
     {
-        void set(
-            slang::IComponentType*              slangProgram);
+        void set(slang::IComponentType* slangProgram);
         void reset();
-        ~Output()
-        {
-            reset();
-        }
+        ~Output() { reset(); }
 
         ComPtr<slang::IComponentType> slangProgram;
-        IShaderProgram::Desc desc = {};
+        ShaderProgramDesc desc = {};
 
-            /// Compile request that owns the lifetime of compiled kernel code.
-        ComPtr<SlangCompileRequest> m_requestForKernels = nullptr;
+        ComPtr<SlangCompileRequest> m_requestDEPRECATED = nullptr;
 
-            /// Compile request that owns the lifetime of reflection information.
-        ComPtr<SlangCompileRequest> m_extraRequestForReflection = nullptr;
-
-        SlangCompileRequest* getRequestForKernels() const { return m_requestForKernels; }
-        SlangCompileRequest* getRequestForReflection() const { return m_extraRequestForReflection ? m_extraRequestForReflection : m_requestForKernels; }
-
-        SlangSession* session = nullptr;
-
+        slang::IGlobalSession* globalSession = nullptr;
     };
 
     struct OutputAndLayout
@@ -93,13 +79,13 @@ struct ShaderCompilerUtil
         Slang::String sourcePath;
     };
 
-    static SlangResult compileWithLayout(slang::IGlobalSession* globalSession, const Options& options, const ShaderCompilerUtil::Input& input, OutputAndLayout& output);
-
-    static SlangResult readSource(const Slang::String& inSourcePath, Slang::List<char>& outSourceText);
-
-    static SlangResult _compileProgramImpl(slang::IGlobalSession* globalSession, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out);
-    static SlangResult compileProgram(slang::IGlobalSession* globalSession, const Options& options, const Input& input, const ShaderCompileRequest& request, Output& out);
+    // Wrapper for compileProgram
+    static SlangResult compileWithLayout(
+        slang::IGlobalSession* globalSession,
+        const Options& options,
+        const ShaderCompilerUtil::Input& input,
+        OutputAndLayout& output);
 };
 
 
-} // renderer_test
+} // namespace renderer_test

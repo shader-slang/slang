@@ -3,13 +3,13 @@
 
 namespace Slang
 {
-    struct IRModule;
-    struct IRGlobalValueWithCode;
+struct IRModule;
+struct IRGlobalValueWithCode;
 
-    // Convert the CFG of `func` to have only a single `return` at the end.
-    void convertFuncToSingleReturnForm(IRModule* module, IRGlobalValueWithCode* func);
+// Convert the CFG of `func` to have only a single `return` at the end.
+void convertFuncToSingleReturnForm(IRModule* module, IRGlobalValueWithCode* func);
 
-    bool isSingleReturnFunc(IRGlobalValueWithCode* func);
+bool isSingleReturnFunc(IRGlobalValueWithCode* func);
 
-    int getReturnCount(IRGlobalValueWithCode* func);
-}
+int getReturnCount(IRGlobalValueWithCode* func);
+} // namespace Slang

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "slang-gfx.h"
 #include "core/slang-math.h"
+#include "slang-gfx.h"
 
 namespace gfx
 {
@@ -99,4 +99,4 @@ ITextureResource::Desc fixupTextureDesc(const ITextureResource::Desc& desc);
 
 Format srgbToLinearFormat(Format format);
 
-}
+} // namespace gfx

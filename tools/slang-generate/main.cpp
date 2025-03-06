@@ -1,14 +1,14 @@
 // main.cpp
 
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-list.h"
+#include "../../source/core/slang-secure-crt.h"
+#include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-string.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../source/core/slang-secure-crt.h"
-
-#include "../../source/core/slang-list.h"
-#include "../../source/core/slang-string.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-io.h"
 
 using namespace Slang;
 
@@ -24,10 +24,10 @@ struct Node
     };
 
     // What sort of node is this?
-    Flavor      flavor;
+    Flavor flavor;
 
     // The text of this node for `Flavor::text`
-    StringSpan  span;
+    StringSpan span;
 
     // The body of this node for other flavors
     Node* body = nullptr;
@@ -38,8 +38,10 @@ struct Node
     Node() = default;
     ~Node()
     {
-        if (body) delete body;
-        if (next) delete next;
+        if (body)
+            delete body;
+        if (next)
+            delete next;
     }
 };
 
@@ -47,9 +49,9 @@ struct Node
 struct SourceFile : public RefObject
 {
     String inputPath;
-    String linePath;            ///< The path to this file for #line output
+    String linePath; ///< The path to this file for #line output
 
-    StringSpan   text;
+    StringSpan text;
     Node* node = nullptr;
     SourceFile() = default;
     ~SourceFile()
@@ -69,11 +71,7 @@ struct SourceFile : public RefObject
     }
 };
 
-void addNode(
-    Node**&         ioLink,
-    Node::Flavor    flavor,
-    char const*     spanBegin,
-    char const*     spanEnd)
+void addNode(Node**& ioLink, Node::Flavor flavor, char const* spanBegin, char const* spanEnd)
 {
     Node* node = new Node();
     node->flavor = flavor;
@@ -84,10 +82,7 @@ void addNode(
     ioLink = &node->next;
 }
 
-void addNode(
-    Node**&         ioLink,
-    Node::Flavor    flavor,
-    Node*           body)
+void addNode(Node**& ioLink, Node::Flavor flavor, Node* body)
 {
     Node* node = new Node();
     node->flavor = flavor;
@@ -100,15 +95,10 @@ void addNode(
 
 bool isAlpha(int c)
 {
-    return ((c >= 'a') && (c <= 'z'))
-        || ((c >= 'A') && (c <= 'Z'))
-        || (c == '_');
+    return ((c >= 'a') && (c <= 'z')) || ((c >= 'A') && (c <= 'Z')) || (c == '_');
 }
 
-void addTextSpan(
-    Node**&         ioLink,
-    char const*     spanBegin,
-    char const*     spanEnd)
+void addTextSpan(Node**& ioLink, char const* spanBegin, char const* spanEnd)
 {
     // Don't add an empty text span.
     if (spanBegin == spanEnd)
@@ -117,24 +107,17 @@ void addTextSpan(
     addNode(ioLink, Node::Flavor::text, spanBegin, spanEnd);
 }
 
-void addSpliceSpan(
-    Node**&         ioLink,
-    Node*           body)
+void addSpliceSpan(Node**& ioLink, Node* body)
 {
     addNode(ioLink, Node::Flavor::splice, body);
 }
 
-void addEscapeSpan(
-    Node**&         ioLink,
-    Node*           body)
+void addEscapeSpan(Node**& ioLink, Node* body)
 {
     addNode(ioLink, Node::Flavor::escape, body);
 }
 
-void addEscapeSpan(
-    Node**&         ioLink,
-    char const*     spanBegin,
-    char const*     spanEnd)
+void addEscapeSpan(Node**& ioLink, char const* spanBegin, char const* spanEnd)
 {
     Node* body = nullptr;
     Node** link = &body;
@@ -146,12 +129,14 @@ void addEscapeSpan(
 
 bool isIdentifierChar(int c)
 {
-    if (c >= 'a' && c <= 'z')   return true;
-    if (c >= 'A' && c <= 'Z')   return true;
-    if (c == '_')               return true;
+    if (c >= 'a' && c <= 'z')
+        return true;
+    if (c >= 'A' && c <= 'Z')
+        return true;
+    if (c == '_')
+        return true;
 
     return false;
-
 }
 
 struct Reader
@@ -203,7 +188,8 @@ void skipOptionalNewline(Reader& reader)
     default:
         break;
 
-    case '\r': case '\n':
+    case '\r':
+    case '\n':
         {
             int c = get(reader);
             handleNewline(reader, c);
@@ -218,12 +204,7 @@ enum
     kNodeReadFlag_AllowEscape = 1 << 0,
 };
 
-Node* readBody(
-    Reader&         reader,
-    NodeReadFlags   flags,
-    char            openChar,
-    int             openCount,
-    char            closeChar)
+Node* readBody(Reader& reader, NodeReadFlags flags, char openChar, int openCount, char closeChar)
 {
     while (peek(reader) == openChar)
     {
@@ -255,7 +236,8 @@ Node* readBody(
                 return nodes;
             }
 
-        case '{': case '(':
+        case '{':
+        case '(':
             if (c == openChar)
             {
                 depth++;
@@ -263,7 +245,8 @@ Node* readBody(
             atStartOfLine = false;
             break;
 
-        case ')': case '}':
+        case ')':
+        case '}':
             if (c == closeChar)
             {
                 char const* spanEnd = reader.cursor - 1;
@@ -302,10 +285,12 @@ Node* readBody(
             break;
 
 
-        case ' ': case '\t':
+        case ' ':
+        case '\t':
             break;
 
-        case '\r': case '\n':
+        case '\r':
+        case '\n':
             {
                 addTextSpan(link, spanBegin, reader.cursor);
 
@@ -332,12 +317,7 @@ Node* readBody(
                     //
                     addTextSpan(link, spanBegin, spanEnd);
 
-                    Node* body = readBody(
-                        reader,
-                        0,
-                        '(',
-                        0,
-                        ')');
+                    Node* body = readBody(reader, 0, '(', 0, ')');
 
                     addSpliceSpan(link, body);
 
@@ -351,12 +331,7 @@ Node* readBody(
 
                     addTextSpan(link, spanBegin, lineBegin);
 
-                    Node* body = readBody(
-                        reader,
-                        0,
-                        '{',
-                        0,
-                        '}');
+                    Node* body = readBody(reader, 0, '{', 0, '}');
 
                     addEscapeSpan(link, body);
 
@@ -436,54 +411,48 @@ Node* readBody(
             break;
         }
     }
-
 }
 
-Node* readInput(
-    char const*     inputBegin,
-    char const*     inputEnd)
+Node* readInput(char const* inputBegin, char const* inputEnd)
 {
     Reader reader;
     reader.cursor = inputBegin;
     reader.end = inputEnd;
 
-    return readBody(
-        reader,
-        kNodeReadFlag_AllowEscape,
-        -2,
-        0,
-        -2);
+    return readBody(reader, kNodeReadFlag_AllowEscape, -2, 0, -2);
 }
 
-void emitRaw(
-    FILE* stream,
-    char const* begin,
-    char const* end)
+void emitRaw(FILE* stream, char const* begin, char const* end)
 {
     // We will write the raw text to our output file.
 
     // TODO: need to output `#line` directives as well
 
     fputs("sb << \"", stream);
-    for( char const* cc = begin; cc != end; ++cc )
+    for (char const* cc = begin; cc != end; ++cc)
     {
         int c = *cc;
-        switch( c )
+        switch (c)
         {
         case '\\':
             fputs("\\\\", stream);
             break;
 
-        case '\r': break;
-        case '\t': fputs("\\t", stream); break;
-        case '\"': fputs("\\\"", stream); break;
+        case '\r':
+            break;
+        case '\t':
+            fputs("\\t", stream);
+            break;
+        case '\"':
+            fputs("\\\"", stream);
+            break;
         case '\n':
             fputs("\\n\";\n", stream);
             fputs("sb << \"", stream);
             break;
 
         default:
-            if((c >= 32) && (c <= 126))
+            if ((c >= 32) && (c <= 126))
             {
                 fputc(c, stream);
             }
@@ -492,35 +461,27 @@ void emitRaw(
                 assert(false);
             }
         }
-
     }
     fprintf(stream, "\";\n");
 }
 
-void emitCode(
-    FILE*   stream,
-    char const* begin,
-    char const* end)
+void emitCode(FILE* stream, char const* begin, char const* end)
 {
-    for( auto cc = begin; cc != end; ++cc )
+    for (auto cc = begin; cc != end; ++cc)
     {
-        if(*cc == '\r')
+        if (*cc == '\r')
             continue;
 
         fputc(*cc, stream);
     }
 }
 
-void emit(
-    FILE*       stream,
-    char const* text)
+void emit(FILE* stream, char const* text)
 {
     fprintf(stream, "%s", text);
 }
 
-void emit(
-    FILE*       stream,
-    StringSpan const&   span)
+void emit(FILE* stream, StringSpan const& span)
 {
     fprintf(stream, "%.*s", int(span.end() - span.begin()), span.begin());
 }
@@ -530,9 +491,7 @@ bool isASCIIPrintable(int c)
     return (c >= 0x20) && (c <= 0x7E);
 }
 
-void emitStringLiteralText(
-    FILE*               stream,
-    StringSpan const&   span)
+void emitStringLiteralText(FILE* stream, StringSpan const& span)
 {
     char const* cursor = span.begin();
     char const* end = span.end();
@@ -542,7 +501,8 @@ void emitStringLiteralText(
         int c = *cursor++;
         switch (c)
         {
-        case '\r': case '\n':
+        case '\r':
+        case '\n':
             fprintf(stream, "\\n");
             break;
 
@@ -576,9 +536,7 @@ void emitStringLiteralText(
     }
 }
 
-void emitSimpleText(
-    FILE*               stream,
-    StringSpan const&   span)
+void emitSimpleText(FILE* stream, StringSpan const& span)
 {
     UnownedStringSlice content(span), line;
     while (StringUtil::extractLine(content, line))
@@ -587,7 +545,8 @@ void emitSimpleText(
         fwrite(line.begin(), 1, line.getLength(), stream);
 
         // Specially handle the 'final line', excluding an empty line after \n.
-        // We can detect, as if input ends with 'cr/lf' combination, content.begin == span.end(), else if content.begin() == nullptr.
+        // We can detect, as if input ends with 'cr/lf' combination, content.begin == span.end(),
+        // else if content.begin() == nullptr.
         if (content.begin() == nullptr || content.begin() == span.end())
         {
             break;
@@ -597,9 +556,7 @@ void emitSimpleText(
     }
 }
 
-void emitCodeNodes(
-    FILE*   stream,
-    Node*   node)
+void emitCodeNodes(FILE* stream, Node* node)
 {
     for (auto nn = node; nn; nn = nn->next)
     {
@@ -646,10 +603,7 @@ static Index _findLineIndex(const List<UnownedStringSlice>& lineBreaks, const ch
     return lo;
 }
 
-void emitTemplateNodes(
-    SourceFile* sourceFile,
-    FILE*   stream,
-    Node*   node)
+void emitTemplateNodes(SourceFile* sourceFile, FILE* stream, Node* node)
 {
     // Work out
     List<UnownedStringSlice> lineBreaks;
@@ -660,7 +614,8 @@ void emitTemplateNodes(
     {
         // If we transition from escape to text, insert line number directive
         bool enable = true;
-        if (enable && prev && prev->flavor == Node::Flavor::escape && nn->flavor == Node::Flavor::text)
+        if (enable && prev && prev->flavor == Node::Flavor::escape &&
+            nn->flavor == Node::Flavor::text)
         {
             // Find the line
             Index lineIndex = _findLineIndex(lineBreaks, nn->span.begin());
@@ -668,7 +623,8 @@ void emitTemplateNodes(
             if (lineIndex >= 0)
             {
                 StringBuilder buf;
-                buf << "SLANG_RAW(\"#line " << (lineIndex + 1) << " \\\"" << sourceFile->linePath << "\\\"\")\n";
+                buf << "SLANG_RAW(\"#line " << (lineIndex + 1) << " \\\"" << sourceFile->linePath
+                    << "\\\"\")\n";
 
                 emit(stream, buf.getUnownedSlice());
             }
@@ -691,7 +647,7 @@ void emitTemplateNodes(
         case Node::Flavor::escape:
             emitCodeNodes(stream, nn->body);
             break;
-        }  
+        }
     }
 }
 
@@ -700,7 +656,7 @@ void usage(char const* appName)
     fprintf(stderr, "usage: %s [FILE]... [--target-directory FILE]\n", appName);
 }
 
-SlangResult readAllText(char const * fileName, String& outString)
+SlangResult readAllText(char const* fileName, String& outString)
 {
     FILE* f;
     fopen_s(&f, fileName, "rb");
@@ -714,13 +670,14 @@ SlangResult readAllText(char const * fileName, String& outString)
         fseek(f, 0, SEEK_END);
         auto size = ftell(f);
 
-        StringRepresentation* stringRep = StringRepresentation::createWithCapacityAndLength(size, size);
+        StringRepresentation* stringRep =
+            StringRepresentation::createWithCapacityAndLength(size, size);
         outString = String(stringRep);
 
         char* buffer = stringRep->getData();
 
         // Seems unnecessary
-        //memset(buffer, 0, size);
+        // memset(buffer, 0, size);
 
         fseek(f, 0, SEEK_SET);
         size_t readCount = fread(buffer, sizeof(char), size, f);
@@ -730,7 +687,7 @@ SlangResult readAllText(char const * fileName, String& outString)
     }
 }
 
-void writeAllText(char const *srcFileName, char const* fileName, const char* content)
+void writeAllText(char const* srcFileName, char const* fileName, const char* content)
 {
     FILE* f = nullptr;
     fopen_s(&f, fileName, "wb");
@@ -745,8 +702,7 @@ void writeAllText(char const *srcFileName, char const* fileName, const char* con
     }
 }
 
-#define PARSE_HANDLER(NAME) \
-    Node* NAME(StringSpan const& text)
+#define PARSE_HANDLER(NAME) Node* NAME(StringSpan const& text)
 
 typedef PARSE_HANDLER((*ParseHandler));
 
@@ -769,7 +725,6 @@ PARSE_HANDLER(parseUnknownFile)
 }
 
 
-
 Node* parseSourceFile(SourceFile* file)
 {
     auto path = file->inputPath;
@@ -777,14 +732,13 @@ Node* parseSourceFile(SourceFile* file)
 
     static const struct
     {
-        char const*     extension;
-        ParseHandler    handler;
-    } kHandlers[] =
-    {
-        { ".meta.slang",    &parseTemplateFile },
-        { ".meta.cpp",      &parseTemplateFile },
-        { ".cpp",           &parseCxxFile },
-        { "",               &parseUnknownFile },
+        char const* extension;
+        ParseHandler handler;
+    } kHandlers[] = {
+        {".meta.slang", &parseTemplateFile},
+        {".meta.cpp", &parseTemplateFile},
+        {".cpp", &parseCxxFile},
+        {"", &parseUnknownFile},
     };
 
     for (auto hh : kHandlers)
@@ -799,12 +753,11 @@ Node* parseSourceFile(SourceFile* file)
 }
 
 
-
 SourceFile* parseSourceFile(const String& path)
 {
     FILE* inputStream;
     fopen_s(&inputStream, path.getBuffer(), "rb");
-    if(!inputStream)
+    if (!inputStream)
     {
         fprintf(stderr, "unable to read input file: %s\n", path.getBuffer());
         return nullptr;
@@ -814,7 +767,7 @@ SourceFile* parseSourceFile(const String& path)
     fseek(inputStream, 0, SEEK_SET);
 
     char* input = (char*)malloc(inputSize + 1);
-    if(fread(input, inputSize, 1, inputStream) != 1)
+    if (fread(input, inputSize, 1, inputStream) != 1)
     {
         fprintf(stderr, "unable to read input file: %s\n", path.getBuffer());
         return nullptr;
@@ -828,8 +781,8 @@ SourceFile* parseSourceFile(const String& path)
 
     sourceFile->inputPath = path;
 
-    // We use the fileName as the line path, as the path as passed to the command could contain a complicated
-    // depending on the project location.
+    // We use the fileName as the line path, as the path as passed to the command could contain a
+    // complicated depending on the project location.
     sourceFile->linePath = Path::getFileName(path);
 
     sourceFile->text = span;
@@ -844,9 +797,7 @@ SourceFile* parseSourceFile(const String& path)
 
 List<RefPtr<SourceFile>> gSourceFiles;
 
-int main(
-    int     argc,
-    const char*const*  argv)
+int main(int argc, const char* const* argv)
 {
     // Parse command-line arguments.
     List<String> inputPaths;
@@ -854,10 +805,10 @@ int main(
     char const* appName = "slang-generate";
 
     {
-        const char*const* argCursor = argv;
-        const char*const* argEnd = argv + argc;
+        const char* const* argCursor = argv;
+        const char* const* argEnd = argv + argc;
         // Copy the app name
-        if( argCursor != argEnd )
+        if (argCursor != argEnd)
         {
             appName = *argCursor++;
         }
@@ -865,10 +816,10 @@ int main(
         for (; argCursor != argEnd; ++argCursor)
         {
             const auto arg = UnownedStringSlice(*argCursor);
-            if(arg == "--target-directory")
+            if (arg == "--target-directory")
             {
                 argCursor++;
-                if(argCursor == argEnd)
+                if (argCursor == argEnd)
                 {
                     usage(appName);
                     fprintf(stderr, "--target-directory expects an argument\n");
@@ -885,7 +836,7 @@ int main(
         }
     }
 
-    if(inputPaths.getCount() == 0)
+    if (inputPaths.getCount() == 0)
     {
         usage(appName);
         exit(1);
@@ -893,7 +844,7 @@ int main(
 
     // Read each input file and process it according
     // to the type of treatment it requires.
-    for (auto& inputPath: inputPaths)
+    for (auto& inputPath : inputPaths)
     {
         SourceFile* sourceFile = parseSourceFile(inputPath);
         gSourceFiles.add(sourceFile);
@@ -901,7 +852,7 @@ int main(
 
     for (auto sourceFile : gSourceFiles)
     {
-        if(!sourceFile)
+        if (!sourceFile)
         {
             fprintf(stderr, "failed to parse source files\n");
             exit(1);
@@ -921,6 +872,11 @@ int main(
 
         FILE* outputStream;
         fopen_s(&outputStream, outputPath.getBuffer(), "w");
+        if (!outputStream)
+        {
+            fprintf(stderr, "unable to open file for writing: %s.\n", outputPath.getBuffer());
+            exit(1);
+        }
 
         emitTemplateNodes(sourceFile, outputStream, node);
 
@@ -928,7 +884,7 @@ int main(
 
         // update final output only when content has changed
         StringBuilder outputPathFinal;
-        if(outputDir.getLength())
+        if (outputDir.getLength())
             outputPathFinal << outputDir << "/" << Slang::Path::getFileName(inputPath) << ".h";
         else
             outputPathFinal << inputPath << ".h";
@@ -938,7 +894,10 @@ int main(
         readAllText(outputPath.getBuffer(), allTextNew);
         if (allTextOld != allTextNew)
         {
-            writeAllText(inputPath.getBuffer(), outputPathFinal.getBuffer(), allTextNew.getBuffer());
+            writeAllText(
+                inputPath.getBuffer(),
+                outputPathFinal.getBuffer(),
+                allTextNew.getBuffer());
         }
         remove(outputPath.getBuffer());
     }

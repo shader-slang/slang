@@ -1,14 +1,16 @@
 // unit-test-riff.cpp
 
-#include "../../source/core/slang-riff.h"
-
 #include "../../source/core/slang-random-generator.h"
-
-#include "tools/unit-test/slang-unit-test.h"
+#include "../../source/core/slang-riff.h"
+#include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
-static void _writeRandom(RandomGenerator* rand, size_t maxSize, RiffContainer& ioContainer, List<uint8_t>& ioData)
+static void _writeRandom(
+    RandomGenerator* rand,
+    size_t maxSize,
+    RiffContainer& ioContainer,
+    List<uint8_t>& ioData)
 {
     while (true)
     {
@@ -29,7 +31,8 @@ static void _writeRandom(RandomGenerator* rand, size_t maxSize, RiffContainer& i
     }
 
     // Should be a single block with same data as the List
-    RiffContainer::DataChunk* dataChunk = as<RiffContainer::DataChunk>(ioContainer.getCurrentChunk());
+    RiffContainer::DataChunk* dataChunk =
+        as<RiffContainer::DataChunk>(ioContainer.getCurrentChunk());
     SLANG_ASSERT(dataChunk);
 }
 
@@ -45,7 +48,7 @@ SLANG_UNIT_TEST(riff)
         RiffContainer container;
 
         {
-            ScopeChunk scopeContainer(&container, Kind::List, markThings);        
+            ScopeChunk scopeContainer(&container, Kind::List, markThings);
             {
                 ScopeChunk scopeChunk(&container, Kind::Data, markData);
 
@@ -89,7 +92,7 @@ SLANG_UNIT_TEST(riff)
             }
 
             {
-                OwnedMemoryStream stream(FileAccess::ReadWrite); 
+                OwnedMemoryStream stream(FileAccess::ReadWrite);
                 SLANG_CHECK(SLANG_SUCCEEDED(RiffUtil::write(container.getRoot(), true, &stream)));
 
                 stream.seek(SeekOrigin::Start, 0);
@@ -108,10 +111,10 @@ SLANG_UNIT_TEST(riff)
                 SLANG_CHECK(readBuilder == builder);
             }
         }
-
     }
 
-    // Test writing as a stream only allocates a single data block (as long as there is enough space).
+    // Test writing as a stream only allocates a single data block (as long as there is enough
+    // space).
     {
         RiffContainer container;
 
@@ -121,39 +124,46 @@ SLANG_UNIT_TEST(riff)
             RefPtr<RandomGenerator> rand = RandomGenerator::create(0x345234);
 
             List<uint8_t> data;
-            _writeRandom(rand, container.getMemoryArena().getBlockPayloadSize() / 2, container, data); 
+            _writeRandom(
+                rand,
+                container.getMemoryArena().getBlockPayloadSize() / 2,
+                container,
+                data);
 
             // Should be a single block with same data as the List
-            RiffContainer::DataChunk* dataChunk = as<RiffContainer::DataChunk>(container.getCurrentChunk());
+            RiffContainer::DataChunk* dataChunk =
+                as<RiffContainer::DataChunk>(container.getCurrentChunk());
             SLANG_ASSERT(dataChunk);
 
             // It should be a single block
             SLANG_CHECK(dataChunk->getSingleData() != nullptr);
 
             SLANG_CHECK(dataChunk->isEqual(data.getBuffer(), data.getCount()));
-
         }
-    } 
+    }
 
     // Test writing across multiple data blocks
     {
         RefPtr<RandomGenerator> rand = RandomGenerator::create(0x345234);
 
-        for (Int i = 0 ; i < 100; ++i)
+        for (Int i = 0; i < 100; ++i)
         {
             RiffContainer container;
 
-            const size_t maxSize = rand->nextInt32InRange(1, int32_t(container.getMemoryArena().getBlockPayloadSize() * 3));
-            
+            const size_t maxSize = rand->nextInt32InRange(
+                1,
+                int32_t(container.getMemoryArena().getBlockPayloadSize() * 3));
+
             ScopeChunk scopeChunk(&container, Kind::List, markData);
             {
                 ScopeChunk scopeChunk(&container, Kind::Data, markData);
-            
+
                 List<uint8_t> data;
                 _writeRandom(rand, maxSize, container, data);
 
                 // Should be a single block with same data as the List
-                RiffContainer::DataChunk* dataChunk = as<RiffContainer::DataChunk>(container.getCurrentChunk());
+                RiffContainer::DataChunk* dataChunk =
+                    as<RiffContainer::DataChunk>(container.getCurrentChunk());
                 SLANG_CHECK(dataChunk && dataChunk->isEqual(data.getBuffer(), data.getCount()));
             }
         }
@@ -176,4 +186,3 @@ SLANG_UNIT_TEST(riff)
     }
 #endif
 }
-

@@ -5,7 +5,7 @@
 //TEST_INPUT:type_conformance A:IFoo=0
 //TEST_INPUT:type_conformance B:IFoo=1
 
-RWStructuredBuffer<int> outputBuffer : register(u0);
+RWStructuredBuffer<int> outputBuffer;
 interface IFoo
 {
     associatedtype T : IFoo;

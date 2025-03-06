@@ -2,11 +2,11 @@
 
 #include "slang-ir-lower-com-methods.h"
 
-#include "slang-ir.h"
+#include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-marshal-native-call.h"
-#include "slang-ir-inst-pass-base.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -21,7 +21,8 @@ struct ComMethodLoweringContext : public InstPassBase
 
     ComMethodLoweringContext(IRModule* inModule)
         : InstPassBase(inModule)
-    {}
+    {
+    }
 
     void processComCall(IRCall* comCall)
     {
@@ -43,7 +44,7 @@ struct ComMethodLoweringContext : public InstPassBase
                 callee->getRequirementKey());
         }
         comCallees.add(callee);
-        
+
         auto calleeType = as<IRFuncType>(callee->getDataType());
         SLANG_ASSERT(calleeType);
 
@@ -65,8 +66,8 @@ struct ComMethodLoweringContext : public InstPassBase
         if (builder.getBlock() != currentBlock)
         {
             // `marshalNativeCall` may have replaced the original call with branch insts.
-            // If this is the case, we need to move all insts after the original call in the original
-            // basic block to the new basic block.
+            // If this is the case, we need to move all insts after the original call in the
+            // original basic block to the new basic block.
             while (nextInst)
             {
                 auto next = nextInst->getNextInst();
@@ -118,7 +119,8 @@ struct ComMethodLoweringContext : public InstPassBase
     void processWitnessTable(IRWitnessTable* witnessTable)
     {
         auto interfaceType = as<IRInterfaceType>(witnessTable->getConformanceType());
-        if (!interfaceType) return;
+        if (!interfaceType)
+            return;
         if (!interfaceType->findDecoration<IRComInterfaceDecoration>())
             return;
         auto interfaceReqDict = buildInterfaceRequirementDict(interfaceType);
@@ -132,10 +134,13 @@ struct ComMethodLoweringContext : public InstPassBase
             if (!interfaceReqDict.tryGetValue(entry->getRequirementKey(), interfaceRequirement))
                 continue;
             auto implFunc = as<IRFunc>(entry->getSatisfyingVal());
-            if (!implFunc) continue;
+            if (!implFunc)
+                continue;
             // If the function already has the same signature as the lowered COM interface method,
             // we don't need to do anything.
-            if (isTypeEqual(entry->getSatisfyingVal()->getDataType(), (IRType*)interfaceRequirement))
+            if (isTypeEqual(
+                    entry->getSatisfyingVal()->getDataType(),
+                    (IRType*)interfaceRequirement))
                 continue;
             // Now we need to generate a wrapper function that calls into the original one.
             auto nativeFunc = marshalContext.generateDLLExportWrapperFunc(builder, implFunc);
@@ -156,16 +161,21 @@ struct ComMethodLoweringContext : public InstPassBase
         {
             IRBuilder builder(module);
             builder.setInsertBefore(callee);
-            auto nativeType = marshal.getNativeFuncType(builder, as<IRFuncType>(callee->getDataType()));
+            auto nativeType =
+                marshal.getNativeFuncType(builder, as<IRFuncType>(callee->getDataType()));
             callee->setFullType(nativeType);
         }
 
         // Update func types of COM interfaces.
-        processInstsOfType<IRInterfaceType>(kIROp_InterfaceType, [this](IRInterfaceType* inst) { processInterfaceType(inst); });
+        processInstsOfType<IRInterfaceType>(
+            kIROp_InterfaceType,
+            [this](IRInterfaceType* inst) { processInterfaceType(inst); });
 
         // Update witness tables of classes that implement COM interfaces.
         // Generate native-to-managed wrappers for each witness table entry.
-        processInstsOfType<IRWitnessTable>(kIROp_WitnessTable, [this](IRWitnessTable* table) { processWitnessTable(table); });
+        processInstsOfType<IRWitnessTable>(
+            kIROp_WitnessTable,
+            [this](IRWitnessTable* table) { processWitnessTable(table); });
     }
 };
 
@@ -177,4 +187,4 @@ void lowerComMethods(IRModule* module, DiagnosticSink* sink)
 
     return context.processModule();
 }
-}
+} // namespace Slang

@@ -26,7 +26,8 @@ public:
     List<ShaderBinary> m_shaders;
 
     virtual Result createShaderModule(
-        slang::EntryPointReflection* entryPointInfo, ComPtr<ISlangBlob> kernelCode) override;
+        slang::EntryPointReflection* entryPointInfo,
+        List<ComPtr<ISlangBlob>>& kernelCodes) override;
 };
 
 } // namespace d3d12

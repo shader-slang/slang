@@ -1,5 +1,5 @@
+#include "core/slang-basic.h"
 #include "renderer-shared.h"
-#include "source/core/slang-basic.h"
 
 namespace gfx
 {
@@ -32,7 +32,11 @@ public:
 
     const size_t kStagingBufferDefaultPageSize = 16 * 1024 * 1024;
 
-    void init(TDevice* device, MemoryType memoryType, uint32_t alignment, ResourceStateSet allowedStates)
+    void init(
+        TDevice* device,
+        MemoryType memoryType,
+        uint32_t alignment,
+        ResourceStateSet allowedStates)
     {
         m_device = device;
         m_memoryType = memoryType;
@@ -129,7 +133,7 @@ public:
     }
 };
 
-template <typename TDevice, typename TBufferResource>
+template<typename TDevice, typename TBufferResource>
 class TransientResourceHeapBaseImpl : public TransientResourceHeapBase
 {
 public:
@@ -158,11 +162,9 @@ public:
             device,
             MemoryType::Upload,
             256,
-            ResourceStateSet(
-                ResourceState::CopySource,
-                ResourceState::CopyDestination));
+            ResourceStateSet(ResourceState::CopySource, ResourceState::CopyDestination));
 
-         m_readbackBufferPool.init(
+        m_readbackBufferPool.init(
             device,
             MemoryType::ReadBack,
             256,
@@ -173,7 +175,12 @@ public:
         return SLANG_OK;
     }
 
-    Result allocateStagingBuffer(size_t size, IBufferResource*& outBufferWeakPtr, size_t& offset, MemoryType memoryType, bool forceLargePage = false)
+    Result allocateStagingBuffer(
+        size_t size,
+        IBufferResource*& outBufferWeakPtr,
+        size_t& offset,
+        MemoryType memoryType,
+        bool forceLargePage = false)
     {
         switch (memoryType)
         {

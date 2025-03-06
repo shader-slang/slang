@@ -15,7 +15,8 @@ void legalizeUniformBufferLoad(IRModule* module)
                 {
                     if (auto load = as<IRLoad>(inst))
                     {
-                        auto uniformBufferType = as<IRConstantBufferType>(load->getPtr()->getDataType());
+                        auto uniformBufferType =
+                            as<IRConstantBufferType>(load->getPtr()->getDataType());
                         if (!uniformBufferType)
                             continue;
                         workList.add(load);
@@ -38,7 +39,9 @@ void legalizeUniformBufferLoad(IRModule* module)
         for (auto field : structType->getFields())
         {
             auto fieldAddr = builder.emitFieldAddress(
-                builder.getPtrType(field->getFieldType()), load->getPtr(), field->getKey());
+                builder.getPtrType(field->getFieldType()),
+                load->getPtr(),
+                field->getKey());
             auto fieldLoad = builder.emitLoad(fieldAddr);
             fieldLoads.add(fieldLoad);
         }
@@ -47,4 +50,4 @@ void legalizeUniformBufferLoad(IRModule* module)
     }
 }
 
-}
+} // namespace Slang

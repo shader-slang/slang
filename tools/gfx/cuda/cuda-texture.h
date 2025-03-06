@@ -1,7 +1,6 @@
 // cuda-texture.h
 #pragma once
 #include "cuda-base.h"
-
 #include "cuda-context.h"
 
 namespace gfx
@@ -17,7 +16,8 @@ class TextureResourceImpl : public TextureResource
 public:
     TextureResourceImpl(const TextureResource::Desc& desc)
         : TextureResource(desc)
-    {}
+    {
+    }
     ~TextureResourceImpl();
 
     uint64_t getBindlessHandle();
@@ -36,7 +36,8 @@ public:
 
     RefPtr<CUDAContext> m_cudaContext;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL getNativeResourceHandle(InteropHandle* outHandle) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    getNativeResourceHandle(InteropHandle* outHandle) override;
 };
 
 } // namespace cuda

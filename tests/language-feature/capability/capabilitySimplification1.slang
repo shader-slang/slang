@@ -5,10 +5,10 @@
 // CHECK_IGNORE_CAPS-NOT: error 36107
 
 // CHECK: error 36107
-// CHECK-SAME: entrypoint 'computeMain' does not support compilation target 'glsl' with stage 'compute'
-// CHECK: capabilitySimplification1.slang(21): note: see using of 'WaveMultiPrefixProduct'
-// CHECK-NOT: see using of 'WaveMultiPrefixProduct'
-// CHECK: {{.*}}.meta.slang({{.*}}): note: see definition of 'WaveMultiPrefixProduct'
+// CHECK-SAME: entrypoint 'computeMain' uses features that are not available in 'compute' stage for 'glsl' target.
+// CHECK: capabilitySimplification1.slang(21): note: see using of 'WaveMultiPrefixCountBits'
+// CHECK-NOT: see using of 'WaveMultiPrefixCountBits'
+// CHECK: {{.*}}.meta.slang({{.*}}): note: see definition of 'WaveMultiPrefixCountBits'
 // CHECK: {{.*}}.meta.slang({{.*}}): note: see declaration of 'require'
 
 void nestedSafeCall()
@@ -18,7 +18,7 @@ void nestedSafeCall()
 
 void nestedBadCall()
 {
-    WaveMultiPrefixProduct(1, 0);
+    WaveMultiPrefixCountBits(true, 0);
 }
 
 void nestedCall()

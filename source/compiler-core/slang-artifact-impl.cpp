@@ -1,29 +1,27 @@
 // slang-artifact-impl.cpp
 #include "slang-artifact-impl.h"
 
-#include "slang-artifact-representation.h"
-
-#include "slang-artifact-util.h"
+#include "../core/slang-castable.h"
 #include "slang-artifact-desc-util.h"
-
 #include "slang-artifact-handler-impl.h"
-
+#include "slang-artifact-representation.h"
+#include "slang-artifact-util.h"
 #include "slang-slice-allocator.h"
 
-#include "../core/slang-castable.h"
+namespace Slang
+{
 
-namespace Slang {
-
-namespace { // anonymous
+namespace
+{ // anonymous
 
 /* Get a view as a slice of *raw* pointers */
-template <typename T>
+template<typename T>
 SLANG_FORCE_INLINE ConstArrayView<T*> _getRawView(const List<ComPtr<T>>& in)
 {
-    return makeConstArrayView((T*const*)in.getBuffer(), in.getCount());
+    return makeConstArrayView((T* const*)in.getBuffer(), in.getCount());
 }
 
-} // anonymous
+} // namespace
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Artifact !!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -38,8 +36,7 @@ void* Artifact::castAs(const Guid& guid)
 
 void* Artifact::getInterface(const Guid& uuid)
 {
-    if (uuid == ISlangUnknown::getTypeGuid() || 
-        uuid == ICastable::getTypeGuid() ||
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == ICastable::getTypeGuid() ||
         uuid == IArtifact::getTypeGuid())
     {
         return static_cast<IArtifact*>(this);
@@ -96,7 +93,11 @@ SlangResult Artifact::requireFile(Keep keep, IOSFileArtifactRepresentation** out
     auto handler = _getHandler();
 
     ComPtr<ICastable> castable;
-    SLANG_RETURN_ON_FAIL(handler->getOrCreateRepresentation(this, IOSFileArtifactRepresentation::getTypeGuid(), keep, castable.writeRef()));
+    SLANG_RETURN_ON_FAIL(handler->getOrCreateRepresentation(
+        this,
+        IOSFileArtifactRepresentation::getTypeGuid(),
+        keep,
+        castable.writeRef()));
 
     auto fileRep = as<IOSFileArtifactRepresentation>(castable);
     fileRep->addRef();
@@ -110,8 +111,12 @@ SlangResult Artifact::loadSharedLibrary(ArtifactKeep keep, ISlangSharedLibrary**
     auto handler = _getHandler();
 
     ComPtr<ICastable> castable;
-    SLANG_RETURN_ON_FAIL(handler->getOrCreateRepresentation(this, ISlangSharedLibrary::getTypeGuid(), keep, castable.writeRef()));
-   
+    SLANG_RETURN_ON_FAIL(handler->getOrCreateRepresentation(
+        this,
+        ISlangSharedLibrary::getTypeGuid(),
+        keep,
+        castable.writeRef()));
+
     auto lib = as<ISlangSharedLibrary>(castable);
     lib->addRef();
 
@@ -133,10 +138,17 @@ void Artifact::clear(IArtifact::ContainedKind kind)
 {
     switch (kind)
     {
-        case ContainedKind::Associated:     m_associated.clear(); break;
-        case ContainedKind::Representation: m_representations.clear(); break;
-        case ContainedKind::Children:       m_children.clear(); break;
-        default: break;
+    case ContainedKind::Associated:
+        m_associated.clear();
+        break;
+    case ContainedKind::Representation:
+        m_representations.clear();
+        break;
+    case ContainedKind::Children:
+        m_children.clear();
+        break;
+    default:
+        break;
     }
 }
 
@@ -144,14 +156,24 @@ void Artifact::removeAt(ContainedKind kind, Index i)
 {
     switch (kind)
     {
-        case ContainedKind::Associated:     m_associated.removeAt(i); break;
-        case ContainedKind::Representation: m_representations.removeAt(i); break;
-        case ContainedKind::Children:       m_children.removeAt(i); break;
-        default: break;
+    case ContainedKind::Associated:
+        m_associated.removeAt(i);
+        break;
+    case ContainedKind::Representation:
+        m_representations.removeAt(i);
+        break;
+    case ContainedKind::Children:
+        m_children.removeAt(i);
+        break;
+    default:
+        break;
     }
 }
 
-SlangResult Artifact::getOrCreateRepresentation(const Guid& typeGuid, ArtifactKeep keep, ICastable** outCastable)
+SlangResult Artifact::getOrCreateRepresentation(
+    const Guid& typeGuid,
+    ArtifactKeep keep,
+    ICastable** outCastable)
 {
     auto handler = _getHandler();
     return handler->getOrCreateRepresentation(this, typeGuid, keep, outCastable);
@@ -162,7 +184,11 @@ SlangResult Artifact::loadBlob(Keep keep, ISlangBlob** outBlob)
     auto handler = _getHandler();
 
     ComPtr<ICastable> castable;
-    SLANG_RETURN_ON_FAIL(handler->getOrCreateRepresentation(this, ISlangBlob::getTypeGuid(), keep, castable.writeRef()));
+    SLANG_RETURN_ON_FAIL(handler->getOrCreateRepresentation(
+        this,
+        ISlangBlob::getTypeGuid(),
+        keep,
+        castable.writeRef()));
 
     ISlangBlob* blob = as<ISlangBlob>(castable);
     blob->addRef();
@@ -205,9 +231,11 @@ void* Artifact::findRepresentation(ContainedKind kind, const Guid& guid)
 {
     switch (kind)
     {
-        case ContainedKind::Associated:         return _findRepresentation(_getRawView(m_associated), guid);
-        case ContainedKind::Representation:     return _findRepresentation(_getRawView(m_representations), guid);
-        case ContainedKind::Children:           
+    case ContainedKind::Associated:
+        return _findRepresentation(_getRawView(m_associated), guid);
+    case ContainedKind::Representation:
+        return _findRepresentation(_getRawView(m_representations), guid);
+    case ContainedKind::Children:
         {
             _requireChildren();
             return _findRepresentation(_getRawView(m_children), guid);
@@ -240,7 +268,9 @@ void Artifact::addRepresentationUnknown(ISlangUnknown* unk)
     SLANG_ASSERT(unk);
 
     {
-        const auto view = makeConstArrayView((ISlangUnknown*const*)m_representations.getBuffer(), m_representations.getCount());
+        const auto view = makeConstArrayView(
+            (ISlangUnknown* const*)m_representations.getBuffer(),
+            m_representations.getCount());
         if (view.indexOf(unk) >= 0)
         {
             SLANG_ASSERT_FAILURE("Already have this representation");
@@ -270,7 +300,7 @@ Slice<ICastable*> Artifact::getRepresentations()
     return SliceUtil::asSlice(m_representations);
 }
 
-void Artifact::setChildren(IArtifact*const* children, Count count)
+void Artifact::setChildren(IArtifact* const* children, Count count)
 {
     m_expandResult = SLANG_OK;
 

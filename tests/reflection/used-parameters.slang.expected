@@ -107,7 +107,15 @@ standard output = {
             "binding": {"kind": "shaderResource", "index": 0},
             "type": {
                 "kind": "resource",
-                "baseShape": "texture2D"
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         },
         {
@@ -115,7 +123,15 @@ standard output = {
             "binding": {"kind": "shaderResource", "index": 1},
             "type": {
                 "kind": "resource",
-                "baseShape": "texture2D"
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         },
         {
@@ -164,7 +180,15 @@ standard output = {
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
-                "access": "readWrite"
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         },
         {
@@ -173,7 +197,15 @@ standard output = {
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
-                "access": "readWrite"
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         },
         {
@@ -254,7 +286,7 @@ standard output = {
     "entryPoints": [
         {
             "name": "main",
-            "stage:": "compute",
+            "stage": "compute",
             "parameters": [
                 {
                     "name": "dispatchThreadID",

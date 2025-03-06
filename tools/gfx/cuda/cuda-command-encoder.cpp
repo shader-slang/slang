@@ -13,7 +13,7 @@ namespace cuda
 {
 
 void ResourceCommandEncoderImpl::init(CommandBufferImpl* cmdBuffer)
-{ 
+{
     m_writer = cmdBuffer;
 }
 
@@ -28,13 +28,16 @@ SLANG_NO_THROW void SLANG_MCALL ResourceCommandEncoderImpl::copyBuffer(
 }
 
 SLANG_NO_THROW void SLANG_MCALL ResourceCommandEncoderImpl::uploadBufferData(
-    IBufferResource* dst, Offset offset, Size size, void* data)
+    IBufferResource* dst,
+    Offset offset,
+    Size size,
+    void* data)
 {
     m_writer->uploadBufferData(dst, offset, size, data);
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-    ResourceCommandEncoderImpl::writeTimestamp(IQueryPool* pool, GfxIndex index)
+ResourceCommandEncoderImpl::writeTimestamp(IQueryPool* pool, GfxIndex index)
 {
     m_writer->writeTimestamp(pool, index);
 }
@@ -159,7 +162,7 @@ SLANG_NO_THROW void SLANG_MCALL ResourceCommandEncoderImpl::textureSubresourceBa
 }
 
 SLANG_NO_THROW void SLANG_MCALL
-    ResourceCommandEncoderImpl::beginDebugEvent(const char* name, float rgbColor[3])
+ResourceCommandEncoderImpl::beginDebugEvent(const char* name, float rgbColor[3])
 {
     SLANG_UNUSED(name);
     SLANG_UNUSED(rgbColor);
@@ -172,23 +175,26 @@ void ComputeCommandEncoderImpl::init(CommandBufferImpl* cmdBuffer)
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ComputeCommandEncoderImpl::bindPipeline(IPipelineState* state, IShaderObject** outRootObject)
+ComputeCommandEncoderImpl::bindPipeline(IPipelineState* state, IShaderObject** outRootObject)
 {
     m_writer->setPipelineState(state);
     PipelineStateBase* pipelineImpl = static_cast<PipelineStateBase*>(state);
     SLANG_RETURN_ON_FAIL(m_commandBuffer->m_device->createRootShaderObject(
-        pipelineImpl->m_program, m_rootObject.writeRef()));
+        pipelineImpl->m_program,
+        m_rootObject.writeRef()));
     returnComPtr(outRootObject, m_rootObject);
     return SLANG_OK;
 }
 
-SLANG_NO_THROW Result SLANG_MCALL
-    ComputeCommandEncoderImpl::bindPipelineWithRootObject(IPipelineState* state, IShaderObject* rootObject)
+SLANG_NO_THROW Result SLANG_MCALL ComputeCommandEncoderImpl::bindPipelineWithRootObject(
+    IPipelineState* state,
+    IShaderObject* rootObject)
 {
     m_writer->setPipelineState(state);
     PipelineStateBase* pipelineImpl = static_cast<PipelineStateBase*>(state);
     SLANG_RETURN_ON_FAIL(m_commandBuffer->m_device->createRootShaderObject(
-        pipelineImpl->m_program, m_rootObject.writeRef()));
+        pipelineImpl->m_program,
+        m_rootObject.writeRef()));
     m_rootObject->copyFrom(rootObject, m_commandBuffer->m_transientHeap);
     return SLANG_OK;
 }
@@ -201,7 +207,7 @@ SLANG_NO_THROW Result SLANG_MCALL ComputeCommandEncoderImpl::dispatchCompute(int
 }
 
 SLANG_NO_THROW Result SLANG_MCALL
-    ComputeCommandEncoderImpl::dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset)
+ComputeCommandEncoderImpl::dispatchComputeIndirect(IBufferResource* argBuffer, Offset offset)
 {
     SLANG_UNIMPLEMENTED_X("dispatchComputeIndirect");
 }

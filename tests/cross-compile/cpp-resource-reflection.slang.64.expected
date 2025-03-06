@@ -95,7 +95,11 @@ standard output = {
             "binding": {"kind": "uniform", "offset": 24, "size": 8},
             "type": {
                 "kind": "resource",
-                "baseShape": "texture2D"
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "scalar",
+                    "scalarType": "float32"
+                }
             }
         },
         {
@@ -109,7 +113,7 @@ standard output = {
     "entryPoints": [
         {
             "name": "computeMain",
-            "stage:": "compute",
+            "stage": "compute",
             "parameters": [
                 {
                     "name": "dispatchThreadID",

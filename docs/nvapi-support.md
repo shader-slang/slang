@@ -46,7 +46,7 @@ Thus causing the prelude to include nvHLSLExtns.h, and specifying the slot and p
 
 The actual values for the slot and optionally the space, are found by Slang examining the values of those values at the end of preprocessing input Slang source files. 
 
-This means that if you compile Slang source that has implicit use NVAPI, the slot and optionally the space must be defined. This can be achieved with a command line -D, throught the API or through having suitable `#define`s in the Slang source code.
+This means that if you compile Slang source that has implicit use NVAPI, the slot and optionally the space must be defined. This can be achieved with a command line -D, through the API or through having suitable `#define`s in the Slang source code.
 
 It is worth noting if you *replace* the default HLSL prelude, and use NVAPI then it will be necessary to have something like the default HLSL prelude part of your custom prelude.
 
@@ -63,7 +63,7 @@ The astute reader may have noticed that the default Slang HLSL prelude *does* co
 #endif
 ```
 
-This means that the *downstream* compiler (such as DXC and FXC) must be able to handle this include. Include paths can be specified for downstream compilers via the [-X mechanism](command-line-slangc.md#downstream-arguments). So for example...
+This means that the *downstream* compiler (such as DXC and FXC) must be able to handle this include. Include paths can be specified for downstream compilers via the [-X mechanism](user-guide/08-compiling.md#downstream-arguments). So for example...
 
 ```
 -Xfxc -IpathTo/nvapi -Xdxc -IpathTo/nvapi

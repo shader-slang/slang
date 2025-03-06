@@ -4,12 +4,13 @@
 
 #include "slang-ast-base.h"
 
-namespace Slang {
+namespace Slang
+{
 
 // Syntax class definitions for declarations.
 
 // A group of declarations that should be treated as a unit
-class DeclGroup: public DeclBase
+class DeclGroup : public DeclBase
 {
     SLANG_AST_CLASS(DeclGroup)
 
@@ -22,7 +23,7 @@ class UnresolvedDecl : public Decl
 };
 
 // A "container" decl is a parent to other declarations
-class ContainerDecl: public Decl
+class ContainerDecl : public Decl
 {
     SLANG_ABSTRACT_AST_CLASS(ContainerDecl)
 
@@ -65,14 +66,15 @@ class ContainerDecl: public Decl
         }
     }
 
-    SLANG_UNREFLECTED   // We don't want to reflect the following fields
+    SLANG_UNREFLECTED // We don't want to reflect the following fields
 
-private:
-    // Denotes how much of Members has been placed into the dictionary/transparentMembers.
-    // If this value equals the Members.getCount(), the dictionary is completely full and valid.
-    // If it's >= 0, then the Members after dictionaryLastCount are all that need to be added.
-    // If it < 0 it means that the dictionary/transparentMembers is invalid and needs to be recreated.
-    Index dictionaryLastCount = 0;
+        private :
+        // Denotes how much of Members has been placed into the dictionary/transparentMembers.
+        // If this value equals the Members.getCount(), the dictionary is completely full and valid.
+        // If it's >= 0, then the Members after dictionaryLastCount are all that need to be added.
+        // If it < 0 it means that the dictionary/transparentMembers is invalid and needs to be
+        // recreated.
+        Index dictionaryLastCount = 0;
 
     // Dictionary for looking up members by name.
     // This is built on demand before performing lookup.
@@ -112,14 +114,14 @@ class LetDecl : public VarDecl
     SLANG_AST_CLASS(LetDecl)
 };
 
-    // An `AggTypeDeclBase` captures the shared functionality
-    // between true aggregate type declarations and extension
-    // declarations:
-    //
-    // - Both can contain members (they are `ContainerDecl`s)
-    // - Both can have declared bases
-    // - Both expose a `this` variable in their body
-    //
+// An `AggTypeDeclBase` captures the shared functionality
+// between true aggregate type declarations and extension
+// declarations:
+//
+// - Both can contain members (they are `ContainerDecl`s)
+// - Both can have declared bases
+// - Both expose a `this` variable in their body
+//
 class AggTypeDeclBase : public ContainerDecl
 {
     SLANG_ABSTRACT_AST_CLASS(AggTypeDeclBase);
@@ -139,10 +141,11 @@ enum class TypeTag
     Unsized = 1,
     Incomplete = 2,
     LinkTimeSized = 4,
+    Opaque = 8,
 };
 
 // Declaration of a type that represents some sort of aggregate
-class AggTypeDecl : public  AggTypeDeclBase
+class AggTypeDecl : public AggTypeDeclBase
 {
     SLANG_ABSTRACT_AST_CLASS(AggTypeDecl)
 
@@ -156,15 +159,16 @@ class AggTypeDecl : public  AggTypeDeclBase
     void addTag(TypeTag tag);
     bool hasTag(TypeTag tag);
 
-    FilteredMemberList<VarDecl> getFields()
-    {
-        return getMembersOfType<VarDecl>();
-    }
+    FilteredMemberList<VarDecl> getFields() { return getMembersOfType<VarDecl>(); }
 };
 
-class StructDecl: public AggTypeDecl
+class StructDecl : public AggTypeDecl
 {
     SLANG_AST_CLASS(StructDecl);
+
+    SLANG_UNREFLECTED
+    // We will use these auxiliary to help in synthesizing the member initialize constructor.
+    Slang::HashSet<VarDeclBase*> m_membersVisibleInCtor;
 };
 
 class ClassDecl : public AggTypeDecl
@@ -210,6 +214,8 @@ class EnumCaseDecl : public Decl
 
     // Tag value
     Expr* tagExpr = nullptr;
+
+    IntVal* tagVal = nullptr;
 };
 
 // A member of InterfaceDecl representing the abstract ThisType.
@@ -219,20 +225,21 @@ class ThisTypeDecl : public AggTypeDecl
 };
 
 // An interface which other types can conform to
-class InterfaceDecl : public  AggTypeDecl
+class InterfaceDecl : public AggTypeDecl
 {
     SLANG_AST_CLASS(InterfaceDecl)
 
     ThisTypeDecl* getThisTypeDecl();
 };
 
-class TypeConstraintDecl : public  Decl
+class TypeConstraintDecl : public Decl
 {
     SLANG_ABSTRACT_AST_CLASS(TypeConstraintDecl)
 
     const TypeExp& getSup() const;
     // Overrides should be public so base classes can access
-    // Implement _getSupOverride on derived classes to change behavior of getSup, as if getSup is virtual
+    // Implement _getSupOverride on derived classes to change behavior of getSup, as if getSup is
+    // virtual
     const TypeExp& _getSupOverride() const;
 };
 
@@ -311,7 +318,7 @@ class GlobalGenericValueParamDecl : public VarDeclBase
 };
 
 // A scope for local declarations (e.g., as part of a statement)
-class ScopeDecl : public  ContainerDecl
+class ScopeDecl : public ContainerDecl
 {
     SLANG_AST_CLASS(ScopeDecl)
 };
@@ -322,7 +329,8 @@ class ParamDecl : public VarDeclBase
     SLANG_AST_CLASS(ParamDecl)
 };
 
-// A parameter of a function declared in "modern" types (immutable unless explicitly `out` or `inout`)
+// A parameter of a function declared in "modern" types (immutable unless explicitly `out` or
+// `inout`)
 class ModernParamDecl : public ParamDecl
 {
     SLANG_AST_CLASS(ModernParamDecl)
@@ -333,10 +341,7 @@ class CallableDecl : public ContainerDecl
 {
     SLANG_ABSTRACT_AST_CLASS(CallableDecl)
 
-    FilteredMemberList<ParamDecl> getParameters()
-    {
-        return getMembersOfType<ParamDecl>();
-    }
+    FilteredMemberList<ParamDecl> getParameters() { return getMembersOfType<ParamDecl>(); }
 
     TypeExp returnType;
 
@@ -359,7 +364,8 @@ class CallableDecl : public ContainerDecl
     CallableDecl* nextDecl = nullptr;
 };
 
-// Base class for callable things that may also have a body that is evaluated to produce their result
+// Base class for callable things that may also have a body that is evaluated to produce their
+// result
 class FunctionDeclBase : public CallableDecl
 {
     SLANG_ABSTRACT_AST_CLASS(FunctionDeclBase)
@@ -372,9 +378,20 @@ class ConstructorDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(ConstructorDecl)
 
-    // Indicates whether the declaration was synthesized by
-    // slang and not actually provided by the user
-    bool isSynthesized = false;
+    enum class ConstructorFlavor : int
+    {
+        UserDefined = 0x00,
+        // Indicates whether the declaration was synthesized by
+        // Slang and not explicitly provided by the user
+        SynthesizedDefault = 0x01,
+        // Member initialize constructor is a synthesized ctor,
+        // but it takes parameters.
+        SynthesizedMemberInit = 0x02
+    };
+
+    int m_flavor = (int)ConstructorFlavor::UserDefined;
+    void addFlavor(ConstructorFlavor flavor) { m_flavor |= (int)flavor; }
+    bool containsFlavor(ConstructorFlavor flavor) { return m_flavor & (int)flavor; }
 };
 
 // A subscript operation used to index instances of a type
@@ -419,21 +436,21 @@ class NamespaceDeclBase : public ContainerDecl
     SLANG_AST_CLASS(NamespaceDeclBase)
 };
 
-    // A `namespace` declaration inside some module, that provides
-    // a named scope for declarations inside it.
-    //
-    // Note: Multiple `namespace` declarations with the same name
-    // in a given module/file will be collapsed into a single
-    // `NamespaceDecl` during parsing, so this declaration does
-    // not directly represent what is present in the input syntax.
-    //
+// A `namespace` declaration inside some module, that provides
+// a named scope for declarations inside it.
+//
+// Note: Multiple `namespace` declarations with the same name
+// in a given module/file will be collapsed into a single
+// `NamespaceDecl` during parsing, so this declaration does
+// not directly represent what is present in the input syntax.
+//
 class NamespaceDecl : public NamespaceDeclBase
 {
     SLANG_AST_CLASS(NamespaceDecl)
 };
 
-    // A "module" of code (essentially, a single translation unit)
-    // that provides a scope for some number of declarations.
+// A "module" of code (essentially, a single translation unit)
+// that provides a scope for some number of declarations.
 class ModuleDecl : public NamespaceDeclBase
 {
     SLANG_AST_CLASS(ModuleDecl)
@@ -445,29 +462,32 @@ class ModuleDecl : public NamespaceDeclBase
     //
     Module* module = nullptr;
 
-        /// Map a decl to the list of its associated decls.
-        ///
-        /// This mapping is filled in during semantic checking, as the decl declarations get checked or generated.
-        ///
-        OrderedDictionary<Decl*, RefPtr<DeclAssociationList>> mapDeclToAssociatedDecls;
+    /// Map a decl to the list of its associated decls.
+    ///
+    /// This mapping is filled in during semantic checking, as the decl declarations get checked or
+    /// generated.
+    ///
+    OrderedDictionary<Decl*, RefPtr<DeclAssociationList>> mapDeclToAssociatedDecls;
 
-        /// Whether the module is defined in legacy language.
-        /// The legacy Slang language does not have visibility modifiers and everything is treated as
-        /// `public`. Newer version of the language introduces visibility and makes `internal` as the
-        /// default. To prevent this from breaking existing code, we need to know whether a module is
-        /// written in the legacy language. We detect this by checking whether the module has any
-        /// visibility modifiers, or if the module uses new language constructs, e.g. `module`, `__include`,
-        /// `__implementing` etc.
+    /// Whether the module is defined in legacy language.
+    /// The legacy Slang language does not have visibility modifiers and everything is treated as
+    /// `public`. Newer version of the language introduces visibility and makes `internal` as the
+    /// default. To prevent this from breaking existing code, we need to know whether a module is
+    /// written in the legacy language. We detect this by checking whether the module has any
+    /// visibility modifiers, or if the module uses new language constructs, e.g. `module`,
+    /// `__include`,
+    /// `__implementing` etc.
     bool isInLegacyLanguage = true;
+
+    DeclVisibility defaultVisibility = DeclVisibility::Internal;
 
     SLANG_UNREFLECTED
 
-        /// Map a type to the list of extensions of that type (if any) declared in this module
-        ///
-        /// This mapping is filled in during semantic checking, as `ExtensionDecl`s get checked.
-        ///
+    /// Map a type to the list of extensions of that type (if any) declared in this module
+    ///
+    /// This mapping is filled in during semantic checking, as `ExtensionDecl`s get checked.
+    ///
     Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> mapTypeToCandidateExtensions;
-
 };
 
 // Represents a transparent scope of declarations that are defined in a single source file.
@@ -552,7 +572,7 @@ class GenericTypeParamDeclBase : public SimpleTypeDecl
     SLANG_AST_CLASS(GenericTypeParamDeclBase)
 
     // The index of the generic parameter.
-    Index parameterIndex = -1;
+    int parameterIndex = -1;
 };
 
 class GenericTypeParamDecl : public GenericTypeParamDeclBase
@@ -583,8 +603,22 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
     TypeExp sub;
     TypeExp sup;
 
+    // If this decl is defined in a where clause, store the source location of the where token.
+    SourceLoc whereTokenLoc = SourceLoc();
+
+    bool isEqualityConstraint = false;
+
     // Overrides should be public so base classes can access
     const TypeExp& _getSupOverride() const { return sup; }
+};
+
+class TypeCoercionConstraintDecl : public Decl
+{
+    SLANG_AST_CLASS(TypeCoercionConstraintDecl)
+
+    SourceLoc whereTokenLoc = SourceLoc();
+    TypeExp fromType;
+    TypeExp toType;
 };
 
 class GenericValueParamDecl : public VarDeclBase
@@ -592,7 +626,7 @@ class GenericValueParamDecl : public VarDeclBase
     SLANG_AST_CLASS(GenericValueParamDecl)
 
     // The index of the generic parameter.
-    Index parameterIndex = 0;
+    int parameterIndex = 0;
 };
 
 // An empty declaration (which might still have modifiers attached).
@@ -622,8 +656,8 @@ class SyntaxDecl : public Decl
     SLANG_UNREFLECTED
 
     // Callback to invoke in order to parse syntax with this keyword.
-    SyntaxParseCallback  parseCallback = nullptr;
-    void*                parseUserData = nullptr;
+    SyntaxParseCallback parseCallback = nullptr;
+    void* parseUserData = nullptr;
 };
 
 // A declaration of an attribute to be used with `[name(...)]` syntax.
@@ -635,15 +669,14 @@ class AttributeDecl : public ContainerDecl
     SyntaxClass<NodeBase> syntaxClass;
 };
 
-// A synthesized decl used as a placeholder for a differentiable function requirement. This decl will
-// be a child of interface decl.
-// This allows us to form an interface requirement key for the derivative of an interface function.
-// The synthesized `DerivativeRequirementDecl` will be a child of the original function requirement
-// decl after an interface type is checked.
+// A synthesized decl used as a placeholder for a differentiable function requirement. This decl
+// will be a child of interface decl. This allows us to form an interface requirement key for the
+// derivative of an interface function. The synthesized `DerivativeRequirementDecl` will be a child
+// of the original function requirement decl after an interface type is checked.
 class DerivativeRequirementDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(DerivativeRequirementDecl)
-    
+
     // The original requirement decl.
     Decl* originalRequirementDecl = nullptr;
 
@@ -651,8 +684,8 @@ class DerivativeRequirementDecl : public FunctionDeclBase
     Type* diffThisType;
 };
 
-// A reference to a synthesized decl representing a differentiable function requirement, this decl will
-// be a child in the orignal function.
+// A reference to a synthesized decl representing a differentiable function requirement, this decl
+// will be a child in the orignal function.
 class DerivativeRequirementReferenceDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(DerivativeRequirementReferenceDecl)
@@ -676,7 +709,10 @@ bool isLocalVar(const Decl* decl);
 
 
 // Add a sibling lookup scope for `dest` to refer to `source`.
-void addSiblingScopeForContainerDecl(ASTBuilder* builder, ContainerDecl* dest, ContainerDecl* source);
+void addSiblingScopeForContainerDecl(
+    ASTBuilder* builder,
+    ContainerDecl* dest,
+    ContainerDecl* source);
 void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, ContainerDecl* source);
 
 } // namespace Slang

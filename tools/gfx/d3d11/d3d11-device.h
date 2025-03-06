@@ -14,18 +14,20 @@ namespace d3d11
 class DeviceImpl : public ImmediateRendererBase
 {
 public:
-
     ~DeviceImpl() {}
 
     // Renderer    implementation
     virtual SLANG_NO_THROW Result SLANG_MCALL initialize(const Desc& desc) override;
     virtual void clearFrame(uint32_t colorBufferMask, bool clearDepth, bool clearStencil) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createSwapchain(
-        const ISwapchain::Desc& desc, WindowHandle window, ISwapchain** outSwapchain) override;
+        const ISwapchain::Desc& desc,
+        WindowHandle window,
+        ISwapchain** outSwapchain) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createFramebufferLayout(
-        const IFramebufferLayout::Desc& desc, IFramebufferLayout** outLayout) override;
+        const IFramebufferLayout::Desc& desc,
+        IFramebufferLayout** outLayout) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer) override;
+    createFramebuffer(const IFramebuffer::Desc& desc, IFramebuffer** outFramebuffer) override;
     virtual void setFramebuffer(IFramebuffer* frameBuffer) override;
     virtual void setStencilReference(uint32_t referenceValue) override;
 
@@ -38,7 +40,7 @@ public:
         const void* initData,
         IBufferResource** outResource) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL
-        createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override;
+    createSamplerState(ISamplerState::Desc const& desc, ISamplerState** outSampler) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL createTextureView(
         ITextureResource* texture,
@@ -51,12 +53,11 @@ public:
         IResourceView::Desc const& desc,
         IResourceView** outView) override;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createInputLayout(
-        IInputLayout::Desc const& desc,
-        IInputLayout** outLayout) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    createInputLayout(IInputLayout::Desc const& desc, IInputLayout** outLayout) override;
 
-    virtual SLANG_NO_THROW Result SLANG_MCALL createQueryPool(
-        const IQueryPool::Desc& desc, IQueryPool** outPool) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
+    createQueryPool(const IQueryPool::Desc& desc, IQueryPool** outPool) override;
 
     virtual Result createShaderObjectLayout(
         slang::ISession* session,
@@ -64,7 +65,9 @@ public:
         ShaderObjectLayoutBase** outLayout) override;
     virtual Result createShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject)
         override;
-    virtual Result createMutableShaderObject(ShaderObjectLayoutBase* layout, IShaderObject** outObject) override;
+    virtual Result createMutableShaderObject(
+        ShaderObjectLayoutBase* layout,
+        IShaderObject** outObject) override;
     virtual Result createRootShaderObject(IShaderProgram* program, ShaderObjectBase** outObject)
         override;
     virtual void bindRootShaderObject(IShaderObject* shaderObject) override;
@@ -74,9 +77,11 @@ public:
         IShaderProgram** outProgram,
         ISlangBlob** outDiagnosticBlob) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createGraphicsPipelineState(
-        const GraphicsPipelineStateDesc& desc, IPipelineState** outState) override;
+        const GraphicsPipelineStateDesc& desc,
+        IPipelineState** outState) override;
     virtual SLANG_NO_THROW Result SLANG_MCALL createComputePipelineState(
-        const ComputePipelineStateDesc& desc, IPipelineState** outState) override;
+        const ComputePipelineStateDesc& desc,
+        IPipelineState** outState) override;
 
     virtual void* map(IBufferResource* buffer, MapFlavor flavor) override;
     virtual void unmap(IBufferResource* buffer, size_t offsetWritten, size_t sizeWritten) override;
@@ -87,7 +92,11 @@ public:
         size_t srcOffset,
         size_t size) override;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL readTextureResource(
-        ITextureResource* texture, ResourceState state, ISlangBlob** outBlob, size_t* outRowPitch, size_t* outPixelSize) override;
+        ITextureResource* texture,
+        ResourceState state,
+        ISlangBlob** outBlob,
+        size_t* outRowPitch,
+        size_t* outPixelSize) override;
 
     virtual void setPrimitiveTopology(PrimitiveTopology topology) override;
 
@@ -96,14 +105,14 @@ public:
         GfxCount slotCount,
         IBufferResource* const* buffers,
         const Offset* offsets) override;
-    virtual void setIndexBuffer(
-        IBufferResource* buffer, Format indexFormat, Offset  offset) override;
+    virtual void setIndexBuffer(IBufferResource* buffer, Format indexFormat, Offset offset)
+        override;
     virtual void setViewports(GfxCount count, Viewport const* viewports) override;
     virtual void setScissorRects(GfxCount count, ScissorRect const* rects) override;
     virtual void setPipelineState(IPipelineState* state) override;
     virtual void draw(GfxCount vertexCount, GfxIndex startVertex) override;
-    virtual void drawIndexed(
-        GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex) override;
+    virtual void drawIndexed(GfxCount indexCount, GfxIndex startIndex, GfxIndex baseVertex)
+        override;
     virtual void drawInstanced(
         GfxCount vertexCount,
         GfxCount instanceCount,
@@ -117,10 +126,7 @@ public:
         GfxIndex startInstanceLocation) override;
     virtual void dispatchCompute(int x, int y, int z) override;
     virtual void submitGpuWork() override {}
-    virtual void waitForGpu() override
-    {
-
-    }
+    virtual void waitForGpu() override {}
     virtual SLANG_NO_THROW const DeviceInfo& SLANG_MCALL getDeviceInfo() const override
     {
         return m_info;
@@ -153,7 +159,7 @@ public:
 
     Desc m_desc;
 
-    float m_clearColor[4] = { 0, 0, 0, 0 };
+    float m_clearColor[4] = {0, 0, 0, 0};
 
     bool m_nvapi = false;
 };

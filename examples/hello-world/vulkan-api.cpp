@@ -1,16 +1,17 @@
 #include "vulkan-api.h"
+
 #include "slang.h"
 
-#include <stdlib.h>
-#include <stdio.h>
 #include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <vector>
 
 #if SLANG_WINDOWS_FAMILY
-#    include <windows.h>
+#include <windows.h>
 #else
-#    include <dlfcn.h>
+#include <dlfcn.h>
 #endif
 
 #if _DEBUG
@@ -25,7 +26,8 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugMessageCallback(
     int32_t /*msgCode*/,
     const char* pLayerPrefix,
     const char* pMsg,
-    void* /*pUserData*/)
+    void* /*pUserData*/
+)
 {
     printf("[%s]: %s\n", pLayerPrefix, pMsg);
     return 1;
@@ -62,7 +64,7 @@ int initializeVulkanDevice(VulkanAPI& api)
     uint32_t propertyCount;
     if (api.vkEnumerateInstanceLayerProperties(&propertyCount, nullptr) != 0)
         return -1;
-    std::vector< VkLayerProperties> properties(propertyCount);
+    std::vector<VkLayerProperties> properties(propertyCount);
     if (api.vkEnumerateInstanceLayerProperties(&propertyCount, properties.data()) != 0)
         return -1;
     for (const auto& p : properties)
@@ -119,17 +121,19 @@ int initializeVulkanDevice(VulkanAPI& api)
         debugCreateInfo.flags = debugFlags;
 
         RETURN_ON_FAIL(api.vkCreateDebugReportCallbackEXT(
-            api.instance, &debugCreateInfo, nullptr, &api.debugReportCallback));
+            api.instance,
+            &debugCreateInfo,
+            nullptr,
+            &api.debugReportCallback));
     }
 
     // Enumerate physical devices.
     uint32_t numPhysicalDevices = 0;
-    RETURN_ON_FAIL(
-        api.vkEnumeratePhysicalDevices(api.instance, &numPhysicalDevices, nullptr));
+    RETURN_ON_FAIL(api.vkEnumeratePhysicalDevices(api.instance, &numPhysicalDevices, nullptr));
     std::vector<VkPhysicalDevice> physicalDevices;
     physicalDevices.resize(numPhysicalDevices);
-    RETURN_ON_FAIL(api.vkEnumeratePhysicalDevices(
-        api.instance, &numPhysicalDevices, &physicalDevices[0]));
+    RETURN_ON_FAIL(
+        api.vkEnumeratePhysicalDevices(api.instance, &numPhysicalDevices, &physicalDevices[0]));
 
     // We will use device 0.
     api.initPhysicalDevice(physicalDevices[0]);
@@ -145,7 +149,9 @@ int initializeVulkanDevice(VulkanAPI& api)
     std::vector<VkQueueFamilyProperties> queueFamilies;
     queueFamilies.resize(numQueueFamilies);
     api.vkGetPhysicalDeviceQueueFamilyProperties(
-        api.physicalDevice, &numQueueFamilies, &queueFamilies[0]);
+        api.physicalDevice,
+        &numQueueFamilies,
+        &queueFamilies[0]);
 
     // Find a queue that can service our needs.
     auto requiredQueueFlags = VK_QUEUE_COMPUTE_BIT;

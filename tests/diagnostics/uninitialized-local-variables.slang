@@ -1,10 +1,10 @@
-//TEST:SIMPLE(filecheck=CHK): -target spirv
+//TEST:SIMPLE(filecheck=CHK): -target spirv -entry computeMain
+
+float f(float) { return 1; }
 
 // Should not warn here (unconditionalBranch)
 float3 unconditional(int mode)
 {
-    float f(float) { return 1; }
-
     float k0;
     float k1;
 
@@ -38,13 +38,14 @@ int use_undefined_value(int k)
     return x;
 }
 
-// Returning uninitialized values
+// We don't know the exact type of T yet.
+// T may not have any members, and it may not need any initialization.
 __generic<T>
 T generic_undefined_return()
 {
-    T x;
-    //CHK-DAG: warning 41016: use of uninitialized variable 'x'
-    return x;
+    T y;
+    //CHK-NOT: warning 41016: use of uninitialized variable 'y'
+    return y;
 }
 
 // Array variables
@@ -175,3 +176,10 @@ float nested_scopes(int x, inout float p)
 }
 
 //CHK-NOT: warning 41016
+
+[Shader("compute")]
+[NumThreads(4, 1, 1)]
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+{
+}
+

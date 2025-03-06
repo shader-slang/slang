@@ -8,24 +8,27 @@
 #include "slang-io.h"
 
 #ifdef _WIN32
-	#include <windows.h>
+#include <windows.h>
 #else
-	#include "slang-string.h"
-	#include <dlfcn.h>
+#include "slang-string.h"
+
+#include <dlfcn.h>
 #endif
 
 namespace Slang
 {
-	// SharedLibrary
+// SharedLibrary
 
-/* static */SlangResult SharedLibrary::load(const char* path, SharedLibrary::Handle& handleOut)
+/* static */ SlangResult SharedLibrary::load(const char* path, SharedLibrary::Handle& handleOut)
 {
     StringBuilder builder;
     calcPlatformPath(UnownedStringSlice(path), builder);
     return loadWithPlatformPath(builder.begin(), handleOut);
 }
 
-/* static */void SharedLibrary::calcPlatformPath(const UnownedStringSlice& path, StringBuilder& outPath)
+/* static */ void SharedLibrary::calcPlatformPath(
+    const UnownedStringSlice& path,
+    StringBuilder& outPath)
 {
     // Work out the shared library name
     String parent = Path::getParentDirectory(path);
@@ -37,15 +40,18 @@ namespace Slang
         StringBuilder platformFileNameBuilder;
         SharedLibrary::appendPlatformFileName(filename.getUnownedSlice(), platformFileNameBuilder);
 
-        Path::combineIntoBuilder(parent.getUnownedSlice(), platformFileNameBuilder.getUnownedSlice(), outPath);
+        Path::combineIntoBuilder(
+            parent.getUnownedSlice(),
+            platformFileNameBuilder.getUnownedSlice(),
+            outPath);
     }
     else if (filename.getLength() > 0)
-    {     
+    {
         appendPlatformFileName(filename.getUnownedSlice(), outPath);
     }
 }
 
-/* static */String SharedLibrary::calcPlatformPath(const UnownedStringSlice& path)
+/* static */ String SharedLibrary::calcPlatformPath(const UnownedStringSlice& path)
 {
     StringBuilder builder;
     calcPlatformPath(path, builder);
@@ -62,7 +68,7 @@ SLANG_COMPILE_TIME_ASSERT(E_NOTIMPL == SLANG_E_NOT_IMPLEMENTED);
 SLANG_COMPILE_TIME_ASSERT(E_INVALIDARG == SLANG_E_INVALID_ARG);
 SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 
-/* static */SlangResult PlatformUtil::getInstancePath(StringBuilder& out)
+/* static */ SlangResult PlatformUtil::getInstancePath(StringBuilder& out)
 {
     wchar_t path[_MAX_PATH];
     ::GetModuleFileName(::GetModuleHandle(NULL), path, SLANG_COUNT_OF(path));
@@ -75,12 +81,13 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     return out.getLength() > 0 ? SLANG_OK : SLANG_FAIL;
 }
 
-/* static */SlangResult PlatformUtil::appendResult(SlangResult res, StringBuilder& builderOut)
+/* static */ SlangResult PlatformUtil::appendResult(SlangResult res, StringBuilder& builderOut)
 {
     if (SLANG_FAILED(res) && res != SLANG_FAIL)
     {
         LPWSTR buffer = nullptr;
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+        FormatMessage(
+            FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
             nullptr,
             res,
             MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
@@ -100,7 +107,9 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     return SLANG_FAIL;
 }
 
-/* static */SlangResult SharedLibrary::loadWithPlatformPath(char const* platformFileName, SharedLibrary::Handle& handleOut)
+/* static */ SlangResult SharedLibrary::loadWithPlatformPath(
+    char const* platformFileName,
+    SharedLibrary::Handle& handleOut)
 {
     handleOut = nullptr;
     if (!platformFileName || strlen(platformFileName) == 0)
@@ -117,19 +126,20 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
         const DWORD lastError = GetLastError();
         switch (lastError)
         {
-            case ERROR_MOD_NOT_FOUND:
-            case ERROR_PATH_NOT_FOUND:
-            case ERROR_FILE_NOT_FOUND:  
+        case ERROR_MOD_NOT_FOUND:
+        case ERROR_PATH_NOT_FOUND:
+        case ERROR_FILE_NOT_FOUND:
             {
                 return SLANG_E_NOT_FOUND;
             }
-            case ERROR_INVALID_ACCESS:
-            case ERROR_ACCESS_DENIED: 
-            case ERROR_INVALID_DATA:
+        case ERROR_INVALID_ACCESS:
+        case ERROR_ACCESS_DENIED:
+        case ERROR_INVALID_DATA:
             {
                 return SLANG_E_CANNOT_OPEN;
             }
-            default: break;
+        default:
+            break;
         }
         // Turn to Result, if not one of the well known errors
         return HRESULT_FROM_WIN32(lastError);
@@ -138,7 +148,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     return SLANG_OK;
 }
 
-/* static */void SharedLibrary::unload(Handle handle)
+/* static */ void SharedLibrary::unload(Handle handle)
 {
     SLANG_ASSERT(handle);
     ::FreeLibrary((HMODULE)handle);
@@ -147,10 +157,12 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 /* static */ void* SharedLibrary::findSymbolAddressByName(Handle handle, char const* name)
 {
     SLANG_ASSERT(handle);
-    return GetProcAddress((HMODULE)handle, name);
+    return reinterpret_cast<void*>(GetProcAddress((HMODULE)handle, name));
 }
 
-/* static */void SharedLibrary::appendPlatformFileName(const UnownedStringSlice& name, StringBuilder& dst)
+/* static */ void SharedLibrary::appendPlatformFileName(
+    const UnownedStringSlice& name,
+    StringBuilder& dst)
 {
     dst.append(name);
     dst.append(".dll");
@@ -158,19 +170,23 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 
 #else // _WIN32
 
-/* static */SlangResult PlatformUtil::getInstancePath([[maybe_unused]] StringBuilder& out)
+/* static */ SlangResult PlatformUtil::getInstancePath([[maybe_unused]] StringBuilder& out)
 {
     // On non Windows it's typically hard to get the instance path, so we'll say not implemented.
     // The meaning is also somewhat more ambiguous - is it the exe or the shared library path?
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
-/* static */SlangResult PlatformUtil::appendResult([[maybe_unused]] SlangResult res, [[maybe_unused]] StringBuilder& builderOut)
+/* static */ SlangResult PlatformUtil::appendResult(
+    [[maybe_unused]] SlangResult res,
+    [[maybe_unused]] StringBuilder& builderOut)
 {
     return SLANG_E_NOT_IMPLEMENTED;
 }
 
-/* static */SlangResult SharedLibrary::loadWithPlatformPath(char const* platformFileName, Handle& handleOut)
+/* static */ SlangResult SharedLibrary::loadWithPlatformPath(
+    char const* platformFileName,
+    Handle& handleOut)
 {
     handleOut = nullptr;
     // Work around
@@ -180,9 +196,9 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     // closed
     const auto unclosableLibNames = {"libdxcompiler", "libdxvk_d3d11", "libdxvk_dxgi"};
     bool isUnclosable = false;
-    for(auto n : unclosableLibNames)
+    for (auto n : unclosableLibNames)
     {
-        if(strncmp(platformFileName, n, strlen(n)) == 0)
+        if (strncmp(platformFileName, n, strlen(n)) == 0)
         {
             isUnclosable = true;
             break;
@@ -191,7 +207,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     if (strlen(platformFileName) == 0)
         platformFileName = nullptr;
     const auto mode = RTLD_NOW | RTLD_GLOBAL | (isUnclosable ? RTLD_NODELETE : 0);
-    void *h = dlopen(platformFileName, mode);
+    void* h = dlopen(platformFileName, mode);
     if (!h)
     {
 #if 0
@@ -202,23 +218,25 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 		}
 #endif
         return SLANG_FAIL;
-	}
+    }
     handleOut = (Handle)h;
     return SLANG_OK;
 }
 
-/* static */void SharedLibrary::unload(Handle handle)
-{    
-    SLANG_ASSERT(handle);
-	dlclose(handle);
-}
-
-/* static */void* SharedLibrary::findSymbolAddressByName(Handle handle, char const* name)
+/* static */ void SharedLibrary::unload(Handle handle)
 {
-	return dlsym((void*)handle, name);
+    SLANG_ASSERT(handle);
+    dlclose(handle);
 }
 
-/* static */void SharedLibrary::appendPlatformFileName(const UnownedStringSlice& name, StringBuilder& dst)
+/* static */ void* SharedLibrary::findSymbolAddressByName(Handle handle, char const* name)
+{
+    return dlsym((void*)handle, name);
+}
+
+/* static */ void SharedLibrary::appendPlatformFileName(
+    const UnownedStringSlice& name,
+    StringBuilder& dst)
 {
 #if __CYGWIN__
     dst.append(name);
@@ -242,7 +260,9 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 #endif // _WIN32
 
 
-/* static */SlangResult PlatformUtil::getEnvironmentVariable(const UnownedStringSlice& name, StringBuilder& out)
+/* static */ SlangResult PlatformUtil::getEnvironmentVariable(
+    const UnownedStringSlice& name,
+    StringBuilder& out)
 {
     const char* value = getenv(String(name).getBuffer());
     if (value)
@@ -253,7 +273,7 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     return SLANG_E_NOT_FOUND;
 }
 
-/* static */PlatformKind PlatformUtil::getPlatformKind()
+/* static */ PlatformKind PlatformUtil::getPlatformKind()
 {
 #if SLANG_WINRT
     return PlatformKind::WinRT;
@@ -286,22 +306,22 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
 #endif
 }
 
-static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] =
-{
-    0,                                                                                                                  // Unknown
-    PlatformFlag::WinRT | PlatformFlag::Win32 | PlatformFlag::Win64,                                                    // Windows
-    PlatformFlag::WinRT | PlatformFlag::Win32 | PlatformFlag::Win64 | PlatformFlag::X360 | PlatformFlag::XBoxOne,       // Microsoft
-    PlatformFlag::Linux | PlatformFlag::Android,                                                                        // Linux
-    PlatformFlag::IOS | PlatformFlag::OSX,                                                                              // Apple
-    PlatformFlag::Linux | PlatformFlag::Android | PlatformFlag::IOS | PlatformFlag::OSX,                                // Unix
+static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] = {
+    0,                                                               // Unknown
+    PlatformFlag::WinRT | PlatformFlag::Win32 | PlatformFlag::Win64, // Windows
+    PlatformFlag::WinRT | PlatformFlag::Win32 | PlatformFlag::Win64 | PlatformFlag::X360 |
+        PlatformFlag::XBoxOne,                   // Microsoft
+    PlatformFlag::Linux | PlatformFlag::Android, // Linux
+    PlatformFlag::IOS | PlatformFlag::OSX,       // Apple
+    PlatformFlag::Linux | PlatformFlag::Android | PlatformFlag::IOS | PlatformFlag::OSX, // Unix
 };
 
-/* static */PlatformFlags PlatformUtil::getPlatformFlags(PlatformFamily family)
+/* static */ PlatformFlags PlatformUtil::getPlatformFlags(PlatformFamily family)
 {
     return s_familyFlags[int(family)];
 }
 
-/* static */SlangResult PlatformUtil::outputDebugMessage([[maybe_unused]] const char* text)
+/* static */ SlangResult PlatformUtil::outputDebugMessage([[maybe_unused]] const char* text)
 {
 #ifdef _WIN32
     OutputDebugStringA(text);
@@ -311,4 +331,4 @@ static const PlatformFlags s_familyFlags[int(PlatformFamily::CountOf)] =
 #endif
 }
 
-}
+} // namespace Slang

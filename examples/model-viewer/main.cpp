@@ -16,21 +16,21 @@
 
 // We still need to include the Slang header to use the Slang API
 //
-#include "slang.h"
 #include "slang-com-helper.h"
+#include "slang.h"
 
 // We will again make use of a graphics API abstraction
 // layer that implements the shader-object idiom based on Slang's
 // `ParameterBlock` and `interface` features to simplify shader specialization
 // and parameter binding.
 //
-#include "slang-gfx.h"
-#include "tools/gfx-util/shader-cursor.h"
-#include "tools/platform/model.h"
-#include "tools/platform/vector-math.h"
-#include "tools/platform/window.h"
-#include "tools/platform/gui.h"
 #include "examples/example-base/example-base.h"
+#include "gfx-util/shader-cursor.h"
+#include "platform/gui.h"
+#include "platform/model.h"
+#include "platform/vector-math.h"
+#include "platform/window.h"
+#include "slang-gfx.h"
 
 #include <map>
 #include <sstream>
@@ -51,14 +51,17 @@ struct RendererContext
     slang::TypeReflection* perViewShaderType;
     slang::TypeReflection* perModelShaderType;
 
-    Result init(IDevice* inDevice)
+    TestBase* pTestBase;
+
+    Result init(IDevice* inDevice, TestBase* inTestBase)
     {
         device = inDevice;
         ComPtr<ISlangBlob> diagnostic;
+        pTestBase = inTestBase;
+
         Slang::String path = resourceBase.resolveResource("shaders.slang").getBuffer();
-        shaderModule = device->getSlangSession()->loadModule(
-            path.getBuffer(),
-            diagnostic.writeRef());
+        shaderModule =
+            device->getSlangSession()->loadModule(path.getBuffer(), diagnostic.writeRef());
         diagnoseIfNeeded(diagnostic);
         if (!shaderModule)
             return SLANG_FAIL;
@@ -108,6 +111,12 @@ struct RendererContext
             diagnosticsBlob.writeRef());
         diagnoseIfNeeded(diagnosticsBlob);
         SLANG_RETURN_ON_FAIL(result);
+
+        if (pTestBase && pTestBase->isTestMode())
+        {
+            pTestBase->printEntrypointHashes(componentTypes.getCount() - 1, 1, composedProgram);
+        }
+
         slangReflection = composedProgram->getLayout();
 
         // At this point, `composedProgram` represents the shader program
@@ -155,9 +164,9 @@ struct Material : RefObject
 //
 struct SimpleMaterial : Material
 {
-    glm::vec3   diffuseColor;
-    glm::vec3   specularColor;
-    float       specularity = 1.0f;
+    glm::vec3 diffuseColor;
+    glm::vec3 specularColor;
+    float specularity = 1.0f;
 
     // Create a shader object that contains the type info and parameter values
     // that represent an instance of `SimpleMaterial`.
@@ -184,20 +193,20 @@ struct SimpleMaterial : Material
 //
 struct Mesh : RefObject
 {
-    RefPtr<Material>    material;
-    int                 firstIndex;
-    int                 indexCount;
+    RefPtr<Material> material;
+    int firstIndex;
+    int indexCount;
 };
 struct Model : RefObject
 {
     typedef platform::ModelLoader::Vertex Vertex;
 
-    ComPtr<IBufferResource>     vertexBuffer;
-    ComPtr<IBufferResource>     indexBuffer;
-    PrimitiveTopology           primitiveTopology;
-    int                         vertexCount;
-    int                         indexCount;
-    std::vector<RefPtr<Mesh>>   meshes;
+    ComPtr<IBufferResource> vertexBuffer;
+    ComPtr<IBufferResource> indexBuffer;
+    PrimitiveTopology primitiveTopology;
+    int vertexCount;
+    int indexCount;
+    std::vector<RefPtr<Mesh>> meshes;
 };
 //
 // Loading a model from disk is done with the help of some utility
@@ -206,10 +215,10 @@ struct Model : RefObject
 // used for its representation.
 //
 RefPtr<Model> loadModel(
-    RendererContext*        context,
-    char const*             inputPath,
+    RendererContext* context,
+    char const* inputPath,
     platform::ModelLoader::LoadFlags loadFlags = 0,
-    float                   scale = 1.0f)
+    float scale = 1.0f)
 {
     // The model loading interface using a C++ interface of
     // callback functions to handle creating the application-specific
@@ -298,7 +307,7 @@ struct Light : RefObject
 
     // The shader object for a light will be stashed here
     // after it is created.
-//    ComPtr<IShaderObject> shaderObject;
+    //    ComPtr<IShaderObject> shaderObject;
 };
 
 // Helper function to retrieve the underlying shader type of `T`.
@@ -401,8 +410,7 @@ struct LightEnvLayout : public RefObject
         {
             auto program = context->slangReflection;
             std::stringstream typeNameBuilder;
-            typeNameBuilder << "LightArray<" << lightType->getName() << "," << maximumCount
-                            << ">";
+            typeNameBuilder << "LightArray<" << lightType->getName() << "," << maximumCount << ">";
             layout.typeName = typeNameBuilder.str();
         }
 
@@ -410,7 +418,8 @@ struct LightEnvLayout : public RefObject
         mapLightTypeToArrayIndex.insert(std::make_pair(lightType, arrayIndex));
     }
 
-    template<typename T> void addLightType(RendererContext* context, Int maximumCount)
+    template<typename T>
+    void addLightType(RendererContext* context, Int maximumCount)
     {
         addLightType(context, getShaderType<T>(context), maximumCount);
     }
@@ -449,8 +458,7 @@ struct LightEnv : public RefObject
     RefPtr<LightEnvLayout> layout;
     RendererContext* context;
     LightEnv(RefPtr<LightEnvLayout> layout, RendererContext* inContext)
-        : layout(layout)
-        , context(inContext)
+        : layout(layout), context(inContext)
     {
         for (auto arrayLayout : layout->lightArrayLayouts)
         {
@@ -630,314 +638,335 @@ struct LightEnv : public RefObject
 //
 struct ModelViewer : WindowedAppBase
 {
-RendererContext context;
+    RendererContext context;
 
-// Most of the application state is stored in the list of loaded models,
-// as well as the active light source (a single light for now).
-//
-std::vector<RefPtr<Model>> gModels;
-RefPtr<LightEnv> lightEnv;
+    // Most of the application state is stored in the list of loaded models,
+    // as well as the active light source (a single light for now).
+    //
+    std::vector<RefPtr<Model>> gModels;
+    RefPtr<LightEnv> lightEnv;
 
-// The pipeline state object we will use to draw models.
-ComPtr<IPipelineState> gPipelineState;
+    // The pipeline state object we will use to draw models.
+    ComPtr<IPipelineState> gPipelineState;
 
-// During startup the application will load one or more models and
-// add them to the `gModels` list.
-//
-void loadAndAddModel(
-    char const*             inputPath,
-    platform::ModelLoader::LoadFlags loadFlags = 0,
-    float                   scale = 1.0f)
-{
-    auto model = loadModel(&context, inputPath, loadFlags, scale);
-    if(!model) return;
-    gModels.push_back(model);
-}
-
-// Our "simulation" state consists of just a few values.
-//
-uint64_t lastTime = 0;
-
-//glm::vec3 lightDir = normalize(glm::vec3(10, 10, 10));
-//glm::vec3 lightColor = glm::vec3(1, 1, 1);
-
-glm::vec3 cameraPosition = glm::vec3(1.75, 1.25, 5);
-glm::quat cameraOrientation = glm::quat(1, glm::vec3(0));
-
-float translationScale = 0.5f;
-float rotationScale = 0.025f;
-
-// In order to control camera movement, we will
-// use good old WASD
-bool wPressed = false;
-bool aPressed = false;
-bool sPressed = false;
-bool dPressed = false;
-
-bool isMouseDown = false;
-float lastMouseX = 0.0f;
-float lastMouseY = 0.0f;
-
-void setKeyState(platform::KeyCode key, bool state)
-{
-    switch (key)
+    // During startup the application will load one or more models and
+    // add them to the `gModels` list.
+    //
+    void loadAndAddModel(
+        char const* inputPath,
+        platform::ModelLoader::LoadFlags loadFlags = 0,
+        float scale = 1.0f)
     {
-    default:
-        break;
-    case platform::KeyCode::W:
-        wPressed = state;
-        break;
-    case platform::KeyCode::A:
-        aPressed = state;
-        break;
-    case platform::KeyCode::S:
-        sPressed = state;
-        break;
-    case platform::KeyCode::D:
-        dPressed = state;
-        break;
+        auto model = loadModel(&context, inputPath, loadFlags, scale);
+        if (!model)
+            return;
+        gModels.push_back(model);
     }
-}
-void onKeyDown(platform::KeyEventArgs args) { setKeyState(args.key, true); }
-void onKeyUp(platform::KeyEventArgs args) { setKeyState(args.key, false); }
 
-void onMouseDown(platform::MouseEventArgs args)
-{
-    isMouseDown = true;
-    lastMouseX = (float)args.x;
-    lastMouseY = (float)args.y;
-}
+    // Our "simulation" state consists of just a few values.
+    //
+    uint64_t lastTime = 0;
 
-void onMouseMove(platform::MouseEventArgs args)
-{
-    if (isMouseDown)
+    // glm::vec3 lightDir = normalize(glm::vec3(10, 10, 10));
+    // glm::vec3 lightColor = glm::vec3(1, 1, 1);
+
+    glm::vec3 cameraPosition = glm::vec3(1.75, 1.25, 5);
+    glm::quat cameraOrientation = glm::quat(1, glm::vec3(0));
+
+    float translationScale = 0.5f;
+    float rotationScale = 0.025f;
+
+    // In order to control camera movement, we will
+    // use good old WASD
+    bool wPressed = false;
+    bool aPressed = false;
+    bool sPressed = false;
+    bool dPressed = false;
+
+    bool isMouseDown = false;
+    float lastMouseX = 0.0f;
+    float lastMouseY = 0.0f;
+
+    void setKeyState(platform::KeyCode key, bool state)
     {
-        float deltaX = args.x - lastMouseX;
-        float deltaY = args.y - lastMouseY;
+        switch (key)
+        {
+        default:
+            break;
+        case platform::KeyCode::W:
+            wPressed = state;
+            break;
+        case platform::KeyCode::A:
+            aPressed = state;
+            break;
+        case platform::KeyCode::S:
+            sPressed = state;
+            break;
+        case platform::KeyCode::D:
+            dPressed = state;
+            break;
+        }
+    }
+    void onKeyDown(platform::KeyEventArgs args) { setKeyState(args.key, true); }
+    void onKeyUp(platform::KeyEventArgs args) { setKeyState(args.key, false); }
 
-        cameraOrientation =
-            glm::rotate(cameraOrientation, -deltaX * rotationScale, glm::vec3(0, 1, 0));
-        cameraOrientation =
-            glm::rotate(cameraOrientation, -deltaY * rotationScale, glm::vec3(1, 0, 0));
-
-        cameraOrientation = normalize(cameraOrientation);
-
+    void onMouseDown(platform::MouseEventArgs args)
+    {
+        isMouseDown = true;
         lastMouseX = (float)args.x;
         lastMouseY = (float)args.y;
     }
-}
-void onMouseUp(platform::MouseEventArgs args)
-{
-    isMouseDown = false;
-}
 
-// The overall initialization logic is quite similar to
-// the earlier example. The biggest difference is that we
-// create instances of our application-specific parameter
-// block layout and effect types instead of just creating
-// raw graphics API objects.
-//
-Result initialize()
-{
-    initializeBase("Model Viewer", 1024, 768);
-    gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e) { onMouseMove(e); };
-    gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { onMouseUp(e); };
-    gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e) { onMouseDown(e); };
-    gWindow->events.keyDown = [this](const platform::KeyEventArgs& e) { onKeyDown(e); };
-    gWindow->events.keyUp = [this](const platform::KeyEventArgs& e) { onKeyUp(e); };
-
-    // Initialize `RendererContext`, which loads the shader module from file.
-    SLANG_RETURN_ON_FAIL(context.init(gDevice));
-
-    InputElementDesc inputElements[] = {
-        {"POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Model::Vertex, position) },
-        {"NORMAL",   0, Format::R32G32B32_FLOAT, offsetof(Model::Vertex, normal) },
-        {"UV",       0, Format::R32G32_FLOAT,  offsetof(Model::Vertex, uv) },
-    };
-    auto inputLayout = gDevice->createInputLayout(
-        sizeof(Model::Vertex),
-        &inputElements[0],
-        3);
-    if(!inputLayout) return SLANG_FAIL;
-
-    // Create the pipeline state object for drawing models.
-    GraphicsPipelineStateDesc pipelineStateDesc = {};
-    pipelineStateDesc.program = context.shaderProgram;
-    pipelineStateDesc.framebufferLayout = gFramebufferLayout;
-    pipelineStateDesc.inputLayout = inputLayout;
-    pipelineStateDesc.primitiveType = PrimitiveType::Triangle;
-    pipelineStateDesc.depthStencil.depthFunc = ComparisonFunc::LessEqual;
-    pipelineStateDesc.depthStencil.depthTestEnable = true;
-    gPipelineState = gDevice->createGraphicsPipelineState(pipelineStateDesc);
-
-    // We will create a lighting environment layout that can hold a few point
-    // and directional lights, and then initialize a lighting environment
-    // with just a single point light.
-    //
-    RefPtr<LightEnvLayout> lightEnvLayout = new LightEnvLayout();
-    lightEnvLayout->addLightType<PointLight>(&context, 10);
-    lightEnvLayout->addLightType<DirectionalLight>(&context, 2);
-
-    lightEnv = new LightEnv(lightEnvLayout, &context);
-
-    RefPtr<PointLight> pointLight = new PointLight();
-    pointLight->position = glm::vec3(5, 3, 1);
-    pointLight->intensity = glm::vec3(10);
-    lightEnv->add(pointLight);
-
-    // Once we have created all our graphcis API and application resources,
-    // we can start to load models. For now we are keeping things extremely
-    // simple by using a trivial `.obj` file that can be checked into source
-    // control.
-    //
-    // Support for loading more interesting/complex models will be added
-    // to this example over time (although model loading is *not* the focus).
-    //
-    Slang::String path = resourceBase.resolveResource("cube.obj").getBuffer();
-    loadAndAddModel(path.getBuffer());
-
-    return SLANG_OK;
-}
-
-// With the setup work done, we can look at the per-frame rendering
-// logic to see how the application will drive the `RenderContext`
-// type to perform both shader parameter binding and code specialization.
-//
-void renderFrame(int frameIndex) override
-{
-    // In order to see that things are rendering properly we need some
-    // kind of animation, so we will compute a crude delta-time value here.
-    //
-    if(!lastTime) lastTime = getCurrentTime();
-    uint64_t currentTime = getCurrentTime();
-    float deltaTime = float(double(currentTime - lastTime) / double(getTimerFrequency()));
-    lastTime = currentTime;
-
-    // We will use the GLM library to do the matrix math required
-    // to set up our various transformation matrices.
-    //
-    glm::mat4x4 identity = glm::mat4x4(1.0f);
-    auto clientRect = getWindow()->getClientRect();
-    if (clientRect.height == 0)
-        return;
-    glm::mat4x4 projection = glm::perspectiveRH_ZO(
-        glm::radians(60.0f), float(clientRect.width) / float(clientRect.height),
-        0.1f,
-        1000.0f);
-
-    // We are implementing a *very* basic 6DOF first-person
-    // camera movement model.
-    //
-    glm::mat3x3 cameraOrientationMat(cameraOrientation);
-    glm::vec3 forward = -cameraOrientationMat[2];
-    glm::vec3 right = cameraOrientationMat[0];
-
-    glm::vec3 movement = glm::vec3(0);
-    if(wPressed) movement += forward;
-    if(sPressed) movement -= forward;
-    if(aPressed) movement -= right;
-    if(dPressed) movement += right;
-
-    cameraPosition += deltaTime * translationScale * movement;
-
-    glm::mat4x4 view = identity;
-    view *= glm::mat4x4(inverse(cameraOrientation));
-    view = glm::translate(view, -cameraPosition);
-
-    glm::mat4x4 viewProjection = projection * view;
-    auto deviceInfo = gDevice->getDeviceInfo();
-    glm::mat4x4 correctionMatrix;
-    memcpy(&correctionMatrix, deviceInfo.identityProjectionMatrix, sizeof(float)*16);
-    viewProjection = correctionMatrix * viewProjection;
-    // glm uses column-major layout, we need to translate it to row-major.
-    viewProjection = glm::transpose(viewProjection);
-
-    auto drawCommandBuffer = gTransientHeaps[frameIndex]->createCommandBuffer();
-    auto drawCommandEncoder =
-        drawCommandBuffer->encodeRenderCommands(gRenderPass, gFramebuffers[frameIndex]);
-    gfx::Viewport viewport = {};
-    viewport.maxZ = 1.0f;
-    viewport.extentX = (float)clientRect.width;
-    viewport.extentY = (float)clientRect.height;
-    drawCommandEncoder->setViewportAndScissor(viewport);
-    drawCommandEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
-
-    // We are only rendering one view, so we can fill in a per-view
-    // shader object once and use it across all draw calls.
-    //
-
-    auto viewShaderObject = gDevice->createShaderObject(context.perViewShaderType);
+    void onMouseMove(platform::MouseEventArgs args)
     {
-        ShaderCursor cursor(viewShaderObject);
-        cursor["viewProjection"].setData(&viewProjection, sizeof(viewProjection));
-        cursor["eyePosition"].setData(&cameraPosition, sizeof(cameraPosition));
-    }
-    // The majority of our rendering logic is handled as a loop
-    // over the models in the scene, and their meshes.
-    //
-    for(auto& model : gModels)
-    {
-        drawCommandEncoder->setVertexBuffer(0, model->vertexBuffer);
-        drawCommandEncoder->setIndexBuffer(model->indexBuffer, Format::R32_UINT);
-        // For each model we provide a parameter
-        // block that holds the per-model transformation
-        // parameters, corresponding to the `PerModel` type
-        // in the shader code.
-        glm::mat4x4 modelTransform = identity;
-        glm::mat4x4 inverseTransposeModelTransform = inverse(transpose(modelTransform));
-        auto modelShaderObject = gDevice->createShaderObject(context.perModelShaderType);
+        if (isMouseDown)
         {
-            ShaderCursor cursor(modelShaderObject);
-            cursor["modelTransform"].setData(&modelTransform, sizeof(modelTransform));
-            cursor["inverseTransposeModelTransform"].setData(
-                &inverseTransposeModelTransform, sizeof(inverseTransposeModelTransform));
-        }
+            float deltaX = args.x - lastMouseX;
+            float deltaY = args.y - lastMouseY;
 
-        auto lightShaderObject = lightEnv->createShaderObject();
+            cameraOrientation =
+                glm::rotate(cameraOrientation, -deltaX * rotationScale, glm::vec3(0, 1, 0));
+            cameraOrientation =
+                glm::rotate(cameraOrientation, -deltaY * rotationScale, glm::vec3(1, 0, 0));
 
-        // Now we loop over the meshes in the model.
-        //
-        // A more advanced rendering loop would sort things by material
-        // rather than by model, to avoid overly frequent state changes.
-        // We are just doing something simple for the purposes of an
-        // exmple program.
-        //
-        for(auto& mesh : model->meshes)
-        {
-            // Set the pipeline and binding state for drawing each mesh.
-            auto rootObject = drawCommandEncoder->bindPipeline(gPipelineState);
-            ShaderCursor rootCursor(rootObject);
-            rootCursor["gViewParams"].setObject(viewShaderObject);
-            rootCursor["gModelParams"].setObject(modelShaderObject);
-            rootCursor["gLightEnv"].setObject(lightShaderObject);
+            cameraOrientation = normalize(cameraOrientation);
 
-            // Each mesh has a material, and each material has its own
-            // parameter block that was created at load time, so we
-            // can just re-use the persistent parameter block for the
-            // chosen material.
-            //
-            // Note that binding the material parameter block here is
-            // both selecting the values to use for various material
-            // parameters as well as the *code* to use for material
-            // evaluation (based on the concrete shader type that
-            // is implementing the `IMaterial` interface).
-            //
-            rootCursor["gMaterial"].setObject(mesh->material->shaderObject);
-
-            // All the shader parameters and pipeline states have been set up,
-            // we can now issue a draw call for the mesh.
-            drawCommandEncoder->drawIndexed(mesh->indexCount, mesh->firstIndex);
+            lastMouseX = (float)args.x;
+            lastMouseY = (float)args.y;
         }
     }
-    drawCommandEncoder->endEncoding();
-    drawCommandBuffer->close();
-    gQueue->executeCommandBuffer(drawCommandBuffer);
+    void onMouseUp(platform::MouseEventArgs args) { isMouseDown = false; }
 
-    gSwapchain->present();
-}
+    // The overall initialization logic is quite similar to
+    // the earlier example. The biggest difference is that we
+    // create instances of our application-specific parameter
+    // block layout and effect types instead of just creating
+    // raw graphics API objects.
+    //
+    Result initialize()
+    {
+        SLANG_RETURN_ON_FAIL(initializeBase("Model Viewer", 1024, 768));
+        if (!isTestMode())
+        {
+            gWindow->events.mouseMove = [this](const platform::MouseEventArgs& e)
+            { onMouseMove(e); };
+            gWindow->events.mouseUp = [this](const platform::MouseEventArgs& e) { onMouseUp(e); };
+            gWindow->events.mouseDown = [this](const platform::MouseEventArgs& e)
+            { onMouseDown(e); };
+            gWindow->events.keyDown = [this](const platform::KeyEventArgs& e) { onKeyDown(e); };
+            gWindow->events.keyUp = [this](const platform::KeyEventArgs& e) { onKeyUp(e); };
+        }
 
+        // Initialize `RendererContext`, which loads the shader module from file.
+        SLANG_RETURN_ON_FAIL(context.init(gDevice, this));
+
+
+        InputElementDesc inputElements[] = {
+            {"POSITION", 0, Format::R32G32B32_FLOAT, offsetof(Model::Vertex, position)},
+            {"NORMAL", 0, Format::R32G32B32_FLOAT, offsetof(Model::Vertex, normal)},
+            {"UV", 0, Format::R32G32_FLOAT, offsetof(Model::Vertex, uv)},
+        };
+        auto inputLayout = gDevice->createInputLayout(sizeof(Model::Vertex), &inputElements[0], 3);
+        if (!inputLayout)
+            return SLANG_FAIL;
+
+        // Create the pipeline state object for drawing models.
+        GraphicsPipelineStateDesc pipelineStateDesc = {};
+        pipelineStateDesc.program = context.shaderProgram;
+        pipelineStateDesc.framebufferLayout = gFramebufferLayout;
+        pipelineStateDesc.inputLayout = inputLayout;
+        pipelineStateDesc.primitiveType = PrimitiveType::Triangle;
+        pipelineStateDesc.depthStencil.depthFunc = ComparisonFunc::LessEqual;
+        pipelineStateDesc.depthStencil.depthTestEnable = true;
+        gPipelineState = gDevice->createGraphicsPipelineState(pipelineStateDesc);
+
+        // We will create a lighting environment layout that can hold a few point
+        // and directional lights, and then initialize a lighting environment
+        // with just a single point light.
+        //
+        RefPtr<LightEnvLayout> lightEnvLayout = new LightEnvLayout();
+        lightEnvLayout->addLightType<PointLight>(&context, 10);
+        lightEnvLayout->addLightType<DirectionalLight>(&context, 2);
+
+        lightEnv = new LightEnv(lightEnvLayout, &context);
+
+        RefPtr<PointLight> pointLight = new PointLight();
+        pointLight->position = glm::vec3(5, 3, 1);
+        pointLight->intensity = glm::vec3(10);
+        lightEnv->add(pointLight);
+
+        // Once we have created all our graphcis API and application resources,
+        // we can start to load models. For now we are keeping things extremely
+        // simple by using a trivial `.obj` file that can be checked into source
+        // control.
+        //
+        // Support for loading more interesting/complex models will be added
+        // to this example over time (although model loading is *not* the focus).
+        //
+        Slang::String path = resourceBase.resolveResource("cube.obj").getBuffer();
+        loadAndAddModel(path.getBuffer());
+
+        return SLANG_OK;
+    }
+
+    // With the setup work done, we can look at the per-frame rendering
+    // logic to see how the application will drive the `RenderContext`
+    // type to perform both shader parameter binding and code specialization.
+    //
+    void renderFrame(int frameIndex) override
+    {
+        // In order to see that things are rendering properly we need some
+        // kind of animation, so we will compute a crude delta-time value here.
+        //
+        if (!lastTime)
+            lastTime = getCurrentTime();
+        uint64_t currentTime = getCurrentTime();
+        float deltaTime = float(double(currentTime - lastTime) / double(getTimerFrequency()));
+        lastTime = currentTime;
+
+        // We will use the GLM library to do the matrix math required
+        // to set up our various transformation matrices.
+        //
+        glm::mat4x4 identity = glm::mat4x4(1.0f);
+
+        platform::Rect clientRect{};
+        if (isTestMode())
+        {
+            clientRect.width = 1024;
+            clientRect.height = 768;
+        }
+        else
+        {
+            clientRect = getWindow()->getClientRect();
+        }
+        if (clientRect.height == 0)
+            return;
+        glm::mat4x4 projection = glm::perspectiveRH_ZO(
+            glm::radians(60.0f),
+            float(clientRect.width) / float(clientRect.height),
+            0.1f,
+            1000.0f);
+
+        // We are implementing a *very* basic 6DOF first-person
+        // camera movement model.
+        //
+        glm::mat3x3 cameraOrientationMat(cameraOrientation);
+        glm::vec3 forward = -cameraOrientationMat[2];
+        glm::vec3 right = cameraOrientationMat[0];
+
+        glm::vec3 movement = glm::vec3(0);
+        if (wPressed)
+            movement += forward;
+        if (sPressed)
+            movement -= forward;
+        if (aPressed)
+            movement -= right;
+        if (dPressed)
+            movement += right;
+
+        cameraPosition += deltaTime * translationScale * movement;
+
+        glm::mat4x4 view = identity;
+        view *= glm::mat4x4(inverse(cameraOrientation));
+        view = glm::translate(view, -cameraPosition);
+
+        glm::mat4x4 viewProjection = projection * view;
+        auto deviceInfo = gDevice->getDeviceInfo();
+        glm::mat4x4 correctionMatrix;
+        memcpy(&correctionMatrix, deviceInfo.identityProjectionMatrix, sizeof(float) * 16);
+        viewProjection = correctionMatrix * viewProjection;
+        // glm uses column-major layout, we need to translate it to row-major.
+        viewProjection = glm::transpose(viewProjection);
+
+        auto drawCommandBuffer = gTransientHeaps[frameIndex]->createCommandBuffer();
+        auto drawCommandEncoder =
+            drawCommandBuffer->encodeRenderCommands(gRenderPass, gFramebuffers[frameIndex]);
+        gfx::Viewport viewport = {};
+        viewport.maxZ = 1.0f;
+        viewport.extentX = (float)clientRect.width;
+        viewport.extentY = (float)clientRect.height;
+        drawCommandEncoder->setViewportAndScissor(viewport);
+        drawCommandEncoder->setPrimitiveTopology(PrimitiveTopology::TriangleList);
+
+        // We are only rendering one view, so we can fill in a per-view
+        // shader object once and use it across all draw calls.
+        //
+
+        auto viewShaderObject = gDevice->createShaderObject(context.perViewShaderType);
+        {
+            ShaderCursor cursor(viewShaderObject);
+            cursor["viewProjection"].setData(&viewProjection, sizeof(viewProjection));
+            cursor["eyePosition"].setData(&cameraPosition, sizeof(cameraPosition));
+        }
+        // The majority of our rendering logic is handled as a loop
+        // over the models in the scene, and their meshes.
+        //
+        for (auto& model : gModels)
+        {
+            drawCommandEncoder->setVertexBuffer(0, model->vertexBuffer);
+            drawCommandEncoder->setIndexBuffer(model->indexBuffer, Format::R32_UINT);
+            // For each model we provide a parameter
+            // block that holds the per-model transformation
+            // parameters, corresponding to the `PerModel` type
+            // in the shader code.
+            glm::mat4x4 modelTransform = identity;
+            glm::mat4x4 inverseTransposeModelTransform = inverse(transpose(modelTransform));
+            auto modelShaderObject = gDevice->createShaderObject(context.perModelShaderType);
+            {
+                ShaderCursor cursor(modelShaderObject);
+                cursor["modelTransform"].setData(&modelTransform, sizeof(modelTransform));
+                cursor["inverseTransposeModelTransform"].setData(
+                    &inverseTransposeModelTransform,
+                    sizeof(inverseTransposeModelTransform));
+            }
+
+            auto lightShaderObject = lightEnv->createShaderObject();
+
+            // Now we loop over the meshes in the model.
+            //
+            // A more advanced rendering loop would sort things by material
+            // rather than by model, to avoid overly frequent state changes.
+            // We are just doing something simple for the purposes of an
+            // exmple program.
+            //
+            for (auto& mesh : model->meshes)
+            {
+                // Set the pipeline and binding state for drawing each mesh.
+                auto rootObject = drawCommandEncoder->bindPipeline(gPipelineState);
+                ShaderCursor rootCursor(rootObject);
+                rootCursor["gViewParams"].setObject(viewShaderObject);
+                rootCursor["gModelParams"].setObject(modelShaderObject);
+                rootCursor["gLightEnv"].setObject(lightShaderObject);
+
+                // Each mesh has a material, and each material has its own
+                // parameter block that was created at load time, so we
+                // can just re-use the persistent parameter block for the
+                // chosen material.
+                //
+                // Note that binding the material parameter block here is
+                // both selecting the values to use for various material
+                // parameters as well as the *code* to use for material
+                // evaluation (based on the concrete shader type that
+                // is implementing the `IMaterial` interface).
+                //
+                rootCursor["gMaterial"].setObject(mesh->material->shaderObject);
+
+                // All the shader parameters and pipeline states have been set up,
+                // we can now issue a draw call for the mesh.
+                drawCommandEncoder->drawIndexed(mesh->indexCount, mesh->firstIndex);
+            }
+        }
+        drawCommandEncoder->endEncoding();
+        drawCommandBuffer->close();
+        gQueue->executeCommandBuffer(drawCommandBuffer);
+
+        if (!isTestMode())
+        {
+            gSwapchain->present();
+        }
+    }
 };
 
 // This macro instantiates an appropriate main function to
 // run the application defined above.
-PLATFORM_UI_MAIN(innerMain<ModelViewer>)
+EXAMPLE_MAIN(innerMain<ModelViewer>);

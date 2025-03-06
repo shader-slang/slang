@@ -1,14 +1,22 @@
-//TEST:SIMPLE(filecheck=CHECK): -target metal
-//TEST:SIMPLE(filecheck=CHECK-ASM): -target metallib
+//TEST:SIMPLE(filecheck=METAL): -target metal
+//TEST:SIMPLE(filecheck=METAL_ASM): -target metallib
+//TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage fragment -entry fragmentMain
+//TEST:SIMPLE(filecheck=WGSLSPIRV): -target wgsl-spirv-asm
 
-// CHECK-ASM: define {{.*}} @vertexMain
-// CHECK-ASM: define {{.*}} @fragmentMain
+// METAL_ASM: define {{.*}} @vertexMain
+// METAL_ASM: define {{.*}} @fragmentMain
 
 // Check that we don't flatten stage-input parameters that have user semantics.
 
-// CHECK: struct pixelInput
-// CHECK-NEXT: {
-// CHECK-NEXT: {{\[\[}}user(COARSEVERTEX){{\]\]}};
+// METAL: struct pixelInput
+// METAL-NEXT: {
+// METAL-NEXT: {{\[\[}}user(COARSEVERTEX){{\]\]}};
+
+//WGSLSPIRV: %vertexMain = OpFunction %
+//WGSLSPIRV: %fragmentMain = OpFunction %
+
+//WGSL:     @location(0) output
+//WGSL:     @location(0) color
 
 // Uniform data to be passed from application -> shader.
 cbuffer Uniforms

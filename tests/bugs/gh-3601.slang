@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
 struct TestStruct
 {
     uint index;

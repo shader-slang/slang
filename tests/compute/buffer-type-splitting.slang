@@ -1,6 +1,8 @@
 //TEST(compute):COMPARE_COMPUTE:-cpu
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -mtl
+// Not supported in WGSL: Arrays of textures or buffers
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 //TEST_INPUT:ubuffer(data=[0 2 3 3]):name=s[0].a

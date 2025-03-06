@@ -4,28 +4,28 @@
 #include "../core/slang-string-escape-util.h"
 #include "../core/slang-string-util.h"
 
-namespace Slang {
-
-/* static */const JSONValue::Kind JSONValue::g_typeToKind[] =
+namespace Slang
 {
-    JSONValue::Kind::Invalid,           // Invalid
 
-    JSONValue::Kind::Bool,              // True,
-    JSONValue::Kind::Bool,              // False
-    JSONValue::Kind::Null,              // Null,
+/* static */ const JSONValue::Kind JSONValue::g_typeToKind[] = {
+    JSONValue::Kind::Invalid, // Invalid
 
-    JSONValue::Kind::String,            // StringLexeme,
-    JSONValue::Kind::Integer,           // IntegerLexeme,
-    JSONValue::Kind::Float,             // FloatLexeme,
+    JSONValue::Kind::Bool, // True,
+    JSONValue::Kind::Bool, // False
+    JSONValue::Kind::Null, // Null,
 
-    JSONValue::Kind::Integer,           // IntegerValue,
-    JSONValue::Kind::Float,             // FloatValue,
-    JSONValue::Kind::String,            // StringValue,
+    JSONValue::Kind::String,  // StringLexeme,
+    JSONValue::Kind::Integer, // IntegerLexeme,
+    JSONValue::Kind::Float,   // FloatLexeme,
 
-    JSONValue::Kind::String,            // StringRepresentation
+    JSONValue::Kind::Integer, // IntegerValue,
+    JSONValue::Kind::Float,   // FloatValue,
+    JSONValue::Kind::String,  // StringValue,
 
-    JSONValue::Kind::Array,             // Array,
-    JSONValue::Kind::Object,            // Object,
+    JSONValue::Kind::String, // StringRepresentation
+
+    JSONValue::Kind::Array,  // Array,
+    JSONValue::Kind::Object, // Object,
 };
 
 static bool _isDefault(const RttiInfo* type, const void* in)
@@ -44,7 +44,7 @@ static OtherRttiInfo _getJSONValueRttiInfo()
     info.m_typeFuncs = GetRttiTypeFuncs<JSONValue>::getFuncs();
     return info;
 }
-/* static */const OtherRttiInfo JSONValue::g_rttiInfo = _getJSONValueRttiInfo();
+/* static */ const OtherRttiInfo JSONValue::g_rttiInfo = _getJSONValueRttiInfo();
 
 static JSONKeyValue _makeInvalidKeyValue()
 {
@@ -54,7 +54,7 @@ static JSONKeyValue _makeInvalidKeyValue()
     return keyValue;
 }
 
-/* static */JSONKeyValue g_invalid = _makeInvalidKeyValue();
+/* static */ JSONKeyValue g_invalid = _makeInvalidKeyValue();
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -66,15 +66,19 @@ bool JSONValue::asBool() const
 {
     switch (type)
     {
-        case JSONValue::Type::True:             return true;
-        case JSONValue::Type::False:
-        case JSONValue::Type::Null:
+    case JSONValue::Type::True:
+        return true;
+    case JSONValue::Type::False:
+    case JSONValue::Type::Null:
         {
             return false;
         }
-        case JSONValue::Type::IntegerValue:     return intValue != 0;
-        case JSONValue::Type::FloatValue:       return floatValue != 0;
-        default: break;
+    case JSONValue::Type::IntegerValue:
+        return intValue != 0;
+    case JSONValue::Type::FloatValue:
+        return floatValue != 0;
+    default:
+        break;
     }
 
     if (isLexeme(type))
@@ -85,7 +89,7 @@ bool JSONValue::asBool() const
     {
         SLANG_ASSERT(!"Not bool convertable");
     }
-   
+
     return false;
 }
 
@@ -93,14 +97,17 @@ int64_t JSONValue::asInteger() const
 {
     switch (type)
     {
-        case JSONValue::Type::True:             return 1;
-        case JSONValue::Type::False:
-        case JSONValue::Type::Null:
+    case JSONValue::Type::True:
+        return 1;
+    case JSONValue::Type::False:
+    case JSONValue::Type::Null:
         {
             return 0;
         }
-        case JSONValue::Type::IntegerValue:     return intValue;
-        case JSONValue::Type::FloatValue:       return int64_t(floatValue);
+    case JSONValue::Type::IntegerValue:
+        return intValue;
+    case JSONValue::Type::FloatValue:
+        return int64_t(floatValue);
         break;
     }
 
@@ -120,15 +127,19 @@ double JSONValue::asFloat() const
 {
     switch (type)
     {
-        case JSONValue::Type::True:             return 1.0;
-        case JSONValue::Type::False:
-        case JSONValue::Type::Null:
+    case JSONValue::Type::True:
+        return 1.0;
+    case JSONValue::Type::False:
+    case JSONValue::Type::Null:
         {
             return 0.0;
         }
-        case JSONValue::Type::IntegerValue:     return double(intValue);
-        case JSONValue::Type::FloatValue:       return floatValue;
-        default: break;
+    case JSONValue::Type::IntegerValue:
+        return double(intValue);
+    case JSONValue::Type::FloatValue:
+        return floatValue;
+    default:
+        break;
     }
 
     if (isLexeme(type))
@@ -139,7 +150,7 @@ double JSONValue::asFloat() const
     {
         SLANG_ASSERT(!"Not float convertable");
     }
-  
+
     return 0;
 }
 
@@ -197,7 +208,8 @@ UnownedStringSlice PersistentJSONValue::getSlice() const
 
 void PersistentJSONValue::set(const UnownedStringSlice& slice, SourceLoc inLoc)
 {
-    StringRepresentation* oldRep = (type == JSONValue::Type::StringRepresentation) ? stringRep : nullptr;
+    StringRepresentation* oldRep =
+        (type == JSONValue::Type::StringRepresentation) ? stringRep : nullptr;
 
     type = Type::StringRepresentation;
     loc = inLoc;
@@ -205,13 +217,11 @@ void PersistentJSONValue::set(const UnownedStringSlice& slice, SourceLoc inLoc)
     StringRepresentation* newRep = nullptr;
 
     const auto sliceLength = slice.getLength();
-    
+
     // If we have an oldRep that is unique and large enough reuse it
     if (sliceLength)
     {
-        if (oldRep &&
-            oldRep->isUniquelyReferenced() &&
-            sliceLength <= oldRep->capacity)
+        if (oldRep && oldRep->isUniquelyReferenced() && sliceLength <= oldRep->capacity)
         {
             oldRep->setContents(slice);
             newRep = oldRep;
@@ -220,7 +230,7 @@ void PersistentJSONValue::set(const UnownedStringSlice& slice, SourceLoc inLoc)
         }
         else
         {
-            newRep = StringRepresentation::createWithReference(slice);    
+            newRep = StringRepresentation::createWithReference(slice);
         }
 
         SLANG_ASSERT(newRep->debugGetReferenceCount() >= 1);
@@ -248,25 +258,26 @@ bool PersistentJSONValue::operator==(const ThisType& rhs) const
         return true;
     }
 
-    if (type != rhs.type ||
-        loc != rhs.loc)
+    if (type != rhs.type || loc != rhs.loc)
     {
         return false;
     }
 
     switch (type)
     {
-        case Type::Invalid:
-        case Type::True:
-        case Type::False:
-        case Type::Null:
+    case Type::Invalid:
+    case Type::True:
+    case Type::False:
+    case Type::Null:
         {
             // The type is all that needs to be checked
             return true;
         }
-        case Type::IntegerValue:    return intValue == rhs.intValue;
-        case Type::FloatValue:      return floatValue == rhs.floatValue;
-        case Type::StringRepresentation:
+    case Type::IntegerValue:
+        return intValue == rhs.intValue;
+    case Type::FloatValue:
+        return floatValue == rhs.floatValue;
+    case Type::StringRepresentation:
         {
             if (stringRep == rhs.stringRep)
             {
@@ -276,7 +287,8 @@ bool PersistentJSONValue::operator==(const ThisType& rhs) const
             auto rhsSlice = StringRepresentation::asSlice(rhs.stringRep);
             return thisSlice == rhsSlice;
         }
-        default: break;
+    default:
+        break;
     }
 
     SLANG_ASSERT(!"Not valid Persistent type");
@@ -290,8 +302,8 @@ void PersistentJSONValue::_init(const JSONValue& in, JSONContainer* container)
 
     switch (in.type)
     {
-        case Type::StringValue:
-        case Type::StringLexeme:
+    case Type::StringValue:
+    case Type::StringLexeme:
         {
             if (!container)
             {
@@ -301,7 +313,7 @@ void PersistentJSONValue::_init(const JSONValue& in, JSONContainer* container)
             _init(container->getTransientString(in), in.loc);
             break;
         }
-        case Type::StringRepresentation:
+    case Type::StringRepresentation:
         {
             *(JSONValue*)this = in;
             if (stringRep)
@@ -310,27 +322,27 @@ void PersistentJSONValue::_init(const JSONValue& in, JSONContainer* container)
             }
             break;
         }
-        case Type::IntegerLexeme:
+    case Type::IntegerLexeme:
         {
             type = JSONValue::Type::IntegerValue;
             intValue = container->asInteger(in);
             loc = in.loc;
             break;
         }
-        case Type::FloatLexeme:
+    case Type::FloatLexeme:
         {
             type = JSONValue::Type::FloatValue;
             floatValue = container->asFloat(in);
             loc = in.loc;
             break;
         }
-        case Type::Array:
-        case Type::Object:
+    case Type::Array:
+    case Type::Object:
         {
             SLANG_ASSERT(!"Not a simple JSON type");
             break;
         }
-        default:
+    default:
         {
             *(JSONValue*)this = in;
             break;
@@ -364,9 +376,8 @@ void PersistentJSONValue::set(const JSONValue& in, JSONContainer* container)
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-JSONContainer::JSONContainer(SourceManager* sourceManager):
-    m_slicePool(StringSlicePool::Style::Default),
-    m_sourceManager(sourceManager)
+JSONContainer::JSONContainer(SourceManager* sourceManager)
+    : m_slicePool(StringSlicePool::Style::Default), m_sourceManager(sourceManager)
 {
     // Index 0 is the empty array or object
     _addRange(Range::Type::None, 0, 0);
@@ -385,7 +396,7 @@ void JSONContainer::reset()
     m_currentView = nullptr;
 }
 
-/* static */bool JSONContainer::areKeysUnique(const JSONKeyValue* keyValues, Index keyValueCount)
+/* static */ bool JSONContainer::areKeysUnique(const JSONKeyValue* keyValues, Index keyValueCount)
 {
     for (Index i = 1; i < keyValueCount; ++i)
     {
@@ -447,7 +458,10 @@ JSONValue JSONContainer::createArray(const JSONValue* values, Index valuesCount,
     return value;
 }
 
-JSONValue JSONContainer::createObject(const JSONKeyValue* keyValues, Index keyValueCount, SourceLoc loc)
+JSONValue JSONContainer::createObject(
+    const JSONKeyValue* keyValues,
+    Index keyValueCount,
+    SourceLoc loc)
 {
     if (keyValueCount <= 0)
     {
@@ -514,7 +528,9 @@ ArrayView<JSONValue> JSONContainer::getArray(const JSONValue& in)
         return ArrayView<JSONValue>((JSONValue*)nullptr, 0);
     }
     const Range& range = m_ranges[in.rangeIndex];
-    SLANG_ASSERT(range.startIndex <= m_arrayValues.getCount() && range.startIndex + range.count <= m_arrayValues.getCount());
+    SLANG_ASSERT(
+        range.startIndex <= m_arrayValues.getCount() &&
+        range.startIndex + range.count <= m_arrayValues.getCount());
 
     return ArrayView<JSONValue>(m_arrayValues.getBuffer() + range.startIndex, range.count);
 }
@@ -558,27 +574,28 @@ UnownedStringSlice JSONContainer::getString(const JSONValue& in)
 {
     switch (in.type)
     {
-        case JSONValue::Type::StringValue:
+    case JSONValue::Type::StringValue:
         {
             return getStringFromKey(in.stringKey);
         }
-        case JSONValue::Type::StringLexeme:
+    case JSONValue::Type::StringLexeme:
         {
             auto slice = getTransientString(in);
             auto handle = m_slicePool.add(slice);
             return m_slicePool.getSlice(handle);
         }
-        case JSONValue::Type::StringRepresentation:
+    case JSONValue::Type::StringRepresentation:
         {
             return StringRepresentation::asSlice(in.stringRep);
         }
-        case JSONValue::Type::Null:
+    case JSONValue::Type::Null:
         {
             return UnownedStringSlice();
         }
-        default: break;
+    default:
+        break;
     }
-   
+
     SLANG_ASSERT(!"Not a string type");
     return UnownedStringSlice();
 }
@@ -587,17 +604,18 @@ UnownedStringSlice JSONContainer::getTransientString(const JSONValue& in)
 {
     switch (in.type)
     {
-        case JSONValue::Type::StringRepresentation:
+    case JSONValue::Type::StringRepresentation:
         {
             return StringRepresentation::asSlice(in.stringRep);
         }
-        case JSONValue::Type::StringValue:
+    case JSONValue::Type::StringValue:
         {
             return getStringFromKey(in.stringKey);
         }
-        case JSONValue::Type::StringLexeme:
+    case JSONValue::Type::StringLexeme:
         {
-            StringEscapeHandler* handler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::JSON);
+            StringEscapeHandler* handler =
+                StringEscapeUtil::getHandler(StringEscapeUtil::Style::JSON);
 
             UnownedStringSlice lexeme = getLexeme(in);
             UnownedStringSlice unquoted = StringEscapeUtil::unquote(handler, lexeme);
@@ -613,7 +631,7 @@ UnownedStringSlice JSONContainer::getTransientString(const JSONValue& in)
                 return unquoted;
             }
         }
-        case JSONValue::Type::Null:
+    case JSONValue::Type::Null:
         {
             return UnownedStringSlice();
         }
@@ -625,16 +643,20 @@ UnownedStringSlice JSONContainer::getTransientString(const JSONValue& in)
 
 JSONKey JSONContainer::getStringKey(const JSONValue& in)
 {
-    return (in.type == JSONValue::Type::StringValue) ? in.stringKey : getKey(getTransientString(in));
+    return (in.type == JSONValue::Type::StringValue) ? in.stringKey
+                                                     : getKey(getTransientString(in));
 }
- 
+
 bool JSONContainer::asBool(const JSONValue& value)
 {
     switch (value.type)
     {
-        case JSONValue::Type::IntegerLexeme:    return asInteger(value) != 0;
-        case JSONValue::Type::FloatLexeme:      return asFloat(value) != 0.0;
-        default:                                return value.asBool();
+    case JSONValue::Type::IntegerLexeme:
+        return asInteger(value) != 0;
+    case JSONValue::Type::FloatLexeme:
+        return asFloat(value) != 0.0;
+    default:
+        return value.asBool();
     }
 }
 
@@ -643,26 +665,27 @@ JSONValue JSONContainer::asValue(const JSONValue& inValue)
     JSONValue value = inValue;
     switch (value.type)
     {
-        case JSONValue::Type::StringLexeme:
+    case JSONValue::Type::StringLexeme:
         {
             const UnownedStringSlice slice = getTransientString(inValue);
             value.stringKey = getKey(slice);
             value.type = JSONValue::Type::StringValue;
             break;
         }
-        case JSONValue::Type::IntegerLexeme:
+    case JSONValue::Type::IntegerLexeme:
         {
             value.floatValue = value.asFloat();
             value.type = JSONValue::Type::IntegerValue;
             break;
         }
-        case JSONValue::Type::FloatLexeme:
+    case JSONValue::Type::FloatLexeme:
         {
             value.floatValue = value.asFloat();
             value.type = JSONValue::Type::FloatValue;
             break;
         }
-        default: break;
+    default:
+        break;
     }
 
     return value;
@@ -687,12 +710,14 @@ void JSONContainer::clearSourceManagerDependency(JSONValue* ioValues, Index valu
     {
         switch (range.type)
         {
-            case Range::Type::Array:
+        case Range::Type::Array:
             {
-                _clearSourceManagerDependency(m_arrayValues.getBuffer() + range.startIndex, range.count);
+                _clearSourceManagerDependency(
+                    m_arrayValues.getBuffer() + range.startIndex,
+                    range.count);
                 break;
             }
-            case Range::Type::Object:
+        case Range::Type::Object:
             {
                 const Index count = range.count;
                 auto pairs = m_objectValues.getBuffer() + range.startIndex;
@@ -706,7 +731,8 @@ void JSONContainer::clearSourceManagerDependency(JSONValue* ioValues, Index valu
                 }
                 break;
             }
-            default: break;
+        default:
+            break;
         }
     }
 
@@ -718,7 +744,7 @@ int64_t JSONContainer::asInteger(const JSONValue& value)
 {
     switch (value.type)
     {
-        case JSONValue::Type::IntegerLexeme:
+    case JSONValue::Type::IntegerLexeme:
         {
             UnownedStringSlice slice = getLexeme(value);
             int64_t intValue;
@@ -729,8 +755,10 @@ int64_t JSONContainer::asInteger(const JSONValue& value)
             SLANG_ASSERT(!"Couldn't convert int");
             return 0;
         }
-        case JSONValue::Type::FloatLexeme:      return int64_t(asFloat(value));
-        default:                                return value.asInteger();
+    case JSONValue::Type::FloatLexeme:
+        return int64_t(asFloat(value));
+    default:
+        return value.asInteger();
     }
 }
 
@@ -738,8 +766,9 @@ double JSONContainer::asFloat(const JSONValue& value)
 {
     switch (value.type)
     {
-        case JSONValue::Type::IntegerLexeme:    return double(asInteger(value));
-        case JSONValue::Type::FloatLexeme:  
+    case JSONValue::Type::IntegerLexeme:
+        return double(asInteger(value));
+    case JSONValue::Type::FloatLexeme:
         {
             UnownedStringSlice slice = getLexeme(value);
             double floatValue;
@@ -750,20 +779,23 @@ double JSONContainer::asFloat(const JSONValue& value)
             SLANG_ASSERT(!"Couldn't convert double");
             return 0.0;
         }
-        default:                                return value.asFloat();
+    default:
+        return value.asFloat();
     }
 }
 
 Index JSONContainer::findObjectIndex(const JSONValue& obj, JSONKey key) const
 {
     auto pairs = getObject(obj);
-    return pairs.findFirstIndex([key](const JSONKeyValue& pair) -> bool { return pair.key == key; });
+    return pairs.findFirstIndex(
+        [key](const JSONKeyValue& pair) -> bool { return pair.key == key; });
 }
 
 JSONValue JSONContainer::findObjectValue(const JSONValue& obj, JSONKey key) const
 {
     auto pairs = getObject(obj);
-    const Index index = pairs.findFirstIndex([key](const JSONKeyValue& pair) -> bool { return pair.key == key; });
+    const Index index =
+        pairs.findFirstIndex([key](const JSONKeyValue& pair) -> bool { return pair.key == key; });
     return (index >= 0) ? pairs[index].value : JSONValue::makeInvalid();
 }
 
@@ -787,7 +819,6 @@ void JSONContainer::addToArray(JSONValue& array, const JSONValue& value)
             // We can just add to the end
             array.rangeIndex = _addRange(Range::Type::Array, m_arrayValues.getCount(), 1);
             m_arrayValues.add(value);
-            
         }
         else
         {
@@ -837,7 +868,10 @@ void JSONContainer::_removeKey(JSONValue& obj, Index globalIndex)
     if (localIndex < range.count - 1)
     {
         auto localBuf = m_objectValues.getBuffer() + range.startIndex;
-        ::memmove(localBuf + localIndex, localBuf + localIndex + 1, sizeof(*localBuf) * (range.count - (localIndex + 1)));
+        ::memmove(
+            localBuf + localIndex,
+            localBuf + localIndex + 1,
+            sizeof(*localBuf) * (range.count - (localIndex + 1)));
     }
 
     --range.count;
@@ -865,8 +899,8 @@ bool JSONContainer::removeKey(JSONValue& obj, const UnownedStringSlice& slice)
     return false;
 }
 
-template <typename T>
-/* static */void JSONContainer::_add(Range& ioRange, List<T>& ioList, const T& value)
+template<typename T>
+/* static */ void JSONContainer::_add(Range& ioRange, List<T>& ioList, const T& value)
 {
     // If we have capacity, we can add to the end
     if (ioRange.count < ioRange.capacity)
@@ -938,7 +972,7 @@ void JSONContainer::_destroyRange(Index rangeIndex)
     // If the range is at the end, shrink it
     switch (range.type)
     {
-        case Range::Type::Array:
+    case Range::Type::Array:
         {
             if (range.startIndex + range.capacity == m_arrayValues.getCount())
             {
@@ -946,7 +980,7 @@ void JSONContainer::_destroyRange(Index rangeIndex)
             }
             break;
         }
-        case Range::Type::Object:
+    case Range::Type::Object:
         {
             if (range.startIndex + range.capacity == m_objectValues.getCount())
             {
@@ -954,7 +988,8 @@ void JSONContainer::_destroyRange(Index rangeIndex)
             }
             break;
         }
-        default: break;
+    default:
+        break;
     }
 
     range.type = Range::Type::Destroyed;
@@ -971,7 +1006,7 @@ void JSONContainer::destroy(JSONValue& value)
 }
 
 void JSONContainer::destroyRecursively(JSONValue& inValue)
-{    
+{
     if (!(inValue.needsDestroy() && m_ranges[inValue.rangeIndex].isActive()))
     {
         inValue.type = JSONValue::Type::Invalid;
@@ -1000,7 +1035,7 @@ void JSONContainer::destroyRecursively(JSONValue& inValue)
             for (Index i = 0; i < count; ++i)
             {
                 auto& value = buf[i];
-                // If we have an active range, add to work list, and destroy 
+                // If we have an active range, add to work list, and destroy
                 if (value.needsDestroy() && m_ranges[value.rangeIndex].isActive())
                 {
                     activeRanges.add(m_ranges[value.rangeIndex]);
@@ -1009,7 +1044,7 @@ void JSONContainer::destroyRecursively(JSONValue& inValue)
                 value.type = JSONValue::Type::Invalid;
             }
         }
-        else 
+        else
         {
             SLANG_ASSERT(type == Range::Type::Object);
 
@@ -1019,7 +1054,8 @@ void JSONContainer::destroyRecursively(JSONValue& inValue)
             {
                 auto& keyValue = buf[i];
                 auto& value = keyValue.value;
-                // We want to mark that it's in the list so that if we have a badly formed tree we don't read
+                // We want to mark that it's in the list so that if we have a badly formed tree we
+                // don't read
                 if (value.needsDestroy() && m_ranges[value.rangeIndex].isActive())
                 {
                     activeRanges.add(m_ranges[value.rangeIndex]);
@@ -1045,7 +1081,10 @@ bool JSONContainer::areEqual(const JSONValue* a, const JSONValue* b, Index count
 }
 
 
-/* static */bool JSONContainer::_sameKeyOrder(const JSONKeyValue* a, const JSONKeyValue* b, Index count)
+/* static */ bool JSONContainer::_sameKeyOrder(
+    const JSONKeyValue* a,
+    const JSONKeyValue* b,
+    Index count)
 {
     for (Index i = 0; i < count; ++i)
     {
@@ -1064,8 +1103,7 @@ bool JSONContainer::_areEqualOrderedKeys(const JSONKeyValue* a, const JSONKeyVal
         const auto& curA = a[i];
         const auto& curB = b[i];
 
-        if (curA.key != curB.key ||
-            !areEqual(curA.value, curB.value))
+        if (curA.key != curB.key || !areEqual(curA.value, curB.value))
         {
             return false;
         }
@@ -1102,15 +1140,17 @@ bool JSONContainer::areEqual(const JSONKeyValue* a, const JSONKeyValue* b, Index
     }
     else
     {
-            // We need to compare with keys in the same order
+        // We need to compare with keys in the same order
         List<JSONKeyValue> sortedAs;
         sortedAs.addRange(a, count);
 
         List<JSONKeyValue> sortedBs;
         sortedBs.addRange(b, count);
 
-        sortedAs.sort([](const JSONKeyValue&a, const JSONKeyValue& b) -> bool { return a.key < b.key; });
-        sortedBs.sort([](const JSONKeyValue&a, const JSONKeyValue& b) -> bool { return a.key < b.key; });
+        sortedAs.sort(
+            [](const JSONKeyValue& a, const JSONKeyValue& b) -> bool { return a.key < b.key; });
+        sortedBs.sort(
+            [](const JSONKeyValue& a, const JSONKeyValue& b) -> bool { return a.key < b.key; });
 
         return _areEqualOrderedKeys(sortedAs.getBuffer(), sortedBs.getBuffer(), count);
     }
@@ -1132,18 +1172,21 @@ bool JSONContainer::areEqual(const JSONValue& a, const JSONValue& b)
     {
         switch (a.type)
         {
-            default:
-            // Invalid are never equal
-            case JSONValue::Type::Invalid:      return false;
-            case JSONValue::Type::True:         
-            case JSONValue::Type::False:        
-            case JSONValue::Type::Null:
+        default:
+        // Invalid are never equal
+        case JSONValue::Type::Invalid:
+            return false;
+        case JSONValue::Type::True:
+        case JSONValue::Type::False:
+        case JSONValue::Type::Null:
             {
                 return true;
             }
-            case JSONValue::Type::IntegerLexeme:return asInteger(a) == asInteger(b); 
-            case JSONValue::Type::FloatLexeme:  return asFloat(a) == asFloat(b);
-            case JSONValue::Type::StringLexeme:
+        case JSONValue::Type::IntegerLexeme:
+            return asInteger(a) == asInteger(b);
+        case JSONValue::Type::FloatLexeme:
+            return asFloat(a) == asFloat(b);
+        case JSONValue::Type::StringLexeme:
             {
                 // If the lexemes are equal they are equal
                 UnownedStringSlice lexemeA = getLexeme(a);
@@ -1151,15 +1194,18 @@ bool JSONContainer::areEqual(const JSONValue& a, const JSONValue& b)
                 // Else we want to decode the string to be sure if they are equal.
                 return lexemeA == lexemeB || getStringKey(a) == getStringKey(b);
             }
-            case JSONValue::Type::IntegerValue: return a.intValue == b.intValue;
-            case JSONValue::Type::FloatValue:   return a.floatValue == b.floatValue;
-            case JSONValue::Type::StringValue:  return a.stringKey == b.stringKey;
-            case JSONValue::Type::StringRepresentation:
+        case JSONValue::Type::IntegerValue:
+            return a.intValue == b.intValue;
+        case JSONValue::Type::FloatValue:
+            return a.floatValue == b.floatValue;
+        case JSONValue::Type::StringValue:
+            return a.stringKey == b.stringKey;
+        case JSONValue::Type::StringRepresentation:
             {
-                return a.stringRep == b.stringRep ||
-                    StringRepresentation::asSlice(a.stringRep) == StringRepresentation::asSlice(b.stringRep);
+                return a.stringRep == b.stringRep || StringRepresentation::asSlice(a.stringRep) ==
+                                                         StringRepresentation::asSlice(b.stringRep);
             }
-            case JSONValue::Type::Array:
+        case JSONValue::Type::Array:
             {
                 if (a.rangeIndex == b.rangeIndex)
                 {
@@ -1169,9 +1215,10 @@ bool JSONContainer::areEqual(const JSONValue& a, const JSONValue& b)
                 auto arrayB = getArray(b);
 
                 const Index count = arrayA.getCount();
-                return (count == arrayB.getCount()) && areEqual(arrayA.getBuffer(), arrayB.getBuffer(), count);
+                return (count == arrayB.getCount()) &&
+                       areEqual(arrayA.getBuffer(), arrayB.getBuffer(), count);
             }
-            case JSONValue::Type::Object:
+        case JSONValue::Type::Object:
             {
                 if (a.rangeIndex == b.rangeIndex)
                 {
@@ -1181,7 +1228,8 @@ bool JSONContainer::areEqual(const JSONValue& a, const JSONValue& b)
                 const auto bValues = getObject(b);
 
                 const Index count = aValues.getCount();
-                return (count == bValues.getCount()) && areEqual(aValues.getBuffer(), bValues.getBuffer(), count);
+                return (count == bValues.getCount()) &&
+                       areEqual(aValues.getBuffer(), bValues.getBuffer(), count);
             }
         }
     }
@@ -1192,10 +1240,14 @@ bool JSONContainer::areEqual(const JSONValue& a, const JSONValue& b)
     {
         switch (kind)
         {
-            case JSONValue::Kind::String:   return getStringKey(a) == getStringKey(b); 
-            case JSONValue::Kind::Integer:  return asInteger(a) == asInteger(b);
-            case JSONValue::Kind::Float:    return asFloat(a) == asFloat(b);
-            default: break;
+        case JSONValue::Kind::String:
+            return getStringKey(a) == getStringKey(b);
+        case JSONValue::Kind::Integer:
+            return asInteger(a) == asInteger(b);
+        case JSONValue::Kind::Float:
+            return asFloat(a) == asFloat(b);
+        default:
+            break;
         }
     }
 
@@ -1207,27 +1259,35 @@ void JSONContainer::traverseRecursively(const JSONValue& value, JSONListener* li
     typedef JSONValue::Type Type;
 
     switch (value.type)
-    {    
-        case Type::True:            return listener->addBoolValue(true, value.loc);
-        case Type::False:           return listener->addBoolValue(false, value.loc);
-        case Type::Null:            return listener->addNullValue(value.loc);
+    {
+    case Type::True:
+        return listener->addBoolValue(true, value.loc);
+    case Type::False:
+        return listener->addBoolValue(false, value.loc);
+    case Type::Null:
+        return listener->addNullValue(value.loc);
 
-        case Type::StringLexeme:    return listener->addLexemeValue(JSONTokenType::StringLiteral, getLexeme(value), value.loc);
-        case Type::IntegerLexeme:   return listener->addLexemeValue(JSONTokenType::IntegerLiteral, getLexeme(value), value.loc);
-        case Type::FloatLexeme:     return listener->addLexemeValue(JSONTokenType::FloatLiteral, getLexeme(value), value.loc);
+    case Type::StringLexeme:
+        return listener->addLexemeValue(JSONTokenType::StringLiteral, getLexeme(value), value.loc);
+    case Type::IntegerLexeme:
+        return listener->addLexemeValue(JSONTokenType::IntegerLiteral, getLexeme(value), value.loc);
+    case Type::FloatLexeme:
+        return listener->addLexemeValue(JSONTokenType::FloatLiteral, getLexeme(value), value.loc);
 
-        case Type::IntegerValue:    return listener->addIntegerValue(value.intValue, value.loc); 
-        case Type::FloatValue:      return listener->addFloatValue(value.floatValue, value.loc);
-        case Type::StringValue:
+    case Type::IntegerValue:
+        return listener->addIntegerValue(value.intValue, value.loc);
+    case Type::FloatValue:
+        return listener->addFloatValue(value.floatValue, value.loc);
+    case Type::StringValue:
         {
             const auto slice = getStringFromKey(value.stringKey);
             return listener->addStringValue(slice, value.loc);
         }
-        case Type::StringRepresentation:
+    case Type::StringRepresentation:
         {
             return listener->addStringValue(getTransientString(value), value.loc);
         }
-        case Type::Array:
+    case Type::Array:
         {
             listener->startArray(value.loc);
 
@@ -1241,7 +1301,7 @@ void JSONContainer::traverseRecursively(const JSONValue& value, JSONListener* li
             listener->endArray(SourceLoc());
             break;
         }
-        case Type::Object:
+    case Type::Object:
         {
             listener->startObject(value.loc);
 
@@ -1260,7 +1320,7 @@ void JSONContainer::traverseRecursively(const JSONValue& value, JSONListener* li
             listener->endObject(SourceLoc());
             break;
         }
-        default:
+    default:
         {
             SLANG_ASSERT(!"Invalid type");
             return;
@@ -1274,9 +1334,8 @@ void JSONContainer::traverseRecursively(const JSONValue& value, JSONListener* li
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-JSONBuilder::JSONBuilder(JSONContainer* container, Flags flags):
-    m_container(container),
-    m_flags(flags)
+JSONBuilder::JSONBuilder(JSONContainer* container, Flags flags)
+    : m_container(container), m_flags(flags)
 {
     m_state.m_kind = State::Kind::Root;
     m_state.m_startIndex = 0;
@@ -1308,12 +1367,12 @@ void JSONBuilder::_popState()
     // Reset the end depending on typpe
     switch (m_state.m_kind)
     {
-        case State::Kind::Array:
+    case State::Kind::Array:
         {
             m_values.setCount(m_state.m_startIndex);
             break;
         }
-        case State::Kind::Object:
+    case State::Kind::Object:
         {
             m_keyValues.setCount(m_state.m_startIndex);
             break;
@@ -1346,18 +1405,18 @@ void JSONBuilder::_add(const JSONValue& value)
     SLANG_ASSERT(value.isValid());
     switch (m_state.m_kind)
     {
-        case State::Kind::Root:
+    case State::Kind::Root:
         {
             SLANG_ASSERT(!m_rootValue.isValid());
             m_rootValue = value;
             break;
         }
-        case State::Kind::Array:
+    case State::Kind::Array:
         {
             m_values.add(value);
             break;
         }
-        case State::Kind::Object:
+    case State::Kind::Object:
         {
             SLANG_ASSERT(m_state.hasKey());
 
@@ -1398,7 +1457,10 @@ void JSONBuilder::endObject(SourceLoc loc)
     SLANG_ASSERT(m_state.m_kind == State::Kind::Object);
 
     const Index count = m_keyValues.getCount() - m_state.m_startIndex;
-    const JSONValue value = m_container->createObject(m_keyValues.getBuffer() + m_state.m_startIndex, count, m_state.m_loc);
+    const JSONValue value = m_container->createObject(
+        m_keyValues.getBuffer() + m_state.m_startIndex,
+        count,
+        m_state.m_loc);
 
     // Pop current state
     _popState();
@@ -1422,7 +1484,8 @@ void JSONBuilder::endArray(SourceLoc loc)
     SLANG_ASSERT(m_state.m_kind == State::Kind::Array);
 
     const Index count = m_values.getCount() - m_state.m_startIndex;
-    const JSONValue value = m_container->createArray(m_values.getBuffer() + m_state.m_startIndex, count, m_state.m_loc);
+    const JSONValue value =
+        m_container->createArray(m_values.getBuffer() + m_state.m_startIndex, count, m_state.m_loc);
 
     // Pop current state
     _popState();
@@ -1449,11 +1512,14 @@ void JSONBuilder::addLexemeValue(JSONTokenType type, const UnownedStringSlice& v
 {
     switch (type)
     {
-        case JSONTokenType::True:       return _add(JSONValue::makeBool(true, loc)); 
-        case JSONTokenType::False:      return _add(JSONValue::makeBool(false, loc));
-        case JSONTokenType::Null:       return _add(JSONValue::makeNull(loc));
-        
-        case JSONTokenType::IntegerLiteral:
+    case JSONTokenType::True:
+        return _add(JSONValue::makeBool(true, loc));
+    case JSONTokenType::False:
+        return _add(JSONValue::makeBool(false, loc));
+    case JSONTokenType::Null:
+        return _add(JSONValue::makeNull(loc));
+
+    case JSONTokenType::IntegerLiteral:
         {
             if (m_flags & Flag::ConvertLexemes)
             {
@@ -1470,7 +1536,7 @@ void JSONBuilder::addLexemeValue(JSONTokenType type, const UnownedStringSlice& v
             }
             break;
         }
-        case JSONTokenType::FloatLiteral:
+    case JSONTokenType::FloatLiteral:
         {
             if (m_flags & Flag::ConvertLexemes)
             {
@@ -1487,7 +1553,7 @@ void JSONBuilder::addLexemeValue(JSONTokenType type, const UnownedStringSlice& v
             }
             break;
         }
-        case JSONTokenType::StringLiteral:
+    case JSONTokenType::StringLiteral:
         {
             if (m_flags & Flag::ConvertLexemes)
             {
@@ -1504,7 +1570,7 @@ void JSONBuilder::addLexemeValue(JSONTokenType type, const UnownedStringSlice& v
             }
             break;
         }
-        default:
+    default:
         {
             SLANG_ASSERT(!"Unhandled type");
         }

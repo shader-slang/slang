@@ -53,10 +53,10 @@ SLANG_HOST_CPP_SOURCE,     ///< C++ code for `host` style
    
 Using the `-target` command line option
 
-* C_SOURCE: c
-* CPP_SOURCE: cpp,c++,cxx
-* CPP_HEADER: hpp,h++,hxx
-* HOST_CPP_SOURCE: host-cpp,host-c++,host-cxx
+* `C_SOURCE`: c
+* `CPP_SOURCE`: cpp,c++,cxx
+* `CPP_HEADER`: hpp,hxx
+* `HOST_CPP_SOURCE`: host-cpp,host-c++,host-cxx
 
 Note! Output of C source is not currently supported.
 
@@ -72,11 +72,11 @@ SLANG_OBJECT_CODE,              ///< Object code that can be used for later link
 
 Using the `-target` command line option
 
-* EXECUTABLE: exe, executable
-* SHADER_SHARED_LIBRARY: sharedlib, sharedlibrary, dll
-* SHADER_HOST_CALLABLE: callable, host-callable
-* OBJECT_CODE: object-conde
-* HOST_HOST_CALLABLE: host-host-callable
+* `EXECUTABLE`: exe, executable
+* `SHADER_SHARED_LIBRARY`: sharedlib, sharedlibrary, dll
+* `SHADER_HOST_CALLABLE`: callable, host-callable
+* `OBJECT_CODE`: object-conde
+* `HOST_HOST_CALLABLE`: host-host-callable
     
 Using `host-callable` types from the the command line, other than to test such code compile and can be loaded for host execution.
 
@@ -92,7 +92,7 @@ The `shader` style implies
 
 * The code *can* be executed in a GPU-kernel like execution model, launched across multiple threads (as described in the [ABI](#abi)) 
 * Currently no reference counting
-* Only functionality from the Slang stdlib, built in HLSL or anything supplied by a [COM interfaces](#com-interface) is available
+* Only functionality from the Slang core module, built in HLSL or anything supplied by a [COM interfaces](#com-interface) is available
 * Currently [slang-llvm](#slang-llvm) only supports the `shader` style
 
 The `host` style implies 
@@ -295,7 +295,7 @@ The global can now be set from host code via
     }
 ```
 
-In terms of reflection `__global` variables are not visibile. 
+In terms of reflection `__global` variables are not visible.
 
 ## NativeString
 
@@ -311,7 +311,7 @@ TODO(JS): What happens with String with shader compile style on CPU? Shouldn't i
 
 It is currently not possible to step into LLVM-JIT code when using [slang-llvm](#slang-llvm). Fortunately it is possible to step into code compiled via a [regular C/C++ compiler](#regular-cpp). 
 
-Below is a code snippet showing how to swich to a [regular C/C++ compiler](#regular-cpp) at runtime. 
+Below is a code snippet showing how to switch to a [regular C/C++ compiler](#regular-cpp) at runtime.
 
 ```C++
     SlangPassThrough findRegularCppCompiler(slang::IGlobalSession* slangSession)
@@ -403,7 +403,7 @@ struct ComputeVaryingInput
 
 `ComputeVaryingInput` allows specifying a range of groupIDs to execute - all the ids in a grid from startGroup to endGroup, but not including the endGroupIDs. Most compute APIs allow specifying an x,y,z extent on 'dispatch'. This would be equivalent as having startGroupID = { 0, 0, 0} and endGroupID = { x, y, z }. The exported function allows setting a range of groupIDs such that client code could dispatch different parts of the work to different cores. This group range mechanism was chosen as the 'default' mechanism as it is most likely to achieve the best performance.
 
-There are two other functions that consist of the entry point name postfixed with `_Thread` and `_Group`. For the entry point 'computeMain' these functions would be accessable from the shared library interface as `computeMain_Group` and `computeMain_Thread`. `_Group` has the same signature as the listed for computeMain, but it doesn't execute a range, only the single group specified by startGroupID (endGroupID is ignored). That is all of the threads within the group (as specified by `[numthreads]`) will be executed in a single call. 
+There are two other functions that consist of the entry point name postfixed with `_Thread` and `_Group`. For the entry point 'computeMain' these functions would be accessible from the shared library interface as `computeMain_Group` and `computeMain_Thread`. `_Group` has the same signature as the listed for computeMain, but it doesn't execute a range, only the single group specified by startGroupID (endGroupID is ignored). That is all of the threads within the group (as specified by `[numthreads]`) will be executed in a single call.
 
 It may be desirable to have even finer control of how execution takes place down to the level of individual 'thread's and this can be achieved with the `_Thread` style. The signature looks as follows
 
@@ -568,7 +568,7 @@ It may be useful to be able to include `slang-cpp-types.h` in C++ code to access
 
 Would wrap all the Slang prelude types in the namespace `CPPPrelude`, such that say a `StructuredBuffer<int32_t>` could be specified in C++ source code as `CPPPrelude::StructuredBuffer<int32_t>`.
 
-The code that sets up the prelude for the test infrastucture and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```. Essentially this determines what the absolute path is to `slang-cpp-prelude.h` is and then just makes the prelude `#include "the absolute path"`.
+The code that sets up the prelude for the test infrastructure and command line usage can be found in ```TestToolUtil::setSessionDefaultPrelude```. Essentially this determines what the absolute path is to `slang-cpp-prelude.h` is and then just makes the prelude `#include "the absolute path"`.
 
 The *default* prelude is set to the contents of the files for C++ held in the prelude directory and is held within the Slang shared library. It is therefore typically not necessary to distribute Slang with prelude files.
 
@@ -618,7 +618,7 @@ Vector<float, 3> defValue = {};         // Zero initialize such that read access
 values.at(3).x = 10;
 ```
 
-Note that '[] 'would be turned into the `at` function, which takes the default value as a paramter provided by the caller. If this is then written to then only the defValue is corrupted.  Even this mechanism not be quite right, because if we write and then read again from the out of bounds reference in HLSL we may expect that 0 is returned, whereas here we get the value that was last written.
+Note that '[] 'would be turned into the `at` function, which takes the default value as a parameter provided by the caller. If this is then written to then only the defValue is corrupted.  Even this mechanism not be quite right, because if we write and then read again from the out of bounds reference in HLSL we may expect that 0 is returned, whereas here we get the value that was last written.
 
 ## <a id="zero-index"/>Zero index bound checking
 

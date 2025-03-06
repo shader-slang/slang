@@ -3,7 +3,8 @@
 
 #include <assert.h>
 
-namespace Slang {
+namespace Slang
+{
 
 UInt MangledLexer::readCount()
 {
@@ -106,7 +107,6 @@ void MangledLexer::readVal()
         readType();
         break;
     }
-
 }
 
 void MangledLexer::readGenericArgs()
@@ -232,7 +232,9 @@ UInt MangledLexer::readParamCount()
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MangledNameParser !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */SlangResult MangledNameParser::parseModuleName(const UnownedStringSlice& in, String& outModuleName)
+/* static */ SlangResult MangledNameParser::parseModuleName(
+    const UnownedStringSlice& in,
+    String& outModuleName)
 {
     MangledLexer lexer(in);
     {
@@ -241,11 +243,12 @@ UInt MangledLexer::readParamCount()
         case 'T':
         case 'G':
         case 'V':
-        {
-            lexer.nextChar();
+            {
+                lexer.nextChar();
+                break;
+            }
+        default:
             break;
-        }
-        default: break;
         }
     }
 

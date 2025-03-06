@@ -13,7 +13,7 @@
 // CHECK-NEXT:uniform sampler sampler1_0;
 
 // CHECK: layout(push_constant)
-// CHECK-NEXT: layout(std140) uniform
+// CHECK-NEXT: layout(std430) uniform
 
 // CHECK:layout(binding = 1004)
 // CHECK-NEXT:layout(std140) uniform

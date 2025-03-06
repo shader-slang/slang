@@ -2,11 +2,10 @@
 
 #pragma once
 
-#include "slang-ast-support-types.h"
-
-#include "slang-generated-ast.h"
 #include "slang-ast-reflect.h"
+#include "slang-ast-support-types.h"
 #include "slang-capability.h"
+#include "slang-generated-ast.h"
 #include "slang-serialize-reflection.h"
 
 // This file defines the primary base classes for the hierarchy of
@@ -14,17 +13,17 @@
 // basic `Decl`, `Stmt`, `Expr`, `type`, etc. definitions come from.
 
 namespace Slang
-{  
+{
 
 class ASTBuilder;
 struct SemanticsVisitor;
 
-class NodeBase 
+class NodeBase
 {
     SLANG_ABSTRACT_AST_CLASS(NodeBase)
 
-        // MUST be called before used. Called automatically via the ASTBuilder.
-        // Note that the astBuilder is not stored in the NodeBase derived types by default.
+    // MUST be called before used. Called automatically via the ASTBuilder.
+    // Note that the astBuilder is not stored in the NodeBase derived types by default.
     SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder)
     {
         SLANG_UNUSED(inAstBuilder);
@@ -36,14 +35,17 @@ class NodeBase
 
     void _initDebug(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder);
 
-        /// Get the class info 
-    SLANG_FORCE_INLINE const ReflectClassInfo& getClassInfo() const { return *ASTClassInfo::getInfo(astNodeType); }
+    /// Get the class info
+    SLANG_FORCE_INLINE const ReflectClassInfo& getClassInfo() const
+    {
+        return *ASTClassInfo::getInfo(astNodeType);
+    }
 
     SyntaxClass<NodeBase> getClass() { return SyntaxClass<NodeBase>(&getClassInfo()); }
 
-        /// The type of the node. ASTNodeType(-1) is an invalid node type, and shouldn't appear on any
-        /// correctly constructed (through ASTBuilder) NodeBase derived class. 
-        /// The actual type is set when constructed on the ASTBuilder. 
+    /// The type of the node. ASTNodeType(-1) is an invalid node type, and shouldn't appear on any
+    /// correctly constructed (through ASTBuilder) NodeBase derived class.
+    /// The actual type is set when constructed on the ASTBuilder.
     ASTNodeType astNodeType = ASTNodeType(-1);
 
 #ifdef _DEBUG
@@ -56,60 +58,79 @@ class NodeBase
 template<typename T>
 SLANG_FORCE_INLINE T* dynamicCast(NodeBase* node)
 {
-    return (node && ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
+    return (node &&
+            ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo))
+               ? static_cast<T*>(node)
+               : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE const T* dynamicCast(const NodeBase* node)
 {
-    return (node && ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
+    return (node &&
+            ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo))
+               ? static_cast<const T*>(node)
+               : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE T* as(NodeBase* node)
 {
-    return (node && ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo)) ? static_cast<T*>(node) : nullptr;
+    return (node &&
+            ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo))
+               ? static_cast<T*>(node)
+               : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE const T* as(const NodeBase* node)
 {
-    return (node && ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo)) ? static_cast<const T*>(node) : nullptr;
+    return (node &&
+            ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo))
+               ? static_cast<const T*>(node)
+               : nullptr;
 }
 
 // Because DeclRefBase is now a `Val`, we prevent casting it directly into other nodes
 // to avoid confusion and bugs. Instead, use the `as<>()` method on `DeclRefBase` to
 // get a `DeclRef<T>` for a specific node type.
 template<typename T>
-T* as(DeclRefBase* declRefBase, typename EnableIf<!IsBaseOf<DeclRefBase, T>::Value, void*>::type arg = nullptr) = delete;
+T* as(
+    DeclRefBase* declRefBase,
+    typename EnableIf<!IsBaseOf<DeclRefBase, T>::Value, void*>::type arg = nullptr) = delete;
 
 template<typename T>
-T* as(DeclRefBase* declRefBase, typename EnableIf<IsBaseOf<DeclRefBase, T>::Value, void*>::type arg = nullptr)
+T* as(
+    DeclRefBase* declRefBase,
+    typename EnableIf<IsBaseOf<DeclRefBase, T>::Value, void*>::type arg = nullptr)
 {
     SLANG_UNUSED(arg);
     return dynamicCast<T>(declRefBase);
 }
 
 template<typename T, typename U>
-DeclRef<T> as(DeclRef<U> declRef) { return DeclRef<T>(declRef); }
+DeclRef<T> as(DeclRef<U> declRef)
+{
+    return DeclRef<T>(declRef);
+}
 
 struct Scope : public NodeBase
 {
     SLANG_AST_CLASS(Scope)
-    
+
     // The container to use for lookup
     //
     // Note(tfoley): This is kept as an unowned pointer
     // so that a scope can't keep parts of the AST alive,
     // but the opposite it allowed.
-    ContainerDecl*          containerDecl = nullptr;
+    ContainerDecl* containerDecl = nullptr;
 
     // The parent of this scope (where lookup should go if nothing is found locally)
-    Scope*                  parent = nullptr;
+    Scope* parent = nullptr;
 
     SLANG_UNREFLECTED
     // The next sibling of this scope (a peer for lookup)
-    Scope*                  nextSibling = nullptr;
+    Scope* nextSibling = nullptr;
 };
 
 // Base class for all nodes representing actual syntax
@@ -138,14 +159,11 @@ struct ValNodeOperand
         int64_t intOperand;
     } values;
 
-    ValNodeOperand()
-    {
-        values.intOperand = 0;
-    }
+    ValNodeOperand() { values.intOperand = 0; }
 
     explicit ValNodeOperand(NodeBase* node)
     {
-        if constexpr(sizeof(values.nodeOperand) < sizeof(values.intOperand))
+        if constexpr (sizeof(values.nodeOperand) < sizeof(values.intOperand))
             values.intOperand = 0;
 
         if (as<Val>(node))
@@ -162,10 +180,11 @@ struct ValNodeOperand
 
     template<typename T>
     explicit ValNodeOperand(DeclRef<T> declRef)
-    { 
+    {
         if constexpr (sizeof(values.nodeOperand) < sizeof(values.intOperand))
             values.intOperand = 0;
-        values.nodeOperand = declRef.declRefBase; kind = ValNodeOperandKind::ValNode;
+        values.nodeOperand = declRef.declRefBase;
+        kind = ValNodeOperandKind::ValNode;
     }
 
     template<typename T>
@@ -185,15 +204,21 @@ struct ValNodeOperand
         }
         else
         {
-            static_assert(std::is_base_of<Val, T>::value || std::is_base_of<NodeBase, T>::value, "pointer used as Val operand must be an AST node.");
+            static_assert(
+                std::is_base_of<Val, T>::value || std::is_base_of<NodeBase, T>::value,
+                "pointer used as Val operand must be an AST node.");
         }
     }
 
     template<typename EnumType>
     explicit ValNodeOperand(EnumType intVal)
     {
-        static_assert(std::is_trivial<EnumType>::value, "Type to construct NodeOperand must be trivial.");
-        static_assert(sizeof(EnumType) <= sizeof(values), "size of operand must be less than pointer size.");
+        static_assert(
+            std::is_trivial<EnumType>::value,
+            "Type to construct NodeOperand must be trivial.");
+        static_assert(
+            sizeof(EnumType) <= sizeof(values),
+            "size of operand must be less than pointer size.");
         values.intOperand = 0;
         memcpy(&values, &intVal, sizeof(intVal));
         kind = ValNodeOperandKind::ConstantValue;
@@ -204,15 +229,19 @@ struct ValNodeDesc
 {
 private:
     HashCode hashCode = 0;
+
 public:
-    ASTNodeType             type;
+    ASTNodeType type;
     ShortList<ValNodeOperand, 8> operands;
 
     inline bool operator==(ValNodeDesc const& that) const
     {
-        if (hashCode != that.hashCode) return false;
-        if (type != that.type) return false;
-        if (operands.getCount() != that.operands.getCount()) return false;
+        if (hashCode != that.hashCode)
+            return false;
+        if (type != that.type)
+            return false;
+        if (operands.getCount() != that.operands.getCount())
+            return false;
         for (Index i = 0; i < operands.getCount(); ++i)
         {
             // Note: we are comparing the operands directly for identity
@@ -222,22 +251,26 @@ public:
             // The rationale here is that nodes that will be created
             // via a `NodeDesc` *should* all be going through the
             // deduplication path anyway, as should their operands.
-            // 
-            if (operands[i].values.intOperand != that.operands[i].values.intOperand) return false;
+            //
+            if (operands[i].values.intOperand != that.operands[i].values.intOperand)
+                return false;
         }
         return true;
     }
     HashCode getHashCode() const { return hashCode; }
     void init();
-
 };
 
 template<int N>
 static void addOrAppendToNodeList(ShortList<ValNodeOperand, N>&)
-{}
+{
+}
 
 template<int N, typename... Ts>
-static void addOrAppendToNodeList(ShortList<ValNodeOperand, N>& list, ExpandedSpecializationArgs e, Ts... ts)
+static void addOrAppendToNodeList(
+    ShortList<ValNodeOperand, N>& list,
+    ExpandedSpecializationArgs e,
+    Ts... ts)
 {
     for (auto arg : e)
     {
@@ -278,11 +311,13 @@ static void addOrAppendToNodeList(ShortList<ValNodeOperand, N>& list, ArrayView<
     addOrAppendToNodeList(list, ts...);
 }
 
-inline void addOrAppendToNodeList(List<ValNodeOperand>&)
-{}
+inline void addOrAppendToNodeList(List<ValNodeOperand>&) {}
 
 template<typename... Ts>
-static void addOrAppendToNodeList(List<ValNodeOperand>& list, ExpandedSpecializationArgs e, Ts... ts)
+static void addOrAppendToNodeList(
+    List<ValNodeOperand>& list,
+    ExpandedSpecializationArgs e,
+    Ts... ts)
 {
     for (auto arg : e)
     {
@@ -331,7 +366,7 @@ static void addOrAppendToNodeList(List<ValNodeOperand>& list, ArrayView<T> l, Ts
 class Val : public NodeBase
 {
     SLANG_ABSTRACT_AST_CLASS(Val)
-    
+
     template<typename T>
     struct OperandView
     {
@@ -344,31 +379,22 @@ class Val : public NodeBase
             offset = 0;
             count = 0;
         }
-        OperandView(const Val* val, Index offset, Index count) : val(val), offset(offset), count(count) {}
-        Index getCount() { return count; }
-        T* operator[](Index index) const
+        OperandView(const Val* val, Index offset, Index count)
+            : val(val), offset(offset), count(count)
         {
-            return as<T>(val->getOperand(index + offset));
         }
+        Index getCount() { return count; }
+        T* operator[](Index index) const { return as<T>(val->getOperand(index + offset)); }
         struct ConstIterator
         {
             const Val* val;
             Index i;
-            bool operator==(ConstIterator other) const
+            bool operator==(ConstIterator other) const { return val == other.val && i == other.i; }
+            bool operator!=(ConstIterator other) const { return val != other.val || i != other.i; }
+            T* const& operator*() const { return *(this->operator->()); }
+            T* const* operator->() const
             {
-                return val == other.val && i == other.i;
-            }
-            bool operator!=(ConstIterator other) const
-            {
-                return val != other.val || i != other.i;
-            }
-            T *const & operator*() const
-            {
-                return *(this->operator->());
-            }
-            T *const * operator->() const
-            {
-                return reinterpret_cast<T *const *>(&val->m_operands[i].values.nodeOperand);
+                return reinterpret_cast<T* const*>(&val->m_operands[i].values.nodeOperand);
             }
             ConstIterator& operator++()
             {
@@ -376,8 +402,8 @@ class Val : public NodeBase
                 return *this;
             }
         };
-        ConstIterator begin() const { return ConstIterator { val, offset }; }
-        ConstIterator end() const { return ConstIterator{ val, offset + count }; }
+        ConstIterator begin() const { return ConstIterator{val, offset}; }
+        ConstIterator end() const { return ConstIterator{val, offset + count}; }
     };
 
     typedef IValVisitor Visitor;
@@ -405,10 +431,7 @@ class Val : public NodeBase
     String toString();
 
     HashCode getHashCode();
-    bool operator == (const Val & v) const
-    {
-        return equals(const_cast<Val*>(&v));
-    }
+    bool operator==(const Val& v) const { return equals(const_cast<Val*>(&v)); }
 
     // Overrides should be public so base classes can access
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -439,13 +462,13 @@ class Val : public NodeBase
 
     Index getOperandCount() const { return m_operands.getCount(); }
 
-    template<typename ... TArgs>
+    template<typename... TArgs>
     void setOperands(TArgs... args)
     {
         m_operands.clear();
         addOrAppendToNodeList(m_operands, args...);
     }
-    template<typename ... TArgs>
+    template<typename... TArgs>
     void addOperands(TArgs... args)
     {
         addOrAppendToNodeList(m_operands, args...);
@@ -458,18 +481,24 @@ class Val : public NodeBase
     }
     List<ValNodeOperand> m_operands;
 
-    // Private use by stdlib deserialization only. Since we know the Vals serialized into stdlib is already
-    // unique, we can just use `this` pointer as the `m_resolvedVal` so we don't need to resolve them again.
+    // Private use by the core module deserialization only. Since we know the Vals serialized into
+    // the core module is already unique, we can just use `this` pointer as the `m_resolvedVal` so
+    // we don't need to resolve them again.
     void _setUnique();
+
 protected:
     Val* defaultResolveImpl();
+
 private:
     mutable Val* m_resolvedVal = nullptr;
     SLANG_UNREFLECTED mutable Index m_resolvedValEpoch = 0;
 };
 
 template<int N, typename T, typename... Ts>
-static void addOrAppendToNodeList(ShortList<ValNodeOperand, N>& list, Val::OperandView<T> l, Ts... ts)
+static void addOrAppendToNodeList(
+    ShortList<ValNodeOperand, N>& list,
+    Val::OperandView<T> l,
+    Ts... ts)
 {
     for (auto t : l)
         list.add(ValNodeOperand(t));
@@ -482,12 +511,12 @@ struct ValSet
     {
         Val* val = nullptr;
         ValItem() = default;
-        ValItem(Val* v) : val(v) {}
-
-        HashCode getHashCode() const
+        ValItem(Val* v)
+            : val(v)
         {
-            return val ? val->getHashCode() : 0;
         }
+
+        HashCode getHashCode() const { return val ? val->getHashCode() : 0; }
         bool operator==(const ValItem other) const
         {
             if (val == other.val)
@@ -500,34 +529,33 @@ struct ValSet
         }
     };
     HashSet<ValItem> set;
-    bool add(Val* val)
-    {
-        return set.add(ValItem(val));
-    }
-    bool contains(Val* val)
-    {
-        return set.contains(ValItem(val));
-    }
+    bool add(Val* val) { return set.add(ValItem(val)); }
+    bool contains(Val* val) { return set.contains(ValItem(val)); }
 };
 
 
-SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, Val* val) { SLANG_ASSERT(val); val->toText(io); return io; }
+SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, Val* val)
+{
+    SLANG_ASSERT(val);
+    val->toText(io);
+    return io;
+}
 
-    /// Given a `value` that refers to a `param` of some generic, attempt to apply
-    /// the `subst` to it and produce a new `Val` as a result.
-    ///
-    /// If the `subst` does not include anything to replace `value`, then this function
-    /// returns null.
-    ///
+/// Given a `value` that refers to a `param` of some generic, attempt to apply
+/// the `subst` to it and produce a new `Val` as a result.
+///
+/// If the `subst` does not include anything to replace `value`, then this function
+/// returns null.
+///
 Val* maybeSubstituteGenericParam(Val* value, Decl* param, SubstitutionSet subst, int* ioDiff);
 
 class Type;
 
-template <typename T>
+template<typename T>
 SLANG_FORCE_INLINE T* as(Type* obj);
-template <typename T>
+template<typename T>
 SLANG_FORCE_INLINE const T* as(const Type* obj);
-    
+
 // A type, representing a classifier for some term in the AST.
 //
 // Types can include "sugar" in that they may refer to a
@@ -539,7 +567,7 @@ SLANG_FORCE_INLINE const T* as(const Type* obj);
 // "canonical" type. The representation caches a pointer to
 // a canonical type on every type, so we can easily
 // operate on the raw representation when needed.
-class Type: public Val
+class Type : public Val
 {
     SLANG_ABSTRACT_AST_CLASS(Type)
 
@@ -547,8 +575,8 @@ class Type: public Val
 
     void accept(ITypeVisitor* visitor, void* extra);
 
-        /// Type derived types store the AST builder they were constructed on. The builder calls this function
-        /// after constructing.
+    /// Type derived types store the AST builder they were constructed on. The builder calls this
+    /// function after constructing.
     SLANG_FORCE_INLINE void init(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder)
     {
         Val::init(inAstNodeType, inAstBuilder);
@@ -560,12 +588,10 @@ class Type: public Val
     Type* _createCanonicalTypeOverride();
     Val* _resolveImplOverride();
 
-    Type* getCanonicalType()
-    {
-        return as<Type>(resolve());
-    }
+    Type* getCanonicalType() { return as<Type>(resolve()); }
 
     ASTBuilder* getASTBuilderForReflection() const { return m_astBuilderForReflection; }
+
 protected:
     Type* createCanonicalType();
 
@@ -577,10 +603,16 @@ protected:
     SLANG_UNREFLECTED ASTBuilder* m_astBuilderForReflection;
 };
 
-template <typename T>
-SLANG_FORCE_INLINE T* as(Type* obj) { return obj ? dynamicCast<T>(obj->getCanonicalType()) : nullptr; }
-template <typename T>
-SLANG_FORCE_INLINE const T* as(const Type* obj) { return obj ? dynamicCast<T>(const_cast<Type*>(obj)->getCanonicalType()) : nullptr; }
+template<typename T>
+SLANG_FORCE_INLINE T* as(Type* obj)
+{
+    return obj ? dynamicCast<T>(obj->getCanonicalType()) : nullptr;
+}
+template<typename T>
+SLANG_FORCE_INLINE const T* as(const Type* obj)
+{
+    return obj ? dynamicCast<T>(const_cast<Type*>(obj)->getCanonicalType()) : nullptr;
+}
 
 class Decl;
 
@@ -620,8 +652,11 @@ class DeclRefBase : public Val
     }
 
     // Returns true if 'as' will return a valid cast
-    template <typename T>
-    bool is() const { return Slang::as<T>(getDecl()) != nullptr; }
+    template<typename T>
+    bool is() const
+    {
+        return Slang::as<T>(getDecl()) != nullptr;
+    }
 
     // Convenience accessors for common properties of declarations
     Name* getName() const;
@@ -638,7 +673,12 @@ class DeclRefBase : public Val
     void toText(StringBuilder& out);
 };
 
-SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, const DeclRefBase* declRef) { if (declRef) const_cast<DeclRefBase*>(declRef)->toText(io); return io; }
+SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, const DeclRefBase* declRef)
+{
+    if (declRef)
+        const_cast<DeclRefBase*>(declRef)->toText(io);
+    return io;
+}
 
 SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, Decl* decl)
 {
@@ -682,7 +722,10 @@ class ModifiableSyntaxNode : public SyntaxNode
     Modifiers modifiers;
 
     template<typename T>
-    FilteredModifierList<T> getModifiersOfType() { return FilteredModifierList<T>(modifiers.first); }
+    FilteredModifierList<T> getModifiersOfType()
+    {
+        return FilteredModifierList<T>(modifiers.first);
+    }
 
     // Find the first modifier of a given type, or return `nullptr` if none is found.
     template<typename T>
@@ -692,12 +735,15 @@ class ModifiableSyntaxNode : public SyntaxNode
     }
 
     template<typename T>
-    bool hasModifier() { return findModifier<T>() != nullptr; }
+    bool hasModifier()
+    {
+        return findModifier<T>() != nullptr;
+    }
 };
 
-struct DeclReferenceWithLoc
+struct ProvenenceNodeWithLoc
 {
-    Decl* referencedDecl;
+    NodeBase* referencedNode;
     SourceLoc referenceLoc;
 };
 
@@ -725,9 +771,9 @@ public:
 
     RefPtr<MarkupEntry> markup;
 
-    Name*     getName() const      { return nameAndLoc.name; }
-    SourceLoc getNameLoc() const   { return nameAndLoc.loc ; }
-    NameLoc   getNameAndLoc() const { return nameAndLoc     ; }
+    Name* getName() const { return nameAndLoc.name; }
+    SourceLoc getNameLoc() const { return nameAndLoc.loc; }
+    NameLoc getNameAndLoc() const { return nameAndLoc; }
 
     DeclCheckStateExt checkState = DeclCheckState::Unchecked;
 
@@ -743,10 +789,12 @@ public:
     bool isChildOf(Decl* other) const;
 
     // Track the decl reference that caused the requirement of a capability atom.
-    SLANG_UNREFLECTED List<DeclReferenceWithLoc> capabilityRequirementProvenance;
+    SLANG_UNREFLECTED List<ProvenenceNodeWithLoc> capabilityRequirementProvenance;
+
+    SLANG_UNREFLECTED bool hiddenFromLookup = false;
+
 private:
     SLANG_UNREFLECTED DeclRefBase* m_defaultDeclRef = nullptr;
-    SLANG_UNREFLECTED Index m_defaultDeclRefEpoch = -1;
 };
 
 class Expr : public SyntaxNode
@@ -756,6 +804,8 @@ class Expr : public SyntaxNode
     typedef IExprVisitor Visitor;
 
     QualType type;
+
+    bool checked = false;
 
     void accept(IExprVisitor* visitor, void* extra);
 };
@@ -806,28 +856,32 @@ Name* DeclRef<T>::getName() const
 template<typename T>
 SourceLoc DeclRef<T>::getNameLoc() const
 {
-    if (declRefBase) return declRefBase->getNameLoc();
+    if (declRefBase)
+        return declRefBase->getNameLoc();
     return SourceLoc();
 }
 
 template<typename T>
 SourceLoc DeclRef<T>::getLoc() const
 {
-    if (declRefBase) return declRefBase->getLoc();
+    if (declRefBase)
+        return declRefBase->getLoc();
     return SourceLoc();
 }
 
 template<typename T>
 DeclRef<ContainerDecl> DeclRef<T>::getParent() const
 {
-    if (declRefBase) return DeclRef<ContainerDecl>(declRefBase->getParent());
+    if (declRefBase)
+        return DeclRef<ContainerDecl>(declRefBase->getParent());
     return DeclRef<ContainerDecl>((DeclRefBase*)nullptr);
 }
 
 template<typename T>
 HashCode DeclRef<T>::getHashCode() const
 {
-    if (declRefBase) return declRefBase->getHashCode();
+    if (declRefBase)
+        return declRefBase->getHashCode();
     return 0;
 }
 
@@ -835,7 +889,8 @@ template<typename T>
 Type* DeclRef<T>::substitute(ASTBuilder* astBuilder, Type* type) const
 {
     SLANG_UNUSED(astBuilder);
-    if (!declRefBase) return type;
+    if (!declRefBase)
+        return type;
     return SubstitutionSet(*this).applyToType(astBuilder, type);
 }
 
@@ -843,7 +898,8 @@ template<typename T>
 SubstExpr<Expr> DeclRef<T>::substitute(ASTBuilder* astBuilder, Expr* expr) const
 {
     SLANG_UNUSED(astBuilder);
-    if (!declRefBase) return expr;
+    if (!declRefBase)
+        return expr;
     return applySubstitutionToExpr(SubstitutionSet(*this), expr);
 }
 
@@ -853,16 +909,19 @@ template<typename U>
 DeclRef<U> DeclRef<T>::substitute(ASTBuilder* astBuilder, DeclRef<U> declRef) const
 {
     SLANG_UNUSED(astBuilder);
-    if (!declRefBase) return declRef;
+    if (!declRefBase)
+        return declRef;
     return DeclRef<U>(SubstitutionSet(*this).applyToDeclRef(astBuilder, declRef.declRefBase));
 }
 
 // Apply substitutions to this declaration reference
 template<typename T>
-DeclRef<T> DeclRef<T>::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff) const
+DeclRef<T> DeclRef<T>::substituteImpl(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+    const
 {
     SLANG_UNUSED(astBuilder);
-    if (!declRefBase) return *this;
+    if (!declRefBase)
+        return *this;
     return DeclRef<T>(declRefBase->substituteImpl(astBuilder, subst, ioDiff));
 }
 

@@ -1,12 +1,11 @@
 // test-context.cpp
 #include "test-context.h"
 
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-shared-library.h"
-
-#include "../../source/core/slang-test-tool-util.h"
 #include "../../source/compiler-core/slang-language-server-protocol.h"
+#include "../../source/core/slang-io.h"
+#include "../../source/core/slang-shared-library.h"
+#include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-test-tool-util.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,18 +14,20 @@ using namespace Slang;
 
 thread_local int slangTestThreadIndex = 0;
 
-TestContext::TestContext() 
+TestContext::TestContext()
 {
-    m_session = nullptr;
-
     /// if we are testing on arm, debug, we may want to increase the connection timeout
 #if (SLANG_PROCESSOR_ARM || SLANG_PROCESSOR_ARM_64) && defined(_DEBUG)
-    // 10 mins(!). This seems to be the order of time needed for timeout on a CI ARM test system on debug
+    // 10 mins(!). This seems to be the order of time needed for timeout on a CI ARM test system on
+    // debug
     connectionTimeOutInMs = 1000 * 60 * 10;
 #endif
 }
 
-void TestContext::setThreadIndex(int index) { slangTestThreadIndex = index; }
+void TestContext::setThreadIndex(int index)
+{
+    slangTestThreadIndex = index;
+}
 
 void TestContext::setMaxTestRunnerThreadCount(int count)
 {
@@ -62,7 +63,7 @@ TestReporter* TestContext::getTestReporter()
 SlangResult TestContext::locateFileCheck()
 {
     DefaultSharedLibraryLoader* loader = DefaultSharedLibraryLoader::getSingleton();
-    
+
     SLANG_RETURN_ON_FAIL(loader->loadSharedLibrary("slang-llvm", m_fileCheckLibrary.writeRef()));
 
     if (!m_fileCheckLibrary)
@@ -71,8 +72,9 @@ SlangResult TestContext::locateFileCheck()
     }
 
     using CreateFileCheckFunc = SlangResult (*)(const SlangUUID&, void**);
-    auto fn = reinterpret_cast<CreateFileCheckFunc>(m_fileCheckLibrary->findFuncByName("createLLVMFileCheck_V1"));
-    if(!fn)
+    auto fn = reinterpret_cast<CreateFileCheckFunc>(
+        m_fileCheckLibrary->findFuncByName("createLLVMFileCheck_V1"));
+    if (!fn)
     {
         return SLANG_FAIL;
     }
@@ -81,13 +83,12 @@ SlangResult TestContext::locateFileCheck()
 
 Result TestContext::init(const char* inExePath)
 {
-    m_session = spCreateSession(nullptr);
-    if (!m_session)
-    {
-        return SLANG_FAIL;
-    }
+    SlangGlobalSessionDesc desc = {};
+    desc.enableGLSL = true;
+    slang::createGlobalSession(&desc, m_session.writeRef());
     exePath = inExePath;
     SLANG_RETURN_ON_FAIL(TestToolUtil::getExeDirectoryPath(inExePath, exeDirectoryPath));
+    SLANG_RETURN_ON_FAIL(TestToolUtil::getDllDirectoryPath(inExePath, dllDirectoryPath));
 
     SLANG_RETURN_ON_FAIL(locateFileCheck());
 
@@ -101,10 +102,6 @@ TestContext::~TestContext()
         m_languageServerConnection->sendCall(
             LanguageServerProtocol::ExitParams::methodName,
             JSONValue::makeInt(0));
-    }
-    if (m_session)
-    {
-        spDestroySession(m_session);
     }
 }
 
@@ -129,7 +126,8 @@ TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, 
 
     SharedLibraryTool tool = {};
 
-    if (SLANG_SUCCEEDED(loader->loadPlatformSharedLibrary(path.begin(), tool.m_sharedLibrary.writeRef())))
+    if (SLANG_SUCCEEDED(
+            loader->loadPlatformSharedLibrary(path.begin(), tool.m_sharedLibrary.writeRef())))
     {
         tool.m_func = (InnerMainFunc)tool.m_sharedLibrary->findFuncByName("innerMain");
     }
@@ -161,7 +159,7 @@ DownstreamCompilerSet* TestContext::getCompilerSet()
     {
         compilerSet = new DownstreamCompilerSet;
 
-        DownstreamCompilerLocatorFunc locators[int(SLANG_PASS_THROUGH_COUNT_OF)] = { nullptr };
+        DownstreamCompilerLocatorFunc locators[int(SLANG_PASS_THROUGH_COUNT_OF)] = {nullptr};
 
         DownstreamCompilerUtil::setDefaultLocators(locators);
         for (Index i = 0; i < Index(SLANG_PASS_THROUGH_COUNT_OF); ++i)
@@ -185,17 +183,23 @@ SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out
     {
         CommandLine cmdLine;
         cmdLine.setExecutableLocation(ExecutableLocation(exeDirectoryPath, "test-server"));
-        SLANG_RETURN_ON_FAIL(Process::create(cmdLine, Process::Flag::AttachDebugger | Process::Flag::DisableStdErrRedirection, process));
+        SLANG_RETURN_ON_FAIL(Process::create(
+            cmdLine,
+            Process::Flag::AttachDebugger | Process::Flag::DisableStdErrRedirection,
+            process));
     }
 
     Stream* writeStream = process->getStream(StdStreamType::In);
-    RefPtr<BufferedReadStream> readStream(new BufferedReadStream(process->getStream(StdStreamType::Out)));
-    RefPtr<BufferedReadStream> readErrStream(new BufferedReadStream(process->getStream(StdStreamType::ErrorOut)));
+    RefPtr<BufferedReadStream> readStream(
+        new BufferedReadStream(process->getStream(StdStreamType::Out)));
+    RefPtr<BufferedReadStream> readErrStream(
+        new BufferedReadStream(process->getStream(StdStreamType::ErrorOut)));
 
     RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, writeStream);
     RefPtr<JSONRPCConnection> rpcConnection = new JSONRPCConnection;
 
-    SLANG_RETURN_ON_FAIL(rpcConnection->init(connection, JSONRPCConnection::CallStyle::Default, process));
+    SLANG_RETURN_ON_FAIL(
+        rpcConnection->init(connection, JSONRPCConnection::CallStyle::Default, process));
 
     out = rpcConnection;
 

@@ -1,4 +1,5 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//DISABLE_TEST:SIMPLE(filecheck=CHK):-target hlsl -stage compute -entry computeMain -report-checkpoint-intermediates
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 
@@ -75,7 +76,8 @@ void d_getParam(uint id, MaterialParam.Differential diff)
     outputBuffer[id] += diff.roughness;
 }
 
-
+//CHK-DAG: note: checkpointing context of 8 bytes associated with function: 'updatePathThroughput'
+//CHK-DAG: note: 8 bytes (PathResult_0) used to checkpoint the following item:
 [BackwardDifferentiable]
 void updatePathThroughput(inout PathResult path, const float weight)
 {
@@ -122,9 +124,13 @@ bool generateScatterRay(const BSDFSample bs, const MaterialParam bsdfParams, ino
     \param[in,out] path The path state.
     \return True if a ray was generated, false otherwise.
 */
+
+//CHK-DAG: note: checkpointing context of 16 bytes associated with function: 'generateScatterRay'
 [BackwardDifferentiable]
 bool generateScatterRay(const BSDFSample bs, const MaterialParam bsdfParams, inout PathState path, inout PathResult pathRes)
 {
+    //CHK-DAG: note: 8 bytes (s_bwd_prop_updatePathThroughput_Intermediates_0) used to checkpoint the following item:
+    //CHK-DAG: note: 8 bytes (PathResult_0) used to checkpoint the following item:
     updatePathThroughput(pathRes, bs.val);
     return true;
 }
@@ -215,5 +221,6 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         var dpx = diffPair(pathRes, pathResD);
         __bwd_diff(tracePath)(1, dpx); // Expect: 5.0 in outputBuffer[3]
     }
-
 }
+
+//CHK-NOT: note

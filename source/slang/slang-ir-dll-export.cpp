@@ -2,11 +2,10 @@
 #include "slang-ir-dll-export.h"
 
 #include "slang-ir-header-export.h"
-
-#include "slang-ir.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-marshal-native-call.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -34,16 +33,20 @@ struct DllExportContext
 
     void processModule()
     {
-        struct Candidate { IRFunc* func; IRDllExportDecoration* exportDecoration; };
+        struct Candidate
+        {
+            IRFunc* func;
+            IRDllExportDecoration* exportDecoration;
+        };
         List<Candidate> candidates;
         for (auto childFunc : module->getGlobalInsts())
         {
-            switch(childFunc->getOp())
+            switch (childFunc->getOp())
             {
             case kIROp_Func:
                 if (auto dllExportDecoration = childFunc->findDecoration<IRDllExportDecoration>())
                 {
-                    candidates.add(Candidate{ as<IRFunc>(childFunc), dllExportDecoration });
+                    candidates.add(Candidate{as<IRFunc>(childFunc), dllExportDecoration});
                 }
                 break;
             default:
@@ -66,4 +69,4 @@ void generateDllExportFuncs(IRModule* module, DiagnosticSink* sink)
     return context.processModule();
 }
 
-}
+} // namespace Slang

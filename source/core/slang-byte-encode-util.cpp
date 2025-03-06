@@ -1,17 +1,18 @@
 #include "slang-byte-encode-util.h"
 
-namespace Slang {
+namespace Slang
+{
 
 // Descriptions of algorithms here...
 // https://github.com/stoklund/varint
 
 #if SLANG_LITTLE_ENDIAN && SLANG_UNALIGNED_ACCESS
 // Testing on i7, unaligned access is around 40% faster
-#   define SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS 1
+#define SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS 1
 #endif
 
 #ifndef SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS
-#   define SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS 0
+#define SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS 0
 #endif
 
 #define SLANG_REPEAT_2(n) n, n
@@ -22,23 +23,22 @@ namespace Slang {
 #define SLANG_REPEAT_64(n) SLANG_REPEAT_32(n), SLANG_REPEAT_32(n)
 #define SLANG_REPEAT_128(n) SLANG_REPEAT_64(n), SLANG_REPEAT_64(n)
 
-/* static */const int8_t ByteEncodeUtil::s_msb8[256] =
-{
-    - 1, 
-    0, 
-    SLANG_REPEAT_2(1), 
-    SLANG_REPEAT_4(2), 
-    SLANG_REPEAT_8(3), 
-    SLANG_REPEAT_16(4), 
+/* static */ const int8_t ByteEncodeUtil::s_msb8[256] = {
+    -1,
+    0,
+    SLANG_REPEAT_2(1),
+    SLANG_REPEAT_4(2),
+    SLANG_REPEAT_8(3),
+    SLANG_REPEAT_16(4),
     SLANG_REPEAT_32(5),
     SLANG_REPEAT_64(6),
     SLANG_REPEAT_128(7),
 };
 
-/* static */size_t ByteEncodeUtil::calcEncodeLiteSizeUInt32(const uint32_t* in, size_t num)
+/* static */ size_t ByteEncodeUtil::calcEncodeLiteSizeUInt32(const uint32_t* in, size_t num)
 {
     size_t totalNumEncodeBytes = 0;
-    
+
     for (size_t i = 0; i < num; i++)
     {
         const uint32_t v = in[i];
@@ -59,7 +59,10 @@ namespace Slang {
     return totalNumEncodeBytes;
 }
 
-/* static */size_t ByteEncodeUtil::encodeLiteUInt32(const uint32_t* in, size_t num, uint8_t* encodeOut)
+/* static */ size_t ByteEncodeUtil::encodeLiteUInt32(
+    const uint32_t* in,
+    size_t num,
+    uint8_t* encodeOut)
 {
     uint8_t* encodeStart = encodeOut;
 
@@ -67,7 +70,7 @@ namespace Slang {
     {
         uint32_t v = in[i];
 
-        if(v < kLiteCut1)
+        if (v < kLiteCut1)
         {
             *encodeOut++ = uint8_t(v);
         }
@@ -95,7 +98,10 @@ namespace Slang {
     return size_t(encodeOut - encodeStart);
 }
 
-/* static */void ByteEncodeUtil::encodeLiteUInt32(const uint32_t* in, size_t num, List<uint8_t>& encodeArrayOut)
+/* static */ void ByteEncodeUtil::encodeLiteUInt32(
+    const uint32_t* in,
+    size_t num,
+    List<uint8_t>& encodeArrayOut)
 {
     // Make sure there is at least enough space for all bytes
     encodeArrayOut.setCount(num);
@@ -111,7 +117,7 @@ namespace Slang {
             const size_t offset = size_t(encodeOut - encodeArrayOut.begin());
 
             const UInt oldCapacity = encodeArrayOut.getCapacity();
-           
+
             // Make some more space
             encodeArrayOut.reserve(oldCapacity + (oldCapacity >> 1) + kMaxLiteEncodeUInt32);
             // Make the size the capacity
@@ -154,7 +160,7 @@ namespace Slang {
     encodeArrayOut.compress();
 }
 
-/* static */int ByteEncodeUtil::encodeLiteUInt32(uint32_t in, uint8_t out[kMaxLiteEncodeUInt32])
+/* static */ int ByteEncodeUtil::encodeLiteUInt32(uint32_t in, uint8_t out[kMaxLiteEncodeUInt32])
 {
     // 0-184        1 byte    value = B0
     // 185 - 248    2 bytes   value = 185 + 256 * (B0 - 185) + B1
@@ -187,8 +193,7 @@ namespace Slang {
     }
 }
 
-static const uint32_t s_unalignedUInt32Mask[5] = 
-{
+static const uint32_t s_unalignedUInt32Mask[5] = {
     0x00000000,
     0x000000ff,
     0x0000ffff,
@@ -196,8 +201,8 @@ static const uint32_t s_unalignedUInt32Mask[5] =
     0xffffffff,
 };
 
-// Decode the >= kLiteCut2. 
-// in is pointing past the first byte. 
+// Decode the >= kLiteCut2.
+// in is pointing past the first byte.
 // Only valid numBytesRemaining is 2, 3, or 4
 SLANG_FORCE_INLINE static uint32_t _decodeLiteCut2UInt32(const uint8_t* in, int numBytesRemaining)
 {
@@ -205,26 +210,37 @@ SLANG_FORCE_INLINE static uint32_t _decodeLiteCut2UInt32(const uint8_t* in, int 
 #if SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS
     switch (numBytesRemaining)
     {
-        case 2:     value = *(const uint16_t*)in; break;
-        case 3:     value = (uint32_t(in[2]) << 16) | (uint32_t(in[1]) << 8) | uint32_t(in[0]); break;
-        case 4:     value = *(const uint32_t*)in; break;
-        default: break;
+    case 2:
+        value = *(const uint16_t*)in;
+        break;
+    case 3:
+        value = (uint32_t(in[2]) << 16) | (uint32_t(in[1]) << 8) | uint32_t(in[0]);
+        break;
+    case 4:
+        value = *(const uint32_t*)in;
+        break;
+    default:
+        break;
     }
 #else
     // This works on all cpus although slower
     value = in[0];
     switch (numBytesRemaining)
     {
-        case 4: value |= uint32_t(in[3]) << 24;         /* fall thru */
-        case 3: value |= uint32_t(in[2]) << 16;         /* fall thru */
-        case 2: value |= uint32_t(in[1]) << 8;          /* fall thru */
-        case 1: break;
+    case 4:
+        value |= uint32_t(in[3]) << 24; /* fall thru */
+    case 3:
+        value |= uint32_t(in[2]) << 16; /* fall thru */
+    case 2:
+        value |= uint32_t(in[1]) << 8; /* fall thru */
+    case 1:
+        break;
     }
 #endif
     return value;
 }
 
-/* static */int ByteEncodeUtil::decodeLiteUInt32(const uint8_t* in, uint32_t* out)
+/* static */ int ByteEncodeUtil::decodeLiteUInt32(const uint8_t* in, uint32_t* out)
 {
     uint8_t b0 = *in++;
     if (b0 < kLiteCut1)
@@ -246,7 +262,10 @@ SLANG_FORCE_INLINE static uint32_t _decodeLiteCut2UInt32(const uint8_t* in, int 
     }
 }
 
-/* static */size_t ByteEncodeUtil::decodeLiteUInt32(const uint8_t* encodeIn, size_t numValues, uint32_t* valuesOut)
+/* static */ size_t ByteEncodeUtil::decodeLiteUInt32(
+    const uint8_t* encodeIn,
+    size_t numValues,
+    uint32_t* valuesOut)
 {
     const uint8_t* encodeStart = encodeIn;
 
@@ -267,13 +286,13 @@ SLANG_FORCE_INLINE static uint32_t _decodeLiteCut2UInt32(const uint8_t* in, int 
             const int numBytesRemaining = b0 - kLiteCut2 + 2 - 1;
 
             // For unaligned access, do not use unaligned access for the last two values,
-            // (3rd last is safe because this value will have at least 2 bytes, followed by at worst two 1-byte values)
-            // otherwise we can access outside the bounds of the encoded array
+            // (3rd last is safe because this value will have at least 2 bytes, followed by at worst
+            // two 1-byte values) otherwise we can access outside the bounds of the encoded array
             // This prevents memory validation tools from causing an exception here
             if (SLANG_BYTE_ENCODE_USE_UNALIGNED_ACCESS && i < numValues - 2)
             {
                 const uint32_t mask = s_unalignedUInt32Mask[numBytesRemaining];
-                //const uint32_t mask = ~(uint32_t(0xffffff00) << ((numBytesRemaining - 1) * 8));
+                // const uint32_t mask = ~(uint32_t(0xffffff00) << ((numBytesRemaining - 1) * 8));
                 valuesOut[i] = (*(const uint32_t*)encodeIn) & mask;
             }
             else

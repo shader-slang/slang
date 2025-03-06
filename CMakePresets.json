@@ -12,7 +12,22 @@
       "generator": "Ninja Multi-Config",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
-        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>",
+        "SLANG_ENABLE_IR_BREAK_ALLOC": "$<$<CONFIG:Debug>:TRUE>$<$<NOT:$<CONFIG:Debug>>:FALSE>"
+      }
+    },
+    {
+      "name": "emscripten",
+      "description": "Emscripten-based Wasm build",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build.em",
+      "cacheVariables": {
+        "SLANG_SLANG_LLVM_FLAVOR": "DISABLE",
+        "SLANG_ENABLE_SPLIT_DEBUG_INFO": "OFF",
+        "SLANG_ENABLE_SLANG_RHI": "OFF",
+        "CMAKE_C_FLAGS_INIT": "-fwasm-exceptions -Os",
+        "CMAKE_CXX_FLAGS_INIT": "-fwasm-exceptions -Os",
+        "CMAKE_EXE_LINKER_FLAGS": "-sASSERTIONS -sALLOW_MEMORY_GROWTH -fwasm-exceptions --export=__cpp_exception"
       }
     },
     {
@@ -30,6 +45,15 @@
       "inherits": "msvc-base",
       "description": "Visual Studio 2019 project",
       "generator": "Visual Studio 16 2019"
+    },
+    {
+      "name": "vs2019-dev",
+      "inherits": "msvc-base",
+      "description": "Visual Studio 2019 project with debug assisting features",
+      "generator": "Visual Studio 16 2019",
+      "cacheVariables": {
+        "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE"
+      }
     },
     {
       "name": "vs2022",
@@ -53,6 +77,15 @@
       "cacheVariables": {
         "SLANG_SLANG_LLVM_FLAVOR": "USE_SYSTEM_LLVM"
       }
+    },
+    {
+      "name": "generators",
+      "inherits": "default",
+      "description": "Build the compile time generators used in building Slang",
+      "cacheVariables": {
+        "SLANG_SLANG_LLVM_FLAVOR": "DISABLE",
+        "SLANG_ENABLE_SLANG_RHI": false
+      }
     }
   ],
   "buildPresets": [
@@ -67,20 +100,42 @@
       "configuration": "Release"
     },
     {
+      "name": "releaseWithDebugInfo",
+      "configurePreset": "default",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "vs2022-debug",
+      "configurePreset": "vs2022",
+      "configuration": "Debug"
+    },
+    {
+      "name": "vs2022-release",
+      "configurePreset": "vs2022",
+      "configuration": "Release"
+    },
+    {
+      "name": "vs2022-releaseWithDebugInfo",
+      "configurePreset": "vs2022",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "emscripten",
+      "configurePreset": "emscripten",
+      "configuration": "Release",
+      "targets": ["slang-wasm"]
+    },
+    {
       "name": "generators",
       "inherits": "release",
-      "configurePreset": "default",
-      "targets": [
-        "all-generators"
-      ]
+      "configurePreset": "generators",
+      "targets": ["all-generators"]
     },
     {
       "name": "slang-llvm",
       "inherits": "release",
       "configurePreset": "slang-llvm",
-      "targets": [
-        "slang-llvm"
-      ]
+      "targets": ["slang-llvm"]
     }
   ],
   "packagePresets": [
@@ -88,34 +143,60 @@
       "name": "base",
       "hidden": true,
       "configurePreset": "default",
-      "generators": [
-        "ZIP"
-      ],
+      "generators": ["ZIP"],
       "variables": {
         "CPACK_PACKAGE_FILE_NAME": "slang",
         "CPACK_COMPONENTS_ALL": "Unspecified;metadata;slang-llvm"
       }
     },
     {
+      "name": "base-debug-info",
+      "inherits": "base",
+      "variables": {
+        "CPACK_PACKAGE_FILE_NAME": "slang-debug-info",
+        "CPACK_COMPONENTS_ALL": "debug-info"
+      }
+    },
+    {
       "name": "release",
       "inherits": "base",
-      "configurations": [
-        "Release"
-      ],
+      "configurations": ["Release"],
       "packageDirectory": "dist-release"
+    },
+    {
+      "name": "releaseWithDebugInfo",
+      "inherits": "base",
+      "configurations": ["RelWithDebInfo"],
+      "packageDirectory": "dist-releaseWithDebugInfo"
     },
     {
       "name": "debug",
       "inherits": "base",
-      "configurations": [
-        "Debug"
-      ],
+      "configurations": ["Debug"],
       "packageDirectory": "dist-debug"
+    },
+    {
+      "name": "release-debug-info",
+      "inherits": "base-debug-info",
+      "configurations": ["Release"],
+      "packageDirectory": "dist-release-debug-info"
+    },
+    {
+      "name": "releaseWithDebugInfo-debug-info",
+      "inherits": "base-debug-info",
+      "configurations": ["RelWithDebInfo"],
+      "packageDirectory": "dist-releaseWithDebugInfo-debug-info"
+    },
+    {
+      "name": "debug-debug-info",
+      "inherits": "base-debug-info",
+      "configurations": ["Debug"],
+      "packageDirectory": "dist-debug-debug-info"
     },
     {
       "name": "generators",
       "inherits": "release",
-      "configurePreset": "default",
+      "configurePreset": "generators",
       "variables": {
         "CPACK_PACKAGE_FILE_NAME": "slang-generators",
         "CPACK_COMPONENTS_ALL": "generators"
@@ -167,11 +248,28 @@
       ]
     },
     {
-      "name": "generators",
+      "name": "releaseWithDebugInfo",
       "steps": [
         {
           "type": "configure",
           "name": "default"
+        },
+        {
+          "type": "build",
+          "name": "releaseWithDebugInfo"
+        },
+        {
+          "type": "package",
+          "name": "releaseWithDebugInfo"
+        }
+      ]
+    },
+    {
+      "name": "generators",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "generators"
         },
         {
           "type": "build",

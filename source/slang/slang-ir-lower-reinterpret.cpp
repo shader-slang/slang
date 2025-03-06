@@ -1,9 +1,10 @@
 #include "slang-ir-lower-reinterpret.h"
-#include "slang-ir.h"
+
+#include "slang-ir-any-value-inference.h"
+#include "slang-ir-any-value-marshalling.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
-#include "slang-ir-any-value-marshalling.h"
-#include "slang-ir-any-value-inference.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -64,27 +65,37 @@ struct ReinterpretLoweringContext
         if (fromTypeSize < 0)
         {
             cantPack = true;
-            sink->diagnose(inst->sourceLoc, Slang::Diagnostics::typeCannotBePackedIntoAnyValue, fromType);
+            sink->diagnose(
+                inst->sourceLoc,
+                Slang::Diagnostics::typeCannotBePackedIntoAnyValue,
+                fromType);
         }
         SlangInt toTypeSize = getAnyValueSize(toType);
         if (toTypeSize < 0)
         {
             cantPack = true;
-            sink->diagnose(inst->sourceLoc, Slang::Diagnostics::typeCannotBePackedIntoAnyValue, toType);
+            sink->diagnose(
+                inst->sourceLoc,
+                Slang::Diagnostics::typeCannotBePackedIntoAnyValue,
+                toType);
         }
-        if (fromTypeSize != toTypeSize
-            && cantPack == false)
+        if (fromTypeSize != toTypeSize && !cantPack && !as<IRExtractExistentialType>(fromType))
         {
-            sink->diagnose(inst->sourceLoc, Slang::Diagnostics::notEqualReinterpretCastSize, fromType, fromTypeSize, toType, toTypeSize);
+            sink->diagnose(
+                inst->sourceLoc,
+                Slang::Diagnostics::notEqualReinterpretCastSize,
+                fromType,
+                fromTypeSize,
+                toType,
+                toTypeSize);
         }
         SlangInt anyValueSize = Math::Max(fromTypeSize, toTypeSize);
 
         IRBuilder builder(module);
         builder.setInsertBefore(inst);
-        auto anyValueType = builder.getAnyValueType(builder.getIntValue(builder.getUIntType(), anyValueSize));
-        auto packInst = builder.emitPackAnyValue(
-            anyValueType,
-            operand);
+        auto anyValueType =
+            builder.getAnyValueType(builder.getIntValue(builder.getUIntType(), anyValueSize));
+        auto packInst = builder.emitPackAnyValue(anyValueType, operand);
         auto unpackInst = builder.emitUnpackAnyValue(toType, packInst);
         inst->replaceUsesWith(unpackInst);
         inst->removeAndDeallocate();
@@ -93,9 +104,9 @@ struct ReinterpretLoweringContext
 
 void lowerReinterpret(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
 {
-    // Before processing reinterpret insts, ensure that existential types without 
+    // Before processing reinterpret insts, ensure that existential types without
     // user-defined sizes have inferred sizes where possible.
-    // 
+    //
     inferAnyValueSizeWhereNecessary(target, module);
 
     ReinterpretLoweringContext context;
@@ -105,4 +116,4 @@ void lowerReinterpret(TargetProgram* target, IRModule* module, DiagnosticSink* s
     context.processModule();
 }
 
-}
+} // namespace Slang

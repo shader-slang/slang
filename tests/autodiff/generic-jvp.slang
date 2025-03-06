@@ -10,6 +10,12 @@ __generic<let N : int>
 struct myvector
 {
     vector<Real, N> val;
+ 
+    [TreatAsDifferentiable]
+    __init(vector<Real,N> data)
+    {
+        val = data;
+    }
 }
 
 extension myvector<3> : MyLinearArithmeticType
@@ -115,7 +121,7 @@ extension myfloat3 : IDifferentiable
     [ForwardDifferentiable]
     static Differential dmul<T : __BuiltinRealType>(T a, Differential b)
     {
-        return { __realCast<Real, T>(a) * b.val };
+        return myfloat3(__realCast<Real, T>(a) * b.val);
     }
 
 };
@@ -141,7 +147,7 @@ extension myfloat4 : IDifferentiable
     [ForwardDifferentiable]
     static Differential dmul<T: __BuiltinRealType>(T a, Differential b)
     {
-        return { __realCast<Real, T>(a) * b.val };
+        return myfloat4(__realCast<Real, T>(a) * b.val);
     }
 };
 

@@ -7,12 +7,13 @@ on:
     branches:
       - master
     paths-ignore:
-      - 'docs/**'
-      - 'LICENCE'
-      - 'CONTRIBUTION.md'
-      - 'README.md'
+      - "docs/**"
+      - "LICENSES/**"
+      - "LICENSE"
+      - "CONTRIBUTING.md"
+      - "README.md"
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   release:
@@ -23,14 +24,25 @@ jobs:
         platform: [x86_64, aarch64]
         test-category: [smoke]
         include:
-          - {os: linux, runs-on: ubuntu-20.04, compiler: gcc}
-          - {os: windows, runs-on: windows-latest, compiler: cl}
-          - {os: macos, runs-on: macos-latest, compiler: clang}
+          - {
+              os: linux,
+              platform: x86_64,
+              runs-on: ubuntu-22.04,
+              compiler: gcc,
+            }
+          - {
+              os: linux,
+              platform: aarch64,
+              runs-on: ubuntu-22.04-arm,
+              compiler: gcc,
+            }
+          - { os: windows, runs-on: windows-latest, compiler: cl }
+          - { os: macos, runs-on: macos-latest, compiler: clang }
 
-          - {build-slang-llvm: false}
-          - {os: linux, platform: x86_64, build-slang-llvm: true}
-          - {os: windows, platform: x86_64, build-slang-llvm: true}
-          - {os: macos, platform: aarch64, build-slang-llvm: true}
+          - { build-slang-llvm: false }
+          - { os: linux, platform: x86_64, build-slang-llvm: true }
+          - { os: windows, platform: x86_64, build-slang-llvm: true }
+          - { os: macos, platform: aarch64, build-slang-llvm: true }
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
     container: ${{ matrix.image || '' }}
@@ -40,10 +52,10 @@ jobs:
         shell: bash
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
-          submodules: 'true'
-          fetch-depth: '0'
+          submodules: "recursive"
+          fetch-depth: "0"
       - name: Setup
         uses: ./.github/actions/common-setup
         with:
@@ -80,15 +92,14 @@ jobs:
 
       - name: Build Slang
         run: |
-          if [[ "${{ matrix.os }}" == "windows" && "${{ matrix.config }}" != "release" ]]; then
-              echo "Please see ci.yml for the steps to make debug builds work on Windows" >&2
+          if [[ "${{ matrix.os }}" == "windows" && "${{ matrix.config }}" != "release" && "${{ matrix.config }}" != "releaseWithDebugInfo" ]]; then
+              echo "Please see ci.yml for the steps to make non-release builds work on Windows" >&2
               exit 1
           fi
 
           cmake --preset default --fresh \
             -DSLANG_GENERATORS_PATH=build-platform-generators/bin \
             -DSLANG_ENABLE_EXAMPLES=OFF \
-            -DSLANG_EMBED_STDLIB=ON \
             "-DSLANG_SLANG_LLVM_FLAVOR=$(
               [[ "${{matrix.build-slang-llvm}}" = "true" ]] && echo "USE_SYSTEM_LLVM" || echo "DISABLE")"
 
@@ -109,34 +120,32 @@ jobs:
           brew install Bearer/tap/gon
           security find-identity -v
           brew install coreutils
-
           # create variables
           CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-
           # import certificate and provisioning profile from secrets
           echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode --output "$CERTIFICATE_PATH"
-
           # create temporary keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
           # import certificate to keychain
           security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
           security list-keychain -d user -s "$KEYCHAIN_PATH"
-
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "${KEYCHAIN_PASSWORD}" "$KEYCHAIN_PATH"
 
           binaries=(
             "${lib_dir}/libslang.dylib"
             "${lib_dir}/libslang-rt.dylib"
             "${lib_dir}/libslang-glslang.dylib"
+            "${lib_dir}/libslang-glsl-module.dylib"
             "${lib_dir}/libslang-llvm.dylib"
             "${lib_dir}/libgfx.dylib"
             "${bin_dir}/slangd"
             "${bin_dir}/slangc"
           )
+
+          # Sign main binaries
           for b in "${binaries[@]}"; do
             if [[ -f "$b" ]]; then
               echo "Signing binary '$b'..."
@@ -152,15 +161,27 @@ jobs:
       - name: Package Slang
         id: package
         run: |
-          # For the release, also generate a tar.gz file
+          # Package main binaries
           cpack --preset "$config" -G ZIP
           cpack --preset "$config" -G TGZ
+          # Package debug info
+          cpack --preset "$config-debug-info" -G ZIP
+          cpack --preset "$config-debug-info" -G TGZ
+
           triggering_ref=${{ github.ref_name }}
           base=slang-${triggering_ref#v}-${{matrix.os}}-${{matrix.platform}}
+
+          # Move main packages
           mv "$(pwd)/build/dist-${config}/slang.zip" "${base}.zip"
           echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> "$GITHUB_OUTPUT"
           mv "$(pwd)/build/dist-${config}/slang.tar.gz" "${base}.tar.gz"
           echo "SLANG_BINARY_ARCHIVE_TAR=${base}.tar.gz" >> "$GITHUB_OUTPUT"
+
+          # Move debug info packages
+          mv "$(pwd)/build/dist-${config}-debug-info/slang-debug-info.zip" "${base}-debug-info.zip"
+          echo "SLANG_DEBUG_INFO_ARCHIVE_ZIP=${base}-debug-info.zip" >> "$GITHUB_OUTPUT"
+          mv "$(pwd)/build/dist-${config}-debug-info/slang-debug-info.tar.gz" "${base}-debug-info.tar.gz"
+          echo "SLANG_DEBUG_INFO_ARCHIVE_TAR=${base}-debug-info.tar.gz" >> "$GITHUB_OUTPUT"
 
           # For some reason, the binaries packed by cpack for macos is modified
           # by cpack and considered damanged by macos. For now we workaround this
@@ -169,8 +190,14 @@ jobs:
             mkdir ./ttmp
             unzip "${base}.zip" -d ./ttmp
 
-            /bin/cp -rf build/Release/bin/* ./ttmp/bin/
-            /bin/cp -rf build/Release/lib/* ./ttmp/lib/
+            # Copy only existing files from build directory
+            find ./ttmp/{bin,lib} -type f | while read -r file; do
+              src_file="build/$cmake_config/${file#./ttmp/}"
+              if [ -f "$src_file" ]; then
+                cp "$src_file" "$file"
+              fi
+            done
+
             rm ${base}.zip
             rm ${base}.tar.gz
             cd ./ttmp
@@ -178,6 +205,7 @@ jobs:
             tar -czvf ../${base}.tar.gz .
             cd ../
           fi
+
       - name: File check
         run: |
           find "build/dist-$config" -print0 ! -iname '*.md' ! -iname '*.h' -type f | xargs -0 file
@@ -186,9 +214,30 @@ jobs:
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/v')
         with:
+          draft: ${{contains(github.ref, 'draft')}}
+          prerelease: ${{contains(github.ref, 'draft')}}
           files: |
             ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_ZIP }}
             ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_TAR }}
+            ${{ steps.package.outputs.SLANG_DEBUG_INFO_ARCHIVE_ZIP }}
+            ${{ steps.package.outputs.SLANG_DEBUG_INFO_ARCHIVE_TAR }}
             ${{ steps.notarize.outputs.SLANG_NOTARIZED_DIST }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Checkout stdlib reference
+        if: matrix.os == 'windows' && matrix.platform == 'x86_64'
+        uses: actions/checkout@v4
+        with:
+          repository: shader-slang/stdlib-reference
+          path: docs/stdlib-reference/
+          token: ${{ secrets.UPDATE_STDLIB_REFERENCE_PAT }}
+      - name: Update stdlib reference
+        if: matrix.os == 'windows' && matrix.platform == 'x86_64'
+        shell: powershell
+        run: |
+          cd docs/
+          ls
+          & ".\build_reference.ps1"
+        env:
+          GITHUB_TOKEN: ${{ secrets.UPDATE_STDLIB_REFERENCE_PAT }}

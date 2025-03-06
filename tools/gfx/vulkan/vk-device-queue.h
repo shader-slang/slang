@@ -4,7 +4,8 @@
 #include "vk-api.h"
 #include "vk-descriptor-allocator.h"
 
-namespace gfx {
+namespace gfx
+{
 
 struct VulkanDeviceQueue
 {
@@ -20,53 +21,56 @@ struct VulkanDeviceQueue
         CountOf,
     };
 
-        /// Initialize - must be called before anything else can be done
+    /// Initialize - must be called before anything else can be done
     SlangResult init(const VulkanApi& api, VkQueue queue, int queueIndex);
 
-        /// Flushes the current command list, and steps to next (internally this is equivalent to a stepA followed by stepB)
+    /// Flushes the current command list, and steps to next (internally this is equivalent to a
+    /// stepA followed by stepB)
     void flush();
-        /// Performs a full flush, and then waits for idle.
+    /// Performs a full flush, and then waits for idle.
     void flushAndWait();
 
-        /// Blocks until all work submitted to GPU has completed
+    /// Blocks until all work submitted to GPU has completed
     void waitForIdle() { m_api->vkQueueWaitIdle(m_queue); }
 
-        /// Get the graphics queue index (as set on init)
+    /// Get the graphics queue index (as set on init)
     int getQueueIndex() const { return m_queueIndex; }
 
-        /// Make the specified event 'current' - meaning it's semaphore must be waited on
+    /// Make the specified event 'current' - meaning it's semaphore must be waited on
     VkSemaphore makeCurrent(EventType eventType);
     VkSemaphore getSemaphore(EventType eventType);
-        /// Makes the event no longer required to be waited on
+    /// Makes the event no longer required to be waited on
     void makeCompleted(EventType eventType);
-        /// Returns true if the event is already current
-    SLANG_FORCE_INLINE bool isCurrent(EventType eventType) const { return m_currentSemaphores[int(eventType)] != VK_NULL_HANDLE; }
+    /// Returns true if the event is already current
+    SLANG_FORCE_INLINE bool isCurrent(EventType eventType) const
+    {
+        return m_currentSemaphores[int(eventType)] != VK_NULL_HANDLE;
+    }
 
-        /// Get the command buffer
+    /// Get the command buffer
     VkCommandBuffer getCommandBuffer() const { return m_commandBuffer; }
 
-        /// Get the queue
+    /// Get the queue
     VkQueue getQueue() const { return m_queue; }
 
-        /// Get the API
+    /// Get the API
     const VulkanApi* getApi() const { return m_api; }
 
-        /// Flushes the current command list
+    /// Flushes the current command list
     void flushStepA();
-        /// Steps to next command buffer and opens. May block if command buffer is still in use
+    /// Steps to next command buffer and opens. May block if command buffer is still in use
     void flushStepB();
 
-        /// Destroy the device queue
+    /// Destroy the device queue
     void destroy();
 
-        /// True if the queue appears to be valid and has been initialized
+    /// True if the queue appears to be valid and has been initialized
     bool isValid() const { return m_api != nullptr; }
 
-        /// Dtor
+    /// Dtor
     ~VulkanDeviceQueue();
 
-    protected:
-
+protected:
     struct Fence
     {
         VkFence fence;
@@ -82,9 +86,9 @@ struct VulkanDeviceQueue
     int m_commandBufferIndex = 0;
     // There are the same amount of command buffers as fences
     VkCommandPool m_commandPools[kMaxCommandBuffers] = {VK_NULL_HANDLE};
-    VkCommandBuffer m_commandBuffers[kMaxCommandBuffers] = { VK_NULL_HANDLE };
+    VkCommandBuffer m_commandBuffers[kMaxCommandBuffers] = {VK_NULL_HANDLE};
 
-    Fence m_fences[kMaxCommandBuffers] = { {VK_NULL_HANDLE, 0, 0u} };
+    Fence m_fences[kMaxCommandBuffers] = {{VK_NULL_HANDLE, 0, 0u}};
 
     VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
     VkCommandPool m_commandPool = VK_NULL_HANDLE;
@@ -99,4 +103,4 @@ struct VulkanDeviceQueue
     const VulkanApi* m_api = nullptr;
 };
 
-} // renderer_test
+} // namespace gfx

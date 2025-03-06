@@ -12,6 +12,7 @@ struct SphereHitAttributes
 struct ShadowRay
 {
     float4 hitDistance;
+    float3 dummyOut;
 };
 
 struct Params
@@ -42,20 +43,19 @@ void main(
     }
 
     uint index = 0U;
-	HitTriangleVertexPosition(index);
+    ioPayload.dummyOut = HitTriangleVertexPosition(index);
 
-	index = 1U;
-	HitTriangleVertexPosition(index);
+    index = 1U;
+    ioPayload.dummyOut += HitTriangleVertexPosition(index);
 
-	index = 2U;
-	HitTriangleVertexPosition(index);
+    index = 2U;
+    ioPayload.dummyOut += HitTriangleVertexPosition(index);
 }
 
 // SPIRV-DAG: OpCapability RayTracing
 // SPIRV-DAG: OpCapability RayTracingPositionFetchKHR
 // SPIRV: OpEntryPoint
 // SPIRV: BuiltIn HitTriangleVertexPositionsKHR
-// SPIRV: OpTypePointer HitAttribute{{NV|KHR}}
 // SPIRV: OpTypePointer HitAttribute{{NV|KHR}}
 // SPIRV: OpVariable{{.*}}HitAttribute{{NV|KHR}}
 // SPIRV: OpIgnoreIntersectionKHR
@@ -68,7 +68,6 @@ void main(
 // GL_SPIRV-DAG: OpCapability RayTracingPositionFetchKHR
 // GL_SPIRV: OpEntryPoint
 // GL_SPIRV: BuiltIn HitTriangleVertexPositionsKHR
-// GL_SPIRV-DAG: OpTypePointer HitAttribute{{NV|KHR}}
 // GL_SPIRV-DAG: OpTypePointer HitAttribute{{NV|KHR}}
 // GL_SPIRV: OpTerminateRayKHR
 // GL_SPIRV: OpIgnoreIntersectionKHR

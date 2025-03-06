@@ -24,6 +24,6 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     AllMemoryBarrier();
 
     // CHECK: 4.0
-    outputBuffer[0] = t[uint2(1, 0)];
+    outputBuffer[0] = t[uint2(1, 0)] + originalValue;
 
 }

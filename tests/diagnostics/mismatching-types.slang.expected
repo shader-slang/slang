@@ -3,31 +3,34 @@ standard error = {
 tests/diagnostics/mismatching-types.slang(51): error 30019: expected an expression of type 'GenericOuter<int>', got 'int'
     a = 0;
         ^
-tests/diagnostics/mismatching-types.slang(53): error 30019: expected an expression of type 'GenericOuter<int>.GenericInner<int>', got 'int'
+tests/diagnostics/mismatching-types.slang(55): error 30019: expected an expression of type 'GenericOuter<int>.GenericInner<int>', got 'int'
     a.g = 0;
           ^
-tests/diagnostics/mismatching-types.slang(55): error 30019: expected an expression of type 'GenericOuter<int>.NonGenericInner', got 'int'
+tests/diagnostics/mismatching-types.slang(55): note: explicit conversion from 'int' to 'GenericOuter<int>.GenericInner<int>' is possible
+tests/diagnostics/mismatching-types.slang(59): error 30019: expected an expression of type 'GenericOuter<int>.NonGenericInner', got 'int'
     a.ng = 0;
            ^
-tests/diagnostics/mismatching-types.slang(57): error 30019: expected an expression of type 'GenericOuter<int>.GenericInner<int>', got 'GenericOuter<float>.GenericInner<float>'
+tests/diagnostics/mismatching-types.slang(59): note: explicit conversion from 'int' to 'GenericOuter<int>.NonGenericInner' is possible
+tests/diagnostics/mismatching-types.slang(61): error 30019: expected an expression of type 'GenericOuter<int>.GenericInner<int>', got 'GenericOuter<float>.GenericInner<float>'
     a.g = b.g;
             ^
-tests/diagnostics/mismatching-types.slang(59): error 30019: expected an expression of type 'GenericOuter<int>.NonGenericInner', got 'GenericOuter<float>.NonGenericInner'
+tests/diagnostics/mismatching-types.slang(63): error 30019: expected an expression of type 'GenericOuter<int>.NonGenericInner', got 'GenericOuter<float>.NonGenericInner'
     a.ng = b.ng;
              ^~
-tests/diagnostics/mismatching-types.slang(61): error 30019: expected an expression of type 'GenericInner<int>', got 'int'
+tests/diagnostics/mismatching-types.slang(66): error 30019: expected an expression of type 'NonGenericOuter.GenericInner<int>', got 'int'
     c.i = 0;
           ^
-tests/diagnostics/mismatching-types.slang(63): error 30019: expected an expression of type 'GenericInner<int>', got 'GenericInner<float>'
+tests/diagnostics/mismatching-types.slang(68): error 30019: expected an expression of type 'NonGenericOuter.GenericInner<int>', got 'NonGenericOuter.GenericInner<float>'
     c.i = c.f;
             ^
-tests/diagnostics/mismatching-types.slang(65): error 30019: expected an expression of type 'GenericInner<int>.ReallyNested', got 'int'
+tests/diagnostics/mismatching-types.slang(72): error 30019: expected an expression of type 'NonGenericOuter.GenericInner<int>.ReallyNested', got 'int'
     c.i.n = 0;
             ^
-tests/diagnostics/mismatching-types.slang(74): error 30019: expected an expression of type 'Texture1D<int>', got 'Texture1D<float>'
+tests/diagnostics/mismatching-types.slang(72): note: explicit conversion from 'int' to 'NonGenericOuter.GenericInner<int>.ReallyNested' is possible
+tests/diagnostics/mismatching-types.slang(81): error 30019: expected an expression of type 'Texture1D<int>', got 'Texture1D<float>'
     Texture1D<int> t1 = tex;
                         ^~~
-tests/diagnostics/mismatching-types.slang(76): error 30019: expected an expression of type 'Texture2D<float>', got 'Texture1D<float>'
+tests/diagnostics/mismatching-types.slang(83): error 30019: expected an expression of type 'Texture2D<float>', got 'Texture1D<float>'
     Texture2D<float> t2 = tex;
                           ^~~
 }

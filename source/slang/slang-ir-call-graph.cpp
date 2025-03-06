@@ -1,21 +1,25 @@
 #include "slang-ir-call-graph.h"
-#include "slang-ir-insts.h"
+
 #include "slang-ir-clone.h"
+#include "slang-ir-insts.h"
 
 namespace Slang
 {
 
-void buildEntryPointReferenceGraph(Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints, IRModule* module)
+void buildEntryPointReferenceGraph(
+    Dictionary<IRInst*, HashSet<IRFunc*>>& referencingEntryPoints,
+    IRModule* module)
 {
     struct WorkItem
     {
-        IRFunc* entryPoint; IRInst* inst;
+        IRFunc* entryPoint;
+        IRInst* inst;
 
         HashCode getHashCode() const
         {
             return combineHash(Slang::getHashCode(entryPoint), Slang::getHashCode(inst));
         }
-        bool operator == (const WorkItem& other) const
+        bool operator==(const WorkItem& other) const
         {
             return entryPoint == other.entryPoint && inst == other.inst;
         }
@@ -46,7 +50,7 @@ void buildEntryPointReferenceGraph(Dictionary<IRInst*, HashSet<IRFunc*>>& refere
             registerEntryPointReference(entryPoint, inst);
             for (auto child : code->getChildren())
             {
-                addToWorkList({ entryPoint, child });
+                addToWorkList({entryPoint, child});
             }
             return;
         }
@@ -60,21 +64,21 @@ void buildEntryPointReferenceGraph(Dictionary<IRInst*, HashSet<IRFunc*>>& refere
         case kIROp_SPIRVAsm:
             for (auto child : inst->getChildren())
             {
-                addToWorkList({ entryPoint, child });
+                addToWorkList({entryPoint, child});
             }
             break;
         case kIROp_Call:
-        {
-            auto call = as<IRCall>(inst);
-            addToWorkList({ entryPoint, call->getCallee() });
-        }
-        break;
+            {
+                auto call = as<IRCall>(inst);
+                addToWorkList({entryPoint, call->getCallee()});
+            }
+            break;
         case kIROp_SPIRVAsmOperandInst:
-        {
-            auto operand = as<IRSPIRVAsmOperandInst>(inst);
-            addToWorkList({ entryPoint, operand->getValue() });
-        }
-        break;
+            {
+                auto operand = as<IRSPIRVAsmOperandInst>(inst);
+                addToWorkList({entryPoint, operand->getValue()});
+            }
+            break;
         }
         for (UInt i = 0; i < inst->getOperandCount(); i++)
         {
@@ -84,7 +88,7 @@ void buildEntryPointReferenceGraph(Dictionary<IRInst*, HashSet<IRFunc*>>& refere
             case kIROp_GlobalParam:
             case kIROp_GlobalVar:
             case kIROp_SPIRVAsmOperandBuiltinVar:
-                addToWorkList({ entryPoint, operand });
+                addToWorkList({entryPoint, operand});
                 break;
             }
         }
@@ -92,7 +96,8 @@ void buildEntryPointReferenceGraph(Dictionary<IRInst*, HashSet<IRFunc*>>& refere
 
     for (auto globalInst : module->getGlobalInsts())
     {
-        if (globalInst->getOp() == kIROp_Func && globalInst->findDecoration<IREntryPointDecoration>())
+        if (globalInst->getOp() == kIROp_Func &&
+            globalInst->findDecoration<IREntryPointDecoration>())
         {
             visit(as<IRFunc>(globalInst), globalInst);
         }
@@ -101,7 +106,9 @@ void buildEntryPointReferenceGraph(Dictionary<IRInst*, HashSet<IRFunc*>>& refere
         visit(workList[i].entryPoint, workList[i].inst);
 }
 
-HashSet<IRFunc*>* getReferencingEntryPoints(Dictionary<IRInst*, HashSet<IRFunc*>>& m_referencingEntryPoints, IRInst* inst)
+HashSet<IRFunc*>* getReferencingEntryPoints(
+    Dictionary<IRInst*, HashSet<IRFunc*>>& m_referencingEntryPoints,
+    IRInst* inst)
 {
     auto* referencingEntryPoints = m_referencingEntryPoints.tryGetValue(inst);
     if (!referencingEntryPoints)
@@ -109,4 +116,4 @@ HashSet<IRFunc*>* getReferencingEntryPoints(Dictionary<IRInst*, HashSet<IRFunc*>
     return referencingEntryPoints;
 }
 
-}
+} // namespace Slang

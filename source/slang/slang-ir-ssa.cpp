@@ -1,13 +1,14 @@
 // slang-ir-ssa.cpp
 #include "slang-ir-ssa.h"
 
-#include "slang-ir.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
-#include "slang-ir-validate.h"
 #include "slang-ir-util.h"
+#include "slang-ir-validate.h"
+#include "slang-ir.h"
 
-namespace Slang {
+namespace Slang
+{
 
 // Track information on a phi node we are in
 // the process of constructing.
@@ -15,7 +16,7 @@ struct PhiInfo : RefObject
 {
     // The phi node will be represented as a parameter
     // to a (non-entry) basic block.
-    IRParam*    phi;
+    IRParam* phi;
 
     // The original variable that this phi will be replacing.
     IRVar* var;
@@ -97,7 +98,7 @@ struct ConstructSSAContext
 
     PhiInfo* getPhiInfo(IRParam* phi)
     {
-        if(auto found = phiInfos.tryGetValue(phi))
+        if (auto found = phiInfos.tryGetValue(phi))
             return *found;
         return nullptr;
     }
@@ -140,14 +141,10 @@ bool allUsesLeadToLoads(IRInst* inst)
     // If all of the uses passed our checking, then
     // we are good to go.
     return true;
-
 }
 
 // Is the given variable one that we can promote to SSA form?
-bool isPromotableVar(
-    ConstructSSAContext*    /*context*/,
-    IRVar*                  var,
-    HashSet<IRBlock*>       &knownBlocks)
+bool isPromotableVar(ConstructSSAContext* /*context*/, IRVar* var, HashSet<IRBlock*>& knownBlocks)
 {
     // We want to identify variables such that we can always
     // determine what they will contain at a point in the
@@ -192,7 +189,7 @@ bool isPromotableVar(
             {
                 // A load has only a single argument, so
                 // it had better be our pointer.
-                SLANG_ASSERT(u == &((IRLoad*) user)->ptr);
+                SLANG_ASSERT(u == &((IRLoad*)user)->ptr);
             }
             break;
 
@@ -240,8 +237,7 @@ bool isPromotableVar(
 }
 
 // Identify local variables that can be promoted to SSA form
-void identifyPromotableVars(
-    ConstructSSAContext* context)
+void identifyPromotableVars(ConstructSSAContext* context)
 {
     HashSet<IRBlock*> knownBlocks;
     for (auto bb = context->globalVal->getFirstBlock(); bb; bb = bb->getNextBlock())
@@ -267,9 +263,7 @@ void identifyPromotableVars(
 }
 
 /// If `value` is a promotable variable, then cast and return it.
-IRVar* asPromotableVar(
-    ConstructSSAContext*    context,
-    IRInst*                value)
+IRVar* asPromotableVar(ConstructSSAContext* context, IRInst* value)
 {
     if (value->getOp() != kIROp_Var)
         return nullptr;
@@ -283,9 +277,7 @@ IRVar* asPromotableVar(
 
 /// If `value` is a promotable variable or an access chain
 /// based on one, then cast and return the variable.
-IRVar* asPromotableVarAccessChain(
-    ConstructSSAContext*    context,
-    IRInst*                 value)
+IRVar* asPromotableVarAccessChain(ConstructSSAContext* context, IRInst* value)
 {
     switch (value->getOp())
     {
@@ -309,10 +301,10 @@ IRVar* asPromotableVarAccessChain(
 /// construct v.b or v[i].
 ///
 IRInst* applyAccessChain(
-    ConstructSSAContext*    context,
-    IRBuilder*              builder,
-    IRInst*                 accessChain,
-    IRInst*                 leafVarValue)
+    ConstructSSAContext* context,
+    IRBuilder* builder,
+    IRInst* accessChain,
+    IRInst* leafVarValue)
 {
     switch (accessChain->getOp())
     {
@@ -331,16 +323,13 @@ IRInst* applyAccessChain(
             auto fieldKey = accessChain->getOperand(1);
             auto type = cast<IRPtrTypeBase>(accessChain->getDataType())->getValueType();
             auto baseValue = applyAccessChain(context, builder, baseChain, leafVarValue);
-            auto extractInst = builder->emitFieldExtract(
-                type,
-                baseValue,
-                fieldKey);
+            auto extractInst = builder->emitFieldExtract(type, baseValue, fieldKey);
 
             for (auto decoration : accessChain->getDecorations())
             {
                 cloneDecoration(decoration, extractInst);
             }
-            
+
             return extractInst;
         }
 
@@ -352,10 +341,7 @@ IRInst* applyAccessChain(
             auto index = accessChain->getOperand(1);
             auto type = cast<IRPtrTypeBase>(accessChain->getDataType())->getValueType();
             auto baseValue = applyAccessChain(context, builder, baseChain, leafVarValue);
-            return builder->emitElementExtract(
-                type,
-                baseValue,
-                index);
+            return builder->emitElementExtract(type, baseValue, index);
         }
     }
 }
@@ -366,24 +352,19 @@ IRInst* applyAccessChain(
 // that value will be used. If not, this all
 // may recursively work its way up through
 // the predecessors of the block.
-IRInst* readVar(
-    ConstructSSAContext*    context,
-    SSABlockInfo*           blockInfo,
-    IRVar*                  var);
+IRInst* readVar(ConstructSSAContext* context, SSABlockInfo* blockInfo, IRVar* var);
 
-    /// Try to copy any relevant decorations from `var` over to `val`.
-    ///
-static void cloneRelevantDecorations(
-    IRVar*                  var,
-    IRInst*                 val)
+/// Try to copy any relevant decorations from `var` over to `val`.
+///
+static void cloneRelevantDecorations(IRVar* var, IRInst* val)
 {
     // Copy selected decorations over from the original
     // variable to the SSA variable, when doing so is
     // required for semantics.
     //
-    for( auto decoration : var->getDecorations() )
+    for (auto decoration : var->getDecorations())
     {
-        switch(decoration->getOp())
+        switch (decoration->getOp())
         {
         default:
             // Ignore most decorations.
@@ -403,7 +384,8 @@ static void cloneRelevantDecorations(
         case kIROp_NameHintDecoration:
             // If the target already contains a linkage decoration, don't add
             // a name decoration to avoid issues with emit logic.
-            if (!val->findDecorationImpl(decoration->getOp()) && !val->findDecoration<IRLinkageDecoration>())
+            if (!val->findDecorationImpl(decoration->getOp()) &&
+                !val->findDecoration<IRLinkageDecoration>())
             {
                 cloneDecoration(nullptr, decoration, val, var->getModule());
             }
@@ -413,15 +395,12 @@ static void cloneRelevantDecorations(
 }
 
 // Add a phi node to represent the given variable
-PhiInfo* addPhi(
-    ConstructSSAContext*    context,
-    SSABlockInfo*           blockInfo,
-    IRVar*                  var)
+PhiInfo* addPhi(ConstructSSAContext* context, SSABlockInfo* blockInfo, IRVar* var)
 {
     auto builder = &blockInfo->builder;
 
     auto valueType = var->getDataType()->getValueType();
-    if( auto rate = var->getRate() )
+    if (auto rate = var->getRate())
     {
         valueType = context->getBuilder()->getRateQualifiedType(rate, valueType);
     }
@@ -431,6 +410,7 @@ PhiInfo* addPhi(
     RefPtr<PhiInfo> phiInfo = new PhiInfo();
     context->phiInfos.add(phi, phiInfo);
 
+    phi->sourceLoc = var->sourceLoc;
     phiInfo->phi = phi;
     phiInfo->var = var;
 
@@ -439,9 +419,7 @@ PhiInfo* addPhi(
     return phiInfo;
 }
 
-IRInst* tryRemoveTrivialPhi(
-    ConstructSSAContext*    context,
-    PhiInfo*                phiInfo)
+IRInst* tryRemoveTrivialPhi(ConstructSSAContext* context, PhiInfo* phiInfo)
 {
     auto phi = phiInfo->phi;
 
@@ -497,16 +475,18 @@ IRInst* tryRemoveTrivialPhi(
     // become trivial. We will recognize such candidates
     // by looking for phi nodes that use this node.
     List<PhiInfo*> otherPhis;
-    for( auto u = phi->firstUse; u; u = u->nextUse )
+    for (auto u = phi->firstUse; u; u = u->nextUse)
     {
         auto user = u->user;
-        if(!user) continue;
-        if(user == phi) continue;
+        if (!user)
+            continue;
+        if (user == phi)
+            continue;
 
-        if( user->getOp() == kIROp_Param )
+        if (user->getOp() == kIROp_Param)
         {
-            auto maybeOtherPhi = (IRParam*) user;
-            if( auto otherPhiInfo = context->getPhiInfo(maybeOtherPhi) )
+            auto maybeOtherPhi = (IRParam*)user;
+            if (auto otherPhiInfo = context->getPhiInfo(maybeOtherPhi))
             {
                 otherPhis.add(otherPhiInfo);
             }
@@ -520,7 +500,7 @@ IRInst* tryRemoveTrivialPhi(
 
     // Clear out the operands to the phi, since they won't
     // actually get used in the program any more.
-    for( auto& u : phiInfo->operands )
+    for (auto& u : phiInfo->operands)
     {
         u.clear();
     }
@@ -531,7 +511,7 @@ IRInst* tryRemoveTrivialPhi(
 
     // Now that we've cleaned up this phi, we need to consider
     // other phis that might have become  trivial.
-    for( auto otherPhi : otherPhis )
+    for (auto otherPhi : otherPhis)
     {
         // It is possible that between when we added a phi
         // node to `otherPhis` and here it might have been
@@ -540,7 +520,7 @@ IRInst* tryRemoveTrivialPhi(
         // `tryRemoveTrivialPhi` on `A` also ended up
         // eliminating `B`.
         //
-        if( otherPhi->replacement )
+        if (otherPhi->replacement)
             continue;
 
         tryRemoveTrivialPhi(context, otherPhi);
@@ -549,10 +529,7 @@ IRInst* tryRemoveTrivialPhi(
     return same;
 }
 
-IRInst* addPhiOperands(
-    ConstructSSAContext*    context,
-    SSABlockInfo*           blockInfo,
-    PhiInfo*                phiInfo)
+IRInst* addPhiOperands(ConstructSSAContext* context, SSABlockInfo* blockInfo, PhiInfo* phiInfo)
 {
     auto var = phiInfo->var;
 
@@ -582,7 +559,7 @@ IRInst* addPhiOperands(
 
     UInt operandCount = operandValues.getCount();
     phiInfo->operands.setCount(operandCount);
-    for(UInt ii = 0; ii < operandCount; ++ii)
+    for (UInt ii = 0; ii < operandCount; ++ii)
     {
         phiInfo->operands[ii].init(phiInfo->phi, operandValues[ii]);
     }
@@ -590,18 +567,12 @@ IRInst* addPhiOperands(
     return tryRemoveTrivialPhi(context, phiInfo);
 }
 
-void writeVar(
-    ConstructSSAContext*    /*context*/,
-    SSABlockInfo*           blockInfo,
-    IRVar*                  var,
-    IRInst*                val)
+void writeVar(ConstructSSAContext* /*context*/, SSABlockInfo* blockInfo, IRVar* var, IRInst* val)
 {
     blockInfo->valueForVar[var] = val;
 }
 
-void maybeSealBlock(
-    ConstructSSAContext*    context,
-    SSABlockInfo*           blockInfo)
+void maybeSealBlock(ConstructSSAContext* context, SSABlockInfo* blockInfo)
 {
     // We can't seal a block that has already been sealed.
     if (blockInfo->isSealed)
@@ -645,23 +616,21 @@ void maybeSealBlock(
 // don't end up referencing a dangling/unused value in
 // the code that we generate.
 //
-IRInst* maybeGetPhiReplacement(
-    ConstructSSAContext*    context,
-    IRInst*                 inVal)
+IRInst* maybeGetPhiReplacement(ConstructSSAContext* context, IRInst* inVal)
 {
     IRInst* val = inVal;
 
-    while( val->getOp() == kIROp_Param )
+    while (val->getOp() == kIROp_Param)
     {
         // The value is a parameter, but is it a phi?
-        IRParam* maybePhi = (IRParam*) val;
+        IRParam* maybePhi = (IRParam*)val;
         RefPtr<PhiInfo> phiInfo = nullptr;
-        if(!context->phiInfos.tryGetValue(maybePhi, phiInfo))
+        if (!context->phiInfos.tryGetValue(maybePhi, phiInfo))
             break;
 
         // Okay, this is indeed a phi we are adding, but
         // is it one that got replaced?
-        if(!phiInfo->replacement)
+        if (!phiInfo->replacement)
             break;
 
         // The phi we want to use got replaced, so we
@@ -672,10 +641,7 @@ IRInst* maybeGetPhiReplacement(
     return val;
 }
 
-IRInst* readVarRec(
-    ConstructSSAContext*    context,
-    SSABlockInfo*           blockInfo,
-    IRVar*                  var)
+IRInst* readVarRec(ConstructSSAContext* context, SSABlockInfo* blockInfo, IRVar* var)
 {
     IRInst* val = nullptr;
     if (!blockInfo->isSealed)
@@ -728,6 +694,7 @@ IRInst* readVarRec(
 
             auto type = var->getDataType()->getValueType();
             val = blockInfo->builder.emitUndefined(type);
+            cloneRelevantDecorations(var, val);
         }
         else if (!multiplePreds)
         {
@@ -781,11 +748,7 @@ IRInst* readVarRec(
 }
 
 
-
-IRInst* readVar(
-    ConstructSSAContext*    context,
-    SSABlockInfo*           blockInfo,
-    IRVar*                  var)
+IRInst* readVar(ConstructSSAContext* context, SSABlockInfo* blockInfo, IRVar* var)
 {
     // In the easy case, there will be a preceeding
     // store in the same block, so we can use
@@ -805,7 +768,7 @@ IRInst* readVar(
         return val;
     }
 
-    if( blockInfo->block == var->parent )
+    if (blockInfo->block == var->parent)
     {
         // If this is the block that actually *introduces*
         // the variable, then there is no reason to keep
@@ -814,6 +777,7 @@ IRInst* readVar(
         //
         auto type = var->getDataType()->getValueType();
         val = blockInfo->builder.emitUndefined(type);
+        cloneRelevantDecorations(var, val);
         writeVar(context, blockInfo, var, val);
         return val;
     }
@@ -823,15 +787,13 @@ IRInst* readVar(
     return readVarRec(context, blockInfo, var);
 }
 
-void collectInstsToRemove(
-    ConstructSSAContext*    context,
-    IRBlock*                block)
+void collectInstsToRemove(ConstructSSAContext* context, IRBlock* block)
 {
     IRInst* next = nullptr;
     for (auto ii = block->getFirstInst(); ii; ii = next)
     {
         next = ii->getNextInst();
-        
+
         switch (ii->getOp())
         {
         default:
@@ -840,7 +802,7 @@ void collectInstsToRemove(
         case kIROp_GetElementPtr:
         case kIROp_FieldAddress:
             {
-                auto  ptrArg = ii->getOperand(0);
+                auto ptrArg = ii->getOperand(0);
                 if (const auto var = asPromotableVarAccessChain(context, ptrArg))
                 {
                     context->instsToRemove.add(ii);
@@ -851,10 +813,7 @@ void collectInstsToRemove(
     }
 }
 
-void processBlock(
-    ConstructSSAContext*    context,
-    IRBlock*                block,
-    SSABlockInfo*           blockInfo)
+void processBlock(ConstructSSAContext* context, IRBlock* block, SSABlockInfo* blockInfo)
 {
     hoistInstOutOfASMBlocks(block);
 
@@ -961,9 +920,7 @@ IRBlock* IREdge::getSuccessor() const
     return cast<IRBlock>(getUse()->get());
 }
 
-void IRBuilder::insertBlockAlongEdge(
-    IRModule* module,
-    IREdge const&       edge)
+void IRBuilder::insertBlockAlongEdge(IRModule* module, IREdge const& edge)
 {
     auto pred = edge.getPredecessor();
     auto succ = edge.getSuccessor();
@@ -1007,7 +964,7 @@ bool IREdge::isCritical() const
     // If the predecessor block doesn't have multiple successors,
     // then this can't be a critical edge.
     //
-    if(pred->getSuccessors().getCount() <= 1)
+    if (pred->getSuccessors().getCount() <= 1)
         return false;
 
     // For the edge to be critical, the successor must have
@@ -1029,7 +986,7 @@ bool IREdge::isCritical() const
             break;
         }
     }
-    if(!multiplePreds)
+    if (!multiplePreds)
         return false;
 
     // At this point we have confirmed that `edgeUse`
@@ -1040,8 +997,7 @@ bool IREdge::isCritical() const
     return true;
 }
 
-static void breakCriticalEdges(
-    ConstructSSAContext*    context)
+static void breakCriticalEdges(ConstructSSAContext* context)
 {
     auto globalVal = context->globalVal;
 
@@ -1068,7 +1024,7 @@ static void breakCriticalEdges(
         for (; succIter != succEnd; ++succIter)
         {
             auto edge = succIter.getEdge();
-            if( edge.isCritical() )
+            if (edge.isCritical())
             {
                 criticalEdges.add(edge);
             }
@@ -1107,7 +1063,7 @@ bool constructSSA(ConstructSSAContext* context)
     // and stores of promotable variables with simple values.
 
     auto globalVal = context->globalVal;
-    for(auto bb : globalVal->getBlocks())
+    for (auto bb : globalVal->getBlocks())
     {
         auto blockInfo = new SSABlockInfo();
         blockInfo->block = bb;
@@ -1118,19 +1074,19 @@ bool constructSSA(ConstructSSAContext* context)
         context->blockInfos.add(bb, blockInfo);
     }
 
-    for(auto bb : globalVal->getBlocks())
+    for (auto bb : globalVal->getBlocks())
         collectInstsToRemove(context, bb);
 
-    for(auto bb : globalVal->getBlocks())
+    for (auto bb : globalVal->getBlocks())
     {
-        auto blockInfo = * context->blockInfos.tryGetValue(bb);
+        auto blockInfo = *context->blockInfos.tryGetValue(bb);
         processBlock(context, bb, blockInfo);
     }
 
     // We need to transfer the logical arguments to our phi nodes
     // from the phi nodes back to the predecessor blocks that will
     // pass them in.
-    for(auto bb : globalVal->getBlocks())
+    for (auto bb : globalVal->getBlocks())
     {
         auto blockInfo = *context->blockInfos.tryGetValue(bb);
 
@@ -1141,7 +1097,7 @@ bool constructSSA(ConstructSSAContext* context)
 
         // Then, add them back in a consistent order, and add predecessor
         // args in the same order.
-        // 
+        //
         for (auto phiInfo : blockInfo->phis)
         {
             // If we replaced this phi with another value,
@@ -1170,9 +1126,9 @@ bool constructSSA(ConstructSSAContext* context)
 
     // Some blocks may now need to pass along arguments to their successor,
     // which have been stored into the `SSABlockInfo::successorArgs` field.
-    for(auto bb : globalVal->getBlocks())
+    for (auto bb : globalVal->getBlocks())
     {
-        auto blockInfo = * context->blockInfos.tryGetValue(bb);
+        auto blockInfo = *context->blockInfos.tryGetValue(bb);
 
         // Sanity check: all blocks should be filled and sealed.
         SLANG_ASSERT(blockInfo->isSealed);
@@ -1250,7 +1206,7 @@ bool constructSSA(ConstructSSAContext* context)
     return true;
 }
 
-// Construct SSA form for a global value with code and reuse 
+// Construct SSA form for a global value with code and reuse
 // an existing sharedBuilder
 //
 bool constructSSA(IRModule* module, IRGlobalValueWithCode* globalVal)
@@ -1285,7 +1241,7 @@ bool constructSSA(IRModule* module, IRInst* globalVal)
 
             auto generic = cast<IRGeneric>(globalVal);
             auto returnVal = findInnerMostGenericReturnVal(generic);
-            if(!returnVal)
+            if (!returnVal)
                 return false;
 
             return constructSSA(module, returnVal);
@@ -1300,7 +1256,7 @@ bool constructSSA(IRModule* module, IRInst* globalVal)
 bool constructSSA(IRModule* module)
 {
     bool changed = false;
-    for(auto ii : module->getGlobalInsts())
+    for (auto ii : module->getGlobalInsts())
     {
         changed |= constructSSA(module, ii);
     }
@@ -1321,4 +1277,4 @@ bool constructSSA(IRInst* globalVal)
     return false;
 }
 
-}
+} // namespace Slang
