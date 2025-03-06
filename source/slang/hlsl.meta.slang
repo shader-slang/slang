@@ -21598,6 +21598,39 @@ namespace vk
     }
 }
 
+struct ConstBufferPointer<T, int alignment = 4>
+{
+    const T *_ptr;
+
+    [ForceInline] T get() { return loadAligned<alignment>(_ptr); }
+
+    __subscript(int index) -> T
+    {
+        [ForceInline]
+        get { return _ptr[index]; }
+    }
+
+    [ForceInline] T* getPtr() { return _ptr; }
+
+    [ForceInline]
+    static ConstBufferPointer<T> fromUInt(uint64_t val)
+    {
+        return {(T*)val};
+    }
+
+    [ForceInline]
+    uint64_t toUInt()
+    {
+        return (uint64_t)_ptr;
+    }
+
+    [ForceInline]
+    bool isValid()
+    {
+        return _ptr != nullptr;
+    }
+}
+
 attribute_syntax[vk_aliased_pointer] : VkAliasedPointerAttribute;
 attribute_syntax[vk_restrict_pointer] : VkRestrictPointerAttribute;
 
