@@ -1881,11 +1881,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                 break;
                             auto valueType = ptrType->getValueType();
                             auto layout = valueType->findDecoration<IRSizeAndAlignmentDecoration>();
-                            IRTypeLayoutRuleName layoutRuleName = IRTypeLayoutRuleName::Natural;
-                            if (layout)
-                            {
-                                layoutRuleName = layout->getLayoutName();
-                            }
                             auto alignment = getIntVal(alignDecor->getAlignment());
                             if (alignment >= layout->getAlignment())
                             {

@@ -219,6 +219,7 @@ struct LoweredElementTypeContext
         auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
         func->setFullType(funcType);
         builder.addNameHintDecoration(func, UnownedStringSlice("packMatrix"));
+        builder.addForceInlineDecoration(func);
         builder.setInsertInto(func);
         builder.emitBlock();
         auto rowCount = getIntVal(matrixType->getRowCount());
