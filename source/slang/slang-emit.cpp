@@ -1647,8 +1647,8 @@ Result linkAndOptimizeIR(
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
-    // if (!isMetalTarget(targetRequest))
-    // legalizeArrayReturnType(irModule);
+    if (!isMetalTarget(targetRequest) && !isSPIRV(target))
+        legalizeArrayReturnType(irModule);
 
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
     {
@@ -1669,6 +1669,9 @@ Result linkAndOptimizeIR(
     if (emitSpirvDirectly)
     {
         performIntrinsicFunctionInlining(irModule);
+    }
+    if (isKhronosTarget(targetRequest) || isWGPUTarget(targetRequest) || isD3DTarget(targetRequest))
+    {
         performTypeInlining(irModule, sink);
         eliminateDeadCode(irModule, deadCodeEliminationOptions);
     }
