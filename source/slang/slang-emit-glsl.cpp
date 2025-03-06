@@ -2036,13 +2036,22 @@ bool GLSLSourceEmitter::_tryEmitBitBinOp(
     return true;
 }
 
-void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* ptrType)
+void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
 {
+    auto ptrType = as<IRPtrType>(type);
+    if (!ptrType)
+        return;
+    if (ptrType->getAddressSpace() != AddressSpace::UserPointer)
+        return;
     _requireGLSLExtension(UnownedStringSlice("GL_EXT_buffer_reference"));
 
-    auto constPtrType = as<IRHLSLConstBufferPointerType>(ptrType);
     auto ptrTypeName = getName(ptrType);
-    auto alignment = getIntVal(constPtrType->getBaseAlignment());
+    IRSizeAndAlignment sizeAlignment;
+    getNaturalSizeAndAlignment(
+        m_codeGenContext->getTargetProgram()->getOptionSet(),
+        ptrType->getValueType(),
+        &sizeAlignment);
+    auto alignment = sizeAlignment.alignment;
     m_writer->emit("layout(buffer_reference, std430, buffer_reference_align = ");
     m_writer->emitInt64(alignment);
     m_writer->emit(") readonly buffer ");
@@ -2050,7 +2059,7 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* ptrType)
     m_writer->emit("\n");
     m_writer->emit("{\n");
     m_writer->indent();
-    emitType((IRType*)constPtrType->getValueType(), "_data");
+    emitType((IRType*)ptrType->getValueType(), "_data");
     m_writer->emit(";\n");
     m_writer->dedent();
     m_writer->emit("};\n");
@@ -2079,7 +2088,7 @@ void GLSLSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    case kIROp_HLSLConstBufferPointerType:
+    case kIROp_PtrType:
         emitBufferPointerTypeDefinition(inst);
         break;
     // No need to use structs which are just taking part in a SSBO declaration
@@ -2101,6 +2110,43 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         {
             m_writer->emit("barrier();\n");
             return true;
+        }
+    case kIROp_Load:
+        {
+            auto addr = inst->getOperand(0);
+            auto ptrType = as<IRPtrType>(addr->getDataType());
+            if (!ptrType)
+                return false;
+            if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
+            {
+                auto prec = getInfo(EmitOp::Postfix);
+                EmitOpInfo outerPrec = inOuterPrec;
+                bool needClose = maybeEmitParens(outerPrec, prec);
+                emitOperand(inst->getOperand(0), prec);
+                m_writer->emit("._data");
+                maybeCloseParens(needClose);
+                return true;
+            }
+            return false;
+        }
+    case kIROp_FieldAddress:
+        {
+            auto addr = inst->getOperand(0);
+            auto ptrType = as<IRPtrType>(addr->getDataType());
+            if (!ptrType)
+                return false;
+            if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
+            {
+                auto prec = getInfo(EmitOp::Postfix);
+                EmitOpInfo outerPrec = inOuterPrec;
+                bool needClose = maybeEmitParens(outerPrec, prec);
+                emitOperand(inst->getOperand(0), prec);
+                m_writer->emit("._data.");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+                maybeCloseParens(needClose);
+                return true;
+            }
+            return false;
         }
     case kIROp_MakeVectorFromScalar:
     case kIROp_MatrixReshape:
@@ -2372,9 +2418,56 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
 
                 return true;
             }
+            if (as<IRPtrType>(left->getDataType()) || as<IRPtrType>(right->getDataType()))
+            {
+                _requireGLSLExtension(
+                    UnownedStringSlice("GL_EXT_shader_explicit_arithmetic_types_int64"));
 
+                // For pointers we need to cast to uint before comparing
+                auto getOperatorString = [](IROp op) -> const char*
+                {
+                    switch (op)
+                    {
+                    case kIROp_Eql:
+                        return "==";
+                    case kIROp_Neq:
+                        return "!=";
+                    case kIROp_Greater:
+                        return ">";
+                    case kIROp_Less:
+                        return "<";
+                    case kIROp_Geq:
+                        return ">=";
+                    case kIROp_Leq:
+                        return "<=";
+                    default:
+                        return nullptr;
+                    }
+                };
+                EmitOpInfo outerPrec = inOuterPrec;
+                auto prec = getInfo(EmitOp::General);
+                bool needClose = maybeEmitParens(outerPrec, prec);
+
+                m_writer->emit("uint64_t(");
+                emitOperand(left, getInfo(EmitOp::General));
+                m_writer->emit(")");
+                m_writer->emit(" ");
+                m_writer->emit(getOperatorString(inst->getOp()));
+                m_writer->emit(" ");
+                m_writer->emit("uint64_t(");
+                emitOperand(right, getInfo(EmitOp::General));
+                m_writer->emit(")");
+
+                maybeCloseParens(needClose);
+                return true;
+            }
             // Use the default
             break;
+        }
+    case kIROp_GetOffsetPtr:
+        {
+            _requireGLSLExtension(UnownedStringSlice("GL_EXT_buffer_reference2"));
+            return false;
         }
     case kIROp_FRem:
         {
@@ -2559,6 +2652,16 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             m_writer->emit(")");
             return true;
+        }
+    case kIROp_PtrLit:
+        {
+            auto ptrType = as<IRPtrType>(inst->getDataType());
+            if (ptrType)
+            {
+                m_writer->emit("0");
+                return true;
+            }
+            break;
         }
     default:
         break;
@@ -3204,10 +3307,9 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
     case kIROp_StructType:
-    case kIROp_HLSLConstBufferPointerType:
+    case kIROp_PtrType:
         m_writer->emit(getName(type));
         return;
-
     case kIROp_VectorType:
         {
             auto vecType = (IRVectorType*)type;
