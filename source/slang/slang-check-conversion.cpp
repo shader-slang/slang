@@ -408,7 +408,12 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
         // When a struct has no constructor and it's not a C-style type, the initializer list is
         // invalid.
         isCStyle = isCStyleType(toType, isVisit);
-        if (!isCStyle)
+
+        // WAR: We currently still has to allow legacy initializer list for array type until we have
+        // more proper solution for array initialization, so if the right hand side is an array
+        // type, we will not report error and fall-back to legacy initializer list logic.
+        bool isArrayType = as<ArrayExpressionType>(toType) != nullptr;
+        if (!isCStyle && !isArrayType)
         {
             getSink()->diagnose(
                 fromInitializerListExpr->loc,
@@ -419,6 +424,7 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
         return false;
     }
 
+    isCStyle = isCStyleType(toType, isVisit);
     // TODO: This is just a special case for a backwards-compatibility feature
     // for HLSL, this flag will imply that the initializer list is synthesized
     // for a type cast from a literal zero to a 'struct'. In this case, we will fall
