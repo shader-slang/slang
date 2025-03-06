@@ -9,6 +9,7 @@
 #include "slang-ir-dominators.h"
 #include "slang-ir-float-non-uniform-resource-index.h"
 #include "slang-ir-glsl-legalize.h"
+#include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-legalize-global-values.h"
@@ -1852,6 +1853,132 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     };
 
+    void propagateAddressAlignment()
+    {
+        // Work list of load/store insts to add Aligned attribute to.
+        List<IRInst*> loadStoreInsts;
+
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    switch (inst->getOp())
+                    {
+                    case kIROp_GetElementPtr:
+                        {
+                            auto base = inst->getOperand(0);
+                            auto ptrType = as<IRPtrTypeBase>(base->getDataType());
+                            if (!ptrType)
+                                break;
+                            // Propagate address alignment if possible.
+                            auto alignDecor = base->findDecoration<IRAlignedAddressDecoration>();
+                            if (!alignDecor)
+                                break;
+                            auto valueType = ptrType->getValueType();
+                            auto layout = valueType->findDecoration<IRSizeAndAlignmentDecoration>();
+                            IRTypeLayoutRuleName layoutRuleName = IRTypeLayoutRuleName::Natural;
+                            if (layout)
+                            {
+                                layoutRuleName = layout->getLayoutName();
+                            }
+                            auto alignment = getIntVal(alignDecor->getAlignment());
+                            if (alignment >= layout->getAlignment())
+                            {
+                                IRBuilder builder(inst);
+                                builder.addAlignedAddressDecoration(
+                                    inst,
+                                    alignDecor->getAlignment());
+                            }
+                        }
+                        break;
+                    case kIROp_FieldAddress:
+                        {
+                            auto base = inst->getOperand(0);
+                            auto ptrType = as<IRPtrTypeBase>(base->getDataType());
+                            if (!ptrType)
+                                break;
+                            auto alignDecor = base->findDecoration<IRAlignedAddressDecoration>();
+                            if (!alignDecor)
+                                break;
+                            auto valueType = ptrType->getValueType();
+                            auto layout = valueType->findDecoration<IRSizeAndAlignmentDecoration>();
+                            if (!layout)
+                                break;
+                            IRTypeLayoutRuleName layoutRuleName = layout->getLayoutName();
+                            auto field = findStructField(
+                                valueType,
+                                (IRStructKey*)as<IRFieldAddress>(inst)->getField());
+                            if (!field)
+                                break;
+                            IRIntegerValue offset = 0;
+                            if (getOffset(
+                                    m_sharedContext->m_targetProgram->getOptionSet(),
+                                    IRTypeLayoutRules::get(layoutRuleName),
+                                    field,
+                                    &offset) != SLANG_OK)
+                                break;
+                            auto alignment = getIntVal(alignDecor->getAlignment());
+                            if (offset % alignment == 0)
+                            {
+                                IRBuilder builder(inst);
+                                builder.addAlignedAddressDecoration(
+                                    inst,
+                                    alignDecor->getAlignment());
+                            }
+                        }
+                        break;
+                    case kIROp_Load:
+                    case kIROp_Store:
+                        {
+                            if (inst->findAttr<IRAlignedAttr>())
+                                break;
+                            loadStoreInsts.add(inst);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Process the work list.
+        // If load/store doesn't have Aligned attribute, and the ptr has
+        // a IRAlignedAddress decoration, we should create a load/store
+        // with a Aligned attribute.
+        for (auto inst : loadStoreInsts)
+        {
+
+            if (auto load = as<IRLoad>(inst))
+            {
+                auto ptr = load->getPtr();
+                if (auto decor = ptr->findDecoration<IRAlignedAddressDecoration>())
+                {
+                    IRBuilder builder(inst);
+                    builder.setInsertBefore(inst);
+                    auto newLoad =
+                        builder.emitLoad(load->getFullType(), ptr, decor->getAlignment());
+                    load->replaceUsesWith(newLoad);
+                    load->removeAndDeallocate();
+                }
+            }
+            else if (auto store = as<IRStore>(inst))
+            {
+                auto ptr = store->getPtr();
+                if (auto decor = ptr->findDecoration<IRAlignedAddressDecoration>())
+                {
+                    IRBuilder builder(inst);
+                    builder.setInsertBefore(inst);
+                    builder.emitStore(ptr, store->getVal(), decor->getAlignment());
+                    store->removeAndDeallocate();
+                }
+            }
+        }
+    }
+
     void processModule()
     {
         determineSpirvVersion();
@@ -1916,8 +2043,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     legalizeSPIRVEntryPoint(func, entryPointDecor);
                 }
                 // SPIRV requires a dominator block to appear before dominated blocks.
-                // After legalizing the control flow, we need to sort our blocks to ensure this is
-                // true.
+                // After legalizing the control flow, we need to sort our blocks to ensure this
+                // is true.
                 sortBlocksInFunc(func);
             }
         }
@@ -1941,15 +2068,23 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             m_module,
             bufferElementTypeLoweringOptions);
 
-        // The above step may produce empty struct types, so we need to lower them out of existence.
+        // Inline all pack/unpack storage type functions generated during buffer element
+        // lowering pass.
+        performTypeInlining(m_module, m_sink);
+
+        // The above step may produce empty struct types, so we need to lower them out of
+        // existence.
         legalizeEmptyTypes(m_sharedContext->m_targetProgram, m_module, m_sink);
+
+        // Propagate alignment hints on address instructions.
+        propagateAddressAlignment();
 
         // Specalize address space for all pointers.
         SpirvAddressSpaceAssigner addressSpaceAssigner;
         specializeAddressSpace(m_module, &addressSpaceAssigner);
 
-        // For SPIR-V, we don't skip this validation, because we might then be generating invalid
-        // SPIR-V.
+        // For SPIR-V, we don't skip this validation, because we might then be generating
+        // invalid SPIR-V.
         bool skipFuncParamValidation = false;
         validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
     }

@@ -1151,6 +1151,18 @@ struct LoweredElementTypeContext
                                     addr = builder.emitVar(loweredElementTypeInfo.loweredType);
                                     builder.emitStore(addr, newLoad);
                                 }
+                                else
+                                {
+                                    if (auto load = as<IRLoad>(user))
+                                    {
+                                        if (auto alignedAttr = load->findAttr<IRAlignedAttr>())
+                                        {
+                                            builder.addAlignedAddressDecoration(
+                                                addr,
+                                                alignedAttr->getAlignment());
+                                        }
+                                    }
+                                }
                                 auto unpackedVal =
                                     loweredElementTypeInfo.convertLoweredToOriginal.apply(
                                         builder,
@@ -1173,6 +1185,16 @@ struct LoweredElementTypeContext
                                 IRInst* addr = getBufferAddr(builder, user);
                                 if (addr)
                                 {
+                                    if (auto store = as<IRStore>(user))
+                                    {
+                                        if (auto alignedAttr = store->findAttr<IRAlignedAttr>())
+                                        {
+                                            builder.addAlignedAddressDecoration(
+                                                addr,
+                                                alignedAttr->getAlignment());
+                                        }
+                                    }
+
                                     loweredElementTypeInfo.convertOriginalToLowered
                                         .applyDestinationDriven(builder, addr, originalVal);
                                     user->removeAndDeallocate();

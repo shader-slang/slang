@@ -814,6 +814,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
     INST(PhysicalTypeDecoration,            PhysicalType,           1, 0)
 
+    // Mark an address instruction as aligned to a specific byte boundary.
+    INST(AlignedAddressDecoration,          AlignedAddressDecoration, 1, 0)
+
     // Marks a type as being used as binary interface (e.g. shader parameters).
     // This prevents the legalizeEmptyType() pass from eliminating it on C++/CUDA targets.
     INST(BinaryInterfaceTypeDecoration,     BinaryInterfaceType, 0, 0)
