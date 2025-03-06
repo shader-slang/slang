@@ -401,11 +401,12 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
 
     HashSet<Type*> isVisit;
     bool isCStyle = false;
-    if(!_getSynthesizedConstructor(
+    if (!_getSynthesizedConstructor(
             structDecl,
             ConstructorDecl::ConstructorFlavor::SynthesizedDefault))
     {
-        // When a struct has no constructor and it's not a C-style type, the initializer list is invalid.
+        // When a struct has no constructor and it's not a C-style type, the initializer list is
+        // invalid.
         isCStyle = isCStyleType(toType, isVisit);
         if (!isCStyle)
         {
