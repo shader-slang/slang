@@ -1870,6 +1870,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     switch (inst->getOp())
                     {
                     case kIROp_GetElementPtr:
+                    case kIROp_FieldAddress:
                         {
                             auto base = inst->getOperand(0);
                             auto ptrType = as<IRPtrTypeBase>(base->getDataType());
@@ -1881,49 +1882,41 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                 break;
                             auto valueType = ptrType->getValueType();
                             auto layout = valueType->findDecoration<IRSizeAndAlignmentDecoration>();
-                            auto alignment = getIntVal(alignDecor->getAlignment());
-                            if (alignment >= layout->getAlignment())
-                            {
-                                IRBuilder builder(inst);
-                                builder.addAlignedAddressDecoration(
-                                    inst,
-                                    alignDecor->getAlignment());
-                            }
-                        }
-                        break;
-                    case kIROp_FieldAddress:
-                        {
-                            auto base = inst->getOperand(0);
-                            auto ptrType = as<IRPtrTypeBase>(base->getDataType());
-                            if (!ptrType)
-                                break;
-                            auto alignDecor = base->findDecoration<IRAlignedAddressDecoration>();
-                            if (!alignDecor)
-                                break;
-                            auto valueType = ptrType->getValueType();
-                            auto layout = valueType->findDecoration<IRSizeAndAlignmentDecoration>();
                             if (!layout)
                                 break;
-                            IRTypeLayoutRuleName layoutRuleName = layout->getLayoutName();
-                            auto field = findStructField(
-                                valueType,
-                                (IRStructKey*)as<IRFieldAddress>(inst)->getField());
-                            if (!field)
-                                break;
-                            IRIntegerValue offset = 0;
-                            if (getOffset(
-                                    m_sharedContext->m_targetProgram->getOptionSet(),
-                                    IRTypeLayoutRules::get(layoutRuleName),
-                                    field,
-                                    &offset) != SLANG_OK)
-                                break;
                             auto alignment = getIntVal(alignDecor->getAlignment());
-                            if (offset % alignment == 0)
+                            if (inst->getOp() == kIROp_GetElementPtr)
                             {
-                                IRBuilder builder(inst);
-                                builder.addAlignedAddressDecoration(
-                                    inst,
-                                    alignDecor->getAlignment());
+                                if (alignment >= layout->getAlignment())
+                                {
+                                    IRBuilder builder(inst);
+                                    builder.addAlignedAddressDecoration(
+                                        inst,
+                                        alignDecor->getAlignment());
+                                }
+                            }
+                            else
+                            {
+                                IRTypeLayoutRuleName layoutRuleName = layout->getLayoutName();
+                                auto field = findStructField(
+                                    valueType,
+                                    (IRStructKey*)as<IRFieldAddress>(inst)->getField());
+                                if (!field)
+                                    break;
+                                IRIntegerValue offset = 0;
+                                if (getOffset(
+                                        m_sharedContext->m_targetProgram->getOptionSet(),
+                                        IRTypeLayoutRules::get(layoutRuleName),
+                                        field,
+                                        &offset) != SLANG_OK)
+                                    break;
+                                if (offset % alignment == 0)
+                                {
+                                    IRBuilder builder(inst);
+                                    builder.addAlignedAddressDecoration(
+                                        inst,
+                                        alignDecor->getAlignment());
+                                }
                             }
                         }
                         break;
