@@ -17,14 +17,14 @@ struct MyStruct
 // CHECK-NEXT: MyStruct{{.*}} _data;
 // CHECK-NEXT: }
 
-// CHECK: struct Globals
+// CHECK: struct ConstBufferPointer
 // CHECK-NEXT: {
-// CHECK-NEXT: BufferPointer_MyStruct{{.*}} pStruct
+// CHECK-NEXT: BufferPointer_MyStruct{{.*}} _ptr
 // CHECK-NEXT: }
 
 struct Globals
 {
-    MyStruct* pStruct;
+    ConstBufferPointer<MyStruct> pStruct;
 }
 
 ConstantBuffer<Globals> gGlobals;
@@ -34,9 +34,9 @@ RWStructuredBuffer<uint> outputBuffer;
 [numthreads(1,1,1)]
 void main(int3 tid: SV_DispatchThreadID)
 {
-    if (gGlobals.pStruct != nullptr)
+    if (gGlobals.pStruct.isValid())
     {
-        MyStruct s = *gGlobals.pStruct;
+        MyStruct s = gGlobals.pStruct.get();
         outputBuffer[tid.x] = uint(s.position.x);
         MyStruct s1 = gGlobals.pStruct[3];
         outputBuffer[tid.x + 1] = uint(s1.position.x);
