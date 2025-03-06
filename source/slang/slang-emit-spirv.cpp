@@ -1793,6 +1793,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitGlobalParam(as<IRGlobalParam>(inst));
         case kIROp_GlobalVar:
             return emitGlobalVar(as<IRGlobalVar>(inst));
+        case kIROp_GlobalConstant:
+            return emitGlobalConstant(as<IRGlobalConstant>(inst));
         case kIROp_SPIRVAsmOperandBuiltinVar:
             return emitBuiltinVar(inst);
         case kIROp_Var:
@@ -2727,15 +2729,62 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             if (ptrType->hasAddressSpace())
                 storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
         }
-        auto varInst = emitOpVariable(
-            getSection(SpvLogicalSectionID::GlobalVariables),
-            globalVar,
-            globalVar->getDataType(),
-            storageClass);
+        
+        // iterate through block children looking for constant initializers
+        // TODO: This is a bit of a hack.
+        IRInst* initializer = nullptr;
+        for (auto child : globalVar->getChildren())
+        {
+            if (auto blockInst = as<IRBlock>(child))
+            {
+                for (auto inst : blockInst->getChildren())
+                {
+                    if (auto var = as<IRReturn>(inst))
+                    {
+                        initializer = var->getVal();
+                    }
+                }
+            }
+        }
+        SpvInst* varInst;
+        if (initializer)
+        {
+            varInst = emitOpVariable(
+                getSection(SpvLogicalSectionID::GlobalVariables),
+                globalVar,
+                globalVar->getDataType(),
+                storageClass,
+                initializer);
+        }
+        else
+        {
+            varInst = emitOpVariable(
+                getSection(SpvLogicalSectionID::GlobalVariables),
+                globalVar,
+                globalVar->getDataType(),
+                storageClass);
+        }        
         maybeEmitPointerDecoration(varInst, globalVar);
         if (layout)
             emitVarLayout(globalVar, varInst, layout);
         emitDecorations(globalVar, getID(varInst));
+
+        return varInst;
+    }
+
+    SpvInst* emitGlobalConstant(IRGlobalConstant* globalConstant)
+    {
+        auto layout = getVarLayout(globalConstant);
+        auto storageClass = SpvStorageClassUniform;
+        if (auto ptrType = as<IRPtrTypeBase>(globalConstant->getDataType()))
+        {
+            if (ptrType->hasAddressSpace())
+                storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
+        }
+        SpvInst* varInst = emitOpConstant(
+            globalConstant,
+            globalConstant->getDataType(),
+            getLiteralBits(globalConstant->getDataType(), globalConstant));
         return varInst;
     }
 
@@ -4041,6 +4090,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     operands.getArrayView());
             }
             break;
+        case kIROp_GlobalConstant:
+            return emitGlobalConstant(as<IRGlobalConstant>(inst));
         }
         if (result)
             emitDecorations(inst, getID(result));
@@ -4860,8 +4911,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_DownstreamModuleImportDecoration:
             {
                 requireSPIRVCapability(SpvCapabilityLinkage);
-                auto name =
-                    decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
+                UnownedStringSlice name;
+                if (decoration->getParent()->findDecoration<IRImportDecoration>())
+                {
+                    name = decoration->getParent()->findDecoration<IRImportDecoration>()->getMangledName();
+                }
+                else
+                {
+                    name = decoration->getParent()->findDecoration<IRExportDecoration>()->getMangledName();
+                }
                 emitInst(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
@@ -8329,13 +8387,10 @@ SlangResult emitSPIRVFromIR(
         }
         if (generateWholeProgram)
         {
-            if (auto func = as<IRFunc>(inst))
+            if (inst->findDecoration<IRDownstreamModuleExportDecoration>())
             {
-                if (func->findDecoration<IRDownstreamModuleExportDecoration>())
-                {
-                    context.ensureInst(inst);
-                    symbolsEmitted = true;
-                }
+                context.ensureInst(inst);
+                symbolsEmitted = true;
             }
         }
     }

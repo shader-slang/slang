@@ -72,6 +72,22 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         m_module = module;
         m_targetProgram = targetProgram;
 
+        // Hack. If there are no entrypoint functions, we don't need to do anything.
+        bool hasEntryPoints = false;
+        for (auto inst : m_module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(inst);
+            if (!func)
+                continue;
+
+            if (!func->findDecoration<IREntryPointDecoration>())
+                continue;
+
+            hasEntryPoints = true;
+        }
+        if (!hasEntryPoints)
+            return;
+
         // We start by looking for global variables with
         // initialization logic in the IR, and processing
         // each to produce a split variable (now without
