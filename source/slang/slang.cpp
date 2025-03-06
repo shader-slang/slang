@@ -1111,6 +1111,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::parseCommandLineArguments(
     SerializedOptionsData& optionData = outData->options[optionDataIndex];
     optionDataIndex++;
     tempReq->getOptionSet().serialize(&optionData);
+    tempReq->m_optionSetForDefaultTarget.serialize(&optionData);
     for (auto target : tempReq->getLinkage()->targets)
     {
         slang::TargetDesc tdesc;
