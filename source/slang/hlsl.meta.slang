@@ -21601,6 +21601,14 @@ namespace vk
 attribute_syntax[vk_aliased_pointer] : VkAliasedPointerAttribute;
 attribute_syntax[vk_restrict_pointer] : VkRestrictPointerAttribute;
 
+extension uint64_t
+{
+    __init<T, let alignment : int>(vk::BufferPointer<T, alignment> ptr)
+    {
+        this = (uint64_t)ptr._ptr;
+    }
+}
+
 struct ConstBufferPointer<T, int alignment = 16>
 {
     const T *_ptr;
@@ -21631,14 +21639,6 @@ struct ConstBufferPointer<T, int alignment = 16>
     bool isValid()
     {
         return _ptr != nullptr;
-    }
-}
-
-extension uint64_t
-{
-    __init<T, let alignment : int>(vk::BufferPointer<T, alignment> ptr)
-    {
-        this = (uint64_t)ptr._ptr;
     }
 }
 
