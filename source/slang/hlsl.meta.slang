@@ -21598,7 +21598,10 @@ namespace vk
     }
 }
 
-struct ConstBufferPointer<T, int alignment = 4>
+attribute_syntax[vk_aliased_pointer] : VkAliasedPointerAttribute;
+attribute_syntax[vk_restrict_pointer] : VkRestrictPointerAttribute;
+
+struct ConstBufferPointer<T, int alignment = 16>
 {
     const T *_ptr;
 
@@ -21630,9 +21633,6 @@ struct ConstBufferPointer<T, int alignment = 4>
         return _ptr != nullptr;
     }
 }
-
-attribute_syntax[vk_aliased_pointer] : VkAliasedPointerAttribute;
-attribute_syntax[vk_restrict_pointer] : VkRestrictPointerAttribute;
 
 extension uint64_t
 {
