@@ -22,18 +22,18 @@ struct DefaultStruct2 : DefaultStruct_base
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    // error 30504: cannot use initializer list for type 'DefaultStruct1'
+    //CHECK: error 30504: cannot use initializer list for type 'DefaultStruct1'
     DefaultStruct1 s1 = {};
 
-    // error 30504: cannot use initializer list for type 'DefaultStruct1'
+    //CHECK: error 30504: cannot use initializer list for type 'DefaultStruct1'
     DefaultStruct1 s2 = {1};
 
-    // error 30504: cannot use initializer list for type 'DefaultStruct1'
+    //CHECK: error 30504: cannot use initializer list for type 'DefaultStruct1'
     DefaultStruct1 s3 = {1, 2};
 
-    // error 30504: cannot use initializer list for type 'DefaultStruct2'
+    //CHECK: error 30504: cannot use initializer list for type 'DefaultStruct2'
     DefaultStruct2 s4 = {};
 
-    // error 30504: cannot use initializer list for type 'DefaultStruct2'
+    //CHECK: error 30504: cannot use initializer list for type 'DefaultStruct2'
     DefaultStruct2 s5 = {1};
 }
