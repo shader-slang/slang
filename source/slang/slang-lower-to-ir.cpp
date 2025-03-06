@@ -8046,12 +8046,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             irWitnessTableBaseType,
                             irWitnessTable->getConcreteType());
 
-                        // TODO: When WitnessTable became HOISTABLE, we needed a way to avoid
-                        // adding the same decorations and childrens redundantly.
-                        // There isn't an easy way to tell if the returned WitnessTable is a
-                        // brand new or a found one from the existing pool.
-                        // The code below assumes that when there are any decoration or child,
-                        // it is a pre-existed one.
+                        // Since IRWitnessTable is Hoistable, `createWitnessTable()` may return a
+                        // pre-existing one. We need to avoid adding the same decorations/children
+                        // when the IRWitnessTable already has them.
                         //
                         if (irSatisfyingWitnessTable->getFirstDecorationOrChild() == nullptr)
                         {
@@ -8197,12 +8194,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Create the IR-level witness table
         auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, irSubType);
 
-        // TODO: When WitnessTable became HOISTABLE, we needed a way to avoid
-        // adding the same decorations and childrens redundantly.
-        // There isn't an easy way to tell if the returned WitnessTable is a
-        // brand new or a found one from the existing pool.
-        // The code below assumes that when there are any decoration or child,
-        // it is a pre-existed one.
+        // Since IRWitnessTable is Hoistable, `createWitnessTable()` may return a
+        // pre-existing one. We need to avoid adding the same decorations/children
+        // when the IRWitnessTable already has them.
         //
         if (irWitnessTable->getFirstDecorationOrChild() == nullptr)
         {

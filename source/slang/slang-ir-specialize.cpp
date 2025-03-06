@@ -3123,13 +3123,18 @@ IRInst* specializeGenericImpl(
         //
         IRInstList<IRInst> ordinaryInsts = bb->getOrdinaryInsts();
 
-        // After IRWitnessTable became Hoistable, they are removed and insered back by
+        // After IRWitnessTable became Hoistable, they are removed and inserted back by
         // `addHoistableInst()`. But when they are re-inserted, the order it appears in the block is
-        // changed. When IRWitnessTable refers to IRSpecialize, as an example, IRSpecialize must be
+        // changed. We need to change the order in a way that the dependancy is resolved.
+        //
+        // The dependency cannot be resolve in `addHoistableInst()`, because IRWitnessTable doesn't
+        // have IRWitnessTableEntry yet while in the function.
+        //
+        // When IRWitnessTable refers to IRSpecialize, as an example, IRSpecialize must be
         // cloned before the cloning of IRWitnessTable. It is because the operands are assumed to be
         // cloned before the cloning of IRInst.
         //
-        // We need to resolve the dependency problem by changing the order of them.
+        // Similarly, there can be dependencies between an IRWitnessTable and another IRWitnessTable.
         //
         List<IRInst*> insts;
         int instCount = 0;
