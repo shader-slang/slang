@@ -870,8 +870,15 @@ LoweredValInfo emitCallToDeclRef(
             return LoweredValInfo::simple(args[0]);
         }
         auto intrinsicOp = getIntrinsicOp(funcDecl, intrinsicOpModifier);
-        return LoweredValInfo::simple(
-            builder->emitIntrinsicInst(type, IROp(intrinsicOp), argCount, args));
+        switch (IROp(intrinsicOp))
+        {
+        case kIROp_GetOffsetPtr:
+            SLANG_ASSERT(argCount == 2);
+            return LoweredValInfo::simple(builder->emitGetOffsetPtr(args[0], args[1]));
+        default:
+            return LoweredValInfo::simple(
+                builder->emitIntrinsicInst(type, IROp(intrinsicOp), argCount, args));
+        }
     }
 
     // Fallback case is to emit an actual call.
@@ -3214,7 +3221,8 @@ void collectParameterLists(
         // For now we will rely on a follow up pass to remove unnecessary temporary variables if
         // we can determine that they are never actually writtten to by the user.
         //
-        bool lowerVaryingInputAsConstRef = declRef.getDecl()->hasModifier<EntryPointAttribute>();
+        bool lowerVaryingInputAsConstRef = declRef.getDecl()->hasModifier<EntryPointAttribute>() ||
+                                           declRef.getDecl()->hasModifier<NumThreadsAttribute>();
 
         // Don't collect parameters from the outer scope if
         // we are in a `static` context.
