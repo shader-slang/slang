@@ -21611,7 +21611,7 @@ extension uint64_t
 
 struct ConstBufferPointer<T, int alignment = 16>
 {
-    const T *_ptr;
+    T *_ptr;
 
     [ForceInline] T get() { return loadAligned<alignment>(_ptr); }
 
