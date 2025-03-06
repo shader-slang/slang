@@ -2387,6 +2387,9 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         emitType(inst->getDataType());
         emitArgs(inst);
         break;
+    case kIROp_CopyLogical:
+        emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+        break;
     case kIROp_MakeMatrixFromScalar:
         {
             emitType(inst->getDataType());

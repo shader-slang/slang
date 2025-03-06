@@ -1669,6 +1669,7 @@ Result linkAndOptimizeIR(
     if (emitSpirvDirectly)
     {
         performIntrinsicFunctionInlining(irModule);
+        performTypeInlining(irModule, sink);
         eliminateDeadCode(irModule, deadCodeEliminationOptions);
     }
     eliminateMultiLevelBreak(irModule);
