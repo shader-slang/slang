@@ -3029,31 +3029,6 @@ void finalizeSpecialization(IRModule* module)
     }
 }
 
-// Returns true when "a" depends on "b".
-bool IsIRInstDependOn(IRInst* a, IRInst* b)
-{
-    if (a->getFullType() == b)
-        return true;
-
-    for (UInt i = 0; i < a->getOperandCount(); i++)
-    {
-        auto operand = a->getOperand(i);
-        if (operand == b)
-            return true;
-    }
-
-    if (auto wt = as<IRWitnessTable>(a))
-    {
-        for (auto entry : wt->getEntries())
-        {
-            if (entry->getRequirementKey() == b || entry->getSatisfyingVal() == b)
-                return true;
-        }
-    }
-
-    return false;
-}
-
 IRInst* specializeGenericImpl(
     IRGeneric* genericVal,
     IRSpecialize* specializeInst,
