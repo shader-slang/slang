@@ -1229,7 +1229,6 @@ INST(CastToVoid, castToVoid, 1, 0)
 INST(PtrCast, PtrCast, 1, 0)
 INST(CastUInt2ToDescriptorHandle, CastUInt2ToDescriptorHandle, 1, 0)
 INST(CastDescriptorHandleToUInt2, CastDescriptorHandleToUInt2, 1, 0)
-INST(CopyLogical, CopyLogical, 1, 0)
 
 // Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are already concrete types.
 INST(CastDescriptorHandleToResource, CastDescriptorHandleToResource, 1, 0)

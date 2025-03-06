@@ -4353,8 +4353,6 @@ public:
 
     IRInst* emitImageStore(IRType* type, ShortList<IRInst*> params);
 
-    IRInst* emitCopyLogical(IRType* type, IRInst* value);
-
     IRInst* emitIsType(IRInst* value, IRInst* witness, IRInst* typeOperand, IRInst* targetWitness);
 
     IRInst* emitFieldExtract(IRInst* base, IRInst* fieldKey);

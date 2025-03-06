@@ -5099,11 +5099,6 @@ IRInst* IRBuilder::emitImageStore(IRType* type, ShortList<IRInst*> params)
     return inst;
 }
 
-IRInst* IRBuilder::emitCopyLogical(IRType* type, IRInst* value)
-{
-    return emitIntrinsicInst(type, kIROp_CopyLogical, 1, &value);
-}
-
 IRInst* IRBuilder::emitIsType(
     IRInst* value,
     IRInst* witness,
@@ -8382,7 +8377,6 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_CastUInt2ToDescriptorHandle:
     case kIROp_CastDescriptorHandleToUInt2:
     case kIROp_CastDescriptorHandleToResource:
-    case kIROp_CopyLogical:
     case kIROp_GetDynamicResourceHeap:
     case kIROp_CastDynamicResource:
     case kIROp_AllocObj:

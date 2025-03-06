@@ -3523,9 +3523,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_BitCast:
             result = emitOpBitcast(parent, inst, inst->getDataType(), inst->getOperand(0));
             break;
-        case kIROp_CopyLogical:
-            result = emitOpCopyLogical(parent, inst, inst->getDataType(), inst->getOperand(0));
-            break;
         case kIROp_BitfieldExtract:
             result = emitBitfieldExtract(parent, inst);
             break;
