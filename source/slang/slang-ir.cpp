@@ -1694,6 +1694,30 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
     while (insertBeforeInst && insertBeforeInst->getOp() == kIROp_Param)
         insertBeforeInst = insertBeforeInst->getNextInst();
 
+    if (inst->getOp() == kIROp_WitnessTable)
+    {
+        // WitnessTable can refer to IRSpecialize from its WitnessTableEntry
+        // children. In this case, specialize insts must be cloned before the
+        // WitnessTable. Similar an WitnessTables can have depdency to another
+        // WitnessTable.
+        //
+        for (IRInst* iter = insertBeforeInst; iter;)
+        {
+            bool mayHaveDependency = false;
+            switch (iter->getOp())
+            {
+            case kIROp_Specialize:
+            case kIROp_WitnessTable:
+                mayHaveDependency = true;
+                break;
+            }
+
+            iter = iter->getNextInst();
+            if (mayHaveDependency)
+                insertBeforeInst = iter;
+        }
+    }
+
     // For instructions that will be placed at module scope,
     // we don't care about relative ordering, but for everything
     // else, we want to ensure that an instruction comes after
@@ -4619,6 +4643,16 @@ void addGlobalValue(IRBuilder* builder, IRInst* value)
     if (!parent)
     {
         parent = builder->getModule()->getModuleInst();
+    }
+
+    // If the value is already in the parent, keep it as it. Because WitnessTable is Hoistable, the
+    // parent can have only one instance of this WitnessTable. The order among siblings should
+    // remain because the later siblings may have dependency to the earlier siblings.
+    // 
+    if (parent == value->parent)
+    {
+        SLANG_ASSERT(getIROpInfo(kIROp_WitnessTable).isHoistable());
+        return;
     }
 
     // If it turns out that we are inserting into the
