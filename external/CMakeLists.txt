@@ -48,7 +48,8 @@ if(NOT ${SLANG_USE_SYSTEM_MINIZ})
     else()
         add_subdirectory(
             ${SLANG_OVERRIDE_MINIZ_PATH}
-            miniz EXCLUDE_FROM_ALL
+            miniz
+            EXCLUDE_FROM_ALL
             ${system}
         )
     endif()
