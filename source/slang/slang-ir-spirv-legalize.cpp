@@ -2070,7 +2070,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // Inline all pack/unpack storage type functions generated during buffer element
         // lowering pass.
-        performTypeInlining(m_module, m_sink);
+        performForceInlining(m_module);
 
         // The above step may produce empty struct types, so we need to lower them out of
         // existence.

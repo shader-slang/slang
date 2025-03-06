@@ -165,6 +165,7 @@ struct LoweredElementTypeContext
         auto funcType = builder.getFuncType(1, (IRType**)&refStructType, matrixType);
         func->setFullType(funcType);
         builder.addNameHintDecoration(func, UnownedStringSlice("unpackStorage"));
+        builder.addForceInlineDecoration(func);
         builder.setInsertInto(func);
         builder.emitBlock();
         auto rowCount = (Index)getIntVal(matrixType->getRowCount());
@@ -302,6 +303,7 @@ struct LoweredElementTypeContext
         auto funcType = builder.getFuncType(1, (IRType**)&refStructType, arrayType);
         func->setFullType(funcType);
         builder.addNameHintDecoration(func, UnownedStringSlice("unpackStorage"));
+        builder.addForceInlineDecoration(func);
         builder.setInsertInto(func);
         builder.emitBlock();
         auto packedParam = builder.emitParam(refStructType);
@@ -366,6 +368,7 @@ struct LoweredElementTypeContext
         auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
         func->setFullType(funcType);
         builder.addNameHintDecoration(func, UnownedStringSlice("packStorage"));
+        builder.addForceInlineDecoration(func);
         builder.setInsertInto(func);
         builder.emitBlock();
         auto outParam = builder.emitParam(outLoweredType);
@@ -707,6 +710,7 @@ struct LoweredElementTypeContext
                 builder.addNameHintDecoration(
                     info.convertLoweredToOriginal.func,
                     UnownedStringSlice("unpackStorage"));
+                builder.addForceInlineDecoration(info.convertLoweredToOriginal.func);
                 auto refLoweredType = builder.getRefType(loweredType, AddressSpace::Generic);
                 info.convertLoweredToOriginal.func->setFullType(
                     builder.getFuncType(1, (IRType**)&refLoweredType, type));
@@ -742,6 +746,8 @@ struct LoweredElementTypeContext
                 builder.addNameHintDecoration(
                     info.convertOriginalToLowered.func,
                     UnownedStringSlice("packStorage"));
+                builder.addForceInlineDecoration(info.convertOriginalToLowered.func);
+
                 auto outLoweredType = builder.getRefType(loweredType, AddressSpace::Generic);
                 IRType* paramTypes[] = {outLoweredType, type};
                 info.convertOriginalToLowered.func->setFullType(

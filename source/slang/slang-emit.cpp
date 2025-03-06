@@ -1644,6 +1644,7 @@ Result linkAndOptimizeIR(
     bufferElementTypeLoweringOptions.use16ByteArrayElementForConstantBuffer =
         isWGPUTarget(targetRequest);
     lowerBufferElementTypeToStorageType(targetProgram, irModule, bufferElementTypeLoweringOptions);
+    performForceInlining(irModule);
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
@@ -1670,11 +1671,7 @@ Result linkAndOptimizeIR(
     {
         performIntrinsicFunctionInlining(irModule);
     }
-    if (isKhronosTarget(targetRequest) || isWGPUTarget(targetRequest) || isD3DTarget(targetRequest))
-    {
-        performTypeInlining(irModule, sink);
-        eliminateDeadCode(irModule, deadCodeEliminationOptions);
-    }
+
     eliminateMultiLevelBreak(irModule);
 
     if (!fastIRSimplificationOptions.minimalOptimization)
