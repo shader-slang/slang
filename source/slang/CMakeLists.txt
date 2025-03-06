@@ -230,6 +230,7 @@ set(slang_link_args
     slang-reflect-headers
     slang-lookup-tables
     SPIRV-Headers
+    SPIRV-Tools
 )
 set(slang_interface_args INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include)
 set(slang_public_lib_args
