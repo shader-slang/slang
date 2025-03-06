@@ -3035,7 +3035,7 @@ bool IsIRInstDependOn(IRInst* a, IRInst* b)
     if (a->getFullType() == b)
         return true;
 
-    for (int i = 0; i < a->getOperandCount(); i++)
+    for (UInt i = 0; i < a->getOperandCount(); i++)
     {
         auto operand = a->getOperand(i);
         if (operand == b)
