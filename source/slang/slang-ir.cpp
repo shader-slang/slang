@@ -2367,6 +2367,11 @@ IRStringLit* IRBuilder::getStringValue(const UnownedStringSlice& inSlice)
 
 IRBlobLit* IRBuilder::getBlobValue(ISlangBlob* blob)
 {
+    if (!blob || blob->getBufferSize() == 0)
+    {
+        return nullptr;
+    }
+
     IRConstant keyInst;
     memset(&keyInst, 0, sizeof(keyInst));
 
