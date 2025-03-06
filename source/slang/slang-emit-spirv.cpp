@@ -1652,6 +1652,29 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     static_cast<IRIntLit*>(coopVecType->getElementCount())->getValue(),
                     coopVecType);
             }
+        case kIROp_CoopMatrixType:
+            {
+                requireSPIRVCapability(SpvCapabilityCooperativeMatrixKHR);
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_cooperative_matrix"));
+
+                IRBuilder builder(m_irModule);
+                auto coopMatType = static_cast<IRCoopMatrixType*>(inst);
+                return emitOpTypeCoopMat(
+                    coopMatType,
+                    coopMatType->getElementType(),
+                    emitIntConstant(
+                        static_cast<IRIntLit*>(coopMatType->getScope())->getValue(),
+                        builder.getIntType()),
+                    emitIntConstant(
+                        static_cast<IRIntLit*>(coopMatType->getRowCount())->getValue(),
+                        builder.getIntType()),
+                    emitIntConstant(
+                        static_cast<IRIntLit*>(coopMatType->getColumnCount())->getValue(),
+                        builder.getIntType()),
+                    emitIntConstant(
+                        static_cast<IRIntLit*>(coopMatType->getMatrixUse())->getValue(),
+                        builder.getIntType()));
+            }
         case kIROp_MatrixType:
             {
                 auto matrixType = static_cast<IRMatrixType*>(inst);
@@ -1776,6 +1799,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         case kIROp_MakeVector:
         case kIROp_MakeCoopVector:
+        case kIROp_MakeCoopMatrix:
         case kIROp_MakeArray:
         case kIROp_MakeStruct:
             return emitCompositeConstruct(getSection(SpvLogicalSectionID::ConstantsAndTypes), inst);

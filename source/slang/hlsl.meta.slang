@@ -21925,6 +21925,430 @@ extension<T, L : IBufferDataLayout> RasterizerOrderedStructuredBuffer<T, L> : IR
 }
 
 //
+// Cooperative Matrix type
+//
+
+__intrinsic_type($(kIROp_CoopMatrixType))
+[require(cooperative_matrix)]
+struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse> : IArray<T>, IArithmetic
+{
+    //
+    // Initialization
+    //
+
+    [ForceInline]
+    [require(cooperative_matrix)]
+    __init()
+    {
+    }
+
+    [ForceInline]
+    [require(cooperative_matrix)]
+    __init(T t)
+    {
+        this.fill(t);
+    }
+
+    [ForceInline]
+    [require(cooperative_matrix)]
+    __init<U : __BuiltinArithmeticType>(CoopMat<U, S, M, N, R> other)
+    {
+        // XXX TODO: validate scope, row, use, etc. are the same(?)
+        this.copyFrom(other);
+    }
+
+    [ForceInline]
+    __init(This x)
+    {
+        this = x;
+    }
+
+    // Required for `IArithmetic`.
+    [OverloadRank(-10)]
+    [ForceInline]
+    __init(int i)
+    {
+        this = CoopMat<T, S, M, N, R>(T(i));
+    }
+
+    //
+    // Simple setters
+    //
+
+    [require(cooperative_matrix)]
+    [mutating]
+    [ForceInline]
+    void fill(T t)
+    {
+        this = spirv_asm
+        {
+            result:$$CoopMat<T, S, M, N, R> = OpConstantComposite $t;
+        };
+    }
+
+    [require(cooperative_matrix)]
+    [mutating]
+    [ForceInline]
+    void copyFrom<U : __BuiltinArithmeticType>(CoopMat<U, S, M, N, R> other)
+    {
+        if (__isFloat<T>() && __isInt<U>())
+            this = __int_to_float_cast<T>(other);
+        else if (__isInt<T>() && __isFloat<U>())
+            this = __float_to_int_cast<T>(other);
+        else if (__isFloat<T>() && __isFloat<U>())
+            this = __real_cast<T>(other);
+        else if (__isInt<T>() && __isInt<U>())
+            this = __int_cast<T>(other);
+    }
+
+    //
+    // Subscript
+    //
+
+    __intrinsic_op($(kIROp_GetElement))
+    [__NoSideEffect]
+    T __indexRead(int index);
+
+    __intrinsic_op($(kIROp_GetElementPtr))
+    [__ref]
+    [__NoSideEffect]
+    Ref<T> __indexRef(int index);
+
+    [ForceInline]
+    [__NoSideEffect]
+    int getCount()
+    {
+        // XXX TODO: what should be returned here? SPIRV "length"?
+        return 0;
+    }
+
+    [ForceInline]
+    [__NoSideEffect]
+    int getRowCount()
+    {
+        return M;
+    }
+
+    [ForceInline]
+    [__NoSideEffect]
+    int getColumnCount()
+    {
+        return N;
+    }
+
+    __subscript(int index) -> T
+    {
+        [__NoSideEffect]
+        [nonmutating]
+        get
+        {
+            return __indexRead(index);
+        }
+
+        [mutating]
+        set
+        {
+            __indexRef(index) = newValue;
+        }
+    }
+
+    /// Returns the number of components owned by each invocation.
+    [require(cooperative_matrix)]
+    uint length()
+    {
+        return spirv_asm
+        {
+            result:$$uint = OpCooperativeMatrixLengthKHR $$This;
+        };
+    }
+
+    //
+    // Store
+    //
+
+    [ForceInline]
+    static uint __getPointerOffset(uint element, uint stride, CoopMatMatrixLayout matrixLayout)
+    {
+        if (matrixLayout == CoopMatMatrixLayout::RowMajor)
+        {
+            return element + (stride * M);
+        }
+        else
+        {
+            return element + (stride * N);
+        }
+    }
+
+    [__NoSideEffect]
+    [require(cooperative_matrix)]
+    void __store<U : __BuiltinArithmeticType>(Ptr<U[]> basePointer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
+    {
+        int memoryLayout = int(matrixLayout);
+        //uint pointerOffset = __getPointerOffset(element, stride, matrixLayout);
+        const int zero = 0;
+        spirv_asm
+        {
+            // %pointer = OpPtrAccessChain $basePointer $pointerOffset;
+            %pointer:$$Ptr<U[]> = OpAccessChain $basePointer $zero $element;
+            OpCooperativeMatrixStoreKHR %pointer $this $memoryLayout $stride;
+        };
+    }
+
+    [require(cooperative_matrix)]
+    void store(RWByteAddressBuffer buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
+    {
+        return __store(buffer.GetBufferPointer(), element, stride, matrixLayout);
+    }
+
+    [require(cooperative_matrix)]
+    void store(RWStructuredBuffer<T> buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
+    {
+        return __store(__getStructuredBufferPtr(buffer), element, stride, matrixLayout);
+    }
+
+    [require(cooperative_matrix)]
+    void store<let U : int>(__ref groupshared T[U] data, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
+    {
+        int memoryLayout = int(matrixLayout);
+        uint pointerOffset = __getPointerOffset(element, stride, matrixLayout);
+        spirv_asm
+        {
+            %pointer = OpPtrAccessChain &data $pointerOffset;
+            OpCooperativeMatrixStoreKHR %pointer $this $memoryLayout $stride;
+        };
+    }
+
+    [ForceInline]
+    [require(cooperative_matrix)]
+    void storeAny<U, let V : int>(__ref groupshared U[V] data, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
+    {
+        int memoryLayout = int(matrixLayout);
+        uint pointerOffset = __getPointerOffset(element, stride, matrixLayout);
+        spirv_asm
+        {
+            %pointer = OpPtrAccessChain &data $pointerOffset;
+            OpCooperativeMatrixStoreKHR %pointer $this $memoryLayout $stride;
+        };
+    }
+
+    [ForceInline]
+    [require(cooperative_matrix)]
+    void storeAny<U, let V : int, let L : int>(__ref groupshared vector<U, L>[V] data, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
+    {
+        uint pointerOffset = __getPointerOffset(element, stride, matrixLayout);
+        int memoryLayout = int(matrixLayout);
+        spirv_asm
+        {
+            %pointer = OpPtrAccessChain &data $pointerOffset;
+            OpCooperativeMatrixStoreKHR %pointer $this $memoryLayout $stride;
+        };
+    }
+
+    //
+    // Load
+    //
+
+    [__NoSideEffect]
+    [require(cooperative_matrix)]
+    static CoopMat<T, S, M, N, R> __load<U : __BuiltinArithmeticType>(Ptr<U[]> basePointer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
+    {
+        // uint pointerOffset = __getPointerOffset(element, stride, matrixLayout);
+        int memoryLayout = int(matrixLayout);
+        return spirv_asm
+        {
+            // %pointer = OpPtrAccessChain $basePointer $pointerOffset;
+            %pointer = OpAccessChain $basePointer 0 $element;
+            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $memoryLayout $stride None;
+        };
+    }
+
+    [__NoSideEffect]
+    [require(cooperative_matrix)]
+    static CoopMat<T, S, M, N, R> load(ByteAddressBuffer buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
+    {
+        return __load(buffer.GetBufferPointer(), element, stride, matrixLayout);
+    }
+
+    [__NoSideEffect]
+    [require(cooperative_matrix)]
+    static CoopMat<T, S, M, N, R> load(RWByteAddressBuffer buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
+    {
+        return __load(buffer.GetBufferPointer(), element, stride, matrixLayout);
+    }
+
+    [__NoSideEffect]
+    [require(cooperative_matrix)]
+    static CoopMat<T, S, M, N, R> load(StructuredBuffer<T> buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
+    {
+        return __load(__getStructuredBufferPtr(buffer), element, stride, matrixLayout);
+    }
+
+    [__NoSideEffect]
+    [require(cooperative_matrix)]
+    static CoopMat<T, S, M, N, R> load(RWStructuredBuffer<T> buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
+    {
+        return __load(__getStructuredBufferPtr(buffer), element, stride, matrixLayout);
+    }
+
+    //
+    // Arithmetic
+    //
+
+    __intrinsic_op($(kIROp_Add))
+    This add(This other);
+
+    __intrinsic_op($(kIROp_Sub))
+    This sub(This other);
+
+    __intrinsic_op($(kIROp_Mul))
+    This mul(This other);
+
+    __intrinsic_op($(kIROp_Div))
+    This div(This other);
+
+    __intrinsic_op($(kIROp_Neg))
+    This neg();
+
+    This mod(This other)
+    {
+        // XXX: Hmmmm...
+        // We can only access components that are OWNED by the current invocation,
+        // hence we can only perform operations to them and not the whole matrix.
+        // It is better to disable this function(?)
+        static_assert(false, "Component-wise mod is not supported");
+        return this;
+    }
+
+    //
+    // Equality and ordering
+    //
+
+    bool equals(This other)
+    {
+        // XXX: Hmmmm...
+        // We can only access components that are OWNED by the current invocation,
+        // hence we can only perform operations to them and not the whole matrix.
+        // It is better to disable this function(?)
+        return false;
+    }
+
+    bool lessThan(This other)
+    {
+        // XXX: Hmmmm...
+        // We can only access components that are OWNED by the current invocation,
+        // hence we can only perform operations to them and not the whole matrix.
+        // It is better to disable this function(?)
+        return false;
+    }
+
+    bool lessThanOrEquals(This other)
+    {
+        // XXX: Hmmmm...
+        // We can only access components that are OWNED by the current invocation,
+        // hence we can only perform operations to them and not the whole matrix.
+        // It is better to disable this function(?)
+        return false;
+    }
+}
+
+//
+// Cooperative Matrix casting
+//
+
+__generic<T : __BuiltinArithmeticType, U : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>
+__intrinsic_op($(kIROp_IntCast))
+[require(cooperative_matrix)]
+CoopMat<T,S,M,N,R> __int_cast(CoopMat<U,S,M,N,R> val);
+
+__generic<T : __BuiltinArithmeticType, U : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>
+__intrinsic_op($(kIROp_FloatCast))
+[require(cooperative_matrix)]
+CoopMat<T,S,M,N,R> __real_cast(CoopMat<U,S,M,N,R> val);
+
+__generic<T : __BuiltinArithmeticType, U : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>
+__intrinsic_op($(kIROp_CastIntToFloat))
+[require(cooperative_matrix)]
+CoopMat<T,S,M,N,R> __int_to_float_cast(CoopMat<U,S,M,N,R> val);
+
+__generic<T : __BuiltinArithmeticType, U : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>
+__intrinsic_op($(kIROp_CastFloatToInt))
+[require(cooperative_matrix)]
+CoopMat<T,S,M,N,R> __float_to_int_cast(CoopMat<U,S,M,N,R> val);
+
+//
+// Cooperative Matrix multiplication with scalar
+//
+
+__generic<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>
+[ForceInline]
+[require(cooperative_matrix)]
+CoopMat<T, S, M, N, R> operator *(CoopMat<T, S, M, N, R> lhs, const T rhs)
+{
+    return spirv_asm
+    {
+        result:$$CoopMat<T, S, M, N, R> = OpMatrixTimesScalar $lhs $rhs;
+    };
+}
+
+__generic<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let N : int, let R : CoopMatMatrixUse>
+[ForceInline]
+[require(cooperative_matrix)]
+CoopMat<T, S, M, N, R> operator *(const T lhs, CoopMat<T, S, M, N, R> rhs)
+{
+    return rhs * lhs;
+}
+
+//
+// Cooperative Matrix enums
+//
+
+enum CoopMatScope
+{
+    Device = 1,
+    Workgroup = 2,
+    Subgroup = 3,
+    QueueFamily = 5,
+};
+
+enum CoopMatMatrixUse
+{
+    A = 0,
+    B = 1,
+    Accumulator = 2,
+};
+
+enum CoopMatMatrixLayout
+{
+    RowMajor = 0,
+    ColumnMajor = 1,
+};
+
+enum CoopMatMatrixOperands
+{
+    None = 0x0,
+    MatrixASigned = 0x1,
+    MatrixBSigned = 0x2,
+    MatrixCSigned = 0x4,
+    MatrixResultSigned = 0x8,
+    SaturatingAccumulation = 0x10,
+};
+
+//
+// Cooperative Matrix multiply accumulate
+//
+
+[require(cooperative_matrix)]
+__generic<T : __BuiltinArithmeticType, U : __BuiltinArithmeticType, V : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let K : int, let N : int, let RA : CoopMatMatrixUse, let RB : CoopMatMatrixUse, let RC : CoopMatMatrixUse>
+CoopMat<V, S, M, N, RC> coopMatMulAdd(CoopMat<T, S, M, K, RA> matA, CoopMat<U, S, K, N, RB> matB, CoopMat<V, S, M, N, RC> matC, CoopMatMatrixOperands operands)
+{
+    // TODO: static assert matrix uses.
+    return spirv_asm
+    {
+        result:$$CoopMat<V, S, M, N, RC> = OpCooperativeMatrixMulAddKHR $matA $matB $matC $operands;
+    };
+}
+
+//
 // Cooperative Vector
 //
 
@@ -23234,6 +23658,8 @@ CoopVec<T, N> coopVecLoadGroupshared<let N : int, T : __BuiltinArithmeticType, l
 //
 // Coop Vector matrix multiplication
 //
+
+//@public
 
 enum CoopVecMatrixLayout
 {
