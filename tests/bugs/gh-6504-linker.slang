@@ -69,7 +69,7 @@ VertexOutput SceneLitVertex(VertexInput input)
     output.bitangentWS = tangent.w * cross(output.normalWS, output.tangentWS);
     output.uv = input.GetUV();
 
-    float4x4 vp;
+    float4x4 vp = {};
     output.position = mul(vp, float4(output.positionWS, 1));
 
     return output;
