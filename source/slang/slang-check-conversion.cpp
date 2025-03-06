@@ -396,13 +396,27 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
 {
     StructDecl* structDecl = isDeclRefTypeOf<StructDecl>(toType).getDecl();
 
-    if (!structDecl || !_getSynthesizedConstructor(
-                           structDecl,
-                           ConstructorDecl::ConstructorFlavor::SynthesizedDefault))
+    if (!structDecl)
         return false;
 
     HashSet<Type*> isVisit;
-    bool isCStyle = isCStyleType(toType, isVisit);
+    bool isCStyle = false;
+    if(!_getSynthesizedConstructor(
+            structDecl,
+            ConstructorDecl::ConstructorFlavor::SynthesizedDefault))
+    {
+        // When a struct has no constructor and it's not a C-style type, the initializer list is invalid.
+        isCStyle = isCStyleType(toType, isVisit);
+        if (!isCStyle)
+        {
+            getSink()->diagnose(
+                fromInitializerListExpr->loc,
+                Diagnostics::cannotUseInitializerListForType,
+                toType);
+        }
+
+        return false;
+    }
 
     // TODO: This is just a special case for a backwards-compatibility feature
     // for HLSL, this flag will imply that the initializer list is synthesized
