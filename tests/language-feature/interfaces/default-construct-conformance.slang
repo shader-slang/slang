@@ -33,6 +33,11 @@ struct TestAny : ITest
         value = v;
     }
 
+    __init()
+    {
+        value = 0;
+    }
+
     uint getValue() { return value; }
 }
 
