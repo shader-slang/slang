@@ -126,8 +126,8 @@ INST(Nop, nop, 0, 0)
             INST(OutType, Out, 1, HOISTABLE)
             INST(InOutType, InOut, 1, HOISTABLE)
         INST_RANGE(OutTypeBase, OutType, InOutType)
-        INST(HLSLConstBufferPointerType, ConstBufferPointerType, 2, HOISTABLE)
     INST_RANGE(PtrTypeBase, PtrType, InOutType)
+
 
     // A ComPtr<T> type is treated as a opaque type that represents a reference-counted handle to a COM object.
     INST(ComPtrType, ComPtr, 1, HOISTABLE)
@@ -811,6 +811,11 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
 
     INST(InterpolationModeDecoration,       interpolationMode,      1, 0)
     INST(NameHintDecoration,                nameHint,               1, 0)
+
+    INST(PhysicalTypeDecoration,            PhysicalType,           1, 0)
+
+    // Mark an address instruction as aligned to a specific byte boundary.
+    INST(AlignedAddressDecoration,          AlignedAddressDecoration, 1, 0)
 
     // Marks a type as being used as binary interface (e.g. shader parameters).
     // This prevents the legalizeEmptyType() pass from eliminating it on C++/CUDA targets.

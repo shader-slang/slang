@@ -1,7 +1,6 @@
 #ifndef SLANG_CORE_DICTIONARY_H
 #define SLANG_CORE_DICTIONARY_H
 
-#include "../../external/unordered_dense/include/ankerl/unordered_dense.h"
 #include "slang-common.h"
 #include "slang-exception.h"
 #include "slang-hash.h"
@@ -10,6 +9,7 @@
 #include "slang-math.h"
 #include "slang-uint-set.h"
 
+#include <ankerl/unordered_dense.h>
 #include <initializer_list>
 
 namespace Slang

@@ -2925,10 +2925,22 @@ IRComPtrType* IRBuilder::getComPtrType(IRType* valueType)
     return (IRComPtrType*)getType(kIROp_ComPtrType, valueType);
 }
 
-IRArrayTypeBase* IRBuilder::getArrayTypeBase(IROp op, IRType* elementType, IRInst* elementCount)
+IRArrayTypeBase* IRBuilder::getArrayTypeBase(
+    IROp op,
+    IRType* elementType,
+    IRInst* elementCount,
+    IRInst* stride)
 {
-    IRInst* operands[] = {elementType, elementCount};
-    return (IRArrayTypeBase*)getType(op, op == kIROp_ArrayType ? 2 : 1, operands);
+    if (op == kIROp_ArrayType)
+    {
+        IRInst* operands[] = {elementType, elementCount, stride};
+        return (IRArrayTypeBase*)getType(op, stride ? 3 : 2, operands);
+    }
+    else
+    {
+        IRInst* operands[] = {elementType, stride};
+        return (IRArrayTypeBase*)getType(op, stride ? 2 : 1, operands);
+    }
 }
 
 IRArrayType* IRBuilder::getArrayType(IRType* elementType, IRInst* elementCount)
@@ -4984,6 +4996,14 @@ IRInst* IRBuilder::emitLoad(IRType* type, IRInst* ptr)
     return inst;
 }
 
+IRInst* IRBuilder::emitLoad(IRType* type, IRInst* ptr, IRInst* align)
+{
+    auto inst = createInst<IRLoad>(this, kIROp_Load, type, ptr, getAttr(kIROp_AlignedAttr, align));
+
+    addInst(inst);
+    return inst;
+}
+
 IRInst* IRBuilder::emitLoad(IRInst* ptr)
 {
     // Note: a `load` operation does not consider the rate
@@ -5018,6 +5038,20 @@ IRInst* IRBuilder::emitLoad(IRInst* ptr)
 IRInst* IRBuilder::emitStore(IRInst* dstPtr, IRInst* srcVal)
 {
     auto inst = createInst<IRStore>(this, kIROp_Store, nullptr, dstPtr, srcVal);
+
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align)
+{
+    auto inst = createInst<IRStore>(
+        this,
+        kIROp_Store,
+        nullptr,
+        dstPtr,
+        srcVal,
+        getAttr(kIROp_AlignedAttr, align));
 
     addInst(inst);
     return inst;

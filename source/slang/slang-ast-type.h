@@ -632,13 +632,6 @@ class PtrType : public PtrTypeBase
     void _toTextOverride(StringBuilder& out);
 };
 
-// A GPU pointer type into global memory.
-
-class ConstBufferPointerType : public PtrTypeBase
-{
-    SLANG_AST_CLASS(ConstBufferPointerType)
-};
-
 /// A pointer-like type used to represent a parameter "direction"
 class ParamDirectionType : public PtrTypeBase
 {
