@@ -1687,35 +1687,29 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
     //
     IRInst* insertBeforeInst = parent->getFirstChild();
 
-    // Hoistable instructions are always "ordinary"
-    // instructions, so they need to come after
-    // any parameters of the parent.
-    //
-    while (insertBeforeInst && insertBeforeInst->getOp() == kIROp_Param)
-        insertBeforeInst = insertBeforeInst->getNextInst();
-
     if (inst->getOp() == kIROp_WitnessTable)
     {
         SLANG_ASSERT(getIROpInfo(kIROp_WitnessTable).isHoistable());
 
-        // WitnessTable can refer to IRSpecialize from its WitnessTableEntry children. In this case,
-        // specialize insts must be cloned before the WitnessTable. Similar an WitnessTables can
-        // have depdency to another WitnessTable.
+        // Because IRWitnessTable is Hoistable, do not move when
+        // it is already a child of the parent.
         //
-        for (IRInst* iter = insertBeforeInst; iter;)
-        {
-            bool mayHaveDependency = false;
-            switch (iter->getOp())
-            {
-            case kIROp_Specialize:
-            case kIROp_WitnessTable:
-                mayHaveDependency = true;
-                break;
-            }
+        if (parent == inst->parent)
+            return;
 
-            iter = iter->getNextInst();
-            if (mayHaveDependency)
-                insertBeforeInst = iter;
+        // For the rest of the cases, IRWitnessTable goes to the
+        // end of the list.
+        insertBeforeInst = nullptr;
+    }
+    else
+    {
+        // Hoistable instructions are always "ordinary"
+        // instructions, so they need to come after
+        // any parameters of the parent.
+        //
+        while (insertBeforeInst && insertBeforeInst->getOp() == kIROp_Param)
+        {
+            insertBeforeInst = insertBeforeInst->getNextInst();
         }
     }
 
@@ -4646,11 +4640,13 @@ void addGlobalValue(IRBuilder* builder, IRInst* value)
         parent = builder->getModule()->getModuleInst();
     }
 
-    // If the value is already in the parent, keep it as-is. Because WitnessTable is Hoistable, the
-    // parent can have only one instance of this WitnessTable. The order among siblings should
-    // remain because the later siblings may have dependency to the earlier siblings.
-    // 
-    if (parent == value->parent)
+    // If the value is already in the parent, keep it as-is.
+    // Because WitnessTable is Hoistable, the parent can have
+    // only one instance of this WitnessTable. The order among
+    // siblings should remain because the later siblings may
+    // have dependency to the earlier siblings.
+    //
+    if (parent == value->parent && value->getOp() == kIROp_WitnessTable)
     {
         SLANG_ASSERT(getIROpInfo(kIROp_WitnessTable).isHoistable());
         return;
