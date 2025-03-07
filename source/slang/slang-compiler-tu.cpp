@@ -10,6 +10,23 @@
 
 namespace Slang
 {
+static void dumpIRIfEnabled(
+    CodeGenContext* codeGenContext,
+    IRModule* irModule,
+    char const* label = nullptr)
+{
+    if (codeGenContext->shouldDumpIR())
+    {
+        DiagnosticSinkWriter writer(codeGenContext->getSink());
+        dumpIR(
+            irModule,
+            codeGenContext->getIRDumpOptions(),
+            label,
+            codeGenContext->getSourceManager(),
+            &writer);
+    }
+}
+
 // Only attempt to precompile functions:
 // 1) With function bodies (not just empty decls)
 // 2) Not marked with unsafeForceInlineDecoration
@@ -103,6 +120,10 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
     applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
     applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
 
+    // Configure diagnostic writer to write directly to stderr
+    static FileWriter stdError(stderr, WriterFlag::IsStatic | WriterFlag::IsUnowned);
+    sink.writer = &stdError;
+
     RefPtr<TargetRequest> targetReq = new TargetRequest(linkage, targetEnum);
 
     List<RefPtr<ComponentType>> allComponentTypes;
@@ -143,6 +164,9 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
     CodeGenContext::Shared sharedCodeGenContext(&tp, entryPointIndices, &sink, nullptr);
     CodeGenContext codeGenContext(&sharedCodeGenContext);
 
+    // Dump initial IR before precompilation
+    dumpIRIfEnabled(&codeGenContext, module, "PRECOMPILE_FOR_TARGET");
+
     // Mark all public functions as exported, ensure there's at least one. Store a mapping
     // of function name to IRInst* for later reference. After linking is done, we'll scan
     // the linked result to see which functions survived the pruning and are included in the
@@ -181,6 +205,9 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
         return SLANG_E_NOT_AVAILABLE;
     }
 
+    // Dump IR after precompilation but before applying decorations
+    dumpIRIfEnabled(&codeGenContext, module, "PRECOMPILE_FOR_TARGET_BEFORE_DECORATIONS");
+
     for (const auto& mangledName : metadata->getExportedFunctionMangledNames())
     {
         auto moduleInst = nameToFunction[mangledName];
@@ -212,6 +239,9 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
     builder.setInsertInto(module);
 
     builder.emitEmbeddedDownstreamIR(targetReq->getTarget(), blob);
+
+    // Dump final IR after all transformations
+    dumpIRIfEnabled(&codeGenContext, module, "PRECOMPILE_FOR_TARGET_COMPLETE_ALL");
     return SLANG_OK;
 }
 
