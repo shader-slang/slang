@@ -1831,7 +1831,20 @@ SlangResult OptionsParser::_parseReferenceModule(const CommandLineArg& arg)
     CommandLineArg referenceModuleName;
     SLANG_RETURN_ON_FAIL(m_reader.expectArg(referenceModuleName));
 
-    return addReferencedModule(referenceModuleName.value, referenceModuleName.loc, true);
+    // Add the module to the request
+    SLANG_RETURN_ON_FAIL(
+        addReferencedModule(referenceModuleName.value, referenceModuleName.loc, true));
+
+    // In addition to adding the module to the request, we also add to the options set, because
+    // the same options parser is also used for IGlobalSession::parseCommandLineArguments, which
+    // parses options via a dummy request that is destroyed once the command line options are
+    // obtained. Therefore, also add the option here so that
+    // IGlobalSession::parseCommandLineArguments can return them.
+    m_requestImpl->getLinkage()->m_optionSet.add(
+        CompilerOptionName::ReferenceModule,
+        referenceModuleName.value);
+
+    return SLANG_OK;
 }
 
 SlangResult OptionsParser::_parseReproFileSystem(const CommandLineArg& arg)
