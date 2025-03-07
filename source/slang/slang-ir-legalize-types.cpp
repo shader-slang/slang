@@ -1962,8 +1962,6 @@ static LegalVal coerceToLegalType(IRTypeLegalizationContext* context, LegalType 
             ShortList<IRInst*> fields;
             for (auto field : structType->getFields())
             {
-                if (as<IRVoidType>(field->getFieldType()))
-                    continue;
                 auto fieldVal = coerceToLegalType(
                     context,
                     LegalType::simple(field->getFieldType()),
