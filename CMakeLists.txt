@@ -166,6 +166,55 @@ option(
 )
 mark_as_advanced(SLANG_SPIRV_HEADERS_INCLUDE_DIR)
 
+# Options for user defined paths for external modules.
+advanced_option(
+    SLANG_OVERRIDE_LZ4_PATH
+    "Build using user defined path for LZ4"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_MINIZ_PATH
+    "Build using user defined path for Miniz"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_UNORDERED_DENSE_PATH
+    "Build using user defined path for unordered_dense"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_VULKAN_HEADERS_PATH
+    "Build using user defined path for Vulkan headers"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_SPIRV_HEADERS_PATH
+    "Build using user defined path for SPIR-V headers"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_SPIRV_TOOLS_PATH
+    "Build using user defined path for SPIR-V tools"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_GLSLANG_PATH
+    "Build using user defined path for glslang"
+    OFF
+)
+
+advanced_option(
+    SLANG_EXCLUDE_DAWN
+    "Optionally exclude webgpu_dawn from the build"
+    OFF
+)
+
+advanced_option(
+    SLANG_EXCLUDE_TINT
+    "Optionally exclude slang-tint from the build"
+    OFF
+)
+
 if(${SLANG_USE_SYSTEM_LZ4})
     add_compile_definitions(SLANG_USE_SYSTEM_LZ4_HEADER)
 endif()
@@ -176,6 +225,10 @@ endif()
 
 if(${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     add_compile_definitions(SLANG_USE_SYSTEM_UNORDERED_DENSE_HEADER)
+endif()
+
+if(SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
+    add_compile_definitions(SLANG_USE_SYSTEM_SPIRV_HEADER)
 endif()
 
 enum_option(
@@ -251,24 +304,28 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     )
 endif()
 
-set(webgpu_dawn_release_tag "webgpu_dawn-0")
-if(
-    CMAKE_SYSTEM_NAME MATCHES "Windows"
-    AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
-)
-    set(SLANG_WEBGPU_DAWN_BINARY_URL
-        "https://github.com/shader-slang/dawn/releases/download/${webgpu_dawn_release_tag}/webgpu_dawn-windows-x64.zip"
+if(NOT SLANG_EXCLUDE_DAWN)
+    set(webgpu_dawn_release_tag "webgpu_dawn-0")
+    if(
+        CMAKE_SYSTEM_NAME MATCHES "Windows"
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
     )
+        set(SLANG_WEBGPU_DAWN_BINARY_URL
+            "https://github.com/shader-slang/dawn/releases/download/${webgpu_dawn_release_tag}/webgpu_dawn-windows-x64.zip"
+        )
+    endif()
 endif()
 
-set(slang_tint_release_tag "slang-tint-0")
-if(
-    CMAKE_SYSTEM_NAME MATCHES "Windows"
-    AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
-)
-    set(SLANG_SLANG_TINT_BINARY_URL
-        "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
+if(NOT SLANG_EXCLUDE_TINT)
+    set(slang_tint_release_tag "slang-tint-0")
+    if(
+        CMAKE_SYSTEM_NAME MATCHES "Windows"
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
     )
+        set(SLANG_SLANG_TINT_BINARY_URL
+            "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
+        )
+    endif()
 endif()
 
 #

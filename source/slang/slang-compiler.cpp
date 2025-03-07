@@ -2669,6 +2669,12 @@ bool CodeGenContext::shouldDumpIR()
     return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::DumpIr);
 }
 
+bool CodeGenContext::shouldSkipDownstreamLinking()
+{
+    return getTargetProgram()->getOptionSet().getBoolOption(
+        CompilerOptionName::SkipDownstreamLinking);
+}
+
 bool CodeGenContext::shouldReportCheckpointIntermediates()
 {
     return getTargetProgram()->getOptionSet().getBoolOption(
