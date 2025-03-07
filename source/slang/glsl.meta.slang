@@ -617,7 +617,7 @@ public vector<float, N> uintBitsToFloat(highp vector<uint, N> x)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 public vec2 unpackUnorm2x16(uint p)
 {
     return unpackUnorm2x16ToFloat(p);
@@ -625,7 +625,7 @@ public vec2 unpackUnorm2x16(uint p)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 public vec2 unpackSnorm2x16(uint p)
 {
     return unpackSnorm2x16ToFloat(p);
@@ -633,7 +633,7 @@ public vec2 unpackSnorm2x16(uint p)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 public vec4 unpackUnorm4x8(highp uint p)
 {
     return unpackUnorm4x8ToFloat(p);
@@ -641,7 +641,7 @@ public vec4 unpackUnorm4x8(highp uint p)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 public vec4 unpackSnorm4x8(highp uint p)
 {
     return unpackSnorm4x8ToFloat(p);
@@ -669,7 +669,7 @@ public float half2float(uint h)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 public vec2 unpackHalf2x16(uint p)
 {
     return unpackHalf2x16ToFloat(p);

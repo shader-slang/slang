@@ -24172,7 +24172,7 @@ typealias int8_t4_packed = uint;
 /// Unpack 4 signed 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int16_t4 unpack_s8s16(int8_t4_packed packed)
 {
     return unpackInt4x8ToInt16(packed);
@@ -24181,7 +24181,7 @@ int16_t4 unpack_s8s16(int8_t4_packed packed)
 /// Unpack 4 unsigned 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint16_t4 unpack_u8u16(uint8_t4_packed packed)
 {
     return unpackUint4x8ToUint16(packed);
@@ -24190,7 +24190,7 @@ uint16_t4 unpack_u8u16(uint8_t4_packed packed)
 /// Unpack 4 signed 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int32_t4 unpack_s8s32(int8_t4_packed packed)
 {
     return unpackInt4x8ToInt32(packed);
@@ -24199,7 +24199,7 @@ int32_t4 unpack_s8s32(int8_t4_packed packed)
 /// Unpack 4 unsigned 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint32_t4 unpack_u8u32(uint8_t4_packed packed)
 {
     return unpackUint4x8ToUint32(packed);
@@ -24208,7 +24208,7 @@ uint32_t4 unpack_u8u32(uint8_t4_packed packed)
 /// Pack a vector of 4 unsigned 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint8_t4_packed pack_u8(uint32_t4 unpackedValue)
 {
     return packUint4x8(unpackedValue);
@@ -24217,7 +24217,7 @@ uint8_t4_packed pack_u8(uint32_t4 unpackedValue)
 /// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int8_t4_packed pack_s8(int32_t4 unpackedValue)
 {
     return packInt4x8(unpackedValue);
@@ -24226,7 +24226,7 @@ int8_t4_packed pack_s8(int32_t4 unpackedValue)
 /// Pack a vector of 4 unsigned 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint8_t4_packed pack_u8(uint16_t4 unpackedValue)
 {
     return packUint4x8(unpackedValue);
@@ -24235,7 +24235,7 @@ uint8_t4_packed pack_u8(uint16_t4 unpackedValue)
 /// Pack a vector of 4 signed 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int8_t4_packed pack_s8(int16_t4 unpackedValue)
 {
     return packInt4x8(unpackedValue);
@@ -24245,7 +24245,7 @@ int8_t4_packed pack_s8(int16_t4 unpackedValue)
 /// clamping each value to the range [0, 255] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint8_t4_packed pack_clamp_u8(int32_t4 unpackedValue)
 {
     return packUint4x8Clamp(unpackedValue);
@@ -24255,7 +24255,7 @@ uint8_t4_packed pack_clamp_u8(int32_t4 unpackedValue)
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int8_t4_packed pack_clamp_s8(int32_t4 unpackedValue)
 {
     return packInt4x8Clamp(unpackedValue);
@@ -24265,7 +24265,7 @@ int8_t4_packed pack_clamp_s8(int32_t4 unpackedValue)
 /// clamping each value to the range [0, 255] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint8_t4_packed pack_clamp_u8(int16_t4 unpackedValue)
 {
     return packUint4x8Clamp(unpackedValue);
@@ -24275,7 +24275,7 @@ uint8_t4_packed pack_clamp_u8(int16_t4 unpackedValue)
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
 {
     return packInt4x8Clamp(unpackedValue);
@@ -24384,7 +24384,7 @@ uint __packInt2x16(int32_t2 unpackedValue)
 /// Unpack 4 unsigned 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint32_t4 unpackUint4x8ToUint32(uint packedValue)
 {
     __target_switch
@@ -24411,7 +24411,7 @@ uint32_t4 unpackUint4x8ToUint32(uint packedValue)
 /// Unpack 4 unsigned 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint16_t4 unpackUint4x8ToUint16(uint packedValue)
 {
     __target_switch
@@ -24437,7 +24437,7 @@ uint16_t4 unpackUint4x8ToUint16(uint packedValue)
 /// Unpack 4 signed 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int32_t4 unpackInt4x8ToInt32(uint packedValue)
 {
     __target_switch
@@ -24464,7 +24464,7 @@ int32_t4 unpackInt4x8ToInt32(uint packedValue)
 /// Unpack 4 signed 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int16_t4 unpackInt4x8ToInt16(uint packedValue)
 {
     __target_switch
@@ -24490,7 +24490,7 @@ int16_t4 unpackInt4x8ToInt16(uint packedValue)
 /// Pack a vector of 4 unsigned 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packUint4x8(uint32_t4 unpackedValue)
 {
     __target_switch
@@ -24508,7 +24508,7 @@ uint packUint4x8(uint32_t4 unpackedValue)
 /// Pack a vector of 4 unsigned 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packUint4x8(uint16_t4 unpackedValue)
 {
     __target_switch
@@ -24522,7 +24522,7 @@ uint packUint4x8(uint16_t4 unpackedValue)
 /// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packInt4x8(int32_t4 unpackedValue)
 {
     __target_switch
@@ -24537,7 +24537,7 @@ uint packInt4x8(int32_t4 unpackedValue)
 /// Pack a vector of 4 signed 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packInt4x8(int16_t4 unpackedValue)
 {
     __target_switch
@@ -24552,7 +24552,7 @@ uint packInt4x8(int16_t4 unpackedValue)
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packUint4x8Clamp(int32_t4 unpackedValue)
 {
     __target_switch
@@ -24568,7 +24568,7 @@ uint packUint4x8Clamp(int32_t4 unpackedValue)
 /// clamping each value to the range [0, 255] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packUint4x8Clamp(int16_t4 unpackedValue)
 {
     __target_switch
@@ -24583,7 +24583,7 @@ uint packUint4x8Clamp(int16_t4 unpackedValue)
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packInt4x8Clamp(int32_t4 unpackedValue)
 {
     __target_switch
@@ -24599,7 +24599,7 @@ uint packInt4x8Clamp(int32_t4 unpackedValue)
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packInt4x8Clamp(int16_t4 unpackedValue)
 {
     __target_switch
@@ -24621,7 +24621,7 @@ uint packInt4x8Clamp(int16_t4 unpackedValue)
 /// floating-point value to generate a 4-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 float4 unpackUnorm4x8ToFloat(uint packedValue)
 {
     __target_switch
@@ -24645,7 +24645,7 @@ float4 unpackUnorm4x8ToFloat(uint packedValue)
 /// floating-point value to generate a 4-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 half4 unpackUnorm4x8ToHalf(uint packedValue)
 {
     __target_switch
@@ -24661,7 +24661,7 @@ half4 unpackUnorm4x8ToHalf(uint packedValue)
 /// floating-point value to generate a 4-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 float4 unpackSnorm4x8ToFloat(uint packedValue)
 {
     __target_switch
@@ -24685,7 +24685,7 @@ float4 unpackSnorm4x8ToFloat(uint packedValue)
 /// floating-point value to generate a 4-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 half4 unpackSnorm4x8ToHalf(uint packedValue)
 {
     __target_switch
@@ -24701,7 +24701,7 @@ half4 unpackSnorm4x8ToHalf(uint packedValue)
 /// floating-point value to generate a 2-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 float2 unpackUnorm2x16ToFloat(uint packedValue)
 {
     __target_switch
@@ -24725,7 +24725,7 @@ float2 unpackUnorm2x16ToFloat(uint packedValue)
 /// floating-point value to generate a 2-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 half2 unpackUnorm2x16ToHalf(uint packedValue)
 {
     __target_switch
@@ -24741,7 +24741,7 @@ half2 unpackUnorm2x16ToHalf(uint packedValue)
 /// floating-point value to generate a 2-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 float2 unpackSnorm2x16ToFloat(uint packedValue)
 {
     __target_switch
@@ -24765,7 +24765,7 @@ float2 unpackSnorm2x16ToFloat(uint packedValue)
 /// floating-point value to generate a 2-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 half2 unpackSnorm2x16ToHalf(uint packedValue)
 {
     __target_switch
@@ -24781,7 +24781,7 @@ half2 unpackSnorm2x16ToHalf(uint packedValue)
 /// floating-point value to generate a 2-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 float2 unpackHalf2x16ToFloat(uint packedValue)
 {
     __target_switch
@@ -24804,7 +24804,7 @@ float2 unpackHalf2x16ToFloat(uint packedValue)
 /// floating-point value to generate a 2-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 half2 unpackHalf2x16ToHalf(uint packedValue)
 {
     return half2(unpackHalf2x16ToFloat(packedValue));
@@ -24815,7 +24815,7 @@ half2 unpackHalf2x16ToHalf(uint packedValue)
 /// 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packUnorm4x8(float4 unpackedValue)
 {
     __target_switch
@@ -24839,7 +24839,7 @@ uint packUnorm4x8(float4 unpackedValue)
 /// 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packUnorm4x8(half4 unpackedValue)
 {
     __target_switch
@@ -24855,7 +24855,7 @@ uint packUnorm4x8(half4 unpackedValue)
 /// 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packSnorm4x8(float4 unpackedValue)
 {
     __target_switch
@@ -24879,7 +24879,7 @@ uint packSnorm4x8(float4 unpackedValue)
 /// 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packSnorm4x8(half4 unpackedValue)
 {
     __target_switch
@@ -24895,7 +24895,7 @@ uint packSnorm4x8(half4 unpackedValue)
 /// 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packUnorm2x16(float2 unpackedValue)
 {
     __target_switch
@@ -24919,7 +24919,7 @@ uint packUnorm2x16(float2 unpackedValue)
 /// 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packUnorm2x16(half2 unpackedValue)
 {
     __target_switch
@@ -24935,7 +24935,7 @@ uint packUnorm2x16(half2 unpackedValue)
 /// 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packSnorm2x16(float2 unpackedValue)
 {
     __target_switch
@@ -24959,7 +24959,7 @@ uint packSnorm2x16(float2 unpackedValue)
 /// 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packSnorm2x16(half2 unpackedValue)
 {
     __target_switch
@@ -24975,7 +24975,7 @@ uint packSnorm2x16(half2 unpackedValue)
 /// 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packHalf2x16(float2 unpackedValue)
 {
     __target_switch
@@ -24998,7 +24998,7 @@ uint packHalf2x16(float2 unpackedValue)
 /// 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_unpack)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packHalf2x16(half2 unpackedValue)
 {
     return packHalf2x16(float2(unpackedValue));
