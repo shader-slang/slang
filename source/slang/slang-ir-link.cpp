@@ -732,7 +732,8 @@ IRWitnessTable* cloneWitnessTableImpl(
         clonedBaseType = cloneType(context, (IRType*)(originalTable->getConformanceType()));
         auto clonedSubType = cloneType(context, (IRType*)(originalTable->getConcreteType()));
         clonedTable = builder->createWitnessTable(clonedBaseType, clonedSubType);
-        SLANG_RELEASE_ASSERT(clonedTable->getFirstDecorationOrChild() == nullptr);
+        if (clonedTable->getFirstDecorationOrChild() != nullptr)
+            return clonedTable;
     }
     else
     {
