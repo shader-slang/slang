@@ -402,6 +402,7 @@ void ShaderObjectImpl::writeOrdinaryDataIntoArgumentBuffer(
 }
 
 BufferResourceImpl* ShaderObjectImpl::_ensureArgumentBufferUpToDate(
+    BindingContext* context,
     DeviceImpl* device,
     ShaderObjectLayoutImpl* layout)
 {
@@ -462,12 +463,23 @@ BufferResourceImpl* ShaderObjectImpl::_ensureArgumentBufferUpToDate(
                     auto subObjectIndex = bindingRange.subObjectIndex;
                     auto subObject = m_objects[subObjectIndex];
                     BufferResourceImpl* argumentBufferPtr =
-                        subObject->_ensureArgumentBufferUpToDate(device, subObject->getLayout());
+                        subObject->_ensureArgumentBufferUpToDate(
+                            context,
+                            device,
+                            subObject->getLayout());
                     if (argumentBufferPtr)
                     {
                         uint8_t* argumentBuffer = (uint8_t*)argumentData + offset;
                         gfx::DeviceAddress bufferAddr = argumentBufferPtr->getDeviceAddress();
                         memcpy(argumentBuffer, &bufferAddr, sizeof(bufferAddr));
+
+                        MTL::Resource const* resource[] = {argumentBufferPtr->m_buffer.get()};
+                        // Nested parameter block and constant buffer is also bindless resource, we
+                        // need to inform Metal to hazard track the resource
+                        context->useResources(
+                            resource,
+                            1,
+                            MTL::ResourceUsageWrite | MTL::ResourceUsageRead);
                     }
                     break;
                 }
@@ -475,6 +487,26 @@ BufferResourceImpl* ShaderObjectImpl::_ensureArgumentBufferUpToDate(
                 break;
             }
         }
+
+        List<MTL::Resource const*> resources;
+        for (uint32_t i = 0; i < m_buffers.getCount(); i++)
+        {
+            MTL::Buffer* mtlBuffer = m_buffers[i]->m_buffer->m_buffer.get();
+            resources.add(mtlBuffer);
+        }
+
+        for (uint32_t i = 0; i < m_textures.getCount(); i++)
+        {
+            MTL::Texture* mtlTexture = m_textures[i]->m_texture->m_texture.get();
+            resources.add(mtlTexture);
+        }
+        // It's important to call useResources because Metal will not automatically do the hazard
+        // tracking for bindless resources, we have to call useResources to inform Metal to track
+        // the resources.
+        context->useResources(
+            resources.getBuffer(),
+            resources.getCount(),
+            MTL::ResourceUsageWrite | MTL::ResourceUsageRead);
 
         m_argumentBuffer->unmap(&range);
         m_isArgumentBufferDirty = false;
@@ -491,7 +523,7 @@ Result ShaderObjectImpl::bindAsParameterBlock(
     if (!context->device->m_hasArgumentBufferTier2)
         return SLANG_FAIL;
 
-    auto argumentBuffer = _ensureArgumentBufferUpToDate(context->device, layout);
+    auto argumentBuffer = _ensureArgumentBufferUpToDate(context, context->device, layout);
 
     if (m_argumentBuffer)
     {
