@@ -1236,9 +1236,9 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
         return linkageDecoration->getMangledName();
     }
 
-    switch (inst->getOp())
+    if (auto ptrType = as<IRPtrType>(inst))
     {
-    case kIROp_HLSLConstBufferPointerType:
+        if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
         {
             StringBuilder sb;
             sb << "BufferPointer_";
@@ -1246,9 +1246,8 @@ String CLikeSourceEmitter::generateName(IRInst* inst)
             sb << "_" << Int32(getID(inst));
             return sb.produceString();
         }
-    default:
-        break;
     }
+
     // Otherwise fall back to a construct temporary name
     // for the instruction.
     StringBuilder sb;

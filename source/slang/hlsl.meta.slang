@@ -21609,90 +21609,36 @@ extension uint64_t
     }
 }
 
-__generic<T, let Alignment : int = 16>
-__intrinsic_type($(kIROp_HLSLConstBufferPointerType))
-__glsl_extension(GL_EXT_buffer_reference)
-__magic_type(ConstBufferPointerType)
-[require(glsl_spirv, bufferreference)]
-struct ConstBufferPointer
+struct ConstBufferPointer<T, int alignment = 16>
 {
-    __glsl_version(450)
-    __glsl_extension(GL_EXT_buffer_reference)
-    [__NoSideEffect]
-    T get()
-    {
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "$0._data";
-        case spirv:
-            return spirv_asm {
-                result:$$T = OpLoad $this Aligned !Alignment;
-            };
-        }
-    }
+    T *_ptr;
 
-
+    [ForceInline] T get() { return loadAligned<alignment>(_ptr); }
 
     __subscript(int index) -> T
     {
         [ForceInline]
-        get {return ConstBufferPointer<T>.fromUInt(toUInt() + __naturalStrideOf<T>() * index).get(); }
+        get { return _ptr[index]; }
     }
 
-    __glsl_version(450)
-    __glsl_extension(GL_EXT_shader_explicit_arithmetic_types_int64)
-    __glsl_extension(GL_EXT_buffer_reference)
-    [require(glsl_spirv, bufferreference_int64)]
+    [ForceInline] T* getPtr() { return _ptr; }
+
+    [ForceInline]
     static ConstBufferPointer<T> fromUInt(uint64_t val)
     {
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "$TR($0)";
-        case spirv:
-            return spirv_asm {
-                result:$$ConstBufferPointer<T> = OpConvertUToPtr $val;
-            };
-        }
+        return {(T*)val};
     }
 
-    __glsl_version(450)
-    __glsl_extension(GL_EXT_shader_explicit_arithmetic_types_int64)
-    __glsl_extension(GL_EXT_buffer_reference)
-    [require(glsl_spirv, bufferreference_int64)]
+    [ForceInline]
     uint64_t toUInt()
     {
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "uint64_t($0)";
-        case spirv:
-            return spirv_asm {
-                result:$$uint64_t = OpConvertPtrToU $this;
-            };
-        }
+        return (uint64_t)_ptr;
     }
 
-    __glsl_version(450)
-    __glsl_extension(GL_EXT_shader_explicit_arithmetic_types_int64)
-    __glsl_extension(GL_EXT_buffer_reference)
-    [__NoSideEffect]
     [ForceInline]
-    [require(glsl_spirv, bufferreference_int64)]
     bool isValid()
     {
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(uint64_t($0) != 0)";
-        case spirv:
-            uint64_t zero = 0ULL;
-            return spirv_asm {
-                %ptrval:$$uint64_t = OpConvertPtrToU $this;
-                result:$$bool = OpINotEqual %ptrval $zero;
-            };
-        }
+        return _ptr != nullptr;
     }
 }
 
