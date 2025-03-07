@@ -194,23 +194,29 @@ extern "C"
         bool glslang_disassembleSPIRV(const uint32_t* contents, int contentsSize)
 {
     static const auto kDefaultEnvironment = SPV_ENV_UNIVERSAL_1_5;
+    spv_text text;
 
     uint32_t options = SPV_BINARY_TO_TEXT_OPTION_NONE;
     options |= SPV_BINARY_TO_TEXT_OPTION_COMMENT;
     options |= SPV_BINARY_TO_TEXT_OPTION_PRINT;
     options |= SPV_BINARY_TO_TEXT_OPTION_COLOR;
-    options |= SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES;
+    options |= SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES,
+    options |= SPV_BINARY_TO_TEXT_OPTION_INDENT;
 
     spv_diagnostic diagnostic = nullptr;
     spv_context context = spvContextCreate(kDefaultEnvironment);
     spv_result_t error =
-        spvBinaryToText(context, contents, contentsSize, options, nullptr, &diagnostic);
+        spvBinaryToText(context, contents, contentsSize, SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES | SPV_BINARY_TO_TEXT_OPTION_INDENT, &text, &diagnostic);
     spvContextDestroy(context);
     if (error)
     {
         spvDiagnosticPrint(diagnostic);
         spvDiagnosticDestroy(diagnostic);
         return false;
+    }
+    else
+    {
+        dump(text->str, text->length, nullptr, nullptr, stderr);
     }
 
     return true;

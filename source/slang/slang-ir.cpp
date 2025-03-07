@@ -8,8 +8,6 @@
 #include "slang-ir-util.h"
 #include "slang-mangle.h"
 
-#include "spirv-tools/libspirv.h"
-
 namespace Slang
 {
 struct IRSpecContext;
@@ -7167,37 +7165,27 @@ static void dumpInstExpr(IRDumpContext* context, IRInst* inst)
             const uint32_t* spirvCode = (const uint32_t*)blob.begin();
             const size_t spirvWordCount = blob.getLength() / sizeof(uint32_t);
 
-            // Create SPIR-V tools context
-            spv_context spvContext = spvContextCreate(SPV_ENV_UNIVERSAL_1_0);
-            spv_text text = nullptr;
-            spv_diagnostic diagnostic = nullptr;
+            // Get the compiler from the session through the module
+            auto module = inst->getModule();
+            auto session = module->getSession();
+            IDownstreamCompiler* compiler = session->getOrLoadDownstreamCompiler(
+                PassThroughMode::SpirvDis,
+                nullptr);
 
-            // Disassemble with friendly names and comments
-            spv_result_t result = spvBinaryToText(
-                spvContext,
-                spirvCode,
-                spirvWordCount,
-                SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES | SPV_BINARY_TO_TEXT_OPTION_INDENT,
-                &text,
-                &diagnostic);
-
-            if (result == SPV_SUCCESS && text)
+            if (compiler)
             {
+                // Use glslang interface to disassemble with captured output
+                compiler->disassemble(spirvCode, int(spirvWordCount));
+
+                // Dump the captured disassembly
                 dump(context, "\n");
                 dumpIndent(context);
-                dump(context, text->str);
+                //dump(context, disassemblyBuilder.getUnownedSlice());
             }
             else
             {
                 dump(context, "<invalid SPIR-V>");
             }
-
-            // Cleanup
-            if (diagnostic)
-                spvDiagnosticDestroy(diagnostic);
-            if (text)
-                spvTextDestroy(text);
-            spvContextDestroy(spvContext);
         }
         else
         {

@@ -1,4 +1,6 @@
-//TEST_IGNORE_FILE:
+// This test checks the SPIR-V output when compiling a library containing generics with embedded downstream IR.
+
+//TEST:SIMPLE(filecheck=CHECK): -o tests/library/export-library-generics-test.slang-module -target spirv -embed-downstream-ir -profile lib_6_6 -incomplete-library -dump-ir -verbose-paths
 
 // export-library-generics.slang
 
@@ -37,3 +39,5 @@ public int normalFunc(int a, float b)
 {
     return a - floor(b);
 }
+
+// CHECK:_SR29export_2Dxlibrary_2Dxgenerics10normalFuncp2pi_ii_fi
