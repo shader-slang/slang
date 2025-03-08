@@ -741,7 +741,7 @@ bool TEST_texture<T>(
     return result;
 }
 
-[numthreads(1, 1, 1)]
+[numthreads(2, 2, 1)]
 void computeMain()
 {
     // SPIR: OpEntryPoint
