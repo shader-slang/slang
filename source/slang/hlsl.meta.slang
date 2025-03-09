@@ -22017,8 +22017,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     [__NoSideEffect]
     int getCount()
     {
-        // XXX TODO: what should be returned here? SPIRV "length"?
-        return 0;
+        return getLength();
     }
 
     [ForceInline]
@@ -22053,7 +22052,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
 
     /// Returns the number of components owned by each invocation.
     [require(cooperative_matrix)]
-    uint length()
+    uint getLength()
     {
         return spirv_asm
         {
@@ -22277,7 +22276,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     This mod(This other)
     {
         This ret;
-        for(int i = 0; i < length(); ++i)
+        for (int i = 0; i < getLength(); ++i)
         {
             ret[i] = this[i] % other[i];
         }
@@ -22290,29 +22289,46 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
 
     bool equals(This other)
     {
-        // XXX: Hmmmm...
-        // We can only access components that are OWNED by the current invocation,
-        // hence we can only perform operations to them and not the whole matrix.
-        // It is better to disable this function(?)
-        return false;
+        for (int i = 0; i < getLength(); i++)
+        {
+            if (this[i] != other[i])
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     bool lessThan(This other)
     {
-        // XXX: Hmmmm...
-        // We can only access components that are OWNED by the current invocation,
-        // hence we can only perform operations to them and not the whole matrix.
-        // It is better to disable this function(?)
+        for (int i = 0; i < getLength(); i++)
+        {
+            if (this[i] < other[i])
+            {
+                return true;
+            }
+            else if (this[i] > other[i])
+            {
+                return false;
+            }
+        }
         return false;
     }
 
     bool lessThanOrEquals(This other)
     {
-        // XXX: Hmmmm...
-        // We can only access components that are OWNED by the current invocation,
-        // hence we can only perform operations to them and not the whole matrix.
-        // It is better to disable this function(?)
-        return false;
+        for (int i = 0; i < getLength(); i++)
+        {
+            if (this[i] < other[i])
+            {
+                return true;
+            }
+            else if (this[i] > other[i])
+            {
+                return false;
+            }
+        }
+        return true;
     }
 }
 

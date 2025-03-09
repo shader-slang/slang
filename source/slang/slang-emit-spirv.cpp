@@ -6266,7 +6266,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         const auto baseTy = base->getDataType();
         SLANG_ASSERT(
             as<IRPointerLikeType>(baseTy) || as<IRArrayType>(baseTy) || as<IRVectorType>(baseTy) ||
-            as<IRCoopVectorType>(baseTy) || as<IRMatrixType>(baseTy));
+            as<IRCoopVectorType>(baseTy) || as<IRMatrixType>(baseTy) ||
+            as<IRCoopMatrixType>(baseTy));
 
         IRBuilder builder(m_irModule);
         builder.setInsertBefore(inst);
