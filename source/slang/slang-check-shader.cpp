@@ -537,9 +537,17 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
         else
         {
-            // Only attempt to error if a user adds to slangc either `-profile` or `-capability`
-            if ((target->getOptionSet().hasOption(CompilerOptionName::Capability) ||
-                 target->getOptionSet().hasOption(CompilerOptionName::Profile)) &&
+            auto& targetOptionSet = target->getOptionSet();
+            bool specificProfileRequested =
+                targetOptionSet.hasOption(CompilerOptionName::Profile) &&
+                (targetOptionSet.getIntOption(CompilerOptionName::Profile) !=
+                 SLANG_PROFILE_UNKNOWN);
+            bool specificCapabilityRequested =
+                targetOptionSet.hasOption(CompilerOptionName::Capability) &&
+                (targetOptionSet.getIntOption(CompilerOptionName::Capability) !=
+                 SLANG_CAPABILITY_UNKNOWN);
+            // Only attempt to error if a specific profile or capability is requested
+            if ((specificCapabilityRequested || specificProfileRequested) &&
                 targetCaps.atLeastOneSetImpliedInOther(
                     entryPointFuncDecl->inferredCapabilityRequirements) ==
                     CapabilitySet::ImpliesReturnFlags::NotImplied)
