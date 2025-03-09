@@ -91,7 +91,7 @@ enum class SpvLogicalSectionID
 };
 
 // The registered id for the Slang compiler.
-static const uint32_t kSPIRVSlangCompilerId = 40;
+static const uint32_t kSPIRVSlangCompilerId = 40 << 16;
 
 // While the SPIR-V module is nominally (according to the spec) just
 // a flat sequence of instructions, in practice some of the instructions
@@ -491,7 +491,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     /// The next destination `<id>` to allocate.
     SpvWord m_nextID = 1;
 
-    OrderedHashSet<IRPtrTypeBase*> m_forwardDeclaredPointers;
+    OrderedDictionary<SpvInst*, IRPtrTypeBase*> m_forwardDeclaredPointers;
 
     SpvInst* m_nullDwarfExpr = nullptr;
 
@@ -1437,6 +1437,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         m_addressingMode = SpvAddressingModelPhysicalStorageBuffer64;
     }
 
+    bool shouldEmitArrayStride(IRInst* elementType)
+    {
+        for (auto decor : elementType->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_SPIRVBufferBlockDecoration:
+            case kIROp_SPIRVBlockDecoration:
+                return false;
+            }
+        }
+        return true;
+    }
+
     // Next, let's look at emitting some of the instructions
     // that can occur at global scope.
 
@@ -1554,7 +1568,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     // After everything has been emitted, we will move the pointer definition to the
                     // end of the Types & Constants section.
-                    if (m_forwardDeclaredPointers.add(ptrType))
+                    if (m_forwardDeclaredPointers.addIfNotExists(
+                            resultSpvType,
+                            (IRPtrTypeBase*)inst))
                         emitOpTypeForwardPointer(resultSpvType, storageClass);
                 }
                 if (storageClass == SpvStorageClassPhysicalStorageBuffer)
@@ -1654,42 +1670,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_ArrayType:
         case kIROp_UnsizedArrayType:
             {
-                const auto elementType = static_cast<IRArrayTypeBase*>(inst)->getElementType();
+                auto irArrayType = static_cast<IRArrayTypeBase*>(inst);
+                const auto elementType = irArrayType->getElementType();
                 const auto arrayType =
                     inst->getOp() == kIROp_ArrayType
-                        ? emitOpTypeArray(
-                              inst,
-                              elementType,
-                              static_cast<IRArrayTypeBase*>(inst)->getElementCount())
+                        ? emitOpTypeArray(inst, elementType, irArrayType->getElementCount())
                         : emitOpTypeRuntimeArray(inst, elementType);
-                auto strideInst = as<IRArrayTypeBase>(inst)->getArrayStride();
-                int stride = 0;
-                if (strideInst)
+                auto strideInst = irArrayType->getArrayStride();
+                if (strideInst && shouldEmitArrayStride(irArrayType->getElementType()))
                 {
-                    stride = (int)getIntVal(strideInst);
-                }
-                else
-                {
-                    IRSizeAndAlignment sizeAndAlignment;
-                    getNaturalSizeAndAlignment(
-                        m_targetProgram->getOptionSet(),
-                        elementType,
-                        &sizeAndAlignment);
-                    stride = (int)sizeAndAlignment.getStride();
-                }
-
-                // Avoid validation error: Array containing a Block or BufferBlock must not be
-                // decorated with ArrayStride
-                if (!elementType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration) &&
-                    !elementType->findDecorationImpl(kIROp_SPIRVBlockDecoration))
-                {
+                    int stride = (int)getIntVal(strideInst);
                     emitOpDecorateArrayStride(
                         getSection(SpvLogicalSectionID::Annotations),
                         nullptr,
                         arrayType,
                         SpvLiteralInteger::from32(stride));
                 }
-
                 return arrayType;
             }
         case kIROp_AtomicType:
@@ -1726,13 +1722,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
             requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
             return emitOpTypeHitObject(inst);
-
-        case kIROp_HLSLConstBufferPointerType:
-            requirePhysicalStorageAddressing();
-            return emitOpTypePointer(
-                inst,
-                SpvStorageClassPhysicalStorageBuffer,
-                inst->getOperand(0));
 
         case kIROp_FuncType:
             // > OpTypeFunction
@@ -4946,6 +4935,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    bool isPhysicalCompositeType(IRType* type)
+    {
+        for (auto decor : type->getDecorations())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_PhysicalTypeDecoration:
+            case kIROp_SPIRVBlockDecoration:
+            case kIROp_SPIRVBufferBlockDecoration:
+                return true;
+            }
+        }
+        return false;
+    }
+
     void emitLayoutDecorations(IRStructType* structType, SpvWord spvStructID)
     {
         /*****
@@ -4974,6 +4978,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             layoutRuleName = layout->getLayoutName();
         }
         int32_t id = 0;
+        bool isPhysicalType = isPhysicalCompositeType(structType);
         for (auto field : structType->getFields())
         {
             for (auto decor : field->getKey()->getDecorations())
@@ -5054,6 +5059,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
             }
 
+            if (!isPhysicalType)
+                continue;
+
+            // Emit explicit struct field layout decorations if the struct is physical.
             IRIntegerValue offset = 0;
             if (auto offsetDecor = field->getKey()->findDecoration<IRPackOffsetDecoration>())
             {
@@ -5084,8 +5093,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             if (matrixType)
             {
                 // SPIRV sepc on MatrixStride:
-                // Applies only to a member of a structure type.Only valid on a
-                // matrix or array whose most basic element is a matrix.Matrix
+                // Applies only to a member of a structure type. Only valid on a
+                // matrix or array whose most basic element is a matrix. Matrix
                 // Stride is an unsigned 32 - bit integer specifying the stride
                 // of the rows in a RowMajor - decorated matrix or columns in a
                 // ColMajor - decorated matrix.
@@ -8373,11 +8382,11 @@ SlangResult emitSPIRVFromIR(
 
         for (auto ptrType : fwdPointers)
         {
-            auto spvPtrType = context.m_mapIRInstToSpvInst[ptrType];
+            auto spvPtrType = ptrType.key;
             // When we emit a pointee type, we may introduce new
             // forward-declared pointer types, so we need to
             // keep iterating until we have emitted all of them.
-            context.ensureInst(ptrType->getValueType());
+            context.ensureInst(ptrType.value->getValueType());
             auto parent = spvPtrType->parent;
             spvPtrType->removeFromParent();
             parent->addInst(spvPtrType);

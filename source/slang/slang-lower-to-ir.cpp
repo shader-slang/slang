@@ -870,8 +870,15 @@ LoweredValInfo emitCallToDeclRef(
             return LoweredValInfo::simple(args[0]);
         }
         auto intrinsicOp = getIntrinsicOp(funcDecl, intrinsicOpModifier);
-        return LoweredValInfo::simple(
-            builder->emitIntrinsicInst(type, IROp(intrinsicOp), argCount, args));
+        switch (IROp(intrinsicOp))
+        {
+        case kIROp_GetOffsetPtr:
+            SLANG_ASSERT(argCount == 2);
+            return LoweredValInfo::simple(builder->emitGetOffsetPtr(args[0], args[1]));
+        default:
+            return LoweredValInfo::simple(
+                builder->emitIntrinsicInst(type, IROp(intrinsicOp), argCount, args));
+        }
     }
 
     // Fallback case is to emit an actual call.
@@ -8186,7 +8193,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // Make sure that all the entries in the witness table have been filled in,
         // including any cases where there are sub-witness-tables for conformances
         bool isExplicitExtern = false;
-        if (!isImportedDecl(context, parentDecl, isExplicitExtern))
+        bool isImported = isImportedDecl(context, parentDecl, isExplicitExtern);
+        if (!isImported || isExplicitExtern)
         {
             Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
             lowerWitnessTable(

@@ -27,13 +27,32 @@ if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
     endif()
 endif()
 
+# Unordered dense
 if(NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})
-    add_subdirectory(unordered_dense EXCLUDE_FROM_ALL ${system})
+    if(NOT SLANG_OVERRIDE_UNORDERED_DENSE_PATH)
+        add_subdirectory(unordered_dense EXCLUDE_FROM_ALL ${system})
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_UNORDERED_DENSE_PATH}
+            unordered_dense
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
 endif()
 
 # Miniz
 if(NOT ${SLANG_USE_SYSTEM_MINIZ})
-    add_subdirectory(miniz EXCLUDE_FROM_ALL ${system})
+    if(NOT SLANG_OVERRIDE_MINIZ_PATH)
+        add_subdirectory(miniz EXCLUDE_FROM_ALL ${system})
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_MINIZ_PATH}
+            miniz
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
     set_property(TARGET miniz PROPERTY POSITION_INDEPENDENT_CODE ON)
     # Work around https://github.com/richgel999/miniz/pull/292
     get_target_property(miniz_c_launcher miniz C_COMPILER_LAUNCHER)
@@ -46,7 +65,16 @@ endif()
 # LZ4
 if(NOT ${SLANG_USE_SYSTEM_LZ4})
     set(LZ4_BUNDLED_MODE ON)
-    add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL ${system})
+    if(NOT SLANG_OVERRIDE_LZ4_PATH)
+        add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL ${system})
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_LZ4_PATH}/build/cmake
+            lz4/build/cmake
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
     if(MSVC)
         target_compile_options(
             lz4_static
@@ -57,7 +85,16 @@ endif()
 
 # Vulkan headers
 if(NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
-    add_subdirectory(vulkan EXCLUDE_FROM_ALL ${system})
+    if(NOT SLANG_OVERRIDE_VULKAN_HEADERS_PATH)
+        add_subdirectory(vulkan EXCLUDE_FROM_ALL ${system})
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_VULKAN_HEADERS_PATH}
+            vulkan
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
 endif()
 
 # metal-cpp headers
@@ -69,22 +106,55 @@ target_include_directories(
 
 # SPIRV-Headers
 if(NOT ${SLANG_USE_SYSTEM_SPIRV_HEADERS})
-    add_subdirectory(spirv-headers EXCLUDE_FROM_ALL ${system})
+    if(NOT SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
+        add_subdirectory(spirv-headers EXCLUDE_FROM_ALL ${system})
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}
+            spirv-headers
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
 endif()
 
 if(SLANG_ENABLE_SLANG_GLSLANG)
     # SPIRV-Tools
     set(SPIRV_TOOLS_BUILD_STATIC ON)
     set(SPIRV_WERROR OFF)
-    set(SPIRV_HEADER_DIR "${CMAKE_CURRENT_LIST_DIR}/spirv-headers/")
+    # Headers
+    if(NOT SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
+        set(SPIRV_HEADER_DIR "${CMAKE_CURRENT_LIST_DIR}/spirv-headers/")
+    else()
+        set(SPIRV_HEADER_DIR ${SLANG_OVERRIDE_SPIRV_HEADERS_PATH})
+    endif()
     set(SPIRV_SKIP_TESTS ON)
-    add_subdirectory(spirv-tools EXCLUDE_FROM_ALL ${system})
+    # Tools
+    if(NOT SLANG_OVERRIDE_SPIRV_TOOLS_PATH)
+        add_subdirectory(spirv-tools EXCLUDE_FROM_ALL ${system})
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH}
+            spirv-tools
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
 
     # glslang
     set(SKIP_GLSLANG_INSTALL ON)
     set(ENABLE_OPT ON)
     set(ENABLE_PCH OFF)
-    add_subdirectory(glslang EXCLUDE_FROM_ALL ${system})
+    if(NOT SLANG_OVERRIDE_GLSLANG_PATH)
+        add_subdirectory(glslang EXCLUDE_FROM_ALL ${system})
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_GLSLANG_PATH}
+            glslang
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
 endif()
 
 # imgui
