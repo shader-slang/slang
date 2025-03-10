@@ -997,6 +997,8 @@ extern "C"
         spvtools::Context context(SPV_ENV_UNIVERSAL_1_5);
         spvtools::LinkerOptions options = {};
 
+        options.SetUseHighestVersion(true);
+
         spvtools::MessageConsumer consumer = [](spv_message_level_t level,
                                                 const char* source,
                                                 const spv_position_t& position,
