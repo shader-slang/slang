@@ -488,17 +488,24 @@ BufferResourceImpl* ShaderObjectImpl::_ensureArgumentBufferUpToDate(
             }
         }
 
+        // Handle bindless resources
         List<MTL::Resource const*> resources;
         for (uint32_t i = 0; i < m_buffers.getCount(); i++)
         {
-            MTL::Buffer* mtlBuffer = m_buffers[i]->m_buffer->m_buffer.get();
-            resources.add(mtlBuffer);
+            if (m_buffers[i])
+            {
+                MTL::Buffer* mtlBuffer = m_buffers[i]->m_buffer->m_buffer.get();
+                resources.add(mtlBuffer);
+            }
         }
 
         for (uint32_t i = 0; i < m_textures.getCount(); i++)
         {
-            MTL::Texture* mtlTexture = m_textures[i]->m_texture->m_texture.get();
-            resources.add(mtlTexture);
+            if (m_textures[i])
+            {
+                MTL::Texture* mtlTexture = m_textures[i]->m_texture->m_texture.get();
+                resources.add(mtlTexture);
+            }
         }
         // It's important to call useResources because Metal will not automatically do the hazard
         // tracking for bindless resources, we have to call useResources to inform Metal to track
