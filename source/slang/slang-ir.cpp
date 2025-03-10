@@ -1687,12 +1687,34 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
     //
     IRInst* insertBeforeInst = parent->getFirstChild();
 
-    // Hoistable instructions are always "ordinary"
-    // instructions, so they need to come after
-    // any parameters of the parent.
-    //
-    while (insertBeforeInst && insertBeforeInst->getOp() == kIROp_Param)
-        insertBeforeInst = insertBeforeInst->getNextInst();
+    if (inst->getOp() == kIROp_WitnessTable)
+    {
+        SLANG_ASSERT(getIROpInfo(kIROp_WitnessTable).isHoistable());
+
+        // Because IRWitnessTable is Hoistable, do not move when
+        // it is already a child of the parent.
+        //
+        if (parent == inst->parent)
+            return;
+
+        // For the rest of the cases, IRWitnessTable goes to the
+        // end of the list but before the terminators.
+        while (insertBeforeInst && !as<IRTerminatorInst>(insertBeforeInst))
+        {
+            insertBeforeInst = insertBeforeInst->getNextInst();
+        }
+    }
+    else
+    {
+        // Hoistable instructions are always "ordinary"
+        // instructions, so they need to come after
+        // any parameters of the parent.
+        //
+        while (insertBeforeInst && insertBeforeInst->getOp() == kIROp_Param)
+        {
+            insertBeforeInst = insertBeforeInst->getNextInst();
+        }
+    }
 
     // For instructions that will be placed at module scope,
     // we don't care about relative ordering, but for everything
@@ -4619,6 +4641,18 @@ void addGlobalValue(IRBuilder* builder, IRInst* value)
     if (!parent)
     {
         parent = builder->getModule()->getModuleInst();
+    }
+
+    // If the value is already in the parent, keep it as-is.
+    // Because WitnessTable is Hoistable, the parent can have
+    // only one instance of this WitnessTable. The order among
+    // siblings should remain because the later siblings may
+    // have dependency to the earlier siblings.
+    //
+    if (parent == value->parent && value->getOp() == kIROp_WitnessTable)
+    {
+        SLANG_ASSERT(getIROpInfo(kIROp_WitnessTable).isHoistable());
+        return;
     }
 
     // If it turns out that we are inserting into the
@@ -7908,7 +7942,11 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
 
             auto user = uu->getUser();
             bool userIsHoistable = getIROpInfo(user->getOp()).isHoistable();
-            if (userIsHoistable)
+
+            // We want to de-duplicate WitnessTable but we don't really want to hoist them.
+            bool userNeedToBeHoisted = userIsHoistable && (user->getOp() != kIROp_WitnessTable);
+
+            if (userNeedToBeHoisted)
             {
                 if (!dedupContext)
                 {
@@ -7925,7 +7963,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
             // to a point before `user`, if it is not already so.
             _maybeHoistOperand(uu);
 
-            if (userIsHoistable)
+            if (userNeedToBeHoisted)
             {
                 // Is the updated inst already exists in the global numbering map?
                 // If so, we need to continue work on replacing the updated inst with the existing

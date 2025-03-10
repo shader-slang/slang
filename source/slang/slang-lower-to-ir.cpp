@@ -8022,27 +8022,35 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         irSatisfyingWitnessTable = subBuilder->createWitnessTable(
                             irWitnessTableBaseType,
                             irWitnessTable->getConcreteType());
-                        auto mangledName = getMangledNameForConformanceWitness(
-                            subContext->astBuilder,
-                            astReqWitnessTable->witnessedType,
-                            astReqWitnessTable->baseType);
-                        subBuilder->addExportDecoration(
-                            irSatisfyingWitnessTable,
-                            mangledName.getUnownedSlice());
-                        if (isExportedType(astReqWitnessTable->witnessedType))
+
+                        // Since IRWitnessTable is Hoistable, `createWitnessTable()` may return
+                        // an IRWitnessTable that already has decorations/children. We should
+                        // add them only once.
+                        //
+                        if (irSatisfyingWitnessTable->getFirstDecorationOrChild() == nullptr)
                         {
-                            subBuilder->addHLSLExportDecoration(irSatisfyingWitnessTable);
-                            subBuilder->addKeepAliveDecoration(irSatisfyingWitnessTable);
+                            auto mangledName = getMangledNameForConformanceWitness(
+                                subContext->astBuilder,
+                                astReqWitnessTable->witnessedType,
+                                astReqWitnessTable->baseType);
+                            subBuilder->addExportDecoration(
+                                irSatisfyingWitnessTable,
+                                mangledName.getUnownedSlice());
+                            if (isExportedType(astReqWitnessTable->witnessedType))
+                            {
+                                subBuilder->addHLSLExportDecoration(irSatisfyingWitnessTable);
+                                subBuilder->addKeepAliveDecoration(irSatisfyingWitnessTable);
+                            }
+
+                            // Recursively lower the sub-table.
+                            lowerWitnessTable(
+                                subContext,
+                                astReqWitnessTable,
+                                irSatisfyingWitnessTable,
+                                mapASTToIRWitnessTable);
+
+                            irSatisfyingWitnessTable->moveToEnd();
                         }
-
-                        // Recursively lower the sub-table.
-                        lowerWitnessTable(
-                            subContext,
-                            astReqWitnessTable,
-                            irSatisfyingWitnessTable,
-                            mapASTToIRWitnessTable);
-
-                        irSatisfyingWitnessTable->moveToEnd();
                     }
                     irSatisfyingVal = irSatisfyingWitnessTable;
                 }
@@ -8151,59 +8159,73 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         auto irWitnessTableBaseType = lowerType(subContext, superType);
 
-        // Create the IR-level witness table
-        auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, nullptr);
+        // Register a dummy value to avoid infinite recursions.
+        // Without this, the call to lowerType() can get into an infinite recursion.
+        //
+        context->setGlobalValue(
+            inheritanceDecl,
+            LoweredValInfo::simple(findOuterMostGeneric(subBuilder->getInsertLoc().getParent())));
 
-        // Register the value now, rather than later, to avoid any possible infinite recursion.
+        auto irSubType = lowerType(subContext, subType);
+
+        // Create the IR-level witness table
+        auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, irSubType);
+
+        // Override with the correct witness-table
         context->setGlobalValue(
             inheritanceDecl,
             LoweredValInfo::simple(findOuterMostGeneric(irWitnessTable)));
 
-        auto irSubType = lowerType(subContext, subType);
-        irWitnessTable->setConcreteType(irSubType);
-
-        // TODO(JS):
-        // Should the mangled name take part in obfuscation if enabled?
-
-        addLinkageDecoration(
-            context,
-            irWitnessTable,
-            inheritanceDecl,
-            mangledName.getUnownedSlice());
-
-        // If the witness table is for a COM interface, always keep it alive.
-        if (irWitnessTableBaseType->findDecoration<IRComInterfaceDecoration>())
+        // Since IRWitnessTable is Hoistable, `createWitnessTable()` may return
+        // an IRWitnessTable that already has decorations/children. We should
+        // add them only once.
+        //
+        if (irWitnessTable->getFirstDecorationOrChild() == nullptr)
         {
-            subBuilder->addHLSLExportDecoration(irWitnessTable);
-        }
+            // TODO(JS):
+            // Should the mangled name take part in obfuscation if enabled?
 
-        for (auto mod : parentDecl->modifiers)
-        {
-            if (as<HLSLExportModifier>(mod))
+            addLinkageDecoration(
+                context,
+                irWitnessTable,
+                inheritanceDecl,
+                mangledName.getUnownedSlice());
+
+            // If the witness table is for a COM interface, always keep it alive.
+            if (irWitnessTableBaseType->findDecoration<IRComInterfaceDecoration>())
             {
                 subBuilder->addHLSLExportDecoration(irWitnessTable);
-                subBuilder->addKeepAliveDecoration(irWitnessTable);
             }
-            else if (as<AutoDiffBuiltinAttribute>(mod))
-            {
-                subBuilder->addAutoDiffBuiltinDecoration(irWitnessTable);
-            }
-        }
 
-        // Make sure that all the entries in the witness table have been filled in,
-        // including any cases where there are sub-witness-tables for conformances
-        bool isExplicitExtern = false;
-        bool isImported = isImportedDecl(context, parentDecl, isExplicitExtern);
-        if (!isImported || isExplicitExtern)
-        {
-            Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
-            lowerWitnessTable(
-                subContext,
-                inheritanceDecl->witnessTable,
-                irWitnessTable,
-                mapASTToIRWitnessTable);
+            for (auto mod : parentDecl->modifiers)
+            {
+                if (as<HLSLExportModifier>(mod))
+                {
+                    subBuilder->addHLSLExportDecoration(irWitnessTable);
+                    subBuilder->addKeepAliveDecoration(irWitnessTable);
+                }
+                else if (as<AutoDiffBuiltinAttribute>(mod))
+                {
+                    subBuilder->addAutoDiffBuiltinDecoration(irWitnessTable);
+                }
+            }
+
+            // Make sure that all the entries in the witness table have been filled in,
+            // including any cases where there are sub-witness-tables for conformances
+            bool isExplicitExtern = false;
+            bool isImported = isImportedDecl(context, parentDecl, isExplicitExtern);
+            if (!isImported || isExplicitExtern)
+            {
+                Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
+                lowerWitnessTable(
+                    subContext,
+                    inheritanceDecl->witnessTable,
+                    irWitnessTable,
+                    mapASTToIRWitnessTable);
+            }
+
+            irWitnessTable->moveToEnd();
         }
-        irWitnessTable->moveToEnd();
 
         return LoweredValInfo::simple(
             finishOuterGenerics(subBuilder, irWitnessTable, outerGeneric));
