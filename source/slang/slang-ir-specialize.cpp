@@ -54,6 +54,30 @@ struct SpecializationContext
     SpecializationOptions options;
     bool changed = false;
 
+    // Keep the record of cloned IRs and avoid duplication.
+    struct WitnessTableKey
+    {
+        IRWitnessTableType* witnessTableType;
+        IRInst* concreteType;
+
+        WitnessTableKey(IRWitnessTable* wt)
+            : witnessTableType(as<IRWitnessTableType>(wt->getFullType()))
+            , concreteType(wt->getOperand(0))
+        {
+        }
+
+        bool operator==(const WitnessTableKey& other) const
+        {
+            return witnessTableType == other.witnessTableType && concreteType == other.concreteType;
+        }
+
+        HashCode getHashCode() const
+        {
+            return combineHash(HashCode(witnessTableType), HashCode(concreteType));
+        }
+    };
+    Dictionary<WitnessTableKey, IRInst*> mapClonedWitnessTable;
+
 
     SpecializationContext(IRModule* inModule, TargetProgram* target, SpecializationOptions options)
         : workList(*inModule->getContainerPool().getList<IRInst>())
@@ -3136,6 +3160,23 @@ IRInst* specializeGenericImpl(
             // simply clone it completely into the global scope.
             //
             IRInst* clonedInst = cloneInst(&env, builder, ii);
+
+            // Avoid duplicated witness tables.
+            //
+            if (auto clonedWitness = as<IRWitnessTable>(clonedInst))
+            {
+                IRInst* cachedInst;
+                if (context->mapClonedWitnessTable.tryGetValue(clonedWitness, cachedInst))
+                {
+                    env.mapOldValToNew[ii] = cachedInst;
+                    clonedInst->removeAndDeallocate();
+                    clonedInst = cachedInst;
+                }
+                else
+                {
+                    context->mapClonedWitnessTable.add(clonedWitness, clonedInst);
+                }
+            }
 
             // Any new instructions we create during cloning were
             // not present when we initially built our work list,
