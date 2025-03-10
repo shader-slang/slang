@@ -5320,6 +5320,10 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
     {
         type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
     }
+    else if (auto coopMatType = as<IRCoopMatrixType>(valueType))
+    {
+        type = coopMatType->getElementType();
+    }
     else if (const auto basicType = as<IRBasicType>(valueType))
     {
         // HLSL support things like float.x, in which case we just return the base pointer.
