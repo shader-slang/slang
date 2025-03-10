@@ -2365,7 +2365,7 @@ Dictionary<String, String> TranslationUnitRequest::getCombinedPreprocessorDefini
     // variables.
     {
         // Used to identify level of HLSL language compatibility
-        combinedPreprocessorDefinitions.addIfNotExists("__HLSL_VERSION", "2020");
+        combinedPreprocessorDefinitions.addIfNotExists("__HLSL_VERSION", "2018");
 
         // Indicates this is being compiled by the slang *compiler*
         combinedPreprocessorDefinitions.addIfNotExists("__SLANG_COMPILER__", "1");
