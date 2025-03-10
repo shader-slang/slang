@@ -1698,8 +1698,11 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
             return;
 
         // For the rest of the cases, IRWitnessTable goes to the
-        // end of the list.
-        insertBeforeInst = nullptr;
+        // end of the list but before the terminators.
+        while (insertBeforeInst && !as<IRTerminatorInst>(insertBeforeInst))
+        {
+            insertBeforeInst = insertBeforeInst->getNextInst();
+        }
     }
     else
     {

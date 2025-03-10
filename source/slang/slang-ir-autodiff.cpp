@@ -3217,8 +3217,10 @@ struct AutoDiffPass : public InstPassBase
                     (UInt)args.getCount(),
                     args.getBuffer()));
 
-                auto witnessTableType = innerResult.diffWitness->getFullType();
-                auto newWitnessTable = builder.createWitnessTable(witnessTableType, concreteType);
+                auto witnessTableType =
+                    cast<IRWitnessTableType>(innerResult.diffWitness->getFullType());
+                auto conformanceType = cast<IRType>(witnessTableType->getConformanceType());
+                auto newWitnessTable = builder.createWitnessTable(conformanceType, concreteType);
 
                 // Add WitnessTableEntry only once
                 if (newWitnessTable->getFirstDecorationOrChild() == nullptr)
