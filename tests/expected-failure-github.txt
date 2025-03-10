@@ -14,3 +14,4 @@ tests/language-feature/shader-params/interface-shader-param-ordinary.slang.4 syn
 tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables.slang.8 (mtl)
 tests/glsl-intrinsic/shader-subgroup/shader-subgroup-builtin-variables-2.slang.3 (mtl)
 tests/hlsl-intrinsic/texture/partial-resident-texture-combined.slang (dx12)
+tests/library/precompiled-spirv-global.slang
