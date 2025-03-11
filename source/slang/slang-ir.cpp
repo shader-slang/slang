@@ -7152,15 +7152,17 @@ static void dumpEmbeddedDownstream(IRDumpContext* context, IRInst* inst)
         // Get the compiler from the session through the module
         auto module = inst->getModule();
         auto session = module->getSession();
-        IDownstreamCompiler* compiler = session->getOrLoadDownstreamCompiler(
-            PassThroughMode::SpirvDis,
-            nullptr);
+        IDownstreamCompiler* compiler =
+            session->getOrLoadDownstreamCompiler(PassThroughMode::SpirvDis, nullptr);
 
         if (compiler)
         {
             // Use glslang interface to disassemble with string output
             String disassemblyOutput;
-            if (SLANG_SUCCEEDED(compiler->disassembleWithResult(spirvCode, int(spirvWordCount), disassemblyOutput)))
+            if (SLANG_SUCCEEDED(compiler->disassembleWithResult(
+                    spirvCode,
+                    int(spirvWordCount),
+                    disassemblyOutput)))
             {
                 // Dump the captured disassembly
                 dump(context, "\n");

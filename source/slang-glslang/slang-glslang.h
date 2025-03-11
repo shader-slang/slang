@@ -166,6 +166,9 @@ typedef int (*glslang_CompileFunc_1_1)(glslang_CompileRequest_1_1* request);
 typedef int (*glslang_CompileFunc_1_2)(glslang_CompileRequest_1_2* request);
 typedef bool (*glslang_ValidateSPIRVFunc)(const uint32_t* contents, int contentsSize);
 typedef bool (*glslang_DisassembleSPIRVFunc)(const uint32_t* contents, int contentsSize);
-typedef bool (*glslang_DisassembleSPIRVWithResultFunc)(const uint32_t* contents, int contentsSize, char** outString);
+typedef bool (*glslang_DisassembleSPIRVWithResultFunc)(
+    const uint32_t* contents,
+    int contentsSize,
+    char** outString);
 typedef bool (*glslang_LinkSPIRVFunc)(glslang_LinkRequest* request);
 #endif

@@ -3752,7 +3752,7 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
                 {
                     DiagnosticSinkWriter writer(frontEndReq->getSink());
 
-                    dumpIR(                        
+                    dumpIR(
                         translationUnit->getModule()->getIRModule(),
                         frontEndReq->m_irDumpOptions,
                         "PRECOMPILE_FOR_TARGET_COMPLETE_ALL",

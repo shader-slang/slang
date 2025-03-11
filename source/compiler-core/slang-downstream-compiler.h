@@ -401,8 +401,10 @@ public:
         return SLANG_FAIL;
     }
 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-    disassembleWithResult(const uint32_t* contents, int contentsSize, String& outString) SLANG_OVERRIDE
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassembleWithResult(
+        const uint32_t* contents,
+        int contentsSize,
+        String& outString) SLANG_OVERRIDE
     {
         SLANG_UNUSED(contents);
         SLANG_UNUSED(contentsSize);
