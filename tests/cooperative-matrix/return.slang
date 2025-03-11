@@ -6,23 +6,23 @@
 // CHECK-NEXT: 9.000000
 // CHECK-NEXT: 12.000000
 
-//TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0], stride=4):in,name=inputBuffer
+//TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0], stride=4, count=256):name=inputBuffer
 StructuredBuffer<float> inputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-typealias CoopMatType = CoopMat<float, CoopMatScope::Subgroup, 2, 2, CoopMatMatrixUse::A>;
+typealias CoopMatType = CoopMat<float, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::A>;
 
 CoopMatType doubleCoopmat(CoopMatType mat)
 {
     return mat * 3.0;
 }
 
-[numthreads(1, 1, 1)]
+[numthreads(32, 1, 1)]
 void computeMain()
 {
-    let stride = 4;
+    let stride = 16;
     let matrixLayout = CoopMatMatrixLayout::RowMajor;
 
     let mat = CoopMatType.load(inputBuffer, 0, stride, matrixLayout);

@@ -17,20 +17,20 @@
 // CHECK-NEXT: F
 // CHECK-NEXT: 10
 
-//TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16]):name=input
+//TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16], stride=4, count=256):name=input
 RWByteAddressBuffer input;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]):out,name=outputBuffer
+//TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<uint32_t> outputBuffer;
 
-typealias CoopMatType = CoopMat<uint32_t, CoopMatScope::Subgroup, 4, 4, CoopMatMatrixUse::A>;
+typealias CoopMatType = CoopMat<uint32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::A>;
 
-groupshared float[16] tempShared;
+groupshared float[256] tempShared;
 
-[numthreads(1, 1, 1)]
+[numthreads(32, 1, 1)]
 void computeMain()
 {
-    let stride = 4;
+    let stride = 16;
     let matrixLayout = CoopMatMatrixLayout::RowMajor;
 
     let mat = CoopMatType.load(input, 0, stride, matrixLayout);

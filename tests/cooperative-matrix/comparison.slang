@@ -5,16 +5,16 @@
 // CHECK-NEXT: 1
 // CHECK-NEXT: 1
 
-//TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0], stride=4),name=input1
+//TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0], stride=4, count=256),name=input1
 ByteAddressBuffer input1;
 
-//TEST_INPUT:ubuffer(data=[1.0 3.0 2.0 4.0], stride=4),name=input2
+//TEST_INPUT:ubuffer(data=[1.0 3.0 2.0 4.0], stride=4, count=256),name=input2
 ByteAddressBuffer input2;
 
 //TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-typealias CoopMatType = CoopMat<float, CoopMatScope::Subgroup, 2, 2, CoopMatMatrixUse::A>;
+typealias CoopMatType = CoopMat<float, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::A>;
 
 [numthreads(1, 1, 1)]
 void computeMain()
