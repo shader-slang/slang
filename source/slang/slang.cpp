@@ -861,6 +861,29 @@ Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSe
             Math::Max(linkageDebugInfoLevel, target->getOptionSet().getDebugInfoLevel());
     linkage->m_optionSet.set(CompilerOptionName::DebugInformation, linkageDebugInfoLevel);
 
+    // Add any referenced modules to the linkage
+    for (auto& option : linkage->m_optionSet.options)
+    {
+        if (option.key != CompilerOptionName::ReferenceModule)
+            continue;
+        for (auto& path : option.value)
+        {
+            DiagnosticSink sink;
+            ComPtr<IArtifact> artifact;
+            SlangResult result = createArtifactFromReferencedModule(
+                path.stringValue,
+                SourceLoc{},
+                &sink,
+                artifact.writeRef());
+            if (SLANG_FAILED(result))
+            {
+                sink.diagnose(SourceLoc{}, Diagnostics::unableToReadFile, path.stringValue);
+                return result;
+            }
+            linkage->m_libModules.add(artifact);
+        }
+    }
+
     *outSession = asExternal(linkage.detach());
     return SLANG_OK;
 }
