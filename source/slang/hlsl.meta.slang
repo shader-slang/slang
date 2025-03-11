@@ -22051,6 +22051,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     }
 
     /// Returns the number of components owned by each invocation.
+    [ForceInline]
     [require(cooperative_matrix)]
     uint getLength()
     {
@@ -22064,12 +22065,14 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     // Store
     //
 
+    [ForceInline]
     [require(cooperative_matrix)]
     void store(RWByteAddressBuffer buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
     {
         return store(__getEquivalentStructuredBuffer<T>(buffer), element, stride, matrixLayout);
     }
 
+    [ForceInline]
     [require(cooperative_matrix)]
     void store(RWStructuredBuffer<T> buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
     {
@@ -22084,18 +22087,21 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     }
 
     [__NoSideEffect]
+    [ForceInline]
     [require(cooperative_matrix)]
     void store(ConstBufferPointer<T> buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
     {
+        let basePointer = buffer.getPtr();
         let alignment = 16U;
         return spirv_asm
         {
-            %pointer:$$T* = OpPtrAccessChain $buffer $element;
+            %pointer:$$T* = OpPtrAccessChain $basePointer $element;
             OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
         };
     }
 
     [__NoSideEffect]
+    [ForceInline]
     [require(cooperative_matrix)]
     void store(T* buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
     {
@@ -22108,6 +22114,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     }
 
     [require(cooperative_matrix)]
+    [ForceInline]
     void store<let U : int>(__ref groupshared T[U] data, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
     {
         let alignment = 16U;
@@ -22119,6 +22126,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
         };
     }
 
+    [ForceInline]
     [ForceInline]
     [require(cooperative_matrix)]
     void storeAny<U, let V : int>(__ref groupshared U[V] data, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
@@ -22132,6 +22140,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
         };
     }
 
+    [ForceInline]
     [ForceInline]
     [require(cooperative_matrix)]
     void storeAny<U, let V : int, let L : int>(__ref groupshared vector<U, L>[V] data, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
@@ -22150,6 +22159,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     //
 
     [__NoSideEffect]
+    [ForceInline]
     [require(cooperative_matrix)]
     static CoopMat<T, S, M, N, R> load(ByteAddressBuffer buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
     {
@@ -22157,6 +22167,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     }
 
     [__NoSideEffect]
+    [ForceInline]
     [require(cooperative_matrix)]
     static CoopMat<T, S, M, N, R> load(RWByteAddressBuffer buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
     {
@@ -22164,6 +22175,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     }
 
     [__NoSideEffect]
+    [ForceInline]
     [require(cooperative_matrix)]
     static CoopMat<T, S, M, N, R> load(StructuredBuffer<T> buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
     {
@@ -22178,6 +22190,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     }
 
     [__NoSideEffect]
+    [ForceInline]
     [require(cooperative_matrix)]
     static CoopMat<T, S, M, N, R> load(RWStructuredBuffer<T> buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
     {
@@ -22192,19 +22205,22 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     }
 
     [__NoSideEffect]
+    [ForceInline]
     [require(cooperative_matrix)]
     static CoopMat<T, S, M, N, R> load(ConstBufferPointer<T> buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
     {
+        let basePointer = buffer.getPtr();
         let alignment = 16;
         return spirv_asm
         {
-            %pointer:$$T* = OpPtrAccessChain $buffer $element;
+            %pointer:$$T* = OpPtrAccessChain $basePointer $element;
             result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
         };
     }
 
 
     [__NoSideEffect]
+    [ForceInline]
     [require(cooperative_matrix)]
     static CoopMat<T, S, M, N, R> load(T* buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
     {
@@ -22216,6 +22232,7 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
         };
     }
 
+    [ForceInline]
     [require(cooperative_matrix)]
     static CoopMat<T, S, M, N, R> load<let U : int>(__ref groupshared T[U] data, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
     {

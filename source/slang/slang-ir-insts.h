@@ -3092,9 +3092,9 @@ struct IRMakeCoopVector : IRInst
     IR_LEAF_ISA(MakeCoopVector)
 };
 
-struct IRMakeCoopMatrix : IRInst
+struct IRMakeCoopMatrixFromScalar : IRInst
 {
-    IR_LEAF_ISA(MakeCoopMatrix)
+    IR_LEAF_ISA(MakeCoopMatrixFromScalar)
 };
 
 // An Instruction that creates a differential pair value from a
