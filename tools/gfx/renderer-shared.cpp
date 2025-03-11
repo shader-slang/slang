@@ -1131,7 +1131,7 @@ Result ShaderProgramBase::compileShaders(RendererBase* device)
                     (char*)diagnostics->getBufferPointer());
             }
             SLANG_RETURN_ON_FAIL(compileResult);
-            
+
             kernelCodes.add(downstreamIR);
         }
 
