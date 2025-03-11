@@ -202,4 +202,3 @@ SLANG_UNIT_TEST(linkTimeTypeLayoutCache)
 }
 
 } // namespace gfx_test
-
