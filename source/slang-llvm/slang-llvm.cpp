@@ -1,4 +1,3 @@
-
 #include "clang/Basic/Stack.h"
 #include "clang/Basic/TargetOptions.h"
 #include "clang/Basic/Version.h"
@@ -145,6 +144,14 @@ public:
     {
         SLANG_UNUSED(contents);
         SLANG_UNUSED(contentsSize);
+        return SLANG_FAIL;
+    }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    disassembleWithResult(const uint32_t* contents, int contentsSize, String& outString) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(contents);
+        SLANG_UNUSED(contentsSize);
+        SLANG_UNUSED(outString);
         return SLANG_FAIL;
     }
 

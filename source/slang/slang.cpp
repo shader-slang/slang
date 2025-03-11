@@ -3747,6 +3747,18 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
             {
                 SLANG_RETURN_ON_FAIL(
                     translationUnit->getModule()->precompileForTarget(targetEnum, nullptr));
+
+                if (frontEndReq->optionSet.shouldDumpIR())
+                {
+                    DiagnosticSinkWriter writer(frontEndReq->getSink());
+
+                    dumpIR(
+                        translationUnit->getModule()->getIRModule(),
+                        frontEndReq->m_irDumpOptions,
+                        "PRECOMPILE_FOR_TARGET_COMPLETE_ALL",
+                        frontEndReq->getSourceManager(),
+                        &writer);
+                }
             }
         }
     }

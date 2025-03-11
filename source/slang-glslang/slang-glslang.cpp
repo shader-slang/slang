@@ -184,27 +184,27 @@ extern "C"
     return tools.Validate(contents, contentsSize, options);
 }
 
-// Disassemble the given SPIRV-ASM instructions.
+// Disassemble the given SPIRV-ASM instructions and return the result as a string.
 extern "C"
 #ifdef _MSC_VER
-    _declspec(dllexport)
+_declspec(dllexport)
 #else
-    __attribute__((__visibility__("default")))
+__attribute__((__visibility__("default")))
 #endif
-        bool glslang_disassembleSPIRV(const uint32_t* contents, int contentsSize)
+bool glslang_disassembleSPIRVWithResult(const uint32_t * contents, int contentsSize, char** outString)
 {
     static const auto kDefaultEnvironment = SPV_ENV_UNIVERSAL_1_5;
+    spv_text text;
 
     uint32_t options = SPV_BINARY_TO_TEXT_OPTION_NONE;
     options |= SPV_BINARY_TO_TEXT_OPTION_COMMENT;
-    options |= SPV_BINARY_TO_TEXT_OPTION_PRINT;
-    options |= SPV_BINARY_TO_TEXT_OPTION_COLOR;
     options |= SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES;
+    options |= SPV_BINARY_TO_TEXT_OPTION_INDENT;
 
     spv_diagnostic diagnostic = nullptr;
     spv_context context = spvContextCreate(kDefaultEnvironment);
     spv_result_t error =
-        spvBinaryToText(context, contents, contentsSize, options, nullptr, &diagnostic);
+        spvBinaryToText(context, contents, contentsSize, options, &text, &diagnostic);
     spvContextDestroy(context);
     if (error)
     {
@@ -212,8 +212,33 @@ extern "C"
         spvDiagnosticDestroy(diagnostic);
         return false;
     }
+    else
+    {
+        if (outString)
+        {
+            // Allocate memory for the output string and copy the result
+            size_t len = text->length + 1;  // +1 for null terminator
+            *outString = new char[len];
+            memcpy(*outString, text->str, text->length);
+            (*outString)[text->length] = '\0';  // Ensure null termination
+        }
 
-    return true;
+        spvTextDestroy(text);
+        return true;
+    }
+}
+
+
+// Disassemble the given SPIRV-ASM instructions.
+extern "C"
+#ifdef _MSC_VER
+_declspec(dllexport)
+#else
+__attribute__((__visibility__("default")))
+#endif
+bool glslang_disassembleSPIRV(const uint32_t * contents, int contentsSize)
+{
+    return glslang_disassembleSPIRVWithResult(contents, contentsSize, nullptr);
 }
 
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
