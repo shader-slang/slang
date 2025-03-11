@@ -7117,6 +7117,74 @@ void dumpIRGeneric(IRDumpContext* context, IRGeneric* witnessTable)
     dump(context, "}\n");
 }
 
+static void dumpEmbeddedDownstream(IRDumpContext* context, IRInst* inst)
+{
+    auto targetInst = inst->getOperand(0);
+    auto blobInst = inst->getOperand(1);
+
+    // Get the target value
+    auto targetLit = as<IRIntLit>(targetInst);
+    if (!targetLit)
+    {
+        dump(context, "EmbeddedDownstreamIR(invalid target)");
+        return;
+    }
+
+    // Get the blob
+    auto blobLitInst = as<IRBlobLit>(blobInst);
+    if (!blobLitInst)
+    {
+        dump(context, "EmbeddedDownstreamIR(invalid blob)");
+        return;
+    }
+
+    dump(context, "EmbeddedDownstreamIR(");
+    dump(context, targetLit->getValue());
+    dump(context, " : Int, ");
+
+    // If target is SPIR-V (6), disassemble the blob
+    if (targetLit->getValue() == (IRIntegerValue)CodeGenTarget::SPIRV)
+    {
+        auto blob = blobLitInst->getStringSlice();
+        const uint32_t* spirvCode = (const uint32_t*)blob.begin();
+        const size_t spirvWordCount = blob.getLength() / sizeof(uint32_t);
+
+        // Get the compiler from the session through the module
+        auto module = inst->getModule();
+        auto session = module->getSession();
+        IDownstreamCompiler* compiler = session->getOrLoadDownstreamCompiler(
+            PassThroughMode::SpirvDis,
+            nullptr);
+
+        if (compiler)
+        {
+            // Use glslang interface to disassemble with string output
+            String disassemblyOutput;
+            if (SLANG_SUCCEEDED(compiler->disassembleWithResult(spirvCode, int(spirvWordCount), disassemblyOutput)))
+            {
+                // Dump the captured disassembly
+                dump(context, "\n");
+                dumpIndent(context);
+                dump(context, disassemblyOutput);
+            }
+            else
+            {
+                dump(context, "<disassembly failed>");
+            }
+        }
+        else
+        {
+            dump(context, "<unavailable disassembler>");
+        }
+    }
+    else
+    {
+        // TODO: Add DXIL disassembly call here.
+        dump(context, "<binary blob>");
+    }
+    dump(context, ")");
+}
+
 static void dumpInstExpr(IRDumpContext* context, IRInst* inst)
 {
     if (!inst)
@@ -7169,69 +7237,7 @@ static void dumpInstExpr(IRDumpContext* context, IRInst* inst)
     // Special case EmbeddedDownstreamIR to show SPIR-V disassembly
     if (op == kIROp_EmbeddedDownstreamIR)
     {
-        auto targetInst = inst->getOperand(0);
-        auto blobInst = inst->getOperand(1);
-
-        // Get the target value
-        auto targetLit = as<IRIntLit>(targetInst);
-        if (!targetLit)
-        {
-            dump(context, "EmbeddedDownstreamIR(invalid target)");
-            return;
-        }
-
-        // Get the blob
-        auto blobLitInst = as<IRBlobLit>(blobInst);
-        if (!blobLitInst)
-        {
-            dump(context, "EmbeddedDownstreamIR(invalid blob)");
-            return;
-        }
-
-        dump(context, "EmbeddedDownstreamIR(");
-        dump(context, targetLit->getValue());
-        dump(context, " : Int, ");
-
-        // If target is SPIR-V (6), disassemble the blob
-        if (targetLit->getValue() == (IRIntegerValue)CodeGenTarget::SPIRV)
-        {
-            auto blob = blobLitInst->getStringSlice();
-            const uint32_t* spirvCode = (const uint32_t*)blob.begin();
-            const size_t spirvWordCount = blob.getLength() / sizeof(uint32_t);
-
-            // Get the compiler from the session through the module
-            auto module = inst->getModule();
-            auto session = module->getSession();
-            IDownstreamCompiler* compiler = session->getOrLoadDownstreamCompiler(
-                PassThroughMode::SpirvDis,
-                nullptr);
-
-            if (compiler)
-            {
-                // Use glslang interface to disassemble with string output
-                String disassemblyOutput;
-                if (SLANG_SUCCEEDED(compiler->disassembleWithResult(spirvCode, int(spirvWordCount), disassemblyOutput)))
-                {
-                    // Dump the captured disassembly
-                    dump(context, "\n");
-                    dumpIndent(context);
-                    dump(context, disassemblyOutput);
-                }
-                else
-                {
-                    dump(context, "<disassembly failed>");
-                }
-            }
-            else
-            {
-                dump(context, "<invalid SPIR-V>");
-            }
-        }
-        else
-        {
-            dump(context, "<binary blob>");
-        }
-        dump(context, ")");
+        dumpEmbeddedDownstream(context, inst);
         return;
     }
 

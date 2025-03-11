@@ -5533,6 +5533,7 @@ RefPtr<ComponentType> CompositeComponentType::create(
     //    Y = compose(C,D);
     //    Z = compose(X,Y);
     //
+    //    W = compose(A, B, C, D);
     //
     // Then there is no observable difference between
     // Z and W, so we might prefer to have them be identical.
