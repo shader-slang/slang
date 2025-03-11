@@ -187,11 +187,14 @@ extern "C"
 // Disassemble the given SPIRV-ASM instructions and return the result as a string.
 extern "C"
 #ifdef _MSC_VER
-_declspec(dllexport)
+    _declspec(dllexport)
 #else
 __attribute__((__visibility__("default")))
 #endif
-bool glslang_disassembleSPIRVWithResult(const uint32_t * contents, int contentsSize, char** outString)
+        bool glslang_disassembleSPIRVWithResult(
+            const uint32_t* contents,
+            int contentsSize,
+            char** outString)
 {
     static const auto kDefaultEnvironment = SPV_ENV_UNIVERSAL_1_5;
     spv_text text;
@@ -217,10 +220,10 @@ bool glslang_disassembleSPIRVWithResult(const uint32_t * contents, int contentsS
         if (outString)
         {
             // Allocate memory for the output string and copy the result
-            size_t len = text->length + 1;  // +1 for null terminator
+            size_t len = text->length + 1; // +1 for null terminator
             *outString = new char[len];
             memcpy(*outString, text->str, text->length);
-            (*outString)[text->length] = '\0';  // Ensure null termination
+            (*outString)[text->length] = '\0'; // Ensure null termination
         }
 
         spvTextDestroy(text);
@@ -232,11 +235,11 @@ bool glslang_disassembleSPIRVWithResult(const uint32_t * contents, int contentsS
 // Disassemble the given SPIRV-ASM instructions.
 extern "C"
 #ifdef _MSC_VER
-_declspec(dllexport)
+    _declspec(dllexport)
 #else
 __attribute__((__visibility__("default")))
 #endif
-bool glslang_disassembleSPIRV(const uint32_t * contents, int contentsSize)
+        bool glslang_disassembleSPIRV(const uint32_t* contents, int contentsSize)
 {
     return glslang_disassembleSPIRVWithResult(contents, contentsSize, nullptr);
 }
