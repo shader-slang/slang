@@ -3752,10 +3752,16 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
                 {
                     DiagnosticSinkWriter writer(frontEndReq->getSink());
 
-                    dumpIR(
+                    dumpIR(                        
                         translationUnit->getModule()->getIRModule(),
                         frontEndReq->m_irDumpOptions,
                         "PRECOMPILE_FOR_TARGET_COMPLETE_ALL",
+                        frontEndReq->getSourceManager(),
+                        &writer);
+
+                    dumpIR(
+                        translationUnit->getModule()->getIRModule()->getModuleInst(),
+                        frontEndReq->m_irDumpOptions,
                         frontEndReq->getSourceManager(),
                         &writer);
                 }
@@ -5527,7 +5533,6 @@ RefPtr<ComponentType> CompositeComponentType::create(
     //    Y = compose(C,D);
     //    Z = compose(X,Y);
     //
-    //    W = compose(A, B, C, D);
     //
     // Then there is no observable difference between
     // Z and W, so we might prefer to have them be identical.
