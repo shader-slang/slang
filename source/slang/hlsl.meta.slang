@@ -24581,3 +24581,15 @@ uint packInt4x8Clamp(int16_t4 unpackedValue)
         return packInt4x8(clamp(unpackedValue, -128, 127));
     }
 }
+
+//
+// Types
+//
+
+// WGSL does not support Buffer
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+typealias Buffer;
+
+// WGSL does not support RWBuffer
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
+typealias RWBuffer;
