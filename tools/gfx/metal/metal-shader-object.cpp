@@ -436,7 +436,7 @@ BufferResourceImpl* ShaderObjectImpl::_ensureArgumentBufferUpToDate(
         void* argumentData;
         SLANG_RETURN_NULL_ON_FAIL(m_argumentBuffer->map(&range, &argumentData));
 
-        // For parameter blocks, all the feilds are flattened as ordinary data, so the size of the
+        // For parameter blocks, all the fields are flattened as ordinary data, so the size of the
         // m_data must be equal to the size of the argument buffer, we just need to copy the data
         // from m_data to argumentData, the only thing we need to specially handle is the parameter
         // block and constant buffer, which will be a represented as device pointer in the argument
