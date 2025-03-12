@@ -1295,6 +1295,7 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst);
 // Add an instruction into the current scope
 void IRBuilder::addInst(IRInst* inst)
 {
+    m_lastInst = inst;
     if (getIROpInfo(inst->getOp()).isGlobal())
     {
         addHoistableInst(this, inst);
@@ -3324,6 +3325,29 @@ IRInst* IRBuilder::emitDebugValue(IRInst* debugVar, IRInst* debugValue)
         kIROp_DebugValue,
         (UInt)args.getCount(),
         args.getBuffer());
+}
+
+IRInst* IRBuilder::emitDebugInlinedAt(IRInst* line, IRInst* col, IRInst* file)
+{
+    IRInst* args[] = {line, col, file};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedAt, 3, args);
+}
+
+IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)
+{
+    IRInst* args[] = {variable, inlinedAt};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedVariable, 2, args);
+}
+
+IRInst* IRBuilder::emitDebugScope(IRInst* scope)
+{
+    IRInst* args[] = {scope};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 1, args);
+}
+
+IRInst* IRBuilder::emitDebugNoScope()
+{
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugNoScope, 0, nullptr);
 }
 
 IRLiveRangeStart* IRBuilder::emitLiveRangeStart(IRInst* referenced)
@@ -7821,8 +7845,8 @@ IRInstList<IRDecoration> IRInst::getDecorations()
 IRInst* IRInst::getFirstChild()
 {
     // The children come after any decorations,
-    // so if there are any decorations, then the
-    // first child is right after the last decoration.
+    // so if there are any decorations, then
+    // the first child is right after the last decoration.
     //
     if (auto lastDecoration = getLastDecoration())
         return lastDecoration->getNextInst();
