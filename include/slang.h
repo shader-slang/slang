@@ -2,7 +2,7 @@
 #define SLANG_H
 
 #ifdef SLANG_USER_CONFIG
-#include SLANG_USER_CONFIG
+    #include SLANG_USER_CONFIG
 #endif
 
 /** \file slang.h
