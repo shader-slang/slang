@@ -215,7 +215,7 @@ struct SpvInst : SpvInstParent
         //
         // > Word Count: The complete number of words taken by an instruction,
         // > including the word holding the word count and opcode, and any optional
-        // > operands. An instruction’s word count is the total space taken by the instruction.
+        // > operands. An instruction�s word count is the total space taken by the instruction.
         //
         SpvWord wordCount = 1 + SpvWord(operandWordsCount);
 
@@ -359,7 +359,7 @@ struct SpvLiteralBits
         // > UTF-8 encoding scheme. The UTF-8 octets (8-bit bytes) are packed
         // > four per word, following the little-endian convention (i.e., the
         // > first octet is in the lowest-order 8 bits of the word).
-        // > The final word contains the string’s nul-termination character (0), and
+        // > The final word contains the string�s nul-termination character (0), and
         // > all contents past the end of the string in the final word are padded with 0.
 
         // First work out the amount of words we'll need
@@ -2181,7 +2181,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvWord arrayed =
             inst->isArray() ? ImageOpConstants::isArrayed : ImageOpConstants::notArrayed;
 
-        // Vulkan spec 16.1: "The “Depth” operand of OpTypeImage is ignored."
+        // Vulkan spec 16.1: "The �Depth� operand of OpTypeImage is ignored."
         SpvWord depth =
             ImageOpConstants::unknownDepthImage; // No knowledge of if this is a depth image
         SpvWord ms = inst->isMultisample() ? ImageOpConstants::isMultisampled
@@ -5862,12 +5862,92 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         else
         {
-            return emitOpFunctionCall(
+            // Handle template function and cross-file function debug information
+            IRFunc* calledFunc = as<IRFunc>(funcValue);
+            SpvInst* originalScope = nullptr;
+            bool needScopeChange = false;
+            
+            if (calledFunc)
+            {
+                // First check if it's a template function (containing '<' in the name)
+                auto name = getName(calledFunc);
+                bool isTemplateFunc = false;
+                if (name && as<IRStringLit>(name))
+                {
+                    auto nameSlice = as<IRStringLit>(name)->getStringSlice();
+                    isTemplateFunc = nameSlice.indexOf('<') >= 0;
+                }
+                
+                // Also check if the called function is from a different source file
+                IRDebugLocationDecoration* callerLoc = nullptr;
+                IRDebugLocationDecoration* calleeLoc = nullptr;
+                
+                // Find current function scope and its source location
+                IRInst* currentFunc = inst->getParent();
+                while (currentFunc && !as<IRFunc>(currentFunc))
+                {
+                    currentFunc = currentFunc->getParent();
+                }
+                
+                if (currentFunc)
+                {
+                    callerLoc = currentFunc->findDecoration<IRDebugLocationDecoration>();
+                }
+                
+                calleeLoc = calledFunc->findDecoration<IRDebugLocationDecoration>();
+                
+                // We need to change the scope if:
+                // 1. It's a template function, OR
+                // 2. The caller and callee have different source files
+                bool differentSourceFiles = false;
+                if (callerLoc && calleeLoc && callerLoc->getSource() != calleeLoc->getSource())
+                {
+                    differentSourceFiles = true;
+                }
+                
+                needScopeChange = isTemplateFunc || differentSourceFiles;
+                
+                if (needScopeChange && currentFunc)
+                {
+                    // Save the current scope so we can restore it later
+                    m_mapIRInstToSpvDebugInst.tryGetValue(currentFunc, originalScope);
+                    
+                    // Find the called function's debug scope
+                    SpvInst* calleeScope = nullptr;
+                    if (m_mapIRInstToSpvDebugInst.tryGetValue(calledFunc, calleeScope))
+                    {
+                        // Emit a debug scope to mark entry into the called function
+                        // This ensures that subsequent DebugLine instructions are properly scoped
+                        emitOpDebugScope(
+                            parent,
+                            nullptr,
+                            m_voidType,
+                            getNonSemanticDebugInfoExtInst(),
+                            calleeScope);
+                    }
+                }
+            }
+            
+            // Emit the actual function call
+            auto result = emitOpFunctionCall(
                 parent,
                 inst,
                 inst->getFullType(),
                 funcValue,
                 inst->getArgsList());
+            
+            // Restore the original debug scope if needed
+            if (needScopeChange && originalScope)
+            {
+                emitOpDebugScope(
+                    parent,
+                    nullptr,
+                    m_voidType,
+                    getNonSemanticDebugInfoExtInst(),
+                    originalScope);
+            }
+            
+            return result;
         }
     }
 
@@ -7285,6 +7365,83 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto scope = findDebugScope(debugLine);
         if (!scope)
             return nullptr;
+
+        // First find the current function and build the scope chain
+        IRInst* currentFunc = debugLine->getParent();
+        List<IRInst*> scopeChain;
+        while (currentFunc && !as<IRModuleInst>(currentFunc))
+        {
+            if (as<IRFunc>(currentFunc))
+            {
+                scopeChain.add(currentFunc);
+            }
+            currentFunc = currentFunc->getParent();
+        }
+
+        // Process the scope chain from outermost to innermost
+        SpvInst* inlinedAt = nullptr;
+        IRInst* lastSource = nullptr;
+
+        for (Index i = scopeChain.getCount() - 1; i >= 0; --i)
+        {
+            auto func = scopeChain[i];
+            auto name = getName(func);
+            auto debugLoc = func->findDecoration<IRDebugLocationDecoration>();
+            
+            // Track when we need to create a new inlined-at chain:
+            // 1. For template functions (containing '<' in the name)
+            // 2. For functions from different source files
+            bool isTemplateFunction = name && as<IRStringLit>(name)->getStringSlice().indexOf('<') >= 0;
+            
+            // Check if this function is from a different source file than the debug line
+            bool isDifferentSourceFile = false;
+            if (debugLoc && debugLoc->getSource() != debugLine->getSource())
+            {
+                isDifferentSourceFile = true;
+            }
+
+            // Check if we're switching source files in the chain
+            if (lastSource && debugLoc && lastSource != debugLoc->getSource())
+            {
+                isDifferentSourceFile = true;
+            }
+            
+            // Update the last source we've seen
+            if (debugLoc)
+            {
+                lastSource = debugLoc->getSource();
+            }
+
+            if (isTemplateFunction || isDifferentSourceFile)
+            {
+                SpvInst* funcDebugScope = nullptr;
+                if (m_mapIRInstToSpvDebugInst.tryGetValue(func, funcDebugScope))
+                {
+                    // Create a new inlined-at instruction for this function
+                    auto newInlinedAt = emitOpDebugInlinedAt(
+                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                        nullptr,
+                        m_voidType,
+                        getNonSemanticDebugInfoExtInst(),
+                        debugLine->getLineStart(),
+                        funcDebugScope,
+                        inlinedAt);  // Chain to previous inlinedAt if any
+
+                    inlinedAt = newInlinedAt;
+
+                    // Create a new scope for this function
+                    emitOpDebugScope(
+                        parent,
+                        nullptr,
+                        m_voidType,
+                        getNonSemanticDebugInfoExtInst(),
+                        funcDebugScope,
+                        inlinedAt);
+                }
+            }
+        }
+
+        // Now emit the actual debug line information with the final scope
         return emitOpDebugLine(
             parent,
             debugLine,

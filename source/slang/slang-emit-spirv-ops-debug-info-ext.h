@@ -406,10 +406,52 @@ SpvInst* emitOpDebugScope(
     IRInst* inst,
     const T& idResultType,
     SpvInst* set,
-    SpvInst* scope)
+    SpvInst* scope,
+    SpvInst* inlinedAt = nullptr)
 {
     static_assert(isSingular<T>);
+    if (inlinedAt)
+    {
+        return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(23), scope, inlinedAt);
+    }
     return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(23), scope);
+}
+
+template<typename T>
+SpvInst* emitOpDebugInlinedAt(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& idResultType,
+    SpvInst* set,
+    IRInst* line,
+    SpvInst* scope,
+    SpvInst* inlinedAt = nullptr)
+{
+    static_assert(isSingular<T>);
+    if (inlinedAt)
+    {
+        return emitInst(
+            parent,
+            inst,
+            SpvOpExtInst,
+            idResultType,
+            kResultID,
+            set,
+            SpvWord(25),
+            line,
+            scope,
+            inlinedAt);
+    }
+    return emitInst(
+        parent,
+        inst,
+        SpvOpExtInst,
+        idResultType,
+        kResultID,
+        set,
+        SpvWord(25),
+        line,
+        scope);
 }
 
 template<typename T>
