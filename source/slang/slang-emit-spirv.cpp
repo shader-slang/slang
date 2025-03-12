@@ -5866,7 +5866,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             IRFunc* calledFunc = as<IRFunc>(funcValue);
             SpvInst* originalScope = nullptr;
             bool needScopeChange = false;
-            
+
             if (calledFunc)
             {
                 // First check if it's a template function (containing '<' in the name)
@@ -5877,25 +5877,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     auto nameSlice = as<IRStringLit>(name)->getStringSlice();
                     isTemplateFunc = nameSlice.indexOf('<') >= 0;
                 }
-                
+
                 // Also check if the called function is from a different source file
                 IRDebugLocationDecoration* callerLoc = nullptr;
                 IRDebugLocationDecoration* calleeLoc = nullptr;
-                
+
                 // Find current function scope and its source location
                 IRInst* currentFunc = inst->getParent();
                 while (currentFunc && !as<IRFunc>(currentFunc))
                 {
                     currentFunc = currentFunc->getParent();
                 }
-                
+
                 if (currentFunc)
                 {
                     callerLoc = currentFunc->findDecoration<IRDebugLocationDecoration>();
                 }
-                
+
                 calleeLoc = calledFunc->findDecoration<IRDebugLocationDecoration>();
-                
+
                 // We need to change the scope if:
                 // 1. It's a template function, OR
                 // 2. The caller and callee have different source files
@@ -5904,14 +5904,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     differentSourceFiles = true;
                 }
-                
+
                 needScopeChange = isTemplateFunc || differentSourceFiles;
-                
+
                 if (needScopeChange && currentFunc)
                 {
                     // Save the current scope so we can restore it later
                     m_mapIRInstToSpvDebugInst.tryGetValue(currentFunc, originalScope);
-                    
+
                     // Find the called function's debug scope
                     SpvInst* calleeScope = nullptr;
                     if (m_mapIRInstToSpvDebugInst.tryGetValue(calledFunc, calleeScope))
@@ -5927,7 +5927,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     }
                 }
             }
-            
+
             // Emit the actual function call
             auto result = emitOpFunctionCall(
                 parent,
@@ -5935,7 +5935,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 inst->getFullType(),
                 funcValue,
                 inst->getArgsList());
-            
+
             // Restore the original debug scope if needed
             if (needScopeChange && originalScope)
             {
@@ -5946,7 +5946,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     getNonSemanticDebugInfoExtInst(),
                     originalScope);
             }
-            
+
             return result;
         }
     }
@@ -7387,12 +7387,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             auto func = scopeChain[i];
             auto name = getName(func);
             auto debugLoc = func->findDecoration<IRDebugLocationDecoration>();
-            
+
             // Track when we need to create a new inlined-at chain:
             // 1. For template functions (containing '<' in the name)
             // 2. For functions from different source files
-            bool isTemplateFunction = name && as<IRStringLit>(name)->getStringSlice().indexOf('<') >= 0;
-            
+            bool isTemplateFunction =
+                name && as<IRStringLit>(name)->getStringSlice().indexOf('<') >= 0;
+
             // Check if this function is from a different source file than the debug line
             bool isDifferentSourceFile = false;
             if (debugLoc && debugLoc->getSource() != debugLine->getSource())
@@ -7405,7 +7406,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 isDifferentSourceFile = true;
             }
-            
+
             // Update the last source we've seen
             if (debugLoc)
             {
@@ -7425,7 +7426,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         getNonSemanticDebugInfoExtInst(),
                         debugLine->getLineStart(),
                         funcDebugScope,
-                        inlinedAt);  // Chain to previous inlinedAt if any
+                        inlinedAt); // Chain to previous inlinedAt if any
 
                     inlinedAt = newInlinedAt;
 

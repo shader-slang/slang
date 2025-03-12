@@ -412,7 +412,16 @@ SpvInst* emitOpDebugScope(
     static_assert(isSingular<T>);
     if (inlinedAt)
     {
-        return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(23), scope, inlinedAt);
+        return emitInst(
+            parent,
+            inst,
+            SpvOpExtInst,
+            idResultType,
+            kResultID,
+            set,
+            SpvWord(23),
+            scope,
+            inlinedAt);
     }
     return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(23), scope);
 }
