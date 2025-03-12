@@ -91,7 +91,7 @@ enum class SpvLogicalSectionID
 };
 
 // The registered id for the Slang compiler.
-static const uint32_t kSPIRVSlangCompilerId = 40;
+static const uint32_t kSPIRVSlangCompilerId = 40 << 16;
 
 // While the SPIR-V module is nominally (according to the spec) just
 // a flat sequence of instructions, in practice some of the instructions

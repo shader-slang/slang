@@ -59,8 +59,15 @@ static Slang::Result precompileProgram(
                 (void**)precompileService.writeRef()) == SLANG_OK)
         {
             Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-            precompileService->precompileForTarget(target, diagnosticsBlob.writeRef());
+            auto res = precompileService->precompileForTarget(target, diagnosticsBlob.writeRef());
             diagnoseIfNeeded(diagnosticsBlob);
+            SLANG_RETURN_ON_FAIL(res);
+
+            // compile a second time to check for driver bugs.
+            diagnosticsBlob = nullptr;
+            res = precompileService->precompileForTarget(target, diagnosticsBlob.writeRef());
+            diagnoseIfNeeded(diagnosticsBlob);
+            SLANG_RETURN_ON_FAIL(res);
         }
     }
 
