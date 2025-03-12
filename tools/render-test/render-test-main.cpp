@@ -267,7 +267,7 @@ struct AssignValsFromLayoutContext
                     InputBufferType::StorageBuffer,
                     sizeof(uint32_t),
                     1,
-                    Format::Unknown,
+                    Format::Undefined,
                 };
                 SLANG_RETURN_ON_FAIL(ShaderRendererUtil::createBuffer(
                     counterBufferDesc,
@@ -613,13 +613,13 @@ SlangResult RenderTestApp::initialize(
                 // fixed/known set of attributes.
                 //
                 const InputElementDesc inputElements[] = {
-                    {"A", 0, Format::R32G32B32_FLOAT, offsetof(Vertex, position)},
-                    {"A", 1, Format::R32G32B32_FLOAT, offsetof(Vertex, color)},
-                    {"A", 2, Format::R32G32_FLOAT, offsetof(Vertex, uv)},
-                    {"A", 3, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData0)},
-                    {"A", 4, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData1)},
-                    {"A", 5, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData2)},
-                    {"A", 6, Format::R32G32B32A32_FLOAT, offsetof(Vertex, customData3)},
+                    {"A", 0, Format::RGB32Float, offsetof(Vertex, position)},
+                    {"A", 1, Format::RGB32Float, offsetof(Vertex, color)},
+                    {"A", 2, Format::RG32Float, offsetof(Vertex, uv)},
+                    {"A", 3, Format::RGBA32Float, offsetof(Vertex, customData0)},
+                    {"A", 4, Format::RGBA32Float, offsetof(Vertex, customData1)},
+                    {"A", 5, Format::RGBA32Float, offsetof(Vertex, customData2)},
+                    {"A", 6, Format::RGBA32Float, offsetof(Vertex, customData3)},
                 };
 
                 ComPtr<IInputLayout> inputLayout;
@@ -639,13 +639,13 @@ SlangResult RenderTestApp::initialize(
                     device->createBuffer(vertexBufferDesc, kVertexData, m_vertexBuffer.writeRef()));
 
                 ColorTargetDesc colorTarget;
-                colorTarget.format = Format::R8G8B8A8_UNORM;
+                colorTarget.format = Format::RGBA8Unorm;
                 RenderPipelineDesc desc;
                 desc.program = m_shaderProgram;
                 desc.inputLayout = inputLayout;
                 desc.targets = &colorTarget;
                 desc.targetCount = 1;
-                desc.depthStencil.format = Format::D32_FLOAT;
+                desc.depthStencil.format = Format::D32Float;
                 m_pipeline = device->createRenderPipeline(desc);
             }
             break;
@@ -654,12 +654,12 @@ SlangResult RenderTestApp::initialize(
         case Options::ShaderProgramType::GraphicsTaskMeshCompute:
             {
                 ColorTargetDesc colorTarget;
-                colorTarget.format = Format::R8G8B8A8_UNORM;
+                colorTarget.format = Format::RGBA8Unorm;
                 RenderPipelineDesc desc;
                 desc.program = m_shaderProgram;
                 desc.targets = &colorTarget;
                 desc.targetCount = 1;
-                desc.depthStencil.format = Format::D32_FLOAT;
+                desc.depthStencil.format = Format::D32Float;
                 m_pipeline = device->createRenderPipeline(desc);
             }
             break;
@@ -722,8 +722,8 @@ void RenderTestApp::_initializeRenderPass()
     depthBufferDesc.size.height = gWindowHeight;
     depthBufferDesc.size.depth = 1;
     depthBufferDesc.mipLevelCount = 1;
-    depthBufferDesc.format = Format::D32_FLOAT;
-    depthBufferDesc.usage = TextureUsage::DepthWrite;
+    depthBufferDesc.format = Format::D32Float;
+    depthBufferDesc.usage = TextureUsage::DepthStencil;
     depthBufferDesc.defaultState = ResourceState::DepthWrite;
     m_depthBuffer = m_device->createTexture(depthBufferDesc, nullptr);
     SLANG_ASSERT(m_depthBuffer);
@@ -736,7 +736,7 @@ void RenderTestApp::_initializeRenderPass()
     colorBufferDesc.size.height = gWindowHeight;
     colorBufferDesc.size.depth = 1;
     colorBufferDesc.mipLevelCount = 1;
-    colorBufferDesc.format = Format::R8G8B8A8_UNORM;
+    colorBufferDesc.format = Format::RGBA8Unorm;
     colorBufferDesc.usage = TextureUsage::RenderTarget | TextureUsage::CopySource;
     colorBufferDesc.defaultState = ResourceState::RenderTarget;
     m_colorBuffer = m_device->createTexture(colorBufferDesc, nullptr);
@@ -765,17 +765,17 @@ void RenderTestApp::_initializeAccelerationStructure()
 
     // Build bottom level acceleration structure.
     {
-        AccelerationStructureBuildInputTriangles triangles = {};
-        BufferWithOffset vertexBufferWithOffset = vertexBuffer;
-        triangles.vertexBuffers = &vertexBufferWithOffset;
-        triangles.vertexBufferCount = 1;
-        triangles.vertexFormat = Format::R32G32B32_FLOAT;
-        triangles.vertexCount = kVertexCount;
-        triangles.vertexStride = sizeof(Vertex);
-        triangles.preTransformBuffer = transformBuffer;
-        triangles.flags = AccelerationStructureGeometryFlags::Opaque;
+        AccelerationStructureBuildInput buildInput = {};
+        buildInput.type = AccelerationStructureBuildInputType::Triangles;
+        buildInput.triangles.vertexBuffers[0] = vertexBuffer;
+        buildInput.triangles.vertexBufferCount = 1;
+        buildInput.triangles.vertexFormat = Format::RGB32Float;
+        buildInput.triangles.vertexCount = kVertexCount;
+        buildInput.triangles.vertexStride = sizeof(Vertex);
+        buildInput.triangles.preTransformBuffer = transformBuffer;
+        buildInput.triangles.flags = AccelerationStructureGeometryFlags::Opaque;
         AccelerationStructureBuildDesc buildDesc = {};
-        buildDesc.inputs = &triangles;
+        buildDesc.inputs = &buildInput;
         buildDesc.inputCount = 1;
         buildDesc.flags = AccelerationStructureBuildFlags::AllowCompaction;
 
@@ -871,12 +871,13 @@ void RenderTestApp::_initializeAccelerationStructure()
         ComPtr<IBuffer> instanceBuffer =
             m_device->createBuffer(instanceBufferDesc, nativeInstanceDescs.getBuffer());
 
-        AccelerationStructureBuildInputInstances instances = {};
-        instances.instanceBuffer = instanceBuffer;
-        instances.instanceCount = 1;
-        instances.instanceStride = nativeInstanceDescSize;
+        AccelerationStructureBuildInput buildInput = {};
+        buildInput.type = AccelerationStructureBuildInputType::Instances;
+        buildInput.instances.instanceBuffer = instanceBuffer;
+        buildInput.instances.instanceCount = 1;
+        buildInput.instances.instanceStride = nativeInstanceDescSize;
         AccelerationStructureBuildDesc buildDesc = {};
-        buildDesc.inputs = &instances;
+        buildDesc.inputs = &buildInput;
         buildDesc.inputCount = 1;
 
         // Query buffer size for acceleration structure build.
