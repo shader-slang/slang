@@ -2440,8 +2440,8 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     50060,
     Error,
-    invalidMeshStageOutputTopology,
-    "Invalid mesh stage output topology $0 for stage $1, target $2")
+    invalidOutputTopology,
+    "Invalid output topology '$0' for stage '$1', target '$2'")
 
 DIAGNOSTIC(
     50082,

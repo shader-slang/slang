@@ -49,8 +49,7 @@ private:
     {
         if (stage == Stage::Mesh)
         {
-            const auto outputTopologyType =
-                convertOutputTopologyStringToEnum(decoration->getTopology()->getStringSlice());
+            const auto outputTopologyType = OutputTopologyType(decoration->getTopologyType());
 
             bool valid = false;
 
@@ -70,7 +69,7 @@ private:
             {
                 m_sink->diagnose(
                     decoration,
-                    Diagnostics::invalidMeshStageOutputTopology,
+                    Diagnostics::invalidOutputTopology,
                     decoration->getTopology()->getStringSlice(),
                     stage,
                     TypeTextUtil::getCompileTargetName(SlangCompileTarget(m_target)));
