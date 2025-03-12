@@ -406,10 +406,72 @@ SpvInst* emitOpDebugScope(
     IRInst* inst,
     const T& idResultType,
     SpvInst* set,
-    SpvInst* scope)
+    SpvInst* scope,
+    SpvInst* inlinedAt = nullptr)
 {
     static_assert(isSingular<T>);
+    if (inlinedAt)
+    {
+        return emitInst(
+            parent,
+            inst,
+            SpvOpExtInst,
+            idResultType,
+            kResultID,
+            set,
+            SpvWord(23),
+            scope,
+            inlinedAt);
+    }
     return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(23), scope);
+}
+
+template<typename T>
+SpvInst* emitOpDebugNoScope(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& idResultType,
+    SpvInst* set)
+{
+    static_assert(isSingular<T>);
+    return emitInst(parent, inst, SpvOpExtInst, idResultType, kResultID, set, SpvWord(24));
+}
+
+template<typename T>
+SpvInst* emitOpDebugInlinedAt(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& idResultType,
+    SpvInst* set,
+    IRInst* line,
+    SpvInst* scope,
+    SpvInst* inlinedAt = nullptr)
+{
+    static_assert(isSingular<T>);
+    if (inlinedAt)
+    {
+        return emitInst(
+            parent,
+            inst,
+            SpvOpExtInst,
+            idResultType,
+            kResultID,
+            set,
+            SpvWord(25),
+            line,
+            scope,
+            inlinedAt);
+    }
+    return emitInst(
+        parent,
+        inst,
+        SpvOpExtInst,
+        idResultType,
+        kResultID,
+        set,
+        SpvWord(25),
+        line,
+        scope);
 }
 
 template<typename T>
@@ -460,6 +522,28 @@ SpvInst* emitOpDebugLocalVariable(
         col,
         scope,
         flags);
+}
+
+template<typename T>
+SpvInst* emitOpDebugInlinedVariable(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& idResultType,
+    SpvInst* set,
+    IRInst* variable,
+    IRInst* inlined)
+{
+    static_assert(isSingular<T>);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpExtInst,
+        idResultType,
+        kResultID,
+        set,
+        SpvWord(27),
+        variable,
+        inlined);
 }
 
 template<typename T, typename Ts>

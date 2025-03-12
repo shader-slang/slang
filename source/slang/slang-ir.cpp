@@ -3326,6 +3326,29 @@ IRInst* IRBuilder::emitDebugValue(IRInst* debugVar, IRInst* debugValue)
         args.getBuffer());
 }
 
+IRInst* IRBuilder::emitDebugInlinedAt(IRInst* line, IRInst* col, IRInst* file, IRInst* outerInlinedAt)
+{
+    IRInst* args[] = {line, col, file, outerInlinedAt};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedAt, 4, args);
+}
+
+IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)
+{
+    IRInst* args[] = {variable, inlinedAt};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedVariable, 2, args);
+}
+
+IRInst* IRBuilder::emitDebugScope(IRInst* scope)
+{
+    IRInst* args[] = {scope};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 1, args);
+}
+
+IRInst* IRBuilder::emitDebugNoScope()
+{
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugNoScope, 0, nullptr);
+}
+
 IRLiveRangeStart* IRBuilder::emitLiveRangeStart(IRInst* referenced)
 {
     // This instruction doesn't produce any result,
@@ -7821,8 +7844,8 @@ IRInstList<IRDecoration> IRInst::getDecorations()
 IRInst* IRInst::getFirstChild()
 {
     // The children come after any decorations,
-    // so if there are any decorations, then the
-    // first child is right after the last decoration.
+    // so if there are any decorations, then
+    // the first child is right after the last decoration.
     //
     if (auto lastDecoration = getLastDecoration())
         return lastDecoration->getNextInst();

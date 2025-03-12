@@ -3067,6 +3067,12 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             emitRequireExtension(as<IRRequireTargetExtension>(inst));
             break;
         }
+    case kIROp_DebugInlinedAt:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+    case kIROp_DebugInlinedVariable:
+        // Debug information instructions should be ignored during C-like emission
+        break;
     default:
         diagnoseUnhandledInst(inst);
         break;

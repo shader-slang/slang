@@ -290,6 +290,70 @@ struct InliningPassBase
         return true;
     }
 
+    /// Setup debug information for the inlined call site
+    void setupDebugInfoForInlinedCall(
+        IRCall* call,
+        IRFunc* callee,
+        IRBuilder& builder)
+    {
+        // Find the last IRDebugLine instruction before the call
+        // Next, see if we already have an older DebugInlinedAt instruction emitted.
+        // If yes, then we chain this along to that.
+        IRDebugLine* lastDebugLine = nullptr;
+        IRInst* debugInlinedAt = nullptr;
+
+        if (callee->findDecoration<IRDebugLocationDecoration>())
+        {
+        // TODO: Seems like we can't do chaining because we won't get access to previous callers of the method.
+        // At least we cannnot just take the last debugInlinedAt and pass it as the previous caller.
+#if 0
+            IRDebugInlinedAt* lastDebugInlinedAt = nullptr;
+            for (IRInst* inst = call->getParent(); inst; inst = inst->getParent())
+            {
+                if (auto debugInlined = as<IRDebugInlinedAt>(inst))
+                {
+                    lastDebugInlinedAt = debugInlined;
+                    break;
+                }
+            }
+#endif
+            for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
+            {
+                if (auto debugLine = as<IRDebugLine>(inst))
+                {
+                    lastDebugLine = debugLine;
+                    break;
+                }
+            }
+            if (lastDebugLine)
+            {
+#if 0 // Refer TODO above.
+                IRInst* outer = nullptr;
+                if (lastDebugInlinedAt) outer = lastDebugInlinedAt;
+                else                    outer = lastDebugLine;
+#endif
+
+                debugInlinedAt = builder.emitDebugInlinedAt(
+                    lastDebugLine->getLineStart(),
+                    lastDebugLine->getColStart(),
+                    lastDebugLine->getSource(),
+                    lastDebugLine);
+            }
+
+            // Now emit the scope and noscope instructions.
+            if (debugInlinedAt)
+            {
+                // We emit DebugScope and DebugNoScope *before* we do the inlining.
+                // This is a much straightforard approach because during inlining,
+                // the "call" gets removed. So it's cleaner to do it here.
+                builder.emitDebugScope(debugInlinedAt);
+                builder.setInsertAfter(call);
+                builder.emitDebugNoScope();
+                builder.setInsertBefore(call);
+            }
+        }
+    }
+
     /// Inline the given `callSite`, which is assumed to have been validated
     void inlineCallSite(CallSiteInfo const& callSite)
     {
@@ -319,6 +383,8 @@ struct InliningPassBase
         // If callee is an intrinsic op, just issue that intrinsic and be done.
         if (auto intrinsicOpDecor = callee->findDecoration<IRIntrinsicOpDecoration>())
         {
+            setupDebugInfoForInlinedCall(call, callee, builder);
+
             List<IRInst*> args;
             for (UInt i = 0; i < call->getArgCount(); i++)
                 args.add(call->getArg(i));
@@ -337,6 +403,7 @@ struct InliningPassBase
                     args.getBuffer());
                 call->replaceUsesWith(newCall);
             }
+
             call->removeAndDeallocate();
             return;
         }
@@ -418,6 +485,8 @@ struct InliningPassBase
             }
             SLANG_ASSERT(argCounter == (Int)call->getArgCount());
         }
+
+        setupDebugInfoForInlinedCall(call, callee, builder);
 
         inlineFuncBody(callSite, &env, &builder);
     }
