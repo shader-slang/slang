@@ -14,6 +14,7 @@
 #include "slang-ir-constexpr.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-diff-call.h"
+#include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
@@ -10697,7 +10698,18 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto outputTopAttr = as<OutputTopologyAttribute>(modifier))
             {
                 IRStringLit* stringLit = _getStringLitFromAttribute(getBuilder(), outputTopAttr);
-                getBuilder()->addDecoration(irFunc, kIROp_OutputTopologyDecoration, stringLit);
+                const auto topologyType =
+                    convertOutputTopologyStringToEnum(stringLit->getStringSlice());
+                IRInst* topologyTypeInst = getBuilder()->getIntValue(
+                    getBuilder()->getIntType(),
+                    IRIntegerValue(topologyType));
+
+                auto outputTopologyDecoration = getBuilder()->addDecoration(
+                    irFunc,
+                    kIROp_OutputTopologyDecoration,
+                    stringLit,
+                    topologyTypeInst);
+                outputTopologyDecoration->sourceLoc = outputTopAttr->loc;
             }
             else if (auto maxTessFactortAttr = as<MaxTessFactorAttribute>(modifier))
             {
