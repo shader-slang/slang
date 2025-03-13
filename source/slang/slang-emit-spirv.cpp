@@ -4685,7 +4685,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     entryPoint ? entryPoint->findDecoration<IREntryPointDecoration>() : nullptr;
 
                 const auto o = cast<IROutputTopologyDecoration>(decoration);
-                const auto t = o->getTopology()->getStringSlice();
                 const auto topologyType = OutputTopologyType(o->getTopologyType());
 
                 SpvExecutionMode m = SpvExecutionModeMax;
@@ -4695,9 +4694,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     {
                     case Stage::Domain:
                     case Stage::Hull:
-                        if (t == "triangle_cw")
+                        if (topologyType == OutputTopologyType::TriangleCW)
                             m = SpvExecutionModeVertexOrderCw;
-                        else if (t == "triangle_ccw")
+                        else if (topologyType == OutputTopologyType::TriangleCCW)
                             m = SpvExecutionModeVertexOrderCcw;
                         break;
                     }

@@ -1418,6 +1418,8 @@ void GLSLSourceEmitter::emitParameterGroupImpl(
 
 static String getOutputTopologyString(OutputTopologyType topology)
 {
+    SLANG_ASSERT(topology != OutputTopologyType::Unknown);
+
     switch (topology)
     {
     case OutputTopologyType::Point:
@@ -1636,7 +1638,7 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
                 m_writer->emit("layout(");
                 m_writer->emit(
                     getOutputTopologyString(OutputTopologyType(decor->getTopologyType())));
-                m_writer->emit("s) out;\n");
+                m_writer->emit(") out;\n");
             }
             break;
         default:

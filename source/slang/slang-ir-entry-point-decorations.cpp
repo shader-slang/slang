@@ -2,6 +2,7 @@
 
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "core/slang-signal.h"
+#include "core/slang-string.h"
 #include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
 #include "slang-ir-insts.h"
@@ -51,35 +52,42 @@ private:
         if (stage == Stage::Mesh)
         {
             const auto outputTopologyType = OutputTopologyType(decoration->getTopologyType());
-
-            bool valid = false;
-
-            if (isTargetHLSL())
+            if (isTargetGLSL() || isTargetSPIRV() || isTargetMetal())
             {
-                valid = (outputTopologyType == OutputTopologyType::Triangle) ||
-                        (outputTopologyType == OutputTopologyType::Line);
+                if (outputTopologyType != OutputTopologyType::Point &&
+                    outputTopologyType != OutputTopologyType::Line &&
+                    outputTopologyType != OutputTopologyType::Triangle)
+                {
+                    diagnoseInvalidMeshStageOutputTopology(
+                        decoration,
+                        "'point', 'line', 'triangle'");
+                }
             }
-            else if (isTargetGLSL() || isTargetSPIRV() || isTargetMetal())
+            else if (isTargetHLSL())
             {
-                valid = (outputTopologyType == OutputTopologyType::Triangle) ||
-                        (outputTopologyType == OutputTopologyType::Line) ||
-                        (outputTopologyType == OutputTopologyType::Point);
+                if (outputTopologyType != OutputTopologyType::Line &&
+                    outputTopologyType != OutputTopologyType::Triangle)
+                {
+                    diagnoseInvalidMeshStageOutputTopology(decoration, "'line', 'triangle'");
+                }
             }
             else
             {
                 SLANG_UNEXPECTED("Invalid compilation target for mesh stage");
             }
-
-            if (!valid)
-            {
-                m_sink->diagnose(
-                    decoration,
-                    Diagnostics::invalidOutputTopology,
-                    decoration->getTopology()->getStringSlice(),
-                    stage,
-                    TypeTextUtil::getCompileTargetName(SlangCompileTarget(m_target)));
-            }
         }
+    }
+
+    void diagnoseInvalidMeshStageOutputTopology(
+        IROutputTopologyDecoration* decoration,
+        String validTopologies)
+    {
+        m_sink->diagnose(
+            decoration,
+            Diagnostics::invalidMeshStageOutputTopology,
+            decoration->getTopology()->getStringSlice(),
+            TypeTextUtil::getCompileTargetName(SlangCompileTarget(m_target)),
+            validTopologies);
     }
 
     bool isTargetHLSL() const { return m_target == CodeGenTarget::HLSL; }
