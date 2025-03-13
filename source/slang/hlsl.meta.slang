@@ -24356,15 +24356,19 @@ struct ThreadNodeOutputRecords
     NodePayloadArrayPtr<RecordType, nodeID> alloc;
 
     [ForceInline]
-    [require(spirv)] // [require(spirv, thread)]
+    [require(hlsl_spirv)] // [require(hlsl_spirv, thread)]
     __init(int recordCount, int nodeIndex = 0)
     {
-        // TODO: It seems that unexpected SPIRV code gets emitted here when
-        // assign from spriv_asm to `alloc` such as `get_field_addr`
-        alloc = spirv_asm
+        __target_switch
         {
-            result = OpAllocateNodePayloadsAMDX $$NodePayloadArrayPtr<RecordType, nodeID> Workgroup $recordCount $nodeIndex;
-        };
+        case hlsl: return;
+        case spirv:
+            alloc = spirv_asm
+            {
+                result = OpAllocateNodePayloadsAMDX $$NodePayloadArrayPtr<RecordType, nodeID> Workgroup $recordCount $nodeIndex;
+            };
+            return;
+        }
     }
 
     [ForceInline]
@@ -24384,23 +24388,22 @@ struct ThreadNodeOutputRecords
         get { return Get(index); }
     }
 
+    [ForceInline]
     FunctionPtr<RecordType> Get(int index = 0)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Get";
         case spirv:
-            let tmp = reinterpret<NodePayloadArrayPtr<RecordType, nodeID>>(alloc);
-            let ptr = spirv_asm
+            return spirv_asm
             {
                 %tempPtrVar  = OpVariable $$FunctionPtr<__SPIRVNodePayloadArray<RecordType, nodeID>> Function;
 
-                %loaded = OpLoad $$__SPIRVNodePayloadArray<RecordType, nodeID> $tmp;
+                %loaded = OpLoad $$__SPIRVNodePayloadArray<RecordType, nodeID> $alloc;
                 OpStore %tempPtrVar %loaded;
 
                 result : $$FunctionPtr<RecordType> = OpAccessChain %tempPtrVar $index
             };
-            return ptr;
         }
     }
 };

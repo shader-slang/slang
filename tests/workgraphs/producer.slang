@@ -1,5 +1,4 @@
 //TEST:SIMPLE(filecheck=CHK): -target spirv-asm -stage compute -entry computeMain -skip-spirv-validation
-
 RWStructuredBuffer<int> inputBuffer;
 
 struct RecordData
@@ -27,10 +26,9 @@ void computeMain()
 
 //CHK: ; Annotations
 
-//CHK-DAG: [[RecordType:%[a-zA-Z_0-9]+]] = OpTypeNodePayloadArrayAMDX %RecordData
-//CHK-DAG: [[PtrType:%[a-zA-Z_0-9]+]] = OpTypePointer NodePayloadAMDX [[RecordType]]
-//CHK-DAG: [[NodeID:%[a-zA-Z_0-9]+]] = OpConstantStringAMDX "NodeID_0"
-//CHK-DAG: OpDecorateId [[RecordType]] PayloadNodeNameAMDX [[NodeID]]
+//CHK-DAG: [[PayloadRecordType:%[a-zA-Z_0-9]+]] = OpTypeNodePayloadArrayAMDX %RecordData
+//CHK-DAG: [[NodePtrType:%[a-zA-Z_0-9]+]] = OpTypePointer NodePayloadAMDX [[PayloadRecordType]]
+//CHK-DAG: [[FuncPtrType:%[a-zA-Z_0-9]+]] = OpTypePointer Function %RecordData
 
 //CHK-NOT: = OpTypeNodePayloadArrayAMDX
 //CHK-NOT: = OpConstantStringAMDX
@@ -39,12 +37,13 @@ void computeMain()
 //CHK: ; Function
 
 // ThreadNodeOutputRecords::__init()
-//CHK: [[Alloc:%[a-zA-Z_0-9]+]] = OpAllocateNodePayloadsAMDX [[PtrType]] %
+//CHK: [[Alloc:%[a-zA-Z_0-9]+]] = OpAllocateNodePayloadsAMDX [[NodePtrType]] %
 //CHK-NOT: = OpAllocateNodePayloadsAMDX
 
 // ThreadNodeOutputRecords::Get()
-//CHK: [[Load:%[a-zA-Z_0-9]+]] = OpLoad [[PtrType]] %var
-//CHK: = OpAccessChain [[PtrType]] [[Load]] %
+//CHK: [[Load:%[a-zA-Z_0-9]+]] = OpLoad [[PayloadRecordType]]
+//CHK: OpStore [[Var:%[a-zA-Z_0-9]+]] [[Load]]
+//CHK: = OpAccessChain [[FuncPtrType]] [[Var]] %
 
 // ThreadNodeOutputRecords::OutputComplete()
 //CHK: OpEnqueueNodePayloadsAMDX [[Alloc]]
