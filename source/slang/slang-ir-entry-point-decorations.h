@@ -22,8 +22,6 @@ void checkEntryPointDecorations(IRModule* module, CodeGenTarget target, Diagnost
     M(TriangleCCW, triangle_ccw) \
     /* end */
 
-/// A known system-value semantic name that can be applied to a parameter
-///
 enum class OutputTopologyType
 {
     Unknown = 0,
