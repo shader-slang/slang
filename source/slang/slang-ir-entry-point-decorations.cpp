@@ -1,6 +1,7 @@
 #include "slang-ir-entry-point-decorations.h"
 
 #include "compiler-core/slang-diagnostic-sink.h"
+#include "core/slang-signal.h"
 #include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
 #include "slang-ir-insts.h"
@@ -63,6 +64,10 @@ private:
                 valid = (outputTopologyType == OutputTopologyType::Triangle) ||
                         (outputTopologyType == OutputTopologyType::Line) ||
                         (outputTopologyType == OutputTopologyType::Point);
+            }
+            else
+            {
+                SLANG_UNEXPECTED("Invalid compilation target for mesh stage");
             }
 
             if (!valid)
