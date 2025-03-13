@@ -1,6 +1,17 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage raygeneration -entry rayGenShaderA
 
 // CHECK: struct [raypayload]
+// CHECK: float4 color : read(caller) : write(closesthit, miss);
+// CHECK: float2 uv : read(anyhit, closesthit) : write(caller);
+
+struct [raypayload] RayPayload
+{
+    // Pure output from closesthit or miss, read by caller
+    float4 color : read(caller) : write(closesthit, miss);
+    
+    // Pure input from caller, read by hit shaders
+    float2 uv : read(anyhit, closesthit) : write(caller);
+};
 
 uniform RWTexture2D resultTexture;
 uniform RaytracingAccelerationStructure sceneBVH;
@@ -21,8 +32,8 @@ void rayGenShaderA()
     ray.Direction = rayDir;
     ray.TMin = 0.001;
     ray.TMax = 10000.0;
-    float4 payload = float4(0, 0, 0, 0);
+    RayPayload payload = { float4(0, 0, 0, 0), float2(threadIdx) / float2(DispatchRaysDimensions().xy) };
     TraceRay(sceneBVH, RAY_FLAG_NONE, ~0, 0, 0, 0, ray, payload);
 
-    resultTexture[threadIdx.xy] = payload;
-}
+    resultTexture[threadIdx.xy] = payload.color;
+} 

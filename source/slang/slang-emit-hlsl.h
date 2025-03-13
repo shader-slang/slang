@@ -84,6 +84,8 @@ protected:
 
     virtual void _emitPrefixTypeAttr(IRAttr* attr) SLANG_OVERRIDE;
 
+    virtual void emitStructFieldAttributes(IRStructType* structType, IRStructField* field) SLANG_OVERRIDE;
+
     // Emit a single `register` semantic, as appropriate for a given resource-type-specific layout
     // info Keyword to use in the uniform case (`register` for globals, `packoffset` inside a
     // `cbuffer`)

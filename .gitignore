@@ -94,3 +94,5 @@ vkd3d-proton.cache.write
 .*.swo
 /generators
 /tests/library/linked.spirv
+
+/slangpy
