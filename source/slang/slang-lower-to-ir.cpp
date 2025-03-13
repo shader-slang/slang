@@ -1918,6 +1918,28 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(getBuilder()->getIntValue(type, val->getValue()));
     }
 
+    IRType* visitDifferentialPairType(DifferentialPairType* pairType)
+    {
+        IRType* primalType = lowerType(context, pairType->getPrimalType());
+        if (as<IRAssociatedType>(primalType) || as<IRThisType>(primalType))
+        {
+            List<IRInst*> operands;
+            SubstitutionSet(pairType->getDeclRef())
+                .forEachSubstitutionArg(
+                    [&](Val* arg)
+                    {
+                        auto argVal = lowerVal(context, arg).val;
+                        SLANG_ASSERT(argVal);
+                        operands.add(argVal);
+                    });
+
+            auto undefined = getBuilder()->emitUndefined(operands[1]->getFullType());
+            return getBuilder()->getDifferentialPairUserCodeType(primalType, undefined);
+        }
+        else
+            return lowerSimpleIntrinsicType(pairType);
+    }
+
     IRFuncType* visitFuncType(FuncType* type)
     {
         IRType* resultType = lowerType(context, type->getResultType());
@@ -10194,8 +10216,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // If our function is differentiable, register a callback so the derivative
         // annotations for types can be lowered.
         //
-        if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
+        if (decl->findModifier<DifferentiableAttribute>() && !isInterfaceRequirement(decl))
         {
+            auto diffAttr = decl->findModifier<DifferentiableAttribute>();
+
             auto diffTypeWitnessMap = diffAttr->getMapTypeToIDifferentiableWitness();
             OrderedDictionary<DeclRefBase*, SubtypeWitness*> resolveddiffTypeWitnessMap;
 
@@ -11316,7 +11340,7 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
                 // interface definitions.
                 return emitDeclRef(
                     context,
-                    createDefaultSpecializedDeclRef(context, nullptr, decl),
+                    decl->getDefaultDeclRef(),
                     context->irBuilder->getTypeKind());
             }
 
