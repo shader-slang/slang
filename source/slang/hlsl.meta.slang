@@ -24359,6 +24359,8 @@ struct ThreadNodeOutputRecords
     [require(spirv)] // [require(spirv, thread)]
     __init(int recordCount, int nodeIndex = 0)
     {
+        // TODO: It seems that unexpected SPIRV code gets emitted here when
+        // assign from spriv_asm to `alloc` such as `get_field_addr`
         alloc = spirv_asm
         {
             result = OpAllocateNodePayloadsAMDX $$NodePayloadArrayPtr<RecordType, nodeID> Workgroup $recordCount $nodeIndex;
@@ -24376,29 +24378,29 @@ struct ThreadNodeOutputRecords
         }
     }
 
-    __subscript(uint index) -> NodePayloadPtr<RecordType>
+    __subscript(uint index) -> FunctionPtr<RecordType>
     {
         [ForceInline]
         get { return Get(index); }
     }
 
-    [ForceInline]
-    [require(hlsl_spirv)] // [require(hlsl_spirv, thread)]
-    NodePayloadPtr<RecordType> Get(int index = 0)
+    FunctionPtr<RecordType> Get(int index = 0)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Get";
         case spirv:
-            NodePayloadArrayPtr<RecordType, nodeID> ptr = spirv_asm
+            let tmp = reinterpret<NodePayloadArrayPtr<RecordType, nodeID>>(alloc);
+            let ptr = spirv_asm
             {
-                %ptr  = OpTypePointer Function $$__SPIRVNodePayloadArray<RecordType, nodeID>;
-                %var  = OpVariable %ptr Function;
-                        OpStore %var $alloc;
-                %Load = OpLoad $$NodePayloadArrayPtr<RecordType, nodeID> %var;
-                result : $$NodePayloadArrayPtr<RecordType, nodeID> = OpAccessChain %Load $index
+                %tempPtrVar  = OpVariable $$FunctionPtr<__SPIRVNodePayloadArray<RecordType, nodeID>> Function;
+
+                %loaded = OpLoad $$__SPIRVNodePayloadArray<RecordType, nodeID> $tmp;
+                OpStore %tempPtrVar %loaded;
+
+                result : $$FunctionPtr<RecordType> = OpAccessChain %tempPtrVar $index
             };
-            return reinterpret<NodePayloadPtr<RecordType>>(ptr);
+            return ptr;
         }
     }
 };
@@ -24410,22 +24412,27 @@ __generic<RecordType, let nodeID : int>
 struct DispatchNodeInputRecord
 {
     /// Provide an access to a record object that only holds a single record.
-    [ForceInline]
-    [require(hlsl_spirv)] // [require(hlsl_spirv, broadcasting)]
-    NodePayloadPtr<RecordType> Get()
+    FunctionPtr<RecordType> Get()
     {
         int index = 0;
+
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Get";
         case spirv:
-            NodePayloadArrayPtr<RecordType, nodeID> ptr = spirv_asm
+            let ptr = spirv_asm
             {
-                %ptr = OpTypePointer NodePayloadAMDX $$__SPIRVNodePayloadArray<RecordType, nodeID>;
-                %var = OpVariable %ptr NodePayloadAMDX;
-                result : $$NodePayloadArrayPtr<RecordType, nodeID> = OpAccessChain %var $index;
+                %nodePtrType = OpTypePointer NodePayloadAMDX $$__SPIRVNodePayloadArray<RecordType, nodeID>;
+                %nodePtrVar = OpVariable %nodePtrType NodePayloadAMDX;
+
+                %tempPtrVar = OpVariable $$FunctionPtr<__SPIRVNodePayloadArray<RecordType, nodeID>> Function;
+
+                %loaded = OpLoad $$__SPIRVNodePayloadArray<RecordType, nodeID> %nodePtrVar;
+                OpStore %tempPtrVar %loaded;
+
+                result : $$FunctionPtr<RecordType> = OpAccessChain %tempPtrVar $index;
             };
-            return reinterpret<NodePayloadPtr<RecordType>>(ptr);
+            return ptr;
         }
     }
 };

@@ -11,11 +11,6 @@ struct RecordData
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    spirv_asm
-    {
-        OpExecutionMode $computeMain ShaderIndexAMDX $(0);
-        OpExecutionMode $computeMain StaticNumWorkgroupsAMDX $(1) $(1) $(1);
-    };
 
     //TODO: "myNodeID" is supposed to come from [NodeID("name")] attribute on "node" variable.
     // Until it is implemented properly, we will use an int-type generic argument.
