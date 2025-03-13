@@ -1,7 +1,6 @@
 // Test calling differentiable function through dynamic dispatch.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -compile-arg -skip-spirv-validation -emit-spirv-directly
 
 //TEST_INPUT:ubuffer(data=[2 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -34,9 +33,15 @@ interface IFoo<int N>
 }
 
 [BackwardDerivative(load_bwd)]
+[ForwardDerivative(load_fwd)]
 float load(uint id)
 {
-    return outputBuffer[id];
+    return outputBuffer[id] + 2;
+}
+
+DifferentialPair<float> load_fwd(uint id)
+{
+    return DifferentialPair<float>(load(id), 3.f);
 }
 
 void load_bwd(uint id, float.Differential dOut)
@@ -97,10 +102,9 @@ float doThing(uint id)
 [shader("compute")]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    outputBuffer[0] = doThing(0);
-    outputBuffer[1] = doThing(1);
+    outputBuffer[0] = doThing(0); // CHECK: 2.0
+    outputBuffer[1] = doThing(1); // CHECK: 4.0
 
-    //bwd_diff(doThing)(0, 1.0);
-    outputBuffer[2] = fwd_diff(doThing)(0).d;
-    outputBuffer[3] = fwd_diff(doThing)(1).d;
+    outputBuffer[2] = fwd_diff(doThing)(0).d; // CHECK: 3.0
+    outputBuffer[3] = fwd_diff(doThing)(1).d; // CHECK: 3.0
 }
