@@ -1,7 +1,6 @@
 // slang-ir-entry-point-decorations.h
 #pragma once
 
-#include "core/slang-string.h"
 #include "slang-ir.h"
 
 namespace Slang
