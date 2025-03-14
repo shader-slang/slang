@@ -24353,7 +24353,7 @@ int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
 __generic<RecordType, let nodeID : int>
 struct ThreadNodeOutputRecords
 {
-    NodePayloadArrayPtr<RecordType, nodeID> alloc;
+    FunctionPtr<__SPIRVNodePayloadArray<RecordType, nodeID>> alloc;
 
     [ForceInline]
     [require(hlsl_spirv)] // [require(hlsl_spirv, thread)]
@@ -24365,7 +24365,14 @@ struct ThreadNodeOutputRecords
         case spirv:
             alloc = spirv_asm
             {
-                result = OpAllocateNodePayloadsAMDX $$NodePayloadArrayPtr<RecordType, nodeID> Workgroup $recordCount $nodeIndex;
+                %alloc = OpAllocateNodePayloadsAMDX $$NodePayloadArrayPtr<RecordType, nodeID> Workgroup $recordCount $nodeIndex;
+
+                %loaded = OpLoad $$__SPIRVNodePayloadArray<RecordType, nodeID> %alloc;
+
+                %tempPtrVar  = OpVariable $$FunctionPtr<__SPIRVNodePayloadArray<RecordType, nodeID>> Function;
+                OpStore %tempPtrVar %loaded;
+
+                result : $$FunctionPtr<__SPIRVNodePayloadArray<RecordType, nodeID>> = OpCopyObject %tempPtrVar;
             };
             return;
         }
@@ -24397,12 +24404,7 @@ struct ThreadNodeOutputRecords
         case spirv:
             return spirv_asm
             {
-                %tempPtrVar  = OpVariable $$FunctionPtr<__SPIRVNodePayloadArray<RecordType, nodeID>> Function;
-
-                %loaded = OpLoad $$__SPIRVNodePayloadArray<RecordType, nodeID> $alloc;
-                OpStore %tempPtrVar %loaded;
-
-                result : $$FunctionPtr<RecordType> = OpAccessChain %tempPtrVar $index
+                result : $$FunctionPtr<RecordType> = OpAccessChain $alloc $index
             };
         }
     }

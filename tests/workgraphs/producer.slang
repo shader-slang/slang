@@ -24,28 +24,26 @@ void computeMain()
 //CHK: OpCapability ShaderEnqueueAMDX
 //CHK: OpExtension "SPV_AMDX_shader_enqueue"
 
-//CHK: ; Annotations
+//CHK: ; Types, variables and constants
 
-//CHK-DAG: [[PayloadRecordType:%[a-zA-Z_0-9]+]] = OpTypeNodePayloadArrayAMDX %RecordData
-//CHK-DAG: [[NodePtrType:%[a-zA-Z_0-9]+]] = OpTypePointer NodePayloadAMDX [[PayloadRecordType]]
-//CHK-DAG: [[FuncPtrType:%[a-zA-Z_0-9]+]] = OpTypePointer Function %RecordData
-
-//CHK-NOT: = OpTypeNodePayloadArrayAMDX
-//CHK-NOT: = OpConstantStringAMDX
-//CHK-NOT: OpDecorateID {{.*}} PayloadNodeNameAMDX
+//CHK-DAG: [[MemberType:%[a-zA-Z_0-9]+]] = OpTypeInt 32 1
+//CHK-DAG: [[StructType:%[a-zA-Z_0-9]+]] = OpTypeStruct [[MemberType]]
+//CHK-DAG: [[PayloadType:%[a-zA-Z_0-9]+]] = OpTypeNodePayloadArrayAMDX [[StructType]]
+//CHK-DAG: [[NodePtrType:%[a-zA-Z_0-9]+]] = OpTypePointer NodePayloadAMDX [[PayloadType]]
+//CHK-DAG: [[TempPtrType:%[a-zA-Z_0-9]+]] = OpTypePointer Function [[PayloadType]]
+//CHK-DAG: [[FuncPtrType:%[a-zA-Z_0-9]+]] = OpTypePointer Function [[StructType]]
 
 //CHK: ; Function
 
 // ThreadNodeOutputRecords::__init()
+//CHK: [[TempPtrVar:%[a-zA-Z_0-9]+]] = OpVariable [[TempPtrType]] Function
 //CHK: [[Alloc:%[a-zA-Z_0-9]+]] = OpAllocateNodePayloadsAMDX [[NodePtrType]] %
-//CHK-NOT: = OpAllocateNodePayloadsAMDX
+//CHK: [[Loaded:%[a-zA-Z_0-9]+]] = OpLoad [[PayloadType]] [[Alloc]]
+//CHK: OpStore [[TempPtrVar]] [[Loaded]]
 
 // ThreadNodeOutputRecords::Get()
-//CHK: [[Load:%[a-zA-Z_0-9]+]] = OpLoad [[PayloadRecordType]]
-//CHK: OpStore [[Var:%[a-zA-Z_0-9]+]] [[Load]]
-//CHK: = OpAccessChain [[FuncPtrType]] [[Var]] %
+//CHK: = OpAccessChain [[FuncPtrType]] %
 
 // ThreadNodeOutputRecords::OutputComplete()
-//CHK: OpEnqueueNodePayloadsAMDX [[Alloc]]
-//CHK-NOT: OpEnqueueNodePayloadsAMDX
+//CHK: OpEnqueueNodePayloadsAMDX %
 
