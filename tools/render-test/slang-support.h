@@ -67,7 +67,7 @@ struct ShaderCompilerUtil
         ComPtr<slang::IComponentType> slangProgram;
         ShaderProgramDesc desc = {};
 
-        ComPtr<SlangCompileRequest> m_requestDEPRECATED = nullptr;
+        ComPtr<slang::ISession> m_session = nullptr;
 
         slang::IGlobalSession* globalSession = nullptr;
     };

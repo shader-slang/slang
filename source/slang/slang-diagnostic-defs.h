@@ -2438,6 +2438,12 @@ DIAGNOSTIC(
     "'Domain' should be either 'triangles' or 'quads'.")
 
 DIAGNOSTIC(
+    50060,
+    Error,
+    invalidMeshStageOutputTopology,
+    "Invalid mesh stage output topology '$0' for target '$1', must be one of: $2")
+
+DIAGNOSTIC(
     50082,
     Error,
     importingFromPackedBufferUnsupported,

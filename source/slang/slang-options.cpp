@@ -1748,13 +1748,17 @@ SlangResult OptionsParser::_expectInt(const CommandLineArg& initArg, Int& outInt
     return SLANG_OK;
 }
 
-SlangResult OptionsParser::addReferencedModule(String path, SourceLoc loc, bool includeEntryPoint)
+SlangResult createArtifactFromReferencedModule(
+    String path,
+    SourceLoc loc,
+    DiagnosticSink* sink,
+    IArtifact** outArtifact)
 {
     auto desc = ArtifactDescUtil::getDescFromPath(path.getUnownedSlice());
 
     if (desc.kind == ArtifactKind::Unknown)
     {
-        m_sink->diagnose(loc, Diagnostics::unknownLibraryKind, Path::getPathExt(path));
+        sink->diagnose(loc, Diagnostics::unknownLibraryKind, Path::getPathExt(path));
         return SLANG_FAIL;
     }
 
@@ -1772,7 +1776,7 @@ SlangResult OptionsParser::addReferencedModule(String path, SourceLoc loc, bool 
 
     if (!ArtifactDescUtil::isLinkable(desc))
     {
-        m_sink->diagnose(loc, Diagnostics::kindNotLinkable, Path::getPathExt(path));
+        sink->diagnose(loc, Diagnostics::kindNotLinkable, Path::getPathExt(path));
         return SLANG_FAIL;
     }
 
@@ -1803,11 +1807,20 @@ SlangResult OptionsParser::addReferencedModule(String path, SourceLoc loc, bool 
             nullptr);
         if (!fileRep->exists())
         {
-            m_sink->diagnose(loc, Diagnostics::libraryDoesNotExist, path);
+            sink->diagnose(loc, Diagnostics::libraryDoesNotExist, path);
             return SLANG_FAIL;
         }
     }
     artifact->addRepresentation(fileRep);
+    *outArtifact = artifact.detach();
+    return SLANG_OK;
+}
+
+SlangResult OptionsParser::addReferencedModule(String path, SourceLoc loc, bool includeEntryPoint)
+{
+    ComPtr<IArtifact> artifact;
+    SLANG_RETURN_ON_FAIL(
+        createArtifactFromReferencedModule(path, loc, m_sink, artifact.writeRef()));
 
     SLANG_RETURN_ON_FAIL(_addLibraryReference(m_requestImpl, path, artifact, includeEntryPoint));
     for (Index i = m_rawTranslationUnits.getCount(); i < m_requestImpl->getTranslationUnitCount();
@@ -2247,7 +2260,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     16,
                     &writer));
 
-                File::writeAllText(fileName.value, builder);
+                File::writeNativeText(fileName.value, builder.getBuffer(), builder.getLength());
                 break;
             }
         case OptionKind::DumpIrIds:
