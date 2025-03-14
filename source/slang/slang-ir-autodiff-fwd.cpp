@@ -955,20 +955,22 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
 InstPair ForwardDiffTranscriber::transcribeSwizzle(IRBuilder* builder, IRSwizzle* origSwizzle)
 {
     IRInst* primalSwizzle = maybeCloneForPrimalInst(builder, origSwizzle);
-
     if (auto diffBase = lookupDiffInst(origSwizzle->getBase(), nullptr))
     {
-        List<IRInst*> swizzleIndices;
-        for (UIndex ii = 0; ii < origSwizzle->getElementCount(); ii++)
-            swizzleIndices.add(origSwizzle->getElementIndex(ii));
+        if (auto diffType = differentiateType(builder, primalSwizzle->getDataType()))
+        {
+            List<IRInst*> swizzleIndices;
+            for (UIndex ii = 0; ii < origSwizzle->getElementCount(); ii++)
+                swizzleIndices.add(origSwizzle->getElementIndex(ii));
 
-        return InstPair(
-            primalSwizzle,
-            builder->emitSwizzle(
-                differentiateType(builder, primalSwizzle->getDataType()),
-                diffBase,
-                origSwizzle->getElementCount(),
-                swizzleIndices.getBuffer()));
+            return InstPair(
+                primalSwizzle,
+                builder->emitSwizzle(
+                    diffType,
+                    diffBase,
+                    origSwizzle->getElementCount(),
+                    swizzleIndices.getBuffer()));
+        }
     }
 
     return InstPair(primalSwizzle, nullptr);
