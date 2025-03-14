@@ -1915,6 +1915,18 @@ DIAGNOSTIC(
     "mode, specify 'SlangGlobalSessionDesc::enableGLSL' when creating the global session.")
 DIAGNOSTIC(39999, Fatal, complationCeased, "compilation ceased")
 
+DIAGNOSTIC(
+    38202,
+    Error,
+    matrixWithDisallowedElementTypeEncountered,
+    "matrix with disallowed element type '$0' encountered")
+
+DIAGNOSTIC(
+    38203,
+    Error,
+    vectorWithDisallowedElementTypeEncountered,
+    "vector with disallowed element type '$0' encountered")
+
 // 39xxx - Type layout and parameter binding.
 
 DIAGNOSTIC(
