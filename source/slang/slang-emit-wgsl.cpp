@@ -1256,7 +1256,7 @@ bool WGSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 
             emitInstResultDecl(inst);
             m_writer->emit("vec2<u32>(");
-            m_writer->emit("arrayLength(");
+            m_writer->emit("arrayLength(&");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(")");
             m_writer->emit(", ");

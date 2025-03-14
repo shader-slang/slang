@@ -4923,7 +4923,7 @@ struct $(item.name)
     /// Get the number of bytes in the buffer.
     ///@param[out] dim The number of bytes in the buffer.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer_rw)]
     void GetDimensions(out uint dim)
     {
         __target_switch
@@ -4933,6 +4933,7 @@ struct $(item.name)
         case hlsl: __intrinsic_asm ".GetDimensions";
         case glsl:
         case spirv:
+        case wgsl:
             dim = __structuredBufferGetDimensions(__getEquivalentStructuredBuffer<uint>(this)).x*4;
         }
     }
