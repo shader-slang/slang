@@ -1640,6 +1640,22 @@ struct IRRayPayloadDecoration : public IRDecoration
     IR_LEAF_ISA(RayPayloadDecoration)
 };
 
+struct IRRayPayloadReadDecoration : public IRDecoration
+{
+    IR_LEAF_ISA(RayPayloadReadDecoration)
+    
+    // Stages that can read this field (bitmask)
+    IRInst* getStages() { return getOperand(0); }
+};
+
+struct IRRayPayloadWriteDecoration : public IRDecoration
+{
+    IR_LEAF_ISA(RayPayloadWriteDecoration)
+    
+    // Stages that can write this field (bitmask)
+    IRInst* getStages() { return getOperand(0); }
+};
+
 // Mesh shader decorations
 
 struct IRMeshOutputDecoration : public IRDecoration
@@ -5370,6 +5386,16 @@ public:
     }
 
     void addRayPayloadDecoration(IRType* inst) { addDecoration(inst, kIROp_RayPayloadDecoration); }
+
+    void addRayPayloadReadDecoration(IRInst* inst, IRInst* stages) 
+    { 
+        addDecoration(inst, kIROp_RayPayloadReadDecoration, stages); 
+    }
+
+    void addRayPayloadWriteDecoration(IRInst* inst, IRInst* stages) 
+    { 
+        addDecoration(inst, kIROp_RayPayloadWriteDecoration, stages); 
+    }
 };
 
 // Helper to establish the source location that will be used

@@ -1006,6 +1006,8 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
     INST(RayPayloadDecoration, raypayload, 0, 0)
+    INST(RayPayloadReadDecoration, raypayload_read, 1, 0)
+    INST(RayPayloadWriteDecoration, raypayload_write, 1, 0)
 
     /* Mesh Shader outputs */
         INST(VerticesDecoration, vertices, 1, 0)
