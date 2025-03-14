@@ -2260,7 +2260,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     16,
                     &writer));
 
-                File::writeAllText(fileName.value, builder);
+                File::writeNativeText(fileName.value, builder.getBuffer(), builder.getLength());
                 break;
             }
         case OptionKind::DumpIrIds:
