@@ -957,6 +957,12 @@ InstPair ForwardDiffTranscriber::transcribeSwizzle(IRBuilder* builder, IRSwizzle
     IRInst* primalSwizzle = maybeCloneForPrimalInst(builder, origSwizzle);
     if (auto diffBase = lookupDiffInst(origSwizzle->getBase(), nullptr))
     {
+        // `diffBase` may exist even if the type is non-differentiable (e.g. IRCall inst that
+        // creates other differentiable outputs).
+        //
+        // We'll check to see if we can get a differential for the type in order to determine
+        // whether to generate a differential swizzle inst.
+        //
         if (auto diffType = differentiateType(builder, primalSwizzle->getDataType()))
         {
             List<IRInst*> swizzleIndices;
