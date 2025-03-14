@@ -1244,15 +1244,22 @@ bool WGSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_StructuredBufferGetDimensions:
         {
-            auto structuredBufferType =
-                as<IRHLSLStructuredBufferTypeBase>(inst->getOperand(0)->getDataType());
-            SLANG_ASSERT(structuredBufferType);
-
-            auto elementType = structuredBufferType->getElementType();
-            auto sizeDecor = elementType->findDecoration<IRSizeAndAlignmentDecoration>();
-            SLANG_ASSERT(sizeDecor);
-
-            const auto strideValue = align(sizeDecor->getSize(), (int)sizeDecor->getAlignment());
+            IRIntegerValue strideValue;
+            auto dataType = inst->getOperand(0)->getDataType();
+            auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(dataType);
+            if (structuredBufferType)
+            {
+                auto elementType = structuredBufferType->getElementType();
+                auto sizeDecor = elementType->findDecoration<IRSizeAndAlignmentDecoration>();
+                SLANG_ASSERT(sizeDecor);
+                strideValue = align(sizeDecor->getSize(), (int)sizeDecor->getAlignment());
+            }
+            else
+            {
+                SLANG_ASSERT(as<IRByteAddressBufferTypeBase>(dataType));
+                // ByteAddressBuffer(s) are an array of 32 bit integers, stride is 4 bytes.
+                strideValue = 4;
+            }
 
             emitInstResultDecl(inst);
             m_writer->emit("vec2<u32>(");

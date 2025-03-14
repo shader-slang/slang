@@ -1341,6 +1341,7 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::WGSLSPIRV:
         case CodeGenTarget::WGSLSPIRVAssembly:
             byteAddressBufferOptions.scalarizeVectorLoadStore = true;
+            byteAddressBufferOptions.treatGetEquivalentStructuredBufferAsGetThis = true;
             byteAddressBufferOptions.translateToStructuredBufferOps = false;
             byteAddressBufferOptions.lowerBasicTypeOps = true;
             byteAddressBufferOptions.useBitCastFromUInt = true;
