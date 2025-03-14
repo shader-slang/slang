@@ -1076,6 +1076,9 @@ Compound Capabilities
 `shader5_sm_5_0`
 > Capabilities required to use sm_5_0 features apart of GL_ARB_gpu_shader5
 
+`pack_vector`
+> Capabilities required to use pack/unpack intrinsics on packed vector data
+
 `subgroup_basic`
 > Capabilities required to use GLSL-style subgroup operations 'subgroup_basic'
 
