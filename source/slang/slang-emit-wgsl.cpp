@@ -1,6 +1,8 @@
 #include "slang-emit-wgsl.h"
 
+#include "slang-ir-layout.h"
 #include "slang-ir-util.h"
+#include "slang-ir.h"
 
 // A note on row/column "terminology reversal".
 //
@@ -1238,6 +1240,28 @@ bool WGSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit("), ");
             emitType(inst->getDataType());
             m_writer->emit("(1));\n");
+            return true;
+        }
+    case kIROp_StructuredBufferGetDimensions:
+        {
+            auto structuredBufferType =
+                as<IRHLSLStructuredBufferTypeBase>(inst->getOperand(0)->getDataType());
+            SLANG_ASSERT(structuredBufferType);
+
+            auto elementType = structuredBufferType->getElementType();
+            auto sizeDecor = elementType->findDecoration<IRSizeAndAlignmentDecoration>();
+            SLANG_ASSERT(sizeDecor);
+
+            const auto strideValue = align(sizeDecor->getSize(), (int)sizeDecor->getAlignment());
+
+            emitInstResultDecl(inst);
+            m_writer->emit("vec2<u32>(");
+            m_writer->emit("arrayLength(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            m_writer->emit(", ");
+            m_writer->emit(strideValue);
+            m_writer->emit(");\n");
             return true;
         }
     }
