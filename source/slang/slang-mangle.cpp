@@ -824,6 +824,41 @@ String getMangledNameForConformanceWitness(ASTBuilder* astBuilder, Type* sub, Ty
     return context.sb.produceString();
 }
 
+// This function takes an additional parameter to get a simplified
+// mangled name when the witness-table is for enum-type.
+//
+// In order to deduplicate the witness-tables, we need to apply a little different
+// rule for the mangled name when the `superType` is `enum` type.
+// All witness-table for enum types whose underlying type is same should get the same
+// manged name.
+//
+// TODO: We should remove this function and have a new IR for enum-type. The "option 2"
+// described on the issue 6364 is more proper and ideal solution for the issue.
+//
+String getMangledNameForConformanceWitness(
+    ASTBuilder* astBuilder,
+    Type* sub,
+    Type* sup,
+    IRType* irSubType)
+{
+    SLANG_AST_BUILDER_RAII(astBuilder);
+
+    ManglingContext context(astBuilder);
+    emitRaw(&context, "_SW");
+
+    if (ASTNodeType(sup->getClassInfo().m_classId) == ASTNodeType::EnumTypeType)
+    {
+        emitRaw(&context, getIROpInfo(irSubType->getOp()).name);
+    }
+    else
+    {
+        emitType(&context, sub);
+    }
+
+    emitType(&context, sup);
+    return context.sb.produceString();
+}
+
 String getMangledTypeName(ASTBuilder* astBuilder, Type* type)
 {
     SLANG_AST_BUILDER_RAII(astBuilder);
