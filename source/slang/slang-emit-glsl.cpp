@@ -4,6 +4,7 @@
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-call-graph.h"
+#include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-legalize-types.h"
@@ -1415,6 +1416,23 @@ void GLSLSourceEmitter::emitParameterGroupImpl(
     _emitGLSLParameterGroup(varDecl, type);
 }
 
+static String getOutputTopologyString(OutputTopologyType topology)
+{
+    SLANG_ASSERT(topology != OutputTopologyType::Unknown);
+
+    switch (topology)
+    {
+    case OutputTopologyType::Point:
+        return "points";
+    case OutputTopologyType::Line:
+        return "lines";
+    case OutputTopologyType::Triangle:
+        return "triangles";
+    default:
+        return "";
+    }
+}
+
 void GLSLSourceEmitter::emitEntryPointAttributesImpl(
     IRFunc* irFunc,
     IREntryPointDecoration* entryPointDecor)
@@ -1617,12 +1635,10 @@ void GLSLSourceEmitter::emitEntryPointAttributesImpl(
             }
             if (auto decor = as<IROutputTopologyDecoration>(decoration))
             {
-                // TODO: Ellie validate here/elsewhere, what's allowed here is
-                // different from the tesselator
-                // The naming here is plural, so add an 's'
                 m_writer->emit("layout(");
-                m_writer->emit(decor->getTopology()->getStringSlice());
-                m_writer->emit("s) out;\n");
+                m_writer->emit(
+                    getOutputTopologyString(OutputTopologyType(decor->getTopologyType())));
+                m_writer->emit(") out;\n");
             }
             break;
         default:
