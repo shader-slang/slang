@@ -4147,6 +4147,8 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
     {
         return LegalType();
     }
+
+    virtual bool isEmptyTypeLegalize() override { return true; }
 };
 
 // The main entry points that are used when transforming IR code
