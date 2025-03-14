@@ -22,6 +22,7 @@ struct MyStruct
 
 ParameterBlock<MyStruct> param;
 
+// LIB: @computeMain
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(
