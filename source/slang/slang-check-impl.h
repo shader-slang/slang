@@ -1512,7 +1512,7 @@ public:
     /// Registers a type as conforming to IDifferentiable, along with a witness
     /// describing the relationship.
     ///
-    void addDifferentiableTypeToDiffTypeRegistry(DeclRefType* type, SubtypeWitness* witness);
+    void addDifferentiableTypeToDiffTypeRegistry(Type* type, SubtypeWitness* witness);
     void maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* builder, Type* type);
 
     // Construct the differential for 'type', if it exists.
