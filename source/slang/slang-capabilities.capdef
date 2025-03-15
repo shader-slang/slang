@@ -541,6 +541,10 @@ def SPV_EXT_replicated_composites : _spirv_1_0;
 /// [EXT]
 def SPV_NV_cooperative_vector : _spirv_1_6 + SPV_EXT_replicated_composites;
 
+/// Represents the SPIR-V extension for SPV_KHR_cooperative_matrix.
+/// [EXT]
+def SPV_KHR_cooperative_matrix : _spirv_1_6 + SPV_EXT_physical_storage_buffer;
+
 // SPIRV Capabilities.
 
 /// Represents the SPIR-V capability for atomic float 32 add operations.
@@ -690,6 +694,10 @@ def spvCooperativeVectorNV : SPV_NV_cooperative_vector;
 /// Represents the SPIR-V capability for cooperative vector training
 /// [EXT]
 def spvCooperativeVectorTrainingNV : SPV_NV_cooperative_vector;
+
+/// Represents the SPIR-V capability for cooperative matrices
+/// [EXT]
+def spvCooperativeMatrixKHR : SPV_KHR_cooperative_matrix;
 
 /// Represents the SPIR-V capability for maximal reconvergence.
 /// [EXT]
@@ -1070,6 +1078,9 @@ alias cooperative_vector = _sm_6_8 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV
 /// Capabilities needed to train cooperative vectors
 /// [Compound]
 alias cooperative_vector_training = spvCooperativeVectorTrainingNV;
+
+/// Capabilities needed to use cooperative matrices
+alias cooperative_matrix = spvCooperativeMatrixKHR;
 
 // Non-internal shader stages
 //
