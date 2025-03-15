@@ -835,11 +835,7 @@ String getMangledNameForConformanceWitness(ASTBuilder* astBuilder, Type* sub, Ty
 // TODO: We should remove this function and have a new IR for enum-type. The "option 2"
 // described on the issue 6364 is more proper and ideal solution for the issue.
 //
-String getMangledNameForConformanceWitness(
-    ASTBuilder* astBuilder,
-    Type* sub,
-    Type* sup,
-    IRType* irSubType)
+String getMangledNameForConformanceWitness(ASTBuilder* astBuilder, Type* sub, Type* sup, IROp subOp)
 {
     SLANG_AST_BUILDER_RAII(astBuilder);
 
@@ -848,7 +844,7 @@ String getMangledNameForConformanceWitness(
 
     if (ASTNodeType(sup->getClassInfo().m_classId) == ASTNodeType::EnumTypeType)
     {
-        emitRaw(&context, getIROpInfo(irSubType->getOp()).name);
+        emitRaw(&context, getIROpInfo(subOp).name);
     }
     else
     {

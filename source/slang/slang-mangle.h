@@ -21,7 +21,7 @@ String getMangledNameForConformanceWitness(
     ASTBuilder* astBuilder,
     Type* sub,
     Type* sup,
-    IRType* irSubType);
+    IROp subOp);
 String getMangledNameForConformanceWitness(
     ASTBuilder* astBuilder,
     DeclRef<Decl> sub,
