@@ -151,10 +151,7 @@ struct ByteAddressBuffer
         case cpp: __intrinsic_asm ".GetDimensions";
         case cuda: __intrinsic_asm ".GetDimensions";
         case hlsl: __intrinsic_asm ".GetDimensions";
-        case glsl:
-        case metal:
-        case spirv:
-        case wgsl:
+        default:
             dim = __structuredBufferGetDimensions(__getEquivalentStructuredBuffer<uint>(this)).x*4;
         }
     }
@@ -4931,9 +4928,7 @@ struct $(item.name)
         case cpp: __intrinsic_asm ".GetDimensions";
         case cuda: __intrinsic_asm ".GetDimensions";
         case hlsl: __intrinsic_asm ".GetDimensions";
-        case glsl:
-        case spirv:
-        case wgsl:
+        default:
             dim = __structuredBufferGetDimensions(__getEquivalentStructuredBuffer<uint>(this)).x*4;
         }
     }
