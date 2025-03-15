@@ -2,7 +2,6 @@
 
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
-#include "slang-ir.h"
 
 // A note on row/column "terminology reversal".
 //
