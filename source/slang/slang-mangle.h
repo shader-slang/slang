@@ -19,6 +19,11 @@ String getHashedName(const UnownedStringSlice& mangledName);
 String getMangledNameForConformanceWitness(ASTBuilder* astBuilder, Type* sub, Type* sup);
 String getMangledNameForConformanceWitness(
     ASTBuilder* astBuilder,
+    Type* sub,
+    Type* sup,
+    IRType* irSubType);
+String getMangledNameForConformanceWitness(
+    ASTBuilder* astBuilder,
     DeclRef<Decl> sub,
     DeclRef<Decl> sup);
 String getMangledNameForConformanceWitness(ASTBuilder* astBuilder, DeclRef<Decl> sub, Type* sup);
