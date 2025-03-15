@@ -139,6 +139,7 @@ bool testBallot() {
         ;
 }
 
+[shader("compute")]
 void computeMain()
 {
     outputBuffer.data[0] = true

@@ -17,7 +17,7 @@ static Slang::Result precompileProgram(
     gfx::IDevice* device,
     ISlangMutableFileSystem* fileSys,
     const char* shaderModuleName,
-    bool precompileToTarget)
+    PrecompilationMode precompilationMode)
 {
     Slang::ComPtr<slang::ISession> slangSession;
     SLANG_RETURN_ON_FAIL(device->getSlangSession(slangSession.writeRef()));
@@ -37,7 +37,8 @@ static Slang::Result precompileProgram(
     if (!module)
         return SLANG_FAIL;
 
-    if (precompileToTarget)
+    if (precompilationMode == PrecompilationMode::InternalLink ||
+        precompilationMode == PrecompilationMode::ExternalLink)
     {
         SlangCompileTarget target;
         switch (device->getDeviceInfo().deviceType)
@@ -58,8 +59,15 @@ static Slang::Result precompileProgram(
                 (void**)precompileService.writeRef()) == SLANG_OK)
         {
             Slang::ComPtr<slang::IBlob> diagnosticsBlob;
-            precompileService->precompileForTarget(target, diagnosticsBlob.writeRef());
+            auto res = precompileService->precompileForTarget(target, diagnosticsBlob.writeRef());
             diagnoseIfNeeded(diagnosticsBlob);
+            SLANG_RETURN_ON_FAIL(res);
+
+            // compile a second time to check for driver bugs.
+            diagnosticsBlob = nullptr;
+            res = precompileService->precompileForTarget(target, diagnosticsBlob.writeRef());
+            diagnoseIfNeeded(diagnosticsBlob);
+            SLANG_RETURN_ON_FAIL(res);
         }
     }
 
@@ -82,7 +90,7 @@ static Slang::Result precompileProgram(
 void precompiledModule2TestImplCommon(
     IDevice* device,
     UnitTestContext* context,
-    bool precompileToTarget)
+    PrecompilationMode precompilationMode)
 {
     Slang::ComPtr<ITransientResourceHeap> transientHeap;
     ITransientResourceHeap::Desc transientHeapDesc = {};
@@ -100,7 +108,7 @@ void precompiledModule2TestImplCommon(
         device,
         memoryFileSystem.get(),
         "precompiled-module-imported",
-        precompileToTarget));
+        precompilationMode));
 
     // Next, load the precompiled slang program.
     Slang::ComPtr<slang::ISession> slangSession;
@@ -121,6 +129,17 @@ void precompiledModule2TestImplCommon(
     }
     sessionDesc.targets = &targetDesc;
     sessionDesc.fileSystem = memoryFileSystem.get();
+
+    Slang::List<slang::CompilerOptionEntry> options;
+    slang::CompilerOptionEntry skipDownstreamLinkingOption;
+    skipDownstreamLinkingOption.name = slang::CompilerOptionName::SkipDownstreamLinking;
+    skipDownstreamLinkingOption.value.kind = slang::CompilerOptionValueKind::Int;
+    skipDownstreamLinkingOption.value.intValue0 =
+        precompilationMode == PrecompilationMode::ExternalLink;
+    options.add(skipDownstreamLinkingOption);
+
+    sessionDesc.compilerOptionEntries = options.getBuffer();
+    sessionDesc.compilerOptionEntryCount = options.getCount();
     auto globalSession = slangSession->getGlobalSession();
     globalSession->createSession(sessionDesc, slangSession.writeRef());
 
@@ -147,7 +166,8 @@ void precompiledModule2TestImplCommon(
         shaderProgram,
         "precompiled-module",
         "computeMain",
-        slangReflection));
+        slangReflection,
+        precompilationMode));
 
     ComputePipelineStateDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
@@ -208,12 +228,17 @@ void precompiledModule2TestImplCommon(
 
 void precompiledModule2TestImpl(IDevice* device, UnitTestContext* context)
 {
-    precompiledModule2TestImplCommon(device, context, false);
+    precompiledModule2TestImplCommon(device, context, PrecompilationMode::SlangIR);
 }
 
-void precompiledTargetModule2TestImpl(IDevice* device, UnitTestContext* context)
+void precompiledTargetModule2InternalLinkTestImpl(IDevice* device, UnitTestContext* context)
 {
-    precompiledModule2TestImplCommon(device, context, true);
+    precompiledModule2TestImplCommon(device, context, PrecompilationMode::InternalLink);
+}
+
+void precompiledTargetModule2ExternalLinkTestImpl(IDevice* device, UnitTestContext* context)
+{
+    precompiledModule2TestImplCommon(device, context, PrecompilationMode::ExternalLink);
 }
 
 SLANG_UNIT_TEST(precompiledModule2D3D12)
@@ -221,19 +246,42 @@ SLANG_UNIT_TEST(precompiledModule2D3D12)
     runTestImpl(precompiledModule2TestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
 }
 
-SLANG_UNIT_TEST(precompiledTargetModule2D3D12)
+SLANG_UNIT_TEST(precompiledTargetModuleInternalLink2D3D12)
 {
-    runTestImpl(precompiledTargetModule2TestImpl, unitTestContext, Slang::RenderApiFlag::D3D12);
+    runTestImpl(
+        precompiledTargetModule2InternalLinkTestImpl,
+        unitTestContext,
+        Slang::RenderApiFlag::D3D12);
 }
+
+/*
+// Unavailable on D3D12/DXIL currently
+SLANG_UNIT_TEST(precompiledTargetModuleExternalLink2D3D12)
+{
+    runTestImpl(precompiledTargetModule2ExternalLinkTestImpl, unitTestContext,
+Slang::RenderApiFlag::D3D12);
+}
+*/
 
 SLANG_UNIT_TEST(precompiledModule2Vulkan)
 {
     runTestImpl(precompiledModule2TestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
 }
 
-SLANG_UNIT_TEST(precompiledTargetModule2Vulkan)
+SLANG_UNIT_TEST(precompiledTargetModule2InternalLinkVulkan)
 {
-    runTestImpl(precompiledTargetModule2TestImpl, unitTestContext, Slang::RenderApiFlag::Vulkan);
+    runTestImpl(
+        precompiledTargetModule2InternalLinkTestImpl,
+        unitTestContext,
+        Slang::RenderApiFlag::Vulkan);
+}
+
+SLANG_UNIT_TEST(precompiledTargetModule2ExternalLinkVulkan)
+{
+    runTestImpl(
+        precompiledTargetModule2ExternalLinkTestImpl,
+        unitTestContext,
+        Slang::RenderApiFlag::Vulkan);
 }
 
 } // namespace gfx_test

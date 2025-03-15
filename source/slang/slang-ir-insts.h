@@ -168,6 +168,12 @@ struct IRIntrinsicOpDecoration : IRDecoration
     IROp getIntrinsicOp() { return (IROp)getIntrinsicOpOperand()->getValue(); }
 };
 
+struct IRAlignedAddressDecoration : IRDecoration
+{
+    IR_LEAF_ISA(AlignedAddressDecoration)
+    IRInst* getAlignment() { return getOperand(0); }
+};
+
 struct IRGLSLOuterArrayDecoration : IRDecoration
 {
     enum
@@ -555,6 +561,8 @@ struct IROutputTopologyDecoration : IRDecoration
     IR_LEAF_ISA(OutputTopologyDecoration)
 
     IRStringLit* getTopology() { return cast<IRStringLit>(getOperand(0)); }
+
+    IRIntegerValue getTopologyType() { return cast<IRIntLit>(getOperand(1))->getValue(); }
 };
 
 struct IRPartitioningDecoration : IRDecoration
@@ -878,6 +886,8 @@ IR_SIMPLE_DECORATION(UnsafeForceInlineEarlyDecoration)
 IR_SIMPLE_DECORATION(ForceInlineDecoration)
 
 IR_SIMPLE_DECORATION(ForceUnrollDecoration)
+
+IR_SIMPLE_DECORATION(PhysicalTypeDecoration)
 
 struct IRSizeAndAlignmentDecoration : IRDecoration
 {
@@ -3788,7 +3798,11 @@ public:
     /// Get a 'SPIRV literal'
     IRSPIRVLiteralType* getSPIRVLiteralType(IRType* type);
 
-    IRArrayTypeBase* getArrayTypeBase(IROp op, IRType* elementType, IRInst* elementCount);
+    IRArrayTypeBase* getArrayTypeBase(
+        IROp op,
+        IRType* elementType,
+        IRInst* elementCount,
+        IRInst* stride = nullptr);
 
     IRArrayType* getArrayType(IRType* elementType, IRInst* elementCount);
 
@@ -4324,7 +4338,7 @@ public:
     IRVar* emitVar(IRType* type, AddressSpace addressSpace);
 
     IRInst* emitLoad(IRType* type, IRInst* ptr);
-
+    IRInst* emitLoad(IRType* type, IRInst* ptr, IRInst* align);
     IRInst* emitLoad(IRInst* ptr);
 
     IRInst* emitLoadReverseGradient(IRType* type, IRInst* diffValue);
@@ -4333,6 +4347,7 @@ public:
     IRInst* emitDiffParamRef(IRType* type, IRInst* param);
 
     IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal);
+    IRInst* emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align);
 
     IRInst* emitAtomicStore(IRInst* dstPtr, IRInst* srcVal, IRInst* memoryOrder);
 
@@ -4725,6 +4740,15 @@ public:
     IRVarLayout* getVarLayout(List<IRInst*> const& operands);
     IREntryPointLayout* getEntryPointLayout(IRVarLayout* paramsLayout, IRVarLayout* resultLayout);
 
+    void addPhysicalTypeDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_PhysicalTypeDecoration);
+    }
+
+    void addAlignedAddressDecoration(IRInst* value, IRInst* alignment)
+    {
+        addDecoration(value, kIROp_AlignedAddressDecoration, alignment);
+    }
 
     void addNameHintDecoration(IRInst* value, IRStringLit* name)
     {

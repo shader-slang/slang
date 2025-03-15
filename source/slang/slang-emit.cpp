@@ -38,6 +38,7 @@
 #include "slang-ir-early-raytracing-intrinsic-simplification.h"
 #include "slang-ir-eliminate-multilevel-break.h"
 #include "slang-ir-eliminate-phis.h"
+#include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-entry-point-raw-ptr-params.h"
 #include "slang-ir-entry-point-uniforms.h"
 #include "slang-ir-explicit-global-context.h"
@@ -721,6 +722,8 @@ Result linkAndOptimizeIR(
     dumpIRIfEnabled(codeGenContext, irModule, "GLOBAL UNIFORMS COLLECTED");
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    checkEntryPointDecorations(irModule, target, sink);
 
     // Another transformation that needed to wait until we
     // had layout information on parameters is to take uniform
@@ -1644,10 +1647,11 @@ Result linkAndOptimizeIR(
     bufferElementTypeLoweringOptions.use16ByteArrayElementForConstantBuffer =
         isWGPUTarget(targetRequest);
     lowerBufferElementTypeToStorageType(targetProgram, irModule, bufferElementTypeLoweringOptions);
+    performForceInlining(irModule);
 
     // Rewrite functions that return arrays to return them via `out` parameter,
     // since our target languages doesn't allow returning arrays.
-    if (!isMetalTarget(targetRequest))
+    if (!isMetalTarget(targetRequest) && !isSPIRV(target))
         legalizeArrayReturnType(irModule);
 
     if (isKhronosTarget(targetRequest) || target == CodeGenTarget::HLSL)
@@ -1669,8 +1673,8 @@ Result linkAndOptimizeIR(
     if (emitSpirvDirectly)
     {
         performIntrinsicFunctionInlining(irModule);
-        eliminateDeadCode(irModule, deadCodeEliminationOptions);
     }
+
     eliminateMultiLevelBreak(irModule);
 
     if (!fastIRSimplificationOptions.minimalOptimization)
@@ -2093,9 +2097,70 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     if (compiler)
     {
 #if 0
-        // Dump the unoptimized SPIRV after lowering from slang IR -> SPIRV
+        // Dump the unoptimized/unlinked SPIRV after lowering from slang IR -> SPIRV
         compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
 #endif
+
+        bool isPrecompilation = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
+            CompilerOptionName::EmbedDownstreamIR);
+
+        if (!isPrecompilation && !codeGenContext->shouldSkipDownstreamLinking())
+        {
+            ComPtr<IArtifact> linkedArtifact;
+
+            // collect spirv files
+            List<uint32_t*> spirvFiles;
+            List<uint32_t> spirvSizes;
+
+            // Start with the SPIR-V we just generated.
+            // SPIRV-Tools-link expects the size in 32-bit words
+            // whereas the spirv blob size is in bytes.
+            spirvFiles.add((uint32_t*)spirv.getBuffer());
+            spirvSizes.add(int(spirv.getCount()) / 4);
+
+            // Iterate over all modules in the linkedIR. For each module, if it
+            // contains an embedded downstream ir instruction, add it to the list
+            // of spirv files.
+            auto program = codeGenContext->getProgram();
+
+            program->enumerateIRModules(
+                [&](IRModule* irModule)
+                {
+                    for (auto globalInst : irModule->getModuleInst()->getChildren())
+                    {
+                        if (auto inst = as<IREmbeddedDownstreamIR>(globalInst))
+                        {
+                            if (inst->getTarget() == CodeGenTarget::SPIRV)
+                            {
+                                auto slice = inst->getBlob()->getStringSlice();
+                                spirvFiles.add((uint32_t*)slice.begin());
+                                spirvSizes.add(int(slice.getLength()) / 4);
+                            }
+                        }
+                    }
+                });
+
+            SLANG_ASSERT(int(spirv.getCount()) % 4 == 0);
+            SLANG_ASSERT(spirvFiles.getCount() == spirvSizes.getCount());
+
+            if (spirvFiles.getCount() > 1)
+            {
+                SlangResult linkresult = compiler->link(
+                    (const uint32_t**)spirvFiles.getBuffer(),
+                    (const uint32_t*)spirvSizes.getBuffer(),
+                    (uint32_t)spirvFiles.getCount(),
+                    linkedArtifact.writeRef());
+
+                if (linkresult != SLANG_OK)
+                {
+                    return SLANG_FAIL;
+                }
+
+                ComPtr<ISlangBlob> blob;
+                linkedArtifact->loadBlob(ArtifactKeep::No, blob.writeRef());
+                artifact = _Move(linkedArtifact);
+            }
+        }
 
         if (!codeGenContext->shouldSkipSPIRVValidation())
         {

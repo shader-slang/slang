@@ -1,6 +1,10 @@
 #ifndef SLANG_H
 #define SLANG_H
 
+#ifdef SLANG_USER_CONFIG
+    #include SLANG_USER_CONFIG
+#endif
+
 /** \file slang.h
 
 The Slang API provides services to compile, reflect, and specialize code
@@ -653,6 +657,7 @@ typedef uint32_t SlangSizeT;
         SLANG_PASS_THROUGH_SPIRV_OPT,     ///< SPIRV-opt
         SLANG_PASS_THROUGH_METAL,         ///< Metal compiler
         SLANG_PASS_THROUGH_TINT,          ///< Tint WGSL compiler
+        SLANG_PASS_THROUGH_SPIRV_LINK,    ///< SPIRV-link
         SLANG_PASS_THROUGH_COUNT_OF,
     };
 
@@ -1008,6 +1013,8 @@ typedef uint32_t SlangSizeT;
 
         EmitReflectionJSON, // bool
         SaveGLSLModuleBinSource,
+
+        SkipDownstreamLinking, // bool, experimental
         CountOf,
     };
 

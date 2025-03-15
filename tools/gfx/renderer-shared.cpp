@@ -1130,14 +1130,18 @@ Result ShaderProgramBase::compileShaders(RendererBase* device)
                     DebugMessageSource::Slang,
                     (char*)diagnostics->getBufferPointer());
             }
+            SLANG_RETURN_ON_FAIL(compileResult);
+
             kernelCodes.add(downstreamIR);
         }
 
-        // If target precompilation was used, kernelCode may only represent the
-        // glue code holding together the bits of precompiled target IR.
-        // Collect those dependency target IRs too.
+        // If target precompilation with deferred downstream linking is enabled,
+        // kernelCode may only represent the glue code holding together the
+        // bits of precompiled target IR. It's the application's job to pull it
+        // together. Collect those dependency target IRs too.
         ComPtr<slang::IModulePrecompileService_Experimental> componentPrecompileService;
-        if (entryPointComponent->queryInterface(
+        if (this->desc.downstreamLinkMode == DownstreamLinkMode::Deferred &&
+            entryPointComponent->queryInterface(
                 slang::IModulePrecompileService_Experimental::getTypeGuid(),
                 (void**)componentPrecompileService.writeRef()) == SLANG_OK)
         {
