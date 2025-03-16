@@ -3020,6 +3020,8 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void visitReturnStmt(ReturnStmt* stmt);
 
+    void visitDeferStmt(DeferStmt* stmt);
+
     void visitWhileStmt(WhileStmt* stmt);
 
     void visitGpuForeachStmt(GpuForeachStmt* stmt);

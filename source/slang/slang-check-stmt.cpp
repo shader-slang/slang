@@ -508,6 +508,11 @@ void SemanticsStmtVisitor::visitWhileStmt(WhileStmt* stmt)
     checkLoopInDifferentiableFunc(stmt);
 }
 
+void SemanticsStmtVisitor::visitDeferStmt(DeferStmt* stmt)
+{
+    checkStmt(stmt->statement);
+}
+
 void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
 {
     stmt->expression = CheckExpr(stmt->expression);
