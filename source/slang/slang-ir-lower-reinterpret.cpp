@@ -79,16 +79,6 @@ struct ReinterpretLoweringContext
                 Slang::Diagnostics::typeCannotBePackedIntoAnyValue,
                 toType);
         }
-        if (fromTypeSize != toTypeSize && !cantPack && !as<IRExtractExistentialType>(fromType))
-        {
-            sink->diagnose(
-                inst->sourceLoc,
-                Slang::Diagnostics::notEqualReinterpretCastSize,
-                fromType,
-                fromTypeSize,
-                toType,
-                toTypeSize);
-        }
         SlangInt anyValueSize = Math::Max(fromTypeSize, toTypeSize);
 
         IRBuilder builder(module);

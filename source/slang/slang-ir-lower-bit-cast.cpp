@@ -171,6 +171,7 @@ struct BitCastLoweringContext
         case kIROp_UInt16Type:
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 2);
+                object = builder.emitCast(builder.getUInt16Type(), object);
                 return builder.emitBitCast(type, object);
             }
             break;
@@ -184,6 +185,7 @@ struct BitCastLoweringContext
 #endif
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 4);
+                object = builder.emitCast(builder.getUIntType(), object);
                 return builder.emitBitCast(type, object);
             }
             break;
@@ -195,6 +197,7 @@ struct BitCastLoweringContext
         case kIROp_UIntPtrType:
 #endif
         case kIROp_RawPointerType:
+        case kIROp_PtrType:
             {
                 auto low = extractValueAtOffset(builder, targetProgram, src, offset, 4);
                 auto high = extractValueAtOffset(builder, targetProgram, src, offset + 4, 4);
@@ -214,6 +217,7 @@ struct BitCastLoweringContext
         case kIROp_Int8Type:
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 1);
+                object = builder.emitCast(builder.getUInt8Type(), object);
                 return builder.emitBitCast(type, object);
             }
             break;
@@ -250,14 +254,6 @@ struct BitCastLoweringContext
             return;
         }
         // Ignore cases we cannot handle yet.
-        if (as<IRPtrType>(fromType) || as<IRPtrType>(toType))
-        {
-            return;
-        }
-        if (as<IRRawPointerType>(fromType) || as<IRRawPointerType>(toType))
-        {
-            return;
-        }
         if (as<IRResourceTypeBase>(fromType) || as<IRResourceTypeBase>(toType))
         {
             return;
