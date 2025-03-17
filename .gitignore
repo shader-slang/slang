@@ -12,6 +12,7 @@
 *.zip
 *.ini
 *.DS_store
+.direnv
 .gdb_history
 .vimspector
 .vimspector.json

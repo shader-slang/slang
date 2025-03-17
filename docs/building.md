@@ -14,6 +14,12 @@ Please install:
 - A CMake compatible backend, for example Visual Studio or Ninja
 - Python3 (a dependency for building spirv-tools)
 
+Note that if you are using [Nix](https://nixos.org/) (with
+[flakes](https://wiki.nixos.org/wiki/Flakes) enabled) and
+[direnv](https://direnv.net/), these prerequisites are automatically installed
+in a local environment when you've entered your clone of the repository and run
+`direnv allow`.
+
 Optional dependencies for tests include
 
 - CUDA
