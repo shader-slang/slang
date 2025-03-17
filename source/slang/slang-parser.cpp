@@ -8302,7 +8302,6 @@ static Expr* _parseGenericArg(Parser* parser)
         return typeExpr;
     }
 
-
     return parser->ParseArgExpr();
 }
 
