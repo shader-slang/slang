@@ -2187,6 +2187,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_MakeCoopVector:
     case kIROp_MakeCoopVectorFromValuePack:
     case kIROp_GetCurrentStage:
+    case kIROp_GetOffsetPtr:
         return transcribeNonDiffInst(builder, origInst);
 
         // A call to createDynamicObject<T>(arbitraryData) cannot provide a diff value,
