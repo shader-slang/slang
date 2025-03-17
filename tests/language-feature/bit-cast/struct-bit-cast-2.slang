@@ -27,6 +27,7 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     Bar b = { 0x1122334455667788 };
+
     Foo f = bit_cast<Foo>(b);
     // CHECK: 7788
     outputBuffer[0] = f.a;
@@ -40,6 +41,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 
     // CHECK: 40302010
     outputBuffer[3] = u;
+
     int* ptr = bit_cast<int*>(b.d);
     Foo f1 = bit_cast<Foo>(ptr);
     // CHECK: 11223344

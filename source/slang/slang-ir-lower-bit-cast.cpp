@@ -198,19 +198,11 @@ struct BitCastLoweringContext
 #endif
         case kIROp_RawPointerType:
         case kIROp_PtrType:
+        case kIROp_FuncType:
             {
-                auto low = extractValueAtOffset(builder, targetProgram, src, offset, 4);
-                auto high = extractValueAtOffset(builder, targetProgram, src, offset + 4, 4);
-                auto combined = builder.emitAdd(
-                    builder.getUInt64Type(),
-                    low,
-                    builder.emitShl(
-                        builder.getUInt64Type(),
-                        high,
-                        builder.getIntValue(builder.getUIntType(), 32)));
-                if (type->getOp() == kIROp_UInt64Type)
-                    return combined;
-                return builder.emitBitCast(type, combined);
+                auto object = extractValueAtOffset(builder, targetProgram, src, offset, 8);
+                object = builder.emitCast(builder.getUInt64Type(), object);
+                return builder.emitBitCast(type, object);
             }
             break;
         case kIROp_UInt8Type:
