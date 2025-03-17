@@ -51,7 +51,7 @@ namespace integrator {
 
         float4 sample(IScene scene, RayDesc _ray, IRandom rng, int pixel_aabb_uv, uint3 id) {
             float4 grad = { 0.0f, 0.0f, 0.0f, 1.0f };
-
+                
             RayDesc ray = _ray; uint32_t depth = 0;
             RayQuery<0> rayQuery;
             while (rayQuery.Proceed()) {
