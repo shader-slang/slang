@@ -1919,6 +1919,28 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(getBuilder()->getIntValue(type, val->getValue()));
     }
 
+    IRType* visitDifferentialPairType(DifferentialPairType* pairType)
+    {
+        IRType* primalType = lowerType(context, pairType->getPrimalType());
+        if (as<IRAssociatedType>(primalType) || as<IRThisType>(primalType))
+        {
+            List<IRInst*> operands;
+            SubstitutionSet(pairType->getDeclRef())
+                .forEachSubstitutionArg(
+                    [&](Val* arg)
+                    {
+                        auto argVal = lowerVal(context, arg).val;
+                        SLANG_ASSERT(argVal);
+                        operands.add(argVal);
+                    });
+
+            auto undefined = getBuilder()->emitUndefined(operands[1]->getFullType());
+            return getBuilder()->getDifferentialPairUserCodeType(primalType, undefined);
+        }
+        else
+            return lowerSimpleIntrinsicType(pairType);
+    }
+
     IRFuncType* visitFuncType(FuncType* type)
     {
         IRType* resultType = lowerType(context, type->getResultType());
@@ -10195,15 +10217,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // If our function is differentiable, register a callback so the derivative
         // annotations for types can be lowered.
         //
-        if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
+        if (decl->findModifier<DifferentiableAttribute>() && !isInterfaceRequirement(decl))
         {
+            auto diffAttr = decl->findModifier<DifferentiableAttribute>();
+
             auto diffTypeWitnessMap = diffAttr->getMapTypeToIDifferentiableWitness();
-            OrderedDictionary<DeclRefBase*, SubtypeWitness*> resolveddiffTypeWitnessMap;
+            OrderedDictionary<Type*, SubtypeWitness*> resolveddiffTypeWitnessMap;
 
             // Go through each entry in the map and resolve the key.
             for (auto& entry : diffTypeWitnessMap)
             {
-                auto resolvedKey = as<DeclRefBase>(entry.key->resolve());
+                auto resolvedKey = as<Type>(entry.key->resolve());
                 resolveddiffTypeWitnessMap[resolvedKey] =
                     as<SubtypeWitness>(as<Val>(entry.value)->resolve());
             }
@@ -10211,14 +10235,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContext->registerTypeCallback(
                 [=](IRGenContext* context, Type* type, IRType* irType)
                 {
-                    if (!as<DeclRefType>(type))
-                        return irType;
-
-                    DeclRefBase* declRefBase = as<DeclRefType>(type)->getDeclRefBase();
-                    if (resolveddiffTypeWitnessMap.containsKey(declRefBase))
+                    if (resolveddiffTypeWitnessMap.containsKey(type))
                     {
-                        auto irWitness =
-                            lowerVal(subContext, resolveddiffTypeWitnessMap[declRefBase]).val;
+                        auto irWitness = lowerVal(subContext, resolveddiffTypeWitnessMap[type]).val;
                         if (irWitness)
                         {
                             IRInst* args[] = {irType, irWitness};
@@ -11328,7 +11347,7 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
                 // interface definitions.
                 return emitDeclRef(
                     context,
-                    createDefaultSpecializedDeclRef(context, nullptr, decl),
+                    decl->getDefaultDeclRef(),
                     context->irBuilder->getTypeKind());
             }
 
