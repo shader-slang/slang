@@ -2698,6 +2698,10 @@ DIAGNOSTIC(
 // Ray tracing
 //
 
-DIAGNOSTIC(40000, Error, rayPayloadFieldMissingAccessQualifiers, "field '$0' in ray payload struct must have either 'read' OR 'write' access qualifiers")
+DIAGNOSTIC(
+    40000,
+    Error,
+    rayPayloadFieldMissingAccessQualifiers,
+    "field '$0' in ray payload struct must have either 'read' OR 'write' access qualifiers")
 
 #undef DIAGNOSTIC
