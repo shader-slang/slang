@@ -3603,7 +3603,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         continue;
 
                     ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_NV_compute_shader_derivatives"));
+                        UnownedStringSlice("SPV_KHR_compute_shader_derivatives"));
                     auto numThreadsDecor =
                         entryPointDecor->findDecoration<IRNumThreadsDecoration>();
                     if (isQuad)
@@ -3617,8 +3617,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         requireSPIRVExecutionMode(
                             nullptr,
                             getIRInstSpvID(entryPoint),
-                            SpvExecutionModeDerivativeGroupQuadsNV);
-                        requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupQuadsNV);
+                            SpvExecutionModeDerivativeGroupQuadsKHR);
+                        requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupQuadsKHR);
                     }
                     else
                     {
@@ -3631,8 +3631,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         requireSPIRVExecutionMode(
                             nullptr,
                             getIRInstSpvID(entryPoint),
-                            SpvExecutionModeDerivativeGroupLinearNV);
-                        requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupLinearNV);
+                            SpvExecutionModeDerivativeGroupLinearKHR);
+                        requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupLinearKHR);
                     }
                 }
 
