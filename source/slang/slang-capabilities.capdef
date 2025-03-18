@@ -529,6 +529,10 @@ def SPV_NV_shader_image_footprint : _spirv_1_0;
 /// [EXT]
 def SPV_KHR_compute_shader_derivatives : _spirv_1_0;
 
+/// Represents the SPIR-V extension for compute shader derivatives.
+/// [EXT]
+alias SPV_NV_compute_shader_derivatives = SPV_KHR_compute_shader_derivatives;
+
 /// Represents the SPIR-V extension for SPV_GOOGLE_user_type.
 /// [EXT]
 def SPV_GOOGLE_user_type : _spirv_1_0;

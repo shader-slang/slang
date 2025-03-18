@@ -412,6 +412,9 @@ Extensions
 `SPV_KHR_compute_shader_derivatives`
 > Represents the SPIR-V extension for compute shader derivatives.
 
+`SPV_NV_compute_shader_derivatives`
+> Represents the SPIR-V extension for compute shader derivatives.
+
 `SPV_GOOGLE_user_type`
 > Represents the SPIR-V extension for SPV_GOOGLE_user_type.
 
