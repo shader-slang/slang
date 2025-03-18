@@ -819,7 +819,7 @@ struct IRInst
 
     /// Print the IR to a string for debugging purposes.
     ///
-    void dump(String &outStr);
+    void dump(String& outStr);
 
     /// Insert a basic block at the end of this func/code containing inst.
     void addBlock(IRBlock* block);

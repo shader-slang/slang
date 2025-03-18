@@ -4421,8 +4421,8 @@ struct IModule : public IComponentType
 
     /** Disassemble a module.
      */
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(
-        slang::IBlob** outDisassembledBlob) = 0;    
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    disassemble(slang::IBlob** outDisassembledBlob) = 0;
 };
 
     #define SLANG_UUID_IModule IModule::getTypeGuid()
