@@ -6,7 +6,6 @@
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-random-generator.h"
 #include "slang-check.h"
-#include "slang-compiler.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-bit-field-accessors.h"
 #include "slang-ir-check-differentiability.h"
