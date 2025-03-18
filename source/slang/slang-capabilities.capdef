@@ -1937,6 +1937,16 @@ alias shader5_sm_4_0 = GL_ARB_gpu_shader5 | sm_4_0_version;
 /// [Compound]
 alias shader5_sm_5_0 = GL_ARB_gpu_shader5 | sm_5_0_version;
 
+/// Capabilities required to use pack/unpack intrinsics on packed vector data
+/// [Compound]
+alias pack_vector = GL_ARB_gpu_shader5
+                  | _sm_6_6
+                  | _cuda_sm_9_0
+                  | wgsl
+                  | metal
+                  | cpp
+                  ;
+
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_basic'
 /// [Compound]
 alias subgroup_basic = GL_KHR_shader_subgroup_basic
