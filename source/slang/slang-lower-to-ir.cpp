@@ -8049,7 +8049,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             subBuilder->createWitnessTable(irWitnessTableBaseType, concreteType);
 
                         // Avoid adding same decorations and child more than once.
-                        if (irSatisfyingWitnessTable->getFirstDecorationOrChild() == nullptr)
+                        if (!irSatisfyingWitnessTable->hasDecorationOrChild())
                         {
                             auto mangledName = getMangledNameForConformanceWitness(
                                 subContext->astBuilder,
@@ -8194,7 +8194,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             LoweredValInfo::simple(findOuterMostGeneric(irWitnessTable)));
 
         // Avoid adding same decorations and child more than once.
-        if (irWitnessTable->getFirstDecorationOrChild() == nullptr)
+        if (!irWitnessTable->hasDecorationOrChild())
         {
             // Construct the mangled name for the witness table, which depends
             // on the type that is conforming, and the type that it conforms to.

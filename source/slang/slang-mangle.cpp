@@ -842,7 +842,7 @@ String getMangledNameForConformanceWitness(ASTBuilder* astBuilder, Type* sub, Ty
     ManglingContext context(astBuilder);
     emitRaw(&context, "_SW");
 
-    if (ASTNodeType(sup->getClassInfo().m_classId) == ASTNodeType::EnumTypeType)
+    if (isDeclRefTypeOf<EnumDecl>(sup))
     {
         emitRaw(&context, getIROpInfo(subOp).name);
     }

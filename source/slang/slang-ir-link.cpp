@@ -732,7 +732,7 @@ IRWitnessTable* cloneWitnessTableImpl(
         clonedBaseType = cloneType(context, (IRType*)(originalTable->getConformanceType()));
         auto clonedSubType = cloneType(context, (IRType*)(originalTable->getConcreteType()));
         clonedTable = builder->createWitnessTable(clonedBaseType, clonedSubType);
-        if (clonedTable->getFirstDecorationOrChild() != nullptr)
+        if (clonedTable->hasDecorationOrChild())
             return clonedTable;
     }
     else

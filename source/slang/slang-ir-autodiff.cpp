@@ -1863,7 +1863,7 @@ IRInst* DifferentiableTypeConformanceContext::buildDifferentiablePairWitness(
             (IRType*)pairType);
 
         // Add WitnessTableEntry only once
-        if (table->getFirstDecorationOrChild() == nullptr)
+        if (!table->hasDecorationOrChild())
         {
             // And place it in the synthesized witness table.
             builder->createWitnessTableEntry(
@@ -1949,7 +1949,7 @@ IRInst* DifferentiableTypeConformanceContext::buildDifferentiablePairWitness(
             (IRType*)pairType);
 
         // Add WitnessTableEntry only once
-        if (table->getFirstDecorationOrChild() == nullptr)
+        if (!table->hasDecorationOrChild())
         {
             // And place it in the synthesized witness table.
             builder->createWitnessTableEntry(
@@ -1996,7 +1996,7 @@ IRInst* DifferentiableTypeConformanceContext::buildArrayWitness(
             (IRType*)arrayType);
 
         // Add WitnessTableEntry only once
-        if (table->getFirstDecorationOrChild() == nullptr)
+        if (!table->hasDecorationOrChild())
         {
             // And place it in the synthesized witness table.
             builder->createWitnessTableEntry(
@@ -2079,7 +2079,7 @@ IRInst* DifferentiableTypeConformanceContext::buildArrayWitness(
             (IRType*)arrayType);
 
         // Add WitnessTableEntry only once
-        if (table->getFirstDecorationOrChild() == nullptr)
+        if (!table->hasDecorationOrChild())
         {
             // And place it in the synthesized witness table.
             builder->createWitnessTableEntry(
@@ -2122,7 +2122,7 @@ IRInst* DifferentiableTypeConformanceContext::buildTupleWitness(
             (IRType*)inTupleType);
 
         // Add WitnessTableEntry only once
-        if (table->getFirstDecorationOrChild() == nullptr)
+        if (!table->hasDecorationOrChild())
         {
             // And place it in the synthesized witness table.
             builder->createWitnessTableEntry(
@@ -2240,7 +2240,7 @@ IRInst* DifferentiableTypeConformanceContext::buildTupleWitness(
             (IRType*)inTupleType);
 
         // Add WitnessTableEntry only once
-        if (table->getFirstDecorationOrChild() == nullptr)
+        if (!table->hasDecorationOrChild())
         {
             // And place it in the synthesized witness table.
             builder->createWitnessTableEntry(
@@ -3103,7 +3103,7 @@ struct AutoDiffPass : public InstPassBase
         result.diffWitness = origTypeIsDiffWitness;
 
         // Add WitnessTableEntry only once
-        if (origTypeIsDiffWitness->getFirstDecorationOrChild() == nullptr)
+        if (!origTypeIsDiffWitness->hasDecorationOrChild())
         {
             builder.createWitnessTableEntry(
                 origTypeIsDiffWitness,
@@ -3124,7 +3124,7 @@ struct AutoDiffPass : public InstPassBase
         }
 
         // Add WitnessTableEntry only once
-        if (diffTypeIsDiffWitness->getFirstDecorationOrChild() == nullptr)
+        if (!diffTypeIsDiffWitness->hasDecorationOrChild())
         {
             builder.createWitnessTableEntry(
                 diffTypeIsDiffWitness,
@@ -3223,7 +3223,7 @@ struct AutoDiffPass : public InstPassBase
                 auto newWitnessTable = builder.createWitnessTable(conformanceType, concreteType);
 
                 // Add WitnessTableEntry only once
-                if (newWitnessTable->getFirstDecorationOrChild() == nullptr)
+                if (!newWitnessTable->hasDecorationOrChild())
                 {
                     builder.setInsertInto(newWitnessTable);
                     for (auto entry : as<IRWitnessTable>(innerResult.diffWitness)->getEntries())
