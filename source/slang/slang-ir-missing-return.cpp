@@ -27,11 +27,15 @@ static bool doesTargetAllowMissingReturns(CodeGenTarget target)
 static void diagnoseMissingReturnForTarget(
     IRMissingReturn* missingReturn,
     DiagnosticSink* sink,
-    CodeGenTarget target)
+    CodeGenTarget target,
+    bool diagnoseWarning)
 {
     if (doesTargetAllowMissingReturns(target))
     {
-        sink->diagnose(missingReturn, Diagnostics::missingReturn);
+        if (diagnoseWarning)
+        {
+            sink->diagnose(missingReturn, Diagnostics::missingReturn);
+        }
     }
     else
     {
@@ -42,7 +46,11 @@ static void diagnoseMissingReturnForTarget(
     }
 }
 
-void checkForMissingReturnsRec(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target)
+void checkForMissingReturnsRec(
+    IRInst* inst,
+    DiagnosticSink* sink,
+    CodeGenTarget target,
+    bool diagnoseWarning)
 {
     if (auto code = as<IRGlobalValueWithCode>(inst))
     {
@@ -52,21 +60,25 @@ void checkForMissingReturnsRec(IRInst* inst, DiagnosticSink* sink, CodeGenTarget
 
             if (auto missingReturn = as<IRMissingReturn>(terminator))
             {
-                diagnoseMissingReturnForTarget(missingReturn, sink, target);
+                diagnoseMissingReturnForTarget(missingReturn, sink, target, diagnoseWarning);
             }
         }
     }
 
     for (auto childInst : inst->getDecorationsAndChildren())
     {
-        checkForMissingReturnsRec(childInst, sink, target);
+        checkForMissingReturnsRec(childInst, sink, target, diagnoseWarning);
     }
 }
 
-void checkForMissingReturns(IRModule* module, DiagnosticSink* sink, CodeGenTarget target)
+void checkForMissingReturns(
+    IRModule* module,
+    DiagnosticSink* sink,
+    CodeGenTarget target,
+    bool diagnoseWarning)
 {
     // Look for any `missingReturn` instructions
-    checkForMissingReturnsRec(module->getModuleInst(), sink, target);
+    checkForMissingReturnsRec(module->getModuleInst(), sink, target, diagnoseWarning);
 }
 
 } // namespace Slang

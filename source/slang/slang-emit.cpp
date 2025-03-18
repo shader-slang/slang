@@ -1088,7 +1088,7 @@ Result linkAndOptimizeIR(
         checkForRecursiveFunctions(codeGenContext->getTargetReq(), irModule, sink);
 
         if (requiredLoweringPassSet.missingReturn)
-            checkForMissingReturns(irModule, sink, target);
+            checkForMissingReturns(irModule, sink, target, false);
 
         // For some targets, we are more restrictive about what types are allowed
         // to be used as shader parameters in ConstantBuffer/ParameterBlock.
