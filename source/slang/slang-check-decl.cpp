@@ -12494,6 +12494,12 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
         }
     }
 
+    // Check if this is a ray payload struct and validate field access qualifiers
+    if (structDecl->findModifier<RayPayloadAttribute>())
+    {
+        checkRayPayloadStructFields(structDecl);
+    }
+
     int backingWidth = 0;
     [[maybe_unused]] int totalWidth = 0;
     struct BitFieldInfo

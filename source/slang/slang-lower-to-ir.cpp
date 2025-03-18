@@ -9207,6 +9207,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subBuilder->addDecoration(irAggType, kIROp_PayloadDecoration);
         }
 
+        if (const auto rayPayloadAttribute = decl->findModifier<RayPayloadAttribute>())
+        {
+            subBuilder->addDecoration(irAggType, kIROp_RayPayloadDecoration);
+        }
+
         subBuilder->setInsertInto(irAggType);
 
         // A `struct` that inherits from another `struct` must start

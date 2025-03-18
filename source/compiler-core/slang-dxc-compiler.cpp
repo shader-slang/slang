@@ -479,8 +479,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
         args.add(compilerSpecific[i]);
     }
 
-    // This can be re-enabled when we add PAQs: https://github.com/shader-slang/slang/issues/3448
-    const bool enablePAQs = false;
+    const bool enablePAQs = true;
     if (!enablePAQs)
         args.add(L"-disable-payload-qualifiers");
     else

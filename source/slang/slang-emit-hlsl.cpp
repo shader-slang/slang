@@ -1667,8 +1667,7 @@ void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
     {
         m_writer->emit("[payload] ");
     }
-    // This can be re-enabled when we add PAQs: https://github.com/shader-slang/slang/issues/3448
-    const bool enablePAQs = false;
+    const bool enablePAQs = true;
     if (enablePAQs)
     {
         if (const auto payloadDecoration = inst->findDecoration<IRRayPayloadDecoration>())

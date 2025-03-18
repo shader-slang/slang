@@ -2,6 +2,12 @@
 
 // CHECK: struct [raypayload]
 
+struct [raypayload] RayPayload
+{
+    float4 color : write(caller) : read(anyhit);
+
+};
+
 uniform RWTexture2D resultTexture;
 uniform RaytracingAccelerationStructure sceneBVH;
 
@@ -21,8 +27,8 @@ void rayGenShaderA()
     ray.Direction = rayDir;
     ray.TMin = 0.001;
     ray.TMax = 10000.0;
-    float4 payload = float4(0, 0, 0, 0);
+    RayPayload payload = { float4(0, 0, 0, 0) };
     TraceRay(sceneBVH, RAY_FLAG_NONE, ~0, 0, 0, 0, ray, payload);
 
-    resultTexture[threadIdx.xy] = payload;
+    resultTexture[threadIdx.xy] = payload.color;
 }

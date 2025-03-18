@@ -2835,6 +2835,8 @@ public:
     bool isCStyleType(Type* type, HashSet<Type*>& isVisit);
 
     void addVisibilityModifier(Decl* decl, DeclVisibility vis);
+
+    void checkRayPayloadStructFields(StructDecl* structDecl);
 };
 
 
