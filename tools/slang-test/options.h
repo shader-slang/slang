@@ -129,6 +129,9 @@ struct Options
         TestCategorySet* categorySet,
         Slang::WriterHelper stdError,
         Options* optionsOut);
+
+    /// Display help message
+    static void showHelp(Slang::WriterHelper stdOut);
 };
 
 #endif // OPTIONS_H_INCLUDED

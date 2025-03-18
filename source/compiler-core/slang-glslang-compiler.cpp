@@ -49,6 +49,10 @@ public:
     validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     disassemble(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassembleWithResult(
+        const uint32_t* contents,
+        int contentsSize,
+        String& outString) SLANG_OVERRIDE;
     int link(
         const uint32_t** modules,
         const uint32_t* moduleSizes,
@@ -71,6 +75,7 @@ protected:
     glslang_CompileFunc_1_2 m_compile_1_2 = nullptr;
     glslang_ValidateSPIRVFunc m_validate = nullptr;
     glslang_DisassembleSPIRVFunc m_disassemble = nullptr;
+    glslang_DisassembleSPIRVWithResultFunc m_disassembleWithResult = nullptr;
     glslang_LinkSPIRVFunc m_link = nullptr;
 
     ComPtr<ISlangSharedLibrary> m_sharedLibrary;
@@ -86,6 +91,8 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_validate = (glslang_ValidateSPIRVFunc)library->findFuncByName("glslang_validateSPIRV");
     m_disassemble =
         (glslang_DisassembleSPIRVFunc)library->findFuncByName("glslang_disassembleSPIRV");
+    m_disassembleWithResult = (glslang_DisassembleSPIRVWithResultFunc)library->findFuncByName(
+        "glslang_disassembleSPIRVWithResult");
     m_link = (glslang_LinkSPIRVFunc)library->findFuncByName("glslang_linkSPIRV");
 
     if (m_compile_1_0 == nullptr && m_compile_1_1 == nullptr && m_compile_1_2 == nullptr)
@@ -312,6 +319,28 @@ SlangResult GlslangDownstreamCompiler::validate(const uint32_t* contents, int co
     if (m_validate(contents, contentsSize))
     {
         return SLANG_OK;
+    }
+    return SLANG_FAIL;
+}
+
+SlangResult GlslangDownstreamCompiler::disassembleWithResult(
+    const uint32_t* contents,
+    int contentsSize,
+    String& outString)
+{
+    if (m_disassembleWithResult == nullptr)
+    {
+        return SLANG_FAIL;
+    }
+
+    char* resultString = nullptr;
+    if (m_disassembleWithResult(contents, contentsSize, &resultString))
+    {
+        if (resultString)
+        {
+            outString = String(resultString);
+            return SLANG_OK;
+        }
     }
     return SLANG_FAIL;
 }

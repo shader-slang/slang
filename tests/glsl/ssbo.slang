@@ -17,6 +17,7 @@ buffer MyBlockName2
 } outputBuffer;
 
 layout(local_size_x = 4) in;
+[shader("compute")]
 void computeMain()
 {
     outputBuffer.data[gl_GlobalInvocationID.x] = inputBuffer.data[gl_GlobalInvocationID.x];

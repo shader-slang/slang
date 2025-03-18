@@ -577,9 +577,6 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
             emitNumThreadsAttribute();
             if (auto decor = irFunc->findDecoration<IROutputTopologyDecoration>())
             {
-                // TODO: Ellie validate here/elsewhere, what's allowed here is
-                // different from the tesselator
-                // The naming here is plural, so add an 's'
                 _emitHLSLDecorationSingleString("outputtopology", irFunc, decor->getTopology());
             }
             break;

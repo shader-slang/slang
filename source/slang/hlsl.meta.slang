@@ -67,15 +67,15 @@ __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
 uint2 __structuredBufferGetDimensions(ConsumeStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(StructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RWStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RasterizerOrderedStructuredBuffer<T,L> buffer);
 
 //@public:
@@ -143,7 +143,7 @@ struct ByteAddressBuffer
     ///@param[out] dim The number of bytes in the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer)]
     void GetDimensions(out uint dim)
     {
         __target_switch
@@ -151,9 +151,7 @@ struct ByteAddressBuffer
         case cpp: __intrinsic_asm ".GetDimensions";
         case cuda: __intrinsic_asm ".GetDimensions";
         case hlsl: __intrinsic_asm ".GetDimensions";
-        case glsl:
-        case metal:
-        case spirv:
+        default:
             dim = __structuredBufferGetDimensions(__getEquivalentStructuredBuffer<uint>(this)).x*4;
         }
     }
@@ -4922,7 +4920,7 @@ struct $(item.name)
     /// Get the number of bytes in the buffer.
     ///@param[out] dim The number of bytes in the buffer.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer_rw)]
     void GetDimensions(out uint dim)
     {
         __target_switch
@@ -4930,8 +4928,7 @@ struct $(item.name)
         case cpp: __intrinsic_asm ".GetDimensions";
         case cuda: __intrinsic_asm ".GetDimensions";
         case hlsl: __intrinsic_asm ".GetDimensions";
-        case glsl:
-        case spirv:
+        default:
             dim = __structuredBufferGetDimensions(__getEquivalentStructuredBuffer<uint>(this)).x*4;
         }
     }
@@ -5939,7 +5936,7 @@ struct $(item.name)
     /// @param stride The stride, in bytes, of each structure element.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer_rw)]
     void GetDimensions(
         out uint numStructs,
         out uint stride)

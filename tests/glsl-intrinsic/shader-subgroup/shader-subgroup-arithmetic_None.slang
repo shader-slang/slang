@@ -182,6 +182,7 @@ bool testArithmetic() {
         ;
 }
 
+[shader("compute")]
 void computeMain()
 {
 

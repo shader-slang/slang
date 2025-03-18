@@ -16,6 +16,7 @@ buffer MyBlockName2
 
 layout(local_size_x = 4) in;
 
+[shader("compute")]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     // There may be some issues with structure padding for global context containing

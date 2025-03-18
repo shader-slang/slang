@@ -38,6 +38,7 @@
 #include "slang-ir-early-raytracing-intrinsic-simplification.h"
 #include "slang-ir-eliminate-multilevel-break.h"
 #include "slang-ir-eliminate-phis.h"
+#include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-entry-point-raw-ptr-params.h"
 #include "slang-ir-entry-point-uniforms.h"
 #include "slang-ir-explicit-global-context.h"
@@ -596,20 +597,101 @@ static void unexportNonEmbeddableIR(CodeGenTarget target, IRModule* irModule)
     }
 }
 
-static void validateMatrixDimensions(DiagnosticSink* sink, IRModule* module)
+static void validateVectorOrMatrixElementType(
+    DiagnosticSink* sink,
+    SourceLoc sourceLoc,
+    IRType* elementType,
+    uint32_t allowedWidths,
+    const DiagnosticInfo& disallowedElementTypeEncountered)
+{
+    if (!isFloatingType(elementType))
+    {
+        if (isIntegralType(elementType))
+        {
+            IntInfo info = getIntTypeInfo(elementType);
+            if (allowedWidths == 0U)
+            {
+                sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
+            }
+            else
+            {
+                bool widthAllowed = false;
+                SLANG_ASSERT((allowedWidths & ~(0xfU << 3)) == 0U);
+                for (uint32_t p = 3U; p <= 6U; p++)
+                {
+                    uint32_t width = 1U << p;
+                    if (!(allowedWidths & width))
+                        continue;
+                    widthAllowed = widthAllowed || (info.width == width);
+                }
+                if (!widthAllowed)
+                {
+                    sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
+                }
+            }
+        }
+        else if (!as<IRBoolType>(elementType))
+        {
+            sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
+        }
+    }
+}
+
+static void validateVectorsAndMatrices(
+    DiagnosticSink* sink,
+    IRModule* module,
+    TargetRequest* targetRequest)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
         if (auto matrixType = as<IRMatrixType>(globalInst))
         {
-            auto colCount = as<IRIntLit>(matrixType->getColumnCount());
-            auto rowCount = as<IRIntLit>(matrixType->getRowCount());
-
-            if ((rowCount && (rowCount->getValue() == 1)) ||
-                (colCount && (colCount->getValue() == 1)))
+            // Matrices with row/col dimension 1 are only well-supported on D3D targets
+            if (!isD3DTarget(targetRequest))
             {
-                sink->diagnose(matrixType->sourceLoc, Diagnostics::matrixColumnOrRowCountIsOne);
+                // Verify that neither row nor col count is 1
+                auto colCount = as<IRIntLit>(matrixType->getColumnCount());
+                auto rowCount = as<IRIntLit>(matrixType->getRowCount());
+
+                if ((rowCount && (rowCount->getValue() == 1)) ||
+                    (colCount && (colCount->getValue() == 1)))
+                {
+                    sink->diagnose(matrixType->sourceLoc, Diagnostics::matrixColumnOrRowCountIsOne);
+                }
             }
+
+            // Verify that the element type is a floating point type, or an allowed integral type
+            auto elementType = matrixType->getElementType();
+            uint32_t allowedWidths = 0U;
+            if (isCPUTarget(targetRequest))
+                allowedWidths = 8U | 16U | 32U | 64U;
+            else if (isCUDATarget(targetRequest))
+                allowedWidths = 32U | 64U;
+            else if (isD3DTarget(targetRequest))
+                allowedWidths = 16U | 32U;
+            validateVectorOrMatrixElementType(
+                sink,
+                matrixType->sourceLoc,
+                elementType,
+                allowedWidths,
+                Diagnostics::matrixWithDisallowedElementTypeEncountered);
+        }
+        else if (auto vectorType = as<IRVectorType>(globalInst))
+        {
+            // Verify that the element type is a floating point type, or an allowed integral type
+            auto elementType = vectorType->getElementType();
+            uint32_t allowedWidths = 0U;
+            if (isWGPUTarget(targetRequest))
+                allowedWidths = 32U;
+            else
+                allowedWidths = 8U | 16U | 32U | 64U;
+
+            validateVectorOrMatrixElementType(
+                sink,
+                vectorType->sourceLoc,
+                elementType,
+                allowedWidths,
+                Diagnostics::vectorWithDisallowedElementTypeEncountered);
         }
     }
 }
@@ -721,6 +803,8 @@ Result linkAndOptimizeIR(
     dumpIRIfEnabled(codeGenContext, irModule, "GLOBAL UNIFORMS COLLECTED");
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    checkEntryPointDecorations(irModule, target, sink);
 
     // Another transformation that needed to wait until we
     // had layout information on parameters is to take uniform
@@ -1599,9 +1683,8 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    // Make sure there are no matrices with 1 row/column, except for D3D targets where it's allowed.
-    if (!isD3DTarget(targetRequest))
-        validateMatrixDimensions(sink, irModule);
+    // Validate vectors and matrices according to what the target allows
+    validateVectorsAndMatrices(sink, irModule, targetRequest);
 
     // The resource-based specialization pass above
     // may create specialized versions of functions, but
