@@ -1956,6 +1956,7 @@ bool isMetalTarget(TargetRequest* targetReq);
 
 /// Are we generating code for a Khronos API (OpenGL or Vulkan)?
 bool isKhronosTarget(TargetRequest* targetReq);
+bool isKhronosTarget(CodeGenTarget target);
 
 /// Are we generating code for a CUDA API (CUDA / OptiX)?
 bool isCUDATarget(TargetRequest* targetReq);
@@ -1965,6 +1966,7 @@ bool isCPUTarget(TargetRequest* targetReq);
 
 /// Are we generating code for the WebGPU API?
 bool isWGPUTarget(TargetRequest* targetReq);
+bool isWGPUTarget(CodeGenTarget target);
 
 /// A request to generate output in some target format.
 class TargetRequest : public RefObject

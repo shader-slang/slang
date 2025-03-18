@@ -6,6 +6,7 @@
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-random-generator.h"
 #include "slang-check.h"
+#include "slang-compiler.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-bit-field-accessors.h"
 #include "slang-ir-check-differentiability.h"
@@ -11811,7 +11812,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // TODO: give error messages if any `undefined` or
         // instructions remain.
 
-        checkForMissingReturns(module, compileRequest->getSink());
+        checkForMissingReturns(module, compileRequest->getSink(), CodeGenTarget::Unknown);
         // Check for invalid differentiable function body.
         checkAutoDiffUsages(module, compileRequest->getSink());
 

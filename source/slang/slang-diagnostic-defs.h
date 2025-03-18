@@ -2157,6 +2157,11 @@ DIAGNOSTIC(
 
 DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
 DIAGNOSTIC(41001, Error, recursiveType, "type '$0' contains cyclic reference to itself.")
+DIAGNOSTIC(
+    41002,
+    Error,
+    missingReturnError,
+    "non-void function must return in all cases for target '$0'")
 
 DIAGNOSTIC(41010, Warning, missingReturn, "non-void function does not return in all cases")
 DIAGNOSTIC(

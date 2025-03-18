@@ -3,6 +3,7 @@
 
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "slang-check-impl.h"
+#include "slang-compiler.h"
 #include "slang-ir-insts.h"
 #include "slang-mangle.h"
 #include "slang-syntax.h"
@@ -2508,9 +2509,9 @@ bool isMetalTarget(TargetRequest* targetReq)
     }
 }
 
-bool isKhronosTarget(TargetRequest* targetReq)
+bool isKhronosTarget(CodeGenTarget target)
 {
-    switch (targetReq->getTarget())
+    switch (target)
     {
     default:
         return false;
@@ -2520,6 +2521,11 @@ bool isKhronosTarget(TargetRequest* targetReq)
     case CodeGenTarget::SPIRVAssembly:
         return true;
     }
+}
+
+bool isKhronosTarget(TargetRequest* targetReq)
+{
+    return isKhronosTarget(targetReq->getTarget());
 }
 
 bool isCPUTarget(TargetRequest* targetReq)
@@ -2541,9 +2547,9 @@ bool isCUDATarget(TargetRequest* targetReq)
     }
 }
 
-bool isWGPUTarget(TargetRequest* targetReq)
+bool isWGPUTarget(CodeGenTarget target)
 {
-    switch (targetReq->getTarget())
+    switch (target)
     {
     default:
         return false;
@@ -2553,6 +2559,11 @@ bool isWGPUTarget(TargetRequest* targetReq)
     case CodeGenTarget::WGSLSPIRVAssembly:
         return true;
     }
+}
+
+bool isWGPUTarget(TargetRequest* targetReq)
+{
+    return isWGPUTarget(targetReq->getTarget());
 }
 
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)

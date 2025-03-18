@@ -5,6 +5,7 @@ namespace Slang
 {
 class DiagnosticSink;
 struct IRModule;
+enum class CodeGenTarget;
 
-void checkForMissingReturns(IRModule* module, DiagnosticSink* sink);
+void checkForMissingReturns(IRModule* module, DiagnosticSink* sink, CodeGenTarget target);
 } // namespace Slang
