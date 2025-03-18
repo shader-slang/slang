@@ -1424,7 +1424,7 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::GLSLBufferModifier:
     case ASTNodeType::GLSLPatchModifier:
         return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
-            as<GLSLInterfaceBlockDecl>(decl);
+               as<GLSLInterfaceBlockDecl>(decl);
     case ASTNodeType::RayPayloadAccessSemantic:
     case ASTNodeType::RayPayloadReadSemantic:
     case ASTNodeType::RayPayloadWriteSemantic:
@@ -2207,9 +2207,9 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
     {
         return;
     }
-    
+
     bool anyFieldMissingQualifiers = false;
-    
+
     // Check each field in the struct
     for (auto member : structDecl->members)
     {
@@ -2218,10 +2218,10 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
         {
             continue;
         }
-                
+
         bool hasReadModifier = fieldVarDecl->findModifier<RayPayloadReadSemantic>() != nullptr;
         bool hasWriteModifier = fieldVarDecl->findModifier<RayPayloadWriteSemantic>() != nullptr;
-        
+
         if (!hasReadModifier && !hasWriteModifier)
         {
             // Emit the diagnostic error
@@ -2229,7 +2229,7 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
                 fieldVarDecl,
                 Diagnostics::rayPayloadFieldMissingAccessQualifiers,
                 fieldVarDecl->getName());
-                
+
             anyFieldMissingQualifiers = true;
         }
     }
