@@ -802,7 +802,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::VerifyDebugSerialIr,
          "-verify-debug-serial-ir",
          nullptr,
-         "Verify IR in the front-end."}};
+         "Verify IR in the front-end."},
+        {OptionKind::DumpModule, "-dump-module", nullptr, "Disassemble and print the module IR."}};
     _addOptions(makeConstArrayView(debuggingOpts), options);
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Experimental !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -2947,6 +2948,81 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 Int index = 0;
                 SLANG_RETURN_ON_FAIL(_expectInt(arg, index));
                 linkage->m_optionSet.add(OptionKind::BindlessSpaceIndex, (int)index);
+                break;
+            }
+        case OptionKind::DumpModule:
+            {
+                CommandLineArg fileName;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(fileName));                
+                auto desc = slang::SessionDesc();
+                ComPtr<slang::ISession> session;
+                m_session->createSession(desc, session.writeRef());
+                ComPtr<slang::IBlob> diagnostics;
+
+                // Coerce Slang to load from the given file, without letting it automatically
+                // choose .slang-module files over .slang files.  
+                // First try to load as source string, and fall back to loading as an IR Blob.
+                // Avoid guessing based on filename or inspect the file contents.
+                FILE* file;
+                fopen_s(&file, fileName.value.getBuffer(), "rb");
+                if (!file)
+                {
+                    m_sink->diagnose(arg.loc, Diagnostics::cannotOpenFile, fileName.value);
+                    return SLANG_FAIL;
+                }
+                fseek(file, 0, SEEK_END);
+                size_t size = ftell(file);
+                fseek(file, 0, SEEK_SET);
+                std::vector<char> buffer(size+1);
+                size_t result = fread(buffer.data(), 1, size, file);
+                if (result != size)
+                {
+                    m_sink->diagnoseRaw(Severity::Error, "Failed to read file");
+                    return SLANG_FAIL;
+                }
+                buffer[size] = 0;
+                fclose(file);
+                
+                ComPtr<slang::IModule> module;
+                module = session->loadModuleFromSourceString("module", "path", buffer.data(), diagnostics.writeRef());
+                if (!module)
+                {
+                    // Load buffer as an IR blob
+                    ComPtr<slang::IBlob> blob;
+                    blob = RawBlob::create(buffer.data(), size);
+                    
+                    module = session->loadModuleFromIRBlob(
+                        "module",
+                        "path",
+                        blob,
+                        diagnostics.writeRef());
+                }
+                
+                if (module)
+                {
+                    ComPtr<slang::IBlob> disassemblyBlob;
+                    if (SLANG_FAILED(module->disassemble(disassemblyBlob.writeRef())))
+                    {
+                        m_sink->diagnose(arg.loc, Diagnostics::cannotDisassemble, fileName.value);
+                        return SLANG_FAIL;
+                    }
+                    else
+                    {
+                        m_sink->diagnoseRaw(Severity::Note, (const char*)disassemblyBlob->getBufferPointer());                        
+                    }
+                }
+                else
+                {
+                    if (diagnostics)
+                    {
+                        m_sink->diagnoseRaw(
+                            Severity::Error,
+                            (const char*)diagnostics->getBufferPointer());
+                    }                    
+                    return SLANG_FAIL;
+                }
+                
+                
                 break;
             }
         default:

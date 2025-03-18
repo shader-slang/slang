@@ -813,9 +813,13 @@ struct IRInst
     ///
     void _insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent);
 
-    /// Print the IR to stdout for debugging purposes
+    /// Print the IR to stdout for debugging purposes.
     ///
     void dump();
+
+    /// Print the IR to a string for debugging purposes.
+    ///
+    void dump(String &outStr);
 
     /// Insert a basic block at the end of this func/code containing inst.
     void addBlock(IRBlock* block);

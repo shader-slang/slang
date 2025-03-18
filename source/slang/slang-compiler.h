@@ -1832,6 +1832,19 @@ private:
 
     // Source files that have been pulled into the module with `__include`.
     Dictionary<SourceFile*, FileDecl*> m_mapSourceFileToFileDecl;
+
+    public:
+    SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(
+        slang::IBlob** outDisassembledBlob) override
+        {
+            if (!outDisassembledBlob)
+                return SLANG_E_INVALID_ARG;
+            String disassembly;
+            this->getIRModule()->getModuleInst()->dump(disassembly);
+            auto blob = StringUtil::createStringBlob(disassembly);
+            *outDisassembledBlob = blob.detach();
+            return SLANG_OK;
+        }
 };
 typedef Module LoadedModule;
 
