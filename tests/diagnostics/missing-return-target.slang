@@ -2,6 +2,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_NOT_SUPP): -entry computeMain -stage compute -target glsl
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_NOT_SUPP): -entry computeMain -stage compute -target wgsl
 
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_SUPP):
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_SUPP): -entry computeMain -stage compute -target hlsl
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_SUPP): -entry computeMain -stage compute -target metal
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_SUPP): -entry computeMain -stage compute -target cpp
