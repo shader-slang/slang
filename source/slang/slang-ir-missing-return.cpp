@@ -1,6 +1,7 @@
 // ir-missing-return.cpp
 #include "slang-ir-missing-return.h"
 
+#include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
@@ -23,7 +24,23 @@ static bool doesTargetAllowMissingReturns(CodeGenTarget target)
     return true;
 }
 
-static void diagnoseMissingReturnForTarget(DiagnosticSink* sink, CodeGenTarget target) {}
+static void diagnoseMissingReturnForTarget(
+    IRMissingReturn* missingReturn,
+    DiagnosticSink* sink,
+    CodeGenTarget target)
+{
+    if (doesTargetAllowMissingReturns(target))
+    {
+        sink->diagnose(missingReturn, Diagnostics::missingReturn);
+    }
+    else
+    {
+        sink->diagnose(
+            missingReturn,
+            Diagnostics::missingReturnError,
+            TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
+    }
+}
 
 void checkForMissingReturnsRec(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target)
 {
@@ -35,7 +52,7 @@ void checkForMissingReturnsRec(IRInst* inst, DiagnosticSink* sink, CodeGenTarget
 
             if (auto missingReturn = as<IRMissingReturn>(terminator))
             {
-                sink->diagnose(missingReturn, Diagnostics::missingReturn);
+                diagnoseMissingReturnForTarget(missingReturn, sink, target);
             }
         }
     }
