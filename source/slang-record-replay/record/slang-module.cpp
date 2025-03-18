@@ -249,7 +249,7 @@ SlangResult ModuleRecorder::disassemble(ISlangBlob** outBlob)
 {
     // No need to record this call as it is just a query.
     slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-    auto res = m_actualModule->disassemble(outBlob);    
+    auto res = m_actualModule->disassemble(outBlob);
     return res;
 }
 } // namespace SlangRecord

@@ -8950,9 +8950,9 @@ void IRInst::addBlock(IRBlock* block)
     block->insertAtEnd(this);
 }
 
-void IRInst::dump(String &outStr)
-{    
-    StringBuilder sb;        
+void IRInst::dump(String& outStr)
+{
+    StringBuilder sb;
 
     if (auto intLit = as<IRIntLit>(this))
     {
@@ -8960,10 +8960,10 @@ void IRInst::dump(String &outStr)
     }
     else if (auto stringLit = as<IRStringLit>(this))
     {
-        sb << stringLit->getStringSlice();            
+        sb << stringLit->getStringSlice();
     }
     else
-    {        
+    {
         IRDumpOptions options;
         StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
         dumpIR(this, options, nullptr, &writer);
