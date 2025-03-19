@@ -2964,7 +2964,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // First try to load as source string, and fall back to loading as an IR Blob.
                 // Avoid guessing based on filename or inspecting the file contents.
                 FileStream file;
-                if (SLANG_FAILED(file.init(fileName.value, FileMode::Open, FileAccess::Read, FileShare::None)))
+                if (SLANG_FAILED(file.init(
+                        fileName.value,
+                        FileMode::Open,
+                        FileAccess::Read,
+                        FileShare::None)))
                 {
                     m_sink->diagnose(arg.loc, Diagnostics::cannotOpenFile, fileName.value);
                     return SLANG_FAIL;
@@ -2978,7 +2982,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 SLANG_RETURN_ON_FAIL(file.readExactly(buffer.getBuffer(), (size_t)size));
                 buffer[size] = 0;
                 file.close();
-                                
+
                 ComPtr<slang::IModule> module;
                 module = session->loadModuleFromSourceString(
                     "module",
