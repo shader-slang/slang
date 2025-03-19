@@ -23,6 +23,7 @@
               cmake
               llvm
               ninja
+              nixfmt-rfc-style
               python3
               xorg.libX11
             ];
