@@ -7826,7 +7826,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         SpvInst* last = nullptr;
 
-        auto &idMap = m_idMaps.getOrAddValue(inst, Dictionary<UnownedStringSlice, SpvWord>());
+        auto& idMap = m_idMaps.getOrAddValue(inst, Dictionary<UnownedStringSlice, SpvWord>());
 
         for (const auto spvInst : inst->getInsts())
         {
@@ -8177,7 +8177,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (opcode == SpvOpVariable)
                 {
                     // SPIRV validator says,
-                    // "All OpVariable instructions in a function must be the first instructions in the first block."
+                    // "All OpVariable instructions in a function must be the first instructions in
+                    // the first block."
                     opParent = firstLabel;
 
                     auto opStorageClass = spvInst->getOperand(3);
