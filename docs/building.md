@@ -314,11 +314,11 @@ cmake --build --preset release
 ### Nix
 
 This repository contains a [Nix](https://nixos.org/)
-[flake](https://wiki.nixos.org/wiki/Flakes) for local development (not
-officially supported or tested), which provides the necessary prerequisites
-listed above. Also, if you use [direnv](https://direnv.net/), you can run the
-following commands to have the Nix environment automatically activate when you
-enter your clone of this repository:
+[flake](https://wiki.nixos.org/wiki/Flakes) (not officially supported or
+tested), which provides the necessary prerequisites for local development. Also,
+if you use [direnv](https://direnv.net/), you can run the following commands to
+have the Nix environment automatically activate when you enter your clone of
+this repository:
 
 ```bash
 echo 'use flake' >> .envrc
