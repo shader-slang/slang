@@ -313,7 +313,7 @@ cmake --build --preset release
 
 ### Nix
 
-This repository also contains a [Nix](https://nixos.org/)
+This repository contains a [Nix](https://nixos.org/)
 [flake](https://wiki.nixos.org/wiki/Flakes) for local development (not
 officially supported or tested), which provides the necessary prerequisites
 listed above. Also, if you use [direnv](https://direnv.net/), you can run the
