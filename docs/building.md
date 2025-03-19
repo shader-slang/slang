@@ -14,12 +14,6 @@ Please install:
 - A CMake compatible backend, for example Visual Studio or Ninja
 - Python3 (a dependency for building spirv-tools)
 
-Note that if you are using [Nix](https://nixos.org/) (with
-[flakes](https://wiki.nixos.org/wiki/Flakes) enabled) and
-[direnv](https://direnv.net/), these prerequisites are automatically installed
-in a local environment when you've entered your clone of the repository and run
-`direnv allow`.
-
 Optional dependencies for tests include
 
 - CUDA
@@ -31,6 +25,11 @@ Optional dependencies for tests include
 Other dependencies are sourced from submodules in the [./external](./external)
 directory.
 
+This repository also contains a [Nix](https://nixos.org/)
+[flake](https://wiki.nixos.org/wiki/Flakes) for local development (not
+officially supported or tested), which provides the necessary prerequisites
+listed above.
+
 ## Get the Source Code
 
 Clone [this](https://github.com/shader-slang/slang) repository. Make sure to
@@ -38,6 +37,16 @@ fetch the submodules also.
 
 ```bash
 git clone https://github.com/shader-slang/slang --recursive
+cd slang
+```
+
+If you use Nix and [direnv](https://direnv.net/), you can run the following
+commands to have the Nix environment automatically activate when you enter your
+clone of this repository:
+
+```bash
+echo 'use flake' >> .envrc
+direnv allow
 ```
 
 ## Configure and build
