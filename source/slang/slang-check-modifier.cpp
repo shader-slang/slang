@@ -1148,16 +1148,6 @@ Modifier* SemanticsVisitor::validateAttribute(
         }
         return attr;
     }
-    else if (auto rayPayloadTypeAttr = as<RayPayloadAttribute>(attr))
-    {
-        // RayPayloadAttribute doesn't require any arguments or special validation
-        // It's a simple marker attribute
-        if (attr->args.getCount() != 0)
-        {
-            getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.getCount(), 0);
-            return nullptr;
-        }
-    }
     else
     {
         if (attr->args.getCount() == 0)
@@ -2208,8 +2198,6 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
         return;
     }
 
-    bool anyFieldMissingQualifiers = false;
-
     // Check each field in the struct
     for (auto member : structDecl->members)
     {
@@ -2229,8 +2217,6 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
                 fieldVarDecl,
                 Diagnostics::rayPayloadFieldMissingAccessQualifiers,
                 fieldVarDecl->getName());
-
-            anyFieldMissingQualifiers = true;
         }
     }
 }
