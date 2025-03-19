@@ -7440,6 +7440,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     HashSet<IRType*> m_emittingTypes; // Types that are being emitted.
     Dictionary<IRType*, SpvInst*> m_mapForwardRefsToDebugType;
     static constexpr const int kUnknownPhysicalLayout = 1 << 17;
+    static constexpr const int kDebugTypeAtomicQualifier = 3;
 
     SpvInst* emitDebugTypeImpl(IRType* type)
     {
@@ -7691,6 +7692,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 debugBaseType,
                 builder.getIntValue(builder.getUIntType(), storageClass),
                 builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
+        }
+        else if (auto atomicType = as<IRAtomicType>(type))
+        {
+            auto baseType = atomicType->getElementType();
+            auto debugBaseType = emitDebugType(baseType);
+
+            return emitOpDebugTypeQualifier(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                nullptr,
+                m_voidType,
+                getNonSemanticDebugInfoExtInst(),
+                debugBaseType,
+                builder.getIntValue(builder.getUIntType(), kDebugTypeAtomicQualifier));
         }
         return ensureInst(m_voidType);
     }
