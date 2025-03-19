@@ -1691,12 +1691,6 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
     {
         SLANG_ASSERT(getIROpInfo(kIROp_WitnessTable).isHoistable());
 
-        // Because IRWitnessTable is Hoistable, do not move when
-        // it is already a child of the parent.
-        //
-        if (parent == inst->parent)
-            return;
-
         // For the rest of the cases, IRWitnessTable goes to the
         // end of the list but before the terminators.
         while (insertBeforeInst && !as<IRTerminatorInst>(insertBeforeInst))
@@ -2635,7 +2629,9 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
         }
     }
 
-    addHoistableInst(this, inst);
+    // When the inst is already a child, skip adding it as Hoistable.
+    if (inst->parent == nullptr)
+        addHoistableInst(this, inst);
 
     return inst;
 }
@@ -4605,6 +4601,15 @@ IRDominatorTree* IRModule::findOrCreateDominatorTree(IRGlobalValueWithCode* func
 
 void addGlobalValue(IRBuilder* builder, IRInst* value)
 {
+    // If the value is already in the parent, keep it as-is.
+    // Because when the inst is Hoistable, the parent can have
+    // only one instance of the inst. The order among
+    // siblings should remain because the later siblings may
+    // have dependency to the earlier siblings.
+    //
+    if (value->parent)
+        return;
+
     // Try to find a suitable parent for the
     // global value we are emitting.
     //
@@ -4641,18 +4646,6 @@ void addGlobalValue(IRBuilder* builder, IRInst* value)
     if (!parent)
     {
         parent = builder->getModule()->getModuleInst();
-    }
-
-    // If the value is already in the parent, keep it as-is.
-    // Because WitnessTable is Hoistable, the parent can have
-    // only one instance of this WitnessTable. The order among
-    // siblings should remain because the later siblings may
-    // have dependency to the earlier siblings.
-    //
-    if (parent == value->parent && value->getOp() == kIROp_WitnessTable)
-    {
-        SLANG_ASSERT(getIROpInfo(kIROp_WitnessTable).isHoistable());
-        return;
     }
 
     // If it turns out that we are inserting into the
