@@ -1928,8 +1928,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_PrimitivesType:
             return nullptr;
         case kIROp_SPIRVNodePayloadArrayType:
-            if (auto nodePayloadArrayType = as<IRSPIRVNodePayloadArrayType>(inst))
             {
+                auto nodePayloadArrayType = cast<IRSPIRVNodePayloadArrayType>(inst);
                 auto newType =
                     emitOpTypeNodePayloadArray(inst, nodePayloadArrayType->getRecordType());
                 return newType;
