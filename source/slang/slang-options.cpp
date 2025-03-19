@@ -2962,38 +2962,34 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // Coerce Slang to load from the given file, without letting it automatically
                 // choose .slang-module files over .slang files.
                 // First try to load as source string, and fall back to loading as an IR Blob.
-                // Avoid guessing based on filename or inspect the file contents.
-                FILE* file;
-                fopen_s(&file, fileName.value.getBuffer(), "rb");
-                if (!file)
+                // Avoid guessing based on filename or inspecting the file contents.
+                FileStream file;
+                if (SLANG_FAILED(file.init(fileName.value, FileMode::Open, FileAccess::Read, FileShare::None)))
                 {
                     m_sink->diagnose(arg.loc, Diagnostics::cannotOpenFile, fileName.value);
                     return SLANG_FAIL;
                 }
-                fseek(file, 0, SEEK_END);
-                size_t size = ftell(file);
-                fseek(file, 0, SEEK_SET);
-                std::vector<char> buffer(size + 1);
-                size_t result = fread(buffer.data(), 1, size, file);
-                if (result != size)
-                {
-                    m_sink->diagnoseRaw(Severity::Error, "Failed to read file");
-                    return SLANG_FAIL;
-                }
-                buffer[size] = 0;
-                fclose(file);
 
+                List<uint8_t> buffer;
+                file.seek(SeekOrigin::End, 0);
+                const Int64 size = file.getPosition();
+                buffer.setCount(size + 1);
+                file.seek(SeekOrigin::Start, 0);
+                SLANG_RETURN_ON_FAIL(file.readExactly(buffer.getBuffer(), (size_t)size));
+                buffer[size] = 0;
+                file.close();
+                                
                 ComPtr<slang::IModule> module;
                 module = session->loadModuleFromSourceString(
                     "module",
                     "path",
-                    buffer.data(),
+                    (const char*)buffer.getBuffer(),
                     diagnostics.writeRef());
                 if (!module)
                 {
                     // Load buffer as an IR blob
                     ComPtr<slang::IBlob> blob;
-                    blob = RawBlob::create(buffer.data(), size);
+                    blob = RawBlob::create(buffer.getBuffer(), size);
 
                     module = session->loadModuleFromIRBlob(
                         "module",
@@ -3012,6 +3008,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     }
                     else
                     {
+                        // success, print out the disassembly in a way that slang-test can read
                         m_sink->diagnoseRaw(
                             Severity::Note,
                             (const char*)disassemblyBlob->getBufferPointer());
