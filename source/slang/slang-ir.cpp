@@ -1605,11 +1605,7 @@ static IRInst* pickLaterInstInSameParent(IRInst* left, IRInst* right)
     }
 }
 
-// Given an instruction that represents a constant, a type, etc.
-// Try to "hoist" it as far toward the global scope as possible
-// to insert it at a location where it will be maximally visible.
-//
-void addHoistableInst(IRBuilder* builder, IRInst* inst)
+static IRInst* getParentOfHoistableInst(IRBuilder* builder, IRInst* inst)
 {
     // Start with the assumption that we would insert this instruction
     // into the global scope (the instruction that represents the module)
@@ -1642,6 +1638,17 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
     // or else the invariants of our IR have been violated.
     //
     SLANG_ASSERT(parent);
+
+    return parent;
+}
+
+// Given an instruction that represents a constant, a type, etc.
+// Try to "hoist" it as far toward the global scope as possible
+// to insert it at a location where it will be maximally visible.
+//
+void addHoistableInst(IRBuilder* builder, IRInst* inst)
+{
+    IRInst* parent = getParentOfHoistableInst(builder, inst);
 
     // Once we determine the parent instruction that the
     // new instruction should be inserted into, we need
@@ -1687,27 +1694,13 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
     //
     IRInst* insertBeforeInst = parent->getFirstChild();
 
-    if (inst->getOp() == kIROp_WitnessTable)
+    // Hoistable instructions are always "ordinary"
+    // instructions, so they need to come after
+    // any parameters of the parent.
+    //
+    while (insertBeforeInst && insertBeforeInst->getOp() == kIROp_Param)
     {
-        SLANG_ASSERT(getIROpInfo(kIROp_WitnessTable).isHoistable());
-
-        // For the rest of the cases, IRWitnessTable goes to the
-        // end of the list but before the terminators.
-        while (insertBeforeInst && !as<IRTerminatorInst>(insertBeforeInst))
-        {
-            insertBeforeInst = insertBeforeInst->getNextInst();
-        }
-    }
-    else
-    {
-        // Hoistable instructions are always "ordinary"
-        // instructions, so they need to come after
-        // any parameters of the parent.
-        //
-        while (insertBeforeInst && insertBeforeInst->getOp() == kIROp_Param)
-        {
-            insertBeforeInst = insertBeforeInst->getNextInst();
-        }
+        insertBeforeInst = insertBeforeInst->getNextInst();
     }
 
     // For instructions that will be placed at module scope,
@@ -1721,6 +1714,7 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
         // the operands of `inst` come from the same
         // block that we insert after them.
         //
+        UInt operandCount = inst->getOperandCount();
         for (UInt ii = 0; ii < operandCount; ++ii)
         {
             auto operand = inst->getOperand(ii);
@@ -1754,6 +1748,19 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
     {
         inst->insertAtEnd(parent);
     }
+}
+
+// This function finds where a parent should be for the given inst,
+// and add the inst as a last child.
+// When the inst is marked as Hoistable but the intention is only to de-duplicate it,
+// the inst can be added in a simpler manner.
+void addDeduplicatedInst(IRBuilder * builder, IRInst * inst)
+{
+    SLANG_ASSERT(nullptr == inst->parent);
+
+    IRInst* parent = getParentOfHoistableInst(builder, inst);
+
+    inst->insertAtEnd(parent);
 }
 
 void IRBuilder::_maybeSetSourceLoc(IRInst* inst)
@@ -2629,9 +2636,16 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
         }
     }
 
-    // When the inst is already a child, skip adding it as Hoistable.
+    // When an hoistable inst is already a child, skip adding it.
     if (inst->parent == nullptr)
-        addHoistableInst(this, inst);
+    {
+        // In order to de-duplicate them, Witness-table is marked as Hoistable.
+        // But it is not exactly a hoistable type and it can be added simpler.
+        if (inst->getOp() == kIROp_WitnessTable)
+            addDeduplicatedInst(this, inst);
+        else
+            addHoistableInst(this, inst);
+    }
 
     return inst;
 }
