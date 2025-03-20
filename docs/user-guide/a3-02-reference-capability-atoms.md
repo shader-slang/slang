@@ -409,6 +409,9 @@ Extensions
 `SPV_NV_shader_image_footprint`
 > Represents the SPIR-V extension for shader image footprint.
 
+`SPV_KHR_compute_shader_derivatives`
+> Represents the SPIR-V extension for compute shader derivatives.
+
 `SPV_NV_compute_shader_derivatives`
 > Represents the SPIR-V extension for compute shader derivatives.
 
