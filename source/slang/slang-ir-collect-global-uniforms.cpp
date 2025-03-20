@@ -2,6 +2,7 @@
 #include "slang-ir-collect-global-uniforms.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -176,14 +177,27 @@ struct CollectGlobalUniformParametersContext
         //
         for (auto fieldLayoutAttr : globalParamsStructTypeLayout->getFieldLayoutAttrs())
         {
+            auto globalParamLayout = fieldLayoutAttr->getLayout();
+
+            // If the given parameter doesn't contribute to uniform/ordinary usage, then
+            // we can safely leave it at the global scope and potentially avoid a lot
+            // of complications that might otherwise arise (that is, we don't need to worry
+            // about downstream passes that might have worked for a simple global parameter,
+            // but that would not work for one nested inside a structure.
+            //
+            // TODO: It would be more consistent and robust to *always* wrap up
+            // these global parameters appropriately, and ensure that all the downstream
+            // passes can handle that case, since they would need to do so in general.
+            //
+            if (!globalParamLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::Uniform))
+                continue;
+
             // We expect the IR layout pass to have encoded field per-field
             // layout so that the "key" for the field is the corresponding
             // global shader parameter.
             //
             auto globalParam = _getGlobalParamFromLayoutFieldKey(fieldLayoutAttr->getFieldKey());
             SLANG_ASSERT(globalParam);
-
-            auto globalParamLayout = fieldLayoutAttr->getLayout();
 
             // Once we have decided to do replacement, we need to
             // set ourselves up to emit the replacement code.
@@ -202,19 +216,6 @@ struct CollectGlobalUniformParametersContext
             //
             fieldLayoutAttr = as<IRStructFieldLayoutAttr>(
                 builder->replaceOperand(fieldLayoutAttr->getOperands(), fieldKey));
-
-            // If the given parameter doesn't contribute to uniform/ordinary usage, then
-            // we can safely leave it at the global scope and potentially avoid a lot
-            // of complications that might otherwise arise (that is, we don't need to worry
-            // about downstream passes that might have worked for a simple global parameter,
-            // but that would not work for one nested inside a structure.
-            //
-            // TODO: It would be more consistent and robust to *always* wrap up
-            // these global parameters appropriately, and ensure that all the downstream
-            // passes can handle that case, since they would need to do so in general.
-            //
-            if (!globalParamLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::Uniform))
-                continue;
 
             // The new structure field will need to have whatever decorations
             // had been put on the global parameter (notably including any name hint)
