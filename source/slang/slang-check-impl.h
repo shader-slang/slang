@@ -2976,7 +2976,7 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
     void checkStmt(Stmt* stmt);
 
     template<typename T>
-    T* FindOuterStmt();
+    T* FindOuterStmt(Stmt* searchUntil = nullptr);
 
     Stmt* findOuterStmtWithLabel(Name* label);
 

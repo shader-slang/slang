@@ -119,9 +119,9 @@ void SemanticsStmtVisitor::checkStmt(Stmt* stmt)
 }
 
 template<typename T>
-T* SemanticsStmtVisitor::FindOuterStmt()
+T* SemanticsStmtVisitor::FindOuterStmt(Stmt* searchUntil)
 {
-    for (auto outerStmtInfo = m_outerStmts; outerStmtInfo; outerStmtInfo = outerStmtInfo->next)
+    for (auto outerStmtInfo = m_outerStmts; outerStmtInfo && outerStmtInfo->stmt != searchUntil; outerStmtInfo = outerStmtInfo->next)
     {
         auto outerStmt = outerStmtInfo->stmt;
         auto found = as<T>(outerStmt);
@@ -178,6 +178,14 @@ void SemanticsStmtVisitor::visitBreakStmt(BreakStmt* stmt)
             getSink()->diagnose(stmt, Diagnostics::breakOutsideLoop);
         }
     }
+
+    // If there is a defer statement before the breakable statement, it's
+    // illegal.
+    if (FindOuterStmt<DeferStmt>(targetStmt))
+    {
+        getSink()->diagnose(stmt, Diagnostics::breakInsideDefer);
+    }
+
     stmt->parentStmt = targetStmt;
 }
 
@@ -187,6 +195,11 @@ void SemanticsStmtVisitor::visitContinueStmt(ContinueStmt* stmt)
     if (!outer)
     {
         getSink()->diagnose(stmt, Diagnostics::continueOutsideLoop);
+    }
+
+    if (FindOuterStmt<DeferStmt>(outer))
+    {
+        getSink()->diagnose(stmt, Diagnostics::continueInsideDefer);
     }
     stmt->parentStmt = outer;
 }
@@ -497,6 +510,11 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
             }
         }
     }
+
+    if (FindOuterStmt<DeferStmt>())
+    {
+        getSink()->diagnose(stmt, Diagnostics::returnInsideDefer);
+    }
 }
 
 void SemanticsStmtVisitor::visitWhileStmt(WhileStmt* stmt)
@@ -510,7 +528,8 @@ void SemanticsStmtVisitor::visitWhileStmt(WhileStmt* stmt)
 
 void SemanticsStmtVisitor::visitDeferStmt(DeferStmt* stmt)
 {
-    checkStmt(stmt->statement);
+    WithOuterStmt subContext(this, stmt);
+    subContext.checkStmt(stmt->statement);
 }
 
 void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
