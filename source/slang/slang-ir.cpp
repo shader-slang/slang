@@ -8950,24 +8950,33 @@ void IRInst::addBlock(IRBlock* block)
     block->insertAtEnd(this);
 }
 
-void IRInst::dump()
+void IRInst::dump(String& outStr)
 {
+    StringBuilder sb;
+
     if (auto intLit = as<IRIntLit>(this))
     {
-        std::cout << intLit->getValue() << std::endl;
+        sb << intLit->getValue();
     }
     else if (auto stringLit = as<IRStringLit>(this))
     {
-        std::cout << stringLit->getStringSlice().begin() << std::endl;
+        sb << stringLit->getStringSlice();
     }
     else
     {
-        StringBuilder sb;
         IRDumpOptions options;
         StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
         dumpIR(this, options, nullptr, &writer);
-        std::cout << sb.toString().begin() << std::endl;
     }
+
+    outStr = sb.toString();
+}
+
+void IRInst::dump()
+{
+    String s;
+    dump(s);
+    std::cout << s.begin() << std::endl;
 }
 } // namespace Slang
 
