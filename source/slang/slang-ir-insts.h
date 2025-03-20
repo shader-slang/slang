@@ -2845,6 +2845,13 @@ struct IRTryCall : IRTerminatorInst
     IRInst* getArg(UInt index) { return getOperand(index + 3); }
 };
 
+struct IRDefer : IRInst
+{
+    IR_LEAF_ISA(Defer);
+
+    IRInstList<IRBlock> getBlocks() { return IRInstList<IRBlock>(getChildren()); }
+};
+
 struct IRSwizzle : IRInst
 {
     IR_LEAF_ISA(swizzle);
@@ -4456,6 +4463,8 @@ public:
     IRInst* emitReturn();
 
     IRInst* emitThrow(IRInst* val);
+
+    IRInst* emitDefer();
 
     IRInst* emitDiscard();
 

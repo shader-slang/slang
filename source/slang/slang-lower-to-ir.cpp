@@ -6530,13 +6530,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         auto statement = stmt->statement;
 
-        // TODO: IRDefer & emitDefer
-        //IRInst* deferInst = builder->emitDefer();
-
-        //builder->setInsertInto(deferInst);
-        //builder->emitBlock();
+        IRInst* deferInst = builder->emitDefer();
+        builder->setInsertInto(deferInst);
+        IRBlock* deferBlock = builder->emitBlock();
+        builder->setInsertInto(deferBlock);
         lowerStmt(context, statement);
-        //builder->setInsertAfter(deferInst);
+        builder->setInsertAfter(deferInst);
     }
 
     void visitDiscardStmt(DiscardStmt* stmt)

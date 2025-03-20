@@ -5675,6 +5675,13 @@ IRInst* IRBuilder::emitReturn()
     return inst;
 }
 
+IRInst* IRBuilder::emitDefer()
+{
+    auto inst = createInst<IRDefer>(this, kIROp_Defer, nullptr);
+    addInst(inst);
+    return inst;
+}
+
 IRInst* IRBuilder::emitThrow(IRInst* val)
 {
     auto inst = createInst<IRThrow>(this, kIROp_Throw, nullptr, val);

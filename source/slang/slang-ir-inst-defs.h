@@ -663,6 +663,8 @@ INST_RANGE(Unreachable, MissingReturn, Unreachable)
 
 INST_RANGE(TerminatorInst, Return, Unreachable)
 
+INST(Defer, defer, 0, 0)
+
 INST(discard, discard, 0, 0)
 
 INST(RequirePrelude, RequirePrelude, 1, 0)
