@@ -2922,6 +2922,11 @@ struct VariableLayoutReflection
             (SlangParameterCategory)category);
     }
 
+    SlangImageFormat getImageFormat()
+    {
+        return spReflectionVariableLayout_GetImageFormat((SlangReflectionVariableLayout*)this);
+    }
+
     char const* getSemanticName()
     {
         return spReflectionVariableLayout_GetSemanticName((SlangReflectionVariableLayout*)this);
