@@ -2,7 +2,6 @@
 #include "slang-ir-collect-global-uniforms.h"
 
 #include "slang-ir-insts.h"
-#include "slang-ir-util.h"
 
 namespace Slang
 {
