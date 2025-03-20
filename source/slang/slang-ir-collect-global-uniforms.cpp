@@ -176,7 +176,28 @@ struct CollectGlobalUniformParametersContext
         //
         for (auto fieldLayoutAttr : globalParamsStructTypeLayout->getFieldLayoutAttrs())
         {
+            // We expect the IR layout pass to have encoded field per-field
+            // layout so that the "key" for the field is the corresponding
+            // global shader parameter.
+            builder->setInsertBefore(fieldLayoutAttr->getFieldKey());
+
+            // This global parameter needs to be turned into a field of the global
+            // parameter structure type, and that field will need a key.
+            //
+            auto fieldKey = builder->createStructKey();
+
+            // Store original the global param before replacement.
+            auto globalParam = _getGlobalParamFromLayoutFieldKey(fieldLayoutAttr->getFieldKey());
+
             auto globalParamLayout = fieldLayoutAttr->getLayout();
+
+            // In order to make sure that the existing IR layout information for
+            // the global scope remains valid, we will swap out the key in the
+            // per-field layout information to reference the key we created
+            // instead of the existing parameter (which we will be removing).
+            //
+            fieldLayoutAttr = as<IRStructFieldLayoutAttr>(
+                builder->replaceOperand(fieldLayoutAttr->getOperands(), fieldKey));
 
             // If the given parameter doesn't contribute to uniform/ordinary usage, then
             // we can safely leave it at the global scope and potentially avoid a lot
@@ -191,30 +212,8 @@ struct CollectGlobalUniformParametersContext
             if (!globalParamLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::Uniform))
                 continue;
 
-            // We expect the IR layout pass to have encoded field per-field
-            // layout so that the "key" for the field is the corresponding
-            // global shader parameter.
-            //
-            auto globalParam = _getGlobalParamFromLayoutFieldKey(fieldLayoutAttr->getFieldKey());
             SLANG_ASSERT(globalParam);
-
-            // Once we have decided to do replacement, we need to
-            // set ourselves up to emit the replacement code.
-            //
             builder->setInsertBefore(globalParam);
-
-            // This global parameter needs to be turned into a field of the global
-            // parameter structure type, and that field will need a key.
-            //
-            auto fieldKey = builder->createStructKey();
-
-            // In order to make sure that the existing IR layout information for
-            // the global scope remains valid, we will swap out the key in the
-            // per-field layout information to reference the key we created
-            // instead of the existing parameter (which we will be removing).
-            //
-            fieldLayoutAttr = as<IRStructFieldLayoutAttr>(
-                builder->replaceOperand(fieldLayoutAttr->getOperands(), fieldKey));
 
             // The new structure field will need to have whatever decorations
             // had been put on the global parameter (notably including any name hint)
