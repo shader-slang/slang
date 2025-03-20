@@ -179,14 +179,14 @@ struct CollectGlobalUniformParametersContext
             // We expect the IR layout pass to have encoded field per-field
             // layout so that the "key" for the field is the corresponding
             // global shader parameter.
-            builder->setInsertBefore(fieldLayoutAttr->getFieldKey());
-
+            //
             // This global parameter needs to be turned into a field of the global
             // parameter structure type, and that field will need a key.
             //
+            builder->setInsertBefore(fieldLayoutAttr->getFieldKey());
             auto fieldKey = builder->createStructKey();
 
-            // Store original the global param before replacement.
+            // Save the original global param before replacement.
             auto globalParam = _getGlobalParamFromLayoutFieldKey(fieldLayoutAttr->getFieldKey());
 
             auto globalParamLayout = fieldLayoutAttr->getLayout();
