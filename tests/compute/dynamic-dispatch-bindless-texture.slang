@@ -25,7 +25,6 @@ void computeMain(int3       dispatchThreadID : SV_DispatchThreadID)
     gOutputBuffer[tid] = uint(trunc(outputVal));
 }
 
-//TEST_INPUT: globalExistentialType __Dynamic
 
 // Type must be marked `public` to ensure it is visible in the generated DLL.
 export struct MyImpl : IInterface

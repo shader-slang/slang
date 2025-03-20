@@ -25,6 +25,7 @@ buffer MyBlockName2
 
 layout(local_size_x = 32) in;
 
+[shader("compute")]
 void computeMain()
 {
     if (gl_GlobalInvocationID.x == 3) {

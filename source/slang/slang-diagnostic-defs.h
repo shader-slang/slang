@@ -1915,6 +1915,18 @@ DIAGNOSTIC(
     "mode, specify 'SlangGlobalSessionDesc::enableGLSL' when creating the global session.")
 DIAGNOSTIC(39999, Fatal, complationCeased, "compilation ceased")
 
+DIAGNOSTIC(
+    38202,
+    Error,
+    matrixWithDisallowedElementTypeEncountered,
+    "matrix with disallowed element type '$0' encountered")
+
+DIAGNOSTIC(
+    38203,
+    Error,
+    vectorWithDisallowedElementTypeEncountered,
+    "vector with disallowed element type '$0' encountered")
+
 // 39xxx - Type layout and parameter binding.
 
 DIAGNOSTIC(
@@ -2299,12 +2311,6 @@ DIAGNOSTIC(
     notEqualBitCastSize,
     "invalid to bit_cast differently sized types: '$0' with size '$1' casted into '$2' with size "
     "'$3'")
-DIAGNOSTIC(
-    41203,
-    Warning,
-    notEqualReinterpretCastSize,
-    "reinterpret<> into not equally sized types: '$0' with size '$1' casted into '$2' with size "
-    "'$3'")
 
 DIAGNOSTIC(
     41300,
@@ -2436,6 +2442,12 @@ DIAGNOSTIC(
     Error,
     invalidTessellationDomain,
     "'Domain' should be either 'triangles' or 'quads'.")
+
+DIAGNOSTIC(
+    50060,
+    Error,
+    invalidMeshStageOutputTopology,
+    "Invalid mesh stage output topology '$0' for target '$1', must be one of: $2")
 
 DIAGNOSTIC(
     50082,
