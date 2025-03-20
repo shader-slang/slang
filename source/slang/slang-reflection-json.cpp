@@ -2,7 +2,7 @@
 #include "slang-reflection-json.h"
 
 #include "../core/slang-blob.h"
-#include "slang-ir-util.h"
+#include "slang-ast-support-types.h"
 
 template<typename T>
 struct Range
