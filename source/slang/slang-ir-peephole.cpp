@@ -402,6 +402,10 @@ struct PeepholeContext : InstPassBase
                     Index i = 0;
                     for (auto sfield : structType->getFields())
                     {
+                        if (as<IRVoidType>(sfield->getFieldType()) &&
+                            inst->getOperand(0)->getOp() == kIROp_MakeStruct)
+                            continue;
+
                         if (sfield->getKey() == field)
                         {
                             fieldIndex = i;
