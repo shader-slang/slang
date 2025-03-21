@@ -30,7 +30,7 @@ Format _getFormatFromName(const UnownedStringSlice& slice)
             return Format(i);
         }
     }
-    return Format::Unknown;
+    return Format::Undefined;
 }
 
 struct TypeInfo
@@ -150,7 +150,7 @@ struct ShaderInputLayoutParser
         {
             val->textureDesc.format = parseFormatOption(parser);
 
-            if (val->textureDesc.format == Format::Unknown)
+            if (val->textureDesc.format == Format::Undefined)
             {
                 return SLANG_FAIL;
             }
@@ -1294,14 +1294,14 @@ void generateTextureData(TextureData& output, const InputTextureDesc& desc)
 
     switch (desc.format)
     {
-    case Format::R8G8B8A8_UNORM:
+    case Format::RGBA8Unorm:
         {
             generateTextureDataRGB8(output, desc);
             break;
         }
-    case Format::R16_FLOAT:
-    case Format::R16G16_FLOAT:
-    case Format::R16G16B16A16_FLOAT:
+    case Format::R16Float:
+    case Format::RG16Float:
+    case Format::RGBA16Float:
         {
             generateTextureDataWithTargetTStorage<uint16_t>(
                 output,
@@ -1310,7 +1310,7 @@ void generateTextureData(TextureData& output, const InputTextureDesc& desc)
                 loadDataIntoHalf);
             break;
         }
-    case Format::R64_UINT:
+    case Format::R64Uint:
         {
             generateTextureDataWithTargetTStorage<uint64_t>(
                 output,
@@ -1319,11 +1319,11 @@ void generateTextureData(TextureData& output, const InputTextureDesc& desc)
                 loadDataIntoUint<uint64_t>);
             break;
         }
-    case Format::R32_FLOAT:
-    case Format::R32G32_FLOAT:
-    case Format::R32G32B32_FLOAT:
-    case Format::R32G32B32A32_FLOAT:
-    case Format::D32_FLOAT:
+    case Format::R32Float:
+    case Format::RG32Float:
+    case Format::RGB32Float:
+    case Format::RGBA32Float:
+    case Format::D32Float:
         {
             generateTextureDataWithTargetTStorage<float>(
                 output,
@@ -1332,10 +1332,10 @@ void generateTextureData(TextureData& output, const InputTextureDesc& desc)
                 loadDataIntoFloat);
             break;
         }
-    case Format::R32_UINT:
-    case Format::R32G32_UINT:
-    case Format::R32G32B32_UINT:
-    case Format::R32G32B32A32_UINT:
+    case Format::R32Uint:
+    case Format::RG32Uint:
+    case Format::RGB32Uint:
+    case Format::RGBA32Uint:
         {
             generateTextureDataWithTargetTStorage<uint32_t>(
                 output,
@@ -1344,9 +1344,9 @@ void generateTextureData(TextureData& output, const InputTextureDesc& desc)
                 loadDataIntoUint<uint32_t>);
             break;
         }
-    case Format::R16_UINT:
-    case Format::R16G16_UINT:
-    case Format::R16G16B16A16_UINT:
+    case Format::R16Uint:
+    case Format::RG16Uint:
+    case Format::RGBA16Uint:
         {
             generateTextureDataWithTargetTStorage<uint16_t>(
                 output,
@@ -1355,9 +1355,9 @@ void generateTextureData(TextureData& output, const InputTextureDesc& desc)
                 loadDataIntoUint<uint16_t>);
             break;
         }
-    case Format::R8_UINT:
-    case Format::R8G8_UINT:
-    case Format::R8G8B8A8_UINT:
+    case Format::R8Uint:
+    case Format::RG8Uint:
+    case Format::RGBA8Uint:
         {
             generateTextureDataWithTargetTStorage<uint8_t>(
                 output,
@@ -1366,7 +1366,7 @@ void generateTextureData(TextureData& output, const InputTextureDesc& desc)
                 loadDataIntoUint<uint8_t>);
             break;
         }
-    case Format::R64_SINT:
+    case Format::R64Sint:
         {
             generateTextureDataWithTargetTStorage<int64_t>(
                 output,
@@ -1375,10 +1375,10 @@ void generateTextureData(TextureData& output, const InputTextureDesc& desc)
                 loadDataIntoInt<int64_t>);
             break;
         }
-    case Format::R32_SINT:
-    case Format::R32G32_SINT:
-    case Format::R32G32B32_SINT:
-    case Format::R32G32B32A32_SINT:
+    case Format::R32Sint:
+    case Format::RG32Sint:
+    case Format::RGB32Sint:
+    case Format::RGBA32Sint:
         {
             generateTextureDataWithTargetTStorage<int32_t>(
                 output,
@@ -1387,9 +1387,9 @@ void generateTextureData(TextureData& output, const InputTextureDesc& desc)
                 loadDataIntoInt<int32_t>);
             break;
         }
-    case Format::R16_SINT:
-    case Format::R16G16_SINT:
-    case Format::R16G16B16A16_SINT:
+    case Format::R16Sint:
+    case Format::RG16Sint:
+    case Format::RGBA16Sint:
         {
             generateTextureDataWithTargetTStorage<int16_t>(
                 output,
@@ -1398,9 +1398,9 @@ void generateTextureData(TextureData& output, const InputTextureDesc& desc)
                 loadDataIntoInt<int16_t>);
             break;
         }
-    case Format::R8_SINT:
-    case Format::R8G8_SINT:
-    case Format::R8G8B8A8_SINT:
+    case Format::R8Sint:
+    case Format::RG8Sint:
+    case Format::RGBA8Sint:
         {
             generateTextureDataWithTargetTStorage<int8_t>(
                 output,
@@ -1440,7 +1440,7 @@ void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputD
     if (arrLen == 0)
         arrLen = 1;
 
-    output.init(Format::R8G8B8A8_UNORM);
+    output.init(Format::RGBA8Unorm);
 
     enum class SimpleScalarType
     {
