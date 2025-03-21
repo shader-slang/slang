@@ -189,7 +189,6 @@ struct CollectGlobalUniformParametersContext
             // create struct keys.
             builder->setInsertAfter(fieldLayoutAttr->getFieldKey());
 
-            //
             // This global parameter needs to be turned into a field of the global
             // parameter structure type, and that field will need a key.
             //
