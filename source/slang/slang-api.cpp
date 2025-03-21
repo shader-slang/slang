@@ -155,11 +155,11 @@ SLANG_API SlangResult slang_createGlobalSession2(
 #if SLANG_PROFILE_CORE_MODULE_COMPILE
         auto startTime = std::chrono::high_resolution_clock::now();
 #else
-        if (tryLoadBuiltinModuleFromCache(
-                globalSession,
-                slang::BuiltinModuleName::Core,
-                cacheFilename,
-                dllTimestamp) != SLANG_OK)
+        if (desc->disableBuiltinModuleCache || tryLoadBuiltinModuleFromCache(
+                                                   globalSession,
+                                                   slang::BuiltinModuleName::Core,
+                                                   cacheFilename,
+                                                   dllTimestamp) != SLANG_OK)
 #endif
         {
             // Compile std lib from embeded source.
@@ -182,18 +182,21 @@ SLANG_API SlangResult slang_createGlobalSession2(
     {
         Slang::String cacheFilename;
         uint64_t dllTimestamp = 0;
-        if (SLANG_SUCCEEDED(
-                tryLoadBuiltinModuleFromDLL(globalSession, slang::BuiltinModuleName::GLSL)))
+        bool loadSucceeded = false;
+        if (!desc->disableBuiltinModuleCache)
         {
+            loadSucceeded = SLANG_SUCCEEDED(
+                tryLoadBuiltinModuleFromDLL(globalSession, slang::BuiltinModuleName::GLSL));
+            if (!loadSucceeded)
+            {
+                loadSucceeded = SLANG_SUCCEEDED(tryLoadBuiltinModuleFromCache(
+                    globalSession,
+                    slang::BuiltinModuleName::GLSL,
+                    cacheFilename,
+                    dllTimestamp));
+            }
         }
-        else if (SLANG_SUCCEEDED(tryLoadBuiltinModuleFromCache(
-                     globalSession,
-                     slang::BuiltinModuleName::GLSL,
-                     cacheFilename,
-                     dllTimestamp)))
-        {
-        }
-        else
+        if (!loadSucceeded)
         {
             SLANG_RETURN_ON_FAIL(
                 globalSession->compileBuiltinModule(slang::BuiltinModuleName::GLSL, 0));
