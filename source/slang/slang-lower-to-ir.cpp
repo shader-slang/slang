@@ -19,6 +19,7 @@
 #include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-loop-inversion.h"
+#include "slang-ir-lower-defer.h"
 #include "slang-ir-lower-error-handling.h"
 #include "slang-ir-lower-expand-type.h"
 #include "slang-ir-missing-return.h"
@@ -6533,6 +6534,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         IRInst* deferInst = builder->emitDefer();
         builder->setInsertInto(deferInst);
         IRBlock* deferBlock = builder->emitBlock();
+        deferInst->addBlock(deferBlock);
+
         builder->setInsertInto(deferBlock);
         lowerStmt(context, statement);
         builder->setInsertAfter(deferInst);
@@ -11704,6 +11707,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // returns a `Result<T,E>` value, translating `tryCall` into
     // normal `call` + `ifElse`, etc.
     lowerErrorHandling(module, compileRequest->getSink());
+
+    // Lower `defer` so that later passes need not be aware of it.
+    lowerDefer(module, compileRequest->getSink());
 
     // Synthesize some code we want to make sure is inlined and simplified
     synthesizeBitFieldAccessors(module);
