@@ -3094,6 +3094,11 @@ struct IRMakeCoopVector : IRInst
     IR_LEAF_ISA(MakeCoopVector)
 };
 
+struct IRMakeCoopMatrixFromScalar : IRInst
+{
+    IR_LEAF_ISA(MakeCoopMatrixFromScalar)
+};
+
 // An Instruction that creates a differential pair value from a
 // primal and differential.
 
@@ -4183,6 +4188,8 @@ public:
     IRInst* emitMakeMatrixFromScalar(IRType* type, IRInst* scalarValue);
 
     IRInst* emitMakeCoopVector(IRType* type, UInt argCount, IRInst* const* args);
+
+    IRInst* emitMakeCoopMatrix(IRType* type, UInt argCount, IRInst* const* args);
 
     IRInst* emitMakeArray(IRType* type, UInt argCount, IRInst* const* args);
 
