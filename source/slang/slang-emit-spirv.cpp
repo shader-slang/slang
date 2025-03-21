@@ -1382,6 +1382,36 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
+    List<List<UnownedStringSlice>> m_anyExtension;
+    void ensureAnyExtensionDeclaration(List<UnownedStringSlice> extensions)
+    {
+        if (!m_anyExtension.contains(extensions))
+        {
+            m_anyExtension.add(extensions);
+        }
+    }
+
+    void emitSPIRVAnyExtension()
+    {
+        for (const auto& options : m_anyExtension)
+        {
+            bool found = false;
+            for (UnownedStringSlice option : options)
+            {
+                if (m_extensionInsts.tryGetValue(option))
+                {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                ensureExtensionDeclaration(options[0]);
+            }
+        }
+    }
+
     SpvInst* ensureExtensionDeclarationBeforeSpv14(UnownedStringSlice name)
     {
         if (isSpirv14OrLater())
@@ -1710,8 +1740,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitOpTypeSampler(inst);
 
         case kIROp_RaytracingAccelerationStructureType:
-            requireSPIRVCapability(SpvCapabilityRayTracingKHR);
-            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_tracing"));
+            requireSPIRVAnyCapability({SpvCapabilityRayTracingKHR, SpvCapabilityRayQueryKHR});
+            ensureAnyExtensionDeclaration(
+                {UnownedStringSlice("SPV_KHR_ray_tracing"),
+                 UnownedStringSlice("SPV_KHR_ray_query")});
             return emitOpTypeAccelerationStructure(inst);
 
         case kIROp_RayQueryType:
@@ -8224,6 +8256,36 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    List<List<SpvCapability>> m_anyCapability;
+    void requireSPIRVAnyCapability(List<SpvCapability> capabilities)
+    {
+        if (!m_anyCapability.contains(capabilities))
+        {
+            m_anyCapability.add(capabilities);
+        }
+    }
+
+    void emitSPIRVAnyCapabilities()
+    {
+        for (const auto& options : m_anyCapability)
+        {
+            bool found = false;
+            for (SpvCapability option : options)
+            {
+                if (m_capabilities.contains(option))
+                {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                requireSPIRVCapability(options[0]);
+            }
+        }
+    }
+
     void requireVariableBufferCapabilityIfNeeded(IRInst* type)
     {
         if (auto ptrType = as<IRPtrTypeBase>(type))
@@ -8415,6 +8477,12 @@ SlangResult emitSPIRVFromIR(
             parent->addInst(spvPtrType);
         }
     } while (context.m_forwardDeclaredPointers.getCount() != 0);
+
+    // Emit extensions and capabilities for which there are multiple options available.
+    // This is delayed to avoid emitting unnecessary extensions and capabilities if
+    // one of the options is already required by some other op.
+    context.emitSPIRVAnyExtension();
+    context.emitSPIRVAnyCapabilities();
 
     context.emitFrontMatter();
 
