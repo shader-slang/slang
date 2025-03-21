@@ -1743,7 +1743,7 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
 }
 
 // Add the given inst to the parent of its operand.
-void addInst(IRInst* inst)
+void addDeduplicatedInst(IRInst* inst)
 {
     SLANG_ASSERT(nullptr == inst->parent);
 
@@ -2648,7 +2648,7 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
         // In order to de-duplicate them, Witness-table is marked as Hoistable.
         // But it is not exactly a hoistable type and it can be added simpler.
         if (inst->getOp() == kIROp_WitnessTable)
-            addInst(inst);
+            addDeduplicatedInst(inst);
         else
             addHoistableInst(this, inst);
     }
@@ -4628,7 +4628,10 @@ void addGlobalValue(IRBuilder* builder, IRInst* value)
     // have dependency to the earlier siblings.
     //
     if (value->parent)
+    {
+        SLANG_ASSERT(getIROpInfo(value->getOp()).isHoistable());
         return;
+    }
 
     // Try to find a suitable parent for the
     // global value we are emitting.
