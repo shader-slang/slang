@@ -231,6 +231,7 @@ IRInst* extractMultiByteValueAtOffset(
     {
         // The request value is fully contained in the found leaf element.
         // We can proceed to extract the requested bits from the element.
+        resultValue = builder.emitBitCast(uintType, leaf.leafValue);
         uint32_t shift = leaf.offsetInValue * 8;
         if (shift > 0)
             resultValue =
@@ -242,7 +243,7 @@ IRInst* extractMultiByteValueAtOffset(
             bitMask = 0xFF;
             break;
         case 2:
-            bitMask = 0xFFFFF;
+            bitMask = 0xFFFF;
             break;
         case 3:
             bitMask = 0xFFFFFF;
@@ -264,23 +265,25 @@ IRInst* extractMultiByteValueAtOffset(
     {
         // The requested value crosses the boundaries of different fields.
         // We need to extract first and second half separately, and combine them together.
+        auto firstHalfSize = leaf.valueSize - leaf.offsetInValue;
         auto firstHalf = extractMultiByteValueAtOffset(
             builder,
             targetProgram,
             dataType,
             layout,
             src,
-            size / 2,
+            firstHalfSize,
             offset);
+        auto restSize = size - firstHalfSize;
         auto secondHalf = extractMultiByteValueAtOffset(
             builder,
             targetProgram,
             dataType,
             layout,
             src,
-            size / 2,
-            offset + size / 2);
-        uint32_t shift = (size / 2) * 8;
+            restSize,
+            offset + firstHalfSize);
+        uint32_t shift = firstHalfSize * 8;
         resultValue = builder.emitAdd(
             builder.getUIntType(),
             firstHalf,
