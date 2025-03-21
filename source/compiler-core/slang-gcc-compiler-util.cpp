@@ -647,6 +647,11 @@ static SlangResult _parseGCCFamilyLine(
         cmdLine.addArg("-I");
         cmdLine.addArg(asString(include));
     }
+    // As a convenience, add our dependencies as system include paths, if the
+    // user is compiling without these available here they will have to provide
+    // this themselves.
+    cmdLine.addArg("-isystem");
+    cmdLine.addArg("external/unordered_dense/include");
 
     // Link options
     if (0) // && options.targetType != TargetType::Object)

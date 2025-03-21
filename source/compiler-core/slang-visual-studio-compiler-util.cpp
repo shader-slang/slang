@@ -282,6 +282,12 @@ static void _addFile(
         cmdLine.addArg("/I");
         cmdLine.addArg(asString(include));
     }
+    // As a convenience, add our dependencies as system include paths, if the
+    // user is compiling without these available here they will have to provide
+    // this themselves.
+    cmdLine.addArg("/external:I");
+    cmdLine.addArg("external/unordered_dense/include");
+
 
     // https://docs.microsoft.com/en-us/cpp/build/reference/eh-exception-handling-model?view=vs-2019
     // /Eha - Specifies the model of exception handling. (a, s, c, r are options)
