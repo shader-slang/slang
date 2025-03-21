@@ -102,6 +102,7 @@ SLANG_TEST_TOOL_API SlangResult innerMain(
         // Just create the global session in the regular way if there isn't one set
         SlangGlobalSessionDesc desc = {};
         desc.enableGLSL = true;
+        desc.disableBuiltinModuleCache = true;
         SLANG_RETURN_ON_FAIL(slang_createGlobalSession2(&desc, session.writeRef()));
     }
 
