@@ -2316,12 +2316,6 @@ DIAGNOSTIC(
     notEqualBitCastSize,
     "invalid to bit_cast differently sized types: '$0' with size '$1' casted into '$2' with size "
     "'$3'")
-DIAGNOSTIC(
-    41203,
-    Warning,
-    notEqualReinterpretCastSize,
-    "reinterpret<> into not equally sized types: '$0' with size '$1' casted into '$2' with size "
-    "'$3'")
 
 DIAGNOSTIC(
     41300,
