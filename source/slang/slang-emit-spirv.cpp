@@ -292,6 +292,8 @@ void SpvInstParent::addInst(SpvInst* inst)
     SLANG_ASSERT(inst);
     SLANG_ASSERT(!inst->nextSibling);
 
+    inst->parent = this;
+
     if (m_firstChild == nullptr)
     {
         m_firstChild = m_lastChild = inst;
@@ -304,7 +306,6 @@ void SpvInstParent::addInst(SpvInst* inst)
     //
     m_lastChild->nextSibling = inst;
     inst->prevSibling = m_lastChild;
-    inst->parent = this;
     m_lastChild = inst;
 }
 
@@ -491,6 +492,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     /// The next destination `<id>` to allocate.
     SpvWord m_nextID = 1;
+
+    // This keeps track of the named IDs used in the asm block
+    Dictionary<IRSPIRVAsm*, Dictionary<UnownedStringSlice, SpvWord>> m_idMaps;
 
     OrderedDictionary<SpvInst*, IRPtrTypeBase*> m_forwardDeclaredPointers;
 
@@ -1552,12 +1556,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     valueTypeId = getIRInstSpvID(valueType);
                 }
-                else if (storageClass == SpvStorageClassNodePayloadAMDX)
-                {
-                    auto spvValueType = ensureInst(valueType);
-                    auto spvNodePayloadType = emitOpTypeNodePayloadArray(inst, spvValueType);
-                    valueTypeId = getID(spvNodePayloadType);
-                }
                 else
                 {
                     auto spvValueType = ensureInst(valueType);
@@ -1897,6 +1895,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_IndicesType:
         case kIROp_PrimitivesType:
             return nullptr;
+        case kIROp_SPIRVNodePayloadArrayType:
+            {
+                auto nodePayloadArrayType = cast<IRSPIRVNodePayloadArrayType>(inst);
+                auto newType =
+                    emitOpTypeNodePayloadArray(inst, nodePayloadArrayType->getRecordType());
+                return newType;
+            }
         default:
             {
                 if (as<IRSPIRVAsmOperand>(inst))
@@ -2958,13 +2963,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         switch (inst->getOp())
                         {
                         case kIROp_Var:
-                            emitLocalInst(spvBlock, inst);
+                            emitLocalInst(spvBlock, spvBlock, inst);
                             break;
                         case kIROp_DebugVar:
                             // Declare an ordinary local variable for debugDeclare association
                             // of a debug variable. This variable is what we will actually write
                             // values to upon a `kIROp_DebugValue` inst.
                             emitDebugVarBackingLocalVarDeclaration(spvBlock, as<IRDebugVar>(inst));
+                            break;
+                        case kIROp_SPIRVAsm:
+                            emitLocalInst(spvBlock, spvBlock, inst);
                             break;
                         }
                     }
@@ -3046,7 +3054,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 // Skip vars because they are already emitted.
                 if (as<IRVar>(irInst))
                     continue;
-                emitLocalInst(spvBlock, irInst);
+                emitLocalInst(spvBlock, nullptr, irInst);
                 if (irInst->getOp() == kIROp_loop)
                     pendingLoopInsts.add(as<IRLoop>(irInst));
                 if (irInst->getOp() == kIROp_discard && !shouldEmitDiscardAsDemote())
@@ -3423,7 +3431,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // a known parent (the basic block that contains them).
 
     /// Emit an instruction that is local to the body of the given `parent`.
-    SpvInst* emitLocalInst(SpvInstParent* parent, IRInst* inst)
+    SpvInst* emitLocalInst(SpvInstParent* parent, SpvInstParent* firstLabel, IRInst* inst)
     {
         SpvInst* result = nullptr;
         switch (inst->getOp())
@@ -3555,7 +3563,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Geq:
         case kIROp_Rsh:
         case kIROp_Lsh:
-            result = emitArithmetic(parent, inst);
+            result = emitArithmetic(parent, firstLabel, inst);
             break;
         case kIROp_CastDescriptorHandleToUInt2:
         case kIROp_CastUInt2ToDescriptorHandle:
@@ -3806,7 +3814,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             result = emitOpUndef(parent, inst, inst->getDataType());
             break;
         case kIROp_SPIRVAsm:
-            result = emitSPIRVAsm(parent, as<IRSPIRVAsm>(inst));
+            result = emitSPIRVAsm(parent, firstLabel, as<IRSPIRVAsm>(inst));
             break;
         case kIROp_ImageLoad:
             result = emitImageLoad(parent, as<IRImageLoad>(inst));
@@ -4417,6 +4425,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         break;
                     }
                 }
+
+                // Pass in global OpVariable as interface to the entry point
+                // TODO: Pass in only when they are used by the entry point
+                for (auto entryInterface : m_entryPointInterfaces)
+                {
+                    SpvInst* spvInst;
+                    if (m_mapIRInstToSpvInst.tryGetValue(entryInterface, spvInst))
+                    {
+                        params.add(spvInst);
+                    }
+                }
+
                 emitOpEntryPoint(section, decoration, spvStage, dstID, name, params);
 
                 // Stage specific execution mode and capability declarations.
@@ -7216,7 +7236,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
 
-    SpvInst* emitArithmetic(SpvInstParent* parent, IRInst* inst)
+    SpvInst* emitArithmetic(SpvInstParent* parent, SpvInstParent* firstLabel, IRInst* inst)
     {
         if (const auto matrixType = as<IRMatrixType>(inst->getDataType()))
         {
@@ -7235,7 +7255,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     if (as<IRMatrixType>(originalOperand->getDataType()))
                     {
                         auto operand = builder.emitElementExtract(originalOperand, i);
-                        emitLocalInst(parent, operand);
+                        emitLocalInst(parent, firstLabel, operand);
                         operands.add(operand);
                     }
                     else
@@ -7801,12 +7821,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return debugFunc;
     }
 
-    SpvInst* emitSPIRVAsm(SpvInstParent* parent, IRSPIRVAsm* inst)
+    SpvInst* emitSPIRVAsm(SpvInstParent* parent, SpvInstParent* firstLabel, IRSPIRVAsm* inst)
     {
         SpvInst* last = nullptr;
 
-        // This keeps track of the named IDs used in the asm block
-        Dictionary<UnownedStringSlice, SpvWord> idMap;
+        auto& idMap = m_idMaps.getOrAddValue(inst, Dictionary<UnownedStringSlice, SpvWord>());
 
         for (const auto spvInst : inst->getInsts())
         {
@@ -7984,6 +8003,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
             if (spvInst->getOpcodeOperand()->getOp() == kIROp_SPIRVAsmOperandTruncate)
             {
+                // Nothing to emit to the first OpLabel
+                if (firstLabel)
+                    continue;
+
                 const auto getSlangType = [&](IRSPIRVAsmOperand* operand) -> IRType*
                 {
                     switch (operand->getOp())
@@ -8147,13 +8170,58 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 default:
                     break;
                 }
-                const auto opParent = parentForOpCode(opcode, parent);
+
+                IRStringLit* resultID = nullptr;
+                SpvInstParent* opParent = nullptr;
+                if (opcode == SpvOpVariable)
+                {
+                    // SPIRV validator says,
+                    // "All OpVariable instructions in a function must be the first instructions in
+                    // the first block."
+                    opParent = firstLabel;
+
+                    auto opStorageClass = spvInst->getOperand(3);
+                    if (opStorageClass && opStorageClass->getOp() == kIROp_SPIRVAsmOperandEnum)
+                    {
+                        if (auto intLit = cast<IRIntLit>(opStorageClass->getOperand(0)))
+                        {
+                            switch (SpvStorageClass(intLit->getValue()))
+                            {
+                            case SpvStorageClassNodePayloadAMDX:
+                                requireSPIRVCapability(SpvCapabilityShaderEnqueueAMDX);
+                                ensureExtensionDeclaration(
+                                    UnownedStringSlice("SPV_AMDX_shader_enqueue"));
+
+                                opParent = getSection(SpvLogicalSectionID::ConstantsAndTypes);
+
+                                if (auto resultOperand =
+                                        cast<IRSPIRVAsmOperand>(spvInst->getOperand(2)))
+                                {
+                                    resultID = cast<IRStringLit>(resultOperand->getValue());
+                                }
+
+                                m_entryPointInterfaces.add(spvInst);
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (opParent == nullptr)
+                {
+                    opParent = parentForOpCode(opcode, parent);
+                }
+
                 const auto opInfo = m_grammarInfo->opInfos.lookup(opcode);
 
                 // TODO: handle resultIdIndex == 1, for constants
                 const bool memoize =
                     opParent == getSection(SpvLogicalSectionID::ConstantsAndTypes) && opInfo &&
                     opInfo->resultIdIndex == 0;
+
+                // SpvOpVariable must appear at the first block of the function
+                // And it may depends on other memoized instructions.
+                if ((opcode == SpvOpVariable || memoize) == (firstLabel == nullptr))
+                    continue;
 
                 // We want the "result instruction" to refer to the top level
                 // block which assumes its value, the others are free to refer
@@ -8205,15 +8273,27 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             for (const auto operand : spvInst->getSPIRVOperands())
                                 emitSpvAsmOperand(operand);
                         });
+
+                    // TODO: We may be able to simplify without checking the string.
+                    if (resultID)
+                    {
+                        SpvWord id;
+                        if (last->id == 0 && idMap.tryGetValue(resultID->getStringSlice(), id))
+                            last->id = id;
+                    }
                 }
             }
         }
 
-        for (const auto& [name, id] : idMap)
-            emitOpName(getSection(SpvLogicalSectionID::DebugNames), nullptr, id, name);
+        if (firstLabel == nullptr)
+        {
+            for (const auto& [name, id] : idMap)
+                emitOpName(getSection(SpvLogicalSectionID::DebugNames), nullptr, id, name);
+        }
 
         return last;
     }
+    HashSet<IRInst*> m_entryPointInterfaces;
 
     OrderedHashSet<SpvCapability> m_capabilities;
     void requireSPIRVCapability(SpvCapability capability)
