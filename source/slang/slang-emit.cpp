@@ -2158,6 +2158,15 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     // Outside because we want to keep IR in scope whilst we are processing emits
     LinkedIR linkedIR;
     LinkingAndOptimizationOptions linkingAndOptimizationOptions;
+
+    bool isPrecompilation = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
+        CompilerOptionName::EmbedDownstreamIR);
+
+    if (!isPrecompilation)
+    {
+        codeGenContext->removeAvailableInDownstreamIR = true;
+    }
+
     SLANG_RETURN_ON_FAIL(
         linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
 
@@ -2188,9 +2197,6 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         // Dump the unoptimized/unlinked SPIRV after lowering from slang IR -> SPIRV
         compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
 #endif
-
-        bool isPrecompilation = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
-            CompilerOptionName::EmbedDownstreamIR);
 
         if (!isPrecompilation && !codeGenContext->shouldSkipDownstreamLinking())
         {
@@ -2282,8 +2288,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
             downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None;
             break;
         case OptimizationLevel::Default:
-            downstreamOptions.optimizationLevel =
-                DownstreamCompileOptions::OptimizationLevel::Default;
+            downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None;
+            //Default;
             break;
         case OptimizationLevel::High:
             downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::High;
