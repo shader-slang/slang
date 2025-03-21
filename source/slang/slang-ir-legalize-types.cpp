@@ -4125,6 +4125,11 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 
     bool isSimpleType(IRType* type) override
     {
+        if (isMetalTarget(targetProgram->getTargetReq()))
+        {
+            return false;
+        }
+
         // If type is used as public interface, then treat it as simple.
         for (auto decor : type->getDecorations())
         {
@@ -4147,6 +4152,8 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
     {
         return LegalType();
     }
+
+    virtual bool isEmptyTypeLegalize() override { return true; }
 };
 
 // The main entry points that are used when transforming IR code
