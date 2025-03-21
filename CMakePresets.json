@@ -105,6 +105,11 @@
       "configuration": "RelWithDebInfo"
     },
     {
+      "name": "minSizeRel",
+      "configurePreset": "default",
+      "configuration": "MinSizeRel"
+    },
+    {
       "name": "vs2022-debug",
       "configurePreset": "vs2022",
       "configuration": "Debug"
