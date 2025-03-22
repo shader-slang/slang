@@ -5675,9 +5675,12 @@ IRInst* IRBuilder::emitReturn()
     return inst;
 }
 
-IRInst* IRBuilder::emitDefer()
+IRInst* IRBuilder::emitDefer(uint64_t hookIndex)
 {
-    auto inst = createInst<IRDefer>(this, kIROp_Defer, nullptr);
+    auto uintType = getBasicType(BaseType::UInt64);
+    IRInst* irHookIndex = getIntValue(uintType, hookIndex);
+
+    auto inst = createInst<IRDefer>(this, kIROp_Defer, nullptr, irHookIndex);
     addInst(inst);
     return inst;
 }

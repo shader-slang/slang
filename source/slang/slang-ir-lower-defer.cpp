@@ -20,30 +20,28 @@ struct DeferLoweringContext : InstPassBase
     {
     }
 
-    void inlineSingleBlockDefer(IRInst* terminator, IRBlock* deferBlock, IRBuilder* builder)
+    void inlineSingleBlockDefer(IRInst* beforeInst, IRBlock* deferBlock, IRBuilder* builder)
     {
-        // Insert to the end of the block right before the terminator.
-        builder->setInsertBefore(terminator);
-
+        builder->setInsertBefore(beforeInst);
         IRCloneEnv env;
         for(IRInst* inst: deferBlock->getChildren())
             cloneInst(&env, builder, inst);
     }
 
-    void inlineDefer(IRInst* terminator, IRBlock* targetBlock, IRDefer* defer, IRBuilder* builder)
+    // Returns the new last block.
+    IRBlock* inlineDefer(IRInst* beforeInst, IRBlock* targetBlock, IRDefer* defer, IRBuilder* builder)
     {
         // The single-block inlining case is simple, we can just dump the
         // instructions at the target position, in the existing block.
         auto firstBlock = defer->getFirstBlock();
         if (!firstBlock->getNextBlock())
         {
-            inlineSingleBlockDefer(terminator, firstBlock, builder);
-            return;
+            inlineSingleBlockDefer(beforeInst, firstBlock, builder);
+            return targetBlock;
         }
 
         // Otherwise, we'll have to splice the blocks in.
         IRCloneEnv env;
-
         auto lastBlock = targetBlock;
 
         // Clone blocks first
@@ -66,14 +64,55 @@ struct DeferLoweringContext : InstPassBase
             }
         }
 
-        // Move old terminator to afterBlock
-        terminator->removeFromParent();
-        terminator->insertAtEnd(lastBlock);
+        // Move old instructions to the last block's end. The last defer block
+        // shouldn't have a terminator at this point yet.
+        while (beforeInst)
+        {
+            auto nextInst = beforeInst->getNextInst();
+            beforeInst->removeFromParent();
+            beforeInst->insertAtEnd(lastBlock);
+            beforeInst = nextInst;
+        }
+
+        // If the previous target had defer hooks, move them to the new one.
+        IRDecoration* oldDecor = targetBlock->getFirstDecoration();
+        while (oldDecor)
+        {
+            auto nextDecor = oldDecor->getNextDecoration();
+            auto hook = as<IRDeferHookDecoration>(oldDecor);
+            if (hook)
+            {
+                oldDecor->removeFromParent();
+                oldDecor->insertAtStart(lastBlock);
+            }
+            oldDecor = nextDecor;
+        }
 
         // Make target block jump to the cloned blocks.
         builder->setInsertInto(targetBlock);
         auto mainBlock = as<IRBlock>(env.mapOldValToNew.getValue(firstBlock));
         builder->emitBranch(mainBlock);
+        return lastBlock;
+    }
+
+    bool blockSucceedsDeferScope(IRBlock* block, IRIntegerValue hookIndex)
+    {
+        // Scroll through previous blocks and check if they're decorated with
+        // `DeferHook`s.
+        IRBlock* prev = block->getPrevBlock();
+        while (prev != nullptr)
+        {
+            for (IRDecoration* decor : prev->getDecorations())
+            {
+                auto hook = as<IRDeferHookDecoration>(decor);
+                if (hook && hook->getHookIndex() == hookIndex)
+                {
+                    return true;
+                }
+            }
+            prev = prev->getPrevBlock();
+        }
+        return false;
     }
 
     void processModule()
@@ -93,6 +132,8 @@ struct DeferLoweringContext : InstPassBase
         while (unhandledDefers.getCount() != 0)
         {
             IRDefer* defer = unhandledDefers.getLast();
+            IRIntegerValue hook = defer->getHookIndex();
+
             unhandledDefers.removeLast();
 
             IRFunc* func = getParentFunc(defer);
@@ -107,7 +148,10 @@ struct DeferLoweringContext : InstPassBase
             HashSet<IRBlock*> dominatedBlocksSet;
             dominatedBlocksSet.add(parentBlock);
             for (IRBlock* block : dominatedBlocks)
-                dominatedBlocksSet.add(block);
+            {
+                if (!blockSucceedsDeferScope(block, hook))
+                    dominatedBlocksSet.add(block);
+            }
 
             for (IRBlock* block : dominatedBlocksSet)
             {
@@ -122,14 +166,22 @@ struct DeferLoweringContext : InstPassBase
                     exits = true;
                     break;
                 case kIROp_unconditionalBranch:
-                case kIROp_conditionalBranch:
-                    // Check through all Block operands and check that all
-                    // are dominated.
-                    for (UInt index = 0; index < terminator->getOperandCount(); ++index)
                     {
-                        auto target = as<IRBlock>(terminator->getOperand(index));
-                        if (target && !dominatedBlocksSet.contains(target))
+                        auto targetBlock = as<IRBlock>(terminator->getOperand(0));
+                        if (!dominatedBlocksSet.contains(targetBlock))
                         {
+                            exits = true;
+                        }
+                    }
+                    break;
+                case kIROp_conditionalBranch:
+                    {
+                        auto trueBlock = as<IRBlock>(terminator->getOperand(1));
+                        auto falseBlock = as<IRBlock>(terminator->getOperand(2));
+                        if (
+                            !dominatedBlocksSet.contains(trueBlock) ||
+                            !dominatedBlocksSet.contains(falseBlock)
+                        ){
                             exits = true;
                         }
                     }
@@ -140,12 +192,25 @@ struct DeferLoweringContext : InstPassBase
 
                 if (exits)
                 { // Duplicate child instructions to the end of this block.
-                    inlineDefer(terminator, block, defer, &builder);
+                    if(inlineDefer(terminator, block, defer, &builder) != block)
+                    {
+                        // New last block is not the same as before, so mark
+                        // analysis of the function with defer as outdated.
+                        module->invalidateAnalysisForInst(func);
+                    }
                 }
             }
 
             defer->removeAndDeallocate();
         }
+
+        // Remove all defer hooks, they're not needed anymore.
+        processInstsOfType<IRDeferHookDecoration>(
+            kIROp_DeferHookDecoration,
+            [&](IRDeferHookDecoration* deferHook)
+            {
+                deferHook->removeAndDeallocate();
+            });
     }
 };
 
