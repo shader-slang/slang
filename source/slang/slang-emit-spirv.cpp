@@ -216,7 +216,7 @@ struct SpvInst : SpvInstParent
         //
         // > Word Count: The complete number of words taken by an instruction,
         // > including the word holding the word count and opcode, and any optional
-        // > operands. An instruction’s word count is the total space taken by the instruction.
+        // > operands. An instruction's word count is the total space taken by the instruction.
         //
         SpvWord wordCount = 1 + SpvWord(operandWordsCount);
 
@@ -360,7 +360,7 @@ struct SpvLiteralBits
         // > UTF-8 encoding scheme. The UTF-8 octets (8-bit bytes) are packed
         // > four per word, following the little-endian convention (i.e., the
         // > first octet is in the lowest-order 8 bits of the word).
-        // > The final word contains the string’s nul-termination character (0), and
+        // > The final word contains the string's nul-termination character (0), and
         // > all contents past the end of the string in the final word are padded with 0.
 
         // First work out the amount of words we'll need
@@ -1929,6 +1929,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_IndicesType:
         case kIROp_PrimitivesType:
             return nullptr;
+        case kIROp_Param:
+            // Handle parameters that appear at global scope
+            return emitGlobalParam(getSection(SpvLogicalSectionID::GlobalVariables), inst);
         default:
             {
                 if (as<IRSPIRVAsmOperand>(inst))
@@ -2001,11 +2004,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case ImageFormat::rg8i:
             return SpvImageFormatRg8i;
         case ImageFormat::r32i:
-            return SpvImageFormatR32i;
+            return SpvImageFormatRgba32i;
         case ImageFormat::r16i:
-            return SpvImageFormatR16i;
+            return SpvImageFormatRgba16i;
         case ImageFormat::r8i:
-            return SpvImageFormatR8i;
+            return SpvImageFormatRgba8i;
         case ImageFormat::rgba32ui:
             return SpvImageFormatRgba32ui;
         case ImageFormat::rgba16ui:
@@ -2214,7 +2217,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvWord arrayed =
             inst->isArray() ? ImageOpConstants::isArrayed : ImageOpConstants::notArrayed;
 
-        // Vulkan spec 16.1: "The “Depth” operand of OpTypeImage is ignored."
+        // Vulkan spec 16.1: "The �Depth� operand of OpTypeImage is ignored."
         SpvWord depth =
             ImageOpConstants::unknownDepthImage; // No knowledge of if this is a depth image
         SpvWord ms = inst->isMultisample() ? ImageOpConstants::isMultisampled
@@ -4059,6 +4062,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     operands.getArrayView());
             }
             break;
+        case kIROp_DebugInlinedAt:
+            return emitDebugInlinedAt(getSection(SpvLogicalSectionID::ConstantsAndTypes), as<IRDebugInlinedAt>(inst));
+        case kIROp_DebugScope:
+            return emitDebugScope(parent, as<IRDebugScope>(inst));
+        case kIROp_DebugNoScope:
+            return emitDebugNoScope(parent);
+        case kIROp_DebugInlinedVariable:
+            return emitDebugInlinedVariable(getSection(SpvLogicalSectionID::ConstantsAndTypes), as<IRDebugInlinedVariable>(inst));
         }
         if (result)
             emitDecorations(inst, getID(result));
@@ -5665,6 +5676,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         maybeEmitName(paramSpvInst, inst);
         maybeEmitPointerDecoration(paramSpvInst, inst);
         return paramSpvInst;
+    }
+
+    // Special version for handling global parameters, treating them as variables
+    // This is needed while emitting 'DebugInlinedVariable's
+    SpvInst* emitGlobalParam(SpvInstParent* parent, IRInst* inst)
+    {
+        auto storageClass = SpvStorageClassFunction;
+        auto varSpvInst = emitOpVariable(parent, inst, inst->getFullType(), storageClass);
+        maybeEmitName(varSpvInst, inst);
+        maybeEmitPointerDecoration(varSpvInst, inst);
+        return varSpvInst;
     }
 
     SpvInst* emitVar(SpvInstParent* parent, IRInst* inst)
@@ -7303,6 +7325,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto scope = findDebugScope(debugLine);
         if (!scope)
             return nullptr;
+
         return emitOpDebugLine(
             parent,
             debugLine,
@@ -7326,6 +7349,74 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             getNonSemanticDebugInfoExtInst(),
             List<SpvInst*>());
         return m_nullDwarfExpr;
+    }
+
+    SpvInst* emitDebugScope(SpvInstParent* parent, IRDebugScope* scope)
+    {
+        if (!scope)
+            return nullptr;
+
+        auto scopeNeeded = ensureInst(scope->getScope());
+        if (!scopeNeeded)
+            return nullptr;
+
+        return emitOpDebugScope(
+            parent,
+            nullptr,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            scopeNeeded);
+    }
+
+    SpvInst* emitDebugNoScope(SpvInstParent* parent)
+    {
+        return emitOpDebugNoScope(
+            parent,
+            nullptr,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst());
+    }
+
+    SpvInst* emitDebugInlinedAt(SpvInstParent* parent, IRDebugInlinedAt* debugInlinedAt)
+    {
+        if (!debugInlinedAt)
+            return nullptr;
+        
+        // Get the operands from the IRDebugInlinedAt instruction
+        IRInst* lineInst = debugInlinedAt->getLine();
+
+        // Find the debug scope for this instruction
+        auto scope = findDebugScope(debugInlinedAt);
+        if (!scope)
+            return nullptr;
+
+        return emitOpDebugInlinedAt(
+            parent,
+            debugInlinedAt,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            lineInst,
+            scope,
+            nullptr);
+    }
+
+    SpvInst* emitDebugInlinedVariable(SpvInstParent* parent, IRDebugInlinedVariable* debugInlinedVar)
+    {
+        if (!debugInlinedVar)
+            return nullptr;
+        
+        // Get the operands from the IRDebugInlinedVariable instruction
+        IRInst* variable = debugInlinedVar->getVariable();
+        IRInst* inlinedAt = debugInlinedVar->getInlinedAt();
+
+        // Emit the OpDebugInlinedVariable instruction
+        return emitOpDebugInlinedVariable(
+            parent,
+            debugInlinedVar,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            variable,
+            inlinedAt);
     }
 
     bool translateIRAccessChain(

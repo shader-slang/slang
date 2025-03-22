@@ -319,6 +319,33 @@ struct InliningPassBase
         // If callee is an intrinsic op, just issue that intrinsic and be done.
         if (auto intrinsicOpDecor = callee->findDecoration<IRIntrinsicOpDecoration>())
         {
+            IRDebugLine* lastDebugLine = nullptr;
+            IRInst* debugInlinedAt = nullptr;
+            for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
+            {
+                if (auto debugLine = as<IRDebugLine>(inst))
+                {
+                    lastDebugLine = debugLine;
+                    break;
+                }
+            }
+            if (lastDebugLine)
+            {
+                debugInlinedAt = builder.emitDebugInlinedAt(
+                    lastDebugLine->getLineStart(),
+                    lastDebugLine->getColStart(),
+                    lastDebugLine->getSource());
+
+                if (debugInlinedAt)
+                {
+                    builder.emitDebugScope(debugInlinedAt);
+                    {
+                        builder.setInsertAfter(call);
+                        builder.emitDebugNoScope();
+                        builder.setInsertBefore(call);
+                    }
+                }
+            }
             List<IRInst*> args;
             for (UInt i = 0; i < call->getArgCount(); i++)
                 args.add(call->getArg(i));
@@ -335,9 +362,12 @@ struct InliningPassBase
                     op,
                     args.getCount(),
                     args.getBuffer());
+
                 call->replaceUsesWith(newCall);
             }
+
             call->removeAndDeallocate();
+
             return;
         }
 
@@ -419,7 +449,55 @@ struct InliningPassBase
             SLANG_ASSERT(argCounter == (Int)call->getArgCount());
         }
 
-        inlineFuncBody(callSite, &env, &builder);
+        // !!TODO!!: move into separate method
+        // Find the last IRDebugLine instruction before the call
+        IRDebugLine* lastDebugLine = nullptr;
+        IRInst* debugInlinedAt = nullptr;
+        for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
+        {
+            if (auto debugLine = as<IRDebugLine>(inst))
+            {
+                lastDebugLine = debugLine;
+                break;
+            }
+        }
+        if (lastDebugLine)
+        {
+#if 0
+            auto lineStart = lastDebugLine->getLineStart();
+            auto colStart = lastDebugLine->getColStart();
+            auto source = lastDebugLine->getSource();
+            if (lineStart && colStart && source)
+            {
+                if (auto val = as<IRIntLit>(lineStart))
+                {
+                    if (val->getValue() == 44)
+                    {
+                        debugInlinedAt = builder.emitDebugInlinedAt(
+                            lineStart,
+                            colStart,
+                            source);
+                    }
+                }
+            }
+#else
+            debugInlinedAt = builder.emitDebugInlinedAt(
+                    lastDebugLine->getLineStart(),
+                    lastDebugLine->getColStart(),
+                    lastDebugLine->getSource());
+#endif
+
+            if (debugInlinedAt)
+            {
+                builder.emitDebugScope(debugInlinedAt);
+                {
+                    builder.setInsertAfter(call);
+                    builder.emitDebugNoScope();
+                    builder.setInsertBefore(call);
+                }
+            }
+        }
+        inlineFuncBody(callSite, &env, &builder, debugInlinedAt);
     }
 
     // When instructions are cloned, with cloneInst no sourceLoc information is copied over by
@@ -471,7 +549,7 @@ struct InliningPassBase
         IRInst* inst)
     {
         IRInst* clonedInst = cloneInst(env, builder, inst);
-        _setSourceLoc(clonedInst, inst, callSite);
+        _setSourceLoc(clonedInst, inst, callSite);               
         return clonedInst;
     }
 
@@ -481,10 +559,13 @@ struct InliningPassBase
     void inlineSingleBlockFuncBody(
         CallSiteInfo const& callSite,
         IRCloneEnv* env,
-        IRBuilder* builder)
+        IRBuilder* builder,
+        IRInst* debugInlinedAt)
     {
         auto call = callSite.call;
         auto callee = callSite.callee;
+        // TODO: Remove this once we figure out where to inline debug vars.
+        static_cast<void>(debugInlinedAt);
 
         // The callee had better have only a single basic block.
         //
@@ -495,6 +576,19 @@ struct InliningPassBase
         // them into the same basic block as the `call`.
         //
         builder->setInsertBefore(call);
+
+        Int argCounter = 0;
+        for (auto param : callee->getParams())
+        {
+            if (param->sourceLoc.isValid() && argCounter < (Int)call->getArgCount())
+            {
+                // TODO: Add this back once we figure where to emit these.
+                static_cast<void>(debugInlinedAt);
+                //builder->emitDebugInlinedVariable(param, debugInlinedAt);
+            }
+            argCounter++;
+        }
+
 
         // Along the way, we will detect any `return` instruction,
         // and remember the (clone of the) returned value.
@@ -547,7 +641,7 @@ struct InliningPassBase
     }
 
     /// Inline the body of the callee for `callSite`.
-    void inlineFuncBody(CallSiteInfo const& callSite, IRCloneEnv* env, IRBuilder* builder)
+    void inlineFuncBody(CallSiteInfo const& callSite, IRCloneEnv* env, IRBuilder* builder, IRInst* debugInlinedAt)
     {
         auto call = callSite.call;
         auto callee = callSite.callee;
@@ -561,7 +655,7 @@ struct InliningPassBase
         SLANG_ASSERT(firstBlock);
         if (!firstBlock->getNextBlock() && as<IRReturn>(firstBlock->getTerminator()))
         {
-            inlineSingleBlockFuncBody(callSite, env, builder);
+            inlineSingleBlockFuncBody(callSite, env, builder, debugInlinedAt);
             return;
         }
 
@@ -584,6 +678,18 @@ struct InliningPassBase
         {
             return;
         }
+
+        Int argCounter = 0;
+        for (auto param : callee->getParams())
+        {
+            if (param->sourceLoc.isValid() && argCounter < (Int)call->getArgCount())
+            {
+                // TODO: Add this back once we figure where to emit these.
+                //builder->emitDebugInlinedVariable(param, debugInlinedAt);
+            }
+            argCounter++;
+        }
+
 
         // We will create a new basic block block in the parent function that
         // will contain all the instructions that come *after* the `call`.
