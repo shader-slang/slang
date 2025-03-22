@@ -1692,7 +1692,9 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
     // any parameters of the parent.
     //
     while (insertBeforeInst && insertBeforeInst->getOp() == kIROp_Param)
+    {
         insertBeforeInst = insertBeforeInst->getNextInst();
+    }
 
     // For instructions that will be placed at module scope,
     // we don't care about relative ordering, but for everything
@@ -1738,6 +1740,33 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
     {
         inst->insertAtEnd(parent);
     }
+}
+
+// Add the given inst to the parent of its operand.
+void addDeduplicatedInst(IRInst* inst)
+{
+    SLANG_ASSERT(nullptr == inst->parent);
+
+    IRInst* parent = nullptr;
+
+    UInt operandCount = inst->getOperandCount();
+    for (UInt ii = 0; ii < operandCount; ++ii)
+    {
+        auto operand = inst->getOperand(ii);
+        if (!operand)
+            continue;
+
+        auto operandParent = operand->getParent();
+
+        parent = mergeCandidateParentsForHoistableInst(parent, operandParent);
+    }
+
+    if (inst->getFullType())
+    {
+        parent = mergeCandidateParentsForHoistableInst(parent, inst->getFullType()->getParent());
+    }
+
+    inst->insertAtEnd(parent);
 }
 
 void IRBuilder::_maybeSetSourceLoc(IRInst* inst)
@@ -2613,7 +2642,16 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
         }
     }
 
-    addHoistableInst(this, inst);
+    // When an hoistable inst is already a child, skip adding it.
+    if (inst->parent == nullptr)
+    {
+        // In order to de-duplicate them, Witness-table is marked as Hoistable.
+        // But it is not exactly a hoistable type and it can be added simpler.
+        if (inst->getOp() == kIROp_WitnessTable)
+            addDeduplicatedInst(inst);
+        else
+            addHoistableInst(this, inst);
+    }
 
     return inst;
 }
@@ -4583,6 +4621,18 @@ IRDominatorTree* IRModule::findOrCreateDominatorTree(IRGlobalValueWithCode* func
 
 void addGlobalValue(IRBuilder* builder, IRInst* value)
 {
+    // If the value is already in the parent, keep it as-is.
+    // Because when the inst is Hoistable, the parent can have
+    // only one instance of the inst. The order among
+    // siblings should remain because the later siblings may
+    // have dependency to the earlier siblings.
+    //
+    if (value->parent)
+    {
+        SLANG_ASSERT(getIROpInfo(value->getOp()).isHoistable());
+        return;
+    }
+
     // Try to find a suitable parent for the
     // global value we are emitting.
     //
@@ -7985,7 +8035,11 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
 
             auto user = uu->getUser();
             bool userIsHoistable = getIROpInfo(user->getOp()).isHoistable();
-            if (userIsHoistable)
+
+            // We want to de-duplicate WitnessTable but we don't really want to hoist them.
+            bool userNeedToBeHoisted = userIsHoistable && (user->getOp() != kIROp_WitnessTable);
+
+            if (userNeedToBeHoisted)
             {
                 if (!dedupContext)
                 {
@@ -8002,7 +8056,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
             // to a point before `user`, if it is not already so.
             _maybeHoistOperand(uu);
 
-            if (userIsHoistable)
+            if (userNeedToBeHoisted)
             {
                 // Is the updated inst already exists in the global numbering map?
                 // If so, we need to continue work on replacing the updated inst with the existing
