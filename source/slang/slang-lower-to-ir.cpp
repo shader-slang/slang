@@ -11873,7 +11873,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // TODO: give error messages if any `undefined` or
         // instructions remain.
 
-        checkForMissingReturns(module, compileRequest->getSink());
+        checkForMissingReturns(module, compileRequest->getSink(), CodeGenTarget::None, true);
         // Check for invalid differentiable function body.
         checkAutoDiffUsages(module, compileRequest->getSink());
 
