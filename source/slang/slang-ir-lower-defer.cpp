@@ -25,7 +25,14 @@ struct DeferLoweringContext : InstPassBase
         builder->setInsertBefore(beforeInst);
         IRCloneEnv env;
         for(IRInst* inst: deferBlock->getChildren())
-            cloneInst(&env, builder, inst);
+        {
+            // Copy everything except terminators; the only kind of terminators
+            // that could occur at the end of deferBlocks are ones that lead
+            // nowhere sensible and only exist because blocks generally must
+            // have terminators.
+            if(!as<IRTerminatorInst>(inst))
+                cloneInst(&env, builder, inst);
+        }
     }
 
     // Returns the new last block.
@@ -63,6 +70,12 @@ struct DeferLoweringContext : InstPassBase
                 cloneInst(&env, builder, inst);
             }
         }
+
+        // Remove a terminator from the last block copied from `defer` if there
+        // is one; it cannot be valid.
+        auto lastTerminator = lastBlock->getTerminator();
+        if (lastTerminator)
+            lastTerminator->removeAndDeallocate();
 
         // Move old instructions to the last block's end. The last defer block
         // shouldn't have a terminator at this point yet.
