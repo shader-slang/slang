@@ -321,6 +321,17 @@ ${{{{
 }
 }}}}
 
+/// Array length
+__generic<T, let N : int>
+public extension Array<T, N>
+{
+    [ForceInline]
+    public int length()
+    {
+        return this.getCount();
+    }
+}
+
 //
 // Section 8.1. Angle and Trigonometry Functions
 //
