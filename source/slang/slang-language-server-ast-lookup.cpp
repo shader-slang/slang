@@ -642,10 +642,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitReturnStmt(ReturnStmt* stmt) { return checkExpr(stmt->expression); }
 
-    bool visitDeferStmt(DeferStmt* stmt)
-    {
-        return dispatchIfNotNull(stmt->statement);
-    }
+    bool visitDeferStmt(DeferStmt* stmt) { return dispatchIfNotNull(stmt->statement); }
 
     bool visitWhileStmt(WhileStmt* stmt)
     {

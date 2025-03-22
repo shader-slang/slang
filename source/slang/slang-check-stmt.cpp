@@ -121,7 +121,8 @@ void SemanticsStmtVisitor::checkStmt(Stmt* stmt)
 template<typename T>
 T* SemanticsStmtVisitor::FindOuterStmt(Stmt* searchUntil)
 {
-    for (auto outerStmtInfo = m_outerStmts; outerStmtInfo && outerStmtInfo->stmt != searchUntil; outerStmtInfo = outerStmtInfo->next)
+    for (auto outerStmtInfo = m_outerStmts; outerStmtInfo && outerStmtInfo->stmt != searchUntil;
+         outerStmtInfo = outerStmtInfo->next)
     {
         auto outerStmt = outerStmtInfo->stmt;
         auto found = as<T>(outerStmt);

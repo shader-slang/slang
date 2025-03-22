@@ -24,19 +24,23 @@ struct DeferLoweringContext : InstPassBase
     {
         builder->setInsertBefore(beforeInst);
         IRCloneEnv env;
-        for(IRInst* inst: deferBlock->getChildren())
+        for (IRInst* inst : deferBlock->getChildren())
         {
             // Copy everything except terminators; the only kind of terminators
             // that could occur at the end of deferBlocks are ones that lead
             // nowhere sensible and only exist because blocks generally must
             // have terminators.
-            if(!as<IRTerminatorInst>(inst))
+            if (!as<IRTerminatorInst>(inst))
                 cloneInst(&env, builder, inst);
         }
     }
 
     // Returns the new last block.
-    IRBlock* inlineDefer(IRInst* beforeInst, IRBlock* targetBlock, IRDefer* defer, IRBuilder* builder)
+    IRBlock* inlineDefer(
+        IRInst* beforeInst,
+        IRBlock* targetBlock,
+        IRDefer* defer,
+        IRBuilder* builder)
     {
         // The single-block inlining case is simple, we can just dump the
         // instructions at the target position, in the existing block.
@@ -133,10 +137,7 @@ struct DeferLoweringContext : InstPassBase
         List<IRDefer*> unhandledDefers;
         processInstsOfType<IRDefer>(
             kIROp_Defer,
-            [&](IRDefer* defer)
-            {
-                unhandledDefers.add(defer);
-            });
+            [&](IRDefer* defer) { unhandledDefers.add(defer); });
 
         IRBuilder builder(module);
 
@@ -171,7 +172,7 @@ struct DeferLoweringContext : InstPassBase
                 auto terminator = block->getTerminator();
                 SLANG_ASSERT(terminator);
                 bool exits = false;
-                switch(terminator->getOp())
+                switch (terminator->getOp())
                 {
                 case kIROp_Return:
                 case kIROp_discard:
@@ -191,10 +192,9 @@ struct DeferLoweringContext : InstPassBase
                     {
                         auto trueBlock = as<IRBlock>(terminator->getOperand(1));
                         auto falseBlock = as<IRBlock>(terminator->getOperand(2));
-                        if (
-                            !dominatedBlocksSet.contains(trueBlock) ||
-                            !dominatedBlocksSet.contains(falseBlock)
-                        ){
+                        if (!dominatedBlocksSet.contains(trueBlock) ||
+                            !dominatedBlocksSet.contains(falseBlock))
+                        {
                             exits = true;
                         }
                     }
@@ -205,7 +205,7 @@ struct DeferLoweringContext : InstPassBase
 
                 if (exits)
                 { // Duplicate child instructions to the end of this block.
-                    if(inlineDefer(terminator, block, defer, &builder) != block)
+                    if (inlineDefer(terminator, block, defer, &builder) != block)
                     {
                         // New last block is not the same as before, so mark
                         // analysis of the function with defer as outdated.
@@ -220,10 +220,7 @@ struct DeferLoweringContext : InstPassBase
         // Remove all defer hooks, they're not needed anymore.
         processInstsOfType<IRDeferHookDecoration>(
             kIROp_DeferHookDecoration,
-            [&](IRDeferHookDecoration* deferHook)
-            {
-                deferHook->removeAndDeallocate();
-            });
+            [&](IRDeferHookDecoration* deferHook) { deferHook->removeAndDeallocate(); });
     }
 };
 
