@@ -1667,7 +1667,18 @@ void HLSLSourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
     {
         m_writer->emit("[payload] ");
     }
-    const bool enablePAQs = true;
+
+    // Get the target profile to determine if PAQs are supported
+    bool enablePAQs = false;
+    auto profile = getTargetProgram()->getOptionSet().getProfile();
+    if (profile.getFamily() == ProfileFamily::DX)
+    {
+        // PAQs are default in Shader Model 6.7 and above when called with `--profile lib_6_7`
+
+        auto version = profile.getVersion();
+        enablePAQs = version >= ProfileVersion::DX_6_7;
+    }
+
     if (enablePAQs)
     {
         if (const auto payloadDecoration = inst->findDecoration<IRRayPayloadDecoration>())
