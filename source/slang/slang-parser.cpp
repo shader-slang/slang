@@ -215,6 +215,7 @@ public:
     BreakStmt* ParseBreakStatement();
     ContinueStmt* ParseContinueStatement();
     ReturnStmt* ParseReturnStatement();
+    DeferStmt* ParseDeferStatement();
     ExpressionStmt* ParseExpressionStatement();
     Expr* ParseExpression(Precedence level = Precedence::Comma);
 
@@ -5770,6 +5771,10 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
     {
         statement = parseCompileTimeStmt(this);
     }
+    else if (LookAheadToken("defer"))
+    {
+        statement = ParseDeferStatement();
+    }
     else if (LookAheadToken("try"))
     {
         statement = ParseExpressionStatement();
@@ -6297,6 +6302,15 @@ ReturnStmt* Parser::ParseReturnStatement()
         returnStatement->expression = ParseExpression();
     ReadToken(TokenType::Semicolon);
     return returnStatement;
+}
+
+DeferStmt* Parser::ParseDeferStatement()
+{
+    DeferStmt* deferStatement = astBuilder->create<DeferStmt>();
+    FillPosition(deferStatement);
+    ReadToken("defer");
+    deferStatement->statement = ParseStatement();
+    return deferStatement;
 }
 
 ExpressionStmt* Parser::ParseExpressionStatement()

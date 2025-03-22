@@ -890,6 +890,10 @@ DIAGNOSTIC(
 DIAGNOSTIC(30106, Error, improperUseOfType, "type '$0' cannot be used in this context.")
 DIAGNOSTIC(30107, Error, parameterPackMustBeConst, "a parameter pack must be declared as 'const'.")
 
+DIAGNOSTIC(30108, Error, breakInsideDefer, "'break' must not appear inside a defer statement.")
+DIAGNOSTIC(30109, Error, continueInsideDefer, "'continue' must not appear inside a defer statement.")
+DIAGNOSTIC(30110, Error, returnInsideDefer, "'return' must not appear inside a defer statement.")
+
 
 // Include
 DIAGNOSTIC(
