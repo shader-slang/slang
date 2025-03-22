@@ -9412,4 +9412,9 @@ __intrinsic_op($(kIROp_NonUniformResourceIndex))
 [require(cpp_cuda_glsl_hlsl_spirv, nonuniformqualifier)]
 public T nonuniformEXT(T index);
 
-
+/// Debug output printing
+[ForceInline]
+public void debugPrintfEXT<each T>(NativeString format, expand each T args)
+{
+    printf(format, args);
+}
