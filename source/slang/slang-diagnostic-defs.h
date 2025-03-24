@@ -2158,6 +2158,11 @@ DIAGNOSTIC(
 DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
 DIAGNOSTIC(41001, Error, recursiveType, "type '$0' contains cyclic reference to itself.")
 
+DIAGNOSTIC(
+    41009,
+    Error,
+    missingReturnError,
+    "non-void function must return in all cases for target '$0'")
 DIAGNOSTIC(41010, Warning, missingReturn, "non-void function does not return in all cases")
 DIAGNOSTIC(
     41011,
@@ -2310,12 +2315,6 @@ DIAGNOSTIC(
     Error,
     notEqualBitCastSize,
     "invalid to bit_cast differently sized types: '$0' with size '$1' casted into '$2' with size "
-    "'$3'")
-DIAGNOSTIC(
-    41203,
-    Warning,
-    notEqualReinterpretCastSize,
-    "reinterpret<> into not equally sized types: '$0' with size '$1' casted into '$2' with size "
     "'$3'")
 
 DIAGNOSTIC(
