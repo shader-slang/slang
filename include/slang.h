@@ -1740,8 +1740,6 @@ public:                                                              \
     typedef slang::IGlobalSession SlangSession;
 
 
-    typedef struct SlangProgramLayout SlangProgramLayout;
-
     /*!
     @brief A request for one or more compilation actions to be performed.
     */
