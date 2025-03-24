@@ -575,7 +575,7 @@ Statement statementDisjunction(IRBlock* block, Statement a, Statement b)
 // set.
 //
 
-struct PredicateSet
+struct StatementSet
 {
     // A conjunction of independent predicates (a1 ^ a2 ^ a3 ...)
     Dictionary<IRInst*, Statement> predicates;
@@ -586,9 +586,23 @@ struct PredicateSet
         if (predicate.type == Statement::Empty)
             return;
 
-        // Disjunct the predicate with the appropriate existing predicate
-        predicates[predicate.inst] =
-            statementDisjunction(predicate.block, predicate, predicates[predicate.inst]);
+        // Since we hold only one statement per inst, we can perform disjunction
+        // on a per-inst basis.
+        // If an inst does not exist in the current set, then it's an empty statement.
+        //
+        if (predicates.containsKey(predicate.inst))
+        {
+            // If the predicate is already in the set, then we can just update it.
+            predicates[predicate.inst] =
+                statementDisjunction(predicate.block, predicate, predicates[predicate.inst]);
+        }
+    }
+
+    // Disjunction of a set of statements (a1 v a2 v a3 ...) with the current set.
+    void disjunct(StatementSet other)
+    {
+        for (auto& predicate : other.predicates)
+            disjunct(predicate.second);
     }
 
     // Conjunction of a predicate with the current set (pred ^ (a1 ^ a2 ^ a3 ...))
@@ -597,20 +611,28 @@ struct PredicateSet
         if (predicate.type == Statement::Empty)
             return;
 
-        // Conjunct the predicate with the appropriate existing predicate
-        auto newStatement =
-            statementConjunction(predicate.block, predicate, predicates[predicate.inst]);
-
-        if (newStatement.type == Statement::Concrete &&
-            newStatement.relation.type == SimpleRelation::Any)
+        if (predicates.containsKey(predicate.inst))
         {
-            // If the new statement is trivially true, then we can remove the predicate.
-            predicates.remove(predicate.inst);
+            // Conjunct the predicate with the appropriate existing predicate
+            auto newStatement =
+                statementConjunction(predicate.block, predicate, predicates[predicate.inst]);
+
+            if (newStatement.type == Statement::Concrete &&
+                newStatement.relation.type == SimpleRelation::Any)
+            {
+                // If the new statement is trivially true, then we can remove the predicate.
+                predicates.remove(predicate.inst);
+            }
+            else
+            {
+                // Otherwise, we update the predicate.
+                predicates[predicate.inst] = newStatement;
+            }
         }
         else
         {
-            // Otherwise, we update the predicate.
-            predicates[predicate.inst] = newStatement;
+            // Otherwise, we add the predicate to the set.
+            predicates[predicate.inst] = predicate;
         }
     }
 
@@ -1045,6 +1067,154 @@ Statement tryCollectPredicatedStatement(
     default:
         SLANG_UNREACHABLE("Unhandled statement type");
     }
+}
+
+// Different approach...
+
+// Use the equality of the parameter & argument to translate a statement to a predecessor block.
+Statement translateToPredecessor(IRBlock* block, IRBlock* predecessor, Statement statement)
+{
+    if (as<IRParam>(statement.inst) && statement.type == Statement::Concrete)
+    {
+        auto paramIndex = getParamIndexInBlock(cast<IRParam>(statement.inst));
+        auto translatedInst =
+            as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(paramIndex);
+        return Statement::concrete(translatedInst, statement.relation);
+    }
+
+    // Not a parameter (or we have a non-concrete statement), so no need to translate it.
+    return statement;
+}
+
+StatementSet translateToPredecessor(IRBlock* block, IRBlock* predecessor, StatementSet statementSet)
+{
+    StatementSet newStatementSet;
+    // Translate each statement in the set.
+    for (auto& statement : statementSet.predicates)
+        newStatementSet.conjunct(translateToPredecessor(block, predecessor, statement.second));
+    return newStatementSet;
+}
+
+Statement translateToCurrent(IRBlock* block, IRBlock* predecessor, Statement statement)
+{
+    List<IRParam*> params;
+    for (auto param : block->getParams())
+        params.add(param);
+
+    // If the statement is concrete, we need to check if it's an argument in the predecessor's
+    // branch
+    if (statement.type == Statement::Concrete)
+    {
+        auto terminator = predecessor->getTerminator();
+        auto branch = as<IRUnconditionalBranch>(terminator);
+
+        if (branch)
+        {
+            // Scan through all arguments to find if statement.inst is one of them
+            auto argCount = branch->getArgCount();
+            for (UInt argIndex = 0; argIndex < argCount; argIndex++)
+            {
+                auto arg = branch->getArg(argIndex);
+                if (arg == statement.inst)
+                {
+                    // Found the argument - translate to the corresponding parameter in the current
+                    // block
+                    auto param = params[argIndex];
+                    if (param)
+                    {
+                        return Statement::concrete(param, statement.relation);
+                    }
+                }
+            }
+        }
+    }
+
+    // If it's not an argument in the branch or not a concrete statement, no translation needed
+    return statement;
+}
+
+// Same translation, but from predecessor to current block.
+StatementSet translateToCurrent(IRBlock* block, IRBlock* predecessor, StatementSet statementSet)
+{
+    StatementSet newStatementSet;
+    for (auto& statement : statementSet.predicates)
+        newStatementSet.conjunct(translateToCurrent(block, predecessor, statement.second));
+    return newStatementSet;
+}
+
+
+// Obtain all implications that can be inferred from the predicate in a
+// certain block.
+//
+// This is something we could do on a per-block basis.
+//
+StatementSet tryGetImplications(
+    Dictionary<StatementCacheKey, StatementSet>& cache,
+    IRBlock* block,
+    Statement predicate)
+{
+    auto cacheKey = StatementCacheKey(block, predicate.inst, predicate);
+    if (auto cached = cache.tryGetValue(cacheKey))
+        return *cached;
+
+    auto memoize = [&](StatementSet result)
+    {
+        cache[cacheKey] = result;
+        return result;
+    };
+
+    // Memoize a variable for each parameter in this block.
+    // This way if we see these variables again, we know that
+    // we have a recursive relation.
+    //
+    // This memoization simultaneously avoids infinite recursion,
+    // and allows an elegant representation of recursive relationships.
+    //
+    StatementSet parameterImplications;
+    for (auto param : block->getParams())
+        parameterImplications.conjunct(Statement::variable(param, block));
+    memoize(parameterImplications);
+
+    // Empty set of statements.
+    ShortList<StatementSet, 2> predecessorStatementSets;
+
+    // Merge statements from predecessors.
+    for (auto predecessor : block->getPredecessors())
+    {
+        // Translate predicate and parameters to the predecessor block.
+
+
+        auto predecessorImplications = tryGetImplications(cache, predecessor, predicate);
+
+        // If we have any extra statements that we can infer from this branch,
+        // we'll add them to the list. (This could be the true or false branch of a
+        // conditional).
+        //
+        auto branchStatements = tryExtractStatements(predecessor->getTerminator(), block);
+
+        for (auto& branchStatement : branchStatements)
+            predecessorImplications.conjunct(branchStatement);
+
+        if (predecessorImplications.isTriviallyFalse())
+            continue;
+
+        predecessorStatementSets.add(predecessorImplications);
+    }
+
+    // If we get to a situation where there are no valid
+    // predecessors into this block, then something is wrong.
+    //
+    SLANG_ASSERT(predecessorStatementSets.getCount() > 0);
+
+    if (predecessorStatementSets.getCount() == 0)
+        return StatementSet();
+
+    // Disjunction of all the implications.
+    StatementSet result = predecessorStatementSets[0];
+    for (int i = 1; i < predecessorStatementSets.getCount(); i++)
+        result.disjunct(predecessorStatementSets[i]);
+
+    return memoize(result);
 }
 
 } // namespace Slang
