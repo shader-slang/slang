@@ -63,47 +63,119 @@ struct App
 {
     char const* appName = "slang-embed";
     char const* inputPath = nullptr;
-    char const* includeDir = nullptr;
     char const* outputPath = nullptr;
+    Slang::List<Slang::String> includeDirs;
     Slang::HashSet<Slang::String> includedFiles;
+    size_t charCount = 0;
+    bool useNewStringLit = true;
 
     void parseOptions(int argc, char** argv)
     {
-        // Options are currently all specified by position,
-        // so the parsing logic is simplistic.
-
+        // First, get the program name
         if (argc > 0)
         {
             appName = *argv++;
             argc--;
         }
 
-        if (argc > 0)
+        // Parse remaining arguments - we need at least inputPath
+        if (argc < 1)
         {
-            inputPath = *argv++;
-            argc--;
+            fprintf(stderr, "usage: %s inputPath [outputPath] [-I<includeDir> ...]\n", appName);
+            exit(1);
         }
 
-        if (argc > 0)
+        // Get input path (first positional argument)
+        inputPath = *argv++;
+        argc--;
+
+        // Process remaining arguments
+        while (argc > 0)
         {
-            includeDir = *argv++;
+            char* arg = *argv++;
             argc--;
+
+            // Check for -I prefix for include directories
+            if (strncmp(arg, "-I", 2) == 0)
+            {
+                // Check if this is a concatenated string of include directories
+                char* startPtr = arg;
+
+                // Process the entire string as potentially multiple -I directives
+                while (startPtr && *startPtr)
+                {
+                    // Find the -I prefix
+                    char* iPos = strstr(startPtr, "-I");
+                    if (!iPos)
+                        break;
+
+                    // Move past the -I
+                    char* dirStart = iPos + 2;
+
+                    // Find the next -I or end of string
+                    char* nextIPos = strstr(dirStart, "-I");
+
+                    // Determine end of current include dir
+                    char* dirEnd = nextIPos ? nextIPos : (startPtr + strlen(startPtr));
+
+                    // Check if the directory has a semicolon or quotes at the end
+                    if (dirEnd > dirStart && (*(dirEnd - 1) == ';' || *(dirEnd - 1) == '"'))
+                        dirEnd--;
+
+                    // Save the current directory by creating a substring
+                    if (dirEnd > dirStart)
+                    {
+                        // Create a null-terminated copy
+                        size_t dirLen = dirEnd - dirStart;
+                        char* tempDir = (char*)malloc(dirLen + 1);
+                        strncpy(tempDir, dirStart, dirLen);
+                        tempDir[dirLen] = '\0';
+
+                        // Remove any quotes
+                        char* dir = tempDir;
+                        if (*dir == '"')
+                            dir++;
+                        if (dir[strlen(dir) - 1] == '"')
+                            dir[strlen(dir) - 1] = '\0';
+
+                        // Remove trailing whitespace
+                        size_t len = strlen(dir);
+                        while (len > 0 && isspace((unsigned char)dir[len - 1]))
+                        {
+                            dir[len - 1] = '\0';
+                            len--;
+                        }
+
+                        // Add to include dirs
+                        includeDirs.add(Slang::String(dir));
+                        free(tempDir);
+                    }
+
+                    // Move to next position (if any)
+                    startPtr = nextIPos;
+                }
+            }
+            // Otherwise treat as output path if not already set
+            else if (!outputPath)
+            {
+                outputPath = arg;
+            }
+            else
+            {
+                fprintf(stderr, "unexpected argument: %s\n", arg);
+                fprintf(stderr, "usage: %s inputPath [outputPath] [-I<includeDir> ...]\n", appName);
+                exit(1);
+            }
         }
 
-        if (argc > 0)
+        // Validate we have the required arguments
+        if (!inputPath)
         {
-            outputPath = *argv++;
-            argc--;
-        }
-
-        if (!inputPath || (argc != 0))
-        {
-            fprintf(stderr, "usage: %s inputPath includeDir [outputPath]\n", appName);
+            fprintf(stderr, "usage: %s inputPath [outputPath] [-I<includeDir> ...]\n", appName);
             exit(1);
         }
     }
-    size_t charCount = 0;
-    bool useNewStringLit = true;
+
     void processInputFile(FILE* outputFile, Slang::String inputPath)
     {
         using namespace Slang;
@@ -138,19 +210,62 @@ struct App
             if (trimedLine.startsWith("#include"))
             {
                 auto fileName = Slang::StringUtil::getAtInSplit(trimedLine, ' ', 1);
-                if (fileName[0] == '<')
-                    goto normalProcess;
-                fileName = Slang::UnownedStringSlice(fileName.begin() + 1, fileName.end() - 1);
-                auto path =
-                    Slang::Path::combine(Slang::Path::getParentDirectory(inputPath), fileName);
-                if (!Slang::File::exists(path))
-                {
-                    // Try looking in the include directory.
-                    path = Slang::Path::combine(includeDir, fileName);
+                bool isSystemInclude = false;
 
-                    if (!Slang::File::exists(path))
-                        goto normalProcess;
+                // Handle both quoted and angle-bracket includes
+                if (fileName[0] == '<')
+                {
+                    // Handle <filename> format
+                    isSystemInclude = true;
+                    // Extract filename between < and >
+                    if (fileName.getLength() >= 2 && fileName[fileName.getLength() - 1] == '>')
+                    {
+                        fileName =
+                            Slang::UnownedStringSlice(fileName.begin() + 1, fileName.end() - 1);
+                    }
+                    else
+                    {
+                        goto normalProcess; // Malformed include, skip it
+                    }
                 }
+                else if (fileName[0] == '"' && fileName[fileName.getLength() - 1] == '"')
+                {
+                    // Handle "filename" format
+                    fileName = Slang::UnownedStringSlice(fileName.begin() + 1, fileName.end() - 1);
+                }
+                else
+                {
+                    // Malformed include, skip it
+                    goto normalProcess;
+                }
+
+                // For system includes, only look in include dirs, not relative to current file
+                auto path = isSystemInclude ? Slang::String()
+                                            : Slang::Path::combine(
+                                                  Slang::Path::getParentDirectory(inputPath),
+                                                  fileName);
+
+                bool foundInclude = false;
+                if (isSystemInclude || !Slang::File::exists(path))
+                {
+                    // Try looking in each of the include directories
+                    for (auto& includeDir : includeDirs)
+                    {
+                        path = Slang::Path::combine(includeDir, fileName);
+                        if (Slang::File::exists(path))
+                        {
+                            foundInclude = true;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    foundInclude = true;
+                }
+
+                if (!foundInclude)
+                    goto normalProcess;
                 processInputFile(outputFile, path.getUnownedSlice());
                 continue;
             }
