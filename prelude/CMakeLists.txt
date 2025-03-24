@@ -12,8 +12,8 @@ foreach(input ${prelude_headers})
     add_custom_command(
         OUTPUT ${output}
         COMMAND
-            slang-embed "${input}" ${output} "-I$<JOIN:$<TARGET_PROPERTY:core,INCLUDE_DIRECTORIES>, -I>"
-             
+            slang-embed "${input}" ${output} 
+            "-I$<JOIN:$<TARGET_PROPERTY:core,INCLUDE_DIRECTORIES>, -I>" 
         DEPENDS ${input} slang-embed
         VERBATIM
     )
