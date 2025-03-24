@@ -127,28 +127,19 @@ struct App
                     {
                         // Create a null-terminated copy
                         size_t dirLen = dirEnd - dirStart;
-                        char* tempDir = (char*)malloc(dirLen + 1);
-                        strncpy(tempDir, dirStart, dirLen);
-                        tempDir[dirLen] = '\0';
+                        Slang::String tempDir(Slang::UnownedStringSlice(dirStart, dirLen));
 
                         // Remove any quotes
-                        char* dir = tempDir;
-                        if (*dir == '"')
-                            dir++;
-                        if (dir[strlen(dir) - 1] == '"')
-                            dir[strlen(dir) - 1] = '\0';
+                        if (tempDir[0] == '"')
+                            tempDir = tempDir.subString(1, tempDir.getLength() - 1);
+                        if (tempDir.endsWith("\"") && tempDir.getLength() > 0)
+                            tempDir = tempDir.subString(0, tempDir.getLength() - 1);
 
                         // Remove trailing whitespace
-                        size_t len = strlen(dir);
-                        while (len > 0 && isspace((unsigned char)dir[len - 1]))
-                        {
-                            dir[len - 1] = '\0';
-                            len--;
-                        }
+                        tempDir = tempDir.trimEnd();
 
                         // Add to include dirs
-                        includeDirs.add(Slang::String(dir));
-                        free(tempDir);
+                        includeDirs.add(tempDir);
                     }
 
                     // Move to next position (if any)
