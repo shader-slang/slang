@@ -2710,6 +2710,13 @@ struct IRCheckpointObject : IRInst
     IRInst* getVal() { return getOperand(0); }
 };
 
+struct IRLoopExitValue : IRInst
+{
+    IR_LEAF_ISA(LoopExitValue);
+
+    IRInst* getVal() { return getOperand(0); }
+};
+
 // Signals that this point in the code should be unreachable.
 // We can/should emit a dataflow error if we can ever determine
 // that a block ending in one of these can actually be
@@ -4460,6 +4467,7 @@ public:
     IRInst* emitDiscard();
 
     IRInst* emitCheckpointObject(IRInst* value);
+    IRInst* emitLoopExitValue(IRInst* value);
 
     IRInst* emitUnreachable();
     IRInst* emitMissingReturn();

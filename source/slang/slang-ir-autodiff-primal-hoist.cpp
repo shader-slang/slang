@@ -2,6 +2,7 @@
 
 #include "../core/slang-func-ptr.h"
 #include "slang-ast-support-types.h"
+#include "slang-ir-autodiff-loop-analysis.h"
 #include "slang-ir-autodiff-region.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-simplify-cfg.h"
@@ -402,7 +403,7 @@ void splitLoopConditionBlockInsts(
             if (loopUses.getCount() > 0 && afterLoopUses.getCount() > 0)
             {
                 setInsertAfterOrdinaryInst(&builder, inst);
-                auto copy = builder.emitCheckpointObject(inst);
+                auto copy = builder.emitLoopExitValue(inst);
 
                 // Copy source location so that checkpoint reporting is accurate
                 copy->sourceLoc = inst->sourceLoc;
@@ -424,6 +425,8 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
     Dictionary<IRBlock*, List<IndexTrackingInfo>>& blockIndexInfo)
 {
     collectInductionValues(func);
+
+    collectLoopExitConditions(func);
 
     RefPtr<CheckpointSetInfo> checkpointInfo = new CheckpointSetInfo();
 
@@ -554,6 +557,17 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                     if (auto inductionInfo = inductionValueInsts.tryGetValue(param))
                     {
                         checkpointInfo->loopInductionInfo.addIfNotExists(param, *inductionInfo);
+
+                        // If we also have an exit value (a stronger condition on the param), record
+                        // it.
+                        //
+                        if (auto loopExitValueInst =
+                                checkpointInfo->loopExitValueInsts.tryGetValue(param))
+                        {
+                            checkpointInfo->loopExitValueInsts.addIfNotExists(
+                                result.instToRecompute,
+                                *loopExitValueInst);
+                        }
                         continue;
                     }
 
@@ -1046,6 +1060,147 @@ void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode*
     }
 }
 
+
+void AutodiffCheckpointPolicyBase::collectLoopExitConditions(IRGlobalValueWithCode* func)
+{
+    // Assume that the InductionValueInfo is already collected.
+    IRBuilder builder(func->getModule());
+    Dictionary<StatementCacheKey, Statement> cache;
+    for (auto block : func->getBlocks())
+    {
+        auto loopInst = as<IRLoop>(block->getTerminator());
+        if (!loopInst)
+            continue;
+        auto targetBlock = loopInst->getTargetBlock();
+        auto ifElse = as<IRIfElse>(targetBlock->getTerminator());
+        if (!ifElse)
+            continue;
+
+        auto condParam = as<IRParam>(ifElse->getCondition());
+        if (!condParam || condParam->getParent() != targetBlock)
+            continue;
+
+        // Locate the loop counter.
+        IRInst* loopCounter = nullptr;
+        for (auto param : targetBlock->getParams())
+        {
+            if (param->findDecoration<IRLoopCounterDecoration>())
+            {
+                loopCounter = param;
+                break;
+            }
+        }
+
+        if (!loopCounter)
+            continue;
+
+        // Go over all loop phi parameters for which we have induction value info,
+        // and try to determine a relation on the exit value.
+        //
+        for (auto param : targetBlock->getParams())
+        {
+            auto inductionValueInfo = inductionValueInsts.tryGetValue(param);
+            if (!inductionValueInfo ||
+                inductionValueInfo->kind != LoopInductionValueInfo::AffineFunctionOfCounter)
+                continue;
+
+            // We need to have a known constant offset to be able to compute the loop exit value.
+            if (!isIntegerConstantValue(inductionValueInfo->counterOffset))
+                continue;
+
+            // Collect a statement that holds when the loop condition is false.
+            const auto statement = tryCollectPredicatedStatement(
+                cache,
+                targetBlock,
+                param,
+                Statement::concrete(condParam, SimpleRelation::boolRelation(false)));
+            SLANG_ASSERT(statement.type == Statement::Concrete);
+
+            // The statement we collected says nothing about the parameter. No point continuing.
+            if (statement.relation.type == SimpleRelation::Type::Any)
+                continue;
+
+            // We will also obtain a statement for the inverse, i.e. some relation
+            // that holds if condParam is true.
+            const auto inverseStatement = tryCollectPredicatedStatement(
+                cache,
+                targetBlock,
+                param,
+                Statement::concrete(condParam, SimpleRelation::boolRelation(true)));
+            SLANG_ASSERT(statement.type == Statement::Concrete);
+
+            if (inverseStatement.relation.type == SimpleRelation::Type::Any)
+                continue;
+
+            // If this doesn't hold, we can't be sure that the loop exits *if and only if*
+            // the relation on the parameter holds. (there could be cases where the relation
+            // is true, but the loop doesn't exit immediately)
+            //
+            if (!doesRelationImply(statement.relation, inverseStatement.relation.negated()))
+                continue;
+
+            // We found a relation on the parameter at the loop exit, and we also proved that
+            // if the relation holds, the loop must exit.
+            //
+            // If we have an inequality + information that a value is an inductive (i.e. follows a
+            // sequence of the form `start + i * step`), then we can use that to compute the exact
+            // value at the loop exit.
+            //
+            // We can do this by solving the inequality for the parameter, using the inductive value
+            // as the counter variable.
+            //
+            if (inductionValueInfo->kind == LoopInductionValueInfo::Kind::AffineFunctionOfCounter)
+            {
+                auto counterOffset = getConstantIntegerValue(inductionValueInfo->counterOffset);
+                auto counterFactor = inductionValueInfo->counterFactor;
+
+                SLANG_ASSERT(statement.relation.type == SimpleRelation::Type::IntegerRelation);
+                auto relationValue = statement.relation.integerValue;
+
+                auto recordExitValue = [&](IRIntegerValue exitIValue, IRIntegerValue exitParamValue)
+                {
+                    this->loopExitValueInsts[param] =
+                        builder.getIntValue(param->getDataType(), exitParamValue);
+
+                    // The interesting part is that since we know that this variable is an bijective
+                    // function of the loop counter, we can also compute the loop counter's exit
+                    // value.
+                    //
+                    // Since this can come from multiple parameters, we'll verify to make sure that
+                    // there are no contradictions.
+                    //
+                    IRInst* loopCounterExitValue;
+                    if (this->loopExitValueInsts.tryGetValue(loopCounter, loopCounterExitValue))
+                    {
+                        auto loopCounterExitIValue = getConstantIntegerValue(loopCounterExitValue);
+                        if (loopCounterExitIValue != exitIValue)
+                        {
+                            SLANG_ASSERT(!"contradictory loop exit values");
+                        }
+                    }
+                    else
+                    {
+                        this->loopExitValueInsts[loopCounter] =
+                            builder.getIntValue(loopCounter->getDataType(), exitIValue);
+                    }
+                };
+
+                if (counterFactor > 0 &&
+                    statement.relation.comparator == SimpleRelation::GreaterThan)
+                {
+                    // Find the smallest value that satisfies counterFactor * i + counterOffset >=
+                    // relationValue
+                    //
+                    IRIntegerValue exitIValue = ((relationValue - counterOffset) / counterFactor);
+                    IRIntegerValue exitParamValue = counterOffset + counterFactor * exitIValue;
+                    recordExitValue(exitIValue, exitParamValue);
+                }
+                // TODO: handle other cases
+            }
+        }
+    }
+}
+
 void applyToInst(
     IRBuilder* builder,
     CheckpointSetInfo* checkpointInfo,
@@ -1065,6 +1220,22 @@ void applyToInst(
     bool isInstRecomputed = checkpointInfo->recomputeSet.contains(inst);
     if (isInstRecomputed)
     {
+        if (auto loopExitValueInst = as<IRLoopExitValue>(inst))
+        {
+            if (auto loopExitValue =
+                    checkpointInfo->loopExitValueInsts.tryGetValue(loopExitValueInst->getVal()))
+            {
+                cloneCtx->cloneEnv.mapOldValToNew[inst] = *loopExitValue;
+                cloneCtx->registerClonedInst(builder, inst, *loopExitValue);
+                return;
+            }
+
+            // Should never happen. (Can't mark a LoopExitValue inst as recomputed without having an
+            // entry in loopExitValueInsts dict)
+            //
+            SLANG_ASSERT(!"no loop exit value found for inst");
+        }
+
         if (as<IRParam>(inst))
         {
             // Can completely ignore first block parameters
@@ -2239,6 +2410,13 @@ void lowerCheckpointObjectInsts(IRGlobalValueWithCode* func)
                 inst->removeAndDeallocate();
             }
 
+            if (auto loopExitValueInst = as<IRLoopExitValue>(inst))
+            {
+                auto originalVal = loopExitValueInst->getVal();
+                loopExitValueInst->replaceUsesWith(originalVal);
+                loopExitValueInst->removeAndDeallocate();
+            }
+
             inst = nextInst;
         }
     }
@@ -2247,7 +2425,7 @@ void lowerCheckpointObjectInsts(IRGlobalValueWithCode* func)
 // For each primal inst that is used in reverse blocks, decide if we should recompute or store
 // its value, then make them accessible in reverse blocks based the decision.
 //
-RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
+RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func, DiagnosticSink* sink)
 {
     sortBlocksInFunc(func);
 
@@ -2268,9 +2446,17 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
 
     sortBlocksInFunc(func);
 
+    // Dump IR.
+    IRDumpOptions options;
+    options.flags = IRDumpOptions::Flag::DumpDebugIds;
+    options.mode = IRDumpOptions::Mode::Detailed;
+    DiagnosticSinkWriter writer(sink);
+    writer.write("### BEFORE-PROCESS-FUNC\n", strlen("### BEFORE-PROCESS-FUNC\n"));
+    dumpIR(func, options, sink->getSourceManager(), &writer);
+
     // Determine the strategy we should use to make a primal inst available.
-    // If we decide to recompute the inst, emit the recompute inst in the corresponding recompute
-    // block.
+    // If we decide to recompute the inst, emit the recompute inst in the corresponding
+    // recompute block.
     //
     RefPtr<AutodiffCheckpointPolicyBase> chkPolicy = new DefaultCheckpointPolicy(func->getModule());
     chkPolicy->preparePolicy(func);
@@ -2421,6 +2607,7 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_MatrixReshape:
     case kIROp_VectorReshape:
     case kIROp_GetTupleElement:
+    case kIROp_LoopExitValue:
         return false;
 
     case kIROp_Load:
@@ -2534,6 +2721,9 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
         if (inductionValueInsts.containsKey(param))
             return true;
 
+        if (loopExitValueInsts.containsKey(param))
+            return true;
+
         // We can recompute a phi param if it is not in a loop start block.
         auto parentBlock = as<IRBlock>(param->getParent());
         for (auto pred : parentBlock->getPredecessors())
@@ -2578,5 +2768,4 @@ HoistResult DefaultCheckpointPolicy::classify(UseOrPseudoUse use)
         }
     }
 }
-
 }; // namespace Slang
