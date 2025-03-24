@@ -4515,9 +4515,6 @@ struct SlangGlobalSessionDesc
     /// Whether to enable GLSL support.
     bool enableGLSL = false;
 
-    /// Whether to load builtin modules from prebuilt cache/binary.
-    bool disableBuiltinModuleCache = false;
-
     /// Reserved for future use.
     uint32_t reserved[16] = {};
 };
