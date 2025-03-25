@@ -62,6 +62,8 @@ generator(
     TARGET_NAME
     slang-bootstrap
     USE_FEWER_WARNINGS
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE
+    SLANG_BOOTSTRAP=1
     LINK_WITH_PUBLIC
     slang-without-embedded-core-module
     LINK_WITH_PRIVATE
