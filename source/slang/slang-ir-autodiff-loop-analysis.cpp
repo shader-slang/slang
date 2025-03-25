@@ -209,6 +209,97 @@ SimpleRelation relationIntersection(SimpleRelation a, SimpleRelation b)
     return SimpleRelation::anyRelation();
 }
 
+void StatementSet::disjunct(StatementSet other)
+{
+    if (other.isTriviallyFalse() || isTriviallyFalse())
+        return;
+
+    if (other.isTriviallyTrue())
+    {
+        statements.clear();
+        return;
+    }
+
+    if (isTriviallyTrue())
+        return;
+
+    for (auto& statement : other.statements)
+    {
+        // Since we hold only one statement per inst, we can perform disjunction
+        // on a per-inst basis.
+        // If an inst does not exist in the current set, then it's an empty statement.
+        //
+        if (statements.containsKey(statement.first))
+        {
+            auto newRelation = relationUnion(statement.second, statements[statement.first]);
+            set(statement.first, newRelation);
+        }
+    }
+
+    // Remove any insts that don't have a corresponding statement in the other set,
+    // since this effectively means "any".
+    //
+    for (auto& statement : statements)
+    {
+        if (!other.statements.containsKey(statement.first))
+            statements.remove(statement.first);
+    }
+}
+
+void StatementSet::conjunct(StatementSet other)
+{
+    // true ^ (a1 ^ a2 ^ a3 ...) = (a1 ^ a2 ^ a3 ...)
+    if (other.isTriviallyTrue())
+        return;
+
+    // (a1 ^ a2 ^ a3 ...) ^ true = (a1 ^ a2 ^ a3 ...)
+    if (isTriviallyTrue())
+    {
+        statements = other.statements;
+        return;
+    }
+
+    // false ^ (a1 ^ a2 ^ a3 ...) = false
+    if (isTriviallyFalse())
+        return;
+
+    // (a1 ^ a2 ^ a3 ...) ^ false = false
+    if (other.isTriviallyFalse())
+    {
+        statements = other.statements;
+        return;
+    }
+
+    // Otherwise do an element-wise conjunction.
+    for (auto& statement : other.statements)
+    {
+        if (statements.containsKey(statement.first))
+        {
+            set(statement.first,
+                relationIntersection(statement.second, statements[statement.first]));
+        }
+        else
+        {
+            set(statement.first, statement.second);
+        }
+    }
+}
+
+void StatementSet::conjunct(IRInst* inst, SimpleRelation relation)
+{
+    if (isTriviallyFalse())
+        return;
+
+    if (statements.containsKey(inst))
+    {
+        set(inst, relationIntersection(relation, statements[inst]));
+    }
+    else
+    {
+        set(inst, relation);
+    }
+}
+
 // This function answers the question: "Can we prove that relationB is true if relationA is true?"
 //
 // Note that this is not the same as "Does relationA imply relationB", since there can be cases
@@ -298,26 +389,9 @@ bool getConstantBoolValue(IRInst* inst)
     return as<IRBoolLit>(inst)->getValue();
 }
 
-static List<Statement> tryExtractStatements(IRTerminatorInst* inst, IRBlock* block)
+StatementSet tryExtractStatements(IRTerminatorInst* inst, IRBlock* block)
 {
-    List<Statement> statements;
-
-    // Lambds to add statements to the list. If there' already something about an inst,
-    // we'll need to AND it with the new statement.
-    //
-    auto addStatement = [&](Statement statement)
-    {
-        for (auto& existingStatement : statements)
-        {
-            if (existingStatement.inst == statement.inst)
-            {
-                existingStatement.relation =
-                    relationIntersection(existingStatement.relation, statement.relation);
-                return;
-            }
-        }
-        statements.add(statement);
-    };
+    StatementSet statements;
 
     // From condInst, extract a statement about any inst such that we have an equality
     // statement (integer or boolean) on the inst.
@@ -339,19 +413,19 @@ static List<Statement> tryExtractStatements(IRTerminatorInst* inst, IRBlock* blo
 
             if (isIntegerConstantValue(leftOperand))
             {
-                addStatement(Statement::concrete(
+                statements.conjunct(
                     rightOperand,
                     SimpleRelation::integerRelation(
                         (isTrueBlock ? SimpleRelation::Equal : SimpleRelation::NotEqual),
-                        getConstantIntegerValue(leftOperand))));
+                        getConstantIntegerValue(leftOperand)));
             }
             else if (isIntegerConstantValue(rightOperand))
             {
-                addStatement(Statement::concrete(
+                statements.conjunct(
                     leftOperand,
                     SimpleRelation::integerRelation(
                         (isTrueBlock ? SimpleRelation::Equal : SimpleRelation::NotEqual),
-                        getConstantIntegerValue(rightOperand))));
+                        getConstantIntegerValue(rightOperand)));
             }
         }
         else if (isCompareCmpInst(condInst))
@@ -400,14 +474,14 @@ static List<Statement> tryExtractStatements(IRTerminatorInst* inst, IRBlock* blo
                 SLANG_UNREACHABLE("unexpected op code");
             }
             auto relation = SimpleRelation::integerRelation(comparator, constantVal);
-            addStatement(Statement::concrete(
+            statements.conjunct(
                 paramOperand,
-                ((isParamLeft ^ !isTrueBlock) ? relation : relation.negated())));
+                ((isParamLeft ^ !isTrueBlock) ? relation : relation.negated()));
         }
         else if (auto condParam = as<IRParam>(condInst))
         {
             // We can add a statement about the parameter.
-            addStatement(Statement::concrete(condParam, SimpleRelation::boolRelation(isTrueBlock)));
+            statements.conjunct(condParam, SimpleRelation::boolRelation(isTrueBlock));
         }
     }
     else if (auto switchInst = as<IRSwitch>(inst))
@@ -426,9 +500,9 @@ static List<Statement> tryExtractStatements(IRTerminatorInst* inst, IRBlock* blo
             if (caseBlock == block && isIntegerConstantValue(caseValue))
             {
                 auto constantVal = getConstantIntegerValue(caseValue);
-                addStatement(Statement::concrete(
+                statements.conjunct(
                     switchInst->getCondition(),
-                    SimpleRelation::integerRelation(SimpleRelation::Equal, constantVal)));
+                    SimpleRelation::integerRelation(SimpleRelation::Equal, constantVal));
             }
         }
     }
@@ -437,674 +511,20 @@ done:
     return statements;
 }
 
-Statement statementConjunction(IRBlock* block, Statement a, Statement b)
-{
-    if (a == b)
-        return a;
-
-    if (a.type == Statement::Empty)
-        return b;
-    if (b.type == Statement::Empty)
-        return a;
-
-    SLANG_ASSERT(a.inst == b.inst);
-
-    if (a.type == Statement::Concrete && b.type == Statement::Concrete)
-    {
-        return Statement::concrete(a.inst, relationIntersection(a.relation, b.relation));
-    }
-
-    if (a.type == Statement::Variable && b.type == Statement::Concrete)
-    {
-        // If we're talking about the same instruction, then we should return the other statement.
-        if (a.inst == b.inst)
-            return b;
-        else
-        {
-            // Otherwise, we can be a bit more specfic depending on 'b's relation.
-            if (b.relation.type == SimpleRelation::Any)
-                return a; // The variable might be more specific, so we'll keep the variable.
-            else if (b.relation.type == SimpleRelation::Impossible)
-                return Statement::concrete(b.inst, SimpleRelation::impossibleRelation());
-            else
-            {
-                // If B says something about the inst, then we'll use that.
-                return b;
-            }
-        }
-    }
-
-    // Same as above, but for the other way around.
-    if (b.type == Statement::Variable && a.type == Statement::Concrete)
-    {
-        // If we're talking about the same instruction, then we should return the other statement.
-        if (b.inst == a.inst)
-            return a;
-        else
-        {
-            // Otherwise, we can be a bit more specfic depending on 'a's relation.
-            if (a.relation.type == SimpleRelation::Any)
-                return b; // The variable might be more specific, so we'll keep the variable.
-            else if (a.relation.type == SimpleRelation::Impossible)
-                return Statement::concrete(a.inst, SimpleRelation::impossibleRelation());
-            else
-            {
-                // If A says something about the inst, then we'll use that.
-                return a;
-            }
-        }
-    }
-
-    SLANG_UNREACHABLE("Unhandled statement conjunction case");
-}
-
-Statement statementDisjunction(IRBlock* block, Statement a, Statement b)
-{
-    if (a.type == Statement::Empty)
-        return b;
-    if (b.type == Statement::Empty)
-        return a;
-
-    // Here we're taking advantage of the fact that variables can only appear once.
-    // x ^ a = x, gives us x = a as a solution.
-    // x v a = x, gives us x = a as a solution.
-    //
-    // What about (x ^ a) v b = x ?
-    // Substitute x = a v b, and we get ((a v b) ^ a) v b = ((a ^ a) v (b ^ a)) v b = a v (b ^ a) v
-    // b = a v b
-    //
-    // What about (x v a) ^ b = x ?
-    // Substitute x = a ^ b, and we get ((a v b) v a) ^ b = ((a v a) v (b v a)) ^ b = a v (b ^ a) ^
-    // b = a v b
-    //
-    if (a.type == Statement::Variable && b.type == Statement::Concrete)
-    {
-        // If we're trying to disjunct an unknown relation with a concrete relation
-        // _on the same inst_, then the result is the concrete relation.
-        //
-        if (a.inst == b.inst && a.block == block)
-            return b;
-
-        // If we're trying to disjunct an unknown relation with a concrete relation
-        // _on different insts_, then the result is simply unknown since we don't
-        // have enough information to say anything.
-        //
-        if (a.inst != b.inst)
-            return Statement::concrete(b.inst, SimpleRelation::anyRelation());
-    }
-
-    if (b.type == Statement::Variable && a.type == Statement::Concrete)
-    {
-        if (a.inst == b.inst && b.block == block)
-            return a;
-
-        // If we're trying to disjunct an unknown relation with a concrete relation
-        // _on different insts_, then the result is simply unknown since we don't
-        // have enough information to say anything.
-        //
-        if (a.inst != b.inst)
-            return Statement::concrete(a.inst, SimpleRelation::anyRelation());
-    }
-
-    SLANG_ASSERT(a.inst == b.inst);
-
-    if (a.type == Statement::Concrete && b.type == Statement::Concrete)
-    {
-        return Statement::concrete(a.inst, relationUnion(a.relation, b.relation));
-    }
-
-    SLANG_UNREACHABLE("Unhandled statement disjunction case");
-}
-
-// NEW APPROACH:
-
-// For each block,
-// First, we need to get a statement from our predecessors.
-//
-// - For each predecessor,
-//      - Transfer inst, and all predicate insts based on phi args.
-//      - Extract statement from the split block, if there is one.
-//      - Add to the predicate set.
-//      - Resolve predicate set.
-//      - If set resolves to False, ignore branch
-//      - Otherwise, recursively query the predecessor with the new predicate set.
-//  - Take disjunction of available statements.
-//  - Base case: we come back to the loop starting block.
-//
-// Note: inst is always the same here. Other insts are just being added/removed from the predicate
-// set.
-//
-
-struct StatementSet
-{
-    // A conjunction of independent predicates (a1 ^ a2 ^ a3 ...)
-    Dictionary<IRInst*, Statement> predicates;
-
-    // Disjunction of a predicate with the current set (pred v (a1 ^ a2 ^ a3 ...))
-    void disjunct(Statement predicate)
-    {
-        if (predicate.type == Statement::Empty)
-            return;
-
-        // Since we hold only one statement per inst, we can perform disjunction
-        // on a per-inst basis.
-        // If an inst does not exist in the current set, then it's an empty statement.
-        //
-        if (predicates.containsKey(predicate.inst))
-        {
-            // If the predicate is already in the set, then we can just update it.
-            predicates[predicate.inst] =
-                statementDisjunction(predicate.block, predicate, predicates[predicate.inst]);
-        }
-    }
-
-    // Disjunction of a conjunction of statements (a1 ^ a2 ^ a3 ...) with the current conjunction.
-    void disjunct(StatementSet other)
-    {
-        if (other.isTriviallyFalse() || isTriviallyFalse())
-            return;
-
-        for (auto& predicate : other.predicates)
-            disjunct(predicate.second);
-    }
-
-    // Conjunction of a predicate with the current set (pred ^ (a1 ^ a2 ^ a3 ...))
-    void conjunct(Statement predicate)
-    {
-        if (predicate.type == Statement::Empty)
-            return;
-
-        if (predicates.containsKey(predicate.inst))
-        {
-            // Conjunct the predicate with the appropriate existing predicate
-            auto newStatement =
-                statementConjunction(predicate.block, predicate, predicates[predicate.inst]);
-
-            if (newStatement.type == Statement::Concrete &&
-                newStatement.relation.type == SimpleRelation::Any)
-            {
-                // If the new statement is trivially true, then we can remove the predicate.
-                predicates.remove(predicate.inst);
-            }
-            else
-            {
-                // Otherwise, we update the predicate.
-                predicates[predicate.inst] = newStatement;
-            }
-        }
-        else
-        {
-            // Otherwise, we add the predicate to the set.
-            predicates[predicate.inst] = predicate;
-        }
-    }
-
-    // Conjunction of a conjunction of statements (a1 ^ a2 ^ a3 ...) with the current conjunction.
-    void conjunct(StatementSet other)
-    {
-        if (other.isTriviallyTrue() || isTriviallyTrue())
-            return;
-
-        for (auto& predicate : other.predicates)
-            conjunct(predicate.second);
-    }
-
-    bool isTriviallyFalse()
-    {
-        for (auto& predicate : predicates)
-        {
-            if (predicate.second.type == Statement::Concrete &&
-                predicate.second.relation.type == SimpleRelation::Impossible)
-                return true;
-        }
-        return false;
-    }
-
-    bool isTriviallyTrue() { return predicates.getCount() == 0; }
-};
-
-struct StatementCacheKey2
-{
-    IRBlock* block;
-    IRInst* inst;
-
-    StatementCacheKey2(IRBlock* block, IRInst* inst)
-        : block(block), inst(inst)
-    {
-    }
-};
-
-Statement _tryCollectPredicatedStatement(
-    Dictionary<StatementCacheKey2, Statement>& cache,
-    IRBlock* block,
-    IRInst* inst,
-    PredicateSet predicateSet)
-{
-    auto cacheKey = StatementCacheKey2(block, inst);
-    if (auto cached = cache.tryGetValue(cacheKey))
-        return *cached;
-
-    // Memoization lambda
-    auto checkAndMemoize = [&](Statement result)
-    {
-        // Check that we aren't caching something about a different block or inst.
-        SLANG_ASSERT(result.inst == cacheKey.inst);
-
-        for (auto& predicate : predicateSet.predicates)
-        {
-            if (result.type == Statement::Concrete &&
-                doesRelationImply(result.relation, predicate.second.relation.negated()))
-            {
-                cache[cacheKey] = Statement::empty();
-                return Statement::empty();
-            }
-        }
-
-        cache[cacheKey] = result;
-        return result;
-    };
-
-    // We'll store a variable for the inst in the block, that we are currently solving for.
-    // If we see this variable again, then we have a recursive relation, and we can use that
-    // information to find a concrete relation.
-    //
-    checkAndMemoize(Statement::variable(inst, block));
-
-    // Base cases
-    if (isIntegerConstantValue(inst))
-    {
-        return checkAndMemoize(Statement::concrete(
-            inst,
-            SimpleRelation::integerRelation(SimpleRelation::Equal, getConstantIntegerValue(inst))));
-    }
-
-    if (isBoolConstantValue(inst))
-    {
-        return checkAndMemoize(
-            Statement::concrete(inst, SimpleRelation::boolRelation(getConstantBoolValue(inst))));
-    }
-
-    if (inst->getParent() == block && !as<IRParam>(inst))
-    {
-        // Arithemetic instructions.
-        if (inst->getOp() == kIROp_Add || inst->getOp() == kIROp_Sub)
-        {
-            auto left = inst->getOperand(0);
-            auto right = inst->getOperand(1);
-            auto isLeftConstant = isIntegerConstantValue(left);
-            auto isRightConstant = isIntegerConstantValue(right);
-
-            if (((isLeftConstant || isRightConstant) && (inst->getOp() == kIROp_Add)) ||
-                ((isRightConstant) && (inst->getOp() == kIROp_Sub)))
-            {
-                auto constantVal =
-                    isLeftConstant ? getConstantIntegerValue(left) : getConstantIntegerValue(right);
-                auto paramOperand = isLeftConstant ? right : left;
-
-                if (inst->getOp() == kIROp_Sub)
-                    constantVal = -constantVal;
-
-                auto statementOnOperand =
-                    _tryCollectPredicatedStatement(cache, block, paramOperand, predicateSet);
-
-                if (statementOnOperand.type == Statement::Concrete &&
-                    statementOnOperand.relation.type == SimpleRelation::IntegerRelation)
-                {
-                    switch (statementOnOperand.relation.comparator)
-                    {
-                    case SimpleRelation::Equal:
-                        return checkAndMemoize(Statement::concrete(
-                            inst,
-                            SimpleRelation::integerRelation(
-                                SimpleRelation::Equal,
-                                constantVal + statementOnOperand.relation.integerValue)));
-                    case SimpleRelation::LessThan:
-                    case SimpleRelation::LessThanEqual:
-                    case SimpleRelation::GreaterThan:
-                    case SimpleRelation::GreaterThanEqual:
-                        return checkAndMemoize(Statement::concrete(
-                            inst,
-                            SimpleRelation::integerRelation(
-                                statementOnOperand.relation.comparator,
-                                constantVal + statementOnOperand.relation.integerValue)));
-                    default:
-                        break;
-                    }
-                }
-            }
-        }
-
-        // If none of the above returned a statement, then the resulting value can take on any
-        // value. (can't provide a bound)
-        //
-        return checkAndMemoize(Statement::concrete(inst, SimpleRelation::anyRelation()));
-    }
-
-    // Otherwise, we need to look at the predecessors to see if we can propagate a
-    // statement about the inst from the predecessor blocks.
-    //
-    Statement result = Statement::empty();
-
-    for (auto predecessor : block->getPredecessors())
-    {
-        auto translatedInst = inst;
-        PredicateSet translatedPredicateSet = predicateSet;
-
-        if (as<IRParam>(inst))
-        {
-            auto paramIndex = getParamIndexInBlock(cast<IRParam>(inst));
-            translatedInst =
-                as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(paramIndex);
-        }
-
-        for (auto& predicate : predicateSet.predicates)
-        {
-            if (as<IRParam>(predicate.first))
-            {
-                auto paramIndex = getParamIndexInBlock(cast<IRParam>(predicate.first));
-                auto translatedPredInst =
-                    as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(paramIndex);
-                translatedPredicateSet.conjunct(predicate.second.toInst(translatedPredInst));
-            }
-        }
-
-
-        auto branchStatements = tryExtractStatements(predecessor->getTerminator(), block);
-
-        for (auto& branchStatement : branchStatements)
-            translatedPredicateSet.conjunct(branchStatement);
-
-        if (!translatedPredicateSet.isTriviallyFalse())
-        {
-            auto statementFromPredecessor = _tryCollectPredicatedStatement(
-                cache,
-                predecessor,
-                translatedInst,
-                translatedPredicateSet);
-            result = statementDisjunction(block, result, statementFromPredecessor.toInst(inst));
-        }
-    }
-
-    return checkAndMemoize(result);
-}
-
-// Try to collect a statement such that predicate => statement, statement.block == block and
-// statement.inst == param.
-//
-// This is a "best effort" process, so we want to return as tight a statement as possible,
-// but shouldn't return anything incorrect.
-//
-Statement tryCollectPredicatedStatement(
-    Dictionary<StatementCacheKey, Statement>& cache,
-    IRBlock* block,
-    IRInst* inst,
-    Statement predicate)
-{
-    auto cacheKey = StatementCacheKey(block, inst, predicate);
-    if (auto cached = cache.tryGetValue(cacheKey))
-        return *cached;
-
-    // Memoization lambda
-    auto memoize = [&](Statement result)
-    {
-        // Check that we aren't caching something about a different block or inst.
-        SLANG_ASSERT(result.inst == cacheKey.inst);
-
-        cache[cacheKey] = result;
-        return result;
-    };
-
-    // We'll store a variable for the inst in the block, that we are currently solving for.
-    // If we see this variable again, then we have a recursive relation, and we can use that
-    // information to find a concrete relation.
-    //
-    memoize(Statement::variable(inst, block));
-
-    // Base cases
-    if (isIntegerConstantValue(inst))
-    {
-        return memoize(Statement::concrete(
-            inst,
-            SimpleRelation::integerRelation(SimpleRelation::Equal, getConstantIntegerValue(inst))));
-    }
-
-    if (isBoolConstantValue(inst))
-    {
-        return memoize(
-            Statement::concrete(inst, SimpleRelation::boolRelation(getConstantBoolValue(inst))));
-    }
-
-    // Arithemetic instructions.
-    if (inst->getOp() == kIROp_Add || inst->getOp() == kIROp_Sub)
-    {
-        auto left = inst->getOperand(0);
-        auto right = inst->getOperand(1);
-        auto isLeftConstant = isIntegerConstantValue(left);
-        auto isRightConstant = isIntegerConstantValue(right);
-
-        if (((isLeftConstant || isRightConstant) && (inst->getOp() == kIROp_Add)) ||
-            ((isRightConstant) && (inst->getOp() == kIROp_Sub)))
-        {
-            auto constantVal =
-                isLeftConstant ? getConstantIntegerValue(left) : getConstantIntegerValue(right);
-            auto paramOperand = isLeftConstant ? right : left;
-
-            if (inst->getOp() == kIROp_Sub)
-                constantVal = -constantVal;
-
-            auto statementOnOperand =
-                tryCollectPredicatedStatement(cache, block, paramOperand, predicate);
-
-            if (statementOnOperand.type == Statement::Concrete &&
-                statementOnOperand.relation.type == SimpleRelation::IntegerRelation)
-            {
-                switch (statementOnOperand.relation.comparator)
-                {
-                case SimpleRelation::Equal:
-                    return memoize(Statement::concrete(
-                        inst,
-                        SimpleRelation::integerRelation(
-                            SimpleRelation::Equal,
-                            constantVal + statementOnOperand.relation.integerValue)));
-                case SimpleRelation::LessThan:
-                case SimpleRelation::LessThanEqual:
-                case SimpleRelation::GreaterThan:
-                case SimpleRelation::GreaterThanEqual:
-                    return memoize(Statement::concrete(
-                        inst,
-                        SimpleRelation::integerRelation(
-                            statementOnOperand.relation.comparator,
-                            constantVal + statementOnOperand.relation.integerValue)));
-                default:
-                    break;
-                }
-            }
-        }
-    }
-
-    // Is the inst defined in this block, and isn't a parameter?
-    // Then, right now, there's not a whole lot we can say.
-    //
-    if (inst->getParent() == block && !as<IRParam>(inst))
-    {
-        return memoize(Statement::concrete(inst, SimpleRelation::anyRelation()));
-    }
-
-    // Otherwise, we need to look at the predecessors to see if we can propagate a
-    // statement about the inst from the predecessor blocks.
-    //
-    Statement result = Statement::empty();
-    for (auto predecessor : block->getPredecessors())
-    {
-        auto translatedInst = inst;
-        auto translatedPredInst = predicate.inst;
-
-        // If the parameter is defined in the current block, we need to translate it to the
-        // inst in the predecessor block.
-        //
-        if (as<IRParam>(inst) && (inst->getParent() == block))
-        {
-            auto paramIndex = getParamIndexInBlock(cast<IRParam>(inst));
-            translatedInst =
-                as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(paramIndex);
-        }
-
-        // If the predicate parameter is defined in the current block, we need to translate it
-        // to the inst in the predecessor block.
-        //
-        if (as<IRParam>(predicate.inst) && (predicate.inst->getParent() == block))
-        {
-            auto predParamIndex = getParamIndexInBlock(cast<IRParam>(predicate.inst));
-            translatedPredInst =
-                as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(predParamIndex);
-        }
-
-        Statement translatedPredicate = Statement::trivial();
-
-        // If we have a predicate, check that the predicate is true in the predecessor block, by
-        // (i) finding the best statement that we can prove to be always true in the predecessor
-        // block, and (ii) checking if that implies the predicate to be false.
-        //
-        if (translatedPredInst)
-        {
-            auto predecessorPredicateInstStatement = tryCollectPredicatedStatement(
-                cache,
-                predecessor,
-                translatedPredInst,
-                Statement::trivial());
-
-            bool isPredStatementConcrete =
-                predecessorPredicateInstStatement.type == Statement::Concrete;
-
-            // If A -> ~Pred, then this branch is irrelevant
-            if (isPredStatementConcrete && doesRelationImply(
-                                               predecessorPredicateInstStatement.relation,
-                                               predicate.relation.negated()))
-                continue;
-
-            // If A -> Pred, then we'll use an always true predicate (mostly for performance, since
-            // we don't want re-calculate the same thing for multiple predicates that are all true)
-            //
-            if (isPredStatementConcrete &&
-                doesRelationImply(predecessorPredicateInstStatement.relation, predicate.relation))
-                translatedPredicate = Statement::trivial();
-            else
-                translatedPredicate = Statement::concrete(translatedPredInst, predicate.relation);
-        }
-        else
-        {
-            translatedPredicate = Statement::trivial();
-        }
-
-        // Otherwise, collect the whatever statement we can prove given the predicate is true
-        // for the predecessor block.
-        //
-        auto statementFromPredecessor =
-            tryCollectPredicatedStatement(cache, predecessor, translatedInst, translatedPredicate)
-                .toInst(inst);
-
-        // We can narrow the relation if we know that we got here conditionally.
-        // We have a bottleneck function that returns all statements (for all instructions)
-        // that we can prove for a given target block of a conditional branch.
-        //
-        auto branchStatements = tryExtractStatements(predecessor->getTerminator(), block);
-
-        // Do we have anything about 'translatedInst' in the branch statements?
-        //
-        for (auto& branchStatement : branchStatements)
-        {
-            SLANG_ASSERT(branchStatement.type == Statement::Concrete);
-
-            if (branchStatement.inst == translatedInst)
-            {
-                // Refine our statement
-                statementFromPredecessor = statementConjunction(
-                    block,
-                    statementFromPredecessor,
-                    branchStatement.toInst(inst));
-                continue;
-            }
-
-            // There's one more thing we can do. Even if we don't have anything about
-            // 'translatedInst', we may be able to find a statement about `translatedInst` that is
-            // implied by one of the branch statements.
-            //
-            // Effectively, we're trying to construct a transitive proof by finding a statement "B",
-            // such that A -> B and B -> C. We already have the first part, we just need the second.
-            //
-
-            // We'll stick to integer & boolean "==" and "!=" for now, since those cover most
-            // scenarios.
-            //
-            if (!(branchStatement.relation.type == SimpleRelation::IntegerRelation ||
-                  branchStatement.relation.type == SimpleRelation::BoolRelation))
-                continue;
-
-            if (!(branchStatement.relation.comparator == SimpleRelation::Equal ||
-                  branchStatement.relation.comparator == SimpleRelation::NotEqual))
-                continue;
-
-            // We'll try to find a statement, by using the branch statement as a predicate.
-            //
-            auto statementOnInst =
-                tryCollectPredicatedStatement(cache, predecessor, translatedInst, branchStatement);
-
-            // Refine our relation..
-            statementFromPredecessor =
-                statementConjunction(block, statementFromPredecessor, statementOnInst.toInst(inst));
-        }
-
-        // The final result is the relation disjunction of all the implications we found for
-        // predecessor blocks.
-        //
-        result = statementDisjunction(block, result, statementFromPredecessor.toInst(inst));
-    }
-
-    switch (result.type)
-    {
-    case Statement::Empty:
-        return memoize(Statement::concrete(inst, SimpleRelation::anyRelation()));
-    case Statement::Concrete:
-        return memoize(result);
-    case Statement::Variable:
-        if (result.inst == inst && result.block == block)
-        {
-            // If we got here, then we had a recursive relation that we couldn't resolve.
-            // This shouldn't happen..
-            //
-            SLANG_ASSERT(!"Unable to solve for variable");
-        }
-        else
-        {
-            return memoize(Statement::concrete(inst, SimpleRelation::anyRelation()));
-        }
-    default:
-        SLANG_UNREACHABLE("Unhandled statement type");
-    }
-}
-
-// Different approach...
-
 enum class BlockStateFlags
 {
     UpwardPropCompleted = 1 << 0,
-    DownwardPropCompleted = 1 << 1,
-    PredicateTriviallyFalse = 1 << 2,
+    DownwardPropCompleted = 1 << 1
 };
 
-bool markUpwardPropCompleted(IRBlock* block)
+void markUpwardPropCompleted(IRBlock* block)
 {
     block->scratchData |= (UInt64)BlockStateFlags::UpwardPropCompleted;
 }
 
-bool markDownwardPropCompleted(IRBlock* block)
+void markDownwardPropCompleted(IRBlock* block)
 {
     block->scratchData |= (UInt64)BlockStateFlags::DownwardPropCompleted;
-}
-
-bool markPredicateTriviallyFalse(IRBlock* block)
-{
-    block->scratchData |= (UInt64)BlockStateFlags::PredicateTriviallyFalse;
 }
 
 bool isUpwardPropCompleted(IRBlock* block)
@@ -1117,18 +537,33 @@ bool isDownwardPropCompleted(IRBlock* block)
     return block->scratchData & (UInt64)BlockStateFlags::DownwardPropCompleted;
 }
 
-bool isPredicateTriviallyFalse(IRBlock* block)
-{
-    return block->scratchData & (UInt64)BlockStateFlags::PredicateTriviallyFalse;
-}
-
-bool clearBlockState(IRBlock* block)
+void clearBlockState(IRBlock* block)
 {
     block->scratchData = 0;
 }
 
+bool isLoopConditionBlock(IRBlock* block)
+{
+    for (auto use = block->firstUse; use; use = use->nextUse)
+    {
+        if (auto loop = as<IRLoop>(use->getUser()))
+        {
+            if (loop->getTargetBlock() == block)
+                return true;
+        }
+    }
+
+    return false;
+}
+
 bool isBlockReadyForUpwardProp(IRBlock* block)
 {
+    if (isLoopConditionBlock(block))
+    {
+        auto falseBlock = cast<IRIfElse>(block->getTerminator())->getFalseBlock();
+        return isUpwardPropCompleted(falseBlock);
+    }
+
     // Check that successors have completed upward propagation.
     for (auto successor : block->getSuccessors())
     {
@@ -1149,43 +584,46 @@ bool isBlockReadyForDownwardProp(IRBlock* block)
     return true;
 }
 
-std::optional<Statement> propagateStatementUpwards(IRInst* inst, SimpleRelation relation)
+StatementSet propagateStatementUpwards(IRInst* inst, SimpleRelation relation)
 {
-    // We'll keep translating through the inst, until we either hit a parameter
-    // until we either hit a parameter, or we leave the current block.
-    //
-    auto parentInst = inst->getParent();
+    // Lambda to make a single-statement set.
+    auto makeStatementSet = [&](IRInst* inst, SimpleRelation relation)
+    {
+        StatementSet set;
+        set.set(inst, relation);
+        return set;
+    };
 
     if (as<IRParam>(inst))
-        return Statement::concrete(inst, relation);
+        return makeStatementSet(inst, relation);
 
     if (isIntegerConstantValue(inst))
     {
         auto relationFromInst =
             SimpleRelation::integerRelation(SimpleRelation::Equal, getConstantIntegerValue(inst));
         if (doesRelationImply(relation, relationFromInst))
-            return std::nullopt; // Trivially true
+            return makeStatementSet(inst, SimpleRelation::anyRelation()); // Trivially true
         else if (doesRelationImply(relation, relationFromInst.negated()))
-            return Statement::concrete(inst, SimpleRelation::impossibleRelation());
+            return makeStatementSet(inst, SimpleRelation::impossibleRelation());
         else
-            return std::nullopt; // Trivially true
+            return makeStatementSet(inst, SimpleRelation::anyRelation());
     }
     else if (isBoolConstantValue(inst))
     {
         auto relationFromInst = SimpleRelation::boolRelation(getConstantBoolValue(inst));
         if (doesRelationImply(relation, relationFromInst))
-            return std::nullopt; // Trivially true
+            return makeStatementSet(inst, SimpleRelation::anyRelation()); // Trivially true
         else if (doesRelationImply(relation, relationFromInst.negated()))
-            return Statement::concrete(inst, SimpleRelation::impossibleRelation());
+            return makeStatementSet(inst, SimpleRelation::impossibleRelation());
         else
-            return std::nullopt; // Trivially true
+            return makeStatementSet(inst, SimpleRelation::anyRelation());
     }
     else if (inst->getOp() == kIROp_Add || inst->getOp() == kIROp_Sub)
     {
         // TODO: Translate equality/inequality.
     }
 
-    return std::nullopt;
+    return makeStatementSet(inst, SimpleRelation::anyRelation());
 }
 
 StatementSet propagateUpwards(
@@ -1208,12 +646,13 @@ StatementSet propagateUpwards(
     //
 
     StatementSet newPredicateSet;
-    for (auto& predicateInstPair : predicateSet.predicates)
+    for (auto& statementInstPair : predicateSet.statements)
     {
-        auto predicate = predicateInstPair.second;
-        if (as<IRParam>(predicate.inst) && predicate.type == Statement::Concrete)
+        auto predicateRelation = statementInstPair.second;
+        auto predicateInst = statementInstPair.first;
+        if (as<IRParam>(predicateInst))
         {
-            auto paramIndex = getParamIndexInBlock(cast<IRParam>(predicate.inst));
+            auto paramIndex = getParamIndexInBlock(cast<IRParam>(predicateInst));
             auto translatedInst =
                 as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(paramIndex);
 
@@ -1221,13 +660,16 @@ StatementSet propagateUpwards(
             // we'll need to propagate it to the operands of the inst
             //
             if (translatedInst->getParent() != predecessor)
-                newPredicateSet.conjunct(Statement::concrete(translatedInst, predicate.relation));
-            else if (auto statement = propagateStatementUpwards(translatedInst, predicate.relation))
-                newPredicateSet.conjunct(*statement);
+                newPredicateSet.conjunct(translatedInst, predicateRelation);
+            else
+            {
+                auto statementSet = propagateStatementUpwards(translatedInst, predicateRelation);
+                newPredicateSet.disjunct(statementSet);
+            }
         }
         else
         {
-            newPredicateSet.conjunct(predicate);
+            newPredicateSet.conjunct(predicateInst, predicateRelation);
         }
     }
 
@@ -1245,18 +687,12 @@ StatementSet propagateUpwards(
                 if (domTree->dominates(ifElse->getTrueBlock(), current))
                 {
                     // True branch
-                    auto trueBranchStatements =
-                        tryExtractStatements(ifElse, ifElse->getTrueBlock());
-                    for (auto& statement : trueBranchStatements)
-                        newPredicateSet.conjunct(statement);
+                    newPredicateSet.conjunct(tryExtractStatements(ifElse, ifElse->getTrueBlock()));
                 }
                 else if (domTree->dominates(ifElse->getFalseBlock(), current))
                 {
                     // False branch
-                    auto falseBranchStatements =
-                        tryExtractStatements(ifElse, ifElse->getFalseBlock());
-                    for (auto& statement : falseBranchStatements)
-                        newPredicateSet.conjunct(statement);
+                    newPredicateSet.conjunct(tryExtractStatements(ifElse, ifElse->getFalseBlock()));
                 }
                 else
                 {
@@ -1273,18 +709,29 @@ StatementSet propagateUpwards(
     return newPredicateSet;
 }
 
-Statement propagateStatementDownwards(IRInst* srcInst, IRInst* dstInst, StatementSet srcStatements)
+StatementSet propagateStatementDownwards(
+    IRInst* srcInst,
+    IRInst* dstInst,
+    StatementSet srcStatements)
 {
     // We'll keep translating through the inst, until we either hit a parameter
     // until we either hit a parameter, or we leave the current block.
     //
 
-    if (srcStatements.predicates.containsKey(srcInst))
-        return srcStatements.predicates[srcInst];
+    // Lambda to make a single-statement set.
+    auto singleStatement = [&](IRInst* inst, SimpleRelation relation)
+    {
+        StatementSet set;
+        set.conjunct(inst, relation);
+        return set;
+    };
+
+    if (srcStatements.statements.containsKey(srcInst))
+        return singleStatement(dstInst, srcStatements.statements[srcInst]);
 
     if (isIntegerConstantValue(srcInst))
     {
-        return Statement::concrete(
+        return singleStatement(
             dstInst,
             SimpleRelation::integerRelation(
                 SimpleRelation::Equal,
@@ -1292,7 +739,7 @@ Statement propagateStatementDownwards(IRInst* srcInst, IRInst* dstInst, Statemen
     }
     else if (isBoolConstantValue(srcInst))
     {
-        return Statement::concrete(
+        return singleStatement(
             dstInst,
             SimpleRelation::boolRelation(getConstantBoolValue(srcInst)));
     }
@@ -1306,9 +753,8 @@ Statement propagateStatementDownwards(IRInst* srcInst, IRInst* dstInst, Statemen
         auto isRightConstant = isIntegerConstantValue(right);
 
         if (!isLeftConstant && !isRightConstant)
-            return Statement::concrete(
-                dstInst,
-                SimpleRelation::anyRelation()); // Can't say anything
+            return singleStatement(dstInst,
+                                   SimpleRelation::anyRelation()); // Can't say anything
 
         if (srcInst->getOp() == kIROp_Add || (srcInst->getOp() == kIROp_Sub && isRightConstant))
         {
@@ -1319,44 +765,29 @@ Statement propagateStatementDownwards(IRInst* srcInst, IRInst* dstInst, Statemen
             constant = srcInst->getOp() == kIROp_Add ? constant : -constant;
 
             auto operandStatement = propagateStatementDownwards(operand, operand, srcStatements);
+            auto relation = operandStatement.statements.containsKey(operand)
+                                ? operandStatement.statements[operand]
+                                : SimpleRelation::anyRelation();
 
-            if (operandStatement.type != Statement::Concrete)
-                return Statement::concrete(
-                    dstInst,
-                    SimpleRelation::anyRelation()); // Can't say anything
-
-            switch (operandStatement.relation.type)
+            switch (relation.comparator)
             {
             case SimpleRelation::Equal:
-                return Statement::concrete(
-                    dstInst,
-                    SimpleRelation::integerRelation(
-                        SimpleRelation::Equal,
-                        constant + operandStatement.relation.comparator));
             case SimpleRelation::NotEqual:
-                return Statement::concrete(
-                    dstInst,
-                    SimpleRelation::integerRelation(
-                        SimpleRelation::NotEqual,
-                        constant + operandStatement.relation.comparator));
             case SimpleRelation::LessThan:
-                return Statement::concrete(
-                    dstInst,
-                    SimpleRelation::integerRelation(
-                        SimpleRelation::LessThan,
-                        constant + operandStatement.relation.comparator));
+            case SimpleRelation::LessThanEqual:
             case SimpleRelation::GreaterThan:
-                return Statement::concrete(
+            case SimpleRelation::GreaterThanEqual:
+                return singleStatement(
                     dstInst,
                     SimpleRelation::integerRelation(
-                        SimpleRelation::GreaterThan,
-                        constant + operandStatement.relation.comparator));
+                        relation.comparator,
+                        constant + relation.integerValue));
             }
         }
     }
 
     // Default
-    return Statement::concrete(dstInst, SimpleRelation::anyRelation());
+    return singleStatement(dstInst, SimpleRelation::anyRelation());
 }
 
 StatementSet propagateDownwards(
@@ -1383,17 +814,15 @@ StatementSet propagateDownwards(
         paramIndex++;
     }
 
-    auto branchStatements = tryExtractStatements(predecessor->getTerminator(), successor);
-    for (auto& statement : branchStatements)
-        newStatementSet.conjunct(statement);
+    newStatementSet.conjunct(tryExtractStatements(predecessor->getTerminator(), successor));
 
     // For all other statements in the statementSet, we'll add them in, but only
     // if the predecessor dominates the successor. (Otherwise, the inst is invisible)
     //
-    for (auto& statement : statementSet.predicates)
+    for (auto& statement : statementSet.statements)
     {
         if (domTree->dominates(predecessor, statement.first->getParent()))
-            newStatementSet.conjunct(statement.second);
+            newStatementSet.conjunct(statement.first, statement.second);
     }
 
     return newStatementSet;
@@ -1428,7 +857,7 @@ struct Edge
 // statically (this is an undeciable problem), but rather whatever can be inferred in just two steps
 // through the blocks. This suffices for the vast majority of common loop structures.
 //
-StatementSet tryGetImplications(
+StatementSet collectImplications(
     RefPtr<IRDominatorTree> domTree,
     IRBlock* block,
     StatementSet Predicates)
@@ -1450,7 +879,6 @@ StatementSet tryGetImplications(
     Dictionary<IRBlock*, StatementSet> blockPredicates;
 
     blockPredicates[block] = Predicates;
-    markUpwardPropCompleted(block);
 
     while (workList.getCount() > 0)
     {
@@ -1462,7 +890,7 @@ StatementSet tryGetImplications(
             continue;
 
         // If the block is not ready for upward propagation, add it to the work list.
-        if (!isBlockReadyForUpwardProp(current))
+        if (current != block && !isBlockReadyForUpwardProp(current))
         {
             workList.add(current);
             // Then add all the successors to the work list.
@@ -1474,7 +902,7 @@ StatementSet tryGetImplications(
         //
         // Get our predicate set, then propagate it to all predecessors.
         //
-        auto Predicates = blockPredicates[current];
+        auto predicates = blockPredicates[current];
 
         HashSet<IRBlock*> uniquePredecessors;
         for (auto predecessor : current->getPredecessors())
@@ -1491,18 +919,19 @@ StatementSet tryGetImplications(
 
                 // TODO: Implement.
                 /*auto translatedCurrentPredicate = translateToPredecessor(predecessor, current,
-                Predicates); auto predecessorPredicate = blockPredicates[predecessor]; if
+                predicates); auto predecessorPredicate = blockPredicates[predecessor]; if
                 (doesRelationImply(translatedCurrentPredicate.relation,
                 predecessorPredicate.relation))*/
 
                 // We won't add this edge to the set, because we can't be sure that
                 // the current predicate implies the predecessor predicate.
                 //
+                orderedEdgeList.add({predecessor, current});
                 falseEdges.add({predecessor, current});
                 continue;
             }
 
-            auto newPredicates = propagateUpwards(domTree, current, predecessor, Predicates);
+            auto newPredicates = propagateUpwards(domTree, current, predecessor, predicates);
 
             if (!blockPredicates.containsKey(predecessor))
                 blockPredicates[predecessor] = newPredicates;

@@ -1065,7 +1065,7 @@ void AutodiffCheckpointPolicyBase::collectLoopExitConditions(IRGlobalValueWithCo
 {
     // Assume that the InductionValueInfo is already collected.
     IRBuilder builder(func->getModule());
-    Dictionary<StatementCacheKey, Statement> cache;
+    RefPtr<IRDominatorTree> domTree = computeDominatorTree(func);
     for (auto block : func->getBlocks())
     {
         auto loopInst = as<IRLoop>(block->getTerminator());
@@ -1108,35 +1108,41 @@ void AutodiffCheckpointPolicyBase::collectLoopExitConditions(IRGlobalValueWithCo
             if (!isIntegerConstantValue(inductionValueInfo->counterOffset))
                 continue;
 
+            StatementSet conditionIsFalse;
+            conditionIsFalse.conjunct(condParam, SimpleRelation::boolRelation(false));
+
             // Collect a statement that holds when the loop condition is false.
-            const auto statement = tryCollectPredicatedStatement(
-                cache,
-                targetBlock,
-                param,
-                Statement::concrete(condParam, SimpleRelation::boolRelation(false)));
-            SLANG_ASSERT(statement.type == Statement::Concrete);
+            const auto implicationsForFalseCondition =
+                collectImplications(domTree, targetBlock, conditionIsFalse);
 
-            // The statement we collected says nothing about the parameter. No point continuing.
-            if (statement.relation.type == SimpleRelation::Type::Any)
+            if (!implicationsForFalseCondition.statements.containsKey(param))
+            {
+                // The statement we collected says nothing about the parameter. No point continuing.
                 continue;
+            }
 
-            // We will also obtain a statement for the inverse, i.e. some relation
-            // that holds if condParam is true.
-            const auto inverseStatement = tryCollectPredicatedStatement(
-                cache,
-                targetBlock,
-                param,
-                Statement::concrete(condParam, SimpleRelation::boolRelation(true)));
-            SLANG_ASSERT(statement.type == Statement::Concrete);
+            // Collect statements for the inverse.. i.e. some relation that holds if the condition
+            // is true.
+            StatementSet conditionIsTrue;
+            conditionIsTrue.conjunct(condParam, SimpleRelation::boolRelation(true));
+            const auto implicationsForTrueCondition =
+                collectImplications(domTree, targetBlock, conditionIsTrue);
 
-            if (inverseStatement.relation.type == SimpleRelation::Type::Any)
+            if (!implicationsForTrueCondition.statements.containsKey(param))
+            {
+                // The statement we collected says nothing about the parameter. No point continuing.
                 continue;
+            }
+
+            SimpleRelation statement = implicationsForFalseCondition.statements.getValue(param);
+            SimpleRelation inverseStatement =
+                implicationsForTrueCondition.statements.getValue(param);
 
             // If this doesn't hold, we can't be sure that the loop exits *if and only if*
             // the relation on the parameter holds. (there could be cases where the relation
             // is true, but the loop doesn't exit immediately)
             //
-            if (!doesRelationImply(statement.relation, inverseStatement.relation.negated()))
+            if (!doesRelationImply(statement, inverseStatement.negated()))
                 continue;
 
             // We found a relation on the parameter at the loop exit, and we also proved that
@@ -1154,8 +1160,8 @@ void AutodiffCheckpointPolicyBase::collectLoopExitConditions(IRGlobalValueWithCo
                 auto counterOffset = getConstantIntegerValue(inductionValueInfo->counterOffset);
                 auto counterFactor = inductionValueInfo->counterFactor;
 
-                SLANG_ASSERT(statement.relation.type == SimpleRelation::Type::IntegerRelation);
-                auto relationValue = statement.relation.integerValue;
+                SLANG_ASSERT(statement.type == SimpleRelation::Type::IntegerRelation);
+                auto relationValue = statement.integerValue;
 
                 auto recordExitValue = [&](IRIntegerValue exitIValue, IRIntegerValue exitParamValue)
                 {
@@ -1185,8 +1191,7 @@ void AutodiffCheckpointPolicyBase::collectLoopExitConditions(IRGlobalValueWithCo
                     }
                 };
 
-                if (counterFactor > 0 &&
-                    statement.relation.comparator == SimpleRelation::GreaterThan)
+                if (counterFactor > 0 && statement.comparator == SimpleRelation::GreaterThan)
                 {
                     // Find the smallest value that satisfies counterFactor * i + counterOffset >=
                     // relationValue
