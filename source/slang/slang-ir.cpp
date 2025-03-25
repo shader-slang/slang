@@ -3326,7 +3326,11 @@ IRInst* IRBuilder::emitDebugValue(IRInst* debugVar, IRInst* debugValue)
         args.getBuffer());
 }
 
-IRInst* IRBuilder::emitDebugInlinedAt(IRInst* line, IRInst* col, IRInst* file, IRInst* outerInlinedAt)
+IRInst* IRBuilder::emitDebugInlinedAt(
+    IRInst* line,
+    IRInst* col,
+    IRInst* file,
+    IRInst* outerInlinedAt)
 {
     IRInst* args[] = {line, col, file, outerInlinedAt};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedAt, 4, args);

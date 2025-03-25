@@ -4042,13 +4042,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             break;
         case kIROp_DebugInlinedAt:
-            return emitDebugInlinedAt(getSection(SpvLogicalSectionID::ConstantsAndTypes), as<IRDebugInlinedAt>(inst));
+            return emitDebugInlinedAt(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                as<IRDebugInlinedAt>(inst));
         case kIROp_DebugScope:
             return emitDebugScope(parent, as<IRDebugScope>(inst));
         case kIROp_DebugNoScope:
             return emitDebugNoScope(parent);
         case kIROp_DebugInlinedVariable:
-            return emitDebugInlinedVariable(getSection(SpvLogicalSectionID::ConstantsAndTypes), as<IRDebugInlinedVariable>(inst));
+            return emitDebugInlinedVariable(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                as<IRDebugInlinedVariable>(inst));
         }
         if (result)
             emitDecorations(inst, getID(result));
@@ -7343,18 +7347,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugNoScope(SpvInstParent* parent)
     {
-        return emitOpDebugNoScope(
-            parent,
-            nullptr,
-            m_voidType,
-            getNonSemanticDebugInfoExtInst());
+        return emitOpDebugNoScope(parent, nullptr, m_voidType, getNonSemanticDebugInfoExtInst());
     }
 
     SpvInst* emitDebugInlinedAt(SpvInstParent* parent, IRDebugInlinedAt* debugInlinedAt)
     {
         if (!debugInlinedAt)
             return nullptr;
-        
+
         // Get the operands from the IRDebugInlinedAt instruction
         IRInst* lineInst = debugInlinedAt->getLine();
 
@@ -7365,7 +7365,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         // If it's not chained to another IRDebugInlinedAt, we don't use this.
         SpvInst* inlined = nullptr;
-        if (as< IRDebugInlinedAt>(debugInlinedAt->getOuterInlinedAt()))
+        if (as<IRDebugInlinedAt>(debugInlinedAt->getOuterInlinedAt()))
         {
             inlined = ensureInst(debugInlinedAt->getOuterInlinedAt());
         }
@@ -7380,11 +7380,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             inlined);
     }
 
-    SpvInst* emitDebugInlinedVariable(SpvInstParent* parent, IRDebugInlinedVariable* debugInlinedVar)
+    SpvInst* emitDebugInlinedVariable(
+        SpvInstParent* parent,
+        IRDebugInlinedVariable* debugInlinedVar)
     {
         if (!debugInlinedVar)
             return nullptr;
-        
+
         // Get the operands from the IRDebugInlinedVariable instruction
         IRInst* variable = debugInlinedVar->getVariable();
         IRInst* inlinedAt = debugInlinedVar->getInlinedAt();
