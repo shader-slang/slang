@@ -598,9 +598,12 @@ struct StatementSet
         }
     }
 
-    // Disjunction of a set of statements (a1 v a2 v a3 ...) with the current set.
+    // Disjunction of a conjunction of statements (a1 ^ a2 ^ a3 ...) with the current conjunction.
     void disjunct(StatementSet other)
     {
+        if (other.isTriviallyFalse() || isTriviallyFalse())
+            return;
+
         for (auto& predicate : other.predicates)
             disjunct(predicate.second);
     }
@@ -636,7 +639,16 @@ struct StatementSet
         }
     }
 
-    // Predicate
+    // Conjunction of a conjunction of statements (a1 ^ a2 ^ a3 ...) with the current conjunction.
+    void conjunct(StatementSet other)
+    {
+        if (other.isTriviallyTrue() || isTriviallyTrue())
+            return;
+
+        for (auto& predicate : other.predicates)
+            conjunct(predicate.second);
+    }
+
     bool isTriviallyFalse()
     {
         for (auto& predicate : predicates)
@@ -647,6 +659,8 @@ struct StatementSet
         }
         return false;
     }
+
+    bool isTriviallyTrue() { return predicates.getCount() == 0; }
 };
 
 struct StatementCacheKey2
@@ -1071,150 +1085,481 @@ Statement tryCollectPredicatedStatement(
 
 // Different approach...
 
-// Use the equality of the parameter & argument to translate a statement to a predecessor block.
-Statement translateToPredecessor(IRBlock* block, IRBlock* predecessor, Statement statement)
+enum class BlockStateFlags
 {
-    if (as<IRParam>(statement.inst) && statement.type == Statement::Concrete)
+    UpwardPropCompleted = 1 << 0,
+    DownwardPropCompleted = 1 << 1,
+    PredicateTriviallyFalse = 1 << 2,
+};
+
+bool markUpwardPropCompleted(IRBlock* block)
+{
+    block->scratchData |= (UInt64)BlockStateFlags::UpwardPropCompleted;
+}
+
+bool markDownwardPropCompleted(IRBlock* block)
+{
+    block->scratchData |= (UInt64)BlockStateFlags::DownwardPropCompleted;
+}
+
+bool markPredicateTriviallyFalse(IRBlock* block)
+{
+    block->scratchData |= (UInt64)BlockStateFlags::PredicateTriviallyFalse;
+}
+
+bool isUpwardPropCompleted(IRBlock* block)
+{
+    return block->scratchData & (UInt64)BlockStateFlags::UpwardPropCompleted;
+}
+
+bool isDownwardPropCompleted(IRBlock* block)
+{
+    return block->scratchData & (UInt64)BlockStateFlags::DownwardPropCompleted;
+}
+
+bool isPredicateTriviallyFalse(IRBlock* block)
+{
+    return block->scratchData & (UInt64)BlockStateFlags::PredicateTriviallyFalse;
+}
+
+bool clearBlockState(IRBlock* block)
+{
+    block->scratchData = 0;
+}
+
+bool isBlockReadyForUpwardProp(IRBlock* block)
+{
+    // Check that successors have completed upward propagation.
+    for (auto successor : block->getSuccessors())
     {
-        auto paramIndex = getParamIndexInBlock(cast<IRParam>(statement.inst));
-        auto translatedInst =
-            as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(paramIndex);
-        return Statement::concrete(translatedInst, statement.relation);
+        if (!isUpwardPropCompleted(successor))
+            return false;
+    }
+    return true;
+}
+
+bool isBlockReadyForDownwardProp(IRBlock* block)
+{
+    // Check that predecessors have completed downward propagation.
+    for (auto predecessor : block->getPredecessors())
+    {
+        if (!isDownwardPropCompleted(predecessor))
+            return false;
+    }
+    return true;
+}
+
+std::optional<Statement> propagateStatementUpwards(IRInst* inst, SimpleRelation relation)
+{
+    // We'll keep translating through the inst, until we either hit a parameter
+    // until we either hit a parameter, or we leave the current block.
+    //
+    auto parentInst = inst->getParent();
+
+    if (as<IRParam>(inst))
+        return Statement::concrete(inst, relation);
+
+    if (isIntegerConstantValue(inst))
+    {
+        auto relationFromInst =
+            SimpleRelation::integerRelation(SimpleRelation::Equal, getConstantIntegerValue(inst));
+        if (doesRelationImply(relation, relationFromInst))
+            return std::nullopt; // Trivially true
+        else if (doesRelationImply(relation, relationFromInst.negated()))
+            return Statement::concrete(inst, SimpleRelation::impossibleRelation());
+        else
+            return std::nullopt; // Trivially true
+    }
+    else if (isBoolConstantValue(inst))
+    {
+        auto relationFromInst = SimpleRelation::boolRelation(getConstantBoolValue(inst));
+        if (doesRelationImply(relation, relationFromInst))
+            return std::nullopt; // Trivially true
+        else if (doesRelationImply(relation, relationFromInst.negated()))
+            return Statement::concrete(inst, SimpleRelation::impossibleRelation());
+        else
+            return std::nullopt; // Trivially true
+    }
+    else if (inst->getOp() == kIROp_Add || inst->getOp() == kIROp_Sub)
+    {
+        // TODO: Translate equality/inequality.
     }
 
-    // Not a parameter (or we have a non-concrete statement), so no need to translate it.
-    return statement;
+    return std::nullopt;
 }
 
-StatementSet translateToPredecessor(IRBlock* block, IRBlock* predecessor, StatementSet statementSet)
+StatementSet propagateUpwards(
+    RefPtr<IRDominatorTree> domTree,
+    IRBlock* current,
+    IRBlock* predecessor,
+    StatementSet predicateSet)
 {
-    StatementSet newStatementSet;
-    // Translate each statement in the set.
-    for (auto& statement : statementSet.predicates)
-        newStatementSet.conjunct(translateToPredecessor(block, predecessor, statement.second));
-    return newStatementSet;
-}
+    // Translate the set of predicates from the current block to the predecessor block.
+    //
+    // The key idea is that we need to find a set of predicate statements (A') for the predecessor
+    // block, such that A => A'.
+    //
+    // During the downward phase, the predecessor will then return a set of
+    // statements (B') such that A' => B'. This B' can be propagated "downwards" into a set
+    // of statements B such that B' => B.
+    //
+    // We can then combine these three rules A => A', A' => B' and B' => B to get A => B
+    // which is the statement set that we want for our current block.
+    //
 
-Statement translateToCurrent(IRBlock* block, IRBlock* predecessor, Statement statement)
-{
-    List<IRParam*> params;
-    for (auto param : block->getParams())
-        params.add(param);
-
-    // If the statement is concrete, we need to check if it's an argument in the predecessor's
-    // branch
-    if (statement.type == Statement::Concrete)
+    StatementSet newPredicateSet;
+    for (auto& predicateInstPair : predicateSet.predicates)
     {
-        auto terminator = predecessor->getTerminator();
-        auto branch = as<IRUnconditionalBranch>(terminator);
-
-        if (branch)
+        auto predicate = predicateInstPair.second;
+        if (as<IRParam>(predicate.inst) && predicate.type == Statement::Concrete)
         {
-            // Scan through all arguments to find if statement.inst is one of them
-            auto argCount = branch->getArgCount();
-            for (UInt argIndex = 0; argIndex < argCount; argIndex++)
+            auto paramIndex = getParamIndexInBlock(cast<IRParam>(predicate.inst));
+            auto translatedInst =
+                as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(paramIndex);
+
+            // If the translate inst is outside the block, add it in as-is, otherwise,
+            // we'll need to propagate it to the operands of the inst
+            //
+            if (translatedInst->getParent() != predecessor)
+                newPredicateSet.conjunct(Statement::concrete(translatedInst, predicate.relation));
+            else if (auto statement = propagateStatementUpwards(translatedInst, predicate.relation))
+                newPredicateSet.conjunct(*statement);
+        }
+        else
+        {
+            newPredicateSet.conjunct(predicate);
+        }
+    }
+
+    // If our current block is a merge block for a conditional branch, we should add the condition
+    // to the predicate set.
+    //
+    for (auto blockUse = current->firstUse; blockUse; blockUse = blockUse->nextUse)
+    {
+        if (auto ifElse = as<IRIfElse>(blockUse->getUser()))
+        {
+            if (ifElse->getAfterBlock() == current)
             {
-                auto arg = branch->getArg(argIndex);
-                if (arg == statement.inst)
+                // We're looking at the merge block for a conditional branch.
+
+                if (domTree->dominates(ifElse->getTrueBlock(), current))
                 {
-                    // Found the argument - translate to the corresponding parameter in the current
-                    // block
-                    auto param = params[argIndex];
-                    if (param)
-                    {
-                        return Statement::concrete(param, statement.relation);
-                    }
+                    // True branch
+                    auto trueBranchStatements =
+                        tryExtractStatements(ifElse, ifElse->getTrueBlock());
+                    for (auto& statement : trueBranchStatements)
+                        newPredicateSet.conjunct(statement);
                 }
+                else if (domTree->dominates(ifElse->getFalseBlock(), current))
+                {
+                    // False branch
+                    auto falseBranchStatements =
+                        tryExtractStatements(ifElse, ifElse->getFalseBlock());
+                    for (auto& statement : falseBranchStatements)
+                        newPredicateSet.conjunct(statement);
+                }
+                else
+                {
+                    // Panic
+                    SLANG_UNREACHABLE("Unreachable block in conditional branch");
+                }
+            }
+        }
+
+        // We'll ignore switch statements for now, but they're trivial to add.
+        // TODO: Add switch statements.
+    }
+
+    return newPredicateSet;
+}
+
+Statement propagateStatementDownwards(IRInst* srcInst, IRInst* dstInst, StatementSet srcStatements)
+{
+    // We'll keep translating through the inst, until we either hit a parameter
+    // until we either hit a parameter, or we leave the current block.
+    //
+
+    if (srcStatements.predicates.containsKey(srcInst))
+        return srcStatements.predicates[srcInst];
+
+    if (isIntegerConstantValue(srcInst))
+    {
+        return Statement::concrete(
+            dstInst,
+            SimpleRelation::integerRelation(
+                SimpleRelation::Equal,
+                getConstantIntegerValue(srcInst)));
+    }
+    else if (isBoolConstantValue(srcInst))
+    {
+        return Statement::concrete(
+            dstInst,
+            SimpleRelation::boolRelation(getConstantBoolValue(srcInst)));
+    }
+
+    if (srcInst->getOp() == kIROp_Add || srcInst->getOp() == kIROp_Sub)
+    {
+        auto left = srcInst->getOperand(0);
+        auto right = srcInst->getOperand(1);
+
+        auto isLeftConstant = isIntegerConstantValue(left);
+        auto isRightConstant = isIntegerConstantValue(right);
+
+        if (!isLeftConstant && !isRightConstant)
+            return Statement::concrete(
+                dstInst,
+                SimpleRelation::anyRelation()); // Can't say anything
+
+        if (srcInst->getOp() == kIROp_Add || (srcInst->getOp() == kIROp_Sub && isRightConstant))
+        {
+            auto constant =
+                isLeftConstant ? getConstantIntegerValue(left) : getConstantIntegerValue(right);
+            auto operand = isLeftConstant ? right : left;
+
+            constant = srcInst->getOp() == kIROp_Add ? constant : -constant;
+
+            auto operandStatement = propagateStatementDownwards(operand, operand, srcStatements);
+
+            if (operandStatement.type != Statement::Concrete)
+                return Statement::concrete(
+                    dstInst,
+                    SimpleRelation::anyRelation()); // Can't say anything
+
+            switch (operandStatement.relation.type)
+            {
+            case SimpleRelation::Equal:
+                return Statement::concrete(
+                    dstInst,
+                    SimpleRelation::integerRelation(
+                        SimpleRelation::Equal,
+                        constant + operandStatement.relation.comparator));
+            case SimpleRelation::NotEqual:
+                return Statement::concrete(
+                    dstInst,
+                    SimpleRelation::integerRelation(
+                        SimpleRelation::NotEqual,
+                        constant + operandStatement.relation.comparator));
+            case SimpleRelation::LessThan:
+                return Statement::concrete(
+                    dstInst,
+                    SimpleRelation::integerRelation(
+                        SimpleRelation::LessThan,
+                        constant + operandStatement.relation.comparator));
+            case SimpleRelation::GreaterThan:
+                return Statement::concrete(
+                    dstInst,
+                    SimpleRelation::integerRelation(
+                        SimpleRelation::GreaterThan,
+                        constant + operandStatement.relation.comparator));
             }
         }
     }
 
-    // If it's not an argument in the branch or not a concrete statement, no translation needed
-    return statement;
+    // Default
+    return Statement::concrete(dstInst, SimpleRelation::anyRelation());
 }
 
-// Same translation, but from predecessor to current block.
-StatementSet translateToCurrent(IRBlock* block, IRBlock* predecessor, StatementSet statementSet)
+StatementSet propagateDownwards(
+    RefPtr<IRDominatorTree> domTree,
+    IRBlock* successor,
+    IRBlock* predecessor,
+    StatementSet statementSet)
 {
+    // Translate a set of statements from the current block to the successor block.
+    //
+    // That is, find a set of statements (B') for the successor block such that B => B'
+    //
     StatementSet newStatementSet;
+
+    // Go over all the parameters of the successor block, find corresponding arguments, and
+    // convert any statements to the new set.
+    //
+    UInt paramIndex = 0;
+    for (auto param : successor->getParams())
+    {
+        auto arg = as<IRUnconditionalBranch>(predecessor->getTerminator())->getArg(paramIndex);
+        auto statement = propagateStatementDownwards(arg, param, statementSet);
+        newStatementSet.conjunct(statement);
+        paramIndex++;
+    }
+
+    auto branchStatements = tryExtractStatements(predecessor->getTerminator(), successor);
+    for (auto& statement : branchStatements)
+        newStatementSet.conjunct(statement);
+
+    // For all other statements in the statementSet, we'll add them in, but only
+    // if the predecessor dominates the successor. (Otherwise, the inst is invisible)
+    //
     for (auto& statement : statementSet.predicates)
-        newStatementSet.conjunct(translateToCurrent(block, predecessor, statement.second));
+    {
+        if (domTree->dominates(predecessor, statement.first->getParent()))
+            newStatementSet.conjunct(statement.second);
+    }
+
     return newStatementSet;
 }
 
-
-// Obtain all implications that can be inferred from the predicate in a
-// certain block.
-//
-// This is something we could do on a per-block basis.
-//
-StatementSet tryGetImplications(
-    Dictionary<StatementCacheKey, StatementSet>& cache,
-    IRBlock* block,
-    Statement predicate)
+struct Edge
 {
-    auto cacheKey = StatementCacheKey(block, predicate.inst, predicate);
-    if (auto cached = cache.tryGetValue(cacheKey))
-        return *cached;
+    IRBlock* predecessor;
+    IRBlock* successor;
 
-    auto memoize = [&](StatementSet result)
+    bool operator==(const Edge& other) const
     {
-        cache[cacheKey] = result;
-        return result;
-    };
-
-    // Memoize a variable for each parameter in this block.
-    // This way if we see these variables again, we know that
-    // we have a recursive relation.
-    //
-    // This memoization simultaneously avoids infinite recursion,
-    // and allows an elegant representation of recursive relationships.
-    //
-    StatementSet parameterImplications;
-    for (auto param : block->getParams())
-        parameterImplications.conjunct(Statement::variable(param, block));
-    memoize(parameterImplications);
-
-    // Empty set of statements.
-    ShortList<StatementSet, 2> predecessorStatementSets;
-
-    // Merge statements from predecessors.
-    for (auto predecessor : block->getPredecessors())
-    {
-        // Translate predicate and parameters to the predecessor block.
-
-
-        auto predecessorImplications = tryGetImplications(cache, predecessor, predicate);
-
-        // If we have any extra statements that we can infer from this branch,
-        // we'll add them to the list. (This could be the true or false branch of a
-        // conditional).
-        //
-        auto branchStatements = tryExtractStatements(predecessor->getTerminator(), block);
-
-        for (auto& branchStatement : branchStatements)
-            predecessorImplications.conjunct(branchStatement);
-
-        if (predecessorImplications.isTriviallyFalse())
-            continue;
-
-        predecessorStatementSets.add(predecessorImplications);
+        return predecessor == other.predecessor && successor == other.successor;
     }
 
-    // If we get to a situation where there are no valid
-    // predecessors into this block, then something is wrong.
+    UInt64 getHashCode() const
+    {
+        UInt64 predHash = Slang::getHashCode(predecessor);
+        UInt64 succHash = Slang::getHashCode(successor);
+        return Slang::combineHash(predHash, succHash);
+    }
+};
+
+
+// This routine returns a set of implications for any insts visible in a block.
+//
+// The process uses a modified version of abstract interpretation, by first propagating a set
+// of predicates "backwards" repeatedly through the predecessors, then calculating the set of
+// implications "forwards" repeatedly through the successors.
+//
+// Note that the resulting implications don't contain all possible statements that could be inferred
+// statically (this is an undeciable problem), but rather whatever can be inferred in just two steps
+// through the blocks. This suffices for the vast majority of common loop structures.
+//
+StatementSet tryGetImplications(
+    RefPtr<IRDominatorTree> domTree,
+    IRBlock* block,
+    StatementSet Predicates)
+{
+    List<Edge> orderedEdgeList; // Edges in the order that they're processed.
+    HashSet<Edge> falseEdges; // Edges between blocks where the successor's predicate does not imply
+                              // the predecessor's predicate.
+
+    // Initialize a work list.
+    List<IRBlock*> workList;
+    workList.add(block);
+
     //
-    SLANG_ASSERT(predecessorStatementSets.getCount() > 0);
+    // Upward pass, propagate predicates through predecessors, until
+    // there're no more blocks left to process.
+    //
 
-    if (predecessorStatementSets.getCount() == 0)
-        return StatementSet();
+    // We'll keep track of the predicates for each block.
+    Dictionary<IRBlock*, StatementSet> blockPredicates;
 
-    // Disjunction of all the implications.
-    StatementSet result = predecessorStatementSets[0];
-    for (int i = 1; i < predecessorStatementSets.getCount(); i++)
-        result.disjunct(predecessorStatementSets[i]);
+    blockPredicates[block] = Predicates;
+    markUpwardPropCompleted(block);
 
-    return memoize(result);
+    while (workList.getCount() > 0)
+    {
+        auto current = workList.getLast();
+        workList.removeLast();
+
+        // If the block has already been processed, skip it.
+        if (isUpwardPropCompleted(current))
+            continue;
+
+        // If the block is not ready for upward propagation, add it to the work list.
+        if (!isBlockReadyForUpwardProp(current))
+        {
+            workList.add(current);
+            // Then add all the successors to the work list.
+            for (auto successor : current->getSuccessors())
+                workList.add(successor);
+        }
+
+        // Otherwise, we'll process the block.
+        //
+        // Get our predicate set, then propagate it to all predecessors.
+        //
+        auto Predicates = blockPredicates[current];
+
+        HashSet<IRBlock*> uniquePredecessors;
+        for (auto predecessor : current->getPredecessors())
+            uniquePredecessors.add(predecessor);
+
+        for (auto predecessor : uniquePredecessors)
+        {
+            // We also need to handle the recursive case, where the predecessor
+            // is already "sealed".
+            //
+            if (isUpwardPropCompleted(predecessor))
+            {
+                // Verify that current predicate => predecessor predicate.
+
+                // TODO: Implement.
+                /*auto translatedCurrentPredicate = translateToPredecessor(predecessor, current,
+                Predicates); auto predecessorPredicate = blockPredicates[predecessor]; if
+                (doesRelationImply(translatedCurrentPredicate.relation,
+                predecessorPredicate.relation))*/
+
+                // We won't add this edge to the set, because we can't be sure that
+                // the current predicate implies the predecessor predicate.
+                //
+                falseEdges.add({predecessor, current});
+                continue;
+            }
+
+            auto newPredicates = propagateUpwards(domTree, current, predecessor, Predicates);
+
+            if (!blockPredicates.containsKey(predecessor))
+                blockPredicates[predecessor] = newPredicates;
+            else
+                blockPredicates[predecessor].disjunct(newPredicates);
+
+            orderedEdgeList.add({predecessor, current});
+        }
+
+        markUpwardPropCompleted(current);
+    }
+
+    //
+    // Downward pass, propagate implications through successors, until
+    // there're no more blocks left to process.
+    //
+
+    Dictionary<IRBlock*, StatementSet> blockImplications;
+
+    // Set 'block' to something trivial base case.
+    blockImplications[block] = blockPredicates[block]; // statement => statement
+
+    orderedEdgeList.reverse();
+    while (orderedEdgeList.getCount() > 0)
+    {
+        auto edge = orderedEdgeList.getLast();
+        orderedEdgeList.removeLast();
+
+        // Get the predicate set for the predecessor.
+        auto predecessorPredicates = blockPredicates[edge.predecessor];
+
+        // Get the implication set for the predecessor.
+        auto predecessorImplications = blockImplications[edge.predecessor];
+
+        if (falseEdges.contains(edge))
+        {
+            // Since A' => B' is not true, effectively, we can't say anything..
+            predecessorImplications = StatementSet();
+        }
+        else
+        {
+            // (A' => B') => (A' => A' ^ B')
+            predecessorImplications.conjunct(predecessorPredicates);
+        }
+
+        // Propagate the implication set to the successor.
+        auto successorImplications =
+            propagateDownwards(domTree, edge.successor, edge.predecessor, predecessorImplications);
+
+        if (!blockImplications.containsKey(edge.successor))
+            blockImplications[edge.successor] = successorImplications;
+        else
+            blockImplications[edge.successor].disjunct(successorImplications);
+    }
+
+    // We should have a final set of implications for our block.
+    return blockImplications[block];
 }
 
 } // namespace Slang
