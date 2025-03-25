@@ -4153,7 +4153,10 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
         return LegalType();
     }
 
-    virtual bool isEmptyTypeLegalize() override { return true; }
+    virtual bool shouldLegalizeParameterBlockElementType() override
+    {
+        return isMetalTarget(targetProgram->getTargetReq());
+    }
 };
 
 // The main entry points that are used when transforming IR code

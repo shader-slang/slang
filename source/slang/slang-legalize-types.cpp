@@ -1211,7 +1211,8 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
         LegalType legalElementType;
 
         if (isMetalTarget(context->targetProgram->getTargetReq()) &&
-            as<IRParameterBlockType>(uniformBufferType) && !context->isEmptyTypeLegalize())
+            as<IRParameterBlockType>(uniformBufferType) &&
+            !context->shouldLegalizeParameterBlockElementType())
         {
             // On Metal, we do not need to legalize the element type of
             // a parameter block because we can translate it directly into

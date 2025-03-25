@@ -660,7 +660,7 @@ struct IRTypeLegalizationContext
         LegalType legalElementType,
         IRInst* layoutOperand) = 0;
 
-    virtual bool isEmptyTypeLegalize() { return false; }
+    virtual bool shouldLegalizeParameterBlockElementType() { return false; }
 };
 
 // This typedef exists to support pre-existing code from when
