@@ -104,6 +104,75 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     return newInst;
 }
 
+static void specializeExportDecorationIFP(IRInst * target, IRSpecialize* oldInst, IRBuilder* builder)
+{
+    auto gen = as<IRGeneric>(oldInst->getBase());
+    if (gen)
+    {
+        auto genExport = gen->findDecoration<IRExportDecoration>();
+        if(genExport)
+        {
+            StringBuilder sb;
+            sb.append(genExport->getMangledName());
+            for (UInt i = 0; i < oldInst->getArgCount(); ++i)
+            {
+                auto arg = oldInst->getArg(i);
+                // TODO call the mangler (but it works one the AST, not the IR?)
+                // This will do for now
+                sb.append(i);
+                auto emit = [&sb](IRInst* inst, const auto & rec_f) -> void
+                {
+                    if (auto intValue = as<IRIntLit>(inst))
+                    {
+                        sb.append("V");
+                        sb.append(intValue->getValue());
+                    }
+                    else if (auto type = as<IRType>(inst))
+                    {
+                        sb.append("T");
+                        if (auto typeExport = type->findDecoration<IRExportDecoration>())
+                        {
+                            sb.append(typeExport->getMangledName());
+                        }
+                        else if (auto nameHint = type->findDecoration<IRNameHintDecoration>())
+                        {
+                            sb.append(nameHint->getName());
+                        }
+                        else
+                        {
+                            if (auto basicType = as<IRBasicType>(type))
+                            {
+                                sb.append("B");
+                                sb.append(static_cast<int>(basicType->getBaseType()));
+                            }
+                            else if (auto vectorType = as<IRVectorType>(type))
+                            {
+                                sb.append("v");
+                                rec_f(vectorType->getElementCount(), rec_f);
+                                rec_f(vectorType->getElementType(), rec_f);
+                            }
+                            else if (auto matrixType = as<IRMatrixType>(type))
+                            {
+                                sb.append("m");
+                                rec_f(matrixType->getRowCount(), rec_f);
+                                sb.append("x");
+                                rec_f(matrixType->getColumnCount(), rec_f);
+                                rec_f(matrixType->getElementType(), rec_f);
+                            }
+                            else
+                            {
+                                SLANG_E_NOT_IMPLEMENTED;
+                            }
+                        }
+                    }
+                };
+                emit(arg, emit);
+            }
+            builder->addExportDecoration(target, sb.getUnownedSlice());
+        }
+    }
+}
+
 // The complexity of the second phase of cloning (the
 // one that deals with decorations and children) comes
 // from the fact that it needs to sequence the two phases
@@ -157,6 +226,11 @@ static void _cloneInstDecorationsAndChildren(
     //
     List<IRCloningOldNewPair> pairs;
     ShortList<IRCloningOldNewPair> paramPairs;
+
+    if (auto oldAsSpec = as<IRSpecialize>(oldInst))
+    {
+        specializeExportDecorationIFP(newInst, oldAsSpec, builder);
+    }
 
     for (auto oldChild : oldInst->getDecorationsAndChildren())
     {
