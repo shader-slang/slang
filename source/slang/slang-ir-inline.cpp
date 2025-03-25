@@ -291,10 +291,7 @@ struct InliningPassBase
     }
 
     /// Setup debug information for the inlined call site
-    void setupDebugInfoForInlinedCall(
-        IRCall* call,
-        IRFunc* callee,
-        IRBuilder& builder)
+    void setupDebugInfoForInlinedCall(IRCall* call, IRFunc* callee, IRBuilder& builder)
     {
         // Find the last IRDebugLine instruction before the call
         // Next, see if we already have an older DebugInlinedAt instruction emitted.
@@ -304,8 +301,9 @@ struct InliningPassBase
 
         if (callee->findDecoration<IRDebugLocationDecoration>())
         {
-        // TODO: Seems like we can't do chaining because we won't get access to previous callers of the method.
-        // At least we cannnot just take the last debugInlinedAt and pass it as the previous caller.
+            // TODO: Seems like we can't do chaining because we won't get access to previous callers
+            // of the method. At least we cannnot just take the last debugInlinedAt and pass it as
+            // the previous caller.
 #if 0
             IRDebugInlinedAt* lastDebugInlinedAt = nullptr;
             for (IRInst* inst = call->getParent(); inst; inst = inst->getParent())
