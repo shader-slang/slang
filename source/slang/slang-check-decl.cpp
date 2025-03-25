@@ -13635,6 +13635,27 @@ CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt)
 
 void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
+    auto declaredCaps = getDeclaredCapabilitySet(varDecl);
+    auto module = getModule(varDecl);
+    auto linkage = module->getLinkage();
+    for (auto target : linkage->targets)
+    {
+        auto targetCaps = target->getTargetCaps();
+        
+        if (targetCaps.isIncompatibleWith(declaredCaps))
+        {
+            auto compileTarget = targetCaps.getCompileTarget();
+            maybeDiagnose(
+                getSink(),
+                this->getOptionSet(),
+                DiagnosticCategory::Capability,
+                varDecl->loc,
+                Diagnostics::declHasDependenciesNotCompatibleOnTarget,
+                varDecl,
+                compileTarget);
+        }
+    }
+
     visitReferencedDecls(
         *this,
         varDecl->type.type,
@@ -14197,19 +14218,18 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
         }
     }
 
-    //// The second scenario is when the callee is using a capability that is not provided by
-    /// the
-    /// requirement. / For example: /     [require(hlsl,b,c)] /     void caller() /     { /
-    /// useD();
-    ///// require capability (hlsl,d) /     } / In this case we should report that useD() is
-    /// using a
-    /// capability that is not declared by caller.
-    ////
-
-    //// If we reach here, we are case 2.
-
+    // The second scenario is when the callee is using a capability that is not provided by the requirement.
+    // For example:
+    //     [require(hlsl,b,c)]
+    //     void caller()
+    //     {
+    //         useD();    // requires capability (hlsl,d)
+    //     }
+    // In this case we should report that useD() is using a capability that is not declared by caller.
+    // If we reach here, we are case 2.
     // We will produce all failed atoms. This is important since provenance of multiple atoms
     // can come from multiple referenced items in a function body.
+
     HashSet<Decl*> printedDecls;
     auto simplifiedFailedAtomsSet = failedAtomsInsideAvailableSet.newSetWithoutImpliedAtoms();
     for (auto i : simplifiedFailedAtomsSet)
