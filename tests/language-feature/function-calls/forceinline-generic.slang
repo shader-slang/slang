@@ -68,5 +68,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 }
 
 // CHECK-COUNT-2: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugInlinedAt %uint_{{[0-9]+}} %{{[0-9]+}}
-// CHECK-COUNT-2: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
+// CHECK-COUNT-6: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
 // CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope

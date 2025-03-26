@@ -7333,7 +7333,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return nullptr;
 
         auto scope1 = findDebugScope(scope->getScope());
-        if (!scope)
+        if (!scope1)
             return nullptr;
 
         return emitOpDebugScope(
@@ -7352,9 +7352,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugInlinedAt(SpvInstParent* parent, IRDebugInlinedAt* debugInlinedAt)
     {
-        if (!debugInlinedAt)
-            return nullptr;
-
         // Get the operands from the IRDebugInlinedAt instruction
         IRInst* lineInst = debugInlinedAt->getLine();
 

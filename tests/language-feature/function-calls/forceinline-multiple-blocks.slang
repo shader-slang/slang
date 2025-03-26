@@ -3,6 +3,13 @@ RWStructuredBuffer<int> outputBuffer;
 
 // This tests debuginfo for inlining a function with multiple basic blocks
 // to test the more complex case of inlining with control flow.
+
+[ForceInline]
+int calculateAdjustment(int value)
+{
+    return value * 3 / 2;
+}
+
 [ForceInline]
 int inlineMultipleBasicBlocks(int value)
 {
@@ -12,6 +19,7 @@ int inlineMultipleBasicBlocks(int value)
     if (value > 10)
     {
         result = value * 2;
+        result = calculateAdjustment(result);
     }
     else
     {
@@ -39,5 +47,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 }
 
 // CHECK-COUNT-1: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugInlinedAt %uint_{{[0-9]+}} %{{[0-9]+}}
-// CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
+// CHECK-COUNT-6: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
 // CHECK-COUNT-1: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
