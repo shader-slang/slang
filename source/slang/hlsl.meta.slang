@@ -24280,28 +24280,97 @@ int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
 
 // Work-graphs
 
-//@public:
-/// read-only input to Broadcasting launch node.
-__generic<T>
-//TODO: DispatchNodeInputRecord should be available only for broadcasting node shader.
-//[require(broadcasting_node)]
-[require(spirv)]
-struct DispatchNodeInputRecord
+///@public
+/// Set of zero or more records for each thread.
+///
+__generic<RecordType, let nodeID : int>
+struct ThreadNodeOutputRecords
 {
-    /// Provide an access to a record object that only holds a single record.
-    NodePayloadPtr<T> Get()
+    FunctionPtr<__SPIRVNodePayloadArray<RecordType, nodeID>> alloc;
+
+    [ForceInline]
+    [require(hlsl_spirv)] // [require(hlsl_spirv, thread)]
+    __init(int recordCount, int nodeIndex = 0)
     {
-        int index = 0;
         __target_switch
         {
+        case hlsl: return;
+        case spirv:
+            alloc = spirv_asm
+            {
+                %alloc = OpAllocateNodePayloadsAMDX $$NodePayloadArrayPtr<RecordType, nodeID> Workgroup $recordCount $nodeIndex;
+
+                %loaded = OpLoad $$__SPIRVNodePayloadArray<RecordType, nodeID> %alloc;
+
+                %tempPtrVar  = OpVariable $$FunctionPtr<__SPIRVNodePayloadArray<RecordType, nodeID>> Function;
+                OpStore %tempPtrVar %loaded;
+
+                result : $$FunctionPtr<__SPIRVNodePayloadArray<RecordType, nodeID>> = OpCopyObject %tempPtrVar;
+            };
+            return;
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl_spirv)] // [require(hlsl_spirv, thread)]
+    void OutputComplete()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".OutputComplete";
+        case spirv: spirv_asm { OpEnqueueNodePayloadsAMDX $alloc; };
+        }
+    }
+
+    __subscript(uint index) -> FunctionPtr<RecordType>
+    {
+        [ForceInline]
+        get { return Get(index); }
+    }
+
+    [ForceInline]
+    FunctionPtr<RecordType> Get(int index = 0)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Get";
         case spirv:
             return spirv_asm
             {
-                %in_payload_t = OpTypeNodePayloadArrayAMDX $$T;
-                %in_payload_ptr_t = OpTypePointer NodePayloadAMDX %in_payload_t;
-                %var = OpVariable %in_payload_ptr_t NodePayloadAMDX;
-                result : $$NodePayloadPtr<T> = OpAccessChain %var $index;
+                result : $$FunctionPtr<RecordType> = OpAccessChain $alloc $index
             };
+        }
+    }
+};
+
+//@public:
+/// Read-only input to Broadcasting launch node.
+///
+__generic<RecordType, let nodeID : int>
+struct DispatchNodeInputRecord
+{
+    /// Provide an access to a record object that only holds a single record.
+    FunctionPtr<RecordType> Get()
+    {
+        int index = 0;
+
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Get";
+        case spirv:
+            let ptr = spirv_asm
+            {
+                %nodePtrType = OpTypePointer NodePayloadAMDX $$__SPIRVNodePayloadArray<RecordType, nodeID>;
+                %nodePtrVar = OpVariable %nodePtrType NodePayloadAMDX;
+
+                %tempPtrVar = OpVariable $$FunctionPtr<__SPIRVNodePayloadArray<RecordType, nodeID>> Function;
+
+                %loaded = OpLoad $$__SPIRVNodePayloadArray<RecordType, nodeID> %nodePtrVar;
+                OpStore %tempPtrVar %loaded;
+
+                result : $$FunctionPtr<RecordType> = OpAccessChain %tempPtrVar $index;
+            };
+            return ptr;
         }
     }
 };
