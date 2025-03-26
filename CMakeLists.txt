@@ -371,7 +371,11 @@ add_subdirectory(external)
 # trees are too large and onerous for us to depend on.
 # We ignore the failure to fetch the library, since it's not required for the build to succeed.
 if(SLANG_WEBGPU_DAWN_BINARY_URL)
-    copy_fetched_shared_library("webgpu_dawn" "${SLANG_WEBGPU_DAWN_BINARY_URL}" IGNORE_FAILURE)
+    copy_fetched_shared_library(
+        "webgpu_dawn"
+        "${SLANG_WEBGPU_DAWN_BINARY_URL}"
+        IGNORE_FAILURE
+    )
 endif()
 
 # slang-tint is only available as a fetched shared library, since it's hosted in the Dawn
@@ -379,7 +383,11 @@ endif()
 # on.
 # We ignore the failure to fetch the library, since it's not required for the build to succeed.
 if(SLANG_SLANG_TINT_BINARY_URL)
-    copy_fetched_shared_library("slang-tint" "${SLANG_SLANG_TINT_BINARY_URL}" IGNORE_FAILURE)
+    copy_fetched_shared_library(
+        "slang-tint"
+        "${SLANG_SLANG_TINT_BINARY_URL}"
+        IGNORE_FAILURE
+    )
 endif()
 
 fetch_or_build_slang_llvm()
