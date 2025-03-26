@@ -69,9 +69,9 @@ inline int calcNumMipLevels(TextureType type, Extents size)
 {
     TextureDesc textureDesc = {};
 
-    // Default to R8G8B8A8_UNORM
+    // Default to RGBA8Unorm
     const Format format =
-        (inputDesc.format == Format::Unknown) ? Format::R8G8B8A8_UNORM : inputDesc.format;
+        (inputDesc.format == Format::Undefined) ? Format::RGBA8Unorm : inputDesc.format;
 
     textureDesc.sampleCount = inputDesc.sampleCount;
     textureDesc.format = format;
