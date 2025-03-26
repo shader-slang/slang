@@ -2455,7 +2455,7 @@ void lowerCheckpointObjectInsts(IRGlobalValueWithCode* func)
 // For each primal inst that is used in reverse blocks, decide if we should recompute or store
 // its value, then make them accessible in reverse blocks based the decision.
 //
-RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func, DiagnosticSink* sink)
+RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func)
 {
     sortBlocksInFunc(func);
 

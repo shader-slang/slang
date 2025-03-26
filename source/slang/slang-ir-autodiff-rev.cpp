@@ -854,7 +854,7 @@ void BackwardDiffTranscriberBase::transcribeFuncImpl(
 
     // Apply checkpointing policy to legalize cross-scope uses of primal values
     // using either recompute or store strategies.
-    auto primalsInfo = applyCheckpointPolicy(diffPropagateFunc, getSink());
+    auto primalsInfo = applyCheckpointPolicy(diffPropagateFunc);
 
     eliminateDeadCode(diffPropagateFunc);
 

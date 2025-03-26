@@ -344,5 +344,5 @@ private:
     bool canRecompute(UseOrPseudoUse use);
 };
 
-RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func, DiagnosticSink* sink);
+RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func);
 }; // namespace Slang
