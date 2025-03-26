@@ -557,17 +557,6 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                     if (auto inductionInfo = inductionValueInsts.tryGetValue(param))
                     {
                         checkpointInfo->loopInductionInfo.addIfNotExists(param, *inductionInfo);
-
-                        // If we also have an exit value (a stronger condition on the param), record
-                        // it.
-                        //
-                        if (auto loopExitValueInst =
-                                checkpointInfo->loopExitValueInsts.tryGetValue(param))
-                        {
-                            checkpointInfo->loopExitValueInsts.addIfNotExists(
-                                result.instToRecompute,
-                                *loopExitValueInst);
-                        }
                         continue;
                     }
 
@@ -593,6 +582,19 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                         SLANG_ASSERT(branchInst->getOperandCount() > paramIndex);
 
                         workList.add(&branchInst->getArgs()[paramIndex]);
+                    }
+                }
+                else if (auto exitValue = as<IRLoopExitValue>(result.instToRecompute))
+                {
+                    // If we also have an exit value (a stronger condition on the param), record
+                    // it.
+                    //
+                    if (auto loopExitValueInst =
+                            loopExitValueInsts.tryGetValue(exitValue->getVal()))
+                    {
+                        checkpointInfo->loopExitValueInsts.addIfNotExists(
+                            exitValue->getVal(),
+                            *loopExitValueInst);
                     }
                 }
                 else
@@ -1134,16 +1136,26 @@ void AutodiffCheckpointPolicyBase::collectLoopExitConditions(IRGlobalValueWithCo
                 continue;
             }
 
+            // Extract A s.t. ~breakFlag => A.
+            //
+            // (Note that breakFlag == false is the case where the
+            // loop exits)
+            //
             SimpleRelation statement = implicationsForFalseCondition.statements.getValue(param);
+
+            // Extract B s.t. breakFlag => B
             SimpleRelation inverseStatement =
                 implicationsForTrueCondition.statements.getValue(param);
 
-            // If this doesn't hold, we can't be sure that the loop exits *if and only if*
-            // the relation on the parameter holds. (there could be cases where the relation
-            // is true, but the loop doesn't exit immediately)
-            //
+            // If A => ~B, then by using the contrapositive, we get A <=> ~breakFlag
             if (!doesRelationImply(statement, inverseStatement.negated()))
-                continue;
+            {
+                // If the above doesn't work, we can try using ~B instead.
+                if (!doesRelationImply(inverseStatement.negated(), statement))
+                    continue; // Neither works.. we can't infer anything about param.
+                else
+                    statement = inverseStatement.negated(); // Use ~B <=> ~breakFlag
+            }
 
             // We found a relation on the parameter at the loop exit, and we also proved that
             // if the relation holds, the loop must exit.
@@ -1191,13 +1203,15 @@ void AutodiffCheckpointPolicyBase::collectLoopExitConditions(IRGlobalValueWithCo
                     }
                 };
 
-                if (counterFactor > 0 && statement.comparator == SimpleRelation::GreaterThan)
+                if (counterFactor > 0 && statement.comparator == SimpleRelation::GreaterThanEqual)
                 {
                     // Find the smallest value that satisfies counterFactor * i + counterOffset >=
                     // relationValue
                     //
-                    IRIntegerValue exitIValue = ((relationValue - counterOffset) / counterFactor);
-                    IRIntegerValue exitParamValue = counterOffset + counterFactor * exitIValue;
+                    IRIntegerValue exitIValue =
+                        (((relationValue - counterOffset) + counterFactor - 1) / counterFactor);
+                    IRIntegerValue exitParamValue =
+                        counterOffset + counterFactor * (exitIValue - 1);
                     recordExitValue(exitIValue, exitParamValue);
                 }
                 // TODO: handle other cases
@@ -2452,12 +2466,12 @@ RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func, Di
     sortBlocksInFunc(func);
 
     // Dump IR.
-    IRDumpOptions options;
+    /*IRDumpOptions options;
     options.flags = IRDumpOptions::Flag::DumpDebugIds;
     options.mode = IRDumpOptions::Mode::Detailed;
     DiagnosticSinkWriter writer(sink);
     writer.write("### BEFORE-PROCESS-FUNC\n", strlen("### BEFORE-PROCESS-FUNC\n"));
-    dumpIR(func, options, sink->getSourceManager(), &writer);
+    dumpIR(func, options, sink->getSourceManager(), &writer);*/
 
     // Determine the strategy we should use to make a primal inst available.
     // If we decide to recompute the inst, emit the recompute inst in the corresponding
@@ -2726,9 +2740,6 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
         if (inductionValueInsts.containsKey(param))
             return true;
 
-        if (loopExitValueInsts.containsKey(param))
-            return true;
-
         // We can recompute a phi param if it is not in a loop start block.
         auto parentBlock = as<IRBlock>(param->getParent());
         for (auto pred : parentBlock->getPredecessors())
@@ -2739,6 +2750,13 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
                     return false;
             }
         }
+    }
+    else if (auto exitValue = as<IRLoopExitValue>(use.usedVal))
+    {
+        if (loopExitValueInsts.containsKey(exitValue->getVal()))
+            return true;
+        else
+            return false;
     }
     return true;
 }

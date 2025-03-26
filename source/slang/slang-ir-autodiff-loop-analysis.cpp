@@ -39,21 +39,21 @@ SimpleRelation mergeEqualityWithIntegerRelation(SimpleRelation equality, SimpleR
                                                   // {equality.integerValue, relation.integerValue};
                                                   // but we don't have a representation for this.
     case SimpleRelation::LessThan:
+        if (equality.integerValue < relation.integerValue)
+            return relation;
+        break;
     case SimpleRelation::LessThanEqual:
-        if (relation.integerValue <= equality.integerValue)
-            return SimpleRelation::integerRelation(
-                SimpleRelation::LessThanEqual,
-                equality.integerValue);
-        else
-            return SimpleRelation::anyRelation();
+        if (equality.integerValue <= relation.integerValue)
+            return relation;
+        break;
     case SimpleRelation::GreaterThan:
+        if (equality.integerValue > relation.integerValue)
+            return relation;
+        break;
     case SimpleRelation::GreaterThanEqual:
-        if (relation.integerValue >= equality.integerValue)
-            return SimpleRelation::integerRelation(
-                SimpleRelation::GreaterThanEqual,
-                equality.integerValue);
-        else
-            return SimpleRelation::anyRelation();
+        if (equality.integerValue >= relation.integerValue)
+            return relation;
+        break;
     default:
         break;
     }
@@ -159,44 +159,66 @@ SimpleRelation relationIntersection(SimpleRelation a, SimpleRelation b)
         {
             if (b.comparator == SimpleRelation::LessThan && a.integerValue < b.integerValue)
             {
-                return b;
+                return a;
             }
             else if (b.comparator == SimpleRelation::GreaterThan && a.integerValue > b.integerValue)
             {
-                return b;
+                return a;
             }
             else if (
                 b.comparator == SimpleRelation::LessThanEqual && a.integerValue <= b.integerValue)
             {
-                return b;
+                return a;
             }
             else if (
                 b.comparator == SimpleRelation::GreaterThanEqual &&
                 a.integerValue >= b.integerValue)
             {
-                return b;
+                return a;
+            }
+            else if (b.comparator == SimpleRelation::NotEqual && a.integerValue != b.integerValue)
+            {
+                return a;
+            }
+            else if (b.comparator == SimpleRelation::Equal)
+            {
+                if (b.integerValue == a.integerValue)
+                    return b;
+                else
+                    return SimpleRelation::impossibleRelation();
             }
         }
         else if (b.comparator == SimpleRelation::Equal)
         {
             if (a.comparator == SimpleRelation::LessThan && b.integerValue < a.integerValue)
             {
-                return a;
+                return b;
             }
             else if (a.comparator == SimpleRelation::GreaterThan && b.integerValue > a.integerValue)
             {
-                return a;
+                return b;
             }
             else if (
                 a.comparator == SimpleRelation::LessThanEqual && b.integerValue <= a.integerValue)
             {
-                return a;
+                return b;
             }
             else if (
                 a.comparator == SimpleRelation::GreaterThanEqual &&
                 b.integerValue >= a.integerValue)
             {
-                return a;
+                return b;
+            }
+            else if (a.comparator == SimpleRelation::NotEqual && b.integerValue != a.integerValue)
+            {
+                return b;
+            }
+            else if (b.comparator == SimpleRelation::Equal)
+            {
+                if (b.integerValue == a.integerValue)
+                    return b;
+                else
+                    return SimpleRelation::impossibleRelation();
             }
         }
     }
@@ -211,7 +233,13 @@ SimpleRelation relationIntersection(SimpleRelation a, SimpleRelation b)
 
 void StatementSet::disjunct(StatementSet other)
 {
-    if (other.isTriviallyFalse() || isTriviallyFalse())
+    if (isTriviallyFalse())
+    {
+        statements = other.statements;
+        return;
+    }
+
+    if (other.isTriviallyFalse())
         return;
 
     if (other.isTriviallyTrue())
@@ -359,6 +387,18 @@ bool doesRelationImply(SimpleRelation relationA, SimpleRelation relationB)
             relationB.comparator == SimpleRelation::NotEqual)
         {
             return relationA.integerValue != relationB.integerValue;
+        }
+
+        if (relationA.comparator == SimpleRelation::GreaterThanEqual &&
+            relationB.comparator == SimpleRelation::GreaterThanEqual)
+        {
+            return relationA.integerValue >= relationB.integerValue;
+        }
+
+        if (relationA.comparator == SimpleRelation::LessThanEqual &&
+            relationB.comparator == SimpleRelation::LessThanEqual)
+        {
+            return relationA.integerValue <= relationB.integerValue;
         }
 
         // TODO: Handle other cases.. these come up rarely, so we can
@@ -590,7 +630,7 @@ StatementSet propagateStatementUpwards(IRInst* inst, SimpleRelation relation)
     auto makeStatementSet = [&](IRInst* inst, SimpleRelation relation)
     {
         StatementSet set;
-        set.set(inst, relation);
+        set.conjunct(inst, relation);
         return set;
     };
 
@@ -650,7 +690,7 @@ StatementSet propagateUpwards(
     {
         auto predicateRelation = statementInstPair.second;
         auto predicateInst = statementInstPair.first;
-        if (as<IRParam>(predicateInst))
+        if (as<IRParam>(predicateInst) && predicateInst->getParent() == current)
         {
             auto paramIndex = getParamIndexInBlock(cast<IRParam>(predicateInst));
             auto translatedInst =
@@ -659,13 +699,8 @@ StatementSet propagateUpwards(
             // If the translate inst is outside the block, add it in as-is, otherwise,
             // we'll need to propagate it to the operands of the inst
             //
-            if (translatedInst->getParent() != predecessor)
-                newPredicateSet.conjunct(translatedInst, predicateRelation);
-            else
-            {
-                auto statementSet = propagateStatementUpwards(translatedInst, predicateRelation);
-                newPredicateSet.disjunct(statementSet);
-            }
+            auto statementSet = propagateStatementUpwards(translatedInst, predicateRelation);
+            newPredicateSet.conjunct(statementSet);
         }
         else
         {
@@ -684,12 +719,12 @@ StatementSet propagateUpwards(
             {
                 // We're looking at the merge block for a conditional branch.
 
-                if (domTree->dominates(ifElse->getTrueBlock(), current))
+                if (domTree->dominates(ifElse->getTrueBlock(), predecessor))
                 {
                     // True branch
                     newPredicateSet.conjunct(tryExtractStatements(ifElse, ifElse->getTrueBlock()));
                 }
-                else if (domTree->dominates(ifElse->getFalseBlock(), current))
+                else if (domTree->dominates(ifElse->getFalseBlock(), predecessor))
                 {
                     // False branch
                     newPredicateSet.conjunct(tryExtractStatements(ifElse, ifElse->getFalseBlock()));
@@ -706,6 +741,16 @@ StatementSet propagateUpwards(
         // TODO: Add switch statements.
     }
 
+    // We have one more edge-case. The condition block of a loop inst.
+    if (auto ifElse = as<IRIfElse>(current->getTerminator()))
+    {
+        if (domTree->dominates(ifElse->getTrueBlock(), predecessor) &&
+            !domTree->dominates(ifElse->getFalseBlock(), predecessor))
+        {
+            // True branch
+            newPredicateSet.conjunct(tryExtractStatements(ifElse, ifElse->getTrueBlock()));
+        }
+    }
     return newPredicateSet;
 }
 
@@ -769,19 +814,22 @@ StatementSet propagateStatementDownwards(
                                 ? operandStatement.statements[operand]
                                 : SimpleRelation::anyRelation();
 
-            switch (relation.comparator)
+            if (relation.type == SimpleRelation::IntegerRelation)
             {
-            case SimpleRelation::Equal:
-            case SimpleRelation::NotEqual:
-            case SimpleRelation::LessThan:
-            case SimpleRelation::LessThanEqual:
-            case SimpleRelation::GreaterThan:
-            case SimpleRelation::GreaterThanEqual:
-                return singleStatement(
-                    dstInst,
-                    SimpleRelation::integerRelation(
-                        relation.comparator,
-                        constant + relation.integerValue));
+                switch (relation.comparator)
+                {
+                case SimpleRelation::Equal:
+                case SimpleRelation::NotEqual:
+                case SimpleRelation::LessThan:
+                case SimpleRelation::LessThanEqual:
+                case SimpleRelation::GreaterThan:
+                case SimpleRelation::GreaterThanEqual:
+                    return singleStatement(
+                        dstInst,
+                        SimpleRelation::integerRelation(
+                            relation.comparator,
+                            constant + relation.integerValue));
+                }
             }
         }
     }
@@ -817,11 +865,14 @@ StatementSet propagateDownwards(
     newStatementSet.conjunct(tryExtractStatements(predecessor->getTerminator(), successor));
 
     // For all other statements in the statementSet, we'll add them in, but only
-    // if the predecessor dominates the successor. (Otherwise, the inst is invisible)
+    // if the predecessor dominates the successor.
+    // An exception is parameters defined in the successor (since these are getting
+    // redefined, we should not be considering existing statements)
     //
     for (auto& statement : statementSet.statements)
     {
-        if (domTree->dominates(predecessor, statement.first->getParent()))
+        if (domTree->dominates(statement.first->getParent(), successor) &&
+            !(as<IRParam>(statement.first) && statement.first->getParent() == successor))
             newStatementSet.conjunct(statement.first, statement.second);
     }
 
@@ -870,6 +921,13 @@ StatementSet collectImplications(
     List<IRBlock*> workList;
     workList.add(block);
 
+    // Clear scratch bits.
+    IRFunc* func = cast<IRFunc>(domTree->code);
+    for (auto _block : func->getBlocks())
+    {
+        clearBlockState(_block);
+    }
+
     //
     // Upward pass, propagate predicates through predecessors, until
     // there're no more blocks left to process.
@@ -896,6 +954,8 @@ StatementSet collectImplications(
             // Then add all the successors to the work list.
             for (auto successor : current->getSuccessors())
                 workList.add(successor);
+
+            continue;
         }
 
         // Otherwise, we'll process the block.
@@ -939,6 +999,9 @@ StatementSet collectImplications(
                 blockPredicates[predecessor].disjunct(newPredicates);
 
             orderedEdgeList.add({predecessor, current});
+
+            // Add predecessors to work list.
+            workList.add(predecessor);
         }
 
         markUpwardPropCompleted(current);
@@ -952,9 +1015,8 @@ StatementSet collectImplications(
     Dictionary<IRBlock*, StatementSet> blockImplications;
 
     // Set 'block' to something trivial base case.
-    blockImplications[block] = blockPredicates[block]; // statement => statement
+    // blockImplications[block] = blockPredicates[block]; // statement => statement
 
-    orderedEdgeList.reverse();
     while (orderedEdgeList.getCount() > 0)
     {
         auto edge = orderedEdgeList.getLast();
@@ -964,7 +1026,7 @@ StatementSet collectImplications(
         auto predecessorPredicates = blockPredicates[edge.predecessor];
 
         // Get the implication set for the predecessor.
-        auto predecessorImplications = blockImplications[edge.predecessor];
+        auto predecessorImplications = StatementSet();
 
         if (falseEdges.contains(edge))
         {
@@ -974,6 +1036,7 @@ StatementSet collectImplications(
         else
         {
             // (A' => B') => (A' => A' ^ B')
+            predecessorImplications = blockImplications[edge.predecessor];
             predecessorImplications.conjunct(predecessorPredicates);
         }
 
@@ -985,6 +1048,12 @@ StatementSet collectImplications(
             blockImplications[edge.successor] = successorImplications;
         else
             blockImplications[edge.successor].disjunct(successorImplications);
+    }
+
+    // Clear scratch bits.
+    for (auto _block : func->getBlocks())
+    {
+        clearBlockState(_block);
     }
 
     // We should have a final set of implications for our block.
