@@ -2,6 +2,7 @@
 #include "slang-ir-clone.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -104,69 +105,38 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     return newInst;
 }
 
-static void specializeExportDecorationIFP(IRInst * target, IRSpecialize* oldInst, IRBuilder* builder)
+static void specializeExportDecorationIFP(IRInst* target, IRSpecialize* oldInst, IRBuilder* builder)
 {
     auto gen = as<IRGeneric>(oldInst->getBase());
     if (gen)
     {
         auto genExport = gen->findDecoration<IRExportDecoration>();
-        if(genExport)
+        if (genExport)
         {
             StringBuilder sb;
             sb.append(genExport->getMangledName());
-            for (UInt i = 0; i < oldInst->getArgCount(); ++i)
+            sb.append("G");
+            IRSpecialize * specializationProvider = oldInst;
+            if (auto targetAsSpec = as<IRSpecialize>(target))
             {
-                auto arg = oldInst->getArg(i);
-                // TODO call the mangler (but it works one the AST, not the IR?)
-                // This will do for now
+                specializationProvider = targetAsSpec;
+            }
+            for (UInt i = 0; i < specializationProvider->getArgCount(); ++i)
+            {
+                auto arg = specializationProvider->getArg(i);
                 sb.append(i);
-                auto emit = [&sb](IRInst* inst, const auto & rec_f) -> void
+                if (auto typeExport = arg->findDecoration<IRExportDecoration>())
                 {
-                    if (auto intValue = as<IRIntLit>(inst))
-                    {
-                        sb.append("V");
-                        sb.append(intValue->getValue());
-                    }
-                    else if (auto type = as<IRType>(inst))
-                    {
-                        sb.append("T");
-                        if (auto typeExport = type->findDecoration<IRExportDecoration>())
-                        {
-                            sb.append(typeExport->getMangledName());
-                        }
-                        else if (auto nameHint = type->findDecoration<IRNameHintDecoration>())
-                        {
-                            sb.append(nameHint->getName());
-                        }
-                        else
-                        {
-                            if (auto basicType = as<IRBasicType>(type))
-                            {
-                                sb.append("B");
-                                sb.append(static_cast<int>(basicType->getBaseType()));
-                            }
-                            else if (auto vectorType = as<IRVectorType>(type))
-                            {
-                                sb.append("v");
-                                rec_f(vectorType->getElementCount(), rec_f);
-                                rec_f(vectorType->getElementType(), rec_f);
-                            }
-                            else if (auto matrixType = as<IRMatrixType>(type))
-                            {
-                                sb.append("m");
-                                rec_f(matrixType->getRowCount(), rec_f);
-                                sb.append("x");
-                                rec_f(matrixType->getColumnCount(), rec_f);
-                                rec_f(matrixType->getElementType(), rec_f);
-                            }
-                            else
-                            {
-                                SLANG_E_NOT_IMPLEMENTED;
-                            }
-                        }
-                    }
-                };
-                emit(arg, emit);
+                    sb.append(typeExport->getMangledName());
+                }
+                else if (auto nameHint = arg->findDecoration<IRNameHintDecoration>())
+                {
+                    sb.append(nameHint->getName());
+                }
+                else
+                {
+                    getTypeNameHint(sb, arg);
+                }
             }
             builder->addExportDecoration(target, sb.getUnownedSlice());
         }
@@ -226,11 +196,6 @@ static void _cloneInstDecorationsAndChildren(
     //
     List<IRCloningOldNewPair> pairs;
     ShortList<IRCloningOldNewPair> paramPairs;
-
-    if (auto oldAsSpec = as<IRSpecialize>(oldInst))
-    {
-        specializeExportDecorationIFP(newInst, oldAsSpec, builder);
-    }
 
     for (auto oldChild : oldInst->getDecorationsAndChildren())
     {
@@ -299,6 +264,11 @@ static void _cloneInstDecorationsAndChildren(
         auto newType = (IRType*)findCloneForOperand(env, oldType);
         newParam->setFullType(newType);
         newParam->sourceLoc = oldParam->sourceLoc;
+    }
+
+    if (auto oldAsSpec = as<IRSpecialize>(oldInst))
+    {
+        specializeExportDecorationIFP(newInst, oldAsSpec, builder);
     }
 }
 
