@@ -656,6 +656,11 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(">");
             return;
         }
+    case kIROp_ConstantBufferType:
+        {
+            emitType((IRType*)type->getOperand(0));
+            return;
+        }
     default:
         break;
     }
@@ -770,6 +775,10 @@ void WGSLSourceEmitter::emitVarKeywordImpl(IRType* type, IRInst* varDecl)
     if (as<IRGroupSharedRate>(varDecl->getRate()))
     {
         m_writer->emit("<workgroup>");
+    }
+    else if (type->getOp() == kIROp_ArrayType)
+    {
+        m_writer->emit("<uniform>");
     }
     else if (
         type->getOp() == kIROp_HLSLRWStructuredBufferType ||
