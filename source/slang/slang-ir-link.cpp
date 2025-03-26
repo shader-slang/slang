@@ -1720,7 +1720,7 @@ static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, 
 {
     for (auto globalSym : module->getGlobalInsts())
     {
-        if (globalSym->findDecoration<IRImportDecoration>())
+        if (globalSym->findDecoration<IRImportDecoration>() && !globalSym->findDecoration<IRDownstreamModuleImportDecoration>())
         {
             for (;;)
             {
