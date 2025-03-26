@@ -13635,24 +13635,26 @@ CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt)
 
 void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
-    auto declaredCaps = getDeclaredCapabilitySet(varDecl);
-    auto module = getModule(varDecl);
-    auto linkage = module->getLinkage();
-    for (auto target : linkage->targets)
-    {
-        auto targetCaps = target->getTargetCaps();
-        
-        if (targetCaps.isIncompatibleWith(declaredCaps))
+    if (isGlobalDecl(varDecl)) {
+        auto declaredCaps = getDeclaredCapabilitySet(varDecl);
+        auto module = getModule(varDecl);
+        auto linkage = module->getLinkage();
+        for (auto target : linkage->targets)
         {
-            auto compileTarget = targetCaps.getCompileTarget();
-            maybeDiagnose(
-                getSink(),
-                this->getOptionSet(),
-                DiagnosticCategory::Capability,
-                varDecl->loc,
-                Diagnostics::declHasDependenciesNotCompatibleOnTarget,
-                varDecl,
-                compileTarget);
+            auto targetCaps = target->getTargetCaps();
+
+            if (targetCaps.isIncompatibleWith(declaredCaps))
+            {
+                auto compileTarget = targetCaps.getCompileTarget();
+                maybeDiagnose(
+                    getSink(),
+                    this->getOptionSet(),
+                    DiagnosticCategory::Capability,
+                    varDecl->loc,
+                    Diagnostics::declHasDependenciesNotCompatibleOnTarget,
+                    varDecl,
+                    compileTarget);
+            }
         }
     }
 
