@@ -409,6 +409,9 @@ Extensions
 `SPV_NV_shader_image_footprint`
 > Represents the SPIR-V extension for shader image footprint.
 
+`SPV_KHR_compute_shader_derivatives`
+> Represents the SPIR-V extension for compute shader derivatives.
+
 `SPV_NV_compute_shader_derivatives`
 > Represents the SPIR-V extension for compute shader derivatives.
 
@@ -1075,6 +1078,9 @@ Compound Capabilities
 
 `shader5_sm_5_0`
 > Capabilities required to use sm_5_0 features apart of GL_ARB_gpu_shader5
+
+`pack_vector`
+> Capabilities required to use pack/unpack intrinsics on packed vector data
 
 `subgroup_basic`
 > Capabilities required to use GLSL-style subgroup operations 'subgroup_basic'

@@ -681,6 +681,8 @@ extern "C"
     SLANG_API size_t spReflectionVariableLayout_GetSpace(
         SlangReflectionVariableLayout* var,
         SlangParameterCategory category);
+    SLANG_API SlangImageFormat
+    spReflectionVariableLayout_GetImageFormat(SlangReflectionVariableLayout* var);
 
     SLANG_API char const* spReflectionVariableLayout_GetSemanticName(
         SlangReflectionVariableLayout* var);

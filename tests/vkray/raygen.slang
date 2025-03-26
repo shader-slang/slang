@@ -117,6 +117,10 @@ void main()
     outputImage[int2(gl_LaunchIDNV.xy)] = float4(color, 1.0);
 }
 
+// CHECK_SPV: OpCapability RayTracingKHR
+// CHECK_SPV-NOT: OpCapability RayQueryKHR
+// CHECK_SPV: OpExtension "SPV_KHR_ray_tracing"
+// CHECK_SPV-NOT: OpExtension "SPV_KHR_ray_query"
 // CHECK_SPV: %{{.*}} = OpVariable %_ptr_RayPayload{{NV|KHR}}_ReflectionRay{{.*}} RayPayload
 // CHECK_SPV: OpTraceRayKHR
 // CHECK_SPV: OpTraceRayKHR
