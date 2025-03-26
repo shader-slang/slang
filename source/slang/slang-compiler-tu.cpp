@@ -10,36 +10,51 @@
 
 namespace Slang
 {
-// Only attempt to precompile functions:
+// Only attempt to precompile functions and global variables:
 // 1) With function bodies (not just empty decls)
 // 2) Not marked with unsafeForceInlineDecoration
 // 3) Have a simple HLSL data type as the return or parameter type
 static bool attemptPrecompiledExport(IRInst* inst)
 {
-    if (inst->getOp() != kIROp_Func)
+    if (inst->getOp() != kIROp_Func && inst->getOp() != kIROp_GlobalVar && inst->getOp() != kIROp_GlobalConstant)
     {
         return false;
     }
 
-    // Skip functions with no body
-    bool hasBody = false;
-    for (auto child : inst->getChildren())
+    if (inst->getOp() == kIROp_GlobalVar ||
+        inst->getOp() == kIROp_GlobalConstant)
     {
-        if (child->getOp() == kIROp_Block)
+        printf("GlobalVar or GlobalConstant\n");
+        if (inst->findDecoration<IRExportDecoration>())
         {
-            hasBody = true;
-            break;
+            printf("Exporting global variable\n");
+            return true;
         }
-    }
-    if (!hasBody)
-    {
+        printf("Not exporting global variable\n");
         return false;
     }
+    else if (inst->getOp() == kIROp_Func)
+    {
+        // Skip functions with no body
+        bool hasBody = false;
+        for (auto child : inst->getChildren())
+        {
+            if (child->getOp() == kIROp_Block)
+            {
+                hasBody = true;
+                break;
+            }
+        }
+        if (!hasBody)
+        {
+            return false;
+        }
 
-    // Skip functions marked with unsafeForceInlineDecoration
-    if (inst->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
-    {
-        return false;
+        // Skip functions marked with unsafeForceInlineDecoration
+        if (inst->findDecoration<IRUnsafeForceInlineEarlyDecoration>())
+        {
+            return false;
+        }
     }
 
     // Skip non-simple HLSL data types, filters out generics
@@ -49,6 +64,18 @@ static bool attemptPrecompiledExport(IRInst* inst)
     }
 
     return true;
+}
+
+static bool needsImport(IRInst* inst)
+{
+    if (inst->getOp() == kIROp_GlobalVar || inst->getOp() == kIROp_GlobalConstant)
+    {
+        if (inst->findDecoration<IRUserExternDecoration>())
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 /*
@@ -67,28 +94,28 @@ static bool attemptPrecompiledExport(IRInst* inst)
  * done during target generation in between IR linking+legalization and
  * target source emission.
  *
- * Functions which can be rejected up front:
+ * Language features which can be rejected up front:
  * - Functions with no body
  * - Functions marked with unsafeForceInlineDecoration
  * - Functions that define or use generics
  *
- * The functions not rejected up front are marked with
- * DownstreamModuleExportDecoration which indicates functions we're trying to
- * export for precompilation, and this also helps to identify the functions
+ * The instructions not rejected up front are marked with
+ * DownstreamModuleExportDecoration which indicates what we're trying to
+ * export for precompilation, and this also helps to identify the instructions
  * in the linked IR which survived the additional pruning.
  *
- * Functions that are rejected after linking+legalization (inside
+ * Instructions that are rejected after linking+legalization (inside
  * emitPrecompiledDownstreamIR):
  * - (DXIL) Functions that return or take a HLSLStructuredBufferType
  * - (DXIL) Functions that return or take a Matrix type
  *
  * emitPrecompiled* produces the output artifact containing target language
- * blob, and as metadata, the list of functions which survived the second
+ * blob, and as metadata, the list of instructions which survived the second
  * phase of filtering.
  *
- * The original module IR functions matching those are then marked with
+ * The original module IR instructions matching those are then marked with
  * "AvailableInDownstreamIRDecoration" to indicate to future
- * module users which functions are present in the precompiled blob.
+ * module users which instructions are present in the precompiled blob.
  */
 SLANG_NO_THROW SlangResult SLANG_MCALL
 Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnostics)
@@ -106,6 +133,9 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
             }
         }
     }
+
+    if (getEntryPoints().getCount() != 0)
+        return SLANG_OK;
 
     auto module = getIRModule();
     auto linkage = getLinkage();
@@ -160,20 +190,26 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
     // the linked result to see which functions survived the pruning and are included in the
     // precompiled blob.
     Dictionary<String, IRInst*> nameToFunction;
-    bool hasAtLeastOneFunction = false;
+    bool hasAtLeastOneExport = false;
+    bool hasAtLeastOneImport = false;
     for (auto inst : module->getGlobalInsts())
     {
         if (attemptPrecompiledExport(inst))
         {
-            hasAtLeastOneFunction = true;
+            hasAtLeastOneExport = true;
             builder.addDecoration(inst, kIROp_DownstreamModuleExportDecoration);
             nameToFunction[inst->findDecoration<IRExportDecoration>()->getMangledName()] = inst;
         }
+        if (needsImport(inst))
+        {
+            hasAtLeastOneImport = true;
+            builder.addDecoration(inst, kIROp_DownstreamModuleImportDecoration);
+        }
     }
 
-    // Bail if there are no functions to export. That's not treated as an error
-    // because it's possible that the module just doesn't have any simple HLSL.
-    if (!hasAtLeastOneFunction)
+    // Bail if there is nothing to import/export. That's not treated as an error
+    // because it's possible that the module just doesn't have any simple code.
+    if (!hasAtLeastOneExport && !hasAtLeastOneImport)
     {
         return SLANG_OK;
     }
@@ -201,19 +237,17 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
             kIROp_AvailableInDownstreamIRDecoration,
             builder.getIntValue(builder.getIntType(), (int)targetReq->getTarget()));
         auto moduleDec = moduleInst->findDecoration<IRDownstreamModuleExportDecoration>();
-        moduleDec->removeAndDeallocate();
+        if (moduleDec)
+            moduleDec->removeAndDeallocate();
     }
 
     // Finally, clean up the transient export decorations left over in the module. These are
     // represent functions that were pruned from the IR after linking, before target generation.
     for (auto moduleInst : module->getGlobalInsts())
     {
-        if (moduleInst->getOp() == kIROp_Func)
+        if (auto dec = moduleInst->findDecoration<IRDownstreamModuleExportDecoration>())
         {
-            if (auto dec = moduleInst->findDecoration<IRDownstreamModuleExportDecoration>())
-            {
-                dec->removeAndDeallocate();
-            }
+            dec->removeAndDeallocate();
         }
     }
 
