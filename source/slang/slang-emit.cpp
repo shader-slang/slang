@@ -1032,7 +1032,10 @@ Result linkAndOptimizeIR(
 
     // Report checkpointing information
     if (codeGenContext->shouldReportCheckpointIntermediates())
+    {
+        simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
         reportCheckpointIntermediates(codeGenContext, sink, irModule);
+    }
 
     // Finalization is always run so AD-related instructions can be removed,
     // even if the AD pass itself is not run.

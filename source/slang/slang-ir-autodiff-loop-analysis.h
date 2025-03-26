@@ -21,8 +21,6 @@ struct SimpleRelation
 
     enum Comparator
     {
-        LessThan,
-        GreaterThan,
         LessThanEqual,
         GreaterThanEqual,
         Equal,
@@ -81,14 +79,10 @@ struct SimpleRelation
         case IntegerRelation:
             switch (comparator)
             {
-            case LessThan:
-                return SimpleRelation{IntegerRelation, GreaterThanEqual, integerValue, false};
-            case GreaterThan:
-                return SimpleRelation{IntegerRelation, LessThanEqual, integerValue, false};
             case LessThanEqual:
-                return SimpleRelation{IntegerRelation, GreaterThan, integerValue, false};
+                return SimpleRelation{IntegerRelation, GreaterThanEqual, integerValue + 1, false};
             case GreaterThanEqual:
-                return SimpleRelation{IntegerRelation, LessThan, integerValue, false};
+                return SimpleRelation{IntegerRelation, LessThanEqual, integerValue - 1, false};
             case Equal:
                 return SimpleRelation{IntegerRelation, NotEqual, integerValue, false};
             case NotEqual:
@@ -126,6 +120,11 @@ struct SimpleRelation
 struct StatementSet
 {
     // A conjunction of independent statements (a1 ^ a2 ^ a3 ...)
+    // - One simple relation per inst.
+    // - The absence of an entry implies that the inst is unconstrained.
+    // - The presence of any "Impossible" relation indicates that the entire conjunction is always
+    // false.
+    //
     Dictionary<IRInst*, SimpleRelation> statements;
 
     // Disjunction of a conjunction of statements (a1 ^ a2 ^ a3 ...) with the current conjunction.

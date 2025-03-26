@@ -33,21 +33,11 @@ SimpleRelation mergeEqualityWithIntegerRelation(SimpleRelation equality, SimpleR
     {
     case SimpleRelation::Equal:
         if (relation.integerValue == equality.integerValue)
-            return SimpleRelation::integerRelation(SimpleRelation::Equal, equality.integerValue);
-        else
-            return SimpleRelation::anyRelation(); // Technically this is a "set"
-                                                  // {equality.integerValue, relation.integerValue};
-                                                  // but we don't have a representation for this.
-    case SimpleRelation::LessThan:
-        if (equality.integerValue < relation.integerValue)
             return relation;
-        break;
+        break; // Technically we'd want to return a "set" here, but we don't have a representation
+               // for that.
     case SimpleRelation::LessThanEqual:
         if (equality.integerValue <= relation.integerValue)
-            return relation;
-        break;
-    case SimpleRelation::GreaterThan:
-        if (equality.integerValue > relation.integerValue)
             return relation;
         break;
     case SimpleRelation::GreaterThanEqual:
@@ -79,8 +69,7 @@ SimpleRelation mergeIntervals(SimpleRelation a, SimpleRelation b)
     return SimpleRelation::anyRelation();
 }
 
-// Returns the tighest "simple" relation we can prove to be true given an input that may be
-// "a" OR "b" (disjunction)
+// Returns the tighest "simple" relation such that (a v b -> result)
 //
 // Note: "simple" means that the relation is not a disjunction or conjunction of other relations.
 //
@@ -120,8 +109,72 @@ SimpleRelation relationUnion(SimpleRelation a, SimpleRelation b)
     return SimpleRelation::anyRelation();
 }
 
-// Returns the tighest "simple" relation we can prove to be true given an input that is
-// "a" AND "b" (conjunction)
+SimpleRelation intersectEqualityWithIntegerRelation(
+    SimpleRelation equality,
+    SimpleRelation relation)
+{
+    SLANG_ASSERT(equality.type == SimpleRelation::IntegerRelation);
+    SLANG_ASSERT(relation.type == SimpleRelation::IntegerRelation);
+    SLANG_ASSERT(equality.comparator == SimpleRelation::Equal);
+
+    if (relation.comparator == SimpleRelation::Equal)
+    {
+        if (relation.integerValue == equality.integerValue)
+            return SimpleRelation::integerRelation(SimpleRelation::Equal, equality.integerValue);
+        else
+            return SimpleRelation::impossibleRelation();
+    }
+    else if (relation.comparator == SimpleRelation::LessThanEqual)
+    {
+        if (equality.integerValue <= relation.integerValue)
+            return SimpleRelation::integerRelation(
+                SimpleRelation::LessThanEqual,
+                relation.integerValue);
+        else
+            return SimpleRelation::impossibleRelation();
+    }
+    else if (relation.comparator == SimpleRelation::GreaterThanEqual)
+    {
+        if (equality.integerValue >= relation.integerValue)
+            return SimpleRelation::integerRelation(
+                SimpleRelation::GreaterThanEqual,
+                relation.integerValue);
+        else
+            return SimpleRelation::impossibleRelation();
+    }
+    else if (relation.comparator == SimpleRelation::NotEqual)
+    {
+        if (equality.integerValue != relation.integerValue)
+            return SimpleRelation::integerRelation(SimpleRelation::NotEqual, relation.integerValue);
+        else
+            return SimpleRelation::impossibleRelation();
+    }
+
+    return SimpleRelation::anyRelation();
+}
+
+// Intersect intervals.
+SimpleRelation intersectIntervals(SimpleRelation a, SimpleRelation b)
+{
+    SLANG_ASSERT(
+        a.type == SimpleRelation::IntegerRelation && b.type == SimpleRelation::IntegerRelation);
+
+    if (a.comparator == SimpleRelation::Equal)
+    {
+        return intersectEqualityWithIntegerRelation(a, b);
+    }
+    else if (b.comparator == SimpleRelation::Equal)
+    {
+        return intersectEqualityWithIntegerRelation(b, a);
+    }
+
+    // TODO: Handle other cases...
+
+    // We'll just default to picking the first one, since (a ^ b) -> a is always true.
+    return a;
+}
+
+// Returns the best "simple" relation such that (a ^ b -> result)
 //
 SimpleRelation relationIntersection(SimpleRelation a, SimpleRelation b)
 {
@@ -148,106 +201,38 @@ SimpleRelation relationIntersection(SimpleRelation a, SimpleRelation b)
         return a;
 
     //
-    // We'll handle the case where one is an equality and the other is an inequality.
+    // We'll handle the cases where one is an equality and the other is an inequality or equality.
     //
-    // i.e. if we have (a == 10) and (a < 20), then (a < 20) is still the tighest relation we can
-    // prove.
+    // i.e. For a conjunction (a == 10) ^ (a < 20), we can use the narrower relation (a == 10).
     //
     if (a.type == SimpleRelation::IntegerRelation && b.type == SimpleRelation::IntegerRelation)
-    {
-        if (a.comparator == SimpleRelation::Equal)
-        {
-            if (b.comparator == SimpleRelation::LessThan && a.integerValue < b.integerValue)
-            {
-                return a;
-            }
-            else if (b.comparator == SimpleRelation::GreaterThan && a.integerValue > b.integerValue)
-            {
-                return a;
-            }
-            else if (
-                b.comparator == SimpleRelation::LessThanEqual && a.integerValue <= b.integerValue)
-            {
-                return a;
-            }
-            else if (
-                b.comparator == SimpleRelation::GreaterThanEqual &&
-                a.integerValue >= b.integerValue)
-            {
-                return a;
-            }
-            else if (b.comparator == SimpleRelation::NotEqual && a.integerValue != b.integerValue)
-            {
-                return a;
-            }
-            else if (b.comparator == SimpleRelation::Equal)
-            {
-                if (b.integerValue == a.integerValue)
-                    return b;
-                else
-                    return SimpleRelation::impossibleRelation();
-            }
-        }
-        else if (b.comparator == SimpleRelation::Equal)
-        {
-            if (a.comparator == SimpleRelation::LessThan && b.integerValue < a.integerValue)
-            {
-                return b;
-            }
-            else if (a.comparator == SimpleRelation::GreaterThan && b.integerValue > a.integerValue)
-            {
-                return b;
-            }
-            else if (
-                a.comparator == SimpleRelation::LessThanEqual && b.integerValue <= a.integerValue)
-            {
-                return b;
-            }
-            else if (
-                a.comparator == SimpleRelation::GreaterThanEqual &&
-                b.integerValue >= a.integerValue)
-            {
-                return b;
-            }
-            else if (a.comparator == SimpleRelation::NotEqual && b.integerValue != a.integerValue)
-            {
-                return b;
-            }
-            else if (b.comparator == SimpleRelation::Equal)
-            {
-                if (b.integerValue == a.integerValue)
-                    return b;
-                else
-                    return SimpleRelation::impossibleRelation();
-            }
-        }
-    }
+        return intersectIntervals(a, b);
 
-    // TODO: Here's where we can handle more subset cases like (a < 10) and (a < 20) => (a < 10),
-    // etc.. But we don't _have_ to. The more we can prove, the more cases we can handle, but the
-    // result is still correct without it.
-    //
-
+    // TODO: Handle other cases...
     return SimpleRelation::anyRelation();
 }
 
 void StatementSet::disjunct(StatementSet other)
 {
+    // false v (a1 v a2 v a3 ...) = (a1 v a2 v a3 ...)
     if (isTriviallyFalse())
     {
         statements = other.statements;
         return;
     }
 
+    // (a1 v a2 v a3 ...) v false = (a1 v a2 v a3 ...)
     if (other.isTriviallyFalse())
         return;
 
+    // true v (a1 v a2 v a3 ...) = true
     if (other.isTriviallyTrue())
     {
         statements.clear();
         return;
     }
 
+    // (a1 v a2 v a3 ...) v true = true
     if (isTriviallyTrue())
         return;
 
@@ -370,11 +355,7 @@ bool doesRelationImply(SimpleRelation relationA, SimpleRelation relationB)
         // If A is an equality, and B is an inequality, we can test
         if (relationA.comparator == SimpleRelation::Equal)
         {
-            if (relationB.comparator == SimpleRelation::LessThan)
-                return relationA.integerValue <= relationB.integerValue;
-            else if (relationB.comparator == SimpleRelation::GreaterThan)
-                return relationA.integerValue >= relationB.integerValue;
-            else if (relationB.comparator == SimpleRelation::LessThanEqual)
+            if (relationB.comparator == SimpleRelation::LessThanEqual)
                 return relationA.integerValue <= relationB.integerValue;
             else if (relationB.comparator == SimpleRelation::GreaterThanEqual)
                 return relationA.integerValue >= relationB.integerValue;
@@ -493,10 +474,12 @@ StatementSet tryExtractStatements(IRTerminatorInst* inst, IRBlock* block)
             switch (condInst->getOp())
             {
             case kIROp_Less:
-                comparator = SimpleRelation::LessThan;
+                comparator = SimpleRelation::LessThanEqual;
+                constantVal = constantVal - 1;
                 break;
             case kIROp_Greater:
-                comparator = SimpleRelation::GreaterThan;
+                comparator = SimpleRelation::GreaterThanEqual;
+                constantVal = constantVal + 1;
                 break;
             case kIROp_Leq:
                 comparator = SimpleRelation::LessThanEqual;
@@ -820,9 +803,7 @@ StatementSet propagateStatementDownwards(
                 {
                 case SimpleRelation::Equal:
                 case SimpleRelation::NotEqual:
-                case SimpleRelation::LessThan:
                 case SimpleRelation::LessThanEqual:
-                case SimpleRelation::GreaterThan:
                 case SimpleRelation::GreaterThanEqual:
                     return singleStatement(
                         dstInst,
@@ -929,7 +910,7 @@ StatementSet collectImplications(
     }
 
     //
-    // Upward pass, propagate predicates through predecessors, until
+    // Upward pass: Propagate predicates through predecessors until
     // there're no more blocks left to process.
     //
 
@@ -975,18 +956,20 @@ StatementSet collectImplications(
             //
             if (isUpwardPropCompleted(predecessor))
             {
-                // Verify that current predicate => predecessor predicate.
-
-                // TODO: Implement.
-                /*auto translatedCurrentPredicate = translateToPredecessor(predecessor, current,
-                predicates); auto predecessorPredicate = blockPredicates[predecessor]; if
-                (doesRelationImply(translatedCurrentPredicate.relation,
-                predecessorPredicate.relation))*/
-
-                // We won't add this edge to the set, because we can't be sure that
-                // the current predicate implies the predecessor predicate.
-                //
                 orderedEdgeList.add({predecessor, current});
+
+                // Verify that "current predicate" => "predecessor predicate".
+
+                // TODO: Implement later.
+                // For now, we can default to assuming that this edge is not
+                // valid. This works fine since we're not trying to prove anything recursive (like
+                // inductivity), but we should revisit this if we do want to unify the induction
+                // value inference pass with this loop analysis system.
+                //
+
+                // We'll add this to the set of false edges so that the downward prop pass
+                // doesn't propagate any implications through this edge.
+                //
                 falseEdges.add({predecessor, current});
                 continue;
             }
@@ -1008,7 +991,7 @@ StatementSet collectImplications(
     }
 
     //
-    // Downward pass, propagate implications through successors, until
+    // Downward pass: Propagate implications through successors until
     // there're no more blocks left to process.
     //
 

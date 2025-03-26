@@ -296,9 +296,10 @@ bool areIndicesSubsetOf(List<IndexTrackingInfo>& indicesA, List<IndexTrackingInf
     if (indicesA.getCount() > indicesB.getCount())
         return false;
 
+    auto offset = (indicesB.getCount() - indicesA.getCount());
     for (Index ii = 0; ii < indicesA.getCount(); ii++)
     {
-        if (indicesA[ii].primalCountParam != indicesB[ii].primalCountParam)
+        if (indicesA[ii].primalCountParam != indicesB[ii + offset].primalCountParam)
             return false;
     }
 
@@ -1212,6 +1213,16 @@ void AutodiffCheckpointPolicyBase::collectLoopExitConditions(IRGlobalValueWithCo
                         (((relationValue - counterOffset) + counterFactor - 1) / counterFactor);
                     IRIntegerValue exitParamValue =
                         counterOffset + counterFactor * (exitIValue - 1);
+                    recordExitValue(exitIValue, exitParamValue);
+                }
+                else if (counterFactor < 0 && statement.comparator == SimpleRelation::LessThanEqual)
+                {
+                    // Find the largest value that satisfies counterFactor * i + counterOffset <=
+                    // relationValue
+                    //
+                    IRIntegerValue exitIValue =
+                        ((relationValue - counterOffset) + (counterFactor + 1)) / counterFactor;
+                    IRIntegerValue exitParamValue = counterOffset + counterFactor * exitIValue;
                     recordExitValue(exitIValue, exitParamValue);
                 }
                 // TODO: handle other cases
