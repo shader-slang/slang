@@ -4059,6 +4059,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     operands.getArrayView());
             }
             break;
+        case kIROp_DebugInlinedAt:
+            return emitDebugInlinedAt(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                as<IRDebugInlinedAt>(inst));
+        case kIROp_DebugScope:
+            return emitDebugScope(parent, as<IRDebugScope>(inst));
+        case kIROp_DebugNoScope:
+            return emitDebugNoScope(parent);
+        case kIROp_DebugInlinedVariable:
+            return emitDebugInlinedVariable(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                as<IRDebugInlinedVariable>(inst));
         }
         if (result)
             emitDecorations(inst, getID(result));
@@ -7303,6 +7315,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto scope = findDebugScope(debugLine);
         if (!scope)
             return nullptr;
+
         return emitOpDebugLine(
             parent,
             debugLine,
@@ -7326,6 +7339,81 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             getNonSemanticDebugInfoExtInst(),
             List<SpvInst*>());
         return m_nullDwarfExpr;
+    }
+
+    SpvInst* emitDebugScope(SpvInstParent* parent, IRDebugScope* scope)
+    {
+        if (!scope)
+            return nullptr;
+
+        auto scopeNeeded = ensureInst(scope->getScope());
+        if (!scopeNeeded)
+            return nullptr;
+
+        auto scope1 = findDebugScope(scope->getScope());
+        if (!scope1)
+            return nullptr;
+
+        return emitOpDebugScope(
+            parent,
+            nullptr,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            scope1,
+            scopeNeeded);
+    }
+
+    SpvInst* emitDebugNoScope(SpvInstParent* parent)
+    {
+        return emitOpDebugNoScope(parent, nullptr, m_voidType, getNonSemanticDebugInfoExtInst());
+    }
+
+    SpvInst* emitDebugInlinedAt(SpvInstParent* parent, IRDebugInlinedAt* debugInlinedAt)
+    {
+        // Get the operands from the IRDebugInlinedAt instruction
+        IRInst* lineInst = debugInlinedAt->getLine();
+
+        // Find the debug scope for this instruction
+        auto scope = findDebugScope(debugInlinedAt);
+        if (!scope)
+            return nullptr;
+
+        // If it's not chained to another IRDebugInlinedAt, we don't use this.
+        SpvInst* inlined = nullptr;
+        if (as<IRDebugInlinedAt>(debugInlinedAt->getOuterInlinedAt()))
+        {
+            inlined = ensureInst(debugInlinedAt->getOuterInlinedAt());
+        }
+
+        return emitOpDebugInlinedAt(
+            parent,
+            debugInlinedAt,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            lineInst,
+            scope,
+            inlined);
+    }
+
+    SpvInst* emitDebugInlinedVariable(
+        SpvInstParent* parent,
+        IRDebugInlinedVariable* debugInlinedVar)
+    {
+        if (!debugInlinedVar)
+            return nullptr;
+
+        // Get the operands from the IRDebugInlinedVariable instruction
+        IRInst* variable = debugInlinedVar->getVariable();
+        IRInst* inlinedAt = debugInlinedVar->getInlinedAt();
+
+        // Emit the OpDebugInlinedVariable instruction
+        return emitOpDebugInlinedVariable(
+            parent,
+            debugInlinedVar,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            variable,
+            inlinedAt);
     }
 
     bool translateIRAccessChain(
