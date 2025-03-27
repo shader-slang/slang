@@ -19,6 +19,7 @@
 #include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-loop-inversion.h"
+#include "slang-ir-lower-defer.h"
 #include "slang-ir-lower-error-handling.h"
 #include "slang-ir-lower-expand-type.h"
 #include "slang-ir-missing-return.h"
@@ -592,6 +593,11 @@ struct IRGenContext
 
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
+
+    // The current scope index for `defer`.
+    UInt64 deferScopeCounter = 0;
+    bool deferScopeActive = false;
+    UInt64 currentDeferScope = 0;
 
     // Callback function to call when after lowering a type.
     std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> lowerTypeCallback =
@@ -6429,10 +6435,45 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     void visitBlockStmt(BlockStmt* stmt)
     {
-        // To lower a block (scope) statement,
-        // just lower its body. The IR doesn't
-        // need to reflect the scoping of the AST.
+        // Blocks affect the `defer` statement, so we need to track their scopes
+        // with a decorator in the IR.
+        bool prevDeferScopeActive = context->deferScopeActive;
+        UInt64 prevDeferScope = context->currentDeferScope;
+
+        context->deferScopeActive = false;
+        context->deferScopeCounter++;
+        context->currentDeferScope = context->deferScopeCounter;
+
+        // To lower a block (scope) statement, just lower its body.
         lowerStmt(context, stmt->body);
+
+        if (context->deferScopeActive)
+        {
+            // Defer was used in this scope. So, we'll need to add a decorator
+            // to the current block to mark the end of the scope.
+            auto builder = getBuilder();
+            auto curBlock = builder->getBlock();
+            builder->addDeferHookDecoration(curBlock, context->currentDeferScope);
+
+            // We also need to terminate the block here; the hook relates to
+            // the end of the block, and if more instructions were added, they
+            // would make it much harder to interpret where the hook is.
+            auto nextBlock = builder->emitBlock();
+
+            // Move the terminator to the next block if present.
+            auto terminator = curBlock->getTerminator();
+            if (terminator)
+            {
+                terminator->removeFromParent();
+                terminator->insertAtEnd(nextBlock);
+            }
+
+            builder->setInsertInto(curBlock);
+            builder->emitBranch(nextBlock);
+            builder->setInsertInto(nextBlock);
+        }
+        context->deferScopeActive = prevDeferScopeActive;
+        context->currentDeferScope = prevDeferScope;
     }
 
     void visitReturnStmt(ReturnStmt* stmt)
@@ -6521,6 +6562,24 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             }
             getBuilder()->emitReturn();
         }
+    }
+
+    void visitDeferStmt(DeferStmt* stmt)
+    {
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+
+        // Start a new defer scope.
+        context->deferScopeActive = true;
+
+        IRInst* deferInst = builder->emitDefer(context->currentDeferScope);
+        builder->setInsertInto(deferInst);
+        IRBlock* deferBlock = builder->emitBlock();
+        deferInst->addBlock(deferBlock);
+
+        builder->setInsertInto(deferBlock);
+        lowerStmt(context, stmt->statement);
+        builder->setInsertAfter(deferInst);
     }
 
     void visitDiscardStmt(DiscardStmt* stmt)
@@ -11689,6 +11748,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // returns a `Result<T,E>` value, translating `tryCall` into
     // normal `call` + `ifElse`, etc.
     lowerErrorHandling(module, compileRequest->getSink());
+
+    // Lower `defer` so that later passes need not be aware of it.
+    lowerDefer(module, compileRequest->getSink());
 
     // Synthesize some code we want to make sure is inlined and simplified
     synthesizeBitFieldAccessors(module);

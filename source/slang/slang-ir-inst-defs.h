@@ -663,6 +663,8 @@ INST_RANGE(Unreachable, MissingReturn, Unreachable)
 
 INST_RANGE(TerminatorInst, Return, Unreachable)
 
+INST(Defer, defer, 1, 0)
+
 INST(discard, discard, 0, 0)
 
 INST(RequirePrelude, RequirePrelude, 1, 0)
@@ -1176,7 +1178,11 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         /// backing value key, width and offset
     INST(BitFieldAccessorDecoration, BitFieldAccessorDecoration, 3, 0)
 
- INST_RANGE(Decoration, HighLevelDeclDecoration, BitFieldAccessorDecoration)
+        /// Marks a block as ending the scope of some `defer` statements. The
+        /// operand is a scope identifier.
+    INST(DeferHookDecoration, DeferHookDecoration, 1, 0)
+
+ INST_RANGE(Decoration, HighLevelDeclDecoration, DeferHookDecoration)
 
     //
 
