@@ -1,5 +1,4 @@
-//enable when https://github.com/shader-slang/slang/issues/3448 is implemented
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage raygeneration -entry rayGenShaderA
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile lib_6_7 -stage raygeneration -entry rayGenShaderA
 
 // CHECK: struct [raypayload]
 
