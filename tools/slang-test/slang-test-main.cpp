@@ -3746,8 +3746,9 @@ TestResult doImageComparison(TestContext* context, String const& filePath)
     if (SLANG_FAILED(expectedImage.read(expectedPath.getBuffer())))
     {
         reporter->messageFormat(
-            TestMessageType::RunError,
-            "Unable to load image ;%s'",
+            TestMessageType::TestFailure,
+            "Missing or invalid reference image '%s'. Reference images should exist and be "
+            "read-only.",
             expectedPath.getBuffer());
         return TestResult::Fail;
     }
@@ -3757,7 +3758,7 @@ TestResult doImageComparison(TestContext* context, String const& filePath)
     {
         reporter->messageFormat(
             TestMessageType::RunError,
-            "Unable to load image ;%s'",
+            "Unable to load image '%s'",
             actualPath.getBuffer());
         return TestResult::Fail;
     }
@@ -3860,15 +3861,9 @@ TestResult runHLSLRenderComparisonTestImpl(
     auto filePath = input.filePath;
     auto outputStem = input.outputStem;
 
-    String expectedOutput;
     String actualOutput;
 
-    TestResult hlslResult =
-        doRenderComparisonTestRun(context, input, expectedArg, ".expected", &expectedOutput);
-    if (hlslResult != TestResult::Pass)
-    {
-        return hlslResult;
-    }
+    // Only run the actual test case - don't generate .expected.png
     TestResult slangResult =
         doRenderComparisonTestRun(context, input, actualArg, ".actual", &actualOutput);
     if (slangResult != TestResult::Pass)
@@ -3881,25 +3876,12 @@ TestResult runHLSLRenderComparisonTestImpl(
         return TestResult::Pass;
     }
 
-    Slang::File::writeAllText(outputStem + ".expected", expectedOutput);
     Slang::File::writeAllText(outputStem + ".actual", actualOutput);
 
-    if (hlslResult == TestResult::Fail)
-        return TestResult::Fail;
     if (slangResult == TestResult::Fail)
         return TestResult::Fail;
 
-    if (!StringUtil::areLinesEqual(
-            actualOutput.getUnownedSlice(),
-            expectedOutput.getUnownedSlice()))
-    {
-        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
-
-        return TestResult::Fail;
-    }
-
     // Next do an image comparison on the expected output images!
-
     TestResult imageCompareResult = doImageComparison(context, outputStem);
     if (imageCompareResult != TestResult::Pass)
         return imageCompareResult;
