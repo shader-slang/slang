@@ -84,6 +84,7 @@ RWStructuredBuffer<int> gOutputBuffer;
 // Now we'll define a global shader parameter for the
 // random number generation strategy.
 //
+//TEST_INPUT: globalSpecializationArg MyStrategy
 //TEST_INPUT:set gStrategy = new MyStrategy{}
 uniform IRandomNumberGenerationStrategy gStrategy;
 
@@ -93,6 +94,7 @@ uniform IRandomNumberGenerationStrategy gStrategy;
 //
 [numthreads(4, 1, 1)]
 void computeMain(
+//TEST_INPUT: entryPointSpecializationArg MyModifier
 //TEST_INPUT:set modifier = new MyModifier{}
     uniform IModifier   modifier,
             int3       dispatchThreadID : SV_DispatchThreadID)

@@ -861,6 +861,29 @@ Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSe
             Math::Max(linkageDebugInfoLevel, target->getOptionSet().getDebugInfoLevel());
     linkage->m_optionSet.set(CompilerOptionName::DebugInformation, linkageDebugInfoLevel);
 
+    // Add any referenced modules to the linkage
+    for (auto& option : linkage->m_optionSet.options)
+    {
+        if (option.key != CompilerOptionName::ReferenceModule)
+            continue;
+        for (auto& path : option.value)
+        {
+            DiagnosticSink sink;
+            ComPtr<IArtifact> artifact;
+            SlangResult result = createArtifactFromReferencedModule(
+                path.stringValue,
+                SourceLoc{},
+                &sink,
+                artifact.writeRef());
+            if (SLANG_FAILED(result))
+            {
+                sink.diagnose(SourceLoc{}, Diagnostics::unableToReadFile, path.stringValue);
+                return result;
+            }
+            linkage->m_libModules.add(artifact);
+        }
+    }
+
     *outSession = asExternal(linkage.detach());
     return SLANG_OK;
 }
@@ -2365,7 +2388,7 @@ Dictionary<String, String> TranslationUnitRequest::getCombinedPreprocessorDefini
     // variables.
     {
         // Used to identify level of HLSL language compatibility
-        combinedPreprocessorDefinitions.addIfNotExists("__HLSL_VERSION", "2020");
+        combinedPreprocessorDefinitions.addIfNotExists("__HLSL_VERSION", "2018");
 
         // Indicates this is being compiled by the slang *compiler*
         combinedPreprocessorDefinitions.addIfNotExists("__SLANG_COMPILER__", "1");
@@ -2856,7 +2879,7 @@ static void collectExportedConstantInContainer(
         if (!varMember->val)
             continue;
         bool isExported = false;
-        bool isConst = true;
+        bool isConst = false;
         bool isExtern = false;
         for (auto modifier : m->modifiers)
         {
@@ -2869,8 +2892,6 @@ static void collectExportedConstantInContainer(
             }
             if (as<ConstModifier>(modifier))
                 isConst = true;
-            if (isExported && isConst)
-                break;
         }
         if (isExported && isConst)
         {
@@ -3747,6 +3768,24 @@ SlangResult EndToEndCompileRequest::executeActionsInner()
             {
                 SLANG_RETURN_ON_FAIL(
                     translationUnit->getModule()->precompileForTarget(targetEnum, nullptr));
+
+                if (frontEndReq->optionSet.shouldDumpIR())
+                {
+                    DiagnosticSinkWriter writer(frontEndReq->getSink());
+
+                    dumpIR(
+                        translationUnit->getModule()->getIRModule(),
+                        frontEndReq->m_irDumpOptions,
+                        "PRECOMPILE_FOR_TARGET_COMPLETE_ALL",
+                        frontEndReq->getSourceManager(),
+                        &writer);
+
+                    dumpIR(
+                        translationUnit->getModule()->getIRModule()->getModuleInst(),
+                        frontEndReq->m_irDumpOptions,
+                        frontEndReq->getSourceManager(),
+                        &writer);
+                }
             }
         }
     }

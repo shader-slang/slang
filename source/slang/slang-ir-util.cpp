@@ -2164,7 +2164,9 @@ void legalizeDefUse(IRGlobalValueWithCode* func)
             {
                 // If inst is an var, this is easy, we just move it to the
                 // common dominator.
-                var->insertBefore(commonDominator->getTerminator());
+                if (var->getParent() != commonDominator)
+                    var->insertBefore(commonDominator->getTerminator());
+
                 if (shouldInitializeVar)
                 {
                     IRBuilder builder(func);

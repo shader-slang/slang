@@ -1,6 +1,10 @@
 #ifndef SLANG_H
 #define SLANG_H
 
+#ifdef SLANG_USER_CONFIG
+    #include SLANG_USER_CONFIG
+#endif
+
 /** \file slang.h
 
 The Slang API provides services to compile, reflect, and specialize code
@@ -1011,6 +1015,7 @@ typedef uint32_t SlangSizeT;
         SaveGLSLModuleBinSource,
 
         SkipDownstreamLinking, // bool, experimental
+        DumpModule,
         CountOf,
     };
 
@@ -2917,6 +2922,11 @@ struct VariableLayoutReflection
             (SlangParameterCategory)category);
     }
 
+    SlangImageFormat getImageFormat()
+    {
+        return spReflectionVariableLayout_GetImageFormat((SlangReflectionVariableLayout*)this);
+    }
+
     char const* getSemanticName()
     {
         return spReflectionVariableLayout_GetSemanticName((SlangReflectionVariableLayout*)this);
@@ -4413,6 +4423,11 @@ struct IModule : public IComponentType
     virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(SlangInt32 index) = 0;
 
     virtual SLANG_NO_THROW DeclReflection* SLANG_MCALL getModuleReflection() = 0;
+
+    /** Disassemble a module.
+     */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    disassemble(slang::IBlob** outDisassembledBlob) = 0;
 };
 
     #define SLANG_UUID_IModule IModule::getTypeGuid()

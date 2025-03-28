@@ -4,6 +4,7 @@
 #include "slang-compiler.h"
 #include "slang-emit-base.h"
 #include "slang-ir-call-graph.h"
+#include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-redundancy-removal.h"
@@ -1381,6 +1382,36 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
+    List<List<UnownedStringSlice>> m_anyExtension;
+    void ensureAnyExtensionDeclaration(List<UnownedStringSlice> extensions)
+    {
+        if (!m_anyExtension.contains(extensions))
+        {
+            m_anyExtension.add(extensions);
+        }
+    }
+
+    void emitSPIRVAnyExtension()
+    {
+        for (const auto& options : m_anyExtension)
+        {
+            bool found = false;
+            for (UnownedStringSlice option : options)
+            {
+                if (m_extensionInsts.tryGetValue(option))
+                {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                ensureExtensionDeclaration(options[0]);
+            }
+        }
+    }
+
     SpvInst* ensureExtensionDeclarationBeforeSpv14(UnownedStringSlice name)
     {
         if (isSpirv14OrLater())
@@ -1732,8 +1763,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitOpTypeSampler(inst);
 
         case kIROp_RaytracingAccelerationStructureType:
-            requireSPIRVCapability(SpvCapabilityRayTracingKHR);
-            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_ray_tracing"));
+            requireSPIRVAnyCapability({SpvCapabilityRayTracingKHR, SpvCapabilityRayQueryKHR});
+            ensureAnyExtensionDeclaration(
+                {UnownedStringSlice("SPV_KHR_ray_tracing"),
+                 UnownedStringSlice("SPV_KHR_ray_query")});
             return emitOpTypeAccelerationStructure(inst);
 
         case kIROp_RayQueryType:
@@ -3626,7 +3659,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         continue;
 
                     ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_NV_compute_shader_derivatives"));
+                        UnownedStringSlice("SPV_KHR_compute_shader_derivatives"));
                     auto numThreadsDecor =
                         entryPointDecor->findDecoration<IRNumThreadsDecoration>();
                     if (isQuad)
@@ -3640,8 +3673,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         requireSPIRVExecutionMode(
                             nullptr,
                             getIRInstSpvID(entryPoint),
-                            SpvExecutionModeDerivativeGroupQuadsNV);
-                        requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupQuadsNV);
+                            SpvExecutionModeDerivativeGroupQuadsKHR);
+                        requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupQuadsKHR);
                     }
                     else
                     {
@@ -3654,8 +3687,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         requireSPIRVExecutionMode(
                             nullptr,
                             getIRInstSpvID(entryPoint),
-                            SpvExecutionModeDerivativeGroupLinearNV);
-                        requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupLinearNV);
+                            SpvExecutionModeDerivativeGroupLinearKHR);
+                        requireSPIRVCapability(SpvCapabilityComputeDerivativeGroupLinearKHR);
                     }
                 }
 
@@ -3663,35 +3696,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
 
         case kIROp_RequireMaximallyReconverges:
-            if (auto entryPointsUsingInst =
-                    getReferencingEntryPoints(m_referencingEntryPoints, getParentFunc(inst)))
-            {
-                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_maximal_reconvergence"));
-                for (IRFunc* entryPoint : *entryPointsUsingInst)
-                {
-                    requireSPIRVExecutionMode(
-                        nullptr,
-                        getIRInstSpvID(entryPoint),
-                        SpvExecutionModeMaximallyReconvergesKHR);
-                }
-            }
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_maximal_reconvergence"));
+            requireSPIRVExecutionModeOnReferencingEntryPoints(
+                nullptr,
+                getParentFunc(inst),
+                SpvExecutionModeMaximallyReconvergesKHR);
             break;
         case kIROp_RequireQuadDerivatives:
-            if (auto entryPointsUsingInst =
-                    getReferencingEntryPoints(m_referencingEntryPoints, getParentFunc(inst)))
-            {
-                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_quad_control"));
-                requireSPIRVCapability(SpvCapabilityQuadControlKHR);
-                for (IRFunc* entryPoint : *entryPointsUsingInst)
-                {
-                    requireSPIRVExecutionMode(
-                        nullptr,
-                        getIRInstSpvID(entryPoint),
-                        SpvExecutionModeQuadDerivativesKHR);
-                }
-            }
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_quad_control"));
+            requireSPIRVCapability(SpvCapabilityQuadControlKHR);
+            requireSPIRVExecutionModeOnReferencingEntryPoints(
+                nullptr,
+                getParentFunc(inst),
+                SpvExecutionModeQuadDerivativesKHR);
             break;
-
         case kIROp_Return:
             if (as<IRReturn>(inst)->getVal()->getOp() == kIROp_VoidLit)
                 result = emitOpReturn(parent, inst);
@@ -3714,9 +3732,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_BeginFragmentShaderInterlock:
             ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_fragment_shader_interlock"));
             requireSPIRVCapability(SpvCapabilityFragmentShaderPixelInterlockEXT);
-            requireSPIRVExecutionMode(
+            requireSPIRVExecutionModeOnReferencingEntryPoints(
                 nullptr,
-                getIRInstSpvID(getParentFunc(inst)),
+                getParentFunc(inst),
                 SpvExecutionModePixelInterlockOrderedEXT);
             result = emitOpBeginInvocationInterlockEXT(parent, inst);
             break;
@@ -4656,7 +4674,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             break;
         case kIROp_MaximallyReconvergesDecoration:
-            ensureExtensionDeclaration(UnownedStringSlice("SPV_khr_maximal_reconvergence"));
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_maximal_reconvergence"));
             requireSPIRVExecutionMode(nullptr, dstID, SpvExecutionModeMaximallyReconvergesKHR);
             break;
         case kIROp_QuadDerivativesDecoration:
@@ -4708,7 +4726,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     entryPoint ? entryPoint->findDecoration<IREntryPointDecoration>() : nullptr;
 
                 const auto o = cast<IROutputTopologyDecoration>(decoration);
-                const auto t = o->getTopology()->getStringSlice();
+                const auto topologyType = OutputTopologyType(o->getTopologyType());
 
                 SpvExecutionMode m = SpvExecutionModeMax;
                 if (entryPointDecor)
@@ -4717,20 +4735,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     {
                     case Stage::Domain:
                     case Stage::Hull:
-                        if (t == "triangle_cw")
+                        if (topologyType == OutputTopologyType::TriangleCW)
                             m = SpvExecutionModeVertexOrderCw;
-                        else if (t == "triangle_ccw")
+                        else if (topologyType == OutputTopologyType::TriangleCCW)
                             m = SpvExecutionModeVertexOrderCcw;
                         break;
                     }
                 }
                 if (m == SpvExecutionModeMax)
                 {
-                    if (t == "triangle")
+                    if (topologyType == OutputTopologyType::Triangle)
                         m = SpvExecutionModeOutputTrianglesEXT;
-                    else if (t == "line")
+                    else if (topologyType == OutputTopologyType::Line)
                         m = SpvExecutionModeOutputLinesEXT;
-                    else if (t == "point")
+                    else if (topologyType == OutputTopologyType::Point)
                         m = SpvExecutionModeOutputPoints;
                 }
 
@@ -7464,6 +7482,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     HashSet<IRType*> m_emittingTypes; // Types that are being emitted.
     Dictionary<IRType*, SpvInst*> m_mapForwardRefsToDebugType;
     static constexpr const int kUnknownPhysicalLayout = 1 << 17;
+    static constexpr const int kDebugTypeAtomicQualifier = 3;
 
     SpvInst* emitDebugTypeImpl(IRType* type)
     {
@@ -7715,6 +7734,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 debugBaseType,
                 builder.getIntValue(builder.getUIntType(), storageClass),
                 builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
+        }
+        else if (auto atomicType = as<IRAtomicType>(type))
+        {
+            auto baseType = atomicType->getElementType();
+            auto debugBaseType = emitDebugType(baseType);
+
+            return emitOpDebugTypeQualifier(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                nullptr,
+                m_voidType,
+                getNonSemanticDebugInfoExtInst(),
+                debugBaseType,
+                builder.getIntValue(builder.getUIntType(), kDebugTypeAtomicQualifier));
         }
         return ensureInst(m_voidType);
     }
@@ -8249,6 +8281,36 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
+    List<List<SpvCapability>> m_anyCapability;
+    void requireSPIRVAnyCapability(List<SpvCapability> capabilities)
+    {
+        if (!m_anyCapability.contains(capabilities))
+        {
+            m_anyCapability.add(capabilities);
+        }
+    }
+
+    void emitSPIRVAnyCapabilities()
+    {
+        for (const auto& options : m_anyCapability)
+        {
+            bool found = false;
+            for (SpvCapability option : options)
+            {
+                if (m_capabilities.contains(option))
+                {
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                requireSPIRVCapability(options[0]);
+            }
+        }
+    }
+
     void requireVariableBufferCapabilityIfNeeded(IRInst* type)
     {
         if (auto ptrType = as<IRPtrTypeBase>(type))
@@ -8287,6 +8349,29 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 entryPoint,
                 executionMode,
                 ops...);
+        }
+    }
+
+    // Applies execution mode to entry points that reference `childFunc`.
+    template<typename... Operands>
+    void requireSPIRVExecutionModeOnReferencingEntryPoints(
+        IRInst* parentInst,
+        IRFunc* childFunc,
+        SpvExecutionMode executionMode,
+        const Operands&... ops)
+    {
+
+        if (auto entryPointsUsingInst =
+                getReferencingEntryPoints(m_referencingEntryPoints, childFunc))
+        {
+            for (IRFunc* entryPoint : *entryPointsUsingInst)
+            {
+                requireSPIRVExecutionMode(
+                    parentInst,
+                    getIRInstSpvID(entryPoint),
+                    executionMode,
+                    ops...);
+            }
         }
     }
 
@@ -8417,6 +8502,12 @@ SlangResult emitSPIRVFromIR(
             parent->addInst(spvPtrType);
         }
     } while (context.m_forwardDeclaredPointers.getCount() != 0);
+
+    // Emit extensions and capabilities for which there are multiple options available.
+    // This is delayed to avoid emitting unnecessary extensions and capabilities if
+    // one of the options is already required by some other op.
+    context.emitSPIRVAnyExtension();
+    context.emitSPIRVAnyCapabilities();
 
     context.emitFrontMatter();
 

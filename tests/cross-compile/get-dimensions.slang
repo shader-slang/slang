@@ -3,6 +3,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-d3d12 -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-d3d11 -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
 
 struct Thing
 {

@@ -561,6 +561,8 @@ struct IROutputTopologyDecoration : IRDecoration
     IR_LEAF_ISA(OutputTopologyDecoration)
 
     IRStringLit* getTopology() { return cast<IRStringLit>(getOperand(0)); }
+
+    IRIntegerValue getTopologyType() { return cast<IRIntLit>(getOperand(1))->getValue(); }
 };
 
 struct IRPartitioningDecoration : IRDecoration
