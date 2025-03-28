@@ -2,6 +2,7 @@
 #include "slang-ir-clone.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -102,6 +103,44 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     newInst->sourceLoc = oldInst->sourceLoc;
 
     return newInst;
+}
+
+static void specializeExportDecorationIFP(IRInst* target, IRSpecialize* oldInst, IRBuilder* builder)
+{
+    auto gen = as<IRGeneric>(oldInst->getBase());
+    if (gen)
+    {
+        auto genExport = gen->findDecoration<IRExportDecoration>();
+        if (genExport)
+        {
+            StringBuilder sb;
+            sb.append(genExport->getMangledName());
+            sb.append("G");
+            IRSpecialize * specializationProvider = oldInst;
+            if (auto targetAsSpec = as<IRSpecialize>(target))
+            {
+                specializationProvider = targetAsSpec;
+            }
+            for (UInt i = 0; i < specializationProvider->getArgCount(); ++i)
+            {
+                auto arg = specializationProvider->getArg(i);
+                sb.append(i);
+                if (auto typeExport = arg->findDecoration<IRExportDecoration>())
+                {
+                    sb.append(typeExport->getMangledName());
+                }
+                else if (auto nameHint = arg->findDecoration<IRNameHintDecoration>())
+                {
+                    sb.append(nameHint->getName());
+                }
+                else
+                {
+                    getTypeNameHint(sb, arg);
+                }
+            }
+            builder->addExportDecoration(target, sb.getUnownedSlice());
+        }
+    }
 }
 
 // The complexity of the second phase of cloning (the
@@ -225,6 +264,11 @@ static void _cloneInstDecorationsAndChildren(
         auto newType = (IRType*)findCloneForOperand(env, oldType);
         newParam->setFullType(newType);
         newParam->sourceLoc = oldParam->sourceLoc;
+    }
+
+    if (auto oldAsSpec = as<IRSpecialize>(oldInst))
+    {
+        specializeExportDecorationIFP(newInst, oldAsSpec, builder);
     }
 }
 
