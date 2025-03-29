@@ -191,7 +191,7 @@ struct DeferLoweringContext : InstPassBase
             }
 
             // Replace defer with unconditional branch to mergeBlock. Defer
-            // blocks should now be orphaned, and we could remove them too.
+            // blocks should now be orphaned, and we can remove them too.
             defer->removeAndDeallocate();
             builder.setInsertInto(parentBlock);
             builder.emitBranch(mergeBlock);
