@@ -594,10 +594,9 @@ struct IRGenContext
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
 
-    // The current scope index for `defer`.
-    UInt64 deferScopeCounter = 0;
-    bool deferScopeActive = false;
-    UInt64 currentDeferScope = 0;
+    // The current scope end for use with `defer`.
+    IRBlock* scopeEndBlock = nullptr;
+    bool scopeEndBlockActive = false;
 
     // Callback function to call when after lowering a type.
     std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> lowerTypeCallback =
@@ -6437,43 +6436,33 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     {
         // Blocks affect the `defer` statement, so we need to track their scopes
         // with a decorator in the IR.
-        bool prevDeferScopeActive = context->deferScopeActive;
-        UInt64 prevDeferScope = context->currentDeferScope;
+        bool prevScopeActive = context->scopeEndBlockActive;
+        IRBlock* prevScopeEndBlock = context->scopeEndBlock;
 
-        context->deferScopeActive = false;
-        context->deferScopeCounter++;
-        context->currentDeferScope = context->deferScopeCounter;
+        auto builder = getBuilder();
+        context->scopeEndBlockActive = false;
+        context->scopeEndBlock = builder->createBlock();
 
         // To lower a block (scope) statement, just lower its body.
         lowerStmt(context, stmt->body);
 
-        if (context->deferScopeActive)
+        if (context->scopeEndBlockActive)
         {
-            // Defer was used in this scope. So, we'll need to add a decorator
-            // to the current block to mark the end of the scope.
-            auto builder = getBuilder();
-            auto curBlock = builder->getBlock();
-            builder->addDeferHookDecoration(curBlock, context->currentDeferScope);
-
-            // We also need to terminate the block here; the hook relates to
-            // the end of the block, and if more instructions were added, they
-            // would make it much harder to interpret where the hook is.
-            auto nextBlock = builder->emitBlock();
-
-            // Move the terminator to the next block if present.
-            auto terminator = curBlock->getTerminator();
-            if (terminator)
-            {
-                terminator->removeFromParent();
-                terminator->insertAtEnd(nextBlock);
-            }
-
-            builder->setInsertInto(curBlock);
-            builder->emitBranch(nextBlock);
-            builder->setInsertInto(nextBlock);
+            // The end of the scope was referenced, so we need to actually
+            // create a block starting from there.
+            // Move the terminator to the scope end block.
+            emitBranchIfNeeded(context->scopeEndBlock);
+            builder->insertBlock(context->scopeEndBlock);
+            builder->setInsertInto(context->scopeEndBlock);
         }
-        context->deferScopeActive = prevDeferScopeActive;
-        context->currentDeferScope = prevDeferScope;
+        else
+        {
+            // Scope end block was left unused, so we may as well delete it.
+            context->scopeEndBlock->removeAndDeallocate();
+        }
+
+        context->scopeEndBlockActive = prevScopeActive;
+        context->scopeEndBlock = prevScopeEndBlock;
     }
 
     void visitReturnStmt(ReturnStmt* stmt)
@@ -6569,17 +6558,19 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto builder = getBuilder();
         startBlockIfNeeded(stmt);
 
-        // Start a new defer scope.
-        context->deferScopeActive = true;
+        IRBlock* deferBlock = builder->createBlock();
+        IRBlock* mergeBlock = builder->createBlock();
+        context->scopeEndBlockActive = true;
 
-        IRInst* deferInst = builder->emitDefer(context->currentDeferScope);
-        builder->setInsertInto(deferInst);
-        IRBlock* deferBlock = builder->emitBlock();
-        deferInst->addBlock(deferBlock);
+        builder->emitDefer(deferBlock, mergeBlock, context->scopeEndBlock);
 
+        builder->insertBlock(deferBlock);
         builder->setInsertInto(deferBlock);
         lowerStmt(context, stmt->statement);
-        builder->setInsertAfter(deferInst);
+        builder->emitBranch(mergeBlock);
+
+        builder->insertBlock(mergeBlock);
+        builder->setInsertInto(mergeBlock);
     }
 
     void visitDiscardStmt(DiscardStmt* stmt)

@@ -2845,24 +2845,13 @@ struct IRTryCall : IRTerminatorInst
     IRInst* getArg(UInt index) { return getOperand(index + 3); }
 };
 
-struct IRDefer : IRInst
+struct IRDefer : IRTerminatorInst
 {
     IR_LEAF_ISA(Defer);
 
-    IRInstList<IRBlock> getBlocks() { return IRInstList<IRBlock>(getChildren()); }
-    IRIntegerValue getHookIndex() { return as<IRIntLit>(getOperand(0))->getValue(); }
-};
-
-struct IRDeferHookDecoration : IRDecoration
-{
-    enum
-    {
-        kOp = kIROp_DeferHookDecoration
-    };
-
-    IR_LEAF_ISA(DeferHookDecoration);
-
-    IRIntegerValue getHookIndex() { return as<IRIntLit>(getOperand(0))->getValue(); }
+    IRBlock* getDeferBlock() { return cast<IRBlock>(getOperand(0)); }
+    IRBlock* getMergeBlock() { return cast<IRBlock>(getOperand(1)); }
+    IRBlock* getScopeBlock() { return cast<IRBlock>(getOperand(2)); }
 };
 
 struct IRSwizzle : IRInst
@@ -4477,7 +4466,7 @@ public:
 
     IRInst* emitThrow(IRInst* val);
 
-    IRInst* emitDefer(uint64_t hookIndex);
+    IRInst* emitDefer(IRBlock* deferBlock, IRBlock* mergeBlock, IRBlock* scopeEndBlock);
 
     IRInst* emitDiscard();
 
@@ -4965,14 +4954,6 @@ public:
             value,
             kIROp_RequireCapabilityAtomDecoration,
             getIntValue(getUIntType(), IRIntegerValue(atom)));
-    }
-
-    void addDeferHookDecoration(IRInst* value, uint64_t hookIndex)
-    {
-        addDecoration(
-            value,
-            kIROp_DeferHookDecoration,
-            getIntValue(getBasicType(BaseType::UInt64), hookIndex));
     }
 
     void addPatchConstantFuncDecoration(IRInst* value, IRInst* patchConstantFunc)

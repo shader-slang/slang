@@ -10,7 +10,6 @@ float testFunc(float a)
 {
     float x = a / (abs(a) + 0.5f);
     {
-        // Make sure to take square root of 'x' at the end!
         defer x = sqrt(x);
 
         x = x * 0.5f + 0.5f;
@@ -18,6 +17,9 @@ float testFunc(float a)
         if (a < 0)
         {
             x += 1.0f;
+            // NOTE suprising but correct behaviour here: 'defer' occurs after
+            // the return statement's value has been computed, so mutating 'x'
+            // no longer affects anything.
             return x;
         }
 
