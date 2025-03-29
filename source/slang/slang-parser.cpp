@@ -7752,7 +7752,6 @@ static Expr* parsePostfixExpr(Parser* parser)
                 case TokenType::LBracket:
                 case TokenType::OpMul:
                 case TokenType::Dot:
-                case TokenType::Scope:
                     expr = parsePostfixTypeSuffix(parser, expr);
                     break;
                 default:
