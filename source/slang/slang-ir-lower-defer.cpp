@@ -96,6 +96,33 @@ struct DeferLoweringContext : InstPassBase
         return lastBlock;
     }
 
+    bool isBlockInScope(IRBlock* block, IRDominatorTree* dom, IRBlock* scopeEndBlock)
+    {
+        if (block == scopeEndBlock)
+            return false;
+
+        // Technically, we'd like to know if 'scopeEndBlock' is a predecessor of
+        // 'block'. This is usually the same as 'scopeEndBlock' dominating the
+        // given block, except for when a statement can jump over the scope end
+        // without completely exiting the dominance of the 'defer' statement
+        // itself. The only case like this is the continue statement of a for
+        // loop.
+        if (dom->properlyDominates(scopeEndBlock, block))
+            return false;
+
+        // The continuation block is not always dominated by the end of the
+        // scope, since a continue statement is another way to get there.
+        // Luckily, we can just check if the scope end is directly succeeded by
+        // the target block, which is the case in for loops.
+        for (auto successor : scopeEndBlock->getSuccessors())
+        {
+            if (successor == block)
+                return false;
+        }
+
+        return true;
+    }
+
     void processModule()
     {
         List<IRDefer*> unhandledDefers;
@@ -138,7 +165,7 @@ struct DeferLoweringContext : InstPassBase
             scopeBlocksSet.add(mergeBlock);
             for (IRBlock* block : dominatedBlocks)
             {
-                if (!dom->properlyDominates(scopeEndBlock, block) && block != scopeEndBlock)
+                if (isBlockInScope(block, dom, scopeEndBlock))
                     scopeBlocksSet.add(block);
             }
 
