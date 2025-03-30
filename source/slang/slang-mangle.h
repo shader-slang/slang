@@ -10,6 +10,8 @@ namespace Slang
 {
 struct IRSpecialize;
 
+void emitNameForLinkage(StringBuilder& sb, UnownedStringSlice str);
+
 String getMangledName(ASTBuilder* astBuilder, Decl* decl);
 String getMangledName(ASTBuilder* astBuilder, DeclRefBase* declRef);
 String getMangledNameFromNameString(const UnownedStringSlice& name);

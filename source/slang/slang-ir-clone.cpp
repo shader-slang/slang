@@ -4,6 +4,8 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-mangle.h"
+
 
 namespace Slang
 {
@@ -105,18 +107,20 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     return newInst;
 }
 
-static void specializeExportDecorationIFP(IRInst* target, IRSpecialize* oldInst, IRBuilder* builder)
+// Copy the linkage decoration of oldInst (if present) and specialize it for target.
+static void specializeLinkageDecoration(IRInst* target, IRSpecialize* oldInst, IRBuilder* builder)
 {
     auto gen = as<IRGeneric>(oldInst->getBase());
     if (gen)
     {
-        auto genExport = gen->findDecoration<IRExportDecoration>();
-        if (genExport)
+        auto genLinkage = gen->findDecoration<IRLinkageDecoration>();
+        if (genLinkage)
         {
+            bool isExport = as<IRExportDecoration>(genLinkage);
             StringBuilder sb;
-            sb.append(genExport->getMangledName());
+            sb.append(genLinkage->getMangledName());
             sb.append("G");
-            IRSpecialize * specializationProvider = oldInst;
+            IRSpecialize* specializationProvider = oldInst;
             if (auto targetAsSpec = as<IRSpecialize>(target))
             {
                 specializationProvider = targetAsSpec;
@@ -125,20 +129,35 @@ static void specializeExportDecorationIFP(IRInst* target, IRSpecialize* oldInst,
             {
                 auto arg = specializationProvider->getArg(i);
                 sb.append(i);
-                if (auto typeExport = arg->findDecoration<IRExportDecoration>())
+                if (auto typeLinkage = arg->findDecoration<IRLinkageDecoration>())
                 {
-                    sb.append(typeExport->getMangledName());
-                }
-                else if (auto nameHint = arg->findDecoration<IRNameHintDecoration>())
-                {
-                    sb.append(nameHint->getName());
+                    sb.append(typeLinkage->getMangledName());
                 }
                 else
                 {
-                    getTypeNameHint(sb, arg);
+                    // getTypeNameHint may produce a name with characters that can't
+                    // be part of an identifier, so we need to filter it afterward.
+                    StringBuilder tmp;
+                    getTypeNameHint(tmp, arg);
+                    emitNameForLinkage(sb, tmp.getUnownedSlice());
                 }
             }
-            builder->addExportDecoration(target, sb.getUnownedSlice());
+            if (auto previousLinkage = target->findDecoration<IRLinkageDecoration>())
+            {
+                // Overwrite the previous linkage decoration, since it was not specialized
+                previousLinkage->setOperand(0, builder->getStringValue(sb.getUnownedSlice()));
+            }
+            else
+            {
+                if (isExport)
+                {
+                    builder->addExportDecoration(target, sb.getUnownedSlice());
+                }
+                else
+                {
+                    builder->addImportDecoration(target, sb.getUnownedSlice());
+                }
+            }
         }
     }
 }
@@ -268,7 +287,7 @@ static void _cloneInstDecorationsAndChildren(
 
     if (auto oldAsSpec = as<IRSpecialize>(oldInst))
     {
-        specializeExportDecorationIFP(newInst, oldAsSpec, builder);
+        specializeLinkageDecoration(newInst, oldAsSpec, builder);
     }
 }
 
