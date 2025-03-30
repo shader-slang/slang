@@ -240,13 +240,9 @@ struct DeferLoweringContext : InstPassBase
 
     void processModule()
     {
-        for (auto globalInst : module->getGlobalInsts())
-        {
-            if (auto codeInst = as<IRGlobalValueWithCode>(globalInst))
-            {
-                processFunc(codeInst);
-            }
-        }
+        processInstsOfType<IRFunc>(
+            kIROp_Func,
+            [&](IRFunc* func) { processFunc(func); });
     }
 };
 
