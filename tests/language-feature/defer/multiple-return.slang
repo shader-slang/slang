@@ -11,6 +11,7 @@ void testFunc(int index1, int index2, int condition)
     defer outputBuffer[index1] = 0;
 
     outputBuffer[index2] = 3;
+    DeviceMemoryBarrier();
 
     if (condition == 0)
     {
