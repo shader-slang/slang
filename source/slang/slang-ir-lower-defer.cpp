@@ -57,7 +57,8 @@ struct DeferLoweringContext : InstPassBase
         // Clone blocks first
         for (auto block : deferBlocks)
         {
-            auto clonedBlock = builder->emitBlock();
+            auto clonedBlock = builder->createBlock();
+            builder->addInst(clonedBlock);
             env.mapOldValToNew[block] = clonedBlock;
         }
 
@@ -83,7 +84,6 @@ struct DeferLoweringContext : InstPassBase
         while (beforeInst)
         {
             auto nextInst = beforeInst->getNextInst();
-            beforeInst->removeFromParent();
             beforeInst->insertAtEnd(lastBlock);
             beforeInst = nextInst;
         }
@@ -123,30 +123,34 @@ struct DeferLoweringContext : InstPassBase
         return true;
     }
 
-    void processModule()
+    void processFunc(IRGlobalValueWithCode* func)
     {
-        List<IRDefer*> unhandledDefers;
-        processInstsOfType<IRDefer>(
-            kIROp_Defer,
-            [&](IRDefer* defer) { unhandledDefers.add(defer); });
-
-        IRBuilder builder(module);
-
         // Iterating over `defer` instructions in reverse order allows us to
         // expand them in the correct order, including nested `defer`s.
-        Dictionary<IRBlock*, IRBlock*> mapOldScopeToNew;
-        while (unhandledDefers.getCount() != 0)
+        List<IRBlock*> reverseBlocks = getReversePostorderOnReverseCFG(func);
+        List<IRDefer*> unhandledDefers;
+
+        for (IRBlock* block : reverseBlocks)
         {
-            IRDefer* defer = unhandledDefers.getLast();
+            for (auto child = block->getLastChild(); child; child = child->getPrevInst())
+            {
+                if (auto defer = as<IRDefer>(child))
+                    unhandledDefers.add(defer);
+            }
+        }
+
+        IRBuilder builder(module);
+        Dictionary<IRBlock*, IRBlock*> mapOldScopeToNew;
+        for (IRDefer* defer : unhandledDefers)
+        {
             IRBlock* firstDeferBlock = defer->getDeferBlock();
             IRBlock* mergeBlock = defer->getMergeBlock();
             IRBlock* scopeEndBlock = defer->getScopeBlock();
             mapOldScopeToNew.tryGetValue(scopeEndBlock, scopeEndBlock);
             IRBlock* parentBlock = as<IRBlock>(defer->getParent());
 
-            unhandledDefers.removeLast();
-
-            IRFunc* func = getParentFunc(defer);
+            // The dominator tree gets invalidated on every iteration, so it's
+            // necessary to construct it inside the loop.
             auto dom = module->findOrCreateDominatorTree(func);
 
             // Enumerate defer block range. That is, all blocks dominated by
@@ -156,7 +160,7 @@ struct DeferLoweringContext : InstPassBase
             deferBlocks.add(firstDeferBlock);
             for (IRBlock* block : deferDominatedBlocks)
             {
-                if (!dom->properlyDominates(mergeBlock, block))
+                if (!dom->properlyDominates(mergeBlock, block) && block != mergeBlock)
                     deferBlocks.add(block);
             }
 
@@ -231,6 +235,17 @@ struct DeferLoweringContext : InstPassBase
             // Some blocks got removed and added, so mark analysis of the
             // function with defer as outdated.
             module->invalidateAnalysisForInst(func);
+        }
+    }
+
+    void processModule()
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            if (auto codeInst = as<IRGlobalValueWithCode>(globalInst))
+            {
+                processFunc(codeInst);
+            }
         }
     }
 };

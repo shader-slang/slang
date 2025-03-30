@@ -600,7 +600,7 @@ static IRBlock::SuccessorList getSuccessors(IRInst* terminator)
     case kIROp_Defer:
         // defer <deferBlock> <mergeBlock> <scopeEndBlock>
         begin = operands + 0;
-        end = begin + 2;
+        end = begin + 1;
         break;
 
     default:

@@ -596,7 +596,6 @@ struct IRGenContext
 
     // The current scope end for use with `defer`.
     IRBlock* scopeEndBlock = nullptr;
-    bool scopeEndBlockActive = false;
 
     // Callback function to call when after lowering a type.
     std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> lowerTypeCallback =
@@ -6436,20 +6435,18 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     {
         // Blocks affect the `defer` statement, so we need to track their scopes
         // with a decorator in the IR.
-        bool prevScopeActive = context->scopeEndBlockActive;
         IRBlock* prevScopeEndBlock = context->scopeEndBlock;
 
         auto builder = getBuilder();
-        context->scopeEndBlockActive = false;
         context->scopeEndBlock = builder->createBlock();
 
         // To lower a block (scope) statement, just lower its body.
         lowerStmt(context, stmt->body);
 
-        if (context->scopeEndBlockActive)
+        if (context->scopeEndBlock->hasUses())
         {
             // The end of the scope was referenced, so we need to actually
-            // create a block starting from there.
+            // keep it around and jump through it.
             // Move the terminator to the scope end block.
             emitBranchIfNeeded(context->scopeEndBlock);
             builder->insertBlock(context->scopeEndBlock);
@@ -6461,7 +6458,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             context->scopeEndBlock->removeAndDeallocate();
         }
 
-        context->scopeEndBlockActive = prevScopeActive;
         context->scopeEndBlock = prevScopeEndBlock;
     }
 
@@ -6560,7 +6556,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         IRBlock* deferBlock = builder->createBlock();
         IRBlock* mergeBlock = builder->createBlock();
-        context->scopeEndBlockActive = true;
 
         builder->emitDefer(deferBlock, mergeBlock, context->scopeEndBlock);
 
