@@ -311,6 +311,20 @@ cmake --preset vs2022 --fresh -A arm64 -DSLANG_GENERATORS_PATH=generators/bin
 cmake --build --preset release
 ```
 
+### Nix
+
+This repository contains a [Nix](https://nixos.org/)
+[flake](https://wiki.nixos.org/wiki/Flakes) (not officially supported or
+tested), which provides the necessary prerequisites for local development. Also,
+if you use [direnv](https://direnv.net/), you can run the following commands to
+have the Nix environment automatically activate when you enter your clone of
+this repository:
+
+```bash
+echo 'use flake' >> .envrc
+direnv allow
+```
+
 ## Building with an older CMake
 
 Because older CMake versions don't support all the features we want to use in

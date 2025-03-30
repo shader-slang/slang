@@ -169,7 +169,12 @@ jobs:
           cpack --preset "$config-debug-info" -G TGZ
 
           triggering_ref=${{ github.ref_name }}
-          base=slang-${triggering_ref#v}-${{matrix.os}}-${{matrix.platform}}
+          if [[ $triggering_ref =~ ^v[0-9] ]]; then
+            version=${triggering_ref#v}
+          else
+            version=$triggering_ref
+          fi
+          base=slang-${version}-${{matrix.os}}-${{matrix.platform}}
 
           # Move main packages
           mv "$(pwd)/build/dist-${config}/slang.zip" "${base}.zip"

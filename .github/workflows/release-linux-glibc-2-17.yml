@@ -35,7 +35,11 @@ jobs:
         id: package
         run: |
           triggering_ref=${{ github.ref_name }}
-          version=${triggering_ref#v}
+          if [[ $triggering_ref =~ ^v[0-9] ]]; then
+            version=${triggering_ref#v}
+          else
+            version=$triggering_ref
+          fi
           base=$(pwd)/slang-${version}-linux-x86_64-glibc-2.17
 
           sudo mv "$(pwd)/build/dist-release/slang.zip" "${base}.zip"
