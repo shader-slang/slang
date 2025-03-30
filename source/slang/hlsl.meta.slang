@@ -3772,12 +3772,47 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, texture_sm_4_1_samplerless)]
+    [require(hlsl_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load";
+        case spirv:
+             const int lodLoc = Shape.dimensions+isArray;
+             let coord = __vectorReshape<Shape.dimensions+isArray>(location);
+             let lod = location[lodLoc];
+             if (isCombined != 0)
+             {
+                 return spirv_asm
+                 {
+                     OpCapability SparseResidency;
+                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                     %image:__imageType(this) = OpImage $this;
+ 
+                     %sparseResult:%sparseResultType = OpImageSparseFetch %image $coord Lod|ConstOffset $lod $offset;
+                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                     %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+ 
+                     OpStore &status %residentCode;
+                     __truncate $$T result __sampledType(T) %sampled;
+                 };
+             }
+             else
+             {
+                 return spirv_asm
+                 {
+                     OpCapability SparseResidency;
+                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+ 
+                     %sparseResult:%sparseResultType = OpImageSparseFetch $this $coord Lod|ConstOffset $lod $offset;
+                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                     %sampled:__sampledType(T) = OpCompositeExtract  %sparseResult 1;
+ 
+                     OpStore &status %residentCode;
+                     __truncate $$T result __sampledType(T) %sampled;
+                 };
+             }
         default:
             status = 0;
             return Load(location, offset);
@@ -3952,12 +3987,44 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, texture_sm_4_1_samplerless)]
+    [require(hlsl_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load";
+        case spirv:
+             if (isCombined != 0)
+             {
+                 return spirv_asm
+                 {
+                     OpCapability SparseResidency;
+                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                     %image:__imageType(this) = OpImage $this;
+ 
+                     %sparseResult:%sparseResultType = OpImageSparseFetch %image $location ConstOffset|Sample $offset $sampleIndex;
+                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                     %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+ 
+                     OpStore &status %residentCode;
+                     __truncate $$T result __sampledType(T) %sampled;
+                 };
+             }
+             else
+             {
+                 return spirv_asm
+                 {
+                     OpCapability SparseResidency;
+                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+ 
+                     %sparseResult:%sparseResultType = OpImageSparseFetch $this $location ConstOffset|Sample $offset $sampleIndex;
+                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                     %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+ 
+                     OpStore &status %residentCode;
+                     __truncate $$T result __sampledType(T) %sampled;
+                 };
+             }
         default:
             status = 0;
             return Load(location, sampleIndex, offset);
