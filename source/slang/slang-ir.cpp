@@ -1742,33 +1742,6 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
     }
 }
 
-// Add the given inst to the parent of its operand.
-void addDeduplicatedInst(IRInst* inst)
-{
-    SLANG_ASSERT(nullptr == inst->parent);
-
-    IRInst* parent = nullptr;
-
-    UInt operandCount = inst->getOperandCount();
-    for (UInt ii = 0; ii < operandCount; ++ii)
-    {
-        auto operand = inst->getOperand(ii);
-        if (!operand)
-            continue;
-
-        auto operandParent = operand->getParent();
-
-        parent = mergeCandidateParentsForHoistableInst(parent, operandParent);
-    }
-
-    if (inst->getFullType())
-    {
-        parent = mergeCandidateParentsForHoistableInst(parent, inst->getFullType()->getParent());
-    }
-
-    inst->insertAtEnd(parent);
-}
-
 void IRBuilder::_maybeSetSourceLoc(IRInst* inst)
 {
     auto sourceLocInfo = getSourceLocInfo();
@@ -2519,6 +2492,72 @@ static void canonicalizeInstOperands(IRBuilder& builder, IROp op, ArrayView<IRIn
     }
 }
 
+static void addGlobalValue(IRBuilder* builder, IRInst* value)
+{
+    // If the value is already in the parent, keep it as-is.
+    // Because when the inst is Hoistable, the parent can have
+    // only one instance of the inst. The order among
+    // siblings should remain because the later siblings may
+    // have dependency to the earlier siblings.
+    //
+    if (value->parent)
+    {
+        SLANG_ASSERT(getIROpInfo(value->getOp()).isHoistable());
+        return;
+    }
+
+    // Try to find a suitable parent for the
+    // global value we are emitting.
+    //
+    // We will start out search at the current
+    // parent instruction for the builder, and
+    // possibly work our way up.
+    //
+    auto defaultInsertLoc = builder->getInsertLoc();
+    auto defaultParent = defaultInsertLoc.getParent();
+    auto parent = defaultParent;
+    while (parent)
+    {
+        // Inserting into the top level of a module?
+        // That is fine, and we can stop searching.
+        if (as<IRModuleInst>(parent))
+            break;
+
+        // Inserting into a basic block inside of
+        // a generic? That is okay too.
+        if (auto block = as<IRBlock>(parent))
+        {
+            if (as<IRGeneric>(block->parent))
+                break;
+        }
+
+        // Otherwise, move up the chain.
+        parent = parent->parent;
+    }
+
+    // If we somehow ran out of parents (possibly
+    // because an instruction wasn't linked into
+    // the full hierarchy yet), then we will
+    // fall back to inserting into the overall module.
+    if (!parent)
+    {
+        parent = builder->getModule()->getModuleInst();
+    }
+
+    // If it turns out that we are inserting into the
+    // current "insert into" parent for the builder, then
+    // we need to respect its "insert before" setting
+    // as well.
+    if (parent == defaultParent)
+    {
+        value->insertAt(defaultInsertLoc);
+    }
+    else
+    {
+        value->insertAtEnd(parent);
+    }
+}
+
 IRInst* IRBuilder::_findOrEmitHoistableInst(
     IRType* type,
     IROp op,
@@ -2648,7 +2687,7 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
         // In order to de-duplicate them, Witness-table is marked as Hoistable.
         // But it is not exactly a hoistable type and it can be added simpler.
         if (inst->getOp() == kIROp_WitnessTable)
-            addDeduplicatedInst(inst);
+            addGlobalValue(this, inst);
         else
             addHoistableInst(this, inst);
     }
@@ -4617,72 +4656,6 @@ IRDominatorTree* IRModule::findOrCreateDominatorTree(IRGlobalValueWithCode* func
     }
     analysis->domTree = computeDominatorTree(func);
     return analysis->getDominatorTree();
-}
-
-void addGlobalValue(IRBuilder* builder, IRInst* value)
-{
-    // If the value is already in the parent, keep it as-is.
-    // Because when the inst is Hoistable, the parent can have
-    // only one instance of the inst. The order among
-    // siblings should remain because the later siblings may
-    // have dependency to the earlier siblings.
-    //
-    if (value->parent)
-    {
-        SLANG_ASSERT(getIROpInfo(value->getOp()).isHoistable());
-        return;
-    }
-
-    // Try to find a suitable parent for the
-    // global value we are emitting.
-    //
-    // We will start out search at the current
-    // parent instruction for the builder, and
-    // possibly work our way up.
-    //
-    auto defaultInsertLoc = builder->getInsertLoc();
-    auto defaultParent = defaultInsertLoc.getParent();
-    auto parent = defaultParent;
-    while (parent)
-    {
-        // Inserting into the top level of a module?
-        // That is fine, and we can stop searching.
-        if (as<IRModuleInst>(parent))
-            break;
-
-        // Inserting into a basic block inside of
-        // a generic? That is okay too.
-        if (auto block = as<IRBlock>(parent))
-        {
-            if (as<IRGeneric>(block->parent))
-                break;
-        }
-
-        // Otherwise, move up the chain.
-        parent = parent->parent;
-    }
-
-    // If we somehow ran out of parents (possibly
-    // because an instruction wasn't linked into
-    // the full hierarchy yet), then we will
-    // fall back to inserting into the overall module.
-    if (!parent)
-    {
-        parent = builder->getModule()->getModuleInst();
-    }
-
-    // If it turns out that we are inserting into the
-    // current "insert into" parent for the builder, then
-    // we need to respect its "insert before" setting
-    // as well.
-    if (parent == defaultParent)
-    {
-        value->insertAt(defaultInsertLoc);
-    }
-    else
-    {
-        value->insertAtEnd(parent);
-    }
 }
 
 IRInst* IRBuilder::addDifferentiableTypeDictionaryDecoration(IRInst* target)
