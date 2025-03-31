@@ -143,6 +143,31 @@ float test_with_continue(float y)
     return t;
 }
 
+[Differentiable]
+float test_nested_with_continue(float y)
+{
+    float t = y;
+
+    for (int i = 0; i < 3; i++)
+    {
+        if (i % 2 == 0)
+            continue;
+    
+        for (int j = 0; j < 3; j++)
+        {
+            if (j % 2 == 0)
+                continue;
+
+            if (j == 0)
+                continue;
+
+            t = t * (i + 4 * j + 1);
+        }
+    }
+
+    return t;
+}
+
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -201,14 +226,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpfloat dpa = dpfloat(0.4, 0.0);
 
         __bwd_diff(test_with_continue)(dpa, 1.0f);
-        outputBuffer[8] = dpa.d;
-        
-        // Finite difference check
-        float h = 1e-4;
-        float y_plus_h = test_with_continue(0.4f + h);
-        float y_minus_h = test_with_continue(0.4f - h);
-        float fd = (y_plus_h - y_minus_h) / (2 * h);
-        outputBuffer[9] = fd;
+        outputBuffer[8] = dpa.d; // CHECK-NEXT: 8.000000
+    }
+
+    {
+        dpfloat dpa = dpfloat(0.4, 0.0);
+
+        __bwd_diff(test_nested_with_continue)(dpa, 1.0f);
+        outputBuffer[9] = dpa.d; // CHECK-NEXT: 6.000000
     }
 }
 
