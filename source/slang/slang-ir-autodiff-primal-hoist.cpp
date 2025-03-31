@@ -1063,6 +1063,63 @@ void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode*
     }
 }
 
+static bool isValueInRange(IRIntegerValue value, IRType* type)
+{
+    UCount nBits;
+    bool isSigned;
+    // First determine the number of bits
+    switch (type->getOp())
+    {
+    case kIROp_IntType:
+    case kIROp_UIntType:
+        nBits = 32;
+        break;
+    case kIROp_Int16Type:
+    case kIROp_UInt16Type:
+        nBits = 16;
+        break;
+    case kIROp_Int8Type:
+    case kIROp_UInt8Type:
+        nBits = 8;
+        break;
+    case kIROp_Int64Type:
+    case kIROp_UInt64Type:
+        nBits = 64;
+        break;
+    default:
+        return false;
+    }
+
+    // Then determine if it's signed
+    switch (type->getOp())
+    {
+    case kIROp_IntType:
+    case kIROp_Int16Type:
+    case kIROp_Int8Type:
+    case kIROp_Int64Type:
+        isSigned = true;
+        break;
+    case kIROp_UIntType:
+    case kIROp_UInt16Type:
+    case kIROp_UInt8Type:
+    case kIROp_UInt64Type:
+        isSigned = false;
+        break;
+    default:
+        return false;
+    }
+
+    if (isSigned)
+    {
+        UCount maxValue = (1ULL << (nBits - 1)) - 1;
+        return value >= -maxValue && value <= maxValue;
+    }
+    else
+    {
+        UCount maxValue = (1ULL << nBits) - 1;
+        return value >= 0 && value <= maxValue;
+    }
+}
 
 void AutodiffCheckpointPolicyBase::collectLoopExitConditions(IRGlobalValueWithCode* func)
 {
@@ -1178,8 +1235,12 @@ void AutodiffCheckpointPolicyBase::collectLoopExitConditions(IRGlobalValueWithCo
 
                 auto recordExitValue = [&](IRIntegerValue exitIValue, IRIntegerValue exitParamValue)
                 {
-                    this->loopExitValueInsts[param] =
-                        builder.getIntValue(param->getDataType(), exitParamValue);
+                    // TODO: Maybe we should warn if the inferred exit value is out of range?
+                    if (isValueInRange(exitParamValue, param->getDataType()))
+                    {
+                        this->loopExitValueInsts[param] =
+                            builder.getIntValue(param->getDataType(), exitParamValue);
+                    }
 
                     // The interesting part is that since we know that this variable is an bijective
                     // function of the loop counter, we can also compute the loop counter's exit
@@ -1199,8 +1260,12 @@ void AutodiffCheckpointPolicyBase::collectLoopExitConditions(IRGlobalValueWithCo
                     }
                     else
                     {
-                        this->loopExitValueInsts[loopCounter] =
-                            builder.getIntValue(loopCounter->getDataType(), exitIValue);
+                        // TODO: Maybe we should warn if the inferred exit value is out of range?
+                        if (isValueInRange(exitIValue, loopCounter->getDataType()))
+                        {
+                            this->loopExitValueInsts[loopCounter] =
+                                builder.getIntValue(loopCounter->getDataType(), exitIValue);
+                        }
                     }
                 };
 
