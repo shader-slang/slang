@@ -181,8 +181,8 @@ if(SLANG_ENABLE_SLANG_RHI)
 
     # Not disabling these break tests (issue #5474)
     set(SLANG_RHI_FETCH_DXC OFF)
-    set(SLANG_RHI_FETCH_AGILITY_SDK OFF)
-
+    set(SLANG_RHI_ENABLE_AGILITY_SDK OFF)
+    
     set(SLANG_RHI_ENABLE_NVAPI ${SLANG_ENABLE_NVAPI})
 
     if(SLANG_ENABLE_DX_ON_VK)
