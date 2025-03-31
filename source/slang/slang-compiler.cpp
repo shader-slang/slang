@@ -2172,17 +2172,8 @@ SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
         options.sourceManager = linkage->getSourceManager();
     }
 
-    {
-        RiffContainer container;
-        {
-            SerialContainerData data;
-            SLANG_RETURN_ON_FAIL(
-                SerialContainerUtil::addEndToEndRequestToData(this, options, data));
-            SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(data, options, &container));
-        }
-        // We now write the RiffContainer to the stream
-        SLANG_RETURN_ON_FAIL(RiffUtil::write(container.getRoot(), true, stream));
-    }
+    SLANG_RETURN_ON_FAIL(
+        SerialContainerUtil::write(this, options, stream));
 
     return SLANG_OK;
 }

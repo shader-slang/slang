@@ -6,32 +6,33 @@
 #include "../compiler-core/slang-name.h"
 #include "../core/slang-basic.h"
 #include "../core/slang-semantic-version.h"
-#include "slang-ast-reflect.h"
-#include "slang-generated-ast.h"
+#include "slang-ast-forward-declarations.h"
 #include "slang-profile.h"
-#include "slang-ref-object-reflect.h"
-#include "slang-serialize-reflection.h"
 #include "slang-type-system-shared.h"
 #include "slang.h"
 
 #include <assert.h>
 #include <type_traits>
 
-namespace Slang
+#include "slang-ast-support-types.h.fiddle"
+
+#define SLANG_UNREFLECTED /* empty */
+
+FIDDLE(
+hidden class RefObject;
+)
+
+FIDDLE() namespace Slang
 {
+#define SLANG_AST_NODE_VIRTUAL_CALL(CLASS, METHOD, ARGS) \
+    return ASTNodeDispatcher<CLASS, decltype(this->METHOD ARGS)>::dispatch(this, [&](auto _this) -> decltype(this->METHOD ARGS) { return _this->_##METHOD##Override ARGS; });
+
 class Module;
 class Name;
 class Session;
 class SyntaxVisitor;
 class FuncDecl;
 class Layout;
-
-struct IExprVisitor;
-struct IDeclVisitor;
-struct IModifierVisitor;
-struct IStmtVisitor;
-struct ITypeVisitor;
-struct IValVisitor;
 
 class Parser;
 class SyntaxNode;
@@ -42,6 +43,7 @@ class Type;
 struct TypeExp;
 class Val;
 
+class DeclRefBase;
 class NodeBase;
 class LookupDeclRef;
 class GenericAppDeclRef;
@@ -524,8 +526,6 @@ enum class DeclCheckState : uint8_t
 /// A `DeclCheckState` plus a bit to track whether a declaration is currently being checked.
 struct DeclCheckStateExt
 {
-    SLANG_VALUE_CLASS(DeclCheckStateExt)
-
     typedef uint8_t RawType;
     DeclCheckStateExt() {}
     DeclCheckStateExt(DeclCheckState state)
@@ -569,10 +569,10 @@ void addModifier(ModifiableSyntaxNode* syntax, Modifier* modifier);
 
 void removeModifier(ModifiableSyntaxNode* syntax, Modifier* modifier);
 
+FIDDLE()
 struct QualType
 {
-    SLANG_VALUE_CLASS(QualType)
-
+    FIDDLE(...)
     Type* type = nullptr;
     bool isLeftValue = false;
     bool hasReadOnlyOnTarget = false;
@@ -597,52 +597,72 @@ struct QualType
 
 class ASTBuilder;
 
-struct ASTClassInfo
+struct SyntaxClassBase;
+typedef SyntaxClassBase ReflectClassInfo;
+typedef SyntaxClassBase ASTClassInfo;
+
+struct SyntaxClassInfo
 {
-    struct Infos
+public:
+    char const* name;
+    ASTNodeType firstTag;
+    Count tagCount;
+    void* (*createFunc)(ASTBuilder*);
+    void (*destructFunc)(void*);
+
+    template<typename T>
+    static SyntaxClassInfo* get()
     {
-        const ReflectClassInfo* infos[int(ASTNodeType::CountOf)];
-    };
-    SLANG_FORCE_INLINE static const ReflectClassInfo* getInfo(ASTNodeType type)
-    {
-        return kInfos.infos[int(type)];
+        return const_cast<SyntaxClassInfo*>(&T::kSyntaxClassInfo);
     }
-    static const Infos kInfos;
+
 };
 
 // A reference to a class of syntax node, that can be
 // used to create instances on the fly
 struct SyntaxClassBase
 {
-    SyntaxClassBase() {}
+    SyntaxClassBase()
+    {}
 
-    SyntaxClassBase(ReflectClassInfo const* inClassInfo)
-        : classInfo(inClassInfo)
+    explicit SyntaxClassBase(
+        ASTNodeType tag);
+
+    SyntaxClassBase(
+        SyntaxClassInfo const* info)
+        : _info(info)
+    {}
+
+
+    ASTNodeType getTag() const { return getInfo()->firstTag; }
+    UnownedTerminatedStringSlice getName() const;
+
+    void* createInstanceImpl(ASTBuilder* astBuilder) const;
+    void destructInstanceImpl(void* instance) const;
+
+    bool isSubClassOf(SyntaxClassBase const& super) const;
+
+    typedef SyntaxClassInfo Info;
+
+    Info* getInfo() const { return const_cast<Info*>(_info); }
+    operator Info* () const { return const_cast<Info*>(_info); }
+
+
+    bool operator==(SyntaxClassBase const& other) const
     {
+        return _info == other._info;
     }
 
-    void* createInstanceImpl(ASTBuilder* astBuilder) const
+    bool operator!=(SyntaxClassBase const& other) const
     {
-        auto ci = classInfo;
-        if (!ci)
-            return nullptr;
-
-        auto cf = ci->m_createFunc;
-        if (!cf)
-            return nullptr;
-
-        return cf(astBuilder);
+        return _info != other._info;
     }
 
-    SLANG_FORCE_INLINE bool isSubClassOfImpl(SyntaxClassBase const& super) const
-    {
-        return classInfo ? classInfo->isSubClassOf(*super.classInfo) : false;
-    }
-
-    ReflectClassInfo const* classInfo = nullptr;
+private:
+    Info const* _info = nullptr;
 };
 
-template<typename T>
+template<typename T = NodeBase>
 struct SyntaxClass : SyntaxClassBase
 {
     SyntaxClass() {}
@@ -651,48 +671,44 @@ struct SyntaxClass : SyntaxClassBase
     SyntaxClass(
         SyntaxClass<U> const& other,
         typename EnableIf<IsConvertible<T*, U*>::Value, void>::type* = 0)
-        : SyntaxClassBase(other.classInfo)
+        : SyntaxClassBase(other)
     {
     }
+
+    explicit SyntaxClass(
+        SyntaxClassBase const& other)
+        : SyntaxClassBase(other)
+    {}
+
+    explicit SyntaxClass(
+        ASTNodeType tag)
+        : SyntaxClassBase(tag)
+    {}
+
+    explicit SyntaxClass(
+        SyntaxClassInfo const* info)
+        : SyntaxClassBase(info)
+    {}
 
     T* createInstance(ASTBuilder* astBuilder) const { return (T*)createInstanceImpl(astBuilder); }
+    void destructInstance(T* instance) { destructInstanceImpl(instance); }
 
-    SyntaxClass(const ReflectClassInfo* inClassInfo)
-        : SyntaxClassBase(inClassInfo)
+    bool isSubClassOf(SyntaxClassBase const& other)
     {
-    }
-
-    static SyntaxClass<T> getClass() { return SyntaxClass<T>(&T::kReflectClassInfo); }
-
-    template<typename U>
-    bool isSubClassOf(SyntaxClass<U> super)
-    {
-        return isSubClassOfImpl(super);
+        return SyntaxClassBase::isSubClassOf(other);
     }
 
     template<typename U>
     bool isSubClassOf()
     {
-        return isSubClassOf(SyntaxClass<U>::getClass());
-    }
-
-    template<typename U>
-    bool operator==(const SyntaxClass<U> other) const
-    {
-        return classInfo == other.classInfo;
-    }
-
-    template<typename U>
-    bool operator!=(const SyntaxClass<U> other) const
-    {
-        return classInfo != other.classInfo;
+        return SyntaxClassBase::isSubClassOf(getSyntaxClass<U>());
     }
 };
 
 template<typename T>
-SyntaxClass<T> getClass()
+SyntaxClass<T> getSyntaxClass()
 {
-    return SyntaxClass<T>::getClass();
+    return SyntaxClass<T>(SyntaxClassInfo::get<T>());
 }
 
 struct SubstitutionSet
@@ -964,7 +980,7 @@ Index getFilterCountImpl(
 template<typename T>
 Decl* const* adjustFilterCursor(MemberFilterStyle filterStyle, Decl* const* ptr, Decl* const* end)
 {
-    return adjustFilterCursorImpl(T::kReflectClassInfo, filterStyle, ptr, end);
+    return adjustFilterCursorImpl(getSyntaxClass<T>(), filterStyle, ptr, end);
 }
 
 /// Finds the element at index. If there is no element at the index (for example has too few
@@ -976,19 +992,19 @@ Decl* const* getFilterCursorByIndex(
     Decl* const* end,
     Index index)
 {
-    return getFilterCursorByIndexImpl(T::kReflectClassInfo, filterStyle, ptr, end, index);
+    return getFilterCursorByIndexImpl(getSyntaxClass<T>(), filterStyle, ptr, end, index);
 }
 
 template<typename T>
 Index getFilterCount(MemberFilterStyle filterStyle, Decl* const* ptr, Decl* const* end)
 {
-    return getFilterCountImpl(T::kReflectClassInfo, filterStyle, ptr, end);
+    return getFilterCountImpl(getSyntaxClass<T>(), filterStyle, ptr, end);
 }
 
 template<typename T>
 bool isFilterNonEmpty(MemberFilterStyle filterStyle, Decl* const* ptr, Decl* const* end)
 {
-    return adjustFilterCursorImpl(T::kReflectClassInfo, filterStyle, ptr, end) != end;
+    return adjustFilterCursorImpl(getSyntaxClass<T>(), filterStyle, ptr, end) != end;
 }
 
 template<typename T>
@@ -1175,9 +1191,10 @@ struct FilteredMemberRefList
 
 // A "type expression" is a term that we expect to resolve to a type during checking.
 // We store both the original syntax and the resolved type here.
+FIDDLE()
 struct TypeExp
 {
-    SLANG_VALUE_CLASS(TypeExp)
+    FIDDLE(...)
     typedef TypeExp ThisType;
 
     TypeExp() {}
@@ -1208,8 +1225,6 @@ struct TypeExp
     Type* operator->() { return Ptr(); }
 
     ThisType& operator=(const ThisType& rhs) = default;
-
-    // TypeExp accept(SyntaxVisitor* visitor);
 
     /// A global immutable TypeExp, that has no type or exp set.
     static const TypeExp empty;
@@ -1249,20 +1264,9 @@ inline LookupOptions operator&(LookupOptions a, LookupOptions b)
                            (std::underlying_type_t<LookupOptions>)b);
 }
 
-class SerialRefObject;
-
-// Make sure C++ extractor can see the base class.
-SLANG_PRE_DECLARE(OBJ, class SerialRefObject)
-
-SLANG_TYPE_SET(OBJ, RefObject)
-SLANG_TYPE_SET(VALUE, Value)
-SLANG_TYPE_SET(AST, ASTNode)
-
-class LookupResultItem_Breadcrumb : public SerialRefObject
+class LookupResultItem_Breadcrumb : public RefObject
 {
 public:
-    SLANG_OBJ_CLASS(LookupResultItem_Breadcrumb)
-
     enum class Kind : uint8_t
     {
         // The lookup process looked "through" an in-scope
@@ -1342,8 +1346,6 @@ protected:
 // Represents one item found during lookup
 struct LookupResultItem
 {
-    SLANG_VALUE_CLASS(LookupResultItem)
-
     typedef LookupResultItem_Breadcrumb Breadcrumb;
 
     // Sometimes lookup finds an item, but there were additional
@@ -1501,14 +1503,12 @@ struct LookupRequest
     }
 };
 
-struct WitnessTable;
+class WitnessTable;
 
 // A value that witnesses the satisfaction of an interface
 // requirement by a particular declaration or value.
 struct RequirementWitness
 {
-    SLANG_VALUE_CLASS(RequirementWitness)
-
     RequirementWitness()
         : m_flavor(Flavor::none)
     {
@@ -1557,10 +1557,10 @@ struct RequirementWitness
 
 typedef OrderedDictionary<Decl*, RequirementWitness> RequirementDictionary;
 
-struct WitnessTable : SerialRefObject
+FIDDLE()
+class WitnessTable : public RefObject
 {
-    SLANG_OBJ_CLASS(WitnessTable)
-
+    FIDDLE(...)
     const RequirementDictionary& getRequirementDictionary() { return m_requirementDictionary; }
 
     void add(Decl* decl, RequirementWitness const& witness);
@@ -1597,14 +1597,12 @@ typedef List<SpecializationParam> SpecializationParams;
 
 struct SpecializationArg
 {
-    SLANG_VALUE_CLASS(SpecializationArg)
     Val* val = nullptr;
 };
 typedef List<SpecializationArg> SpecializationArgs;
 
 struct ExpandedSpecializationArg : SpecializationArg
 {
-    SLANG_VALUE_CLASS(ExpandedSpecializationArg)
     Val* witness = nullptr;
 };
 typedef List<ExpandedSpecializationArg> ExpandedSpecializationArgs;
@@ -1612,8 +1610,10 @@ typedef List<ExpandedSpecializationArg> ExpandedSpecializationArgs;
 /// A reference-counted object to hold a list of candidate extensions
 /// that might be applicable to a type based on its declaration.
 ///
-struct CandidateExtensionList : RefObject
+FIDDLE()
+class CandidateExtensionList : public RefObject
 {
+    FIDDLE(...)
     List<ExtensionDecl*> candidateExtensions;
 };
 
@@ -1625,19 +1625,20 @@ enum class DeclAssociationKind
     PrimalSubstituteFunc
 };
 
-struct DeclAssociation : SerialRefObject
+FIDDLE()
+class DeclAssociation : public RefObject
 {
-    SLANG_OBJ_CLASS(DeclAssociation)
+    FIDDLE(...)
     DeclAssociationKind kind;
     Decl* decl;
 };
 
 /// A reference-counted object to hold a list of associated decls for a decl.
 ///
-struct DeclAssociationList : SerialRefObject
+FIDDLE()
+class DeclAssociationList : public RefObject
 {
-    SLANG_OBJ_CLASS(DeclAssociationList)
-
+    FIDDLE(...)
     List<RefPtr<DeclAssociation>> associations;
 };
 
@@ -1687,10 +1688,10 @@ enum class FunctionDifferentiableLevel
 };
 
 /// Represents a markup (documentation) associated with a decl.
-struct MarkupEntry : public SerialRefObject
+FIDDLE()
+class MarkupEntry : public RefObject
 {
-    SLANG_OBJ_CLASS(MarkupEntry)
-
+    FIDDLE(...)
     NodeBase* m_node; ///< The node this documentation is associated with
     String m_markup;  ///< The raw contents of of markup associated with the decoration
     MarkupVisibility m_visibility = MarkupVisibility::Public; ///< How visible this decl is

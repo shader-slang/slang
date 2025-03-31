@@ -47,7 +47,7 @@ struct SyntaxParseInfo
 {
     const char* keywordName;           ///< The keyword associated with this parse
     SyntaxParseCallback callback;      ///< The callback to apply to the parse
-    const ReflectClassInfo* classInfo; ///<
+    SyntaxClass<NodeBase> classInfo; ///<
 };
 
 /// Get all of the predefined SyntaxParseInfos

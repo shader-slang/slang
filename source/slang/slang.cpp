@@ -570,64 +570,108 @@ SlangResult Session::saveCoreModule(SlangArchiveType archiveType, ISlangBlob** o
 }
 
 SlangResult Session::saveBuiltinModule(
-    slang::BuiltinModuleName builtinModuleName,
+    slang::BuiltinModuleName moduleTag,
     SlangArchiveType archiveType,
     ISlangBlob** outBlob)
 {
+    // If no builtin modules have been loaded, then there is
+    // nothing to save, and we fail immediately.
+    //
     if (m_builtinLinkage->mapNameToLoadedModules.getCount() == 0)
     {
-        // There is no standard lib loaded
         return SLANG_FAIL;
     }
 
-    BuiltinModuleInfo builtinModuleInfo = getBuiltinModuleInfo(builtinModuleName);
+    // The module will need to be looked up by its name, and
+    // will also be serialized out to a path with a matching name.
+    //
+    BuiltinModuleInfo moduleInfo = getBuiltinModuleInfo(moduleTag);
+    const char* moduleName = moduleInfo.name;
 
-    // Make a file system to read it from
-    ComPtr<ISlangMutableFileSystem> fileSystem;
-    SLANG_RETURN_ON_FAIL(createArchiveFileSystem(archiveType, fileSystem));
-
-    // Must have archiveFileSystem interface
-    auto archiveFileSystem = as<IArchiveFileSystem>(fileSystem);
-    if (!archiveFileSystem)
-    {
-        return SLANG_FAIL;
-    }
-
+    // If we cannot find a loaded module in the linkage with
+    // the appropriate name, then for some reason it hasn't
+    // been loaded, and we fail.
+    //
     RefPtr<Module> module;
     m_builtinLinkage->mapNameToLoadedModules.tryGetValue(
-        getNameObj(UnownedStringSlice(builtinModuleInfo.name)),
+        getNameObj(UnownedStringSlice(moduleName)),
         module);
     if (!module)
     {
         return SLANG_FAIL;
     }
 
+    // AST serialization needs access to an AST builder, so
+    // we establish a current builder for the duration of
+    // the serialization process.
+    //
     SLANG_AST_BUILDER_RAII(m_builtinLinkage->getASTBuilder());
 
-    // Set up options
+    // The serialized module will be represented as a logical
+    // file in an archive, so we create a logical file system
+    // to represent that archive.
+    //
+    ComPtr<ISlangMutableFileSystem> fileSystem;
+    SLANG_RETURN_ON_FAIL(createArchiveFileSystem(archiveType, fileSystem));
+    //
+    // The created file system must support the `IArchiveFileSystem`
+    // interface (since we created it with `createArchiveFileSystem`).
+    //
+    auto archiveFileSystem = as<IArchiveFileSystem>(fileSystem);
+    if (!archiveFileSystem)
+    {
+        return SLANG_FAIL;
+    }
+
+    // The output file name that we'll write to in that file system
+    // is just the builtin module name with a `.slang-module` suffix.
+    //
+    StringBuilder moduleFileName;
+    moduleFileName << moduleName << ".slang-module";
+
+    // The module serialization step has some options that we need
+    // to configure appropriately.
+    //
     SerialContainerUtil::WriteOptions options;
-
-    // Save with SourceLocation information
+    //
+    // We want builtin modules to be saved with their source location
+    // information.
+    //
     options.optionFlags |= SerialOptionFlag::SourceLocation;
-
-    // TODO(JS): Should this be the Session::getBuiltinSourceManager()?
+    //
+    // And in order to work with source locations, the serialization
+    // process will also need access to the source manager that
+    // can translate locations into their humane format.
+    //
     options.sourceManager = m_builtinLinkage->getSourceManager();
 
-    StringBuilder builder;
-    builder << builtinModuleInfo.name << ".slang-module";
-
+    // At this point we can finally delegate down to the next level,
+    // which handles the serialization of a Slang module into a
+    // byte stream.
+    //
     OwnedMemoryStream stream(FileAccess::Write);
-
     SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(module, options, &stream));
-
     auto contents = stream.getContents();
 
-    // Write into the file system
+    // Once the stream that represents the module has been written, we can
+    // write it to a file in the logical file system.
+    //
+    // TODO(tfoley): why can't the file system let us open the file for output?
+    //
     SLANG_RETURN_ON_FAIL(
-        fileSystem->saveFile(builder.getBuffer(), contents.getBuffer(), contents.getCount()));
+        fileSystem->saveFile(moduleFileName.getBuffer(), contents.getBuffer(), contents.getCount()));
 
-    // Now need to convert into a blob
-    SLANG_RETURN_ON_FAIL(archiveFileSystem->storeArchive(true, outBlob));
+    // And finally, we can ask the archive file system to serialize itself
+    // out as a blob of bytes, which yields the final serialized representation
+    // of the module.
+    //
+    SLANG_RETURN_ON_FAIL(archiveFileSystem->storeArchive(
+        // The `true` here indicates that the blob that gets created should own
+        // its content, independent from the file system object itself; otherwise
+        // the file system might return a blob that shares storage with itself.
+        true,
+        outBlob));
+
     return SLANG_OK;
 }
 
@@ -654,74 +698,100 @@ SlangResult Session::_readBuiltinModule(
         SLANG_RETURN_ON_FAIL(RiffUtil::read(&stream, riffContainer));
     }
 
-    // Load up the module
-
-    SerialContainerData containerData;
-
     Linkage* linkage = getBuiltinLinkage();
-
-    SourceManager* sourceManger = getBuiltinSourceManager();
-
+    SourceManager* sourceManager = getBuiltinSourceManager();
     NamePool* sessionNamePool = &namePool;
-    NamePool* linkageNamePool = linkage->getNamePool();
 
-    SerialContainerUtil::ReadOptions options;
-    options.namePool = linkageNamePool;
-    options.session = this;
-    options.sharedASTBuilder = linkage->getASTBuilder()->getSharedASTBuilder();
-    options.astBuilder = linkage->getASTBuilder();
-    options.sourceManager = sourceManger;
-    options.linkage = linkage;
+    auto moduleChunk = ModuleChunkRef::find(&riffContainer);
+    if (!moduleChunk)
+        return SLANG_FAIL;
 
-    // Hmm - don't have a suitable sink yet, so attempt to just not have one
-    options.sink = nullptr;
+    SHA1::Digest moduleDigest = moduleChunk.getDigest();
 
-    SLANG_RETURN_ON_FAIL(
-        SerialContainerUtil::read(&riffContainer, options, nullptr, containerData));
+    auto irChunk = moduleChunk.findIR();
+    if (!irChunk)
+        return SLANG_FAIL;
 
-    for (auto& srcModule : containerData.modules)
+    auto astChunk = moduleChunk.findAST();
+    if (!astChunk)
+        return SLANG_FAIL;
+
+    // Source location information is stored as a distinct
+    // chunk from the IR and AST, so we need to search for
+    // that chunk and then set up the information for use
+    // in the IR and AST deserialization (if we find anything).
+    //
+    RefPtr<SerialSourceLocReader> sourceLocReader;
+    if (auto debugChunk = findDebugChunk(moduleChunk.ptr()))
     {
-        RefPtr<Module> module(new Module(linkage, srcModule.astBuilder));
-        module->setName(moduleName);
-        module->setDigest(srcModule.digest);
-
-        ModuleDecl* moduleDecl = as<ModuleDecl>(srcModule.astRootNode);
-        // Set the module back reference on the decl
-        moduleDecl->module = module;
-
-        if (moduleDecl)
-        {
-            if (isFromCoreModule(moduleDecl))
-            {
-                registerBuiltinDecls(this, moduleDecl);
-            }
-
-            module->setModuleDecl(moduleDecl);
-        }
-
-        srcModule.irModule->setName(module->getNameObj());
-        module->setIRModule(srcModule.irModule);
-
-        // Put in the loaded module map
-        linkage->mapNameToLoadedModules.add(sessionNamePool->getName(moduleName), module);
-
-        // Add the resulting code to the appropriate scope
-        if (!scope->containerDecl)
-        {
-            // We are the first chunk of code to be loaded for this scope
-            scope->containerDecl = moduleDecl;
-        }
-        else
-        {
-            // We need to create a new scope to link into the whole thing
-            auto subScope = linkage->getASTBuilder()->create<Scope>();
-            subScope->containerDecl = moduleDecl;
-            subScope->nextSibling = scope->nextSibling;
-            scope->nextSibling = subScope;
-        }
-
-        outModule = module.get();
+        SLANG_RETURN_ON_FAIL(readSourceLocationsFromDebugChunk(
+            debugChunk,
+            sourceManager,
+            sourceLocReader));
     }
+
+    // At this point we create the `Module` object that will
+    // represent the builtin module we are reading, although
+    // it is still possible that deserialization will fail
+    // at one of the following steps.
+    //
+    auto astBuilder = linkage->getASTBuilder();
+    RefPtr<Module> module(new Module(linkage, astBuilder));
+    module->setName(moduleName);
+    module->setDigest(moduleDigest);
+
+
+    // Next, we set about deserializing the AST representation
+    // of the module.
+    //
+    auto moduleDecl = readSerializedModuleAST(
+        linkage,
+        astBuilder,
+        nullptr, // no sink
+        astChunk,
+        sourceLocReader,
+        SourceLoc());
+    if (!moduleDecl)
+    {
+        return SLANG_FAIL;
+    }
+    moduleDecl->module = module;
+    module->setModuleDecl(moduleDecl);
+
+    if (isFromCoreModule(moduleDecl))
+    {
+        registerBuiltinDecls(this, moduleDecl);
+    }
+
+    // After the AST module has been read in, we next look
+    // to deserialize the IR module.
+    //
+    RefPtr<IRModule> irModule;
+    SLANG_RETURN_ON_FAIL(decodeModuleIR(irModule, irChunk, this, sourceLocReader));
+
+    irModule->setName(module->getNameObj());
+    module->setIRModule(irModule);
+
+    // Put in the loaded module map
+    linkage->mapNameToLoadedModules.add(sessionNamePool->getName(moduleName), module);
+
+
+    // Add the resulting code to the appropriate scope
+    if (!scope->containerDecl)
+    {
+        // We are the first chunk of code to be loaded for this scope
+        scope->containerDecl = moduleDecl;
+    }
+    else
+    {
+        // We need to create a new scope to link into the whole thing
+        auto subScope = linkage->getASTBuilder()->create<Scope>();
+        subScope->containerDecl = moduleDecl;
+        subScope->nextSibling = scope->nextSibling;
+        scope->nextSibling = subScope;
+    }
+
+    outModule = module.get();
 
     return SLANG_OK;
 }
@@ -1526,9 +1596,9 @@ slang::IModule* Linkage::loadModuleFromBlob(
                 pathInfo = PathInfo::makeNormal(pathStr, cannonicalPath);
             }
         }
-        auto module = loadModule(name, pathInfo, source, SourceLoc(), &sink, nullptr, blobType);
+        RefPtr<Module> module = loadModuleImpl(name, pathInfo, source, SourceLoc(), &sink, nullptr, blobType);
         sink.getBlobIfNeeded(outDiagnostics);
-        return asExternal(module);
+        return asExternal(module.detach());
     }
     catch (const AbortCompilationException& e)
     {
@@ -4057,101 +4127,169 @@ void Linkage::loadParsedModule(
     loadedModulesList.add(loadedModule);
 }
 
-RefPtr<Module> Linkage::loadDeserializedModule(
-    Name* name,
-    const PathInfo& filePathInfo,
-    SerialContainerData::Module& moduleEntry,
+RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
+    ModuleChunkRef moduleChunk,
     DiagnosticSink* sink)
 {
-    SLANG_AST_BUILDER_RAII(m_astBuilder);
     RefPtr<Module> resultModule;
-    if (mapNameToLoadedModules.tryGetValue(name, resultModule))
-        return resultModule;
-    if (mapPathToLoadedModule.tryGetValue(filePathInfo.getMostUniqueIdentity(), resultModule))
+
+    // We will attempt things in a few different steps, trying to
+    // decode as little of the serialized module as necessary at
+    // each step, so that we don't waste time on the heavyweight
+    // stuff when we didn't need to.
+    //
+    // The first step is to simply decode the module name, and
+    // see if we have a already loaded a matching module.
+
+    auto moduleName = getNamePool()->getName(moduleChunk.getName());
+    if (mapNameToLoadedModules.tryGetValue(moduleName, resultModule))
         return resultModule;
 
-    resultModule = new Module(this, m_astBuilder);
-    prepareDeserializedModule(moduleEntry, filePathInfo, resultModule, sink);
+    // It is possible that the module has been loaded, but somehow
+    // under a different name, so next we decode the list of file
+    // paths that the module depends on, and then rely on the assumption
+    // that the first of those paths represents the file for the module
+    // itself to detect if we've already loaded a module from that
+    // path.
+    //
+    // Note: While this is a distasteful assumption to make, it is
+    // one that gets made in several parts of the compiler codebase
+    // already. It isn't something that can be fixed in just one
+    // place at this point.
 
-    loadedModulesList.add(resultModule);
-    mapPathToLoadedModule.add(filePathInfo.getMostUniqueIdentity(), resultModule);
-    mapNameToLoadedModules.add(name, resultModule);
-    return resultModule;
+    auto fileDependenciesChunk = moduleChunk.getFileDependencies();
+    auto firstFileDependencyChunk = fileDependenciesChunk.getFirst();
+    if (!firstFileDependencyChunk)
+        return nullptr;
+
+    auto modulePathInfo = PathInfo::makePath(firstFileDependencyChunk.getValue());
+    if (mapPathToLoadedModule.tryGetValue(modulePathInfo.getMostUniqueIdentity(), resultModule))
+        return resultModule;
+
+    // If we failed to find a previously-loaded module, then we
+    // will go ahead and load the module from the serialized form.
+    //
+    PathInfo filePathInfo;
+    return loadSerializedModule(
+        moduleName,
+        modulePathInfo,
+        moduleChunk,
+        SourceLoc(),
+        sink);
 }
 
-RefPtr<Module> Linkage::loadModuleFromIRBlobImpl(
-    Name* name,
-    const PathInfo& filePathInfo,
-    ISlangBlob* fileContentsBlob,
-    SourceLoc const& loc,
-    DiagnosticSink* sink,
-    const LoadedModuleDictionary* additionalLoadedModules)
+RefPtr<Module> Linkage::loadSerializedModule(
+    Name* moduleName,
+    const PathInfo& moduleFilePathInfo,
+    ModuleChunkRef moduleChunk,
+    SourceLoc const& requestingLoc,
+    DiagnosticSink* sink)
 {
-    SLANG_AST_BUILDER_RAII(m_astBuilder);
+    auto astBuilder = getASTBuilder();
+    SLANG_AST_BUILDER_RAII(astBuilder);
 
-    RefPtr<Module> resultModule = new Module(this, getASTBuilder());
-    resultModule->setName(name);
-    ModuleBeingImportedRAII moduleBeingImported(this, resultModule, name, loc);
+    auto module = RefPtr(new Module(this, astBuilder));
+    module->setName(moduleName);
 
-    String mostUniqueIdentity = filePathInfo.getMostUniqueIdentity();
+    // Just as if we were processing an `import` declaration in
+    // source code, we will track the fact that this serialized
+    // modlue is (effectively) being imported, so that we can
+    // diagnose anything troublesome, like an attempt at a
+    // recursive import.
+    //
+    ModuleBeingImportedRAII moduleBeingImported(this, module, moduleName, requestingLoc);
+
+    // We will register the module in our data structures to
+    // track loaded modules, and then remove it in the case
+    // where there is some kind of failure.
+    //
+    String mostUniqueIdentity = moduleFilePathInfo.getMostUniqueIdentity();
     SLANG_ASSERT(mostUniqueIdentity.getLength() > 0);
 
-    RiffContainer container;
-    MemoryStreamBase readStream(
-        FileAccess::Read,
-        fileContentsBlob->getBufferPointer(),
-        fileContentsBlob->getBufferSize());
-    SLANG_RETURN_NULL_ON_FAIL(RiffUtil::read(&readStream, container));
-
-    if (m_optionSet.getBoolOption(CompilerOptionName::UseUpToDateBinaryModule))
+    mapPathToLoadedModule.add(mostUniqueIdentity, module);
+    mapNameToLoadedModules.add(moduleName, module);
+    try
     {
-        if (!isBinaryModuleUpToDate(filePathInfo.foundPath, &container))
+        if (SLANG_FAILED(loadSerializedModuleContents(
+            module,
+            moduleFilePathInfo,
+            moduleChunk,
+            sink)))
+        {
+            mapPathToLoadedModule.remove(mostUniqueIdentity);
+            mapNameToLoadedModules.remove(moduleName);
             return nullptr;
+        }
+
+        loadedModulesList.add(module);
+        return module;
     }
-
-    mapPathToLoadedModule.add(mostUniqueIdentity, resultModule);
-    mapNameToLoadedModules.add(name, resultModule);
-
-    SerialContainerUtil::ReadOptions readOptions;
-    readOptions.linkage = this;
-    readOptions.astBuilder = getASTBuilder();
-    readOptions.session = getSessionImpl();
-    readOptions.sharedASTBuilder = getASTBuilder()->getSharedASTBuilder();
-    readOptions.sink = sink;
-    readOptions.sourceManager = getSourceManager();
-    readOptions.namePool = getNamePool();
-    readOptions.modulePath = filePathInfo.foundPath;
-    SerialContainerData containerData;
-    if (SLANG_FAILED(SerialContainerUtil::read(
-            &container,
-            readOptions,
-            additionalLoadedModules,
-            containerData)) ||
-        containerData.modules.getCount() != 1)
+    catch (...)
     {
         mapPathToLoadedModule.remove(mostUniqueIdentity);
-        mapNameToLoadedModules.remove(name);
-        return nullptr;
+        mapNameToLoadedModules.remove(moduleName);
+        throw;
     }
-    auto moduleEntry = containerData.modules.getFirst();
-
-    prepareDeserializedModule(moduleEntry, filePathInfo, resultModule, sink);
-
-    loadedModulesList.add(resultModule);
-    resultModule->setPathInfo(filePathInfo);
-    resultModule->getIRModule()->setName(resultModule->getNameObj());
-
-    return resultModule;
 }
 
-Module* Linkage::loadModule(String const& name)
+RefPtr<Module> Linkage::loadBinaryModuleImpl(
+    Name* moduleName,
+    const PathInfo& moduleFilePathInfo,
+    ISlangBlob* moduleFileContents,
+    SourceLoc const& requestingLoc,
+    DiagnosticSink* sink)
 {
-    // TODO: We either need to have a diagnostics sink
-    // get passed into this operation, or associate
-    // one with the linkage.
+    auto astBuilder = getASTBuilder();
+    SLANG_AST_BUILDER_RAII(astBuilder);
+
+    // We start by reading the content of the file into
+    // an in-memory RIFF container.
     //
-    DiagnosticSink* sink = nullptr;
-    return findOrImportModule(getNamePool()->getName(name), SourceLoc(), sink);
+    // TODO(tfoley): this is an unnecessary copy step, since
+    // we can simply use the contents of the blob directly
+    // and navigate it in-memory.
+    //
+    RiffContainer riffContainer;
+    {
+        MemoryStreamBase readStream(
+            FileAccess::Read,
+            moduleFileContents->getBufferPointer(),
+            moduleFileContents->getBufferSize());
+        SLANG_RETURN_NULL_ON_FAIL(RiffUtil::read(&readStream, riffContainer));
+    }
+
+    auto moduleChunkRef = ModuleChunkRef::find(&riffContainer);
+    if (!moduleChunkRef)
+    {
+        return nullptr;
+    }
+
+    // Next, we attempt to check if the binary module is up to
+    // date with the compilation options in use as well as
+    // the contents of all the files its compilation depended
+    // on (as determined by its hash).
+    //
+    String mostUniqueIdentity = moduleFilePathInfo.getMostUniqueIdentity();
+    SLANG_ASSERT(mostUniqueIdentity.getLength() > 0);
+    if (m_optionSet.getBoolOption(CompilerOptionName::UseUpToDateBinaryModule))
+    {
+        if (!isBinaryModuleUpToDate(moduleFilePathInfo.foundPath, moduleChunkRef))
+        {
+            return nullptr;
+        }
+    }
+
+    // If everything seems reasonable, then we will go ahead and load
+    // the module more completely from that serialized representation.
+    //
+    RefPtr<Module> module = loadSerializedModule(
+        moduleName,
+        moduleFilePathInfo,
+        moduleChunkRef,
+        requestingLoc,
+        sink);
+
+    return module;
 }
 
 void Linkage::_diagnoseErrorInImportedModule(DiagnosticSink* sink)
@@ -4166,24 +4304,48 @@ void Linkage::_diagnoseErrorInImportedModule(DiagnosticSink* sink)
     }
 }
 
-RefPtr<Module> Linkage::loadModule(
+RefPtr<Module> Linkage::loadModuleImpl(
+    Name* moduleName,
+    const PathInfo& modulePathInfo,
+    ISlangBlob* moduleBlob,
+    SourceLoc const& requestingLoc,
+    DiagnosticSink* sink,
+    const LoadedModuleDictionary* additionalLoadedModules,
+    ModuleBlobType blobType)
+{
+    switch (blobType)
+    {
+    case ModuleBlobType::IR:
+        return loadBinaryModuleImpl(
+            moduleName,
+            modulePathInfo,
+            moduleBlob,
+            requestingLoc,
+            sink);
+
+    case ModuleBlobType::Source:
+        return loadSourceModuleImpl(
+            moduleName,
+            modulePathInfo,
+            moduleBlob,
+            requestingLoc,
+            sink,
+            additionalLoadedModules);
+
+    default:
+        SLANG_UNEXPECTED("unknown module blob type");
+        UNREACHABLE_RETURN(nullptr);
+    }
+}
+
+RefPtr<Module> Linkage::loadSourceModuleImpl(
     Name* name,
     const PathInfo& filePathInfo,
     ISlangBlob* sourceBlob,
     SourceLoc const& srcLoc,
     DiagnosticSink* sink,
-    const LoadedModuleDictionary* additionalLoadedModules,
-    ModuleBlobType blobType)
+    const LoadedModuleDictionary* additionalLoadedModules)
 {
-    if (blobType == ModuleBlobType::IR)
-        return loadModuleFromIRBlobImpl(
-            name,
-            filePathInfo,
-            sourceBlob,
-            srcLoc,
-            sink,
-            additionalLoadedModules);
-
     RefPtr<FrontEndCompileRequest> frontEndReq = new FrontEndCompileRequest(this, nullptr, sink);
 
     frontEndReq->additionalLoadedModules = additionalLoadedModules;
@@ -4275,8 +4437,10 @@ RefPtr<Module> Linkage::loadModule(
         return nullptr;
     }
 
-    if (module)
-        module->setPathInfo(filePathInfo);
+    if (!module)
+        return nullptr;
+
+    module->setPathInfo(filePathInfo);
     return module;
 }
 
@@ -4319,126 +4483,267 @@ String getFileNameFromModuleName(Name* name, bool translateUnderScore)
 }
 
 RefPtr<Module> Linkage::findOrImportModule(
-    Name* name,
-    SourceLoc const& loc,
+    Name* moduleName,
+    SourceLoc const& requestingLoc,
     DiagnosticSink* sink,
     const LoadedModuleDictionary* loadedModules)
 {
     // Have we already loaded a module matching this name?
     //
-    RefPtr<LoadedModule> loadedModule;
-    if (mapNameToLoadedModules.tryGetValue(name, loadedModule))
+    RefPtr<LoadedModule> previouslyLoadedModule;
+    if (mapNameToLoadedModules.tryGetValue(moduleName, previouslyLoadedModule))
     {
         // If the map shows a null module having been loaded,
         // then that means there was a prior load attempt,
         // but it failed, so we won't bother trying again.
         //
-        if (!loadedModule)
+        if (!previouslyLoadedModule)
             return nullptr;
 
         // If state shows us that the module is already being
         // imported deeper on the call stack, then we've
         // hit a recursive case, and that is an error.
         //
-        if (isBeingImported(loadedModule))
+        if (isBeingImported(previouslyLoadedModule))
         {
             // We seem to be in the middle of loading this module
-            sink->diagnose(loc, Diagnostics::recursiveModuleImport, name);
+            sink->diagnose(requestingLoc, Diagnostics::recursiveModuleImport, moduleName);
             return nullptr;
         }
 
-        return loadedModule;
+        return previouslyLoadedModule;
     }
 
     // If the user is providing an additional list of loaded modules, we find
     // if the module being imported is in that list. This allows a translation
     // unit to use previously checked translation units in the same
     // FrontEndCompileRequest.
-    Module* previouslyLoadedModule = nullptr;
-    if (loadedModules && loadedModules->tryGetValue(name, previouslyLoadedModule))
     {
-        return previouslyLoadedModule;
+        Module* previouslyLoadedLocalModule = nullptr;
+        if (loadedModules && loadedModules->tryGetValue(moduleName, previouslyLoadedLocalModule))
+        {
+            return previouslyLoadedLocalModule;
+        }
     }
 
-    if (name == getSessionImpl()->glslModuleName)
+    // If the name being requested matches the name of a built-in module,
+    // then we will special-case the process by loading that builtin
+    // module directly.
+    //
+    // TODO: right now this logic is only considering the built-in `glsl`
+    // module, but it should probably be generalized so that we can more
+    // easily support having multiple built-in modules rather than just
+    // putting everything into `core`.
+    //
+    if (moduleName == getSessionImpl()->glslModuleName)
     {
         // This is a builtin glsl module, just load it from embedded definition.
         auto glslModule = getSessionImpl()->getBuiltinModule(slang::BuiltinModuleName::GLSL);
         if (!glslModule)
         {
-            sink->diagnose(loc, Diagnostics::glslModuleNotAvailable, name);
+            // Note: the way this logic is currently written, if the built-in
+            // `glsl` module fails to load, then we will *not* fall back to
+            // searching for a user-defined module in a file like `glsl.slang`.
+            //
+            // It is unclear if this should be the default behavior or not.
+            // Should built-in modules be prioritized over user modules?
+            // Should built-in modules shadow user modules, even when the
+            // built-in module fails to load, for some reason?
+            //
+            sink->diagnose(requestingLoc, Diagnostics::glslModuleNotAvailable, moduleName);
         }
         return glslModule;
     }
 
-    // Next, try to find the file of the given name,
-    // using our ordinary include-handling logic.
+    // We are going to use a loop to search for a suitable file to
+    // load the module from, to account for a few key choices:
+    //
+    // * We can both load modules from a source `.slang` file,
+    //   or from a binary `.slang-module` file.
+    //
+    // * For a variety of reasons, the `import` logic has historically
+    //   translated underscores in a module name into dashes (so that
+    //   `import my_module` will look for `my-module.slang`), and we
+    //   try to support both that convention as well as a convention
+    //   that preserves underscores.
+    //
+    // To try to keep this logic as orthogonal as possible, we first
+    // construct lists of the options we want to iterate over, and
+    // then do the actual loop later.
 
-    IncludeSystem includeSystem(&getSearchDirectories(), getFileSystemExt(), getSourceManager());
-
-    // Get the original path info
-    PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);
-    PathInfo filePathInfo;
-
-
-    // Look for a precompiled module first, if not exist, load from source.
-    bool shouldCheckBinaryModuleSettings[2] = {true, false};
-
-    for (auto checkBinaryModule : shouldCheckBinaryModuleSettings)
+    ShortList<ModuleBlobType, 2> typesToTry;
+    if (isInLanguageServer())
     {
         // When in language server, we always prefer to use source module if it is available.
-        if (isInLanguageServer())
-            checkBinaryModule = !checkBinaryModule;
+        typesToTry.add(ModuleBlobType::Source);
+        typesToTry.add(ModuleBlobType::IR);
+    }
+    else
+    {
+        // Look for a precompiled module first, if not exist, load from source.
+        typesToTry.add(ModuleBlobType::IR);
+        typesToTry.add(ModuleBlobType::Source);
+    }
 
-        // Try without translating `_` to `-` first, if that fails, try translating.
-        for (int translateUnderScore = 0; translateUnderScore <= 1; translateUnderScore++)
+    // We will always search for a file name that directly matches the
+    // module name as written first, and then search for one with
+    // underscores replaced by dashes. The latter is the original
+    // behavior that `import` provided, but it seems safest to prefer
+    // the exact name spelled in the user's code when there might
+    // actually be ambiguity.
+    //
+    auto defaultSourceFileName = getFileNameFromModuleName(moduleName, false);
+    auto alternativeSourceFileName = getFileNameFromModuleName(moduleName, true);
+    String sourceFileNamesToTry[] = { defaultSourceFileName, alternativeSourceFileName };
+
+    // We are going to look for the candidate file using the same
+    // logic that would be used for a preprocessor `#include`,
+    // so we set up the necessary state.
+    //
+    IncludeSystem includeSystem(
+        &getSearchDirectories(),
+        getFileSystemExt(),
+        getSourceManager());
+
+    // Just like with a `#include`, the search will take into
+    // account the path to the file where the request to import
+    // this module came from (e.g. the source file with the
+    // `import` declaration), if such a path is available.
+    //
+    PathInfo requestingPathInfo = getSourceManager()->getPathInfo(
+        requestingLoc, SourceLocType::Actual);
+
+    for (auto type : typesToTry)
+    {
+        for (auto sourceFileName : sourceFileNamesToTry)
         {
-            auto moduleSourceFileName = getFileNameFromModuleName(name, translateUnderScore == 1);
+            // The `sourceFileName` will have the `.slang` extension,
+            // so if we are looking for a binary module, we need
+            // to change the extension we will look for.
+            //
             String fileName;
-            if (checkBinaryModule == 1)
-                fileName = Path::replaceExt(moduleSourceFileName, "slang-module");
-            else
-                fileName = moduleSourceFileName;
+            switch (type)
+            {
+            case ModuleBlobType::Source:
+                fileName = sourceFileName;
+                break;
 
-            ComPtr<ISlangBlob> fileContents;
+            case ModuleBlobType::IR:
+                fileName = Path::replaceExt(sourceFileName, "slang-module");
+                break;
+            }
 
-            // We have to load via the found path - as that is how file was originally loaded
+            // We now search for a file matching the desired name,
+            // using the same logic as for a `#include`.
+            //
+            // TODO: We might want to consider how to handle the case
+            // of an `import` with a relative path a little specially,
+            // since it could in theory be possible for two `.slang`
+            // files with the same base name to exist in different
+            // directories in a project, and we'd want file-relative
+            // `import`s to work for each, without having either one
+            // be able to "claim" the bare identifier of the base
+            // name for itself.
+            //
+            PathInfo filePathInfo;
             if (SLANG_FAILED(
-                    includeSystem.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
+                includeSystem.findFile(fileName, requestingPathInfo.foundPath, filePathInfo)))
             {
+                // If we failed to find the file at this step, we
+                // will continue the search for our other options.
+                //
                 continue;
             }
 
-            // Maybe this was loaded previously at a different relative name?
+            // We will *again* search for a previously loaded module.
+            //
+            // It is possible that the same file will have been loaded
+            // as a module under two different module names. The easiest
+            // way for this to happen is if there are `import` declarations
+            // using both the underscore and dash conventions (e.g., both
+            // `import "my-module.slang"` and `import my_module`).
+            //
+            // This case may also arise if one file `import`s a module using
+            // just an identifier for its name, but another `import`s it
+            // using a path (e.g., `import "subdir/file.slang"`).
+            //
+            // No matter how the situation arises, we only want to have one
+            // copy of the "same" module loaded at a given time, so we
+            // will re-use the existing module if we find one here.
+            //
             if (mapPathToLoadedModule.tryGetValue(
-                    filePathInfo.getMostUniqueIdentity(),
-                    loadedModule))
-                return loadedModule;
+                filePathInfo.getMostUniqueIdentity(),
+                previouslyLoadedModule))
+            {
+                // TODO: If we find a previously-loaded module at this step,
+                // then we should probably register that module under the
+                // given `moduleName` in the map of loaded modules, so
+                // that subsequent `import`s using the same form will find it.
+                //
+                return previouslyLoadedModule;
+            }
 
-            // Try to load it
-            if (!fileContents && SLANG_FAILED(includeSystem.loadFile(filePathInfo, fileContents)))
+            // Now we try to load the content of the file.
+            //
+            // If for some reason we could find a file at the
+            // given path, but for some reason couldn't *open*
+            // and *read* it, then we continue the search
+            // using whatever other candidate file names are left.
+            //
+            ComPtr<ISlangBlob> fileContents;
+            if (SLANG_FAILED(includeSystem.loadFile(filePathInfo, fileContents)))
             {
                 continue;
             }
 
-            // We've found a file that we can load for the given module, so
-            // go ahead and perform the module-load action
-            auto resultModule = loadModule(
-                name,
+            // If we found a real file and were able to load its contents,
+            // then we'll go ahead and try to load a module from it,
+            // whether by compiling it or decoding the binary.
+            //
+            auto module = loadModuleImpl(
+                moduleName,
                 filePathInfo,
                 fileContents,
-                loc,
+                requestingLoc,
                 sink,
                 loadedModules,
-                (checkBinaryModule == 1 ? ModuleBlobType::IR : ModuleBlobType::Source));
-            if (resultModule)
-                return resultModule;
+                type);
+
+            // If the attempt to load the module from the given path
+            // was successful, we go ahead and use it, without trying
+            // out any other options.
+            //
+            if (module)
+                return module;
         }
     }
 
-    // Error: we cannot find the file.
-    sink->diagnose(loc, Diagnostics::cannotOpenFile, getFileNameFromModuleName(name, false));
-    mapNameToLoadedModules[name] = nullptr;
+    // If we tried out all of our candidate file names
+    // and failed with each of them, then we diagnose
+    // an error based on the original *source* file
+    // name.
+    //
+    // TODO: this should really be an error message
+    // that clearly states something like "no file
+    // suitable for module `whatever` was found
+    // and loaded.
+    //
+    // Ideally that error message would include whatever
+    // of the candidate file names from the loop above
+    // got furthest along in the process (or just a
+    // list of the file names that were tried, if
+    // nothing was even found via the include system).
+    //
+    sink->diagnose(
+        requestingLoc, Diagnostics::cannotOpenFile, defaultSourceFileName);
+
+    // If the attempt to import the module failed, then
+    // we will stick a null pointer into the map of loaded
+    // modules, so that subsequent attempts to load a module
+    // with this name will return null without having to
+    // go through all the above steps yet again.
+    //
+    mapNameToLoadedModules[moduleName] = nullptr;
     return nullptr;
 }
 
@@ -4454,27 +4759,19 @@ SourceFile* Linkage::loadSourceFile(String pathFrom, String path)
 }
 
 // Check if a serialized module is up-to-date with current compiler options and source files.
-bool Linkage::isBinaryModuleUpToDate(String fromPath, RiffContainer* container)
+bool Linkage::isBinaryModuleUpToDate(String fromPath, RiffContainer* riffContainer)
 {
-    DiagnosticSink sink;
-    SerialContainerUtil::ReadOptions readOptions;
-    readOptions.linkage = this;
-    readOptions.astBuilder = getASTBuilder();
-    readOptions.session = getSessionImpl();
-    readOptions.sharedASTBuilder = getASTBuilder()->getSharedASTBuilder();
-    readOptions.sink = &sink;
-    readOptions.sourceManager = getSourceManager();
-    readOptions.namePool = getNamePool();
-    readOptions.readHeaderOnly = true;
-
-    SerialContainerData containerData;
-    if (SLANG_FAILED(SerialContainerUtil::read(container, readOptions, nullptr, containerData)))
+    auto moduleChunk = ModuleChunkRef::find(riffContainer);
+    if (!moduleChunk)
         return false;
 
-    if (containerData.modules.getCount() != 1)
-        return false;
+    return isBinaryModuleUpToDate(fromPath, moduleChunk);
+}
 
-    auto& moduleHeader = containerData.modules[0];
+bool Linkage::isBinaryModuleUpToDate(String fromPath, ModuleChunkRef moduleChunk)
+{
+    SHA1::Digest existingDigest = moduleChunk.getDigest();
+
     DigestBuilder<SHA1> digestBuilder;
     auto version = String(getBuildTagString());
     digestBuilder.append(version);
@@ -4482,9 +4779,12 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RiffContainer* container)
 
     // Find the canonical path of the directory containing the module source file.
     String moduleSrcPath = "";
-    if (moduleHeader.dependentFiles.getCount())
+
+    auto dependencyChunks = moduleChunk.getFileDependencies();
+    if (auto firstDependencyChunk = dependencyChunks.getFirst())
     {
-        moduleSrcPath = moduleHeader.dependentFiles.getFirst();
+        moduleSrcPath = firstDependencyChunk.getValue();
+
         IncludeSystem includeSystem(
             &getSearchDirectories(),
             getFileSystemExt(),
@@ -4497,21 +4797,22 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, RiffContainer* container)
         }
     }
 
-    for (auto file : moduleHeader.dependentFiles)
+    for (auto dependencyChunk : dependencyChunks)
     {
+        auto file = dependencyChunk.getValue();
         auto sourceFile = loadSourceFile(fromPath, file);
         if (!sourceFile)
         {
             // If we cannot find the source file from `fromPath`,
             // try again from the module's source file path.
-            if (moduleHeader.dependentFiles.getCount() != 0)
+            if (dependencyChunks.getFirst())
                 sourceFile = loadSourceFile(moduleSrcPath, file);
         }
         if (!sourceFile)
             return false;
         digestBuilder.append(sourceFile->getDigest());
     }
-    return digestBuilder.finalize() == moduleHeader.digest;
+    return digestBuilder.finalize() == existingDigest;
 }
 
 SLANG_NO_THROW bool SLANG_MCALL
@@ -6243,20 +6544,104 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
     getSourceManager()->setFileSystemExt(m_fileSystemExt);
 }
 
-void Linkage::prepareDeserializedModule(
-    SerialContainerData::Module& moduleEntry,
-    const PathInfo& filePathInfo,
+SlangResult Linkage::loadSerializedModuleContents(
     Module* module,
+    const PathInfo& moduleFilePathInfo,
+    ModuleChunkRef moduleChunk,
     DiagnosticSink* sink)
 {
-    module->setIRModule(moduleEntry.irModule);
-    module->setModuleDecl(as<ModuleDecl>(moduleEntry.astRootNode));
-    module->clearFileDependency();
-    String moduleSourcePath = filePathInfo.foundPath;
-    bool isFirst = true;
-    for (auto file : moduleEntry.dependentFiles)
+    // At this point we've dealt with basically all of
+    // the formalities, and we just need to get down
+    // to the real work of decoding the information
+    // in the `moduleChunk`.
+
+    auto sourceManager = getSourceManager();
+    RefPtr<SerialSourceLocReader> sourceLocReader;
+    if (auto debugChunk = findDebugChunk(moduleChunk.ptr()))
     {
-        auto sourceFile = loadSourceFile(filePathInfo.foundPath, file);
+        SLANG_RETURN_ON_FAIL(readSourceLocationsFromDebugChunk(
+            debugChunk,
+            sourceManager,
+            sourceLocReader));
+    }
+
+    auto astChunk = moduleChunk.findAST();
+    if (!astChunk)
+        return SLANG_FAIL;
+
+    auto irChunk = moduleChunk.findIR();
+    if (!irChunk)
+        return SLANG_FAIL;
+
+    auto astBuilder = getASTBuilder();
+    auto session = getSessionImpl();
+
+    // For the purposes of any modules referenced
+    // by the module we're about to decode, we will
+    // construct a source location that represents
+    // the module itself (if possible).
+    //
+    // TODO(tfoley): This logic seems like overkill, given
+    // that many (most? all?) control-flow paths that can
+    // reach this routine will have already found a `SourceFile`
+    // to represent the module, as part of even getting the
+    // `moduleFilePathInfo` to pass in
+    //
+    // The approach here is more or less exactly copied
+    // from what the old `SerialContainerUtil::read` function
+    // used to do, with the hopes that it will as many tests
+    // passing as possible.
+    //
+    // Down the line somebody should scrutinize all of this
+    // kind of logic in the compiler codebase, because there
+    // is something that feels unclean about how paths are being handled.
+    //
+    SourceLoc serializedModuleLoc;
+    {
+        auto sourceFile = sourceManager->findSourceFileByPathRecursively(moduleFilePathInfo.foundPath);
+        if (!sourceFile)
+        {
+            sourceFile = sourceManager->createSourceFileWithString(moduleFilePathInfo, String());
+            sourceManager->addSourceFile(moduleFilePathInfo.getMostUniqueIdentity(), sourceFile);
+        }
+        auto sourceView = sourceManager->createSourceView(sourceFile, &moduleFilePathInfo, SourceLoc());
+        serializedModuleLoc = sourceView->getRange().begin;
+    }
+
+    auto moduleDecl = readSerializedModuleAST(
+        this,
+        astBuilder,
+        sink,
+        astChunk,
+        sourceLocReader,
+        serializedModuleLoc);
+    if (!moduleDecl)
+        return SLANG_FAIL;
+    module->setModuleDecl(moduleDecl);
+
+    RefPtr<IRModule> irModule;
+    SLANG_RETURN_ON_FAIL(decodeModuleIR(
+        irModule,
+        irChunk,
+        session,
+        sourceLocReader));
+    module->setIRModule(irModule);
+
+    // The handling of file dependencies is complicated, because of
+    // the way that the encoding logic tried to make all of the
+    // paths be relative to the primary source file for the module.
+    //
+    // We end up needing to undo some amount of that work here.
+    //
+
+    module->clearFileDependency();
+    String moduleSourcePath = moduleFilePathInfo.foundPath;
+    bool isFirst = true;
+    for(auto depenencyFileChunk : moduleChunk.getFileDependencies())
+    {
+        auto encodedDependencyFilePath = depenencyFileChunk.getValue();
+
+        auto sourceFile = loadSourceFile(moduleFilePathInfo.foundPath, encodedDependencyFilePath);
         if (isFirst)
         {
             // The first file is the source for the main module file.
@@ -6270,20 +6655,19 @@ void Linkage::prepareDeserializedModule(
         // it relative to the module source path.
         if (!sourceFile)
         {
-            sourceFile = loadSourceFile(moduleSourcePath, file);
+            sourceFile = loadSourceFile(moduleSourcePath, encodedDependencyFilePath);
         }
         if (sourceFile)
         {
             module->addFileDependency(sourceFile);
         }
     }
-    module->setPathInfo(filePathInfo);
-    module->setDigest(moduleEntry.digest);
+    module->setPathInfo(moduleFilePathInfo);
+    module->setDigest(moduleChunk.getDigest());
     module->_collectShaderParams();
     module->_discoverEntryPoints(sink, targets);
 
     // Hook up fileDecl's scope to module's scope.
-    auto moduleDecl = module->getModuleDecl();
     for (auto globalDecl : moduleDecl->members)
     {
         if (auto fileDecl = as<FileDecl>(globalDecl))
@@ -6291,6 +6675,8 @@ void Linkage::prepareDeserializedModule(
             addSiblingScopeForContainerDecl(m_astBuilder, moduleDecl->ownedScope, fileDecl);
         }
     }
+
+    return SLANG_OK;
 }
 
 void Linkage::setRequireCacheFileSystem(bool requireCacheFileSystem)

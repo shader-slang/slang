@@ -1,9 +1,11 @@
 // slang-ast-expr.h
-
 #pragma once
 
 #include "slang-ast-base.h"
 
+#include "slang-ast-expr.h.fiddle"
+
+FIDDLE()
 namespace Slang
 {
 
@@ -12,19 +14,20 @@ using SpvWord = uint32_t;
 // Syntax class definitions for expressions.
 //
 // A placeholder for where an Expr is expected but is missing from source.
+FIDDLE()
 class IncompleteExpr : public Expr
 {
-    SLANG_AST_CLASS(IncompleteExpr)
+    FIDDLE(...)
 };
+
 // Base class for expressions that will reference declarations
+FIDDLE(abstract)
 class DeclRefExpr : public Expr
 {
-    SLANG_ABSTRACT_AST_CLASS(DeclRefExpr)
-
-
+    FIDDLE(...)
     // The declaration of the symbol being referenced
 
-    DeclRef<Decl> declRef;
+    FIDDLE() DeclRef<Decl> declRef;
     // The name of the symbol being referenced
     Name* name = nullptr;
 
@@ -36,22 +39,24 @@ class DeclRefExpr : public Expr
     Scope* scope = nullptr;
 };
 
+FIDDLE()
 class VarExpr : public DeclRefExpr
 {
-    SLANG_AST_CLASS(VarExpr)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class DefaultConstructExpr : public Expr
 {
-    SLANG_AST_CLASS(DefaultConstructExpr)
+    FIDDLE(...)
 };
 
 // An expression that references an overloaded set of declarations
 // having the same name.
+FIDDLE()
 class OverloadedExpr : public Expr
 {
-    SLANG_AST_CLASS(OverloadedExpr)
-
+    FIDDLE(...)
     // The name that was looked up and found to be overloaded
     Name* name = nullptr;
 
@@ -67,10 +72,10 @@ class OverloadedExpr : public Expr
 
 // An expression that references an overloaded set of declarations
 // having the same name.
+FIDDLE()
 class OverloadedExpr2 : public Expr
 {
-    SLANG_AST_CLASS(OverloadedExpr2)
-
+    FIDDLE(...)
     // Optional: the base expression is this overloaded result
     // arose from a member-reference expression.
     Expr* base = nullptr;
@@ -79,108 +84,117 @@ class OverloadedExpr2 : public Expr
     List<Expr*> candidiateExprs;
 };
 
+FIDDLE(abstract)
 class LiteralExpr : public Expr
 {
-    SLANG_ABSTRACT_AST_CLASS(LiteralExpr)
+    FIDDLE(...)
     // The token that was used to express the literal. This can be
     // used to get the raw text of the literal, including any suffix.
     Token token;
-    BaseType suffixType = BaseType::Void;
+    FIDDLE() BaseType suffixType = BaseType::Void;
 };
 
+FIDDLE()
 class IntegerLiteralExpr : public LiteralExpr
 {
-    SLANG_AST_CLASS(IntegerLiteralExpr)
-
-    IntegerLiteralValue value;
+    FIDDLE(...)
+    FIDDLE() IntegerLiteralValue value;
 };
 
+FIDDLE()
 class FloatingPointLiteralExpr : public LiteralExpr
 {
-    SLANG_AST_CLASS(FloatingPointLiteralExpr)
-    FloatingPointLiteralValue value;
+    FIDDLE(...)
+    FIDDLE() FloatingPointLiteralValue value;
 };
 
+FIDDLE()
 class BoolLiteralExpr : public LiteralExpr
 {
-    SLANG_AST_CLASS(BoolLiteralExpr)
-    bool value;
+    FIDDLE(...)
+    FIDDLE() bool value;
 };
 
+FIDDLE()
 class NullPtrLiteralExpr : public LiteralExpr
 {
-    SLANG_AST_CLASS(NullPtrLiteralExpr)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class NoneLiteralExpr : public LiteralExpr
 {
-    SLANG_AST_CLASS(NoneLiteralExpr)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class StringLiteralExpr : public LiteralExpr
 {
-    SLANG_AST_CLASS(StringLiteralExpr)
-
+    FIDDLE(...)
     // TODO: consider storing the "segments" of the string
     // literal, in the case where multiple literals were
     // lined up at the lexer level, e.g.:
     //
     //      "first" "second" "third"
     //
-    String value;
+    FIDDLE() String value;
 };
 
 // An initializer list, e.g. `{ 1, 2, 3 }`
+FIDDLE()
 class InitializerListExpr : public Expr
 {
-    SLANG_AST_CLASS(InitializerListExpr)
-    List<Expr*> args;
+    FIDDLE(...)
+    FIDDLE() List<Expr*> args;
 
     bool useCStyleInitialization = true;
 };
 
+FIDDLE()
 class GetArrayLengthExpr : public Expr
 {
-    SLANG_AST_CLASS(GetArrayLengthExpr)
-    Expr* arrayExpr = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* arrayExpr = nullptr;
 };
 
+FIDDLE()
 class ExpandExpr : public Expr
 {
-    SLANG_AST_CLASS(ExpandExpr)
-    Expr* baseExpr = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* baseExpr = nullptr;
 };
 
+FIDDLE()
 class EachExpr : public Expr
 {
-    SLANG_AST_CLASS(EachExpr)
-    Expr* baseExpr = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* baseExpr = nullptr;
 };
 
 // A base class for expressions with arguments
+FIDDLE(abstract)
 class ExprWithArgsBase : public Expr
 {
-    SLANG_ABSTRACT_AST_CLASS(ExprWithArgsBase)
-
-    List<Expr*> arguments;
+    FIDDLE(...)
+    FIDDLE() List<Expr*> arguments;
 };
 
 // An aggregate type constructor
+FIDDLE()
 class AggTypeCtorExpr : public ExprWithArgsBase
 {
-    SLANG_AST_CLASS(AggTypeCtorExpr)
-
-    TypeExp base;
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
 };
 
 
 // A base expression being applied to arguments: covers
 // both ordinary `()` function calls and `<>` generic application
+FIDDLE(abstract)
 class AppExprBase : public ExprWithArgsBase
 {
-    SLANG_ABSTRACT_AST_CLASS(AppExprBase)
-
-    Expr* functionExpr = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* functionExpr = nullptr;
 
     // The original function expr before overload resolution.
     Expr* originalFunctionExpr = nullptr;
@@ -190,14 +204,16 @@ class AppExprBase : public ExprWithArgsBase
     List<SourceLoc> argumentDelimeterLocs;
 };
 
+FIDDLE()
 class InvokeExpr : public AppExprBase
 {
-    SLANG_AST_CLASS(InvokeExpr)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class ExplicitCtorInvokeExpr : public InvokeExpr
 {
-    SLANG_AST_CLASS(ExplicitCtorInvokeExpr)
+    FIDDLE(...)
 };
 
 enum class TryClauseType
@@ -211,69 +227,80 @@ enum class TryClauseType
 
 char const* getTryClauseTypeName(TryClauseType value);
 
+FIDDLE()
 class TryExpr : public Expr
 {
-    SLANG_AST_CLASS(TryExpr)
+    FIDDLE(...)
+    FIDDLE() Expr* base;
 
-    Expr* base;
-
-    TryClauseType tryClauseType = TryClauseType::Standard;
+    FIDDLE() TryClauseType tryClauseType = TryClauseType::Standard;
 
     // The scope of this expr.
     Scope* scope = nullptr;
 };
 
+FIDDLE()
 class NewExpr : public InvokeExpr
 {
-    SLANG_AST_CLASS(NewExpr)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class OperatorExpr : public InvokeExpr
 {
-    SLANG_AST_CLASS(OperatorExpr)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class InfixExpr : public OperatorExpr
 {
-    SLANG_AST_CLASS(InfixExpr)
-};
-class PrefixExpr : public OperatorExpr
-{
-    SLANG_AST_CLASS(PrefixExpr)
-};
-class PostfixExpr : public OperatorExpr
-{
-    SLANG_AST_CLASS(PostfixExpr)
+    FIDDLE(...)
 };
 
+FIDDLE()
+class PrefixExpr : public OperatorExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class PostfixExpr : public OperatorExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
 class IndexExpr : public Expr
 {
-    SLANG_AST_CLASS(IndexExpr)
-    Expr* baseExpression;
-    List<Expr*> indexExprs;
+    FIDDLE(...)
+    FIDDLE() Expr* baseExpression;
+    FIDDLE() List<Expr*> indexExprs;
 
     // The source location of `(`, `)`, and `,` that marks the start/end of the application op and
     // each argument expr. This info is used by language server.
     List<SourceLoc> argumentDelimeterLocs;
 };
 
+FIDDLE()
 class MemberExpr : public DeclRefExpr
 {
-    SLANG_AST_CLASS(MemberExpr)
-    Expr* baseExpression = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* baseExpression = nullptr;
     SourceLoc memberOperatorLoc;
 };
 
 // Member expression that is dereferenced, e.g. `a->b`.
+FIDDLE()
 class DerefMemberExpr : public MemberExpr
 {
-    SLANG_AST_CLASS(DerefMemberExpr)
+    FIDDLE(...)
 };
 
 // Member looked up on a type, rather than a value
+FIDDLE()
 class StaticMemberExpr : public DeclRefExpr
 {
-    SLANG_AST_CLASS(StaticMemberExpr)
+    FIDDLE(...)
     Expr* baseExpression = nullptr;
     SourceLoc memberOperatorLoc;
 };
@@ -287,69 +314,77 @@ struct MatrixCoord
     int col;
 };
 
+FIDDLE()
 class MatrixSwizzleExpr : public Expr
 {
-    SLANG_AST_CLASS(MatrixSwizzleExpr)
-    Expr* base = nullptr;
-    int elementCount;
-    MatrixCoord elementCoords[4];
+    FIDDLE(...)
+    FIDDLE() Expr* base = nullptr;
+    FIDDLE() int elementCount;
+    FIDDLE() MatrixCoord elementCoords[4];
     SourceLoc memberOpLoc;
 };
 
+FIDDLE()
 class SwizzleExpr : public Expr
 {
-    SLANG_AST_CLASS(SwizzleExpr)
-    Expr* base = nullptr;
-    ShortList<uint32_t, 4> elementIndices;
+    FIDDLE(...)
+    FIDDLE() Expr* base = nullptr;
+    FIDDLE() ShortList<uint32_t, 4> elementIndices;
     SourceLoc memberOpLoc;
 };
 
 // An operation to convert an l-value to a reference type.
+FIDDLE()
 class MakeRefExpr : public Expr
 {
-    SLANG_AST_CLASS(MakeRefExpr)
-    Expr* base = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* base = nullptr;
 };
 
 // A dereference of a pointer or pointer-like type
+FIDDLE()
 class DerefExpr : public Expr
 {
-    SLANG_AST_CLASS(DerefExpr)
-    Expr* base = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* base = nullptr;
 };
 
 // Any operation that performs type-casting
+FIDDLE()
 class TypeCastExpr : public InvokeExpr
 {
-    SLANG_AST_CLASS(TypeCastExpr)
+    FIDDLE(...)
     //    TypeExp TargetType;
     //    Expr* Expression = nullptr;
 };
 
 // An explicit type-cast that appear in the user's code with `(type) expr` syntax
+FIDDLE()
 class ExplicitCastExpr : public TypeCastExpr
 {
-    SLANG_AST_CLASS(ExplicitCastExpr)
+    FIDDLE(...)
 };
 
 // An implicit type-cast inserted during semantic checking
+FIDDLE()
 class ImplicitCastExpr : public TypeCastExpr
 {
-    SLANG_AST_CLASS(ImplicitCastExpr)
+    FIDDLE(...)
 };
 
 // A builtin cast expr generated during semantic checking, where there is
 // no associated conversion function decl.
+FIDDLE()
 class BuiltinCastExpr : public Expr
 {
-    SLANG_AST_CLASS(BuiltinCastExpr);
-    Expr* base = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* base = nullptr;
 };
 
+FIDDLE()
 class LValueImplicitCastExpr : public TypeCastExpr
 {
-    SLANG_AST_CLASS(LValueImplicitCastExpr)
-
+    FIDDLE(...)
     explicit LValueImplicitCastExpr(const TypeCastExpr& rhs)
         : Super(rhs)
     {
@@ -359,10 +394,10 @@ class LValueImplicitCastExpr : public TypeCastExpr
 // To work around situations like int += uint
 // where we want to allow an LValue to work with an implicit cast.
 // The argument being cast *must* be an LValue.
+FIDDLE()
 class OutImplicitCastExpr : public LValueImplicitCastExpr
 {
-    SLANG_AST_CLASS(OutImplicitCastExpr)
-
+    FIDDLE(...)
     /// Allow explict construction from any TypeCastExpr
     explicit OutImplicitCastExpr(const TypeCastExpr& rhs)
         : Super(rhs)
@@ -370,10 +405,10 @@ class OutImplicitCastExpr : public LValueImplicitCastExpr
     }
 };
 
+FIDDLE()
 class InOutImplicitCastExpr : public LValueImplicitCastExpr
 {
-    SLANG_AST_CLASS(InOutImplicitCastExpr)
-
+    FIDDLE(...)
     /// Allow explict construction from any TypeCastExpr
     explicit InOutImplicitCastExpr(const TypeCastExpr& rhs)
         : Super(rhs)
@@ -385,249 +420,266 @@ class InOutImplicitCastExpr : public LValueImplicitCastExpr
 ///
 /// The type being cast to is stored as this expression's `type`.
 ///
+FIDDLE()
 class CastToSuperTypeExpr : public Expr
 {
-    SLANG_AST_CLASS(CastToSuperTypeExpr)
-
+    FIDDLE(...)
     /// The value being cast to a super type
     ///
     /// The type being cast from is `valueArg->type`.
     ///
-    Expr* valueArg = nullptr;
+    FIDDLE() Expr* valueArg = nullptr;
 
     /// A witness showing that `valueArg`'s type is a sub-type of this expression's `type`
-    Val* witnessArg = nullptr;
+    FIDDLE() Val* witnessArg = nullptr;
 };
 
 /// A `value is Type` expression that evaluates to `true` if type of `value` is a sub-type of
 /// `Type`.
+FIDDLE()
 class IsTypeExpr : public Expr
 {
-    SLANG_AST_CLASS(IsTypeExpr)
-
-    Expr* value = nullptr;
-    TypeExp typeExpr;
+    FIDDLE(...)
+    FIDDLE() Expr* value = nullptr;
+    FIDDLE() TypeExp typeExpr;
 
     // A witness showing that `typeExpr.type` is a subtype of `typeof(value)`.
-    Val* witnessArg = nullptr;
+    FIDDLE() Val* witnessArg = nullptr;
 
     // non-null if evaluates to a constant.
-    BoolLiteralExpr* constantVal = nullptr;
+    FIDDLE() BoolLiteralExpr* constantVal = nullptr;
 };
 
 /// A `value as Type` expression that casts `value` to `Type` within type hierarchy.
 /// The result is undefined if `value` is not `Type`.
+FIDDLE()
 class AsTypeExpr : public Expr
 {
-    SLANG_AST_CLASS(AsTypeExpr)
-
-    Expr* value = nullptr;
-    Expr* typeExpr = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* value = nullptr;
+    FIDDLE() Expr* typeExpr = nullptr;
 
     // A witness showing that `typeExpr` is a subtype of `typeof(value)`.
-    Val* witnessArg = nullptr;
+    FIDDLE() Val* witnessArg = nullptr;
 };
 
+FIDDLE(abstract)
 class SizeOfLikeExpr : public Expr
 {
-    SLANG_AST_CLASS(SizeOfLikeExpr);
-
+    FIDDLE(...)
     // Set during the parse, could be an expression, a variable or a type
-    Expr* value = nullptr;
+    FIDDLE() Expr* value = nullptr;
 
     // The type the size/alignment needs to operate on. Set during traversal of SemanticsExprVisitor
-    Type* sizedType = nullptr;
+    FIDDLE() Type* sizedType = nullptr;
 };
 
+FIDDLE()
 class SizeOfExpr : public SizeOfLikeExpr
 {
-    SLANG_AST_CLASS(SizeOfExpr);
+    FIDDLE(...)
 };
 
+FIDDLE()
 class AlignOfExpr : public SizeOfLikeExpr
 {
-    SLANG_AST_CLASS(AlignOfExpr);
+    FIDDLE(...)
 };
 
+FIDDLE()
 class CountOfExpr : public SizeOfLikeExpr
 {
-    SLANG_AST_CLASS(CountOfExpr);
+    FIDDLE(...)
 };
 
+FIDDLE()
 class MakeOptionalExpr : public Expr
 {
-    SLANG_AST_CLASS(MakeOptionalExpr)
-
+    FIDDLE(...)
     // If `value` is null, this constructs an `Optional<T>` that doesn't have a value.
-    Expr* value = nullptr;
-    Expr* typeExpr = nullptr;
+    FIDDLE() Expr* value = nullptr;
+    FIDDLE() Expr* typeExpr = nullptr;
 };
 
 /// A cast of a value to the same type, with different modifiers.
 ///
 /// The type being cast to is stored as this expression's `type`.
 ///
+FIDDLE()
 class ModifierCastExpr : public Expr
 {
-    SLANG_AST_CLASS(ModifierCastExpr)
-
+    FIDDLE(...)
     /// The value being cast.
     ///
     /// The type being cast from is `valueArg->type`.
     ///
-    Expr* valueArg = nullptr;
+    FIDDLE() Expr* valueArg = nullptr;
 };
 
+FIDDLE()
 class SelectExpr : public OperatorExpr
 {
-    SLANG_AST_CLASS(SelectExpr)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class LogicOperatorShortCircuitExpr : public OperatorExpr
 {
-    SLANG_AST_CLASS(LogicOperatorShortCircuitExpr)
+    FIDDLE(...)
 public:
     enum Flavor
     {
         And, // &&
         Or,  // ||
     };
-    Flavor flavor;
+    FIDDLE() Flavor flavor;
 };
 
 
+FIDDLE()
 class GenericAppExpr : public AppExprBase
 {
-    SLANG_AST_CLASS(GenericAppExpr)
+    FIDDLE(...)
 };
 
 // An expression representing re-use of the syntax for a type in more
 // than once conceptually-distinct declaration
+FIDDLE()
 class SharedTypeExpr : public Expr
 {
-    SLANG_AST_CLASS(SharedTypeExpr)
+    FIDDLE(...)
     // The underlying type expression that we want to share
     TypeExp base;
 };
 
+FIDDLE()
 class AssignExpr : public Expr
 {
-    SLANG_AST_CLASS(AssignExpr)
-    Expr* left = nullptr;
-    Expr* right = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* left = nullptr;
+    FIDDLE() Expr* right = nullptr;
 };
 
 // Just an expression inside parentheses `(exp)`
 //
 // We keep this around explicitly to be sure we don't lose any structure
 // when we do rewriter stuff.
+FIDDLE()
 class ParenExpr : public Expr
 {
-    SLANG_AST_CLASS(ParenExpr)
+    FIDDLE(...)
     Expr* base = nullptr;
 };
 
 // An object-oriented `this` expression, used to
 // refer to the current instance of an enclosing type.
+FIDDLE()
 class ThisExpr : public Expr
 {
-    SLANG_AST_CLASS(ThisExpr)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
     Scope* scope = nullptr;
 };
 
 // Represent a reference to the virtual __return_val object holding the return value of
 // functions whose result type is non-copyable.
+FIDDLE()
 class ReturnValExpr : public Expr
 {
-    SLANG_AST_CLASS(ReturnValExpr)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
     Scope* scope = nullptr;
 };
 
 // An expression that binds a temporary variable in a local expression context
+FIDDLE()
 class LetExpr : public Expr
 {
-    SLANG_AST_CLASS(LetExpr)
-    VarDecl* decl = nullptr;
-    Expr* body = nullptr;
+    FIDDLE(...)
+    FIDDLE() VarDecl* decl = nullptr;
+    FIDDLE() Expr* body = nullptr;
 };
 
+FIDDLE()
 class ExtractExistentialValueExpr : public Expr
 {
-    SLANG_AST_CLASS(ExtractExistentialValueExpr)
-    DeclRef<VarDeclBase> declRef;
+    FIDDLE(...)
+    FIDDLE() DeclRef<VarDeclBase> declRef;
     Expr* originalExpr;
 };
 
+FIDDLE()
 class OpenRefExpr : public Expr
 {
-    SLANG_AST_CLASS(OpenRefExpr)
-
-    Expr* innerExpr = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* innerExpr = nullptr;
 };
 
+FIDDLE()
 class DetachExpr : public Expr
 {
-    SLANG_AST_CLASS(DetachExpr)
-
-    Expr* inner = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* inner = nullptr;
 };
 
 /// Base class for higher-order function application
 /// Eg: foo(fn) where fn is a function expression.
 ///
+FIDDLE(abstract)
 class HigherOrderInvokeExpr : public Expr
 {
-    SLANG_ABSTRACT_AST_CLASS(HigherOrderInvokeExpr)
-    Expr* baseFunction;
-    List<Name*> newParameterNames;
+    FIDDLE(...)
+    FIDDLE() Expr* baseFunction;
+    FIDDLE() List<Name*> newParameterNames;
 };
 
+FIDDLE()
 class PrimalSubstituteExpr : public HigherOrderInvokeExpr
 {
-    SLANG_AST_CLASS(PrimalSubstituteExpr)
+    FIDDLE(...)
 };
 
+FIDDLE(abstract)
 class DifferentiateExpr : public HigherOrderInvokeExpr
 {
-    SLANG_ABSTRACT_AST_CLASS(DifferentiateExpr)
+    FIDDLE(...)
 };
 
 /// An expression of the form `__fwd_diff(fn)` to access the
 /// forward-mode derivative version of the function `fn`
 ///
+FIDDLE()
 class ForwardDifferentiateExpr : public DifferentiateExpr
 {
-    SLANG_AST_CLASS(ForwardDifferentiateExpr)
+    FIDDLE(...)
 };
 
 /// An expression of the form `__bwd_diff(fn)` to access the
 /// forward-mode derivative version of the function `fn`
 ///
+FIDDLE()
 class BackwardDifferentiateExpr : public DifferentiateExpr
 {
-    SLANG_AST_CLASS(BackwardDifferentiateExpr)
+    FIDDLE(...)
 };
 
 /// An expression of the form `__dispatch_kernel(fn, threadGroupSize, dispatchSize)` to
 /// dispatch a compute kernel from host.
 ///
+FIDDLE()
 class DispatchKernelExpr : public HigherOrderInvokeExpr
 {
-    SLANG_AST_CLASS(DispatchKernelExpr)
-    Expr* threadGroupSize;
-    Expr* dispatchSize;
+    FIDDLE(...)
+    FIDDLE() Expr* threadGroupSize;
+    FIDDLE() Expr* dispatchSize;
 };
 
 /// An express to mark its inner expression as an intended non-differential call.
+FIDDLE()
 class TreatAsDifferentiableExpr : public Expr
 {
-    SLANG_AST_CLASS(TreatAsDifferentiableExpr)
-
-    Expr* innerExpr;
+    FIDDLE(...)
+    FIDDLE() Expr* innerExpr;
     Scope* scope;
 
     enum Flavor
@@ -645,70 +697,70 @@ class TreatAsDifferentiableExpr : public Expr
         Differentiable
     };
 
-    Flavor flavor;
+    FIDDLE() Flavor flavor;
 };
 
 /// A type expression of the form `This`
 ///
 /// Refers to the type of `this` in the current context.
 ///
+FIDDLE()
 class ThisTypeExpr : public Expr
 {
-    SLANG_AST_CLASS(ThisTypeExpr)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
     Scope* scope = nullptr;
 };
 
 /// A type expression of the form `Left & Right`.
+FIDDLE()
 class AndTypeExpr : public Expr
 {
-    SLANG_AST_CLASS(AndTypeExpr);
-
-    TypeExp left;
-    TypeExp right;
+    FIDDLE(...)
+    FIDDLE() TypeExp left;
+    FIDDLE() TypeExp right;
 };
 
 /// A type exprssion that applies one or more modifiers to another type
+FIDDLE()
 class ModifiedTypeExpr : public Expr
 {
-    SLANG_AST_CLASS(ModifiedTypeExpr);
-
-    Modifiers modifiers;
-    TypeExp base;
+    FIDDLE(...)
+    FIDDLE() Modifiers modifiers;
+    FIDDLE() TypeExp base;
 };
 
 /// A type expression that rrepresents a pointer type, e.g. T*
+FIDDLE()
 class PointerTypeExpr : public Expr
 {
-    SLANG_AST_CLASS(PointerTypeExpr);
-
-    TypeExp base;
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
 };
 
 /// A type expression that represents a function type, e.g. (bool, int) -> float
+FIDDLE()
 class FuncTypeExpr : public Expr
 {
-    SLANG_AST_CLASS(FuncTypeExpr);
-
-    List<TypeExp> parameters;
-    TypeExp result;
+    FIDDLE(...)
+    FIDDLE() List<TypeExp> parameters;
+    FIDDLE() TypeExp result;
 };
 
+FIDDLE()
 class TupleTypeExpr : public Expr
 {
-    SLANG_AST_CLASS(TupleTypeExpr);
-
-    List<TypeExp> members;
+    FIDDLE(...)
+    FIDDLE() List<TypeExp> members;
 };
 
 /// An expression that applies a generic to arguments for some,
 /// but not all, of its explicit parameters.
 ///
+FIDDLE()
 class PartiallyAppliedGenericExpr : public Expr
 {
-    SLANG_AST_CLASS(PartiallyAppliedGenericExpr);
-
+    FIDDLE(...)
 public:
     Expr* originalExpr = nullptr;
 
@@ -723,16 +775,17 @@ public:
 /// An expression that holds a set of argument exprs that got matched to a pack parameter
 /// during overload resolution.
 ///
+FIDDLE()
 class PackExpr : public Expr
 {
-    SLANG_AST_CLASS(PackExpr)
-
-    List<Expr*> args;
+    FIDDLE(...)
+    FIDDLE() List<Expr*> args;
 };
 
-class SPIRVAsmOperand
+FIDDLE()
+struct SPIRVAsmOperand
 {
-    SLANG_VALUE_CLASS(SPIRVAsmOperand);
+    FIDDLE(...)
 
 public:
     enum Flavor
@@ -792,21 +845,21 @@ public:
     TypeExp type = TypeExp();
 };
 
-class SPIRVAsmInst
+FIDDLE()
+struct SPIRVAsmInst
 {
-    SLANG_VALUE_CLASS(SPIRVAsmInst);
-
+    FIDDLE(...)
 public:
     SPIRVAsmOperand opcode;
     List<SPIRVAsmOperand> operands;
 };
 
+FIDDLE()
 class SPIRVAsmExpr : public Expr
 {
-    SLANG_AST_CLASS(SPIRVAsmExpr);
-
+    FIDDLE(...)
 public:
-    List<SPIRVAsmInst> insts;
+    FIDDLE() List<SPIRVAsmInst> insts;
 };
 
 } // namespace Slang

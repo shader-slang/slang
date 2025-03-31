@@ -55,54 +55,30 @@ SlangResult loadModuleLibrary(
     SLANG_RETURN_ON_FAIL(RiffUtil::read(&memoryStream, riffContainer));
 
     auto linkage = req->getLinkage();
+    auto sink = req->getSink();
+    auto namePool = req->getNamePool();
+
+    auto container = ContainerChunkRef::find(&riffContainer);
+
+    for (auto moduleChunk : container.getModules())
     {
-        SerialContainerData containerData;
+        auto loadedModule = linkage->findOrLoadSerializedModuleForModuleLibrary(
+            moduleChunk,
+            sink);
+        if (!loadedModule)
+            return SLANG_FAIL;
 
-        SerialContainerUtil::ReadOptions options;
-        options.namePool = req->getNamePool();
-        options.session = req->getSession();
-        options.sharedASTBuilder = linkage->getASTBuilder()->getSharedASTBuilder();
-        options.sourceManager = linkage->getSourceManager();
-        options.linkage = req->getLinkage();
-        options.sink = req->getSink();
-        options.astBuilder = linkage->getASTBuilder();
-        options.modulePath = path;
-        SLANG_RETURN_ON_FAIL(
-            SerialContainerUtil::read(&riffContainer, options, nullptr, containerData));
-        DiagnosticSink sink;
+        library->m_modules.add(loadedModule);
+    }
 
-        // Modules in the container should be serialized in its depedency order,
-        // so that we always load the dependencies before the consuming module.
-        for (auto& module : containerData.modules)
-        {
-            // If the irModule is set, add it
-            if (module.irModule)
-            {
-                if (module.dependentFiles.getCount() == 0)
-                    return SLANG_FAIL;
-                if (!module.astRootNode)
-                    return SLANG_FAIL;
-                auto loadedModule = linkage->loadDeserializedModule(
-                    as<ModuleDecl>(module.astRootNode)->getName(),
-                    PathInfo::makePath(module.dependentFiles.getFirst()),
-                    module,
-                    &sink);
-                if (!loadedModule)
-                    return SLANG_FAIL;
-                library->m_modules.add(loadedModule);
-            }
-        }
+    for (auto entryPointChunk : container.getEntryPoints())
+    {
+        FrontEndCompileRequest::ExtraEntryPointInfo entryPointInfo;
+        entryPointInfo.mangledName = entryPointChunk.getMangledName();
+        entryPointInfo.name = namePool->getName(entryPointChunk.getName());
+        entryPointInfo.profile = entryPointChunk.getProfile();
 
-        for (const auto& entryPoint : containerData.entryPoints)
-        {
-            FrontEndCompileRequest::ExtraEntryPointInfo dst;
-            dst.mangledName = entryPoint.mangledName;
-            dst.name = entryPoint.name;
-            dst.profile = entryPoint.profile;
-
-            // Add entry point
-            library->m_entryPoints.add(dst);
-        }
+        library->m_entryPoints.add(entryPointInfo);
     }
 
     outLibrary.swap(scopeLibrary);

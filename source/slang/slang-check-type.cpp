@@ -266,8 +266,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 // diagnostic.
 
                 // Get the AST node type info, so we can output a 'got' name
-                auto info = ASTClassInfo::getInfo(originalExpr->astNodeType);
-                diagSink->diagnose(originalExpr, Diagnostics::expectedAType, info->m_name);
+                diagSink->diagnose(originalExpr, Diagnostics::expectedAType, originalExpr->getClass().getName());
             }
         }
 
@@ -296,7 +295,12 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
         {
             if (auto typeParam = as<GenericTypeParamDecl>(member))
             {
-                if (!typeParam->initType.exp)
+                if (auto defaultArg = typeParam->initType.type)
+                {
+                    if (outProperType)
+                        args.add(defaultArg);
+                }
+                else
                 {
                     if (diagSink)
                     {
@@ -305,10 +309,6 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                     }
                     return false;
                 }
-
-                // TODO: this is one place where syntax should get cloned!
-                if (outProperType)
-                    args.add(ExtractGenericArgVal(typeParam->initType.exp));
             }
             else if (auto valParam = as<GenericValueParamDecl>(member))
             {

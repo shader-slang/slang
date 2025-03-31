@@ -38,9 +38,9 @@ struct ASTIterator
         {
             if (!expr)
                 return;
-            expr->accept(this, nullptr);
+            dispatch(expr);
         }
-        bool visitExpr(Expr*) { return false; }
+        void visitExpr(Expr*) {}
         void visitBoolLiteralExpr(BoolLiteralExpr* expr) { iterator->maybeDispatchCallback(expr); }
         void visitNullPtrLiteralExpr(NullPtrLiteralExpr* expr)
         {
@@ -313,6 +313,11 @@ struct ASTIterator
                     dispatchIfNotNull(o.expr);
             }
         }
+
+        void visitDetachExpr(DetachExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+        }
     };
 
     struct ASTIteratorStmtVisitor : public StmtVisitor<ASTIteratorStmtVisitor>
@@ -327,7 +332,7 @@ struct ASTIterator
         {
             if (!stmt)
                 return;
-            stmt->accept(this, nullptr);
+            dispatch(stmt);
         }
 
         void visitDeclStmt(DeclStmt* stmt)

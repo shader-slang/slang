@@ -46,10 +46,8 @@ public:
     Type* getInitializerListType();
     Type* getOverloadedType();
 
-    const ReflectClassInfo* findClassInfo(Name* name);
     SyntaxClass<NodeBase> findSyntaxClass(Name* name);
 
-    const ReflectClassInfo* findClassInfo(const UnownedStringSlice& slice);
     SyntaxClass<NodeBase> findSyntaxClass(const UnownedStringSlice& slice);
 
     // Look up a magic declaration by its name
@@ -113,8 +111,8 @@ protected:
     Dictionary<String, Decl*> m_magicDecls;
     Dictionary<BuiltinRequirementKind, Decl*> m_builtinRequirementDecls;
 
-    Dictionary<UnownedStringSlice, const ReflectClassInfo*> m_sliceToTypeMap;
-    Dictionary<Name*, const ReflectClassInfo*> m_nameToTypeMap;
+    Dictionary<UnownedStringSlice, SyntaxClass<NodeBase>> m_sliceToTypeMap;
+    Dictionary<Name*, SyntaxClass<NodeBase>> m_nameToTypeMap;
 
     NamePool* m_namePool = nullptr;
 
@@ -160,7 +158,7 @@ struct ValKey
     {
         if (hashCode != desc.getHashCode())
             return false;
-        if (val->astNodeType != desc.type)
+        if (val->getClass() != desc.type)
             return false;
         if (val->m_operands.getCount() != desc.operands.getCount())
             return false;
@@ -199,7 +197,7 @@ public:
         if (auto found = m_cachedNodes.tryGetValue(desc))
             return *found;
 
-        auto node = as<Val>(createByNodeType(desc.type));
+        auto node = as<Val>(desc.type.createInstance(this));
         SLANG_ASSERT(node);
         for (auto& operand : desc.operands)
             node->m_operands.add(operand);
@@ -268,12 +266,14 @@ public:
 
     MemoryArena& getArena() { return m_arena; }
 
+    NamePool* getNamePool() { return getSharedASTBuilder()->getNamePool(); }
+
     template<typename T, typename... TArgs>
     SLANG_FORCE_INLINE T* getOrCreate(TArgs... args)
     {
         SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
         ValNodeDesc desc;
-        desc.type = T::kType;
+        desc.type = getSyntaxClass<T>();
         addOrAppendToNodeList(desc.operands, args...);
         desc.init();
         auto result = (T*)_getOrCreateImpl(_Move(desc));
@@ -286,7 +286,7 @@ public:
         SLANG_COMPILE_TIME_ASSERT(IsValidType<T>::Value);
 
         ValNodeDesc desc;
-        desc.type = T::kType;
+        desc.type = getSyntaxClass<T>();
         desc.init();
         auto result = (T*)_getOrCreateImpl(_Move(desc));
         return result;
@@ -642,19 +642,11 @@ public:
         DeclRef<Decl> declRef);
 
     /// Helpers to get type info from the SharedASTBuilder
-    const ReflectClassInfo* findClassInfo(const UnownedStringSlice& slice)
-    {
-        return m_sharedASTBuilder->findClassInfo(slice);
-    }
     SyntaxClass<NodeBase> findSyntaxClass(const UnownedStringSlice& slice)
     {
         return m_sharedASTBuilder->findSyntaxClass(slice);
     }
 
-    const ReflectClassInfo* findClassInfo(Name* name)
-    {
-        return m_sharedASTBuilder->findClassInfo(name);
-    }
     SyntaxClass<NodeBase> findSyntaxClass(Name* name)
     {
         return m_sharedASTBuilder->findSyntaxClass(name);
@@ -695,12 +687,12 @@ protected:
             // Keep such that dtor can be run on ASTBuilder being dtored
             m_dtorNodes.add(node);
         }
-        if (node->getClassInfo().isSubClassOf(*ASTClassInfo::getInfo(Val::kType)))
+        if (node->getClass().isSubClassOf<Val>())
         {
             auto val = (Val*)(node);
             val->m_resolvedValEpoch = getEpoch();
         }
-        else if (node->getClassInfo().isSubClassOf(*ASTClassInfo::getInfo(Decl::kType)))
+        else if (node->getClass().isSubClassOf<Decl>())
         {
             ((Decl*)node)->m_defaultDeclRef = getOrCreate<DirectDeclRef>((Decl*)node);
         }

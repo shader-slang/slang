@@ -9,6 +9,37 @@
 
 namespace Slang
 {
+bool SyntaxClassBase::isSubClassOf(SyntaxClassBase const& other) const
+{
+    auto selfInfo = getInfo();
+    auto otherInfo = other.getInfo();
+    if (!selfInfo || !otherInfo)
+        return false;
+    return unsigned((int)selfInfo->firstTag - (int)otherInfo->firstTag) < unsigned(otherInfo->tagCount);
+}
+
+UnownedTerminatedStringSlice SyntaxClassBase::getName() const
+{
+        return _info ? UnownedTerminatedStringSlice(_info->name) : UnownedTerminatedStringSlice();
+}
+
+void* SyntaxClassBase::createInstanceImpl(ASTBuilder* astBuilder) const
+{
+    if (!_info) return nullptr;
+    if (!_info->createFunc) return nullptr;
+
+    return _info->createFunc(astBuilder);
+}
+
+void SyntaxClassBase::destructInstanceImpl(void* instance) const
+{
+    if (!_info) return;
+    if (!_info->destructFunc) return;
+
+    return _info->destructFunc(instance);
+}
+
+
 
 /* static */ const TypeExp TypeExp::empty;
 
@@ -227,13 +258,13 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
         sb << "discard";
         break;
     default:
-        if (ASTClassInfo::getInfo(nodeType)->isDerivedFrom((uint32_t)ASTNodeType::Expr))
+        if (SyntaxClass<NodeBase>(nodeType).isSubClassOf<Expr>())
             sb << "expression";
-        else if (ASTClassInfo::getInfo(nodeType)->isDerivedFrom((uint32_t)ASTNodeType::Stmt))
+        else if (SyntaxClass<NodeBase>(nodeType).isSubClassOf<Stmt>())
             sb << "statement";
-        else if (ASTClassInfo::getInfo(nodeType)->isDerivedFrom((uint32_t)ASTNodeType::Decl))
+        else if (SyntaxClass<NodeBase>(nodeType).isSubClassOf<Decl>())
             sb << "decl";
-        else if (ASTClassInfo::getInfo(nodeType)->isDerivedFrom((uint32_t)ASTNodeType::Val))
+        else if (SyntaxClass<NodeBase>(nodeType).isSubClassOf<Val>())
             sb << "val";
         else
             sb << "node";
@@ -326,7 +357,7 @@ Decl* const* adjustFilterCursorImpl(
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo))
+                if (decl->getClass().isSubClassOf(clsInfo))
                 {
                     return ptr;
                 }
@@ -338,7 +369,7 @@ Decl* const* adjustFilterCursorImpl(
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) &&
+                if (decl->getClass().isSubClassOf(clsInfo) &&
                     !decl->hasModifier<HLSLStaticModifier>())
                 {
                     return ptr;
@@ -351,7 +382,7 @@ Decl* const* adjustFilterCursorImpl(
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) &&
+                if (decl->getClass().isSubClassOf(clsInfo) &&
                     decl->hasModifier<HLSLStaticModifier>())
                 {
                     return ptr;
@@ -378,7 +409,7 @@ Decl* const* getFilterCursorByIndexImpl(
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo))
+                if (decl->getClass().isSubClassOf(clsInfo))
                 {
                     if (index <= 0)
                     {
@@ -394,7 +425,7 @@ Decl* const* getFilterCursorByIndexImpl(
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) &&
+                if (decl->getClass().isSubClassOf(clsInfo) &&
                     !decl->hasModifier<HLSLStaticModifier>())
                 {
                     if (index <= 0)
@@ -411,7 +442,7 @@ Decl* const* getFilterCursorByIndexImpl(
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                if (decl->getClassInfo().isSubClassOf(clsInfo) &&
+                if (decl->getClass().isSubClassOf(clsInfo) &&
                     decl->hasModifier<HLSLStaticModifier>())
                 {
                     if (index <= 0)
@@ -428,7 +459,7 @@ Decl* const* getFilterCursorByIndexImpl(
 }
 
 Index getFilterCountImpl(
-    const ReflectClassInfo& clsInfo,
+    const SyntaxClassBase& clsInfo,
     MemberFilterStyle filterStyle,
     Decl* const* ptr,
     Decl* const* end)
@@ -442,7 +473,7 @@ Index getFilterCountImpl(
             for (; ptr != end; ptr++)
             {
                 Decl* decl = *ptr;
-                count += Index(decl->getClassInfo().isSubClassOf(clsInfo));
+                count += Index(decl->getClass().isSubClassOf(clsInfo));
             }
             break;
         }
@@ -452,7 +483,7 @@ Index getFilterCountImpl(
             {
                 Decl* decl = *ptr;
                 count += Index(
-                    decl->getClassInfo().isSubClassOf(clsInfo) &&
+                    decl->getClass().isSubClassOf(clsInfo) &&
                     !decl->hasModifier<HLSLStaticModifier>());
             }
             break;
@@ -463,7 +494,7 @@ Index getFilterCountImpl(
             {
                 Decl* decl = *ptr;
                 count += Index(
-                    decl->getClassInfo().isSubClassOf(clsInfo) &&
+                    decl->getClass().isSubClassOf(clsInfo) &&
                     decl->hasModifier<HLSLStaticModifier>());
             }
             break;
@@ -701,7 +732,7 @@ Type* DeclRefType::create(ASTBuilder* astBuilder, DeclRef<Decl> declRef)
     }
     else if (auto magicMod = declRef.getDecl()->findModifier<MagicTypeModifier>())
     {
-        if (magicMod->magicNodeType == ASTNodeType(-1))
+        if (!magicMod->magicNodeType)
         {
             SLANG_UNEXPECTED("unhandled type");
         }

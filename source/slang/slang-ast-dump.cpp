@@ -2,8 +2,8 @@
 #include "slang-ast-dump.h"
 
 #include "../core/slang-string.h"
+#include "slang-ast-dispatch.h"
 #include "slang-compiler.h"
-#include "slang-generated-ast-macro.h"
 
 #include <assert.h>
 #include <limits>
@@ -11,12 +11,10 @@
 namespace Slang
 {
 
-
 struct ASTDumpContext
 {
     struct ObjectInfo
     {
-        const ReflectClassInfo* m_typeInfo;
         NodeBase* m_object;
         bool m_isDumped;
     };
@@ -48,10 +46,10 @@ struct ASTDumpContext
         ASTDumpContext* m_context;
     };
 
-    void dumpObject(const ReflectClassInfo& type, NodeBase* obj);
+    void dumpObject(NodeBase* obj);
 
-    void dumpObjectFull(const ReflectClassInfo& type, NodeBase* obj, Index objIndex);
-    void dumpObjectReference(const ReflectClassInfo& type, NodeBase* obj, Index objIndex);
+    void dumpObjectFull(NodeBase* obj, Index objIndex);
+    void dumpObjectReference(NodeBase* obj, Index objIndex);
 
     void dump(NodeBase* node)
     {
@@ -61,7 +59,7 @@ struct ASTDumpContext
         }
         else
         {
-            dumpObject(node->getClassInfo(), node);
+            dumpObject(node);
         }
     }
 
@@ -283,7 +281,7 @@ struct ASTDumpContext
         m_writer->emit(" }");
     }
 
-    Index getObjectIndex(const ReflectClassInfo& typeInfo, NodeBase* obj)
+    Index getObjectIndex(NodeBase* obj)
     {
         Index* indexPtr = m_objectMap.tryGetValueOrAdd(obj, m_objects.getCount());
         if (indexPtr)
@@ -294,7 +292,6 @@ struct ASTDumpContext
         ObjectInfo info;
         info.m_isDumped = false;
         info.m_object = obj;
-        info.m_typeInfo = &typeInfo;
 
         m_objects.add(info);
         return m_objects.getCount() - 1;
@@ -366,7 +363,7 @@ struct ASTDumpContext
     template<typename T>
     void dump(const SyntaxClass<T>& cls)
     {
-        m_writer->emit(cls.classInfo->m_name);
+        m_writer->emit(cls.getName());
     }
 
     template<typename KEY, typename VALUE>
@@ -568,7 +565,7 @@ struct ASTDumpContext
             ObjectInfo& info = m_objects[i];
             if (!info.m_isDumped)
             {
-                dumpObjectFull(*info.m_typeInfo, info.m_object, i);
+                dumpObjectFull(info.m_object, i);
             }
         }
     }
@@ -580,13 +577,12 @@ struct ASTDumpContext
             // Lets special case handling of module decls -> we only want to output as references
             // otherwise we end up dumping everything in every module.
 
-            const ReflectClassInfo& typeInfo = moduleDecl->getClassInfo();
-            Index index = getObjectIndex(typeInfo, moduleDecl);
+            Index index = getObjectIndex(moduleDecl);
 
             // We don't want to fully dump, referenced modules as doing so dumps everything
             m_objects[index].m_isDumped = true;
 
-            dumpObjectReference(typeInfo, moduleDecl, index);
+            dumpObjectReference(moduleDecl, index);
         }
         else
         {
@@ -640,9 +636,9 @@ struct ASTDumpContext
     void dump(ASTNodeType nodeType)
     {
         // Get the class
-        auto info = ASTClassInfo::getInfo(nodeType);
+        auto syntaxClass = SyntaxClass<NodeBase>(nodeType);
         // Write the name
-        m_writer->emit(info->m_name);
+        m_writer->emit(syntaxClass.getName());
     }
 
     void dump(SourceLanguage language) { m_writer->emit((int)language); }
@@ -775,35 +771,41 @@ struct ASTDumpContext
 
 struct ASTDumpAccess
 {
-
-#define SLANG_AST_DUMP_FIELD(FIELD_NAME, TYPE, param) \
-    context.dumpField(#FIELD_NAME, static_cast<param*>(base)->FIELD_NAME);
-
-#define SLANG_AST_DUMP_FIELDS_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-    case ASTNodeType::NAME:                                                        \
-        {                                                                          \
-            SLANG_FIELDS_ASTNode_##NAME(SLANG_AST_DUMP_FIELD, NAME) break;         \
-        }
-
-    static void dump(ASTNodeType type, NodeBase* base, ASTDumpContext& context)
+#if 0 // FIDDLE TEMPLATE:
+%for _,T in ipairs(Slang.NodeBase.subclasses) do
+    static void dump_($T * node, ASTDumpContext & context)
     {
-        switch (type)
+%   if T.directSuperClass then
+        dump_(static_cast<$(T.directSuperClass)*>(node), context);
+%   end
+%   for _,f in ipairs(T.directFields) do
+        context.dumpField("$f", node->$f);
+%   end
+    }
+%end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 0
+#include "slang-ast-dump.cpp.fiddle"
+#endif // FIDDLE END
+
+    static void dump(NodeBase* base, ASTDumpContext& context)
+    {
+        ASTNodeDispatcher<NodeBase, void>::dispatch(base, [&](auto b)
         {
-            SLANG_ALL_ASTNode_NodeBase(SLANG_AST_DUMP_FIELDS_IMPL, _) default : break;
-        }
+            dump_(b, context);
+        });
     }
 };
 
 void ASTDumpContext::dumpObjectReference(
-    const ReflectClassInfo& type,
     NodeBase* obj,
     Index objIndex)
 {
     SLANG_UNUSED(obj);
-    ScopeWrite(this).getBuf() << type.m_name << ":" << objIndex;
+    ScopeWrite(this).getBuf() << obj->getClass().getName() << ":" << objIndex;
 }
 
-void ASTDumpContext::dumpObjectFull(const ReflectClassInfo& type, NodeBase* obj, Index objIndex)
+void ASTDumpContext::dumpObjectFull(NodeBase* obj, Index objIndex)
 {
     ObjectInfo& info = m_objects[objIndex];
     SLANG_ASSERT(info.m_isDumped == false);
@@ -811,42 +813,27 @@ void ASTDumpContext::dumpObjectFull(const ReflectClassInfo& type, NodeBase* obj,
 
     // We need to dump the fields.
 
-    ScopeWrite(this).getBuf() << type.m_name << ":" << objIndex << " {\n";
+    ScopeWrite(this).getBuf() << obj->getClass().getName() << ":" << objIndex << " {\n";
     m_writer->indent();
 
-    List<const ReflectClassInfo*> allTypes;
-    {
-        const ReflectClassInfo* curType = &type;
-        do
-        {
-            allTypes.add(curType);
-            curType = curType->m_superClass;
-        } while (curType);
-    }
-
-    // Okay we go backwards so we output in the 'normal' order
-    for (Index i = allTypes.getCount() - 1; i >= 0; --i)
-    {
-        const ReflectClassInfo* curType = allTypes[i];
-        ASTDumpAccess::dump(ASTNodeType(curType->m_classId), obj, *this);
-    }
+    ASTDumpAccess::dump(obj, *this);
 
     m_writer->dedent();
     m_writer->emit("}\n");
 }
 
-void ASTDumpContext::dumpObject(const ReflectClassInfo& typeInfo, NodeBase* obj)
+void ASTDumpContext::dumpObject(NodeBase* obj)
 {
-    Index index = getObjectIndex(typeInfo, obj);
+    Index index = getObjectIndex(obj);
 
     ObjectInfo& info = m_objects[index];
     if (info.m_isDumped || m_dumpStyle == ASTDumpUtil::Style::Flat)
     {
-        dumpObjectReference(typeInfo, obj, index);
+        dumpObjectReference(obj, index);
     }
     else
     {
-        dumpObjectFull(typeInfo, obj, index);
+        dumpObjectFull(obj, index);
     }
 }
 
@@ -858,9 +845,8 @@ void ASTDumpContext::dumpObjectFull(NodeBase* node)
     }
     else
     {
-        const ReflectClassInfo& typeInfo = node->getClassInfo();
-        Index index = getObjectIndex(typeInfo, node);
-        dumpObjectFull(typeInfo, node, index);
+        Index index = getObjectIndex(node);
+        dumpObjectFull(node, index);
     }
 }
 
@@ -872,3 +858,4 @@ void ASTDumpContext::dumpObjectFull(NodeBase* node)
 }
 
 } // namespace Slang
+
