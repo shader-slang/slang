@@ -2685,7 +2685,7 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
     if (inst->parent == nullptr)
     {
         // In order to de-duplicate them, Witness-table is marked as Hoistable.
-        // But it is not exactly a hoistable type and it can be added simpler.
+        // But it is not exactly a hoistable type and it should be added as a global value.
         if (inst->getOp() == kIROp_WitnessTable)
             addGlobalValue(this, inst);
         else
