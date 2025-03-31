@@ -79,6 +79,7 @@
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-metal-legalize.h"
+#include "slang-ir-missing-return.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
 #include "slang-ir-pytorch-cpp-binding.h"
 #include "slang-ir-redundancy-removal.h"
@@ -326,6 +327,7 @@ struct RequiredLoweringPassSet
     bool dynamicResourceHeap;
     bool resolveVaryingInputRef;
     bool specializeStageSwitch;
+    bool missingReturn;
 };
 
 // Scan the IR module and determine which lowering/legalization passes are needed based
@@ -450,6 +452,9 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_GetCurrentStage:
         result.specializeStageSwitch = true;
+        break;
+    case kIROp_MissingReturn:
+        result.missingReturn = true;
         break;
     }
     if (!result.generics || !result.existentialTypeLayout)
@@ -1085,6 +1090,9 @@ Result linkAndOptimizeIR(
         checkForRecursiveTypes(irModule, sink);
         checkForRecursiveFunctions(codeGenContext->getTargetReq(), irModule, sink);
 
+        if (requiredLoweringPassSet.missingReturn)
+            checkForMissingReturns(irModule, sink, target, false);
+
         // For some targets, we are more restrictive about what types are allowed
         // to be used as shader parameters in ConstantBuffer/ParameterBlock.
         // We will check for these restrictions here.
@@ -1273,6 +1281,15 @@ Result linkAndOptimizeIR(
         //
         legalizeResourceTypes(targetProgram, irModule, sink);
 
+        // We also need to legalize empty types for Metal targets.
+        switch (target)
+        {
+        case CodeGenTarget::Metal:
+        case CodeGenTarget::MetalLib:
+        case CodeGenTarget::MetalLibAssembly:
+            legalizeEmptyTypes(targetProgram, irModule, sink);
+            break;
+        }
         //  Debugging output of legalization
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "LEGALIZED");
