@@ -73,10 +73,15 @@ inline int calcNumMipLevels(TextureType type, Extents size)
     const Format format =
         (inputDesc.format == Format::Undefined) ? Format::RGBA8Unorm : inputDesc.format;
 
+    bool isArray = inputDesc.arrayLength > 1;
+
     textureDesc.sampleCount = inputDesc.sampleCount;
     textureDesc.format = format;
     textureDesc.mipLevelCount = texData.m_mipLevels;
-    textureDesc.arrayLength = inputDesc.arrayLength > 0 ? inputDesc.arrayLength : 1;
+    if (isArray)
+    {
+        textureDesc.arrayLength = inputDesc.arrayLength;
+    }
     textureDesc.usage = TextureUsage::CopyDestination | TextureUsage::CopySource;
     switch (defaultState)
     {
@@ -96,7 +101,7 @@ inline int calcNumMipLevels(TextureType type, Extents size)
     {
     case 1:
         {
-            textureDesc.type = TextureType::Texture1D;
+            textureDesc.type = isArray ? TextureType::Texture1DArray : TextureType::Texture1D;
             textureDesc.size.width = inputDesc.size;
             textureDesc.size.height = 1;
             textureDesc.size.depth = 1;
@@ -105,7 +110,10 @@ inline int calcNumMipLevels(TextureType type, Extents size)
         }
     case 2:
         {
-            textureDesc.type = inputDesc.isCube ? TextureType::TextureCube : TextureType::Texture2D;
+            textureDesc.type =
+                isArray ? (inputDesc.isCube ? TextureType::TextureCubeArray
+                                            : TextureType::Texture2DArray)
+                        : (inputDesc.isCube ? TextureType::TextureCube : TextureType::Texture2D);
             textureDesc.size.width = inputDesc.size;
             textureDesc.size.height = inputDesc.size;
             textureDesc.size.depth = 1;
@@ -127,10 +135,9 @@ inline int calcNumMipLevels(TextureType type, Extents size)
     }
 
     List<SubresourceData> initSubresources;
-    int arrayLayerCount =
-        textureDesc.arrayLength * (textureDesc.type == TextureType::TextureCube ? 6 : 1);
+    int layerCount = textureDesc.getLayerCount();
     int subResourceCounter = 0;
-    for (int a = 0; a < arrayLayerCount; ++a)
+    for (int a = 0; a < layerCount; ++a)
     {
         for (int m = 0; m < textureDesc.mipLevelCount; ++m)
         {
