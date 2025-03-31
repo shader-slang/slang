@@ -426,6 +426,7 @@ StatementSet tryExtractStatements(IRTerminatorInst* inst, IRBlock* block)
             goto done;
 
         auto condInst = inst->getOperand(0);
+        statements.conjunct(condInst, SimpleRelation::boolRelation(isTrueBlock));
 
         if (condInst->getOp() == kIROp_Eql)
         {
@@ -500,11 +501,6 @@ StatementSet tryExtractStatements(IRTerminatorInst* inst, IRBlock* block)
             statements.conjunct(
                 paramOperand,
                 ((isParamLeft ^ !isTrueBlock) ? relation : relation.negated()));
-        }
-        else if (auto condParam = as<IRParam>(condInst))
-        {
-            // We can add a statement about the parameter.
-            statements.conjunct(condParam, SimpleRelation::boolRelation(isTrueBlock));
         }
     }
     else if (auto switchInst = as<IRSwitch>(inst))
@@ -830,6 +826,11 @@ StatementSet propagateDownwards(
     // That is, find a set of statements (B') for the successor block such that B => B'
     //
     StatementSet newStatementSet;
+
+    if (statementSet.isTriviallyFalse())
+    {
+        return statementSet;
+    }
 
     // Go over all the parameters of the successor block, find corresponding arguments, and
     // convert any statements to the new set.

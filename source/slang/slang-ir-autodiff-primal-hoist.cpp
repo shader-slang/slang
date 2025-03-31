@@ -1065,10 +1065,11 @@ void AutodiffCheckpointPolicyBase::collectInductionValues(IRGlobalValueWithCode*
 
 static bool isValueInRange(IRIntegerValue value, IRType* type)
 {
-    UCount nBits;
+    IRInst* innerType = unwrapAttributedType(type);
+    IRIntegerValue nBits;
     bool isSigned;
-    // First determine the number of bits
-    switch (type->getOp())
+
+    switch (innerType->getOp())
     {
     case kIROp_IntType:
     case kIROp_UIntType:
@@ -1090,8 +1091,7 @@ static bool isValueInRange(IRIntegerValue value, IRType* type)
         return false;
     }
 
-    // Then determine if it's signed
-    switch (type->getOp())
+    switch (innerType->getOp())
     {
     case kIROp_IntType:
     case kIROp_Int16Type:
@@ -1109,14 +1109,23 @@ static bool isValueInRange(IRIntegerValue value, IRType* type)
         return false;
     }
 
+    if (nBits >= 64)
+    {
+        // IRIntegerValue is 64-bit, so we assume we can always represent the value.
+        // TODO: Corner cases like loops that _rely_ on 64-bit integer overflow might not be handled
+        // correctly.
+        //
+        return true;
+    }
+
     if (isSigned)
     {
-        UCount maxValue = (1ULL << (nBits - 1)) - 1;
+        IRIntegerValue maxValue = (1ULL << (nBits - 1)) - 1;
         return value >= -maxValue && value <= maxValue;
     }
     else
     {
-        UCount maxValue = (1ULL << nBits) - 1;
+        IRIntegerValue maxValue = (1ULL << nBits) - 1;
         return value >= 0 && value <= maxValue;
     }
 }
