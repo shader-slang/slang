@@ -8,16 +8,16 @@
 //METAL-NOT: error 41402
 //METALLIB: @computeMain
 
-//TEST_INPUT: RWTexture1D(format=R8G8B8A8_SINT, size=8, content = zero, mipMaps = 1):name outputTexture1D
+//TEST_INPUT: RWTexture1D(format=RGBA8Sint, size=8, content = zero, mipMaps = 1):name outputTexture1D
 RWTexture1D<int4> outputTexture1D;
 
-//TEST_INPUT: RWTexture2D(format=R8G8B8A8_SINT, size=8, content = zero, mipMaps = 1):name outputTexture2D
+//TEST_INPUT: RWTexture2D(format=RGBA8Sint, size=8, content = zero, mipMaps = 1):name outputTexture2D
 RWTexture2D<int4> outputTexture2D;
 
-//TEST_INPUT: RWTexture3D(format=R8G8B8A8_SINT, size=8, content = zero, mipMaps = 1):name outputTexture3D
+//TEST_INPUT: RWTexture3D(format=RGBA8Sint, size=8, content = zero, mipMaps = 1):name outputTexture3D
 RWTexture3D<int4> outputTexture3D;
 
-//TEST_INPUT: RWTexture2D(format=R8G8B8A8_SINT, size=4, content = zero, arrayLength=2, mipMaps = 1):name outputTexture2DArray
+//TEST_INPUT: RWTexture2D(format=RGBA8Sint, size=4, content = zero, arrayLength=2, mipMaps = 1):name outputTexture2DArray
 RWTexture2DArray<int4> outputTexture2DArray;
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
