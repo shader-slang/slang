@@ -169,6 +169,9 @@ public:
     /// Return a capability set of 'target' atoms 'this' has, but 'other' does not.
     CapabilitySet getTargetsThisHasButOtherDoesNot(const CapabilitySet& other);
 
+    /// Return a capability set of 'stage' atoms 'this' has, but 'other' does not.
+    CapabilitySet getStagesThisHasButOtherDoesNot(const CapabilitySet& other);
+
     /// Are these two capability sets equal?
     bool operator==(CapabilitySet const& that) const;
 
@@ -359,7 +362,7 @@ void getCapabilityNames(List<UnownedStringSlice>& ioNames);
 UnownedStringSlice capabilityNameToString(CapabilityName name);
 
 bool isDirectChildOfAbstractAtom(CapabilityAtom name);
-
+bool isStageAtom(CapabilityName name, CapabilityName& outCanonicalStage);
 
 /// Return true if `name` represents an atom for a target version, e.g. spirv_1_5.
 bool isTargetVersionAtom(CapabilityAtom name);

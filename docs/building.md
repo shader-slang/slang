@@ -165,6 +165,7 @@ See the [documentation on testing](../tools/slang-test/README.md) for more infor
 | `SLANG_ENABLE_EXAMPLES`           | `TRUE`                     | Enable example targets, requires SLANG_ENABLE_GFX                                            |
 | `SLANG_LIB_TYPE`                  | `SHARED`                   | How to build the slang library                                                               |
 | `SLANG_ENABLE_RELEASE_DEBUG_INFO` | `TRUE`                     | Enable generating debug info for Release configs                                             |
+| `SLANG_ENABLE_RELEASE_LTO`        | `TRUE`                     | Enable LTO for Release builds                                                                |
 | `SLANG_ENABLE_SPLIT_DEBUG_INFO`   | `TRUE`                     | Enable generating split debug info for Debug and RelWithDebInfo configs                      |
 | `SLANG_SLANG_LLVM_FLAVOR`         | `FETCH_BINARY_IF_POSSIBLE` | How to set up llvm support                                                                   |
 | `SLANG_SLANG_LLVM_BINARY_URL`     | System dependent           | URL specifying the location of the slang-llvm prebuilt library                               |
@@ -310,6 +311,20 @@ cmake --preset vs2022 --fresh -A arm64 -DSLANG_GENERATORS_PATH=generators/bin
 cmake --build --preset release
 ```
 
+### Nix
+
+This repository contains a [Nix](https://nixos.org/)
+[flake](https://wiki.nixos.org/wiki/Flakes) (not officially supported or
+tested), which provides the necessary prerequisites for local development. Also,
+if you use [direnv](https://direnv.net/), you can run the following commands to
+have the Nix environment automatically activate when you enter your clone of
+this repository:
+
+```bash
+echo 'use flake' >> .envrc
+direnv allow
+```
+
 ## Building with an older CMake
 
 Because older CMake versions don't support all the features we want to use in
@@ -318,6 +333,21 @@ CMakePresets, you'll have to do without the presets. Something like the followin
 ```bash
 cmake -B build -G Ninja
 cmake --build build -j
+```
+
+## Static linking against libslang
+
+If linking against a static `libslang.a` you will need to link against some
+dependencies also if you're not already incorporating them into your project.
+
+You will need to link against:
+
+```
+${SLANG_DIR}/build/Release/lib/libslang.a
+${SLANG_DIR}/build/Release/lib/libcompiler-core.a
+${SLANG_DIR}/build/Release/lib/libcore.a
+${SLANG_DIR}/build/external/miniz/libminiz.a
+${SLANG_DIR}/build/external/lz4/build/cmake/liblz4.a
 ```
 
 ## Notes

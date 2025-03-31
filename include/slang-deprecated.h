@@ -659,6 +659,8 @@ extern "C"
         SlangSession* globalSession,
         char const* name);
     SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inVar);
+    SLANG_API SlangResult
+    spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t* rs);
     SLANG_API SlangReflectionGeneric* spReflectionVariable_GetGenericContainer(
         SlangReflectionVariable* var);
     SLANG_API SlangReflectionVariable* spReflectionVariable_applySpecializations(
@@ -679,6 +681,8 @@ extern "C"
     SLANG_API size_t spReflectionVariableLayout_GetSpace(
         SlangReflectionVariableLayout* var,
         SlangParameterCategory category);
+    SLANG_API SlangImageFormat
+    spReflectionVariableLayout_GetImageFormat(SlangReflectionVariableLayout* var);
 
     SLANG_API char const* spReflectionVariableLayout_GetSemanticName(
         SlangReflectionVariableLayout* var);

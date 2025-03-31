@@ -49,6 +49,7 @@ DIAGNOSTIC(-1, Note, seeUsingOf, "see using of '$0'")
 DIAGNOSTIC(-1, Note, seeDefinitionOfShader, "see definition of shader '$0'")
 DIAGNOSTIC(-1, Note, seeInclusionOf, "see inclusion of '$0'")
 DIAGNOSTIC(-1, Note, seeModuleBeingUsedIn, "see module '$0' being used in '$1'")
+DIAGNOSTIC(-1, Note, seeCallOfFunc, "see call to '$0'")
 DIAGNOSTIC(-1, Note, seePipelineRequirementDefinition, "see pipeline requirement definition")
 DIAGNOSTIC(
     -1,
@@ -456,6 +457,11 @@ DIAGNOSTIC(
     Error,
     unexpectedTokenExpectedComponentDefinition,
     "unexpected token '$0', only component definitions are allowed in a shader scope.")
+DIAGNOSTIC(
+    20005,
+    Error,
+    invalidEmptyParenthesisExpr,
+    "empty parenthesis '()' is not a valid expression.")
 DIAGNOSTIC(20008, Error, invalidOperator, "invalid operator '$0'.")
 DIAGNOSTIC(20011, Error, unexpectedColon, "unexpected ':'.")
 DIAGNOSTIC(
@@ -487,7 +493,11 @@ DIAGNOSTIC(
     Warning,
     unintendedEmptyStatement,
     "potentially unintended empty statement at this location; use {} instead.")
-
+DIAGNOSTIC(
+    20102,
+    Error,
+    unexpectedBodyAfterSemicolon,
+    "unexpected function body after signature declaration, is this ';' a typo?")
 DIAGNOSTIC(30102, Error, declNotAllowed, "$0 is not allowed here.")
 
 // 29xxx - Snippet parsing and inline asm
@@ -552,6 +562,13 @@ DIAGNOSTIC(
     Error,
     spirvUndefinedId,
     "SPIRV id '%$0' is not defined in the current assembly block location")
+
+DIAGNOSTIC(
+    29115,
+    Error,
+    targetSwitchCaseCannotBeAStage,
+    "cannot use a stage name in '__target_switch', use '__stage_switch' for stage-specific code.")
+
 //
 // 3xxxx - Semantic analysis
 //
@@ -589,6 +606,11 @@ DIAGNOSTIC(30019, Error, typeMismatch, "expected an expression of type '$0', got
 DIAGNOSTIC(30021, Error, noApplicationFunction, "$0: no overload takes arguments ($1)")
 DIAGNOSTIC(30022, Error, invalidTypeCast, "invalid type cast between \"$0\" and \"$1\".")
 DIAGNOSTIC(30023, Error, typeHasNoPublicMemberOfName, "\"$0\" does not have public member \"$1\".")
+DIAGNOSTIC(
+    30024,
+    Error,
+    cannotConvertArrayOfSmallerToLargerSize,
+    "Cannot convert array of size $0 to array of size $1 as this would truncate data")
 DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be larger than zero.")
 DIAGNOSTIC(
     30026,
@@ -737,6 +759,10 @@ DIAGNOSTIC(
     Error,
     cannotSpecializeGeneric,
     "cannot specialize generic '$0' with the provided arguments.")
+
+DIAGNOSTIC(30076, Error, globalVarCannotHaveOpaqueType, "global variable cannot have opaque type.")
+DIAGNOSTIC(-1, Note, doYouMeanStaticConst, "do you intend to define a `static const` instead?")
+DIAGNOSTIC(-1, Note, doYouMeanUniform, "do you intend to define a `uniform` parameter instead?")
 
 DIAGNOSTIC(
     30100,
@@ -961,7 +987,7 @@ DIAGNOSTIC(
     36107,
     Error,
     entryPointUsesUnavailableCapability,
-    "entrypoint '$0' does not support compilation target '$1' with stage '$2'")
+    "entrypoint '$0' uses features that are not available in '$2' stage for '$1' target.")
 DIAGNOSTIC(
     36108,
     Error,
@@ -999,7 +1025,11 @@ DIAGNOSTIC(
     Error,
     capabilityHasMultipleStages,
     "Capability '$0' is targeting stages '$1', only allowed to use 1 unique stage here.")
-
+DIAGNOSTIC(
+    36117,
+    Error,
+    declHasDependenciesNotCompatibleOnStage,
+    "'$0' uses features that are not available in '$1' stage.")
 
 // Attributes
 DIAGNOSTIC(31000, Warning, unknownAttributeName, "unknown attribute '$0'")
@@ -1032,6 +1062,12 @@ DIAGNOSTIC(
     attributeExpectedStringArg,
     "attribute '$0' expects argument $1 to be string")
 
+DIAGNOSTIC(
+    31009,
+    Error,
+    expectedSingleFloatArg,
+    "attribute '$0' expects a single floating point argument")
+
 DIAGNOSTIC(31100, Error, unknownStageName, "unknown stage name '$0'")
 DIAGNOSTIC(31101, Error, unknownImageFormatName, "unknown image format '$0'")
 DIAGNOSTIC(31101, Error, unknownDiagnosticName, "unknown diagnostic '$0'")
@@ -1051,6 +1087,13 @@ DIAGNOSTIC(
     explicitUniformLocation,
     "Explicit binding of uniform locations is discouraged. Prefer 'ConstantBuffer<$0>' over "
     "'uniform $0'")
+DIAGNOSTIC(
+    31105,
+    Warning,
+    imageFormatUnsupportedByBackend,
+    "Image format '$0' is not explicitly supported by the $1 backend, using supported format '$2' "
+    "instead.")
+
 
 DIAGNOSTIC(31120, Error, invalidAttributeTarget, "invalid syntax target for user defined attribute")
 
@@ -1175,6 +1218,12 @@ DIAGNOSTIC(
     Error,
     overloadedFuncUsedWithDerivativeOfAttributes,
     "cannot resolve overloaded functions for derivative-of attributes.")
+DIAGNOSTIC(
+    31158,
+    Error,
+    primalSubstituteTargetMustHaveHigherDifferentiabilityLevel,
+    "primal substitute function for differentiable method must also be differentiable. Use "
+    "[Differentiable] or [TreatAsDifferentiable] (for empty derivatives)")
 
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 DIAGNOSTIC(31201, Error, modifierNotAllowed, "modifier '$0' is not allowed here.")
@@ -1400,6 +1449,11 @@ DIAGNOSTIC(
     Error,
     cannotUseInitializerListForType,
     "cannot use initializer list for type '$0'")
+DIAGNOSTIC(
+    30505,
+    Error,
+    cannotUseInitializerListForCoopVectorOfUnknownSize,
+    "cannot use initializer list for CoopVector of statically unknown size '$0'")
 
 // 3062x: variables
 DIAGNOSTIC(
@@ -1413,7 +1467,11 @@ DIAGNOSTIC(
     ambiguousDefaultInitializerForType,
     "more than one default initializer was found for type '$0'")
 DIAGNOSTIC(30623, Error, cannotHaveInitializer, "'$0' cannot have an initializer because it is $1")
-
+DIAGNOSTIC(
+    30623,
+    Error,
+    genericValueParameterMustHaveType,
+    "a generic value parameter must be given an explicit type")
 
 // 307xx: parameters
 DIAGNOSTIC(
@@ -1658,6 +1716,12 @@ DIAGNOSTIC(
     overloadedParameterToHigherOrderFunction,
     "passing overloaded functions to higher order functions is not supported")
 
+DIAGNOSTIC(
+    39999,
+    Error,
+    matrixColumnOrRowCountIsOne,
+    "matrices with 1 column or row are not supported by the current code generation target")
+
 // 38xxx
 
 DIAGNOSTIC(
@@ -1842,7 +1906,26 @@ DIAGNOSTIC(
     Error,
     errorInImportedModule,
     "import of module '$0' failed because of a compilation error")
+
+DIAGNOSTIC(
+    38201,
+    Error,
+    glslModuleNotAvailable,
+    "'glsl' module is not available from the current global session. To enable GLSL compatibility "
+    "mode, specify 'SlangGlobalSessionDesc::enableGLSL' when creating the global session.")
 DIAGNOSTIC(39999, Fatal, complationCeased, "compilation ceased")
+
+DIAGNOSTIC(
+    38202,
+    Error,
+    matrixWithDisallowedElementTypeEncountered,
+    "matrix with disallowed element type '$0' encountered")
+
+DIAGNOSTIC(
+    38203,
+    Error,
+    vectorWithDisallowedElementTypeEncountered,
+    "vector with disallowed element type '$0' encountered")
 
 // 39xxx - Type layout and parameter binding.
 
@@ -1987,6 +2070,21 @@ DIAGNOSTIC(
     notValidVaryingParameter,
     "parameter '$0' is not a valid varying parameter.")
 
+DIAGNOSTIC(
+    39029,
+    Warning,
+    registerModifierButNoVkBindingNorShift,
+    "shader parameter '$0' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` "
+    "specified for Vulkan, nor is `-fvk-$1-shift` used.")
+
+DIAGNOSTIC(
+    39071,
+    Warning,
+    bindingAttributeIgnoredOnUniform,
+    "binding attribute on uniform '$0' will be ignored since it will be packed into the default "
+    "constant buffer at descriptor set 0 binding 0. To use explicit bindings, declare the uniform "
+    "inside a constant buffer.")
+
 //
 
 // 4xxxx - IL code generation.
@@ -2060,7 +2158,12 @@ DIAGNOSTIC(
 DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
 DIAGNOSTIC(41001, Error, recursiveType, "type '$0' contains cyclic reference to itself.")
 
-DIAGNOSTIC(41010, Warning, missingReturn, "control flow may reach end of non-'void' function")
+DIAGNOSTIC(
+    41009,
+    Error,
+    missingReturnError,
+    "non-void function must return in all cases for target '$0'")
+DIAGNOSTIC(41010, Warning, missingReturn, "non-void function does not return in all cases")
 DIAGNOSTIC(
     41011,
     Error,
@@ -2117,12 +2220,12 @@ DIAGNOSTIC(
     Error,
     typeDoesNotFitAnyValueSize,
     "type '$0' does not fit in the size required by its conforming interface.")
-DIAGNOSTIC(41012, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")
+DIAGNOSTIC(-1, Note, typeAndLimit, "sizeof($0) is $1, limit is $2")
 DIAGNOSTIC(
-    41012,
+    41014,
     Error,
     typeCannotBePackedIntoAnyValue,
-    "type '$0' contains fields that cannot be packed into an AnyValue.")
+    "type '$0' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.")
 DIAGNOSTIC(
     41020,
     Error,
@@ -2213,12 +2316,6 @@ DIAGNOSTIC(
     notEqualBitCastSize,
     "invalid to bit_cast differently sized types: '$0' with size '$1' casted into '$2' with size "
     "'$3'")
-DIAGNOSTIC(
-    41203,
-    Warning,
-    notEqualReinterpretCastSize,
-    "reinterpret<> into not equally sized types: '$0' with size '$1' casted into '$2' with size "
-    "'$3'")
 
 DIAGNOSTIC(
     41300,
@@ -2233,13 +2330,20 @@ DIAGNOSTIC(
     41402,
     Error,
     staticAssertionConditionNotConstant,
-    "condition for static assertion cannot be evaluated at the compile-time.")
+    "condition for static assertion cannot be evaluated at compile time.")
 
 DIAGNOSTIC(
     41402,
     Error,
     multiSampledTextureDoesNotAllowWrites,
     "cannot write to a multisampled texture with target '$0'.")
+
+DIAGNOSTIC(
+    41403,
+    Error,
+    invalidAtomicDestinationPointer,
+    "cannot perform atomic operation because destination is neither groupshared nor from a device "
+    "buffer.")
 
 //
 // 5xxxx - Target code generation.
@@ -2343,6 +2447,12 @@ DIAGNOSTIC(
     Error,
     invalidTessellationDomain,
     "'Domain' should be either 'triangles' or 'quads'.")
+
+DIAGNOSTIC(
+    50060,
+    Error,
+    invalidMeshStageOutputTopology,
+    "Invalid mesh stage output topology '$0' for target '$1', must be one of: $2")
 
 DIAGNOSTIC(
     50082,
@@ -2460,6 +2570,12 @@ DIAGNOSTIC(
     unsupportedTargetIntrinsic,
     "intrinsic operation '$0' is not supported for the current target.")
 DIAGNOSTIC(
+    55205,
+    Error,
+    unsupportedSpecializationConstantForNumThreads,
+    "Specialization constants are not supported in the 'numthreads' attribute for the current "
+    "target.")
+DIAGNOSTIC(
     56001,
     Error,
     unableToAutoMapCUDATypeToHostType,
@@ -2470,6 +2586,8 @@ DIAGNOSTIC(
     attemptToQuerySizeOfUnsizedArray,
     "cannot obtain the size of an unsized array.")
 
+DIAGNOSTIC(56003, Fatal, useOfUninitializedOpaqueHandle, "use of uninitialized opaque handle '$0'.")
+
 // Metal
 DIAGNOSTIC(
     56100,
@@ -2477,6 +2595,12 @@ DIAGNOSTIC(
     constantBufferInParameterBlockNotAllowedOnMetal,
     "nested 'ConstantBuffer' inside a 'ParameterBlock' is not supported on Metal, use "
     "'ParameterBlock' instead.")
+DIAGNOSTIC(
+    56101,
+    Error,
+    resourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal,
+    "nesting a 'ConstantBuffer' containing resource types inside a 'ParameterBlock' is not "
+    "supported on Metal, please use 'ParameterBlock' instead.")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")

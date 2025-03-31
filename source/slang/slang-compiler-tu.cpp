@@ -95,6 +95,18 @@ Module::precompileForTarget(SlangCompileTarget target, slang::IBlob** outDiagnos
 {
     CodeGenTarget targetEnum = CodeGenTarget(target);
 
+    // Don't precompile twice for the same target
+    for (auto globalInst : getIRModule()->getModuleInst()->getChildren())
+    {
+        if (auto inst = as<IREmbeddedDownstreamIR>(globalInst))
+        {
+            if (inst->getTarget() == targetEnum)
+            {
+                return SLANG_OK;
+            }
+        }
+    }
+
     auto module = getIRModule();
     auto linkage = getLinkage();
     auto builder = IRBuilder(module);
@@ -291,6 +303,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getModuleDependency(
     {
         return SLANG_E_INVALID_ARG;
     }
+    getModuleDependencies()[dependencyIndex]->addRef();
     *outModule = getModuleDependencies()[dependencyIndex];
     return SLANG_OK;
 }

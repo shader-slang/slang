@@ -203,12 +203,22 @@ IRFuncType* BackwardDiffPropagateTranscriber::differentiateFunctionType(
     IRInst* func,
     IRFuncType* funcType)
 {
-    IRType* intermediateType =
-        builder->getBackwardDiffIntermediateContextType(maybeFindOuterGeneric(func));
+    IRType* intermediateType = nullptr;
     if (auto outerGeneric = findOuterGeneric(builder->getInsertLoc().getParent()))
     {
         intermediateType =
+            builder->getBackwardDiffIntermediateContextType(maybeFindOuterGeneric(func));
+        intermediateType =
             (IRType*)specializeWithGeneric(*builder, intermediateType, as<IRGeneric>(outerGeneric));
+    }
+    else if (as<IRLookupWitnessMethod>(func))
+    {
+        intermediateType = nullptr;
+    }
+    else
+    {
+        intermediateType =
+            builder->getBackwardDiffIntermediateContextType(maybeFindOuterGeneric(func));
     }
     return differentiateFunctionTypeImpl(builder, funcType, intermediateType);
 }
@@ -360,7 +370,7 @@ IRType* BackwardDiffTranscriberBase::transcribeParamTypeForPropagateFunc(
     auto diffPairType = tryGetDiffPairType(builder, paramType);
     if (diffPairType)
     {
-        if (!as<IRPtrTypeBase>(diffPairType) && !as<IRDifferentialPtrPairType>(diffPairType))
+        if (!asRelevantPtrType(diffPairType) && !as<IRDifferentialPtrPairType>(diffPairType))
             return builder->getInOutType(diffPairType);
         return diffPairType;
     }
@@ -382,14 +392,7 @@ InstPair BackwardDiffTranscriberBase::transcribeFuncHeaderImpl(
     IRFunc* primalFunc = origFunc;
 
     maybeMigrateDifferentiableDictionaryFromDerivativeFunc(inBuilder, origFunc);
-
-    // The original func may not have a type dictionary if it is not originally marked as
-    // differentiable, in this case we would have already pulled the necessary types from
-    // the user-provided derivative function, so we are still fine.
-    if (origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
-    {
-        differentiableTypeConformanceContext.setFunc(origFunc);
-    }
+    differentiableTypeConformanceContext.setFunc(origFunc);
 
     auto diffFunc = builder.createFunc();
 
@@ -414,12 +417,7 @@ InstPair BackwardDiffTranscriberBase::transcribeFuncHeaderImpl(
 
     // Mark the generated derivative function itself as differentiable.
     builder.addBackwardDifferentiableDecoration(diffFunc);
-    // Find and clone `DifferentiableTypeDictionaryDecoration` to the new diffFunc.
-    if (auto dictDecor = origFunc->findDecoration<IRDifferentiableTypeDictionaryDecoration>())
-    {
-        builder.setInsertBefore(diffFunc->getFirstDecorationOrChild());
-        cloneInst(&cloneEnv, &builder, dictDecor);
-    }
+
     copyOriginalDecorations(origFunc, diffFunc);
     builder.addFloatingModeOverrideDecoration(diffFunc, FloatingPointMode::Fast);
     return InstPair(primalFunc, diffFunc);
@@ -446,7 +444,24 @@ void BackwardDiffTranscriberBase::addTranscribedFuncDecoration(
 
 InstPair BackwardDiffTranscriberBase::transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc)
 {
-    auto result = transcribeFuncHeaderImpl(inBuilder, origFunc);
+    InstPair result;
+
+    // If we're transcribing a function as a 'value' (i.e. maybe embedded in a generic, keep the
+    // insert location unchanges). If we're transcribing it as a declaration, we should
+    // insert into the module.
+    //
+    auto origOuterGen = as<IRGeneric>(findOuterGeneric(origFunc));
+    if (!origOuterGen || !(findInnerMostGenericReturnVal(origOuterGen) == origFunc))
+    {
+        // Dealing with a declaration.. insert into module scope.
+        IRBuilder subBuilder = *inBuilder;
+        subBuilder.setInsertInto(inBuilder->getModule());
+        result = transcribeFuncHeaderImpl(&subBuilder, origFunc);
+    }
+    else
+    {
+        result = transcribeFuncHeaderImpl(inBuilder, origFunc);
+    }
 
     FuncBodyTranscriptionTask task;
     task.originalFunc = as<IRFunc>(result.primal);
@@ -499,7 +514,7 @@ InstPair BackwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRF
             {
                 // As long as the primal parameter is not an out or constref type,
                 // we need to fetch the primal value from the parameter.
-                if (as<IRPtrTypeBase>(propagateParamType))
+                if (asRelevantPtrType(propagateParamType))
                 {
                     primalArg = builder.emitLoad(param);
                 }
@@ -513,10 +528,12 @@ InstPair BackwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRF
                 // If primal parameter is mutable, we need to pass in a temp var.
                 auto tempVar = builder.emitVar(primalParamPtrType->getValueType());
 
-                // We also need to setup the initial value of the temp var, otherwise
-                // the temp var will be uninitialized which could cause undefined behavior
-                // in the primal function.
-                builder.emitStore(tempVar, primalArg);
+                // If the parameter is not a pure 'out' param, we also need to setup the initial
+                // value of the temp var, otherwise the temp var will be uninitialized which could
+                // cause undefined behavior in the primal function.
+                //
+                if (!as<IROutType>(primalParamType))
+                    builder.emitStore(tempVar, primalArg);
 
                 primalArgs.add(tempVar);
             }
@@ -527,7 +544,7 @@ InstPair BackwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRF
         }
         else
         {
-            auto primalPtrType = as<IRPtrTypeBase>(primalParamType);
+            auto primalPtrType = asRelevantPtrType(primalParamType);
             SLANG_RELEASE_ASSERT(primalPtrType);
             auto primalValueType = primalPtrType->getValueType();
             auto var = builder.emitVar(primalValueType);
@@ -1344,6 +1361,7 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
     auto ctxParam =
         builder->emitParam(as<IRFuncType>(diffFunc->getDataType())->getParamType(paramCount - 1));
     builder->addNameHintDecoration(ctxParam, UnownedStringSlice("_s_diff_ctx"));
+    builder->addDecoration(ctxParam, kIROp_PrimalContextDecoration);
     result.primalFuncParams.add(ctxParam);
     result.propagateFuncParams.add(ctxParam);
     result.dOutParam = dOutParam;

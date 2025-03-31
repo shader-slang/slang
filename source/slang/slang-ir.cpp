@@ -2395,9 +2395,8 @@ IRBlobLit* IRBuilder::getBlobValue(ISlangBlob* blob)
     return static_cast<IRBlobLit*>(_findOrEmitConstant(keyInst));
 }
 
-IRPtrLit* IRBuilder::_getPtrValue(void* data)
+IRPtrLit* IRBuilder::getPtrValue(IRType* type, void* data)
 {
-    auto type = getPtrType(getVoidType());
     IRConstant keyInst;
     memset(&keyInst, 0, sizeof(keyInst));
     keyInst.m_op = kIROp_PtrLit;
@@ -2679,6 +2678,11 @@ IRBasicType* IRBuilder::getUInt8Type()
     return (IRBasicType*)getType(kIROp_UInt8Type);
 }
 
+IRBasicType* IRBuilder::getFloatType()
+{
+    return (IRBasicType*)getType(kIROp_FloatType);
+}
+
 IRBasicType* IRBuilder::getCharType()
 {
     return (IRBasicType*)getType(kIROp_CharType);
@@ -2921,10 +2925,22 @@ IRComPtrType* IRBuilder::getComPtrType(IRType* valueType)
     return (IRComPtrType*)getType(kIROp_ComPtrType, valueType);
 }
 
-IRArrayTypeBase* IRBuilder::getArrayTypeBase(IROp op, IRType* elementType, IRInst* elementCount)
+IRArrayTypeBase* IRBuilder::getArrayTypeBase(
+    IROp op,
+    IRType* elementType,
+    IRInst* elementCount,
+    IRInst* stride)
 {
-    IRInst* operands[] = {elementType, elementCount};
-    return (IRArrayTypeBase*)getType(op, op == kIROp_ArrayType ? 2 : 1, operands);
+    if (op == kIROp_ArrayType)
+    {
+        IRInst* operands[] = {elementType, elementCount, stride};
+        return (IRArrayTypeBase*)getType(op, stride ? 3 : 2, operands);
+    }
+    else
+    {
+        IRInst* operands[] = {elementType, stride};
+        return (IRArrayTypeBase*)getType(op, stride ? 2 : 1, operands);
+    }
 }
 
 IRArrayType* IRBuilder::getArrayType(IRType* elementType, IRInst* elementCount)
@@ -2963,6 +2979,13 @@ IRVectorType* IRBuilder::getVectorType(IRType* elementType, IRInst* elementCount
 IRVectorType* IRBuilder::getVectorType(IRType* elementType, IRIntegerValue elementCount)
 {
     return getVectorType(elementType, getIntValue(getIntType(), elementCount));
+}
+
+IRCoopVectorType* IRBuilder::getCoopVectorType(IRType* elementType, IRInst* elementCount)
+{
+    IRInst* operands[] = {elementType, elementCount};
+    return (IRCoopVectorType*)
+        getType(kIROp_CoopVectorType, sizeof(operands) / sizeof(operands[0]), operands);
 }
 
 IRMatrixType* IRBuilder::getMatrixType(
@@ -3196,6 +3219,11 @@ void IRBuilder::setDataType(IRInst* inst, IRType* dataType)
         // No rate? Just clobber the data type.
         inst->setFullType(dataType);
     }
+}
+
+IRInst* IRBuilder::emitGetCurrentStage()
+{
+    return emitIntrinsicInst(getIntType(), kIROp_GetCurrentStage, 0, nullptr);
 }
 
 IRInst* IRBuilder::emitGetValueFromBoundInterface(IRType* type, IRInst* boundInterfaceValue)
@@ -3798,8 +3826,6 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
     case kIROp_UIntType:
     case kIROp_UIntPtrType:
     case kIROp_UInt64Type:
-    case kIROp_Int8x4PackedType:
-    case kIROp_UInt8x4PackedType:
     case kIROp_CharType:
         return getIntValue(type, 0);
     case kIROp_BoolType:
@@ -3888,6 +3914,26 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
                 return nullptr;
             return emitIntrinsicInst(type, kIROp_MakeVectorFromScalar, 1, &inner);
         }
+    case kIROp_CoopVectorType:
+        {
+            auto coopVecType = as<IRCoopVectorType>(actualType);
+            if (auto count = as<IRIntLit>(coopVecType->getElementCount()))
+            {
+                auto element = emitDefaultConstruct(coopVecType->getElementType(), fallback);
+                if (!element)
+                    return nullptr;
+                List<IRInst*> elements;
+                constexpr int maxCount = 4096;
+                if (count->getValue() > maxCount)
+                    break;
+                for (IRIntegerValue i = 0; i < count->getValue(); i++)
+                {
+                    elements.add(element);
+                }
+                return emitMakeCoopVector(type, elements.getCount(), elements.getBuffer());
+            }
+            break;
+        }
     case kIROp_MatrixType:
         {
             auto inner =
@@ -3959,7 +4005,7 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
     }
 }
 
-IRInst* IRBuilder::emitCast(IRType* type, IRInst* value)
+IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinCast)
 {
     if (isTypeEqual(type, value->getDataType()))
         return value;
@@ -3973,8 +4019,17 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value)
         SLANG_UNREACHABLE("cast from void type");
     }
 
-    SLANG_RELEASE_ASSERT(toStyle != TypeCastStyle::Unknown);
-    SLANG_RELEASE_ASSERT(fromStyle != TypeCastStyle::Unknown);
+    if (toStyle == TypeCastStyle::Unknown || fromStyle == TypeCastStyle::Unknown)
+    {
+        if (fallbackToBuiltinCast)
+        {
+            return emitIntrinsicInst(type, kIROp_BuiltinCast, 1, &value);
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
 
     struct OpSeq
     {
@@ -4002,7 +4057,7 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value)
         /* From Float */
         {kIROp_CastFloatToInt,
          kIROp_FloatCast,
-         {kIROp_CastFloatToInt, kIROp_IntCast},
+         {kIROp_Neq},
          {kIROp_CastFloatToInt, kIROp_CastIntToPtr},
          kIROp_CastToVoid},
         /* From Bool  */
@@ -4021,8 +4076,26 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value)
     auto t = type;
     if (op.op1 != kIROp_Nop)
     {
-        t = getUInt64Type();
+        if (toStyle == TypeCastStyle::Bool)
+            t = getIntType();
+        else
+            t = getUInt64Type();
+        if (auto vecType = as<IRVectorType>(type))
+            t = getVectorType(t, vecType->getElementCount());
+        else if (auto matType = as<IRMatrixType>(type))
+            t = getMatrixType(
+                t,
+                matType->getRowCount(),
+                matType->getColumnCount(),
+                matType->getLayout());
     }
+
+    if (op.op0 == kIROp_Neq)
+    {
+        IRInst* args[2] = {value, emitDefaultConstruct(value->getDataType())};
+        return emitIntrinsicInst(type, op.op0, 2, args);
+    }
+
     auto result = emitIntrinsicInst(t, op.op0, 1, &value);
     if (op.op1 != kIROp_Nop)
     {
@@ -4170,6 +4243,18 @@ IRInst* IRBuilder::emitMakeString(IRInst* nativeStr)
 IRInst* IRBuilder::emitGetNativeString(IRInst* str)
 {
     return emitIntrinsicInst(getNativeStringType(), kIROp_getNativeStr, 1, &str);
+}
+
+IRInst* IRBuilder::emitGetElement(IRType* type, IRInst* arrayLikeType, IRIntegerValue element)
+{
+    IRInst* args[] = {arrayLikeType, getIntValue(getIntType(), element)};
+    return emitIntrinsicInst(type, kIROp_GetElement, 2, args);
+}
+
+IRInst* IRBuilder::emitGetElementPtr(IRType* type, IRInst* arrayLikeType, IRIntegerValue element)
+{
+    IRInst* args[] = {arrayLikeType, getIntValue(getIntType(), element)};
+    return emitIntrinsicInst(type, kIROp_GetElementPtr, 2, args);
 }
 
 IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, IRInst* element)
@@ -4346,6 +4431,11 @@ IRInst* IRBuilder::emitMakeMatrixFromScalar(IRType* type, IRInst* scalarValue)
     return emitIntrinsicInst(type, kIROp_MakeMatrixFromScalar, 1, &scalarValue);
 }
 
+IRInst* IRBuilder::emitMakeCoopVector(IRType* type, UInt argCount, IRInst* const* args)
+{
+    return emitIntrinsicInst(type, kIROp_MakeCoopVector, argCount, args);
+}
+
 IRInst* IRBuilder::emitMakeArray(IRType* type, UInt argCount, IRInst* const* args)
 {
     return emitIntrinsicInst(type, kIROp_MakeArray, argCount, args);
@@ -4463,6 +4553,18 @@ RefPtr<IRModule> IRModule::create(Session* session)
     moduleInst->module = module;
 
     return module;
+}
+
+void IRModule::buildMangledNameToGlobalInstMap()
+{
+    m_mapMangledNameToGlobalInst.clear();
+    for (auto inst : getGlobalInsts())
+    {
+        if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
+        {
+            m_mapMangledNameToGlobalInst[linkageDecor->getMangledName()].add(inst);
+        }
+    }
 }
 
 IRDominatorTree* IRModule::findOrCreateDominatorTree(IRGlobalValueWithCode* func)
@@ -4894,6 +4996,14 @@ IRInst* IRBuilder::emitLoad(IRType* type, IRInst* ptr)
     return inst;
 }
 
+IRInst* IRBuilder::emitLoad(IRType* type, IRInst* ptr, IRInst* align)
+{
+    auto inst = createInst<IRLoad>(this, kIROp_Load, type, ptr, getAttr(kIROp_AlignedAttr, align));
+
+    addInst(inst);
+    return inst;
+}
+
 IRInst* IRBuilder::emitLoad(IRInst* ptr)
 {
     // Note: a `load` operation does not consider the rate
@@ -4928,6 +5038,20 @@ IRInst* IRBuilder::emitLoad(IRInst* ptr)
 IRInst* IRBuilder::emitStore(IRInst* dstPtr, IRInst* srcVal)
 {
     auto inst = createInst<IRStore>(this, kIROp_Store, nullptr, dstPtr, srcVal);
+
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitStore(IRInst* dstPtr, IRInst* srcVal, IRInst* align)
+{
+    auto inst = createInst<IRStore>(
+        this,
+        kIROp_Store,
+        nullptr,
+        dstPtr,
+        srcVal,
+        getAttr(kIROp_AlignedAttr, align));
 
     addInst(inst);
     return inst;
@@ -5188,6 +5312,10 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
     {
         type = vectorType->getElementType();
     }
+    else if (auto coopVecType = as<IRCoopVectorType>(valueType))
+    {
+        type = coopVecType->getElementType();
+    }
     else if (auto matrixType = as<IRMatrixType>(valueType))
     {
         type = getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
@@ -5202,6 +5330,11 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
         SLANG_ASSERT(as<IRIntLit>(index));
         type = (IRType*)tupleType->getOperand(getIntVal(index));
     }
+    else if (auto hlslInputPatchType = as<IRHLSLInputPatchType>(valueType))
+    {
+        type = hlslInputPatchType->getElementType();
+    }
+
     SLANG_RELEASE_ASSERT(type);
     auto inst = createInst<IRGetElementPtr>(
         this,
@@ -5570,6 +5703,13 @@ IRInst* IRBuilder::emitDiscard()
     return inst;
 }
 
+IRInst* IRBuilder::emitCheckpointObject(IRInst* value)
+{
+    auto inst =
+        createInst<IRCheckpointObject>(this, kIROp_CheckpointObject, value->getFullType(), value);
+    addInst(inst);
+    return inst;
+}
 
 IRInst* IRBuilder::emitBranch(IRBlock* pBlock)
 {
@@ -5963,6 +6103,20 @@ IRInst* IRBuilder::emitShl(IRType* type, IRInst* left, IRInst* right)
     return inst;
 }
 
+IRInst* IRBuilder::emitAnd(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_And, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitOr(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_Or, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
 IRInst* IRBuilder::emitGetNativePtr(IRInst* value)
 {
     auto valueType = value->getDataType();
@@ -6324,7 +6478,7 @@ IRDecoration* IRBuilder::addDecoration(
 
 void IRBuilder::addHighLevelDeclDecoration(IRInst* inst, Decl* decl)
 {
-    auto ptrConst = _getPtrValue(decl);
+    auto ptrConst = getPtrValue(getPtrType(getVoidType()), decl);
     addDecoration(inst, kIROp_HighLevelDeclDecoration, ptrConst);
 }
 
@@ -6963,6 +7117,76 @@ void dumpIRGeneric(IRDumpContext* context, IRGeneric* witnessTable)
     dump(context, "}\n");
 }
 
+static void dumpEmbeddedDownstream(IRDumpContext* context, IRInst* inst)
+{
+    auto targetInst = inst->getOperand(0);
+    auto blobInst = inst->getOperand(1);
+
+    // Get the target value
+    auto targetLit = as<IRIntLit>(targetInst);
+    if (!targetLit)
+    {
+        dump(context, "EmbeddedDownstreamIR(invalid target)");
+        return;
+    }
+
+    // Get the blob
+    auto blobLitInst = as<IRBlobLit>(blobInst);
+    if (!blobLitInst)
+    {
+        dump(context, "EmbeddedDownstreamIR(invalid blob)");
+        return;
+    }
+
+    dump(context, "EmbeddedDownstreamIR(");
+    dump(context, targetLit->getValue());
+    dump(context, " : Int, ");
+
+    // If target is SPIR-V (6), disassemble the blob
+    if (targetLit->getValue() == (IRIntegerValue)CodeGenTarget::SPIRV)
+    {
+        auto blob = blobLitInst->getStringSlice();
+        const uint32_t* spirvCode = (const uint32_t*)blob.begin();
+        const size_t spirvWordCount = blob.getLength() / sizeof(uint32_t);
+
+        // Get the compiler from the session through the module
+        auto module = inst->getModule();
+        auto session = module->getSession();
+        IDownstreamCompiler* compiler =
+            session->getOrLoadDownstreamCompiler(PassThroughMode::SpirvDis, nullptr);
+
+        if (compiler)
+        {
+            // Use glslang interface to disassemble with string output
+            String disassemblyOutput;
+            if (SLANG_SUCCEEDED(compiler->disassembleWithResult(
+                    spirvCode,
+                    int(spirvWordCount),
+                    disassemblyOutput)))
+            {
+                // Dump the captured disassembly
+                dump(context, "\n");
+                dumpIndent(context);
+                dump(context, disassemblyOutput);
+            }
+            else
+            {
+                dump(context, "<disassembly failed>");
+            }
+        }
+        else
+        {
+            dump(context, "<unavailable disassembler>");
+        }
+    }
+    else
+    {
+        // TODO: Add DXIL disassembly call here.
+        dump(context, "<binary blob>");
+    }
+    dump(context, ")");
+}
+
 static void dumpInstExpr(IRDumpContext* context, IRInst* inst)
 {
     if (!inst)
@@ -7010,6 +7234,13 @@ static void dumpInstExpr(IRDumpContext* context, IRInst* inst)
         default:
             break;
         }
+    }
+
+    // Special case EmbeddedDownstreamIR to show SPIR-V disassembly
+    if (op == kIROp_EmbeddedDownstreamIR)
+    {
+        dumpEmbeddedDownstream(context, inst);
+        return;
     }
 
     // Special case the SPIR-V asm operands as the distinction here is
@@ -7395,8 +7626,6 @@ static bool _isTypeOperandEqual(IRInst* a, IRInst* b)
     {
         return _areTypeOperandsEqual(a, b);
     }
-    SLANG_ASSERT(!"Unhandled comparison");
-
     // We can't equate any other type..
     return false;
 }
@@ -7423,8 +7652,6 @@ bool isIntegralType(IRType* t)
         case BaseType::UInt64:
         case BaseType::IntPtr:
         case BaseType::UIntPtr:
-        case BaseType::Int8x4Packed:
-        case BaseType::UInt8x4Packed:
             return true;
         default:
             return false;
@@ -7470,10 +7697,6 @@ IntInfo getIntTypeInfo(const IRType* intType)
         return {32, true};
     case kIROp_Int64Type:
         return {64, true};
-
-    case kIROp_Int8x4PackedType:
-    case kIROp_UInt8x4PackedType:
-        return {32, false};
 
     case kIROp_IntPtrType:  // target platform dependent
     case kIROp_UIntPtrType: // target platform dependent
@@ -8146,6 +8369,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetAddr:
     case kIROp_GetValueFromBoundInterface:
     case kIROp_MakeUInt64:
+    case kIROp_MakeCoopVector:
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
     case kIROp_MakeMatrixFromScalar:
@@ -8218,6 +8442,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:
     case kIROp_WrapExistential:
+    case kIROp_BuiltinCast:
     case kIROp_BitCast:
     case kIROp_CastFloatToInt:
     case kIROp_CastIntToFloat:
@@ -8226,6 +8451,10 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_CastPtrToInt:
     case kIROp_CastIntToPtr:
     case kIROp_PtrCast:
+    case kIROp_CastUInt2ToDescriptorHandle:
+    case kIROp_CastDescriptorHandleToUInt2:
+    case kIROp_CastDescriptorHandleToResource:
+    case kIROp_GetDynamicResourceHeap:
     case kIROp_CastDynamicResource:
     case kIROp_AllocObj:
     case kIROp_BitfieldExtract:
@@ -8245,6 +8474,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetArrayLength:
     case kIROp_ResolveVaryingInputRef:
     case kIROp_GetPerVertexInputArray:
+    case kIROp_MetalCastToDepthTexture:
+    case kIROp_GetCurrentStage:
         return false;
 
     case kIROp_ForwardDifferentiate:
@@ -8625,6 +8856,7 @@ bool isMovableInst(IRInst* inst)
 
     switch (inst->getOp())
     {
+    case kIROp_MakeCoopVector:
     case kIROp_Add:
     case kIROp_Sub:
     case kIROp_Mul:
@@ -8718,24 +8950,33 @@ void IRInst::addBlock(IRBlock* block)
     block->insertAtEnd(this);
 }
 
-void IRInst::dump()
+void IRInst::dump(String& outStr)
 {
+    StringBuilder sb;
+
     if (auto intLit = as<IRIntLit>(this))
     {
-        std::cout << intLit->getValue() << std::endl;
+        sb << intLit->getValue();
     }
     else if (auto stringLit = as<IRStringLit>(this))
     {
-        std::cout << stringLit->getStringSlice().begin() << std::endl;
+        sb << stringLit->getStringSlice();
     }
     else
     {
-        StringBuilder sb;
         IRDumpOptions options;
         StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
         dumpIR(this, options, nullptr, &writer);
-        std::cout << sb.toString().begin() << std::endl;
     }
+
+    outStr = sb.toString();
+}
+
+void IRInst::dump()
+{
+    String s;
+    dump(s);
+    std::cout << s.begin() << std::endl;
 }
 } // namespace Slang
 

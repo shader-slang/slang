@@ -101,13 +101,8 @@ static const char s_xyzwNames[] = "xyzw";
     case kIROp_UIntPtrType:
         return UnownedStringSlice("uintptr_t");
 
-    case kIROp_Int8x4PackedType:
-    case kIROp_UInt8x4PackedType:
-        return UnownedStringSlice("uint32_t");
-
         // Not clear just yet how we should handle half... we want all processing as float
         // probly, but when reading/writing to memory converting
-
     case kIROp_HalfType:
         return UnownedStringSlice("half");
 
@@ -614,7 +609,10 @@ void CPPSourceEmitter::emitGlobalRTTISymbolPrefix()
 
 void CPPSourceEmitter::emitWitnessTable(IRWitnessTable* witnessTable)
 {
-    auto interfaceType = cast<IRInterfaceType>(witnessTable->getConformanceType());
+    auto interfaceType = as<IRInterfaceType>(witnessTable->getConformanceType());
+
+    if (!interfaceType)
+        return;
 
     // Ignore witness tables for builtin interface types.
     if (isBuiltin(interfaceType))

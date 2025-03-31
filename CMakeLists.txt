@@ -33,6 +33,9 @@ cmake_policy(SET CMP0091 NEW)
 # tree relocatable
 set(CMAKE_BUILD_RPATH_USE_ORIGIN TRUE)
 
+# Export the compile datebase as a json file, this can be used by VIM language server
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Enable placing targets into a hierarchy for IDE generators
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -163,6 +166,55 @@ option(
 )
 mark_as_advanced(SLANG_SPIRV_HEADERS_INCLUDE_DIR)
 
+# Options for user defined paths for external modules.
+advanced_option(
+    SLANG_OVERRIDE_LZ4_PATH
+    "Build using user defined path for LZ4"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_MINIZ_PATH
+    "Build using user defined path for Miniz"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_UNORDERED_DENSE_PATH
+    "Build using user defined path for unordered_dense"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_VULKAN_HEADERS_PATH
+    "Build using user defined path for Vulkan headers"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_SPIRV_HEADERS_PATH
+    "Build using user defined path for SPIR-V headers"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_SPIRV_TOOLS_PATH
+    "Build using user defined path for SPIR-V tools"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_GLSLANG_PATH
+    "Build using user defined path for glslang"
+    OFF
+)
+
+advanced_option(
+    SLANG_EXCLUDE_DAWN
+    "Optionally exclude webgpu_dawn from the build"
+    OFF
+)
+
+advanced_option(
+    SLANG_EXCLUDE_TINT
+    "Optionally exclude slang-tint from the build"
+    OFF
+)
+
 if(${SLANG_USE_SYSTEM_LZ4})
     add_compile_definitions(SLANG_USE_SYSTEM_LZ4_HEADER)
 endif()
@@ -173,6 +225,10 @@ endif()
 
 if(${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     add_compile_definitions(SLANG_USE_SYSTEM_UNORDERED_DENSE_HEADER)
+endif()
+
+if(SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
+    add_compile_definitions(SLANG_USE_SYSTEM_SPIRV_HEADER)
 endif()
 
 enum_option(
@@ -192,6 +248,8 @@ option(
     "Generate debug info for Release builds"
     ON
 )
+
+option(SLANG_ENABLE_RELEASE_LTO "Enable LTO for Release builds" ON)
 
 option(
     SLANG_ENABLE_SPLIT_DEBUG_INFO
@@ -246,24 +304,28 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
     )
 endif()
 
-set(webgpu_dawn_release_tag "webgpu_dawn-0")
-if(
-    CMAKE_SYSTEM_NAME MATCHES "Windows"
-    AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
-)
-    set(SLANG_WEBGPU_DAWN_BINARY_URL
-        "https://github.com/shader-slang/dawn/releases/download/${webgpu_dawn_release_tag}/webgpu_dawn-windows-x64.zip"
+if(NOT SLANG_EXCLUDE_DAWN)
+    set(webgpu_dawn_release_tag "webgpu_dawn-0")
+    if(
+        CMAKE_SYSTEM_NAME MATCHES "Windows"
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
     )
+        set(SLANG_WEBGPU_DAWN_BINARY_URL
+            "https://github.com/shader-slang/dawn/releases/download/${webgpu_dawn_release_tag}/webgpu_dawn-windows-x64.zip"
+        )
+    endif()
 endif()
 
-set(slang_tint_release_tag "slang-tint-0")
-if(
-    CMAKE_SYSTEM_NAME MATCHES "Windows"
-    AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
-)
-    set(SLANG_SLANG_TINT_BINARY_URL
-        "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
+if(NOT SLANG_EXCLUDE_TINT)
+    set(slang_tint_release_tag "slang-tint-0")
+    if(
+        CMAKE_SYSTEM_NAME MATCHES "Windows"
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
     )
+        set(SLANG_SLANG_TINT_BINARY_URL
+            "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
+        )
+    endif()
 endif()
 
 #
@@ -307,15 +369,25 @@ add_subdirectory(external)
 
 # webgpu_dawn is only available as a fetched shared library, since Dawn's nested source
 # trees are too large and onerous for us to depend on.
+# We ignore the failure to fetch the library, since it's not required for the build to succeed.
 if(SLANG_WEBGPU_DAWN_BINARY_URL)
-    copy_fetched_shared_library("webgpu_dawn" "${SLANG_WEBGPU_DAWN_BINARY_URL}")
+    copy_fetched_shared_library(
+        "webgpu_dawn"
+        "${SLANG_WEBGPU_DAWN_BINARY_URL}"
+        IGNORE_FAILURE
+    )
 endif()
 
 # slang-tint is only available as a fetched shared library, since it's hosted in the Dawn
 # repository, and Dawn's nested source trees are too large and onerous for us to depend
 # on.
+# We ignore the failure to fetch the library, since it's not required for the build to succeed.
 if(SLANG_SLANG_TINT_BINARY_URL)
-    copy_fetched_shared_library("slang-tint" "${SLANG_SLANG_TINT_BINARY_URL}")
+    copy_fetched_shared_library(
+        "slang-tint"
+        "${SLANG_SLANG_TINT_BINARY_URL}"
+        IGNORE_FAILURE
+    )
 endif()
 
 fetch_or_build_slang_llvm()
@@ -332,6 +404,7 @@ add_subdirectory(source/slang-glslang)
 add_subdirectory(tools)
 add_subdirectory(prelude)
 add_subdirectory(source/slang-core-module)
+add_subdirectory(source/slang-glsl-module)
 add_subdirectory(source/slang)
 add_subdirectory(source/slangc)
 add_subdirectory(examples)
@@ -358,7 +431,6 @@ install(
     DESTINATION .
     PATTERN ".*" EXCLUDE
 )
-
 include(CPack)
 
 # Write basic package config version file using standard CMakePackageConfigHelpers utility
@@ -383,12 +455,14 @@ configure_package_config_file(
 # linkable targets. In this case do not export the targets. Otherwise, just
 # export the slang targets. 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    install(
-        EXPORT SlangTargets
-        FILE ${PROJECT_NAME}Targets.cmake
-        NAMESPACE ${PROJECT_NAME}::
-        DESTINATION cmake
-    )
+    if(NOT ${SLANG_BUILD_TYPE} STREQUAL "STATIC")
+        install(
+            EXPORT SlangTargets
+            FILE ${PROJECT_NAME}Targets.cmake
+            NAMESPACE ${PROJECT_NAME}::
+            DESTINATION cmake
+        )
+    endif()
 endif()
 
 install(

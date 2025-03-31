@@ -592,8 +592,9 @@ struct IRTypeLegalizationContext
     IRBuilder* builder;
     TargetProgram* targetProgram;
     IRBuilder builderStorage;
+    DiagnosticSink* m_sink;
 
-    IRTypeLegalizationContext(TargetProgram* target, IRModule* inModule);
+    IRTypeLegalizationContext(TargetProgram* target, IRModule* inModule, DiagnosticSink* sink);
 
     // When inserting new globals, put them before this one.
     IRInst* insertBeforeGlobal = nullptr;
@@ -658,6 +659,8 @@ struct IRTypeLegalizationContext
         IROp op,
         LegalType legalElementType,
         IRInst* layoutOperand) = 0;
+
+    virtual bool shouldLegalizeParameterBlockElementType() { return false; }
 };
 
 // This typedef exists to support pre-existing code from when
@@ -702,7 +705,7 @@ void legalizeEmptyTypes(TargetProgram* target, IRModule* module, DiagnosticSink*
 
 bool isResourceType(IRType* type);
 
-
+SourceLoc findBestSourceLocFromUses(IRInst* inst);
 } // namespace Slang
 
 #endif

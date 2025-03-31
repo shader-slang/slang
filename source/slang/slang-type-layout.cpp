@@ -4,6 +4,7 @@
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "slang-check-impl.h"
 #include "slang-ir-insts.h"
+#include "slang-mangle.h"
 #include "slang-syntax.h"
 
 #include <assert.h>
@@ -109,10 +110,6 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
                 LayoutResourceKind::Uniform,
                 sizeof(intptr_t),
                 sizeof(intptr_t));
-
-        case BaseType::Int8x4Packed:
-        case BaseType::UInt8x4Packed:
-            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
 
         case BaseType::Half:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
@@ -661,7 +658,7 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
         auto alignedElementCount = 1 << Math::Log2Ceil((uint32_t)elementCount);
 
         // Metal aligns vectors to 2/4 element boundaries.
-        size_t size = elementSize * elementCount;
+        size_t size = alignedElementCount * elementSize;
         size_t alignment = alignedElementCount * elementSize;
 
         SimpleLayoutInfo vectorInfo;
@@ -791,6 +788,7 @@ static LayoutResourceKind _getHLSLLayoutResourceKind(ShaderParameterKind kind)
     case ShaderParameterKind::RawBuffer:
     case ShaderParameterKind::Buffer:
     case ShaderParameterKind::Texture:
+    case ShaderParameterKind::AccelerationStructure:
         return LayoutResourceKind::ShaderResource;
 
     case ShaderParameterKind::MutableStructuredBuffer:
@@ -798,6 +796,7 @@ static LayoutResourceKind _getHLSLLayoutResourceKind(ShaderParameterKind kind)
     case ShaderParameterKind::MutableBuffer:
     case ShaderParameterKind::MutableTexture:
     case ShaderParameterKind::AppendConsumeStructuredBuffer:
+    case ShaderParameterKind::ShaderStorageBuffer:
         return LayoutResourceKind::UnorderedAccess;
 
     case ShaderParameterKind::SamplerState:
@@ -845,6 +844,8 @@ struct GLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         {
         case ShaderParameterKind::SubpassInput:
             return SimpleLayoutInfo(LayoutResourceKind::InputAttachmentIndex, slotCount);
+        case ShaderParameterKind::ParameterBlock:
+            return SimpleLayoutInfo(LayoutResourceKind::SubElementRegisterSpace, 1);
         default:
             break;
         }
@@ -891,14 +892,17 @@ struct HLSLObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         {
         case ShaderParameterKind::ConstantBuffer:
             return SimpleLayoutInfo(LayoutResourceKind::ConstantBuffer, 1);
-
+        case ShaderParameterKind::ParameterBlock:
+            return SimpleLayoutInfo(LayoutResourceKind::SubElementRegisterSpace, 1);
         case ShaderParameterKind::TextureUniformBuffer:
         case ShaderParameterKind::StructuredBuffer:
         case ShaderParameterKind::RawBuffer:
         case ShaderParameterKind::Buffer:
         case ShaderParameterKind::Texture:
+        case ShaderParameterKind::AccelerationStructure:
             return SimpleLayoutInfo(LayoutResourceKind::ShaderResource, 1);
 
+        case ShaderParameterKind::ShaderStorageBuffer:
         case ShaderParameterKind::MutableStructuredBuffer:
         case ShaderParameterKind::MutableRawBuffer:
         case ShaderParameterKind::MutableBuffer:
@@ -1140,6 +1144,14 @@ struct MetalLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
+struct MetalArgumentBufferTier2LayoutRulesFamilyImpl : MetalLayoutRulesFamilyImpl
+{
+    virtual LayoutRulesImpl* getConstantBufferRules(
+        CompilerOptionSet& compilerOptions,
+        Type* containerType) override;
+    virtual LayoutRulesImpl* getParameterBlockRules(CompilerOptionSet& compilerOptions) override;
+};
+
 struct WGSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getAnyValueRules() override;
@@ -1168,6 +1180,7 @@ HLSLLayoutRulesFamilyImpl kHLSLLayoutRulesFamilyImpl;
 CPULayoutRulesFamilyImpl kCPULayoutRulesFamilyImpl;
 CUDALayoutRulesFamilyImpl kCUDALayoutRulesFamilyImpl;
 MetalLayoutRulesFamilyImpl kMetalLayoutRulesFamilyImpl;
+MetalArgumentBufferTier2LayoutRulesFamilyImpl kMetalArgumentBufferTier2LayoutRulesFamilyImpl;
 WGSLLayoutRulesFamilyImpl kWGSLLayoutRulesFamilyImpl;
 
 // CPU case
@@ -1180,6 +1193,7 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         switch (kind)
         {
         case ShaderParameterKind::ConstantBuffer:
+        case ShaderParameterKind::ParameterBlock:
             // It's a pointer to the actual uniform data
             return SimpleLayoutInfo(
                 LayoutResourceKind::Uniform,
@@ -1214,6 +1228,8 @@ struct CPUObjectLayoutRulesImpl : ObjectLayoutRulesImpl
                 sizeof(void*) * 2,
                 SLANG_ALIGN_OF(void*));
 
+        case ShaderParameterKind::ShaderStorageBuffer:
+        case ShaderParameterKind::AccelerationStructure:
         case ShaderParameterKind::SamplerState:
             // It's a pointer
             return SimpleLayoutInfo(
@@ -1262,6 +1278,7 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
         switch (kind)
         {
         case ShaderParameterKind::ConstantBuffer:
+        case ShaderParameterKind::ParameterBlock:
             {
                 // It's a pointer to the actual uniform data
                 return SimpleLayoutInfo(
@@ -1302,6 +1319,15 @@ struct CUDAObjectLayoutRulesImpl : CPUObjectLayoutRulesImpl
                 const size_t size =
                     _roundToAlignment(sizeof(CUDAPtr) + sizeof(CUDACount), sizeof(CUDAPtr));
                 return SimpleLayoutInfo(LayoutResourceKind::Uniform, size, sizeof(CUDAPtr));
+            }
+        case ShaderParameterKind::ShaderStorageBuffer:
+        case ShaderParameterKind::AccelerationStructure:
+            {
+                // It's a pointer.
+                return SimpleLayoutInfo(
+                    LayoutResourceKind::Uniform,
+                    sizeof(CUDAPtr),
+                    sizeof(CUDAPtr));
             }
         case ShaderParameterKind::SamplerState:
             {
@@ -1856,12 +1882,15 @@ struct MetalObjectLayoutRulesImpl : ObjectLayoutRulesImpl
         switch (kind)
         {
         case ShaderParameterKind::ConstantBuffer:
+        case ShaderParameterKind::ParameterBlock:
         case ShaderParameterKind::StructuredBuffer:
         case ShaderParameterKind::MutableStructuredBuffer:
         case ShaderParameterKind::RawBuffer:
         case ShaderParameterKind::Buffer:
         case ShaderParameterKind::MutableRawBuffer:
         case ShaderParameterKind::MutableBuffer:
+        case ShaderParameterKind::ShaderStorageBuffer:
+        case ShaderParameterKind::AccelerationStructure:
             return SimpleLayoutInfo(LayoutResourceKind::MetalBuffer, 1);
         case ShaderParameterKind::AppendConsumeStructuredBuffer:
             return SimpleLayoutInfo(LayoutResourceKind::MetalBuffer, 2);
@@ -1917,6 +1946,7 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
         switch (kind)
         {
         case ShaderParameterKind::ConstantBuffer:
+        case ShaderParameterKind::ParameterBlock:
         case ShaderParameterKind::StructuredBuffer:
         case ShaderParameterKind::MutableStructuredBuffer:
         case ShaderParameterKind::RawBuffer:
@@ -1927,6 +1957,8 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
         case ShaderParameterKind::TextureUniformBuffer:
         case ShaderParameterKind::Texture:
         case ShaderParameterKind::SamplerState:
+        case ShaderParameterKind::ShaderStorageBuffer:
+        case ShaderParameterKind::AccelerationStructure:
             {
                 return SimpleLayoutInfo(LayoutResourceKind::MetalArgumentBufferElement, 1);
             }
@@ -1943,8 +1975,44 @@ struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, Defaul
     }
 };
 
+struct MetalTier2ObjectLayoutRulesImpl : ObjectLayoutRulesImpl
+{
+    virtual ObjectLayoutInfo GetObjectLayout(ShaderParameterKind kind, const Options& /* options */)
+        override
+    {
+        switch (kind)
+        {
+        case ShaderParameterKind::ConstantBuffer:
+        case ShaderParameterKind::ParameterBlock:
+        case ShaderParameterKind::StructuredBuffer:
+        case ShaderParameterKind::MutableStructuredBuffer:
+        case ShaderParameterKind::RawBuffer:
+        case ShaderParameterKind::Buffer:
+        case ShaderParameterKind::MutableRawBuffer:
+        case ShaderParameterKind::MutableBuffer:
+        case ShaderParameterKind::ShaderStorageBuffer:
+        case ShaderParameterKind::AccelerationStructure:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+        case ShaderParameterKind::AppendConsumeStructuredBuffer:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 16, 8);
+        case ShaderParameterKind::MutableTexture:
+        case ShaderParameterKind::TextureUniformBuffer:
+        case ShaderParameterKind::Texture:
+        case ShaderParameterKind::SamplerState:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+        case ShaderParameterKind::TextureSampler:
+        case ShaderParameterKind::MutableTextureSampler:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 16, 8);
+        default:
+            SLANG_UNEXPECTED("unhandled shader parameter kind");
+            UNREACHABLE_RETURN(SimpleLayoutInfo());
+        }
+    }
+};
+
 static MetalObjectLayoutRulesImpl kMetalObjectLayoutRulesImpl;
 static MetalArgumentBufferElementLayoutRulesImpl kMetalArgumentBufferElementLayoutRulesImpl;
+static MetalTier2ObjectLayoutRulesImpl kMetalTier2ObjectLayoutRulesImpl;
 static MetalLayoutRulesImpl kMetalLayoutRulesImpl;
 
 LayoutRulesImpl kMetalAnyValueLayoutRulesImpl_ = {
@@ -1963,6 +2031,18 @@ LayoutRulesImpl kMetalParameterBlockLayoutRulesImpl_ = {
     &kMetalLayoutRulesFamilyImpl,
     &kMetalArgumentBufferElementLayoutRulesImpl,
     &kMetalArgumentBufferElementLayoutRulesImpl,
+};
+
+LayoutRulesImpl kMetalTier2ConstantBufferLayoutRulesImpl_ = {
+    &kMetalLayoutRulesFamilyImpl,
+    &kMetalLayoutRulesImpl,
+    &kMetalTier2ObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kMetalTier2ParameterBlockLayoutRulesImpl_ = {
+    &kMetalLayoutRulesFamilyImpl,
+    &kMetalLayoutRulesImpl,
+    &kMetalTier2ObjectLayoutRulesImpl,
 };
 
 LayoutRulesImpl kMetalStructuredBufferLayoutRulesImpl_ = {
@@ -2052,6 +2132,20 @@ LayoutRulesImpl* MetalLayoutRulesFamilyImpl::getHitAttributesParameterRules()
 {
     return nullptr;
 }
+
+LayoutRulesImpl* MetalArgumentBufferTier2LayoutRulesFamilyImpl::getConstantBufferRules(
+    CompilerOptionSet&,
+    Type*)
+{
+    return &kMetalTier2ConstantBufferLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* MetalArgumentBufferTier2LayoutRulesFamilyImpl::getParameterBlockRules(
+    CompilerOptionSet&)
+{
+    return &kMetalTier2ParameterBlockLayoutRulesImpl_;
+}
+
 
 // WGSL Family
 
@@ -2203,7 +2297,7 @@ TypeLayoutContext getInitialLayoutContextForTarget(
         rulesFamily = getDefaultLayoutRulesFamilyForTarget(targetReq);
         break;
     case slang::LayoutRules::MetalArgumentBufferTier2:
-        rulesFamily = &kCPULayoutRulesFamilyImpl;
+        rulesFamily = &kMetalArgumentBufferTier2LayoutRulesFamilyImpl;
         break;
     }
 
@@ -2341,6 +2435,10 @@ static SimpleLayoutInfo _getParameterGroupLayoutInfo(
     }
     else if (as<ParameterBlockType>(type))
     {
+        auto info =
+            rules->GetObjectLayout(ShaderParameterKind::ParameterBlock, context.objectLayoutOptions)
+                .getSimple();
+
         // Note: we default to consuming zero register spces here, because
         // a parameter block might not contain anything (or all it contains
         // is other blocks), and so it won't get a space allocated.
@@ -2351,7 +2449,9 @@ static SimpleLayoutInfo _getParameterGroupLayoutInfo(
         //
         // TODO: wouldn't it be any different to just allocate this
         // as an empty `SimpleLayoutInfo` of any other kind?
-        return SimpleLayoutInfo(LayoutResourceKind::SubElementRegisterSpace, 0);
+        if (info.kind == LayoutResourceKind::SubElementRegisterSpace)
+            info.size = 0;
+        return info;
     }
 
     // TODO: the vertex-input and fragment-output cases should
@@ -2408,9 +2508,9 @@ bool isMetalTarget(TargetRequest* targetReq)
     }
 }
 
-bool isKhronosTarget(TargetRequest* targetReq)
+bool isKhronosTarget(CodeGenTarget target)
 {
-    switch (targetReq->getTarget())
+    switch (target)
     {
     default:
         return false;
@@ -2420,6 +2520,11 @@ bool isKhronosTarget(TargetRequest* targetReq)
     case CodeGenTarget::SPIRVAssembly:
         return true;
     }
+}
+
+bool isKhronosTarget(TargetRequest* targetReq)
+{
+    return isKhronosTarget(targetReq->getTarget());
 }
 
 bool isCPUTarget(TargetRequest* targetReq)
@@ -2441,9 +2546,9 @@ bool isCUDATarget(TargetRequest* targetReq)
     }
 }
 
-bool isWGPUTarget(TargetRequest* targetReq)
+bool isWGPUTarget(CodeGenTarget target)
 {
-    switch (targetReq->getTarget())
+    switch (target)
     {
     default:
         return false;
@@ -2453,6 +2558,11 @@ bool isWGPUTarget(TargetRequest* targetReq)
     case CodeGenTarget::WGSLSPIRVAssembly:
         return true;
     }
+}
+
+bool isWGPUTarget(TargetRequest* targetReq)
+{
+    return isWGPUTarget(targetReq->getTarget());
 }
 
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
@@ -2523,7 +2633,7 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
 
 bool areResourceTypesBindlessOnTarget(TargetRequest* targetReq)
 {
-    return isCPUTarget(targetReq) || isCUDATarget(targetReq);
+    return isCPUTarget(targetReq) || isCUDATarget(targetReq) || isMetalTarget(targetReq);
 }
 
 static bool isD3D11Target(TargetRequest*)
@@ -4049,6 +4159,21 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     RefPtr<TypeLayout> fieldTypeLayout = fieldResult.layout;
     UniformLayoutInfo fieldInfo = fieldResult.info.getUniformLayout();
 
+    if (fieldTypeLayout->resourceInfos.getCount() == 0)
+    {
+        if (auto paramGroupTypeLayout = as<ParameterGroupTypeLayout>(fieldTypeLayout))
+        {
+            // If field type layout is a parameter block and it has a size that is not just a space,
+            // we need to count for it in the struct layout.
+            auto containerTypeLayout = paramGroupTypeLayout->containerVarLayout->getTypeLayout();
+            if (containerTypeLayout->FindResourceInfo(
+                    LayoutResourceKind::SubElementRegisterSpace) == nullptr)
+            {
+                fieldTypeLayout = containerTypeLayout;
+            }
+        }
+    }
+
     // Note: we don't add any zero-size fields
     // when computing structure layout, just
     // to avoid having a resource type impact
@@ -4079,7 +4204,7 @@ RefPtr<VarLayout> StructTypeLayoutBuilder::addField(
     // for each field of the structure.
     RefPtr<VarLayout> fieldLayout = new VarLayout();
     fieldLayout->varDecl = field;
-    fieldLayout->typeLayout = fieldTypeLayout;
+    fieldLayout->typeLayout = fieldResult.layout;
     m_typeLayout->fields.add(fieldLayout);
 
     if (field)
@@ -4629,6 +4754,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     CASE(GLSLInputAttachmentType, InputRenderTarget);
 
     // This case is mostly to allow users to add new resource types...
+    CASE(RaytracingAccelerationStructureType, AccelerationStructure);
     CASE(UntypedBufferResourceType, RawBuffer);
 
     CASE(GLSLShaderStorageBufferType, MutableRawBuffer);
@@ -4802,6 +4928,15 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             type,
             rules);
     }
+    else if (auto resPtrType = as<DescriptorHandleType>(type))
+    {
+        if (areResourceTypesBindlessOnTarget(context.targetReq))
+            return _createTypeLayout(context, resPtrType->getElementType());
+        auto uint2Type = context.astBuilder->getVectorType(
+            context.astBuilder->getUIntType(),
+            context.astBuilder->getIntVal(context.astBuilder->getIntType(), 2));
+        return _createTypeLayout(context, uint2Type);
+    }
     else if (auto optionalType = as<OptionalType>(type))
     {
         // OptionalType should be laid out the same way as Tuple<T, bool>.
@@ -4885,7 +5020,12 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {
+        // If we are trying to get the layout of some extern type, do our best
+        // to look it up in other loaded modules and generate the type layout
+        // based on that.
+        declRefType = context.lookupExternDeclRefType(declRefType);
         auto declRef = declRefType->getDeclRef();
+
 
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
@@ -5564,6 +5704,79 @@ GlobalGenericParamDecl* GenericParamTypeLayout::getGlobalGenericParamDecl()
     SLANG_ASSERT(declRefType);
     auto rsDeclRef = declRefType->getDeclRef().as<GlobalGenericParamDecl>();
     return rsDeclRef.getDecl();
+}
+
+DeclRefType* TypeLayoutContext::lookupExternDeclRefType(DeclRefType* declRefType)
+{
+    const auto declRef = declRefType->getDeclRef();
+    const auto decl = declRef.getDecl();
+    const auto isExtern =
+        decl->hasModifier<ExternAttribute>() || decl->hasModifier<ExternModifier>();
+    if (isExtern)
+    {
+        if (!externTypeMap)
+            buildExternTypeMap();
+        const auto mangledName = getMangledName(targetReq->getLinkage()->getASTBuilder(), decl);
+        externTypeMap->tryGetValue(mangledName, declRefType);
+    }
+    return declRefType;
+}
+
+void TypeLayoutContext::buildExternTypeMap()
+{
+    externTypeMap.emplace();
+    const auto linkage = targetReq->getLinkage();
+
+    HashSet<String> externNames;
+    Dictionary<String, DeclRefType*> allTypes;
+
+    // Traverse the AST and keep track of all extern names and all type definitions
+    // We'll match them up later
+    auto processDecl = [&](auto&& go, Decl* decl) -> void
+    {
+        const auto isExtern =
+            decl->hasModifier<ExternAttribute>() || decl->hasModifier<ExternModifier>();
+
+        if (auto declRefType = as<DeclRefType>(DeclRefType::create(astBuilder, decl)))
+        {
+            String mangledName = getMangledName(astBuilder, decl);
+
+            if (isExtern)
+            {
+                externNames.add(mangledName);
+            }
+            else
+            {
+                allTypes[mangledName] = declRefType;
+            }
+        }
+
+        if (auto scopeDecl = as<ScopeDecl>(decl))
+        {
+            for (auto member : scopeDecl->members)
+            {
+                go(go, member);
+            }
+        }
+    };
+
+    for (const auto& m : linkage->loadedModulesList)
+    {
+        const auto& ast = m->getModuleDecl();
+        for (auto member : ast->members)
+        {
+            processDecl(processDecl, member);
+        }
+    }
+
+    // Only keep the types that have matching extern declarations
+    for (const auto& externName : externNames)
+    {
+        if (allTypes.containsKey(externName))
+        {
+            externTypeMap.value()[externName] = allTypes[externName];
+        }
+    }
 }
 
 } // namespace Slang

@@ -112,8 +112,8 @@ struct Options
     Slang::RenderApiFlags synthesizedTestApis =
         Slang::RenderApiFlag::AllOf & ~(Slang::RenderApiFlag::Vulkan | Slang::RenderApiFlag::CPU);
 
-    // The adapter to use. If empty will match first found adapter.
-    Slang::String adapter;
+    // If true, print detailed adapter information
+    bool showAdapterInfo = false;
 
     // Maximum number of test servers to run.
     int serverCount = 1;
@@ -129,6 +129,9 @@ struct Options
         TestCategorySet* categorySet,
         Slang::WriterHelper stdError,
         Options* optionsOut);
+
+    /// Display help message
+    static void showHelp(Slang::WriterHelper stdOut);
 };
 
 #endif // OPTIONS_H_INCLUDED

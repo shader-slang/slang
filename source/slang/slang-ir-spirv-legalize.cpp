@@ -2,13 +2,14 @@
 #include "slang-ir-spirv-legalize.h"
 
 #include "slang-emit-base.h"
-#include "slang-glsl-extension-tracker.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-composite-reg-to-mem.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
+#include "slang-ir-float-non-uniform-resource-index.h"
 #include "slang-ir-glsl-legalize.h"
+#include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-legalize-global-values.h"
@@ -21,6 +22,7 @@
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-util.h"
+#include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 
@@ -131,6 +133,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             inst->getElementType(),
             builder.getIntValue(builder.getIntType(), elementSize.getStride()));
         const auto structType = builder.createStructType();
+        builder.addPhysicalTypeDecoration(structType);
         const auto arrayKey = builder.createStructKey();
         builder.createStructField(structType, arrayKey, arrayType);
         IRSizeAndAlignment structSize;
@@ -212,6 +215,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         IRBuilder builder(cbParamInst);
         builder.setInsertBefore(cbParamInst);
         auto structType = builder.createStructType();
+        builder.addPhysicalTypeDecoration(structType);
         addToWorkList(structType);
         StringBuilder sb;
         sb << "cbuffer_";
@@ -421,20 +425,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             }
 
             AddressSpace addressSpace = AddressSpace::ThreadLocal;
-            // Figure out storage class based on var layout.
-            if (auto layout = getVarLayout(inst))
-            {
-                auto cls = getGlobalParamAddressSpace(layout);
-                if (cls != AddressSpace::Generic)
-                    addressSpace = cls;
-                else if (auto systemValueAttr = layout->findAttr<IRSystemValueSemanticAttr>())
-                {
-                    String semanticName = systemValueAttr->getName();
-                    semanticName = semanticName.toLower();
-                    if (semanticName == "sv_pointsize")
-                        addressSpace = AddressSpace::BuiltinInput;
-                }
-            }
+            // Figure out storage class based on builtin info or var layout.
+            auto cls = getGlobalParamAddressSpace(inst);
+            if (cls != AddressSpace::Generic)
+                addressSpace = cls;
 
             // Don't do any processing for specialization constants.
             if (addressSpace == AddressSpace::SpecializationConstant)
@@ -634,8 +628,22 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return addressSpace;
     }
 
-    AddressSpace getGlobalParamAddressSpace(IRVarLayout* varLayout)
+    AddressSpace getGlobalParamAddressSpace(IRInst* varInst)
     {
+        if (auto builtinDecor = varInst->findDecoration<IRTargetBuiltinVarDecoration>())
+        {
+            switch (builtinDecor->getBuiltinVarName())
+            {
+            case IRTargetBuiltinVarName::SpvInstanceIndex:
+            case IRTargetBuiltinVarName::SpvBaseInstance:
+                return AddressSpace::BuiltinInput;
+            }
+        }
+
+        auto varLayout = getVarLayout(varInst);
+        if (!varLayout)
+            return AddressSpace::Generic;
+
         auto typeLayout = varLayout->getTypeLayout()->unwrapArray();
         if (auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout))
         {
@@ -662,15 +670,25 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                      "resolve a storage class address space.");
             }
         }
+        auto systemValueAttr = varLayout->findSystemValueSemanticAttr();
+
+        if (systemValueAttr)
+        {
+            // TODO: is this needed?
+            String semanticName = systemValueAttr->getName();
+            semanticName = semanticName.toLower();
+            if (semanticName == "sv_pointsize")
+                result = AddressSpace::BuiltinInput;
+        }
 
         switch (result)
         {
         case AddressSpace::Input:
-            if (varLayout->findSystemValueSemanticAttr())
+            if (systemValueAttr)
                 result = AddressSpace::BuiltinInput;
             break;
         case AddressSpace::Output:
-            if (varLayout->findSystemValueSemanticAttr())
+            if (systemValueAttr)
                 result = AddressSpace::BuiltinOutput;
             break;
         }
@@ -780,9 +798,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             addressSpace = AddressSpace::GroupShared;
         }
-        else if (const auto varLayout = getVarLayout(inst))
+        else
         {
-            auto cls = getGlobalParamAddressSpace(varLayout);
+            auto cls = getGlobalParamAddressSpace(inst);
             if (cls != AddressSpace::Generic)
                 addressSpace = cls;
         }
@@ -1096,130 +1114,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         storeInst->replaceUsesWith(newStore);
         storeInst->removeAndDeallocate();
         addUsersToWorkList(newStore);
-    }
-
-    void processNonUniformResourceIndex(IRInst* nonUniformResourceIndexInst)
-    {
-        // implement the translation to spirv by walking up the use-def chain
-        // from nonUniformResource inst of an index to an array of buffer or
-        // texture def all the way to the leaf operations. To be precise:
-        // - go through GEP and see if it calls an intrinsic function,
-        //   then decorate the address itself (GetElementPtr)
-        // - go through GEP to identify the pointer access and the Loads that it
-        //   accesses (GetElementPtr -> Load), then decorate the load instruction.
-        // - go through IntCasts to deal with u32 -> i32 / vice-versa (IntCast)
-        List<IRInst*> resWorkList;
-
-        // Handle cases when `nonUniformResourceIndexInst` inst is wrapped around
-        // an index in a nested fashion, i.e. nonUniform(nonUniform(index)) by
-        // only adding the inner-most inst in the worklist, and work our way out.
-        auto insti = nonUniformResourceIndexInst;
-        while (insti->getOp() == kIROp_NonUniformResourceIndex)
-        {
-            if (resWorkList.getCount() != 0)
-                resWorkList.removeLast();
-            resWorkList.add(insti);
-            insti = insti->getOperand(0);
-        }
-
-        // For all the users of a `nonUniformResourceIndexInst`, make them directly
-        // use the underlying base inst that is wrapped by `nonUniformResourceIndex`
-        // and finally wrap them with a `nonUniformResourceIndex`, and add back to the
-        // worklist, and keep bubbling them up until it can.
-        for (Index i = 0; i < resWorkList.getCount(); i++)
-        {
-            auto inst = resWorkList[i];
-            traverseUses(
-                inst,
-                [&](IRUse* use)
-                {
-                    auto user = use->getUser();
-                    IRBuilder builder(user);
-                    builder.setInsertBefore(user);
-
-                    IRInst* newUser = nullptr;
-                    switch (user->getOp())
-                    {
-                    case kIROp_IntCast:
-                        // Replace intCast(nonUniformRes(x)), into nonUniformRes(intCast(x))
-                        newUser = builder.emitCast(user->getFullType(), inst->getOperand(0));
-                        break;
-                    case kIROp_GetElementPtr:
-                        // Ignore when `NonUniformResourceIndex` is not on the index
-                        if (user->getOperand(1) == inst)
-                        {
-                            // Replace gep(pArray, nonUniformRes(x)), into
-                            // nonUniformRes(gep(pArray, x))
-                            newUser = builder.emitElementAddress(
-                                user->getFullType(),
-                                user->getOperand(0),
-                                inst->getOperand(0));
-                        }
-                        break;
-                    case kIROp_NonUniformResourceIndex:
-                        // Replace nonUniformRes(nonUniformRes(x)), into nonUniformRes(x)
-                        newUser = inst->getOperand(0);
-                        break;
-                    case kIROp_Load:
-                        // Replace load(nonUniformRes(x)), into nonUniformRes(load(x))
-                        newUser = builder.emitLoad(user->getFullType(), inst->getOperand(0));
-                        break;
-                    default:
-                        // Ignore for all other unknown insts.
-                        break;
-                    };
-
-                    // Early exit when we could not process the `NonUniformResourceIndex` inst.
-                    if (!newUser)
-                        return;
-
-                    auto nonuniformUser = builder.emitNonUniformResourceIndexInst(newUser);
-                    user->replaceUsesWith(nonuniformUser);
-
-                    // Update the worklist with the newly added `NonUniformResourceIndex` inst,
-                    // based on the base inst it was constructed around, in case we need to further
-                    // bubble up the `NonUniformResourceIndex` inst.
-                    switch (user->getOp())
-                    {
-                    case kIROp_IntCast:
-                    case kIROp_GetElementPtr:
-                    case kIROp_Load:
-                    case kIROp_NonUniformResourceIndex:
-                        resWorkList.add(nonuniformUser);
-                        break;
-                    };
-
-                    // Clean up the base inst from the IR module, to avoid duplicate decorations.
-                    user->removeAndDeallocate();
-                });
-        }
-
-        // Once all the `NonUniformResourceIndex` insts are visited, and the inst type is bubbled up
-        // to the parent, a decoration is added to the operands of the insts.
-        for (int i = 0; i < resWorkList.getCount(); ++i)
-        {
-            // It is only required to decorate the base inst, if the `NonUniformResourceIndex` inst
-            // around it has any active uses.
-            auto inst = resWorkList[i];
-            if (!inst->hasUses())
-            {
-                inst->removeAndDeallocate();
-                continue;
-            }
-            // For each of the `NonUniformResourceIndex` inst that remain, decorate the base inst
-            // with a [NonUniformResource] decoration, which is the operand0 of the inst, only
-            // when the type is a resource type, or a pointer to a resource type, or a pointer
-            // in the Physical Storage buffer address space.
-            auto operand = inst->getOperand(0);
-            auto type = operand->getDataType();
-            if (isResourceType(type) || isPointerToResourceType(type))
-            {
-                IRBuilder builder(operand);
-                builder.addSPIRVNonUniformResourceDecoration(operand);
-            }
-            inst->replaceUsesWith(operand);
-            inst->removeAndDeallocate();
-        }
     }
 
     void processImageSubscript(IRImageSubscript* subscript)
@@ -1765,7 +1659,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 processRWStructuredBufferStore(inst);
                 break;
             case kIROp_NonUniformResourceIndex:
-                processNonUniformResourceIndex(inst);
+                processNonUniformResourceIndex(inst, NonUniformResourceIndexFloatMode::SPIRV);
                 break;
             case kIROp_loop:
                 processLoop(as<IRLoop>(inst));
@@ -1959,6 +1853,120 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     };
 
+    void propagateAddressAlignment()
+    {
+        // Work list of load/store insts to add Aligned attribute to.
+        List<IRInst*> loadStoreInsts;
+
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    switch (inst->getOp())
+                    {
+                    case kIROp_GetElementPtr:
+                    case kIROp_FieldAddress:
+                        {
+                            auto base = inst->getOperand(0);
+                            auto ptrType = as<IRPtrTypeBase>(base->getDataType());
+                            if (!ptrType)
+                                break;
+                            // Propagate address alignment if possible.
+                            auto alignDecor = base->findDecoration<IRAlignedAddressDecoration>();
+                            if (!alignDecor)
+                                break;
+                            auto valueType = ptrType->getValueType();
+                            auto layout = valueType->findDecoration<IRSizeAndAlignmentDecoration>();
+                            if (!layout)
+                                break;
+                            auto alignment = getIntVal(alignDecor->getAlignment());
+                            if (inst->getOp() == kIROp_GetElementPtr)
+                            {
+                                if (alignment >= layout->getAlignment())
+                                {
+                                    IRBuilder builder(inst);
+                                    builder.addAlignedAddressDecoration(
+                                        inst,
+                                        alignDecor->getAlignment());
+                                }
+                            }
+                            else
+                            {
+                                IRTypeLayoutRuleName layoutRuleName = layout->getLayoutName();
+                                auto field = findStructField(
+                                    valueType,
+                                    (IRStructKey*)as<IRFieldAddress>(inst)->getField());
+                                if (!field)
+                                    break;
+                                IRIntegerValue offset = 0;
+                                if (getOffset(
+                                        m_sharedContext->m_targetProgram->getOptionSet(),
+                                        IRTypeLayoutRules::get(layoutRuleName),
+                                        field,
+                                        &offset) != SLANG_OK)
+                                    break;
+                                if (offset % alignment == 0)
+                                {
+                                    IRBuilder builder(inst);
+                                    builder.addAlignedAddressDecoration(
+                                        inst,
+                                        alignDecor->getAlignment());
+                                }
+                            }
+                        }
+                        break;
+                    case kIROp_Load:
+                    case kIROp_Store:
+                        {
+                            if (inst->findAttr<IRAlignedAttr>())
+                                break;
+                            loadStoreInsts.add(inst);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Process the work list.
+        // If load/store doesn't have Aligned attribute, and the ptr has
+        // a IRAlignedAddress decoration, we should create a load/store
+        // with a Aligned attribute.
+        for (auto inst : loadStoreInsts)
+        {
+
+            if (auto load = as<IRLoad>(inst))
+            {
+                auto ptr = load->getPtr();
+                if (auto decor = ptr->findDecoration<IRAlignedAddressDecoration>())
+                {
+                    IRBuilder builder(inst);
+                    builder.setInsertBefore(inst);
+                    auto newLoad =
+                        builder.emitLoad(load->getFullType(), ptr, decor->getAlignment());
+                    load->replaceUsesWith(newLoad);
+                    load->removeAndDeallocate();
+                }
+            }
+            else if (auto store = as<IRStore>(inst))
+            {
+                auto ptr = store->getPtr();
+                if (auto decor = ptr->findDecoration<IRAlignedAddressDecoration>())
+                {
+                    IRBuilder builder(inst);
+                    builder.setInsertBefore(inst);
+                    builder.emitStore(ptr, store->getVal(), decor->getAlignment());
+                    store->removeAndDeallocate();
+                }
+            }
+        }
+    }
+
     void processModule()
     {
         determineSpirvVersion();
@@ -2023,8 +2031,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     legalizeSPIRVEntryPoint(func, entryPointDecor);
                 }
                 // SPIRV requires a dominator block to appear before dominated blocks.
-                // After legalizing the control flow, we need to sort our blocks to ensure this is
-                // true.
+                // After legalizing the control flow, we need to sort our blocks to ensure this
+                // is true.
                 sortBlocksInFunc(func);
             }
         }
@@ -2048,12 +2056,25 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             m_module,
             bufferElementTypeLoweringOptions);
 
-        // The above step may produce empty struct types, so we need to lower them out of existence.
+        // Inline all pack/unpack storage type functions generated during buffer element
+        // lowering pass.
+        performForceInlining(m_module);
+
+        // The above step may produce empty struct types, so we need to lower them out of
+        // existence.
         legalizeEmptyTypes(m_sharedContext->m_targetProgram, m_module, m_sink);
+
+        // Propagate alignment hints on address instructions.
+        propagateAddressAlignment();
 
         // Specalize address space for all pointers.
         SpirvAddressSpaceAssigner addressSpaceAssigner;
         specializeAddressSpace(m_module, &addressSpaceAssigner);
+
+        // For SPIR-V, we don't skip this validation, because we might then be generating
+        // invalid SPIR-V.
+        bool skipFuncParamValidation = false;
+        validateAtomicOperations(skipFuncParamValidation, m_sink, m_module->getModuleInst());
     }
 
     void updateFunctionTypes()

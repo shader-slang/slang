@@ -331,7 +331,9 @@ Result DeviceImpl::getTextureAllocationInfo(
     FormatInfo formatInfo;
     gfxGetFormatInfo(desc.format, &formatInfo);
     MTL::PixelFormat pixelFormat = MetalUtil::translatePixelFormat(desc.format);
-    Size alignment = m_device->minimumLinearTextureAlignmentForPixelFormat(pixelFormat);
+    bool isCompressed = gfxIsCompressedFormat(desc.format);
+    Size alignment =
+        isCompressed ? 1 : m_device->minimumLinearTextureAlignmentForPixelFormat(pixelFormat);
     Size size = 0;
     ITextureResource::Extents extents = desc.size;
     extents.width = extents.width ? extents.width : 1;
@@ -653,8 +655,8 @@ Result DeviceImpl::createTextureView(
     MTL::PixelFormat pixelFormat = desc.format == Format::Unknown
                                        ? textureImpl->m_pixelFormat
                                        : MetalUtil::translatePixelFormat(desc.format);
-    NS::Range levelRange(sr.baseArrayLayer, sr.layerCount);
-    NS::Range sliceRange(sr.mipLevel, sr.mipLevelCount);
+    NS::Range sliceRange(sr.baseArrayLayer, sr.layerCount);
+    NS::Range levelRange(sr.mipLevel, sr.mipLevelCount);
 
     viewImpl->m_textureView = NS::TransferPtr(textureImpl->m_texture->newTextureView(
         pixelFormat,
@@ -875,7 +877,16 @@ Result DeviceImpl::waitForFences(
     bool waitForAll,
     uint64_t timeout)
 {
-    return SLANG_E_NOT_IMPLEMENTED;
+    // return SLANG_E_NOT_IMPLEMENTED;
+    for (GfxCount i = 0; i < fenceCount; ++i)
+    {
+        FenceImpl* fenceImpl = static_cast<FenceImpl*>(fences[i]);
+        if (!fenceImpl->waitForFence(fenceValues[i], timeout))
+        {
+            return SLANG_FAIL;
+        }
+    }
+    return SLANG_OK;
 }
 
 } // namespace metal

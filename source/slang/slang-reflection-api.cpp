@@ -1016,9 +1016,10 @@ SLANG_API SlangReflectionType* spReflection_FindTypeByName(
                 SubstitutionSet(genericDeclRef),
                 astBuilder,
                 genericDeclRef.getDecl()->inner);
-            return convert(DeclRefType::create(
-                astBuilder,
-                createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, innerDeclRef)));
+            if (as<AggTypeDecl>(innerDeclRef.getDecl()) ||
+                as<SimpleTypeDecl>(innerDeclRef.getDecl()))
+                return convert(DeclRefType::create(astBuilder, innerDeclRef));
+            return nullptr;
         }
 
         if (as<ErrorType>(result))
@@ -3163,6 +3164,22 @@ SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inV
     return false;
 }
 
+SLANG_API SlangResult
+spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t* rs)
+{
+    auto decl = convert(inVar).getDecl();
+    if (auto varDecl = as<VarDeclBase>(decl))
+    {
+        if (auto constantVal = as<ConstantIntVal>(varDecl->val))
+        {
+            *rs = constantVal->getValue();
+            return 0;
+        }
+    }
+
+    return SLANG_E_INVALID_ARG;
+}
+
 SLANG_API SlangReflectionGeneric* spReflectionVariable_GetGenericContainer(
     SlangReflectionVariable* var)
 {
@@ -3286,6 +3303,23 @@ SLANG_API size_t spReflectionVariableLayout_GetSpace(
     // will Just Work, so the best we can do is try to not lie.
 
     return space;
+}
+
+SLANG_API SlangImageFormat
+spReflectionVariableLayout_GetImageFormat(SlangReflectionVariableLayout* inVarLayout)
+{
+    auto varLayout = convert(inVarLayout);
+    if (!varLayout)
+        return SLANG_IMAGE_FORMAT_unknown;
+
+    if (auto leafVar = varLayout->getVariable())
+    {
+        if (auto formatAttrib = leafVar->findModifier<FormatAttribute>())
+        {
+            return (SlangImageFormat)formatAttrib->format;
+        }
+    }
+    return SLANG_IMAGE_FORMAT_unknown;
 }
 
 SLANG_API char const* spReflectionVariableLayout_GetSemanticName(
@@ -4033,18 +4067,14 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     auto numThreadsAttribute = entryPointFunc.getDecl()->findModifier<NumThreadsAttribute>();
     if (numThreadsAttribute)
     {
-        if (auto cint = entryPointLayout->program->tryFoldIntVal(numThreadsAttribute->x))
-            sizeAlongAxis[0] = (SlangUInt)cint->getValue();
-        else if (numThreadsAttribute->x)
-            sizeAlongAxis[0] = 0;
-        if (auto cint = entryPointLayout->program->tryFoldIntVal(numThreadsAttribute->y))
-            sizeAlongAxis[1] = (SlangUInt)cint->getValue();
-        else if (numThreadsAttribute->y)
-            sizeAlongAxis[1] = 0;
-        if (auto cint = entryPointLayout->program->tryFoldIntVal(numThreadsAttribute->z))
-            sizeAlongAxis[2] = (SlangUInt)cint->getValue();
-        else if (numThreadsAttribute->z)
-            sizeAlongAxis[2] = 0;
+        for (int i = 0; i < 3; ++i)
+        {
+            if (auto cint =
+                    entryPointLayout->program->tryFoldIntVal(numThreadsAttribute->extents[i]))
+                sizeAlongAxis[i] = (SlangUInt)cint->getValue();
+            else if (numThreadsAttribute->extents[i])
+                sizeAlongAxis[i] = 0;
+        }
     }
 
     //

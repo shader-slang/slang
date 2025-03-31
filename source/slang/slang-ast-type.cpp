@@ -355,6 +355,29 @@ Type* AtomicType::getElementType()
     return as<Type>(_getGenericTypeArg(this, 0));
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CoopVectorExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Type* CoopVectorExpressionType::getElementType()
+{
+    return as<Type>(_getGenericTypeArg(this, 0));
+}
+
+IntVal* CoopVectorExpressionType::getElementCount()
+{
+    return as<IntVal>(_getGenericTypeArg(this, 1));
+}
+
+void CoopVectorExpressionType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("CoopVector<") << getElementType() << toSlice(",") << getElementCount()
+        << toSlice(">");
+}
+
+BasicExpressionType* CoopVectorExpressionType::_getScalarTypeOverride()
+{
+    return as<BasicExpressionType>(getElementType());
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TypeType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void TypeType::_toTextOverride(StringBuilder& out)

@@ -14,19 +14,27 @@ struct IRVectorType;
 struct IRBuilder;
 struct IREntryPointDecoration;
 
+struct EntryPointInfo
+{
+    IRFunc* entryPointFunc;
+    IREntryPointDecoration* entryPointDecor;
+};
+
 void legalizeEntryPointVaryingParamsForCPU(IRModule* module, DiagnosticSink* sink);
 
 void legalizeEntryPointVaryingParamsForCUDA(IRModule* module, DiagnosticSink* sink);
 
+void legalizeEntryPointVaryingParamsForMetal(
+    IRModule* module,
+    DiagnosticSink* sink,
+    List<EntryPointInfo>& entryPoints);
+
+void legalizeEntryPointVaryingParamsForWGSL(
+    IRModule* module,
+    DiagnosticSink* sink,
+    List<EntryPointInfo>& entryPoints);
+
 void depointerizeInputParams(IRFunc* entryPoint);
-
-// (#4375) Once `slang-ir-metal-legalize.cpp` is merged with
-// `slang-ir-legalize-varying-params.cpp`, move the following
-// below into `slang-ir-legalize-varying-params.cpp` as well
-
-IRInst* emitCalcGroupExtents(IRBuilder& builder, IRFunc* entryPoint, IRVectorType* type);
-
-IRInst* emitCalcGroupIndex(IRBuilder& builder, IRInst* groupThreadID, IRInst* groupExtents);
 
 // SystemValueSemanticName member definition macro
 #define SYSTEM_VALUE_SEMANTIC_NAMES(M)                   \
@@ -60,6 +68,8 @@ IRInst* emitCalcGroupIndex(IRBuilder& builder, IRInst* groupThreadID, IRInst* gr
     M(Target, SV_Target)                                 \
     M(StartVertexLocation, SV_StartVertexLocation)       \
     M(StartInstanceLocation, SV_StartInstanceLocation)   \
+    M(WaveLaneCount, SV_WaveLaneCount)                   \
+    M(WaveLaneIndex, SV_WaveLaneIndex)                   \
     /* end */
 
 /// A known system-value semantic name that can be applied to a parameter

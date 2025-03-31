@@ -198,6 +198,78 @@ bool isResourceType(IRType* type)
     return false;
 }
 
+
+bool isOpaqueTypeImpl(IRType* type, HashSet<IRType*>& visited, IRType** outLeafOpaqueHandleType)
+{
+    if (visited.contains(type))
+    {
+        if (outLeafOpaqueHandleType)
+            *outLeafOpaqueHandleType = type;
+        return true;
+    }
+
+    if (isResourceType(type))
+    {
+        if (outLeafOpaqueHandleType)
+            *outLeafOpaqueHandleType = type;
+        return true;
+    }
+
+    if (auto structType = as<IRStructType>(type))
+    {
+        visited.add(type);
+        for (auto field : structType->getFields())
+        {
+            if (isOpaqueTypeImpl(field->getFieldType(), visited, outLeafOpaqueHandleType))
+            {
+                return true;
+            }
+        }
+        visited.remove(type);
+    }
+
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+    {
+        if (isOpaqueTypeImpl(arrayType->getElementType(), visited, outLeafOpaqueHandleType))
+        {
+            return true;
+        }
+    }
+
+    if (auto tupleType = as<IRTupleTypeBase>(type))
+    {
+        for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+        {
+            if (auto elementType = as<IRType>(tupleType->getOperand(i)))
+            {
+                if (isOpaqueTypeImpl(elementType, visited, outLeafOpaqueHandleType))
+                {
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+bool isOpaqueType(IRType* type, IRType** outLeafOpaqueHandleType)
+{
+    HashSet<IRType*> visited;
+    return isOpaqueTypeImpl(type, visited, outLeafOpaqueHandleType);
+}
+
+SourceLoc findBestSourceLocFromUses(IRInst* inst)
+{
+    for (auto use = inst->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        if (user->sourceLoc.isValid())
+            return user->sourceLoc;
+    }
+
+    return inst->sourceLoc;
+}
 // Helper wrapper function around isResourceType that checks if the given
 // type is a pointer to a resource type or a physical storage buffer.
 bool isPointerToResourceType(IRType* type)
@@ -1139,11 +1211,15 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
         LegalType legalElementType;
 
         if (isMetalTarget(context->targetProgram->getTargetReq()) &&
-            as<IRParameterBlockType>(uniformBufferType))
+            as<IRParameterBlockType>(uniformBufferType) &&
+            !context->shouldLegalizeParameterBlockElementType())
         {
             // On Metal, we do not need to legalize the element type of
             // a parameter block because we can translate it directly into
             // an argument buffer.
+            //
+            // But we do need empty type legalized for Metal, because Metal doesn't
+            // allow empty struct in argument buffer.
             legalElementType = LegalType::simple(originalElementType);
         }
         else

@@ -17,7 +17,7 @@ struct Ray : IDifferentiable {
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    Ray ray = Ray();
+    Ray ray = {};
     Ray.Differential ray2;
 
     ray.a = 1.f;

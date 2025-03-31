@@ -91,7 +91,10 @@ LegalVal LegalVal::wrappedBuffer(LegalVal const& baseVal, LegalElementWrapping c
 
 //
 
-IRTypeLegalizationContext::IRTypeLegalizationContext(TargetProgram* target, IRModule* inModule)
+IRTypeLegalizationContext::IRTypeLegalizationContext(
+    TargetProgram* target,
+    IRModule* inModule,
+    DiagnosticSink* sink)
 {
     targetProgram = target;
 
@@ -100,6 +103,8 @@ IRTypeLegalizationContext::IRTypeLegalizationContext(TargetProgram* target, IRMo
 
     builderStorage = IRBuilder(inModule);
     builder = &builderStorage;
+
+    m_sink = sink;
 }
 
 static void registerLegalizedValue(
@@ -110,10 +115,11 @@ static void registerLegalizedValue(
     context->mapValToLegalVal[irValue] = legalVal;
 }
 
-struct IRGlobalNameInfo
+/// Structure to pass information from the original/old global param to
+/// composite members during tuple flavored global param legalization.
+struct IRGlobalParamInfo
 {
-    IRInst* globalVar;
-    UInt counter;
+    IRFunc* originatingEntryPoint = nullptr;
 };
 
 static LegalVal declareVars(
@@ -124,7 +130,7 @@ static LegalVal declareVars(
     LegalVarChain const& varChain,
     UnownedStringSlice nameHint,
     IRInst* leafVar,
-    IRGlobalNameInfo* globalNameInfo,
+    IRGlobalParamInfo* globalParamInfo,
     bool isSpecial);
 
 /// Unwrap a value with flavor `wrappedBuffer`
@@ -572,7 +578,7 @@ private:
                     // We expect that the parent is actually an IR function.
                     //
                     // TODO: What about the case where we have an `IRGlobalVar`
-                    // of a type that needs legalization, and teh variable has
+                    // of a type that needs legalization, and the variable has
                     // an initializer? For now, I believe that case is disallowed
                     // in the legalization for global variables.
                     //
@@ -1956,8 +1962,6 @@ static LegalVal coerceToLegalType(IRTypeLegalizationContext* context, LegalType 
             ShortList<IRInst*> fields;
             for (auto field : structType->getFields())
             {
-                if (as<IRVoidType>(field->getFieldType()))
-                    continue;
                 auto fieldVal = coerceToLegalType(
                     context,
                     LegalType::simple(field->getFieldType()),
@@ -2045,6 +2049,21 @@ static LegalVal coerceToLegalType(IRTypeLegalizationContext* context, LegalType 
     }
 }
 
+static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* inst)
+{
+    IRType* opaqueType = nullptr;
+    if (isOpaqueType(inst->getFullType(), &opaqueType))
+    {
+        SourceLoc loc = findBestSourceLocFromUses(inst);
+
+        if (!loc.isValid())
+            loc = getDiagnosticPos(opaqueType);
+
+        context->m_sink->diagnose(loc, Diagnostics::useOfUninitializedOpaqueHandle, opaqueType);
+    }
+    return LegalVal();
+}
+
 static LegalVal legalizeInst(
     IRTypeLegalizationContext* context,
     IRInst* inst,
@@ -2088,7 +2107,9 @@ static LegalVal legalizeInst(
     case kIROp_Return:
         result = legalizeRetVal(context, args[0], (IRReturn*)inst);
         break;
-
+    case kIROp_CastDescriptorHandleToResource:
+        result = LegalVal::simple(inst);
+        break;
     case kIROp_DebugVar:
         result = legalizeDebugVar(context, type, (IRDebugVar*)inst);
         break;
@@ -2119,10 +2140,16 @@ static LegalVal legalizeInst(
         result = legalizePrintf(context, args);
         break;
     case kIROp_undefined:
-        return LegalVal();
+        return legalizeUndefined(context, inst);
     case kIROp_GpuForeach:
         // This case should only happen when compiling for a target that does not support
         // GpuForeach
+        return LegalVal();
+    case kIROp_StructuredBufferLoad:
+        // empty types are removed, so we need to make sure that we're still
+        // loading a none type when we try and load from a to-be-optimized
+        // out structured buffer
+        SLANG_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
     default:
         // TODO: produce a user-visible diagnostic here
@@ -2708,6 +2735,7 @@ static void cloneDecorationToVar(IRInst* srcInst, IRInst* varInst)
         case kIROp_FormatDecoration:
         case kIROp_UserTypeNameDecoration:
         case kIROp_SemanticDecoration:
+        case kIROp_MemoryQualifierSetDecoration:
             cloneDecoration(decoration, varInst);
             break;
 
@@ -2725,10 +2753,8 @@ static LegalVal declareSimpleVar(
     LegalVarChain const& varChain,
     UnownedStringSlice nameHint,
     IRInst* leafVar,
-    IRGlobalNameInfo* globalNameInfo)
+    IRGlobalParamInfo* globalParamInfo)
 {
-    SLANG_UNUSED(globalNameInfo);
-
     IRVarLayout* varLayout = createVarLayout(context->builder, varChain, typeLayout);
 
     IRBuilder* builder = context->builder;
@@ -2754,6 +2780,19 @@ static LegalVal declareSimpleVar(
             auto globalParam = builder->createGlobalParam(type);
             globalParam->removeFromParent();
             globalParam->insertBefore(context->insertBeforeGlobal);
+
+            // Add originating entry point decoration if original global param
+            // comes from an entry point parameter. This is required in cases where the global
+            // param has to be linked back to the originating entry point, such as when
+            // emitting Metal where there global params have to be moved back to the
+            // entry point parameter.
+            SLANG_ASSERT(globalParamInfo);
+            if (globalParamInfo->originatingEntryPoint)
+            {
+                builder->addEntryPointParamDecoration(
+                    globalParam,
+                    globalParamInfo->originatingEntryPoint);
+            }
 
             irVar = globalParam;
             legalVarVal = LegalVal::simple(globalParam);
@@ -3414,7 +3453,7 @@ static LegalVal declareVars(
     LegalVarChain const& inVarChain,
     UnownedStringSlice nameHint,
     IRInst* leafVar,
-    IRGlobalNameInfo* globalNameInfo,
+    IRGlobalParamInfo* globalParamInfo,
     bool isSpecial)
 {
     LegalVarChain varChain = inVarChain;
@@ -3449,7 +3488,7 @@ static LegalVal declareVars(
             varChain,
             nameHint,
             leafVar,
-            globalNameInfo);
+            globalParamInfo);
         break;
 
     case LegalType::Flavor::implicitDeref:
@@ -3464,7 +3503,7 @@ static LegalVal declareVars(
                 varChain,
                 nameHint,
                 leafVar,
-                globalNameInfo,
+                globalParamInfo,
                 isSpecial);
             return LegalVal::implicitDeref(val);
         }
@@ -3481,7 +3520,7 @@ static LegalVal declareVars(
                 varChain,
                 nameHint,
                 leafVar,
-                globalNameInfo,
+                globalParamInfo,
                 false);
             auto specialVal = declareVars(
                 context,
@@ -3491,7 +3530,7 @@ static LegalVal declareVars(
                 varChain,
                 nameHint,
                 leafVar,
-                globalNameInfo,
+                globalParamInfo,
                 true);
             return LegalVal::pair(ordinaryVal, specialVal, pairType->pairInfo);
         }
@@ -3543,7 +3582,7 @@ static LegalVal declareVars(
                     newVarChain,
                     fieldNameHint,
                     ee.key,
-                    globalNameInfo,
+                    globalParamInfo,
                     true);
 
                 TuplePseudoVal::Element element;
@@ -3598,7 +3637,7 @@ static LegalVal declareVars(
                 varChain,
                 nameHint,
                 leafVar,
-                globalNameInfo);
+                globalParamInfo);
 
             return LegalVal::wrappedBuffer(innerVal, wrappedBuffer->elementInfo);
         }
@@ -3632,10 +3671,6 @@ static LegalVal legalizeGlobalVar(IRTypeLegalizationContext* context, IRGlobalVa
         {
             context->insertBeforeGlobal = irGlobalVar;
 
-            IRGlobalNameInfo globalNameInfo;
-            globalNameInfo.globalVar = irGlobalVar;
-            globalNameInfo.counter = 0;
-
             UnownedStringSlice nameHint = findNameHint(irGlobalVar);
             context->builder->setInsertBefore(irGlobalVar);
             LegalVal newVal = declareVars(
@@ -3646,7 +3681,7 @@ static LegalVal legalizeGlobalVar(IRTypeLegalizationContext* context, IRGlobalVa
                 LegalVarChain(),
                 nameHint,
                 irGlobalVar,
-                &globalNameInfo,
+                nullptr,
                 context->isSpecialType(originalValueType));
 
             // Register the new value as the replacement for the old
@@ -3687,9 +3722,12 @@ static LegalVal legalizeGlobalParam(
 
             LegalVarChainLink varChain(LegalVarChain(), varLayout);
 
-            IRGlobalNameInfo globalNameInfo;
-            globalNameInfo.globalVar = irGlobalParam;
-            globalNameInfo.counter = 0;
+            IRGlobalParamInfo globalParamInfo;
+            if (auto entryPointParamDecoration =
+                    irGlobalParam->findDecoration<IREntryPointParamDecoration>())
+            {
+                globalParamInfo.originatingEntryPoint = entryPointParamDecoration->getEntryPoint();
+            }
 
             // TODO: need to handle initializer here!
 
@@ -3703,7 +3741,7 @@ static LegalVal legalizeGlobalParam(
                 varChain,
                 nameHint,
                 irGlobalParam,
-                &globalNameInfo,
+                &globalParamInfo,
                 context->isSpecialType(irGlobalParam->getDataType()));
 
             // Register the new value as the replacement for the old
@@ -4001,8 +4039,8 @@ static void legalizeTypes(IRTypeLegalizationContext* context)
 //
 struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
 {
-    IRResourceTypeLegalizationContext(TargetProgram* target, IRModule* module)
-        : IRTypeLegalizationContext(target, module)
+    IRResourceTypeLegalizationContext(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+        : IRTypeLegalizationContext(target, module, sink)
     {
     }
 
@@ -4032,8 +4070,11 @@ struct IRResourceTypeLegalizationContext : IRTypeLegalizationContext
 //
 struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
 {
-    IRExistentialTypeLegalizationContext(TargetProgram* target, IRModule* module)
-        : IRTypeLegalizationContext(target, module)
+    IRExistentialTypeLegalizationContext(
+        TargetProgram* target,
+        IRModule* module,
+        DiagnosticSink* sink)
+        : IRTypeLegalizationContext(target, module, sink)
     {
     }
 
@@ -4073,8 +4114,8 @@ struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
 // a public function signature.
 struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 {
-    IREmptyTypeLegalizationContext(TargetProgram* target, IRModule* module)
-        : IRTypeLegalizationContext(target, module)
+    IREmptyTypeLegalizationContext(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+        : IRTypeLegalizationContext(target, module, sink)
     {
     }
 
@@ -4082,6 +4123,11 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 
     bool isSimpleType(IRType* type) override
     {
+        if (isMetalTarget(targetProgram->getTargetReq()))
+        {
+            return false;
+        }
+
         // If type is used as public interface, then treat it as simple.
         for (auto decor : type->getDecorations())
         {
@@ -4104,6 +4150,11 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
     {
         return LegalType();
     }
+
+    virtual bool shouldLegalizeParameterBlockElementType() override
+    {
+        return isMetalTarget(targetProgram->getTargetReq());
+    }
 };
 
 // The main entry points that are used when transforming IR code
@@ -4115,9 +4166,7 @@ void legalizeResourceTypes(TargetProgram* target, IRModule* module, DiagnosticSi
 {
     SLANG_PROFILE;
 
-    SLANG_UNUSED(sink);
-
-    IRResourceTypeLegalizationContext context(target, module);
+    IRResourceTypeLegalizationContext context(target, module, sink);
     legalizeTypes(&context);
 }
 
@@ -4125,18 +4174,13 @@ void legalizeExistentialTypeLayout(TargetProgram* target, IRModule* module, Diag
 {
     SLANG_PROFILE;
 
-    SLANG_UNUSED(module);
-    SLANG_UNUSED(sink);
-
-    IRExistentialTypeLegalizationContext context(target, module);
+    IRExistentialTypeLegalizationContext context(target, module, sink);
     legalizeTypes(&context);
 }
 
 void legalizeEmptyTypes(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
 {
-    SLANG_UNUSED(sink);
-
-    IREmptyTypeLegalizationContext context(target, module);
+    IREmptyTypeLegalizationContext context(target, module, sink);
     legalizeTypes(&context);
 }
 

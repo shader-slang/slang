@@ -1,6 +1,7 @@
 #pragma once
 
 #include "slang-emit-c-like.h"
+#include "slang-extension-tracker.h"
 
 namespace Slang
 {
@@ -8,11 +9,13 @@ namespace Slang
 class WGSLSourceEmitter : public CLikeSourceEmitter
 {
 public:
-    WGSLSourceEmitter(const Desc& desc)
-        : CLikeSourceEmitter(desc)
-    {
-    }
+    explicit WGSLSourceEmitter(const Desc& desc);
 
+    virtual bool isResourceTypeBindless(IRType* type) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(type);
+        return true;
+    }
     virtual void emitParameterGroupImpl(IRGlobalParam* varDecl, IRUniformParameterGroupType* type)
         SLANG_OVERRIDE;
     virtual void emitEntryPointAttributesImpl(
@@ -54,9 +57,15 @@ public:
         EmitOpInfo const& inOuterPrec) SLANG_OVERRIDE;
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* varDecl) SLANG_OVERRIDE;
 
+    virtual void emitRequireExtension(IRRequireTargetExtension* inst) SLANG_OVERRIDE;
+
+    virtual void handleRequiredCapabilitiesImpl(IRInst* inst) SLANG_OVERRIDE;
+
     void emit(const AddressSpace addressSpace);
 
     virtual bool shouldFoldInstIntoUseSites(IRInst* inst) SLANG_OVERRIDE;
+
+    virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }
 
 private:
     bool maybeEmitSystemSemantic(IRInst* inst);
@@ -67,7 +76,13 @@ private:
         const IRIntegerValue& rowCountWGSL,
         const IRIntegerValue& colCountWGSL);
 
+    const char* getWgslImageFormat(IRTextureTypeBase* type);
+
+    void _requireExtension(const UnownedStringSlice& name);
+
     bool m_f16ExtensionEnabled = false;
+
+    RefPtr<ShaderExtensionTracker> m_extensionTracker;
 };
 
 } // namespace Slang

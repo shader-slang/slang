@@ -21,6 +21,8 @@ IRType* getVectorElementType(IRType* type)
 {
     if (auto vectorType = as<IRVectorType>(type))
         return vectorType->getElementType();
+    if (auto coopVecType = as<IRCoopVectorType>(type))
+        return coopVecType->getElementType();
     return type;
 }
 
@@ -105,8 +107,6 @@ IROp getTypeStyle(IROp op)
     case kIROp_UInt64Type:
     case kIROp_IntPtrType:
     case kIROp_UIntPtrType:
-    case kIROp_Int8x4PackedType:
-    case kIROp_UInt8x4PackedType:
         {
             // All int like
             return kIROp_IntType;
@@ -142,8 +142,6 @@ IROp getTypeStyle(BaseType op)
     case BaseType::UInt:
     case BaseType::UInt64:
     case BaseType::UIntPtr:
-    case BaseType::Int8x4Packed:
-    case BaseType::UInt8x4Packed:
         return kIROp_IntType;
     case BaseType::Half:
     case BaseType::Float:
@@ -474,12 +472,6 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
     case kIROp_UIntPtrType:
         sb << "uintptr";
         break;
-    case kIROp_Int8x4PackedType:
-        sb << "int8_t4_packed";
-        break;
-    case kIROp_UInt8x4PackedType:
-        sb << "uint8_t4_packed";
-        break;
     case kIROp_CharType:
         sb << "char";
         break;
@@ -623,11 +615,6 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         break;
     case kIROp_HitObjectType:
         sb << "HitObject";
-        break;
-    case kIROp_HLSLConstBufferPointerType:
-        sb << "ConstantBufferPointer<";
-        getTypeNameHint(sb, as<IRHLSLConstBufferPointerType>(type)->getValueType());
-        sb << ">";
         break;
     case kIROp_HLSLStructuredBufferType:
         sb << "StructuredBuffer<";
@@ -1213,8 +1200,65 @@ bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions opti
     return false;
 }
 
+// Enumerate any associated functions of 'func'
+// that might be used by a pass (e.g. auto-diff)
+//
+template<typename TFunc>
+void forEachAssociatedFunction(IRInst* func, TFunc callback)
+{
+    // Resolve the function to get all its decorations
+    auto resolvedFunc = getResolvedInstForDecorations(func);
+    if (!resolvedFunc)
+        return;
+
+    // We'll scan for appropriate decorations and return
+    // the function references.
+    //
+    // TODO: In the future, as we get more function transformation
+    // passes, we might want to create a parent class for such
+    // decorations that associate functions with each other.
+    //
+    for (auto decor : resolvedFunc->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+            if (as<IRUserDefinedBackwardDerivativeDecoration>(decor))
+            {
+                auto associatedCallee = as<IRUserDefinedBackwardDerivativeDecoration>(decor)
+                                            ->getBackwardDerivativeFunc();
+                callback(associatedCallee);
+            }
+            break;
+
+        case kIROp_ForwardDerivativeDecoration:
+            if (as<IRForwardDerivativeDecoration>(decor))
+            {
+                auto associatedCallee =
+                    as<IRForwardDerivativeDecoration>(decor)->getForwardDerivativeFunc();
+                callback(associatedCallee);
+            }
+            break;
+
+        case kIROp_PrimalSubstituteDecoration:
+            if (as<IRPrimalSubstituteDecoration>(decor))
+            {
+                auto associatedCallee =
+                    as<IRPrimalSubstituteDecoration>(decor)->getPrimalSubstituteFunc();
+                callback(associatedCallee);
+            }
+            break;
+
+        default:
+            break;
+        }
+    }
+}
+
 bool doesCalleeHaveSideEffect(IRInst* callee)
 {
+    bool sideEffect = true;
+
     for (auto decor : getResolvedInstForDecorations(callee)->getDecorations())
     {
         switch (decor->getOp())
@@ -1222,10 +1266,31 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
         case kIROp_NoSideEffectDecoration:
         case kIROp_ReadNoneDecoration:
         case kIROp_IgnoreSideEffectsDecoration:
-            return false;
+            sideEffect = false;
+            break;
+        default:
+            break;
         }
     }
-    return true;
+
+    // If the callee has no side effect, check if any of its associated functions have side effect.
+    // If so, we want to keep the callee around.
+    //
+    // Typically, once the relevant pass has completed, the association is removed,
+    // and at that point we can remove the function.
+    //
+    if (!sideEffect)
+    {
+        forEachAssociatedFunction(
+            callee,
+            [&](IRInst* associatedCallee)
+            {
+                sideEffect |= doesCalleeHaveSideEffect(associatedCallee);
+                return;
+            });
+    }
+
+    return sideEffect;
 }
 
 IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key)
@@ -1388,6 +1453,7 @@ bool isZero(IRInst* inst)
         return as<IRFloatLit>(inst)->getValue() == 0.0;
     case kIROp_BoolLit:
         return as<IRBoolLit>(inst)->getValue() == false;
+    case kIROp_MakeCoopVector:
     case kIROp_MakeVector:
     case kIROp_MakeVectorFromScalar:
     case kIROp_MakeMatrix:
@@ -1422,6 +1488,7 @@ bool isOne(IRInst* inst)
         return as<IRFloatLit>(inst)->getValue() == 1.0;
     case kIROp_BoolLit:
         return as<IRBoolLit>(inst)->getValue();
+    case kIROp_MakeCoopVector:
     case kIROp_MakeVector:
     case kIROp_MakeVectorFromScalar:
     case kIROp_MakeMatrix:
@@ -1446,6 +1513,16 @@ bool isOne(IRInst* inst)
     }
 }
 
+IRPtrTypeBase* asRelevantPtrType(IRInst* inst)
+{
+    if (auto ptrType = as<IRPtrTypeBase>(inst))
+    {
+        if (ptrType->getAddressSpace() != AddressSpace::UserPointer)
+            return ptrType;
+    }
+    return nullptr;
+}
+
 IRPtrTypeBase* isMutablePointerType(IRInst* inst)
 {
     switch (inst->getOp())
@@ -1453,7 +1530,7 @@ IRPtrTypeBase* isMutablePointerType(IRInst* inst)
     case kIROp_ConstRefType:
         return nullptr;
     default:
-        return as<IRPtrTypeBase>(inst);
+        return asRelevantPtrType(inst);
     }
 }
 
@@ -1770,10 +1847,6 @@ UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
         return UnownedStringSlice::fromLiteral("uint64");
     case kIROp_UIntPtrType:
         return UnownedStringSlice::fromLiteral("uintptr");
-    case kIROp_Int8x4PackedType:
-        return UnownedStringSlice::fromLiteral("int8_t4_packed");
-    case kIROp_UInt8x4PackedType:
-        return UnownedStringSlice::fromLiteral("uint8_t4_packed");
     case kIROp_FloatType:
         return UnownedStringSlice::fromLiteral("float");
     case kIROp_HalfType:
@@ -1971,6 +2044,180 @@ IRType* getIRVectorBaseType(IRType* type)
     if (type->getOp() != kIROp_VectorType)
         return type;
     return as<IRVectorType>(type)->getElementType();
+}
+
+Int getSpecializationConstantId(IRGlobalParam* param)
+{
+    auto layout = findVarLayout(param);
+    if (!layout)
+        return 0;
+
+    auto offset = layout->findOffsetAttr(LayoutResourceKind::SpecializationConstant);
+    if (!offset)
+        return 0;
+
+    return offset->getOffset();
+}
+
+IRBlock* getLoopHeaderForConditionBlock(IRBlock* block)
+{
+    // Go through uses and check if any of them are a loop condition block.
+    for (auto use = block->firstUse; use; use = use->nextUse)
+    {
+        if (auto loop = as<IRLoop>(use->getUser()))
+        {
+            if (loop->getTargetBlock() == block)
+                return cast<IRBlock>(loop->getParent());
+        }
+    }
+    return nullptr;
+}
+
+void legalizeDefUse(IRGlobalValueWithCode* func)
+{
+    auto dom = computeDominatorTree(func);
+
+    // Make a map of loop condition blocks to their loop header.
+    // We need this because we'll be treating loop condition blocks as
+    // special cases (they are the special blocks since they "dominate" themselves,
+    // in the dominator tree sense)
+    //
+    Dictionary<IRBlock*, IRBlock*> loopHeaderBlockMap;
+    for (auto block : func->getBlocks())
+    {
+        if (auto header = getLoopHeaderForConditionBlock(block))
+            loopHeaderBlockMap.add(block, header);
+    }
+
+    for (auto block : func->getBlocks())
+    {
+        for (auto inst : block->getModifiableChildren())
+        {
+            // Inspect all uses of `inst` and find the common dominator of all use sites.
+            IRBlock* commonDominator = block;
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                if (!userBlock)
+                    continue;
+                while (commonDominator && !dom->dominates(commonDominator, userBlock))
+                {
+                    commonDominator = dom->getImmediateDominator(commonDominator);
+                }
+            }
+            SLANG_ASSERT(commonDominator);
+
+            // If commonDominator is 'block' and if the inst is not a Var in
+            // a loop condition block, we can skip the legalization.
+            //
+            if (commonDominator == block &&
+                !(as<IRVar>(inst) && loopHeaderBlockMap.containsKey(block)))
+                continue;
+
+            // Normally, if the common dominator is not `block`, we can simply move the definition
+            // to the common dominator.
+            // An exception is when the common dominator is the target block of a
+            // loop.
+            // Another exception is when a var in the loop condition block is accessed both inside
+            // and outside the loop. It is technically visible, but effects on the 'var' are not
+            // visible outside the loop, so we'll need to hoist it out of the loop.
+            //
+            // Note that after normalization, loops are in the form of:
+            // ```
+            // loop { if (condition) block; else break; }
+            // ```
+            // If we find ourselves needing to make the inst available right before
+            // the `if`, it means we are seeing uses of the inst outside the loop.
+            // In this case, we should insert a var/move the inst before the loop
+            // instead of before the `if`. This situation can occur in the IR if
+            // the original code is lowered from a `do-while` loop.
+            //
+            bool shouldInitializeVar = false;
+            if (loopHeaderBlockMap.containsKey(commonDominator))
+            {
+                bool shouldMoveToHeader = false;
+
+                // Check that the break-block dominates any of the uses are past the break
+                // block
+                for (auto _use = inst->firstUse; _use; _use = _use->nextUse)
+                {
+                    if (dom->dominates(
+                            as<IRLoop>(loopHeaderBlockMap[commonDominator]->getTerminator())
+                                ->getBreakBlock(),
+                            _use->getUser()->getParent()))
+                    {
+                        shouldMoveToHeader = true;
+                        break;
+                    }
+                }
+                if (shouldMoveToHeader)
+                {
+                    commonDominator = loopHeaderBlockMap[commonDominator];
+                    shouldInitializeVar = true;
+                }
+            }
+
+            // Now we can legalize uses based on the type of `inst`.
+            if (auto var = as<IRVar>(inst))
+            {
+                // If inst is an var, this is easy, we just move it to the
+                // common dominator.
+                if (var->getParent() != commonDominator)
+                    var->insertBefore(commonDominator->getTerminator());
+
+                if (shouldInitializeVar)
+                {
+                    IRBuilder builder(func);
+                    builder.setInsertAfter(var);
+                    builder.emitStore(
+                        var,
+                        builder.emitDefaultConstruct(
+                            as<IRPtrTypeBase>(var->getDataType())->getValueType()));
+                }
+            }
+            else
+            {
+                // For all other insts, we need to create a local var for it,
+                // and replace all uses with a load from the local var.
+                IRBuilder builder(func);
+                builder.setInsertBefore(commonDominator->getTerminator());
+                IRVar* tempVar = builder.emitVar(inst->getFullType());
+                auto defaultVal = builder.emitDefaultConstruct(inst->getFullType());
+                builder.emitStore(tempVar, defaultVal);
+
+                builder.setInsertAfter(inst);
+                builder.emitStore(tempVar, inst);
+
+                traverseUses(
+                    inst,
+                    [&](IRUse* use)
+                    {
+                        auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                        if (!userBlock)
+                            return;
+                        // Only fix the use of the current definition of `inst` does not
+                        // dominate it.
+                        if (!dom->dominates(block, userBlock))
+                        {
+                            // Replace the use with a load of tempVar.
+                            builder.setInsertBefore(use->getUser());
+                            auto load = builder.emitLoad(tempVar);
+                            builder.replaceOperand(use, load);
+                        }
+                    });
+            }
+        }
+    }
+}
+
+UnownedStringSlice getMangledName(IRInst* inst)
+{
+    for (auto decor : inst->getDecorations())
+    {
+        if (auto linkageDecor = as<IRLinkageDecoration>(decor))
+            return linkageDecor->getMangledName();
+    }
+    return UnownedStringSlice();
 }
 
 } // namespace Slang

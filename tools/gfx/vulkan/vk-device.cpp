@@ -511,6 +511,10 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         extendedFeatures.clockFeatures.pNext = deviceFeatures2.pNext;
         deviceFeatures2.pNext = &extendedFeatures.clockFeatures;
 
+        // cooperative vector features
+        extendedFeatures.cooperativeVectorFeatures.pNext = deviceFeatures2.pNext;
+        deviceFeatures2.pNext = &extendedFeatures.cooperativeVectorFeatures;
+
         // Atomic Float
         // To detect atomic float we need
         // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceShaderAtomicFloatFeaturesEXT.html
@@ -746,6 +750,16 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
         {
             extendedFeatures.vulkan12Features.pNext = (void*)deviceCreateInfo.pNext;
             deviceCreateInfo.pNext = &extendedFeatures.vulkan12Features;
+        }
+
+        if (extendedFeatures.cooperativeVectorFeatures.cooperativeVector)
+        {
+            deviceExtensions.add(VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME);
+
+            extendedFeatures.cooperativeVectorFeatures.pNext = (void*)deviceCreateInfo.pNext;
+            deviceCreateInfo.pNext = &extendedFeatures.cooperativeVectorFeatures;
+
+            m_features.add("cooperative-vector");
         }
 
         VkPhysicalDeviceProperties2 extendedProps = {
@@ -1005,6 +1019,7 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
     SLANG_RETURN_ON_FAIL(RendererBase::initialize(desc));
     SlangResult initDeviceResult = SLANG_OK;
 
+    m_glslang.init();
     for (int forceSoftware = 0; forceSoftware <= 1; forceSoftware++)
     {
         initDeviceResult = m_module.init(forceSoftware != 0);

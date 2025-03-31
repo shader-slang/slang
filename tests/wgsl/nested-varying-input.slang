@@ -22,17 +22,17 @@ struct NestedVertexOutput
 
 struct VertexOutput
 {
-    //VERT: @builtin(position) position
-    //FRAG: @builtin(position) position
-    float4 position : SV_Position;
-
     //VERT: @location(0) uv
-    //FRAG: @location(0) uv
+    //FRAG-DAG: @location(0) uv
     float2 uv : TEXCOORD0;
 
     //VERT: @location(1) color
-    //FRAG: @location(1) color
+    //FRAG-DAG: @location(1) color
     NestedVertexOutput nested;
+
+    //VERT: @builtin(position) position
+    //FRAG-DAG: @builtin(position) position
+    float4 position : SV_Position;
 };
 
 VertexOutput vertexMain()
@@ -44,10 +44,12 @@ VertexOutput vertexMain()
     return out;
 }
 
-FragmentOutput fragmentMain(VertexOutput input)
+//FRAG-DAG: @location(3) color3
+//FRAG-DAG: @location(6) color6
+FragmentOutput fragmentMain(VertexOutput input, float4 color3: COLOR3, float4 color6: COLOR6)
 {
     FragmentOutput out;
-    out.color0 = input.nested.color;
-    out.color1 = input.nested.color;
+    out.color0 = input.nested.color + color3;
+    out.color1 = input.nested.color + color6;
     return out;
 }

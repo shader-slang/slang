@@ -1,6 +1,7 @@
 #include "slang-parser.h"
 
 #include "../core/slang-semantic-version.h"
+#include "slang-check-impl.h"
 #include "slang-compiler.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
@@ -75,11 +76,18 @@ enum Precedence : int
     Postfix,
 };
 
+enum class ParsingStage
+{
+    Decl,
+    Body,
+};
+
 struct ParserOptions
 {
     bool enableEffectAnnotations = false;
     bool allowGLSLInput = false;
     bool isInLanguageServer = false;
+    ParsingStage stage = ParsingStage::Body;
     CompilerOptionSet optionSet;
 };
 
@@ -91,6 +99,7 @@ public:
     NamePool* namePool;
     SourceLanguage sourceLanguage;
     ASTBuilder* astBuilder;
+    SemanticsVisitor* semanticsVisitor = nullptr;
 
     NamePool* getNamePool() { return namePool; }
     SourceLanguage getSourceLanguage() { return sourceLanguage; }
@@ -155,6 +164,8 @@ public:
         currentScope = currentScope->parent;
         resetLookupScope();
     }
+
+    ParsingStage getStage() { return options.stage; }
 
     ModuleDecl* getCurrentModuleDecl() { return currentModule; }
 
@@ -1080,7 +1091,10 @@ static Token peekToken(Parser* parser)
     return parser->tokenReader.peekToken();
 }
 
-static SyntaxDecl* tryLookUpSyntaxDecl(Parser* parser, Name* name)
+static SyntaxDecl* tryLookUpSyntaxDecl(
+    Parser* parser,
+    Name* name,
+    LookupMask syntaxLookupMask = LookupMask::Default)
 {
     // Let's look up the name and see what we find.
 
@@ -1089,7 +1103,7 @@ static SyntaxDecl* tryLookUpSyntaxDecl(Parser* parser, Name* name)
         nullptr, // no semantics visitor available yet
         name,
         parser->currentScope,
-        LookupMask::Default,
+        syntaxLookupMask,
         true);
 
     // If we didn't find anything, or the result was overloaded,
@@ -1164,7 +1178,10 @@ bool tryParseUsingSyntaxDeclImpl(Parser* parser, SyntaxDecl* syntaxDecl, T** out
 }
 
 template<typename T>
-bool tryParseUsingSyntaxDecl(Parser* parser, T** outSyntax)
+bool tryParseUsingSyntaxDecl(
+    Parser* parser,
+    T** outSyntax,
+    LookupMask syntaxLookupMask = LookupMask::Default)
 {
     if (peekTokenType(parser) != TokenType::Identifier)
         return false;
@@ -1172,7 +1189,7 @@ bool tryParseUsingSyntaxDecl(Parser* parser, T** outSyntax)
     auto nameToken = peekToken(parser);
     auto name = nameToken.getName();
 
-    auto syntaxDecl = tryLookUpSyntaxDecl(parser, name);
+    auto syntaxDecl = tryLookUpSyntaxDecl(parser, name, syntaxLookupMask);
 
     if (!syntaxDecl)
         return false;
@@ -1180,7 +1197,7 @@ bool tryParseUsingSyntaxDecl(Parser* parser, T** outSyntax)
     return tryParseUsingSyntaxDeclImpl<T>(parser, syntaxDecl, outSyntax);
 }
 
-static Modifiers ParseModifiers(Parser* parser)
+static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = LookupMask::Default)
 {
     Modifiers modifiers;
     Modifier** modifierLink = &modifiers.first;
@@ -1201,7 +1218,7 @@ static Modifiers ParseModifiers(Parser* parser)
                 Token nameToken = peekToken(parser);
 
                 Modifier* parsedModifier = nullptr;
-                if (tryParseUsingSyntaxDecl<Modifier>(parser, &parsedModifier))
+                if (tryParseUsingSyntaxDecl<Modifier>(parser, &parsedModifier, modifierLookupMask))
                 {
                     parsedModifier->keywordName = nameToken.getName();
                     if (!parsedModifier->loc.isValid())
@@ -1704,6 +1721,20 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
             constraint->sup = parser->ParseTypeExp();
             AddMember(genericParent, constraint);
         }
+        else if (AdvanceIf(parser, TokenType::LParent))
+        {
+            auto constraint = parser->astBuilder->create<TypeCoercionConstraintDecl>();
+            constraint->whereTokenLoc = whereToken.loc;
+            parser->FillPosition(constraint);
+            constraint->toType = subType;
+            constraint->fromType = parser->ParseTypeExp();
+            parser->ReadToken(TokenType::RParent);
+            if (AdvanceIf(parser, "implicit"))
+            {
+                addModifier(constraint, parser->astBuilder->create<ImplicitConversionModifier>());
+            }
+            AddMember(genericParent, constraint);
+        }
     }
 }
 
@@ -1802,15 +1833,71 @@ public:
 /// Parse an optional body statement for a declaration that can have a body.
 static Stmt* parseOptBody(Parser* parser)
 {
-    if (AdvanceIf(parser, TokenType::Semicolon))
+    Token semiColonToken;
+    if (AdvanceIf(parser, TokenType::Semicolon, &semiColonToken))
     {
         // empty body
-        return nullptr;
+        // if we see a `{` after a `;`, it is very likely an user error to
+        // have the `;`, so we will provide a better diagnostic for it.
+        if (peekTokenType(parser) == TokenType::LBrace)
+        {
+            parser->sink->diagnose(semiColonToken.loc, Diagnostics::unexpectedBodyAfterSemicolon);
+
+            // Fall through to parse the block stmt.
+        }
+        else
+        {
+            return nullptr;
+        }
     }
-    else
+
+    if (parser->getStage() == ParsingStage::Decl)
     {
-        return parser->parseBlockStatement();
+        // If we are at the initial parsing stage, just collect the tokens
+        // without actually parsing them.
+        if (peekTokenType(parser) != TokenType::LBrace)
+        {
+            return parser->parseBlockStatement();
+        }
+        auto unparsedStmt = parser->astBuilder->create<UnparsedStmt>();
+        unparsedStmt->currentScope = parser->currentScope;
+        unparsedStmt->outerScope = parser->outerScope;
+        unparsedStmt->sourceLanguage = parser->getSourceLanguage();
+        unparsedStmt->isInVariadicGenerics = parser->isInVariadicGenerics;
+        parser->FillPosition(unparsedStmt);
+        List<Token>& tokens = unparsedStmt->tokens;
+        int braceDepth = 0;
+        for (;;)
+        {
+            auto token = parser->ReadToken();
+            if (token.type == TokenType::EndOfFile)
+            {
+                break;
+            }
+            if (token.type == TokenType::LBrace)
+            {
+                braceDepth++;
+            }
+            else if (token.type == TokenType::RBrace)
+            {
+                braceDepth--;
+            }
+            tokens.add(token);
+            if (braceDepth == 0)
+            {
+                break;
+            }
+        }
+        Token eofToken;
+        eofToken.type = TokenType::EndOfFile;
+        eofToken.loc = parser->tokenReader.peekLoc();
+        tokens.add(eofToken);
+        return unparsedStmt;
     }
+
+    // If we are in the second stage of parsing, then we need to actually
+    // parse the block statement for real.
+    return parser->parseBlockStatement();
 }
 
 /// Complete parsing of a function using traditional (C-like) declarator syntax
@@ -1859,9 +1946,12 @@ static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& decl
             parser->PushScope(funcScope);
 
             decl->body = parseOptBody(parser);
-            if (auto block = as<BlockStmt>(decl->body))
+            if (auto blockStmt = as<BlockStmt>(decl->body))
+                decl->closingSourceLoc = blockStmt->closingSourceLoc;
+            else if (auto unparsedStmt = as<UnparsedStmt>(decl->body))
             {
-                decl->closingSourceLoc = block->closingSourceLoc;
+                if (unparsedStmt->tokens.getCount())
+                    decl->closingSourceLoc = unparsedStmt->tokens.getLast().getLoc();
             }
             parser->PopScope();
 
@@ -2303,14 +2393,78 @@ static bool isGenericName(Parser* parser, Name* name)
     return lookupResult.item.declRef.is<GenericDecl>();
 }
 
+enum class BaseGenericKind
+{
+    Unknown,
+    Generic,
+    NonGeneric,
+};
+
 static Expr* tryParseGenericApp(Parser* parser, Expr* base)
 {
     Name* baseName = nullptr;
-    if (auto varExpr = as<VarExpr>(base))
-        baseName = varExpr->name;
-    // if base is a known generics, parse as generics
-    if (baseName && isGenericName(parser, baseName))
+    BaseGenericKind baseKind = BaseGenericKind::Unknown;
+    if (parser->semanticsVisitor)
+    {
+        // If we have access to a semantic visitor, we can check the base
+        // and see if it refers to a generic.
+        auto checkedBase = parser->semanticsVisitor->CheckTerm(base);
+        if (auto declRefExpr = as<DeclRefExpr>(checkedBase))
+        {
+            if (declRefExpr->declRef.is<GenericDecl>())
+            {
+                baseKind = BaseGenericKind::Generic;
+            }
+            else if (
+                declRefExpr->declRef.is<FunctionDeclBase>() ||
+                declRefExpr->declRef.is<AggTypeDeclBase>())
+            {
+                // If declref is a function or type, even if it is not a generic,
+                // we should parse the `<` as a generic application for better error
+                // messages. This is because functions or types can never precede a
+                // `<` in valid Slang code, and it is more likely that the user assumed
+                // the function or type is generic by mistake.
+                //
+                baseKind = BaseGenericKind::Generic;
+            }
+            else
+            {
+                baseKind = BaseGenericKind::NonGeneric;
+            }
+        }
+        else if (auto overloadedExpr = as<OverloadedExpr>(checkedBase))
+        {
+            baseKind = BaseGenericKind::NonGeneric;
+            for (auto candidate : overloadedExpr->lookupResult2)
+            {
+                if (candidate.declRef.is<GenericDecl>() ||
+                    declRefExpr->declRef.is<FunctionDeclBase>() ||
+                    declRefExpr->declRef.is<AggTypeDeclBase>())
+                {
+                    baseKind = BaseGenericKind::Generic;
+                    break;
+                }
+            }
+        }
+    }
+    else
+    {
+        // Without a semantic visitor, we fallback to a more simplistic lookup
+        // and guessing.
+        if (auto varExpr = as<VarExpr>(base))
+            baseName = varExpr->name;
+        // if base is a known generics, parse as generics
+        if (baseName && isGenericName(parser, baseName))
+            baseKind = BaseGenericKind::Generic;
+    }
+
+    // If base is known to be a generic, just parse as generic app.
+    if (baseKind == BaseGenericKind::Generic)
         return parseGenericApp(parser, base);
+
+    // If base is known to be non-generic, just return base.
+    if (baseKind == BaseGenericKind::NonGeneric)
+        return base;
 
     // otherwise, we speculate as generics, and fallback to comparison when parsing failed
     TokenSpan tokenSpan;
@@ -2344,6 +2498,7 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
         case TokenType::OpEql:
         case TokenType::OpNeq:
         case TokenType::OpGreater:
+        case TokenType::OpRsh:
         case TokenType::EndOfFile:
             {
                 return parseGenericApp(parser, base);
@@ -3835,8 +3990,13 @@ static NodeBase* parseConstructorDecl(Parser* parser, void* /*userData*/)
 
             decl->body = parseOptBody(parser);
 
-            if (auto block = as<BlockStmt>(decl->body))
-                decl->closingSourceLoc = block->closingSourceLoc;
+            if (auto blockStmt = as<BlockStmt>(decl->body))
+                decl->closingSourceLoc = blockStmt->closingSourceLoc;
+            else if (auto unparsedStmt = as<UnparsedStmt>(decl->body))
+            {
+                if (unparsedStmt->tokens.getCount())
+                    decl->closingSourceLoc = unparsedStmt->tokens.getLast().getLoc();
+            }
 
             parser->PopScope();
             return decl;
@@ -3889,10 +4049,13 @@ static AccessorDecl* parseAccessorDecl(Parser* parser)
 
     if (parser->tokenReader.peekTokenType() == TokenType::LBrace)
     {
-        decl->body = parser->parseBlockStatement();
-        if (auto block = as<BlockStmt>(decl->body))
+        decl->body = parseOptBody(parser);
+        if (auto blockStmt = as<BlockStmt>(decl->body))
+            decl->closingSourceLoc = blockStmt->closingSourceLoc;
+        else if (auto unparsedStmt = as<UnparsedStmt>(decl->body))
         {
-            decl->closingSourceLoc = block->closingSourceLoc;
+            if (unparsedStmt->tokens.getCount())
+                decl->closingSourceLoc = unparsedStmt->tokens.getLast().getLoc();
         }
     }
     else
@@ -3932,28 +4095,38 @@ static void parseStorageDeclBody(Parser* parser, ContainerDecl* decl)
 
 static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
 {
-    SubscriptDecl* decl = parser->astBuilder->create<SubscriptDecl>();
-    parser->FillPosition(decl);
-    parser->PushScope(decl);
+    return parseOptGenericDecl(
+        parser,
+        [&](GenericDecl* genericParent)
+        {
+            SubscriptDecl* decl = parser->astBuilder->create<SubscriptDecl>();
+            parser->FillPosition(decl);
+            parser->PushScope(decl);
 
-    // TODO: the use of this name here is a bit magical...
-    decl->nameAndLoc.name = getName(parser, "operator[]");
+            // TODO: the use of this name here is a bit magical...
+            decl->nameAndLoc.name = getName(parser, "operator[]");
 
-    parseParameterList(parser, decl);
+            parseParameterList(parser, decl);
 
-    if (AdvanceIf(parser, TokenType::RightArrow))
-    {
-        decl->returnType = parser->ParseTypeExp();
-    }
-    else
-    {
-        decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
-    }
+            if (AdvanceIf(parser, TokenType::RightArrow))
+            {
+                decl->returnType = parser->ParseTypeExp();
+            }
+            else
+            {
+                decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
+            }
 
-    parseStorageDeclBody(parser, decl);
+            auto funcScope = parser->currentScope;
+            parser->PopScope();
+            maybeParseGenericConstraints(parser, genericParent);
+            parser->PushScope(funcScope);
 
-    parser->PopScope();
-    return decl;
+            parseStorageDeclBody(parser, decl);
+
+            parser->PopScope();
+            return decl;
+        });
 }
 
 /// Peek in the token stream and return `true` if it looks like a modern-style variable declaration
@@ -4100,7 +4273,7 @@ static ParamDecl* parseModernParamDecl(Parser* parser)
     // like `in`, `out`, and `in out`/`inout` be applied to the
     // type (after the colon).
     //
-    auto modifiers = ParseModifiers(parser);
+    auto modifiers = ParseModifiers(parser, LookupMask::SyntaxDecl);
 
     // We want to allow both "modern"-style and traditional-style
     // parameters to appear in any modern-style parameter list,
@@ -4165,6 +4338,11 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
             decl->body = parseOptBody(parser);
             if (auto blockStmt = as<BlockStmt>(decl->body))
                 decl->closingSourceLoc = blockStmt->closingSourceLoc;
+            else if (auto unparsedStmt = as<UnparsedStmt>(decl->body))
+            {
+                if (unparsedStmt->tokens.getCount())
+                    decl->closingSourceLoc = unparsedStmt->tokens.getLast().getLoc();
+            }
             parser->PopScope();
             return decl;
         });
@@ -4715,6 +4893,19 @@ static void CompleteDecl(
             AddMember(containerDecl, decl);
         }
     }
+
+    if (parser->semanticsVisitor && parser->getStage() == ParsingStage::Body)
+    {
+        // When we are in a deferred parsing stage for function bodies,
+        // we will mark all local var decls as `ReadyForParserLookup` so they can
+        // be returned via lookup.
+        // Note that our lookup logic will ignore all unchecked decls, but during
+        // parsing we don't want to ignore them, so we mark them as `ReadyForParserLookup`
+        // here, which is a pseudo state that is only used during parsing.
+        // Before checking the decl in semantic checking, we will mark them back as
+        // `Unchecked`.
+        decl->checkState = DeclCheckState::ReadyForParserLookup;
+    }
 }
 
 static DeclBase* ParseDeclWithModifiers(
@@ -4747,7 +4938,7 @@ static DeclBase* ParseDeclWithModifiers(
             // as a declaration keyword and parse a declaration using
             // its associated callback:
             Decl* parsedDecl = nullptr;
-            if (tryParseUsingSyntaxDecl<Decl>(parser, &parsedDecl))
+            if (tryParseUsingSyntaxDecl<Decl>(parser, &parsedDecl, LookupMask::Default))
             {
                 decl = parsedDecl;
                 break;
@@ -4831,6 +5022,13 @@ static DeclBase* ParseDeclWithModifiers(
             // We shouldn't be seeing an LBrace or an LParent when expecting a decl.
             // However recovery logic may lead us here. In this case we just
             // skip the whole `{}` block and return an empty decl.
+            if (!parser->isRecovering)
+            {
+                parser->sink->diagnose(
+                    loc,
+                    Diagnostics::unexpectedToken,
+                    parser->tokenReader.peekToken());
+            }
             SkipBalancedToken(&parser->tokenReader);
             decl = parser->astBuilder->create<EmptyDecl>();
             decl->loc = loc;
@@ -4949,7 +5147,11 @@ void Parser::parseSourceFile(ContainerDecl* program)
 
     currentModule = getModuleDecl(program);
 
-    PushScope(program);
+    // If the program already has a scope, then reuse it instead of overwriting it!
+    if (program->ownedScope)
+        PushScope(program->ownedScope);
+    else
+        PushScope(program);
 
     // A single `ModuleDecl` might span multiple source files, so it
     // is possible that we are parsing a new source file into a module
@@ -5198,9 +5400,8 @@ static Stmt* ParseDefaultStmt(Parser* parser)
     return stmt;
 }
 
-static Stmt* parseTargetSwitchStmt(Parser* parser)
+static Stmt* parseTargetSwitchStmtImpl(Parser* parser, TargetSwitchStmt* stmt)
 {
-    TargetSwitchStmt* stmt = parser->astBuilder->create<TargetSwitchStmt>();
     parser->FillPosition(stmt);
     parser->ReadToken();
     if (!beginMatch(parser, MatchedTokenType::CurlyBraces))
@@ -5295,6 +5496,18 @@ static Stmt* parseTargetSwitchStmt(Parser* parser)
         parser->PopScope();
     }
     return stmt;
+}
+
+static Stmt* parseTargetSwitchStmt(Parser* parser)
+{
+    auto stmt = parser->astBuilder->create<TargetSwitchStmt>();
+    return parseTargetSwitchStmtImpl(parser, stmt);
+}
+
+static Stmt* parseStageSwitchStmt(Parser* parser)
+{
+    auto stmt = parser->astBuilder->create<StageSwitchStmt>();
+    return parseTargetSwitchStmtImpl(parser, stmt);
 }
 
 static Stmt* parseIntrinsicAsmStmt(Parser* parser)
@@ -5456,6 +5669,7 @@ Stmt* parseCompileTimeForStmt(Parser* parser)
     VarDecl* varDecl = parser->astBuilder->create<VarDecl>();
     varDecl->nameAndLoc = varNameAndLoc;
     varDecl->loc = varNameAndLoc.loc;
+    varDecl->checkState = DeclCheckState::ReadyForParserLookup;
 
     stmt->varDecl = varDecl;
 
@@ -5542,6 +5756,8 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
         statement = ParseSwitchStmt(this);
     else if (LookAheadToken("__target_switch"))
         statement = parseTargetSwitchStmt(this);
+    else if (LookAheadToken("__stage_switch"))
+        statement = parseStageSwitchStmt(this);
     else if (LookAheadToken("__intrinsic_asm"))
         statement = parseIntrinsicAsmStmt(this);
     else if (LookAheadToken("case"))
@@ -5837,7 +6053,6 @@ DeclStmt* Parser::parseVarDeclrStatement(Modifiers modifiers)
     {
         sink->diagnose(decl->loc, Diagnostics::declNotAllowed, decl->astNodeType);
     }
-
     return varDeclrStatement;
 }
 
@@ -5876,6 +6091,11 @@ Stmt* Parser::parseIfLetStatement()
     tempVarDecl->nameAndLoc = NameLoc(getName(this, "$OptVar"), identifierToken.loc);
     tempVarDecl->initExpr = initExpr;
     AddMember(currentScope->containerDecl, tempVarDecl);
+    if (semanticsVisitor)
+        semanticsVisitor->ensureDecl(
+            (Decl*)tempVarDecl,
+            DeclCheckState::DefinitionChecked,
+            nullptr);
 
     DeclStmt* tmpVarDeclStmt = astBuilder->create<DeclStmt>();
     FillPosition(tmpVarDeclStmt);
@@ -6093,7 +6313,7 @@ ExpressionStmt* Parser::ParseExpressionStatement()
 ParamDecl* Parser::ParseParameter()
 {
     ParamDecl* parameter = astBuilder->create<ParamDecl>();
-    parameter->modifiers = ParseModifiers(this);
+    parameter->modifiers = ParseModifiers(this, LookupMask::SyntaxDecl);
     currentLookupScope = currentScope->parent;
     _parseTraditionalParamDeclCommonBase(this, parameter, kDeclaratorParseOption_AllowEmpty);
     resetLookupScope();
@@ -6965,9 +7185,19 @@ static Expr* parseAtomicExpr(Parser* parser)
                 // as an expression.
 
                 Expr* base = nullptr;
-                if (!tryParseExpression(parser, base, TokenType::RParent))
+                if (parser->LookAheadToken(TokenType::RParent))
                 {
-                    base = parser->ParseType();
+                    // We don't support empty parentheses `()` as a valid expression.
+                    parser->diagnose(openParen, Diagnostics::invalidEmptyParenthesisExpr);
+                    base = parser->astBuilder->create<IncompleteExpr>();
+                    base->type = parser->astBuilder->getErrorType();
+                }
+                else
+                {
+                    if (!tryParseExpression(parser, base, TokenType::RParent))
+                    {
+                        base = parser->ParseType();
+                    }
                 }
 
                 parser->ReadToken(TokenType::RParent);
@@ -7489,6 +7719,30 @@ static Expr* parsePostfixExpr(Parser* parser)
                     expr = maybeParseGenericApp(parser, memberExpr);
                 else
                     expr = memberExpr;
+            }
+            break;
+        case TokenType::OpMul:
+            {
+                // We may have a pointer type expr, e.g. T*, or the `*` is a mul operator.
+                // We can easily disambiguate by looking ahead of `*`, if the token after it
+                // is `,`, `>`, `)` or `>>`, then it must be a type postfix.
+                auto lookahead = peekTokenType(parser, 1);
+                switch (lookahead)
+                {
+                case TokenType::Comma:
+                case TokenType::RParent:
+                case TokenType::OpGreater:
+                case TokenType::OpRsh:
+                case TokenType::Colon:
+                case TokenType::Semicolon:
+                case TokenType::LBracket:
+                case TokenType::OpMul:
+                case TokenType::Dot:
+                    expr = parsePostfixTypeSuffix(parser, expr);
+                    break;
+                default:
+                    return expr;
+                }
             }
             break;
         }
@@ -8060,11 +8314,45 @@ Expr* parseTermFromSourceFile(
 {
     ParserOptions options;
     options.allowGLSLInput = sourceLanguage == SourceLanguage::GLSL;
+    options.stage = ParsingStage::Body;
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.currentScope = outerScope;
     parser.namePool = namePool;
     parser.sourceLanguage = sourceLanguage;
     return parser.ParseExpression();
+}
+
+Stmt* parseUnparsedStmt(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* semanticsVisitor,
+    TranslationUnitRequest* translationUnit,
+    SourceLanguage sourceLanguage,
+    bool isInVariadicGenerics,
+    TokenSpan const& tokens,
+    DiagnosticSink* sink,
+    Scope* currentScope,
+    Scope* outerScope)
+{
+    ParserOptions options = {};
+    options.stage = ParsingStage::Body;
+    options.enableEffectAnnotations = translationUnit->compileRequest->optionSet.getBoolOption(
+        CompilerOptionName::EnableEffectAnnotations);
+    options.allowGLSLInput =
+        translationUnit->compileRequest->optionSet.getBoolOption(CompilerOptionName::AllowGLSL) ||
+        sourceLanguage == SourceLanguage::GLSL;
+    options.isInLanguageServer =
+        translationUnit->compileRequest->getLinkage()->isInLanguageServer();
+    options.optionSet = translationUnit->compileRequest->optionSet;
+
+    Parser parser(astBuilder, tokens, sink, outerScope, options);
+    parser.currentScope = outerScope;
+    parser.namePool = translationUnit->getNamePool();
+    parser.sourceLanguage = sourceLanguage;
+    parser.semanticsVisitor = semanticsVisitor;
+    parser.currentScope = parser.currentLookupScope = currentScope;
+    parser.currentModule = semanticsVisitor->getShared()->getModule()->getModuleDecl();
+    parser.isInVariadicGenerics = isInVariadicGenerics;
+    return parser.parseBlockStatement();
 }
 
 // Parse a source file into an existing translation unit
@@ -8078,6 +8366,7 @@ void parseSourceFile(
     ContainerDecl* parentDecl)
 {
     ParserOptions options = {};
+    options.stage = ParsingStage::Decl;
     options.enableEffectAnnotations = translationUnit->compileRequest->optionSet.getBoolOption(
         CompilerOptionName::EnableEffectAnnotations);
     options.allowGLSLInput =
@@ -8269,6 +8558,17 @@ static NodeBase* parseGLSLVersionModifier(Parser* parser, void* /*userData*/)
     return modifier;
 }
 
+static NodeBase* parseWGSLExtensionModifier(Parser* parser, void* /*userData*/)
+{
+    auto modifier = parser->astBuilder->create<RequiredWGSLExtensionModifier>();
+
+    parser->ReadToken(TokenType::LParent);
+    modifier->extensionNameToken = parser->ReadToken(TokenType::Identifier);
+    parser->ReadToken(TokenType::RParent);
+
+    return modifier;
+}
+
 static SlangResult parseSemanticVersion(
     Parser* parser,
     Token& outToken,
@@ -8437,7 +8737,9 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
 
         int localSizeIndex = -1;
         if (nameText.startsWith(localSizePrefix) &&
-            nameText.getLength() == SLANG_COUNT_OF(localSizePrefix) - 1 + 1)
+            (nameText.getLength() == SLANG_COUNT_OF(localSizePrefix) - 1 + 1 ||
+             (nameText.endsWith("_id") &&
+              (nameText.getLength() == SLANG_COUNT_OF(localSizePrefix) - 1 + 4))))
         {
             char lastChar = nameText[SLANG_COUNT_OF(localSizePrefix) - 1];
             localSizeIndex = (lastChar >= 'x' && lastChar <= 'z') ? (lastChar - 'x') : -1;
@@ -8451,6 +8753,8 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
                 numThreadsAttrib->args.setCount(3);
                 for (auto& i : numThreadsAttrib->args)
                     i = nullptr;
+                for (auto& b : numThreadsAttrib->axisIsSpecConstId)
+                    b = false;
 
                 // Just mark the loc and name from the first in the list
                 numThreadsAttrib->keywordName = getName(parser, "numthreads");
@@ -8467,6 +8771,11 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
                 }
 
                 numThreadsAttrib->args[localSizeIndex] = expr;
+
+                // We can't resolve the specialization constant declaration
+                // here, because it may not even exist. IDs pointing to unnamed
+                // specialization constants are allowed in GLSL.
+                numThreadsAttrib->axisIsSpecConstId[localSizeIndex] = nameText.endsWith("_id");
             }
         }
         else if (nameText == "derivative_group_quadsNV")
@@ -8639,8 +8948,19 @@ static NodeBase* parseImplicitConversionModifier(Parser* parser, void* /*userDat
     ConversionCost cost = kConversionCost_Default;
     if (AdvanceIf(parser, TokenType::LParent))
     {
-        cost =
-            ConversionCost(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+        if (AdvanceIf(parser, "constraint"))
+        {
+            cost = kConversionCost_TypeCoercionConstraint;
+            if (AdvanceIf(parser, TokenType::OpAdd))
+            {
+                cost = kConversionCost_TypeCoercionConstraintPlusScalarToVector;
+            }
+        }
+        else
+        {
+            cost = ConversionCost(
+                stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
+        }
         if (AdvanceIf(parser, TokenType::Comma))
         {
             builtinKind = BuiltinConversionKind(
@@ -8820,6 +9140,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("__glsl_extension", parseGLSLExtensionModifier),
     _makeParseModifier("__glsl_version", parseGLSLVersionModifier),
     _makeParseModifier("__spirv_version", parseSPIRVVersionModifier),
+    _makeParseModifier("__wgsl_extension", parseWGSLExtensionModifier),
     _makeParseModifier("__cuda_sm_version", parseCUDASMVersionModifier),
 
     _makeParseModifier("__builtin_type", parseBuiltinTypeModifier),

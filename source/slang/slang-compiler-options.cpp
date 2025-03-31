@@ -54,11 +54,21 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         switch (option.key)
         {
         case CompilerOptionName::Capability:
-            for (auto v : option.value)
             {
-                sb << " " << optionInfo.names << " " << v.stringValue;
+                StringBuilder subBuilder;
+                for (auto v : option.value)
+                {
+                    if (subBuilder.getLength() != 0)
+                        subBuilder << "+";
+                    if (v.kind == CompilerOptionValueKind::Int)
+                        subBuilder << capabilityNameToString((CapabilityName)v.intValue);
+                    else
+                        subBuilder << v.stringValue;
+                }
+                if (subBuilder.getLength())
+                    sb << " " << optionInfo.names << " " << subBuilder.produceString();
+                break;
             }
-            break;
         case CompilerOptionName::Include:
             for (auto v : option.value)
             {
@@ -337,7 +347,7 @@ void CompilerOptionSet::serialize(SerializedOptionsData* outData)
             outData->stringPool.add(val.stringValue);
             entry.value.stringValue0 = val.stringValue.getBuffer();
             outData->stringPool.add(val.stringValue2);
-            entry.value.stringValue1 = val.stringValue.getBuffer();
+            entry.value.stringValue1 = val.stringValue2.getBuffer();
             outData->entries.add(entry);
         }
     }

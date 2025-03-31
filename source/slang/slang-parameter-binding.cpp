@@ -712,6 +712,15 @@ RefPtr<TypeLayout> getTypeLayoutForGlobalShaderParameter(
         return createTypeLayoutWith(layoutContext, specializationConstantRule, type);
     }
 
+    if (varDecl->hasModifier<InModifier>())
+    {
+        return createTypeLayoutWith(layoutContext, rules->getVaryingInputRules(), type);
+    }
+    else if (varDecl->hasModifier<OutModifier>())
+    {
+        return createTypeLayoutWith(layoutContext, rules->getVaryingOutputRules(), type);
+    }
+
     // TODO(tfoley): there may be other cases that we need to handle here
 
     // An "ordinary" global variable is implicitly a uniform
@@ -1064,15 +1073,44 @@ static void _maybeDiagnoseMissingVulkanLayoutModifier(
     ParameterBindingContext* context,
     DeclRef<VarDeclBase> const& varDecl)
 {
+    // Don't warn if the declaration is a vk::push_constant or shaderRecordEXT
+    if (varDecl.getDecl()->hasModifier<PushConstantAttribute>() ||
+        varDecl.getDecl()->hasModifier<ShaderRecordAttribute>())
+    {
+        return;
+    }
+
     // If the user didn't specify a `binding` (and optional `set`) for Vulkan,
     // but they *did* specify a `register` for D3D, then that is probably an
     // oversight on their part.
     if (auto registerModifier = varDecl.getDecl()->findModifier<HLSLRegisterSemantic>())
     {
+        auto varType = getType(context->getASTBuilder(), varDecl.as<VarDeclBase>());
+        if (auto textureType = as<TextureType>(varType))
+        {
+            if (textureType->isCombined())
+            {
+                // Recommend [[vk::binding]] but not '-fvk-xxx-shift` for combined texture samplers
+                getSink(context)->diagnose(
+                    registerModifier,
+                    Diagnostics::registerModifierButNoVulkanLayout,
+                    varDecl.getName());
+                return;
+            }
+        }
+
+        UnownedStringSlice registerClassName;
+        UnownedStringSlice registerIndexDigits;
+        splitNameAndIndex(
+            registerModifier->registerName.getContent(),
+            registerClassName,
+            registerIndexDigits);
+
         getSink(context)->diagnose(
             registerModifier,
-            Diagnostics::registerModifierButNoVulkanLayout,
-            varDecl.getName());
+            Diagnostics::registerModifierButNoVkBindingNorShift,
+            varDecl.getName(),
+            registerClassName);
     }
 }
 
@@ -1116,6 +1154,25 @@ static void addExplicitParameterBindings_GLSL(
 
         if (auto layoutAttr = varDecl.getDecl()->findModifier<VkConstantIdAttribute>())
             info[kResInfo].semanticInfo.index = layoutAttr->location;
+        else
+            return;
+    }
+
+    if (auto foundVaryingInput = typeLayout->FindResourceInfo(LayoutResourceKind::VaryingInput))
+    {
+        info[kResInfo].resInfo = foundVaryingInput;
+
+        if (auto layoutAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
+            info[kResInfo].semanticInfo.index = layoutAttr->value;
+        else
+            return;
+    }
+    if (auto foundVaryingOutput = typeLayout->FindResourceInfo(LayoutResourceKind::VaryingOutput))
+    {
+        info[kResInfo].resInfo = foundVaryingOutput;
+
+        if (auto layoutAttr = varDecl.getDecl()->findModifier<GLSLLocationAttribute>())
+            info[kResInfo].semanticInfo.index = layoutAttr->value;
         else
             return;
     }
@@ -1228,7 +1285,6 @@ static void addExplicitParameterBindings_GLSL(
         return;
     }
 
-
     const auto hlslInfo = _extractLayoutSemanticInfo(context, hlslRegSemantic);
     if (hlslInfo.kind == LayoutResourceKind::None)
     {
@@ -1242,7 +1298,14 @@ static void addExplicitParameterBindings_GLSL(
     if (auto textureType = as<TextureType>(varType))
     {
         if (textureType->isCombined())
+        {
+            if (!warnedMissingVulkanLayoutModifier)
+            {
+                _maybeDiagnoseMissingVulkanLayoutModifier(context, varDecl.as<VarDeclBase>());
+                warnedMissingVulkanLayoutModifier = true;
+            }
             return;
+        }
     }
 
     // Can we map to a Vulkan kind in principal?
@@ -2319,7 +2382,14 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     // otherwise they will include all of the above cases...
     else if (auto declRefType = as<DeclRefType>(type))
     {
+        // If we are trying to get the layout of some extern type, do our best
+        // to look it up in other loaded modules and generate the type layout
+        // based on that.
+        declRefType = context->layoutContext.lookupExternDeclRefType(declRefType);
+
         auto declRef = declRefType->getDeclRef();
+
+
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
             RefPtr<StructTypeLayout> structLayout = new StructTypeLayout();
@@ -3448,34 +3518,22 @@ static void collectParameters(ParameterBindingContext* inContext, ComponentType*
 /// Emit a diagnostic about a uniform/ordinary parameter at global scope.
 void diagnoseGlobalUniform(SharedParameterBindingContext* sharedContext, VarDeclBase* varDecl)
 {
-    // This subroutine gets invoked if a shader parameter containing
-    // "ordinary" data (sometimes just called "uniform" data) is present
-    // at the global scope.
-    //
-    // Slang can support such parameters by aggregating them into
-    // an implicit constant buffer, but it is also common for programmers
-    // to accidentally declare a global-scope shader parameter when they
-    // meant to declare a global variable instead:
-    //
-    //      int gCounter = 0; // this is a shader parameter, not a global
-    //
-    // In order to avoid mistakes, we'd like to warn the user when
-    // they write code like the above, and hint to them that they
-    // should make their intention more explicit with a keyword:
-    //
-    //      static int gCounter = 0; // this is now a (static) global
-    //
-    //      uniform int gCounter; // this is now explicitly a shader parameter
-    //
-    // We skip the diagnostic whenever the variable was explicitly `uniform`,
-    // under the assumption that the programmer who added that modifier
-    // knew what they were opting into.
-    //
-    if (varDecl->hasModifier<HLSLUniformModifier>())
-        return;
+    // Don't emit the implicit global shader parameter warning if the variable is explicitly marked
+    // as uniform
+    if (!varDecl->hasModifier<HLSLUniformModifier>())
+    {
+        getSink(sharedContext)
+            ->diagnose(varDecl, Diagnostics::globalUniformNotExpected, varDecl->getName());
+    }
 
-    getSink(sharedContext)
-        ->diagnose(varDecl, Diagnostics::globalUniformNotExpected, varDecl->getName());
+    // Always check and warn about binding attributes being ignored, regardless of uniform modifier
+    if (varDecl->findModifier<GLSLBindingAttribute>())
+    {
+        sharedContext->m_sink->diagnose(
+            varDecl,
+            Diagnostics::bindingAttributeIgnoredOnUniform,
+            varDecl->getName());
+    }
 }
 
 

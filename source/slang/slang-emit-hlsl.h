@@ -82,7 +82,7 @@ protected:
 
     virtual void emitPostKeywordTypeAttributesImpl(IRInst* inst) SLANG_OVERRIDE;
 
-    void _emitPrefixTypeAttr(IRAttr* attr) SLANG_OVERRIDE;
+    virtual void _emitPrefixTypeAttr(IRAttr* attr) SLANG_OVERRIDE;
 
     // Emit a single `register` semantic, as appropriate for a given resource-type-specific layout
     // info Keyword to use in the uniform case (`register` for globals, `packoffset` inside a
@@ -118,6 +118,7 @@ protected:
 
     void _emitHLSLDecorationSingleString(const char* name, IRFunc* entryPoint, IRStringLit* val);
     void _emitHLSLDecorationSingleInt(const char* name, IRFunc* entryPoint, IRIntLit* val);
+    void _emitHLSLDecorationSingleFloat(const char* name, IRFunc* entryPoint, IRFloatLit* val);
 
     void _emitStageAccessSemantic(IRStageAccessDecoration* decoration, const char* name);
 };

@@ -59,6 +59,45 @@ static bool _isSubCommand(const char* arg)
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Options !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
+/* static */ void Options::showHelp(WriterHelper stdOut)
+{
+    stdOut.print(
+        "Usage: slang-test [options] [test-prefix...]\n"
+        "\n"
+        "Options:\n"
+        "  -h, --help                     Show this help message\n"
+        "  -bindir <path>                 Set directory for binaries (default: the path to the "
+        "slang-test executable)\n"
+        "  -test-dir <path>               Set directory for test files (default: tests/)\n"
+        "  -v                             Enable verbose output\n"
+        "  -hide-ignored                  Hide results from ignored tests\n"
+        "  -api-only                      Only run tests that use specified APIs\n"
+        "  -verbose-paths                 Use verbose paths in output\n"
+        "  -category <name>               Only run tests in specified category\n"
+        "  -exclude <name>                Exclude tests in specified category\n"
+        "  -api <expr>                    Enable specific APIs (e.g., 'vk+dx12' or '+dx11')\n"
+        "  -synthesizedTestApi <expr>     Set APIs for synthesized tests\n"
+        "  -skip-api-detection            Skip API availability detection\n"
+        "  -server-count <n>              Set number of test servers (default: 1)\n"
+        "  -show-adapter-info             Show detailed adapter information\n"
+        "  -generate-hlsl-baselines       Generate HLSL test baselines\n"
+        "  -emit-spirv-via-glsl           Emit SPIR-V through GLSL instead of directly\n"
+        "  -expected-failure-list <file>  Specify file containing expected failures\n"
+        "  -use-shared-library            Run tests in-process using shared library\n"
+        "  -use-test-server               Run tests using test server\n"
+        "  -use-fully-isolated-test-server  Run each test in isolated server\n"
+        "\n"
+        "Output modes:\n"
+        "  -appveyor                      Use AppVeyor output format\n"
+        "  -travis                        Use Travis CI output format\n"
+        "  -teamcity                      Use TeamCity output format\n"
+        "  -xunit                         Use xUnit output format\n"
+        "  -xunit2                        Use xUnit 2 output format\n"
+        "\n"
+        "Test prefixes are used to filter which tests to run. If no prefix is specified,\n"
+        "all tests will be run.\n");
+}
+
 /* static */ Result Options::parse(
     int argc,
     char** argv,
@@ -79,6 +118,16 @@ static bool _isSubCommand(const char* arg)
     if (argCursor != argEnd)
     {
         optionsOut->appName = *argCursor++;
+    }
+
+    // Check for help flags first
+    for (int i = 1; i < argc; i++)
+    {
+        if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0)
+        {
+            showHelp(stdError);
+            return SLANG_FAIL;
+        }
     }
 
     // now iterate over arguments to collect options
@@ -126,6 +175,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             optionsOut->binDir = *argCursor++;
@@ -175,6 +225,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             argCursor++;
@@ -185,25 +236,18 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             argCursor++;
             // Assumed to be handle by .bat file that called us
-        }
-        else if (strcmp(arg, "-adapter") == 0)
-        {
-            if (argCursor == argEnd)
-            {
-                stdError.print("error: expected operand for '%s'\n", arg);
-                return SLANG_FAIL;
-            }
-            optionsOut->adapter = *argCursor++;
         }
         else if (strcmp(arg, "-server-count") == 0)
         {
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             optionsOut->serverCount = stringToInt(*argCursor++);
@@ -239,6 +283,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             auto category = categorySet->findOrError(*argCursor++);
@@ -252,6 +297,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             auto category = categorySet->findOrError(*argCursor++);
@@ -267,6 +313,7 @@ static bool _isSubCommand(const char* arg)
                 stdError.print(
                     "error: expecting an api expression (eg 'vk+dx12' or '+dx11') '%s'\n",
                     arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             const char* apiList = *argCursor++;
@@ -288,6 +335,7 @@ static bool _isSubCommand(const char* arg)
                 stdError.print(
                     "error: expected an api expression (eg 'vk+dx12' or '+dx11') '%s'\n",
                     arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             const char* apiList = *argCursor++;
@@ -315,6 +363,7 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             auto fileName = *argCursor++;
@@ -332,13 +381,19 @@ static bool _isSubCommand(const char* arg)
             if (argCursor == argEnd)
             {
                 stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
                 return SLANG_FAIL;
             }
             optionsOut->testDir = *argCursor++;
         }
+        else if (strcmp(arg, "-show-adapter-info") == 0)
+        {
+            optionsOut->showAdapterInfo = true;
+        }
         else
         {
             stdError.print("unknown option '%s'\n", arg);
+            showHelp(stdError);
             return SLANG_FAIL;
         }
     }

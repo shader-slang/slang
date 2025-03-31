@@ -324,7 +324,7 @@ public:
     public:
         Slang::String derivedTypeName;
         Slang::String baseTypeName;
-        Int idOverride = -1;
+        Slang::Int idOverride = -1;
     };
     Slang::List<TypeConformanceVal> typeConformances;
 

@@ -16,6 +16,7 @@ class FenceImpl : public FenceBase
 public:
     RefPtr<DeviceImpl> m_device;
     NS::SharedPtr<MTL::SharedEvent> m_event;
+    NS::SharedPtr<MTL::SharedEventListener> m_eventListener;
 
     ~FenceImpl();
 
@@ -29,6 +30,8 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
     getNativeHandle(InteropHandle* outNativeHandle) override;
+
+    bool waitForFence(uint64_t value, uint64_t timeout);
 };
 
 } // namespace metal

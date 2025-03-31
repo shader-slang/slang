@@ -1,6 +1,7 @@
 // vk-shader-program.cpp
 #include "vk-shader-program.h"
 
+#include "external/spirv-tools/include/spirv-tools/linker.hpp"
 #include "vk-device.h"
 #include "vk-util.h"
 
@@ -71,15 +72,32 @@ VkPipelineShaderStageCreateInfo ShaderProgramImpl::compileEntryPoint(
 
 Result ShaderProgramImpl::createShaderModule(
     slang::EntryPointReflection* entryPointInfo,
-    ComPtr<ISlangBlob> kernelCode)
+    List<ComPtr<ISlangBlob>>& kernelCodes)
 {
-    m_codeBlobs.add(kernelCode);
+    ComPtr<ISlangBlob> linkedKernel;
+    ComPtr<slang::ISession> slangSession;
+    m_device->getSlangSession(slangSession.writeRef());
+    if (kernelCodes.getCount() == 1)
+    {
+        linkedKernel = kernelCodes[0];
+    }
+    else
+    {
+        linkedKernel = m_device->m_glslang.linkSPIRV(kernelCodes);
+        if (!linkedKernel)
+        {
+            return SLANG_FAIL;
+        }
+    }
+
+    m_codeBlobs.add(linkedKernel);
+
     VkShaderModule shaderModule;
     auto realEntryPointName = entryPointInfo->getNameOverride();
     const char* spirvBinaryEntryPointName = "main";
     m_stageCreateInfos.add(compileEntryPoint(
         spirvBinaryEntryPointName,
-        kernelCode,
+        linkedKernel,
         (VkShaderStageFlagBits)VulkanUtil::getShaderStage(entryPointInfo->getStage()),
         shaderModule));
     m_entryPointNames.add(realEntryPointName);

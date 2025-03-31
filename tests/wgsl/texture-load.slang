@@ -127,16 +127,16 @@ Depth2DMS d2DMS;
 Depth2DArray d2DArray;
 
 
-__generic<T:__BuiltinArithmeticType, let N:int>
-bool TEST_textureLoad(
-    Texture1D<vector<T,N>> t1D,
-    Texture2D<vector<T,N>> t2D,
-    Texture3D<vector<T,N>> t3D,
-    Texture2DMS<vector<T,N>> t2DMS,
-    Texture2DArray<vector<T,N>> t2DArray)
+bool TEST_textureLoad<T>(
+    Texture1D<T> t1D,
+    Texture2D<T> t2D,
+    Texture3D<T> t3D,
+    Texture2DMS<T> t2DMS,
+    Texture2DArray<T> t2DArray)
+    where T : ITexelElement, IArithmetic
 {
     // WGSL-LABEL: TEST_textureLoad
-    typealias Tvn = vector<T,N>;
+    typealias Tvn = T;
 
     return true
         // ===================
@@ -145,19 +145,19 @@ bool TEST_textureLoad(
         // ===================
 
         // WGSL: textureLoad({{\(*}}t1D
-        && all(Tvn(T(0)) == t1D.Load(int2(0, 0)))
+        && all(Tvn(T.Element(0)) == t1D.Load(int2(0, 0)))
 
         // WGSL: textureLoad({{\(*}}t2D
-        && all(Tvn(T(0)) == t2D.Load(int3(0, 0, 0)))
+        && all(Tvn(T.Element(0)) == t2D.Load(int3(0, 0, 0)))
 
         // WGSL: textureLoad({{\(*}}t3D
-        && all(Tvn(T(0)) == t3D.Load(int4(0, 0, 0, 0)))
+        && all(Tvn(T.Element(0)) == t3D.Load(int4(0, 0, 0, 0)))
 
         // WGSL: textureLoad({{\(*}}t2DMS
-        && all(Tvn(T(0)) == t2DMS.Load(int3(0, 0, 0)))
+        && all(Tvn(T.Element(0)) == t2DMS.Load(int3(0, 0, 0)))
 
         // WGSL: textureLoad({{\(*}}t2DArray
-        && all(Tvn(T(0)) == t2DArray.Load(int4(0, 0, 0, 0)))
+        && all(Tvn(T.Element(0)) == t2DArray.Load(int4(0, 0, 0, 0)))
         ;
 }
 
@@ -185,12 +185,12 @@ bool TEST_textureLoad_depth()
 void fragMain()
 {
     bool result = true
-        && TEST_textureLoad<float,    3>(t1D_f32v3, t2D_f32v3, t3D_f32v3, t2DMS_f32v3, t2DArray_f32v3)
-        && TEST_textureLoad<float,    4>(t1D_f32v4, t2D_f32v4, t3D_f32v4, t2DMS_f32v4, t2DArray_f32v4)
-        && TEST_textureLoad<int32_t,  3>(t1D_i32v3, t2D_i32v3, t3D_i32v3, t2DMS_i32v3, t2DArray_i32v3)
-        && TEST_textureLoad<int32_t,  4>(t1D_i32v4, t2D_i32v4, t3D_i32v4, t2DMS_i32v4, t2DArray_i32v4)
-        && TEST_textureLoad<uint32_t, 3>(t1D_u32v3, t2D_u32v3, t3D_u32v3, t2DMS_u32v3, t2DArray_u32v3)
-        && TEST_textureLoad<uint32_t, 4>(t1D_u32v4, t2D_u32v4, t3D_u32v4, t2DMS_u32v4, t2DArray_u32v4)
+        && TEST_textureLoad<float3>(t1D_f32v3, t2D_f32v3, t3D_f32v3, t2DMS_f32v3, t2DArray_f32v3)
+        && TEST_textureLoad<float4>(t1D_f32v4, t2D_f32v4, t3D_f32v4, t2DMS_f32v4, t2DArray_f32v4)
+        && TEST_textureLoad<int32_t3>(t1D_i32v3, t2D_i32v3, t3D_i32v3, t2DMS_i32v3, t2DArray_i32v3)
+        && TEST_textureLoad<int32_t4>(t1D_i32v4, t2D_i32v4, t3D_i32v4, t2DMS_i32v4, t2DArray_i32v4)
+        && TEST_textureLoad<uint32_t3>(t1D_u32v3, t2D_u32v3, t3D_u32v3, t2DMS_u32v3, t2DArray_u32v3)
+        && TEST_textureLoad<uint32_t4>(t1D_u32v4, t2D_u32v4, t3D_u32v4, t2DMS_u32v4, t2DArray_u32v4)
         && TEST_textureLoad_depth()
         ;
 

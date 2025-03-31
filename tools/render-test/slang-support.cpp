@@ -4,6 +4,8 @@
 
 #include "slang-support.h"
 
+#include "../../source/compiler-core/slang-artifact-desc-util.h"
+#include "../../source/core/slang-file-system.h"
 #include "../../source/core/slang-string-util.h"
 #include "../../source/core/slang-test-tool-util.h"
 #include "options.h"
@@ -35,280 +37,472 @@ void ShaderCompilerUtil::Output::reset()
         desc.slangGlobalScope = nullptr;
     }
 
-    session = nullptr;
-    m_requestForKernels = nullptr;
-    m_extraRequestForReflection = nullptr;
+    globalSession = nullptr;
+    m_session = nullptr;
 }
 
-/* static */ SlangResult ShaderCompilerUtil::_compileProgramImpl(
+static SlangResult _compileProgramImpl(
     slang::IGlobalSession* globalSession,
     const Options& options,
-    const Input& input,
+    const ShaderCompilerUtil::Input& input,
     const ShaderCompileRequest& request,
-    Output& out)
+    ShaderCompilerUtil::Output& out)
 {
     out.reset();
 
-    slang::SessionDesc sessionDesc = {};
-    List<slang::PreprocessorMacroDesc> macros;
-    sessionDesc.preprocessorMacroCount = (SlangInt)macros.getCount();
-    sessionDesc.preprocessorMacros = macros.getBuffer();
-
-    ComPtr<SlangCompileRequest> slangRequest = nullptr;
-    SLANG_ALLOW_DEPRECATED_BEGIN
-    globalSession->createCompileRequest(slangRequest.writeRef());
-    SLANG_ALLOW_DEPRECATED_END
-    out.m_requestForKernels = slangRequest;
-    out.session = globalSession;
-
-    bool hasRepro = false;
-
-    // Parse all the extra args
+    List<const char*> args;
+    for (const auto& arg : options.downstreamArgs.getArgsByName("slang"))
     {
-        List<const char*> args;
-        for (const auto& arg : options.downstreamArgs.getArgsByName("slang"))
-        {
-            args.add(arg.value.getBuffer());
-            if (arg.value == "-load-repro")
-                hasRepro = true;
-        }
+        args.add(arg.value.getBuffer());
+        // The -load-repro feature is not maintained, and not supported by the new compile API.
+        // TODO: Remove this when the feature has been deprecated.
+        SLANG_ASSERT(arg.value != "-load-repro");
+    }
 
-        // If there are additional args parse them
-        if (args.getCount())
+    slang::TargetDesc sessionTargetDesc = {};
+    slang::SessionDesc sessionDesc = {};
+    ComPtr<ISlangUnknown> sessionDescMemory;
+    // If there are additional args parse them
+    if (args.getCount())
+    {
+        const auto res = globalSession->parseCommandLineArguments(
+            int(args.getCount()),
+            args.getBuffer(),
+            &sessionDesc,
+            sessionDescMemory.writeRef());
+        // If there is a parse failure and diagnostic, output it
+        if (SLANG_FAILED(res))
         {
-            const auto res =
-                slangRequest->processCommandLineArguments(args.getBuffer(), int(args.getCount()));
-            // If there is a parse failure and diagnostic, output it
-            if (SLANG_FAILED(res))
-            {
-                if (auto diagnostics = slangRequest->getDiagnosticOutput())
-                {
-                    fprintf(stderr, "%s", diagnostics);
-                }
-                return res;
-            }
+            fprintf(stderr, "error: Failed to parse command line arguments: %d\n", int(res));
+            return res;
+        }
+        // We're setting the targets ourselves, below.
+        // To simplify that, we're currently not expecting targets to be added by the command line
+        // arguments.
+        if (sessionDesc.targetCount > 0)
+        {
+            fprintf(stderr, "error: Command line arguments added targets.\n");
+            return SLANG_FAIL;
         }
     }
 
-    // Only proceed if the command line arguments are not loading a repro.
-    if (!hasRepro)
+    // Argument parsing may have already added options, so add those first.
+    // For module reference options there are two cases:
+    // 1. If it's a slang module, then record the path and later create an IModule from that.
+    // 2. If not, then propagate the option.
+    // The reason to propagate the option in case 2 is that there is not currently a way of
+    // representing a module for a downstream compiler in the compilation API.
+    List<slang::CompilerOptionEntry> sessionOptionEntries;
+    List<Slang::String> referencedSlangModulePaths;
+    for (int optionIndex = 0; optionIndex < sessionDesc.compilerOptionEntryCount; optionIndex++)
     {
-        spSetCodeGenTarget(slangRequest, input.target);
-        if (input.profile.getLength()) // do not set profile unless requested
-            spSetTargetProfile(
-                slangRequest,
-                0,
-                spFindProfile(out.session, input.profile.getBuffer()));
-        if (options.generateSPIRVDirectly)
-            spSetTargetFlags(slangRequest, 0, SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY);
-        else
-            spSetTargetFlags(slangRequest, 0, 0);
-
-        slangRequest->setAllowGLSLInput(options.allowGLSL);
-
-        // Define a macro so that shader code in a test can detect what language we
-        // are nominally working with.
-        char const* langDefine = nullptr;
-        switch (input.sourceLanguage)
+        slang::CompilerOptionEntry& option = sessionDesc.compilerOptionEntries[optionIndex];
+        if (option.name == slang::CompilerOptionName::ReferenceModule)
         {
-        case SLANG_SOURCE_LANGUAGE_GLSL:
-            spAddPreprocessorDefine(slangRequest, "__GLSL__", "1");
-            break;
+            SLANG_ASSERT(option.value.kind == slang::CompilerOptionValueKind::String);
+            const char* path = option.value.stringValue0;
+            auto desc = Slang::ArtifactDescUtil::getDescFromPath(Slang::UnownedStringSlice(path));
+            switch (desc.payload)
+            {
+            case Slang::ArtifactDesc::Payload::SlangIR:
+            case Slang::ArtifactDesc::Payload::Slang:
+                referencedSlangModulePaths.add(option.value.stringValue0);
+                break;
+            case Slang::ArtifactDesc::Payload::DXIL:
+                sessionOptionEntries.add(option);
+                break;
+            default:
+                {
+                    fprintf(
+                        stderr,
+                        "error: Unexpected artifact payload type: %d\n",
+                        (int)desc.payload);
+                    return SLANG_FAIL;
+                }
+            }
+        }
+        else
+        {
+            sessionOptionEntries.add(option);
+        }
+    }
 
-        case SLANG_SOURCE_LANGUAGE_SLANG:
-            spAddPreprocessorDefine(slangRequest, "__SLANG__", "1");
-            // fall through
-        case SLANG_SOURCE_LANGUAGE_HLSL:
-            spAddPreprocessorDefine(slangRequest, "__HLSL__", "1");
-            break;
-        case SLANG_SOURCE_LANGUAGE_C:
-            spAddPreprocessorDefine(slangRequest, "__C__", "1");
-            break;
-        case SLANG_SOURCE_LANGUAGE_CPP:
-            spAddPreprocessorDefine(slangRequest, "__CPP__", "1");
-            break;
-        case SLANG_SOURCE_LANGUAGE_CUDA:
-            spAddPreprocessorDefine(slangRequest, "__CUDA__", "1");
-            break;
-        case SLANG_SOURCE_LANGUAGE_WGSL:
-            spAddPreprocessorDefine(slangRequest, "__WGSL__", "1");
-            break;
+    List<slang::PreprocessorMacroDesc> macros;
 
+    // Define a macro so that shader code in a test can detect what language we
+    // are nominally working with.
+    char const* langDefine = nullptr;
+    switch (input.sourceLanguage)
+    {
+    case SLANG_SOURCE_LANGUAGE_GLSL:
+        macros.add({"__GLSL__", "1"});
+        break;
+
+    case SLANG_SOURCE_LANGUAGE_SLANG:
+        macros.add({"__SLANG__", "1"});
+        // fall through
+    case SLANG_SOURCE_LANGUAGE_HLSL:
+        macros.add({"__HLSL__", "1"});
+        break;
+    case SLANG_SOURCE_LANGUAGE_C:
+        macros.add({"__C__", "1"});
+        break;
+    case SLANG_SOURCE_LANGUAGE_CPP:
+        macros.add({"__CPP__", "1"});
+        break;
+    case SLANG_SOURCE_LANGUAGE_CUDA:
+        macros.add({"__CUDA__", "1"});
+        break;
+    case SLANG_SOURCE_LANGUAGE_WGSL:
+        macros.add({"__WGSL__", "1"});
+        break;
+
+    default:
+        assert(!"unexpected");
+        break;
+    }
+
+    {
+        slang::CompilerOptionEntry entry;
+        entry.name = slang::CompilerOptionName::AllowGLSL;
+        entry.value.kind = slang::CompilerOptionValueKind::Int;
+        entry.value.intValue0 = int(options.allowGLSL);
+        sessionOptionEntries.add(entry);
+    }
+
+    {
+        slang::CompilerOptionEntry entry;
+        entry.name = slang::CompilerOptionName::PassThrough;
+        entry.value.kind = slang::CompilerOptionValueKind::Int;
+        entry.value.intValue0 = int(input.passThrough);
+        sessionOptionEntries.add(entry);
+    }
+
+    {
+        slang::CompilerOptionEntry entry;
+        entry.name = slang::CompilerOptionName::LineDirectiveMode;
+        entry.value.kind = slang::CompilerOptionValueKind::Int;
+        entry.value.intValue0 = int(SlangLineDirectiveMode::SLANG_LINE_DIRECTIVE_MODE_NONE);
+        sessionOptionEntries.add(entry);
+    }
+
+    sessionTargetDesc.format = input.target;
+    if (input.profile.getLength()) // do not set profile unless requested
+        sessionTargetDesc.profile = globalSession->findProfile(input.profile.getBuffer());
+    if (options.generateSPIRVDirectly)
+        sessionTargetDesc.flags |= SLANG_TARGET_FLAG_GENERATE_SPIRV_DIRECTLY;
+    else
+        sessionTargetDesc.flags = 0;
+
+    // Not expecting argument parsing to have added any targets
+    SLANG_ASSERT(sessionDesc.targetCount == 0);
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &sessionTargetDesc;
+
+    if (options.generateSPIRVDirectly)
+    {
+        slang::CompilerOptionEntry entry;
+        entry.name = slang::CompilerOptionName::DebugInformation;
+        entry.value.kind = slang::CompilerOptionValueKind::Int;
+        entry.value.intValue0 =
+            int(options.disableDebugInfo ? SlangDebugInfoLevel::SLANG_DEBUG_INFO_LEVEL_NONE
+                                         : SlangDebugInfoLevel::SLANG_DEBUG_INFO_LEVEL_STANDARD);
+        sessionOptionEntries.add(entry);
+    }
+
+    sessionDesc.compilerOptionEntryCount = sessionOptionEntries.getCount();
+    sessionDesc.compilerOptionEntries = sessionOptionEntries.getBuffer();
+
+    // Argument parsing should not have added macros.
+    SLANG_ASSERT(sessionDesc.preprocessorMacroCount == 0);
+    sessionDesc.preprocessorMacroCount = (SlangInt)macros.getCount();
+    sessionDesc.preprocessorMacros = macros.getBuffer();
+
+    ComPtr<slang::ISession> slangSession = nullptr;
+    SLANG_RETURN_ON_FAIL(globalSession->createSession(sessionDesc, slangSession.writeRef()));
+    out.m_session = slangSession;
+    out.globalSession = globalSession;
+
+    String source(request.source.dataBegin, request.source.dataEnd);
+    ComPtr<slang::IBlob> diagnostics;
+    ComPtr<slang::IModule> module(slangSession->loadModuleFromSourceString(
+        "main",
+        request.source.path,
+        source.getBuffer(),
+        diagnostics.writeRef()));
+    if (!module)
+    {
+        fprintf(
+            stderr,
+            "error: Failed to load module: %s\n",
+            diagnostics ? (char*)diagnostics->getBufferPointer() : "(no diagnostic output)");
+        return SLANG_FAIL;
+    }
+
+    // Some tests are verifying that various warnings are printed, so print any diagnostics!
+    if (diagnostics && (diagnostics->getBufferSize() > 0U))
+        StdWriters::getError().print("%s", (char*)diagnostics->getBufferPointer());
+
+    ComPtr<slang::IModule> specializedModule;
+    List<ComPtr<slang::IEntryPoint>> specializedEntryPoints;
+    List<slang::IComponentType*> componentsRawPtr;
+
+    ComPtr<ISlangFileSystem> osFileSystem =
+        ComPtr<ISlangFileSystem>(Slang::OSFileSystem::getExtSingleton());
+
+    // This list is just kept so that the modules will be freed at scope exit
+    List<ComPtr<slang::IModule>> referencedModules;
+    for (auto& path : referencedSlangModulePaths)
+    {
+        auto desc =
+            Slang::ArtifactDescUtil::getDescFromPath(Slang::UnownedStringSlice(path.getBuffer()));
+        // If it's a GPU binary, then we'll assume it's a library
+        if (ArtifactDescUtil::isGpuUsable(desc))
+        {
+            desc.kind = ArtifactKind::Library;
+        }
+        const String name = ArtifactDescUtil::getBaseNameFromPath(desc, path.getUnownedSlice());
+
+        ComPtr<slang::IBlob> codeBlob;
+        SlangResult result = osFileSystem->loadFile(path.getBuffer(), codeBlob.writeRef());
+        if (SLANG_FAILED(result))
+        {
+            fprintf(stderr, "error: Failed to read referenced module file: %s\n", path.getBuffer());
+            return SLANG_FAIL;
+        }
+
+        ComPtr<slang::IModule> module;
+        switch (desc.payload)
+        {
+        case Slang::ArtifactDesc::Payload::Slang:
+            {
+                String sourceString(
+                    (const char*)codeBlob->getBufferPointer(),
+                    (const char*)codeBlob->getBufferPointer() + codeBlob->getBufferSize());
+                module = ComPtr<slang::IModule>(slangSession->loadModuleFromSourceString(
+                    name.getBuffer(),
+                    path.getBuffer(),
+                    sourceString.getBuffer(),
+                    diagnostics.writeRef()));
+                break;
+            }
+        case Slang::ArtifactDesc::Payload::SlangIR:
+            {
+                module = ComPtr<slang::IModule>(slangSession->loadModuleFromIRBlob(
+                    name.getBuffer(),
+                    path.getBuffer(),
+                    codeBlob,
+                    diagnostics.writeRef()));
+                break;
+            }
         default:
-            assert(!"unexpected");
-            break;
+            {
+                SLANG_UNREACHABLE("Unexpected artifact payload type");
+            }
         }
 
-        if (input.passThrough != SLANG_PASS_THROUGH_NONE)
+        if (!module)
         {
-            spSetPassThrough(slangRequest, input.passThrough);
+            fprintf(
+                stderr,
+                "error: Failed to load referenced module: %s: %s\n",
+                path.getBuffer(),
+                diagnostics ? (char*)diagnostics->getBufferPointer() : "(no diagnostic output)");
+            return SLANG_FAIL;
         }
-        else
+        referencedModules.add(module);
+        componentsRawPtr.add(module.get());
+    }
+
+    int globalSpecializationArgCount = int(request.globalSpecializationArgs.getCount());
+    int moduleSpecializationArgCount = module->getSpecializationParamCount();
+    if (globalSpecializationArgCount != moduleSpecializationArgCount)
+    {
+        fprintf(
+            stderr,
+            "error: The specialization argument count of the request (%d) does not match that of "
+            "the module (%d)!\n",
+            globalSpecializationArgCount,
+            moduleSpecializationArgCount);
+        return SLANG_FAIL;
+    }
+    List<slang::SpecializationArg> moduleSpecializationArgs;
+    for (int ii = 0; ii < globalSpecializationArgCount; ++ii)
+    {
+        String specializedTypeName = request.globalSpecializationArgs[ii].getBuffer();
+        slang::TypeReflection* typeReflection =
+            module->getLayout()->findTypeByName(specializedTypeName.getBuffer());
+        moduleSpecializationArgs.add(slang::SpecializationArg::fromType(typeReflection));
+    }
+
+    {
+        ComPtr<slang::IBlob> diagnostics;
+        auto res = module->specialize(
+            moduleSpecializationArgs.getBuffer(),
+            moduleSpecializationArgs.getCount(),
+            (slang::IComponentType**)specializedModule.writeRef(),
+            diagnostics.writeRef());
+        if (SLANG_FAILED(res))
         {
-            spSetCompileFlags(slangRequest, SLANG_COMPILE_FLAG_NO_CODEGEN);
+            fprintf(
+                stderr,
+                "error: Failed to specialize module: %s\n",
+                diagnostics ? (char*)diagnostics->getBufferPointer() : "(no diagnostic output)");
+            return res;
+        }
+    }
+
+    Index explicitEntryPointCount = request.entryPoints.getCount();
+    for (Index ee = 0; ee < explicitEntryPointCount; ++ee)
+    {
+        if (options.dontAddDefaultEntryPoints)
+        {
+            // If default entry points are not to be added, then
+            // the `request.entryPoints` array should have been
+            // left empty.
+            //
+            SLANG_ASSERT(false);
         }
 
+        auto& entryPointInfo = request.entryPoints[ee];
 
-        const auto sourceLanguage = input.sourceLanguage;
-
-        int translationUnitIndex = 0;
+        ComPtr<slang::IEntryPoint> entryPoint;
+        ComPtr<slang::IBlob> diagnostics;
+        auto res = module->findAndCheckEntryPoint(
+            entryPointInfo.name,
+            entryPointInfo.slangStage,
+            entryPoint.writeRef(),
+            diagnostics.writeRef());
+        if (SLANG_FAILED(res))
         {
-            translationUnitIndex = spAddTranslationUnit(slangRequest, sourceLanguage, nullptr);
-            spAddTranslationUnitSourceString(
-                slangRequest,
-                translationUnitIndex,
-                request.source.path,
-                request.source.dataBegin);
-        }
-
-        const int globalSpecializationArgCount = int(request.globalSpecializationArgs.getCount());
-        for (int ii = 0; ii < globalSpecializationArgCount; ++ii)
-        {
-            spSetTypeNameForGlobalExistentialTypeParam(
-                slangRequest,
-                ii,
-                request.globalSpecializationArgs[ii].getBuffer());
+            fprintf(
+                stderr,
+                "error: Failed to find entry point '%s': %s\n",
+                entryPointInfo.name,
+                diagnostics ? (char*)diagnostics->getBufferPointer() : "(no diagnostic output)");
+            return res;
         }
 
         const int entryPointSpecializationArgCount =
             int(request.entryPointSpecializationArgs.getCount());
-        auto setEntryPointSpecializationArgs = [&](int entryPoint)
+        if (entryPointSpecializationArgCount != entryPoint->getSpecializationParamCount())
         {
-            for (int ii = 0; ii < entryPointSpecializationArgCount; ++ii)
-            {
-                spSetTypeNameForEntryPointExistentialTypeParam(
-                    slangRequest,
-                    entryPoint,
-                    ii,
-                    request.entryPointSpecializationArgs[ii].getBuffer());
-            }
-        };
-
-        Index explicitEntryPointCount = request.entryPoints.getCount();
-        for (Index ee = 0; ee < explicitEntryPointCount; ++ee)
-        {
-            if (options.dontAddDefaultEntryPoints)
-            {
-                // If default entry points are not to be added, then
-                // the `request.entryPoints` array should have been
-                // left empty.
-                //
-                SLANG_ASSERT(false);
-            }
-
-            auto& entryPointInfo = request.entryPoints[ee];
-            int entryPointIndex = spAddEntryPoint(
-                slangRequest,
-                translationUnitIndex,
-                entryPointInfo.name,
-                entryPointInfo.slangStage);
-            SLANG_ASSERT(entryPointIndex == ee);
-
-            setEntryPointSpecializationArgs(entryPointIndex);
+            fprintf(
+                stderr,
+                "error: %s\n",
+                "The specialization argument count of the requested entry point does not match "
+                "that of the entry point!");
+            return SLANG_FAIL;
         }
 
-        spSetLineDirectiveMode(slangRequest, SLANG_LINE_DIRECTIVE_MODE_NONE);
+        List<slang::SpecializationArg> entryPointSpecializationArgs;
+        for (int ii = 0; ii < entryPointSpecializationArgCount; ++ii)
+        {
+            String specializedTypeName = request.entryPointSpecializationArgs[ii].getBuffer();
+            slang::TypeReflection* typeReflection =
+                module->getLayout()->findTypeByName(specializedTypeName.getBuffer());
+            entryPointSpecializationArgs.add(slang::SpecializationArg::fromType(typeReflection));
+        }
+
+        ComPtr<slang::IEntryPoint> specializedEntryPoint;
+        {
+            ComPtr<slang::IBlob> diagnostics;
+            auto res = entryPoint->specialize(
+                entryPointSpecializationArgs.getBuffer(),
+                entryPointSpecializationArgs.getCount(),
+                (slang::IComponentType**)specializedEntryPoint.writeRef(),
+                diagnostics.writeRef());
+            if (SLANG_FAILED(res))
+            {
+                fprintf(
+                    stderr,
+                    "error: Failed to specialize entry point: %s\n",
+                    diagnostics ? (char*)diagnostics->getBufferPointer()
+                                : "(no diagnostic output)");
+                return res;
+            }
+        }
+        specializedEntryPoints.add(specializedEntryPoint);
     }
 
-    if (options.generateSPIRVDirectly)
-    {
-        if (options.disableDebugInfo)
-            spSetDebugInfoLevel(slangRequest, SLANG_DEBUG_INFO_LEVEL_NONE);
-        else
-            spSetDebugInfoLevel(slangRequest, SLANG_DEBUG_INFO_LEVEL_STANDARD);
-    }
-
-    const SlangResult res = spCompile(slangRequest);
-
-    if (auto diagnostics = spGetDiagnosticOutput(slangRequest))
-    {
-        StdWriters::getError().print("%s", diagnostics);
-    }
-
-    SLANG_RETURN_ON_FAIL(res);
-
-    ComPtr<slang::IComponentType> linkedSlangProgram;
-
-    List<ShaderCompileRequest::EntryPoint> actualEntryPoints;
     if (input.passThrough == SLANG_PASS_THROUGH_NONE)
     {
-        // In the case where pass-through compilation is not being used,
-        // we can use the Slang reflection information to discover what
-        // the entry points were, and then use those to drive the
-        // loading of code.
-        //
-        auto reflection = slang::ProgramLayout::get(slangRequest);
-        SLANG_RETURN_ON_FAIL(spCompileRequest_getProgramWithEntryPoints(
-            slangRequest,
-            linkedSlangProgram.writeRef()));
-
-        // Get the amount of entry points in reflection
-        Index entryPointCount = Index(reflection->getEntryPointCount());
-
-        // We must have at least one entry point (whether explicit or implicit)
-        SLANG_ASSERT(entryPointCount);
-
-        for (Index ee = 0; ee < entryPointCount; ++ee)
-        {
-            auto entryPoint = reflection->getEntryPointByIndex(ee);
-            const char* entryPointName = entryPoint->getName();
-            SLANG_ASSERT(entryPointName);
-
-            auto slangStage = entryPoint->getStage();
-
-            ShaderCompileRequest::EntryPoint entryPointInfo;
-            entryPointInfo.name = entryPointName;
-            entryPointInfo.slangStage = slangStage;
-
-            actualEntryPoints.add(entryPointInfo);
-        }
-    }
-    else
-    {
-        actualEntryPoints = request.entryPoints;
+        componentsRawPtr.add(specializedModule);
+        for (auto& specializedEntryPoint : specializedEntryPoints)
+            componentsRawPtr.add(specializedEntryPoint);
     }
 
+    // This list just makes sure that the components get released
+    List<ComPtr<slang::ITypeConformance>> typeConformanceComponents;
     if (request.typeConformances.getCount())
     {
-        ComPtr<slang::ISession> session;
-        slangRequest->getSession(session.writeRef());
-        List<ComPtr<slang::ITypeConformance>> typeConformanceComponents;
-        List<slang::IComponentType*> componentsRawPtr;
-        componentsRawPtr.add(linkedSlangProgram.get());
-        auto reflection = slang::ProgramLayout::get(slangRequest);
-        ComPtr<ISlangBlob> outDiagnostic;
+        auto reflection = module->getLayout();
         for (auto& conformance : request.typeConformances)
         {
+            ComPtr<ISlangBlob> outDiagnostic;
             auto derivedType = reflection->findTypeByName(conformance.derivedTypeName.getBuffer());
             auto baseType = reflection->findTypeByName(conformance.baseTypeName.getBuffer());
             ComPtr<slang::ITypeConformance> conformanceComponentType;
-            session->createTypeConformanceComponentType(
+            SlangResult res = slangSession->createTypeConformanceComponentType(
                 derivedType,
                 baseType,
                 conformanceComponentType.writeRef(),
                 conformance.idOverride,
                 outDiagnostic.writeRef());
+            if (SLANG_FAILED(res))
+            {
+                fprintf(
+                    stderr,
+                    "error: Failed to handle type conformances: %s\n",
+                    outDiagnostic ? (char*)outDiagnostic->getBufferPointer()
+                                  : "(no diagnostic output)");
+                return res;
+            }
             typeConformanceComponents.add(conformanceComponentType);
             componentsRawPtr.add(conformanceComponentType);
         }
-        ComPtr<slang::IComponentType> newProgram;
-        session->createCompositeComponentType(
+    }
+
+    ComPtr<slang::IComponentType> linkedSlangProgram;
+    if (componentsRawPtr.getCount() > 0)
+    {
+        ComPtr<slang::IComponentType> composite;
+        ComPtr<ISlangBlob> outDiagnostic;
+        SlangResult res = slangSession->createCompositeComponentType(
             componentsRawPtr.getBuffer(),
             componentsRawPtr.getCount(),
-            newProgram.writeRef(),
+            composite.writeRef(),
             outDiagnostic.writeRef());
-        linkedSlangProgram = newProgram;
+        if (SLANG_FAILED(res))
+        {
+            fprintf(
+                stderr,
+                "error: Failed to create composite: %s\n",
+                outDiagnostic ? (char*)outDiagnostic->getBufferPointer()
+                              : "(no diagnostic output)");
+            return res;
+        }
+        res = composite->link(linkedSlangProgram.writeRef(), outDiagnostic.writeRef());
+        if (SLANG_FAILED(res))
+        {
+            fprintf(
+                stderr,
+                "error: Failed to link program: %s\n",
+                outDiagnostic ? (char*)outDiagnostic->getBufferPointer()
+                              : "(no diagnostic output)");
+        }
     }
+
     out.set(linkedSlangProgram);
     return SLANG_OK;
 }
 
-/* static */ SlangResult ShaderCompilerUtil::compileProgram(
+static SlangResult compileProgram(
     slang::IGlobalSession* globalSession,
     const Options& options,
-    const Input& input,
+    const ShaderCompilerUtil::Input& input,
     const ShaderCompileRequest& request,
-    Output& out)
+    ShaderCompilerUtil::Output& out)
 {
     if (input.passThrough == SLANG_PASS_THROUGH_NONE)
     {
@@ -333,7 +527,7 @@ void ShaderCompilerUtil::Output::reset()
         // compile in another pass using the desired downstream compiler
         // so that we can get the refleciton information we need.
         //
-        Output slangOutput;
+        ShaderCompilerUtil::Output slangOutput;
         if (canUseSlangForPrecompile)
         {
             ShaderCompilerUtil::Input slangInput = input;
@@ -354,17 +548,19 @@ void ShaderCompilerUtil::Output::reset()
         //
         SLANG_RETURN_ON_FAIL(_compileProgramImpl(globalSession, options, input, request, out));
 
-        out.m_extraRequestForReflection = slangOutput.getRequestForReflection();
-        out.desc.slangGlobalScope = slangOutput.desc.slangGlobalScope;
-        slangOutput.m_requestForKernels = nullptr;
-
+        out.m_session = slangOutput.m_session;
+        // slangOutput.desc.slangGlobalScope and slangOutput.slangProgram are the same object,
+        // but the latter is a ComPtr while the former isn't. Therefore we need to detach so
+        // that the object doesn't get destroyed.
+        SLANG_ASSERT(slangOutput.desc.slangGlobalScope == slangOutput.slangProgram.get());
+        out.desc.slangGlobalScope = slangOutput.slangProgram.detach();
+        slangOutput.m_session = nullptr;
         return SLANG_OK;
     }
 }
 
-/* static */ SlangResult ShaderCompilerUtil::readSource(
-    const String& inSourcePath,
-    List<char>& outSourceText)
+// Helper for compileWithLayout
+/* static */ SlangResult readSource(const String& inSourcePath, List<char>& outSourceText)
 {
     // Read in the source code
     FILE* sourceFile = fopen(inSourcePath.getBuffer(), "rb");
@@ -392,8 +588,8 @@ void ShaderCompilerUtil::Output::reset()
 /* static */ SlangResult ShaderCompilerUtil::compileWithLayout(
     slang::IGlobalSession* globalSession,
     const Options& options,
-    const ShaderCompilerUtil::Input& input,
-    OutputAndLayout& output)
+    const Input& input,
+    ShaderCompilerUtil::OutputAndLayout& output)
 {
     String sourcePath = options.sourcePath;
     auto shaderType = options.shaderType;
@@ -531,12 +727,7 @@ void ShaderCompilerUtil::Output::reset()
         c.idOverride = conformance.idOverride;
         compileRequest.typeConformances.add(c);
     }
-    return ShaderCompilerUtil::compileProgram(
-        globalSession,
-        options,
-        input,
-        compileRequest,
-        output.output);
+    return compileProgram(globalSession, options, input, compileRequest, output.output);
 }
 
 } // namespace renderer_test

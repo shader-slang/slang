@@ -24,7 +24,18 @@ jobs:
         platform: [x86_64, aarch64]
         test-category: [smoke]
         include:
-          - { os: linux, runs-on: ubuntu-20.04, compiler: gcc }
+          - {
+              os: linux,
+              platform: x86_64,
+              runs-on: ubuntu-22.04,
+              compiler: gcc,
+            }
+          - {
+              os: linux,
+              platform: aarch64,
+              runs-on: ubuntu-22.04-arm,
+              compiler: gcc,
+            }
           - { os: windows, runs-on: windows-latest, compiler: cl }
           - { os: macos, runs-on: macos-latest, compiler: clang }
 
@@ -127,6 +138,7 @@ jobs:
             "${lib_dir}/libslang.dylib"
             "${lib_dir}/libslang-rt.dylib"
             "${lib_dir}/libslang-glslang.dylib"
+            "${lib_dir}/libslang-glsl-module.dylib"
             "${lib_dir}/libslang-llvm.dylib"
             "${lib_dir}/libgfx.dylib"
             "${bin_dir}/slangd"
@@ -157,7 +169,12 @@ jobs:
           cpack --preset "$config-debug-info" -G TGZ
 
           triggering_ref=${{ github.ref_name }}
-          base=slang-${triggering_ref#v}-${{matrix.os}}-${{matrix.platform}}
+          if [[ $triggering_ref =~ ^v[0-9] ]]; then
+            version=${triggering_ref#v}
+          else
+            version=$triggering_ref
+          fi
+          base=slang-${version}-${{matrix.os}}-${{matrix.platform}}
 
           # Move main packages
           mv "$(pwd)/build/dist-${config}/slang.zip" "${base}.zip"

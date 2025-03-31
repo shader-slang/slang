@@ -98,7 +98,8 @@ struct SharedGenericsLoweringContext
         IRType* concreteType,
         IRInterfaceType* interfaceType,
         IRIntegerValue* outTypeSize = nullptr,
-        IRIntegerValue* outLimit = nullptr);
+        IRIntegerValue* outLimit = nullptr,
+        bool* outIsTypeOpaque = nullptr);
 };
 
 List<IRWitnessTable*> getWitnessTablesFromInterfaceType(IRModule* module, IRInst* interfaceType);

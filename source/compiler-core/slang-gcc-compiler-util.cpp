@@ -551,7 +551,7 @@ static SlangResult _parseGCCFamilyLine(
         }
     case OptimizationLevel::Maximal:
         {
-            cmdLine.addArg("-O4");
+            cmdLine.addArg("-O3");
             break;
         }
     default:
@@ -733,6 +733,13 @@ static SlangResult _parseGCCFamilyLine(
         cmdLine.addArg(libPath);
         cmdLine.addArg("-F");
         cmdLine.addArg(libPath);
+    }
+
+    // Add compiler specific options from user.
+    for (auto compilerSpecificArg : options.compilerSpecificArguments)
+    {
+        const char* const arg = compilerSpecificArg;
+        cmdLine.addArg(arg);
     }
 
     return SLANG_OK;

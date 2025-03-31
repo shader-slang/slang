@@ -18,11 +18,41 @@ tests/diagnostics/variable-redeclaration.slang(51): error 30200: declaration of 
 tests/diagnostics/variable-redeclaration.slang(50): note: see previous declaration of 'size'
     int     size,
             ^~~~
+tests/diagnostics/variable-redeclaration.slang(14): error 30076: global variable cannot have opaque type.
+static Texture2D gA;
+                 ^~
+tests/diagnostics/variable-redeclaration.slang(14): note: do you intend to define a `uniform` parameter instead?
+static Texture2D gA;
+                 ^~
 tests/diagnostics/variable-redeclaration.slang(21): error 30200: declaration of 'y' conflicts with existing declaration
     int y = x;
         ^
 tests/diagnostics/variable-redeclaration.slang(20): note: see previous declaration of 'y'
     int y = x;
+        ^
+tests/diagnostics/variable-redeclaration.slang(41): error 30200: declaration of 'f' conflicts with existing declaration
+struct S
+       ^
+tests/diagnostics/variable-redeclaration.slang(41): note: see previous declaration of 'f'
+struct S
+       ^
+tests/diagnostics/variable-redeclaration.slang(43): error 39999: ambiguous reference to 'f'
+    int f;
+        ^
+tests/diagnostics/variable-redeclaration.slang(44): note 39999: candidate: float S.f
+    float f;
+          ^
+tests/diagnostics/variable-redeclaration.slang(43): note 39999: candidate: int S.f
+    int f;
+        ^
+tests/diagnostics/variable-redeclaration.slang(44): error 39999: ambiguous reference to 'f'
+    float f;
+          ^
+tests/diagnostics/variable-redeclaration.slang(44): note 39999: candidate: float S.f
+    float f;
+          ^
+tests/diagnostics/variable-redeclaration.slang(43): note 39999: candidate: int S.f
+    int f;
         ^
 tests/diagnostics/variable-redeclaration.slang(53): error 39999: ambiguous reference to 'size'
     return size;

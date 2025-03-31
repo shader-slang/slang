@@ -149,6 +149,30 @@ void Val::_toTextOverride(StringBuilder& out)
 
 void ConstantIntVal::_toTextOverride(StringBuilder& out)
 {
+    if (auto enumTypeDecl = isDeclRefTypeOf<EnumDecl>(getType()))
+    {
+        // If this is an enum type, then we want to print the name of the
+        // corresponding enum case, instead of the raw integer value, if possible.
+        //
+        // We will look up the enum case that corresponds to the value, and
+        // print its name if we can find one.
+        //
+        for (auto enumCase : enumTypeDecl.getDecl()->getMembersOfType<EnumCaseDecl>())
+        {
+            if (auto constVal = as<ConstantIntVal>(enumCase->tagVal))
+            {
+                if (constVal->getValue() == getValue())
+                {
+                    out << DeclRef(enumCase);
+                    return;
+                }
+            }
+        }
+
+        // Fallback to explicit cast to the enum type.
+        out << getType() << "(" << getValue() << ")";
+        return;
+    }
     out << getValue();
 }
 
@@ -819,6 +843,58 @@ void ExtractFromConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
         out << getSup();
     out << "," << getIndexInConjunction();
     out << ")";
+}
+
+void TypeCoercionWitness::_toTextOverride(StringBuilder& out)
+{
+    out << "TypeCoercionWitness(";
+    if (getFromType())
+        out << getFromType();
+    if (getToType())
+        out << getToType();
+    out << ")";
+}
+
+Val* TypeCoercionWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+
+    auto substDeclRef = getDeclRef().substituteImpl(astBuilder, subst, &diff);
+    auto substFrom = as<Type>(getFromType()->substituteImpl(astBuilder, subst, &diff));
+    auto substTo = as<Type>(getToType()->substituteImpl(astBuilder, subst, &diff));
+
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+
+    TypeCoercionWitness* substValue =
+        astBuilder->getTypeCoercionWitness(substFrom, substTo, substDeclRef);
+    return substValue;
+}
+
+Val* TypeCoercionWitness::_resolveImplOverride()
+{
+    Val* resolvedDeclRef = nullptr;
+    if (getDeclRef())
+        resolvedDeclRef = getDeclRef().declRefBase->resolve();
+    if (auto resolvedVal = as<Witness>(resolvedDeclRef))
+        return resolvedVal;
+
+    auto newFrom = as<Type>(getFromType()->resolve());
+    auto newTo = as<Type>(getToType()->resolve());
+
+    auto newDeclRef = as<DeclRefBase>(resolvedDeclRef);
+    if (!newDeclRef)
+        newDeclRef = getDeclRef().declRefBase;
+    if (newFrom != getFromType() || newTo != getToType() || newDeclRef != getDeclRef())
+    {
+        return getCurrentASTBuilder()->getTypeCoercionWitness(newFrom, newTo, newDeclRef);
+    }
+    return this;
 }
 
 // UNormModifierVal

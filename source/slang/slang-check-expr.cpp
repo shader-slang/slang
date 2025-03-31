@@ -167,7 +167,7 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
             openedValue->declRef = varDeclRef;
             openedValue->type = QualType(openedType);
             openedValue->originalExpr = expr;
-
+            openedValue->checked = true;
             // The result of opening an existential is an l-value
             // if the original existential is an l-value.
             //
@@ -226,6 +226,7 @@ Expr* SemanticsVisitor::maybeOpenRef(Expr* expr)
         openRef->innerExpr = expr;
         openRef->type.isLeftValue = (as<RefType>(exprType) != nullptr);
         openRef->type.type = refType->getValueType();
+        openRef->checked = true;
         return openRef;
     }
     return expr;
@@ -511,22 +512,40 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
     }
 }
 
-Expr* SemanticsVisitor::ConstructDerefExpr(Expr* base, SourceLoc loc)
+Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, SourceLoc loc)
 {
-    auto elementType = getPointedToTypeIfCanImplicitDeref(base->type);
-    SLANG_ASSERT(elementType);
+    if (auto resPtrType = as<DescriptorHandleType>(base->type))
+    {
+        return coerce(CoercionSite::ExplicitCoercion, resPtrType->getElementType(), base);
+    }
 
     auto derefExpr = m_astBuilder->create<DerefExpr>();
     derefExpr->loc = loc;
     derefExpr->base = base;
     derefExpr->type = QualType(elementType);
+    derefExpr->checked = true;
 
-    if (as<PtrType>(base->type))
+    if (as<PtrType>(base->type) || as<RefType>(base->type))
+    {
         derefExpr->type.isLeftValue = true;
+    }
     else
+    {
         derefExpr->type.isLeftValue = base->type.isLeftValue;
+        derefExpr->type.isLeftValue = base->type.isLeftValue;
+        derefExpr->type.hasReadOnlyOnTarget = base->type.hasReadOnlyOnTarget;
+        derefExpr->type.isWriteOnly = base->type.isWriteOnly;
+    }
 
     return derefExpr;
+}
+
+Expr* SemanticsVisitor::ConstructDerefExpr(Expr* base, SourceLoc loc)
+{
+    auto elementType = getPointedToTypeIfCanImplicitDeref(base->type);
+    SLANG_ASSERT(elementType);
+
+    return constructDerefExpr(base, elementType, loc);
 }
 
 InvokeExpr* SemanticsVisitor::constructUncheckedInvokeExpr(
@@ -1386,14 +1405,12 @@ Type* SemanticsVisitor::getDifferentialType(ASTBuilder* builder, Type* type, Sou
     return result;
 }
 
-void SemanticsVisitor::addDifferentiableTypeToDiffTypeRegistry(
-    DeclRefType* type,
-    SubtypeWitness* witness)
+void SemanticsVisitor::addDifferentiableTypeToDiffTypeRegistry(Type* type, SubtypeWitness* witness)
 {
     SLANG_RELEASE_ASSERT(m_parentDifferentiableAttr);
     if (witness)
     {
-        m_parentDifferentiableAttr->addType(type->getDeclRef(), witness);
+        m_parentDifferentiableAttr->addType(type, witness);
     }
 }
 
@@ -1449,14 +1466,14 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
                 type,
                 getASTBuilder()->getDifferentiableInterfaceType())))
         {
-            addDifferentiableTypeToDiffTypeRegistry((DeclRefType*)type, subtypeWitness);
+            addDifferentiableTypeToDiffTypeRegistry(type, subtypeWitness);
         }
 
         if (auto subtypeWitness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(
                 type,
                 getASTBuilder()->getDifferentiableRefInterfaceType())))
         {
-            addDifferentiableTypeToDiffTypeRegistry((DeclRefType*)type, subtypeWitness);
+            addDifferentiableTypeToDiffTypeRegistry(type, subtypeWitness);
         }
 
         if (auto aggTypeDeclRef = declRefType->getDeclRef().as<AggTypeDecl>())
@@ -1495,6 +1512,15 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
         for (Index i = 0; i < typePack->getTypeCount(); i++)
             maybeRegisterDifferentiableTypeImplRecursive(builder, typePack->getElementType(i));
         return;
+    }
+
+    // General check for types that may not be decl-ref-type, but still have some conformance to
+    // IDifferentiable/IDifferentiablePtrType
+    if (auto subtypeWitness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(
+            type,
+            getASTBuilder()->getDifferentiableInterfaceType())))
+    {
+        addDifferentiableTypeToDiffTypeRegistry(type, subtypeWitness);
     }
 }
 
@@ -2301,8 +2327,7 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
 
     auto indexExpr = subscriptExpr->indexExprs[0];
 
-    if (!indexExpr->type->equals(m_astBuilder->getIntType()) &&
-        !indexExpr->type->equals(m_astBuilder->getUIntType()))
+    if (!isScalarIntegerType(indexExpr->type.type))
     {
         getSink()->diagnose(indexExpr, Diagnostics::subscriptIndexNonInteger);
         return CreateErrorExpr(subscriptExpr);
@@ -2360,6 +2385,18 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                 IntegerConstantExpressionCoercionType::AnyInteger,
                 nullptr,
                 ConstantFoldingKind::LinkTime);
+
+            // Validate that array size is greater than zero
+            if (auto constElementCount = as<ConstantIntVal>(elementCount))
+            {
+                if (constElementCount->getValue() <= 0)
+                {
+                    getSink()->diagnose(
+                        subscriptExpr->indexExprs[0],
+                        Diagnostics::invalidArraySize);
+                    return CreateErrorExpr(subscriptExpr);
+                }
+            }
         }
         else if (subscriptExpr->indexExprs.getCount() != 0)
         {
@@ -2893,7 +2930,7 @@ Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
 
     if (auto varExpr = as<VarExpr>(expr->functionExpr))
     {
-        if ((varExpr->name->text == "&&") || (varExpr->name->text == "||"))
+        if ((getText(varExpr->name) == "&&") || (getText(varExpr->name) == "||"))
         {
             // We only use short-circuiting in scalar input, will fall back
             // to non-short-circuiting in vector input.
@@ -3076,7 +3113,8 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
         expr->scope,
         LookupMask::Default,
         false,
-        getDeclToExcludeFromLookup());
+        getDeclToExcludeFromLookup(),
+        getExcludeTransparentMembersFromLookup());
 
     bool diagnosed = false;
     lookupResult = filterLookupResultByVisibilityAndDiagnose(lookupResult, expr->loc, diagnosed);
@@ -3773,7 +3811,9 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                         InitializerListExpr* initListExpr =
                             m_astBuilder->create<InitializerListExpr>();
                         initListExpr->loc = expr->loc;
+                        initListExpr->useCStyleInitialization = false;
                         auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
+
 
                         return coerce(CoercionSite::General, typeExp.type, checkedInitListExpr);
                     }
@@ -3899,6 +3939,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
         makeOptional->type = optType;
         makeOptional->value = castToSuperType;
         makeOptional->typeExpr = typeExpr.exp;
+        makeOptional->checked = true;
         return makeOptional;
     }
 
@@ -4084,43 +4125,16 @@ Expr* SemanticsVisitor::maybeDereference(Expr* inExpr, CheckBaseContext checkBas
     for (;;)
     {
         auto baseType = expr->type;
-        QualType elementType;
-        if (auto pointerLikeType = as<PointerLikeType>(baseType))
-        {
-            elementType = QualType(pointerLikeType->getElementType());
-            elementType.isLeftValue = baseType.isLeftValue;
-            elementType.hasReadOnlyOnTarget = baseType.hasReadOnlyOnTarget;
-            elementType.isWriteOnly = baseType.isWriteOnly;
-        }
-        else if (auto ptrType = as<PtrType>(baseType))
+        if (as<PtrType>(baseType))
         {
             if (checkBaseContext == CheckBaseContext::Subscript)
                 return expr;
-            elementType = QualType(ptrType->getValueType());
-            elementType.isLeftValue = true;
         }
-        else
-        {
-            auto newExpr = maybeOpenRef(expr);
-            if (newExpr != expr)
-            {
-                expr = newExpr;
-                continue;
-            }
-        }
-        if (elementType.type)
-        {
-            auto derefExpr = m_astBuilder->create<DerefExpr>();
-            derefExpr->base = expr;
-            derefExpr->type = elementType;
-
-            expr = derefExpr;
-            continue;
-        }
-        break;
+        auto elementType = getPointedToTypeIfCanImplicitDeref(baseType);
+        if (!elementType)
+            return expr;
+        expr = constructDerefExpr(expr, elementType, inExpr->loc);
     }
-    // Default case: just use the expression as-is
-    return expr;
 }
 
 Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
@@ -4129,11 +4143,6 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
     IntegerLiteralValue baseElementRowCount,
     IntegerLiteralValue baseElementColCount)
 {
-    MatrixSwizzleExpr* swizExpr = m_astBuilder->create<MatrixSwizzleExpr>();
-    swizExpr->loc = memberRefExpr->loc;
-    swizExpr->base = memberRefExpr->baseExpression;
-    swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
-
     // We can have up to 4 swizzles of two elements each
     MatrixCoord elementCoords[4];
     int elementCount = 0;
@@ -4162,24 +4171,14 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
         // Throw out swizzling with more than 4 output elements
         if (elementCount >= 4)
         {
-            getSink()->diagnose(
-                swizExpr,
-                Diagnostics::invalidSwizzleExpr,
-                swizzleText,
-                baseElementType->toString());
-            return CreateErrorExpr(memberRefExpr);
+            return nullptr;
         }
         MatrixCoord elementCoord = {0, 0};
 
         // Check for the preceding underscore
         if (*cursor++ != '_')
         {
-            getSink()->diagnose(
-                swizExpr,
-                Diagnostics::invalidSwizzleExpr,
-                swizzleText,
-                baseElementType->toString());
-            return CreateErrorExpr(memberRefExpr);
+            return nullptr;
         }
 
         // Check for one or zero indexing
@@ -4188,12 +4187,7 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
             // Can't mix one and zero indexing
             if (zeroIndexOffset == 1)
             {
-                getSink()->diagnose(
-                    swizExpr,
-                    Diagnostics::invalidSwizzleExpr,
-                    swizzleText,
-                    baseElementType->toString());
-                return CreateErrorExpr(memberRefExpr);
+                return nullptr;
             }
             zeroIndexOffset = 0;
             // Increment the index since we saw 'm'
@@ -4204,12 +4198,7 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
             // Can't mix one and zero indexing
             if (zeroIndexOffset == 0)
             {
-                getSink()->diagnose(
-                    swizExpr,
-                    Diagnostics::invalidSwizzleExpr,
-                    swizzleText,
-                    baseElementType->toString());
-                return CreateErrorExpr(memberRefExpr);
+                return nullptr;
             }
             zeroIndexOffset = 1;
         }
@@ -4221,13 +4210,7 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
 
             if (ch < '0' || ch > '4')
             {
-                // An invalid character in the swizzle is an error
-                getSink()->diagnose(
-                    swizExpr,
-                    Diagnostics::invalidSwizzleExpr,
-                    swizzleText,
-                    baseElementType->toString());
-                return CreateErrorExpr(memberRefExpr);
+                return nullptr;
             }
             const int subIndex = ch - '0' - zeroIndexOffset;
 
@@ -4247,12 +4230,7 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
             // Account for off-by-one and reject 0 if oneIndexed
             if (subIndex >= elementLimit || subIndex < 0)
             {
-                getSink()->diagnose(
-                    swizExpr,
-                    Diagnostics::invalidSwizzleExpr,
-                    swizzleText,
-                    baseElementType->toString());
-                return CreateErrorExpr(memberRefExpr);
+                return nullptr;
             }
         }
         // Check if we've seen this index before
@@ -4266,6 +4244,12 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
         elementCoords[elementCount] = elementCoord;
         elementCount++;
     }
+
+    MatrixSwizzleExpr* swizExpr = m_astBuilder->create<MatrixSwizzleExpr>();
+    swizExpr->loc = memberRefExpr->loc;
+    swizExpr->base = memberRefExpr->baseExpression;
+    swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
+    swizExpr->checked = true;
 
     // Store our list in the actual AST node
     for (int ee = 0; ee < elementCount; ++ee)
@@ -4316,11 +4300,7 @@ Expr* SemanticsVisitor::CheckMatrixSwizzleExpr(
                 constantColCount->getValue());
         }
     }
-    getSink()->diagnose(
-        memberRefExpr,
-        Diagnostics::unimplemented,
-        "swizzle on matrix of unknown size");
-    return CreateErrorExpr(memberRefExpr);
+    return nullptr;
 }
 
 Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType* baseTupleType)
@@ -4431,26 +4411,13 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
     Type* baseElementType,
     IntegerLiteralValue baseElementCount)
 {
-    SwizzleExpr* swizExpr = m_astBuilder->create<SwizzleExpr>();
-    swizExpr->loc = memberRefExpr->loc;
-    swizExpr->base = memberRefExpr->baseExpression;
-    swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
     IntegerLiteralValue limitElement = baseElementCount;
 
     ShortList<uint32_t, 4> elementIndices;
 
     bool anyDuplicates = false;
     bool anyError = false;
-    if (memberRefExpr->name == getSession()->getCompletionRequestTokenName())
-    {
-        auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
-        suggestions.clear();
-        suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
-        suggestions.swizzleBaseType =
-            memberRefExpr->baseExpression ? memberRefExpr->baseExpression->type : nullptr;
-        suggestions.elementCount[0] = baseElementCount;
-        suggestions.elementCount[1] = 0;
-    }
+
     auto swizzleText = getText(memberRefExpr->name);
 
     for (Index i = 0; i < swizzleText.getLength(); i++)
@@ -4510,18 +4477,18 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
         elementIndices.add(elementIndex);
     }
 
-    swizExpr->elementIndices = _Move(elementIndices);
-
     if (anyError)
     {
-        getSink()->diagnose(
-            swizExpr,
-            Diagnostics::invalidSwizzleExpr,
-            swizzleText,
-            baseElementType->toString());
-        return CreateErrorExpr(memberRefExpr);
+        return nullptr;
     }
-    else if (swizExpr->elementIndices.getCount() == 1)
+
+    SwizzleExpr* swizExpr = m_astBuilder->create<SwizzleExpr>();
+    swizExpr->loc = memberRefExpr->loc;
+    swizExpr->base = memberRefExpr->baseExpression;
+    swizExpr->memberOpLoc = memberRefExpr->memberOperatorLoc;
+    swizExpr->elementIndices = _Move(elementIndices);
+
+    if (swizExpr->elementIndices.getCount() == 1)
     {
         // single-component swizzle produces a scalar
         //
@@ -4560,11 +4527,7 @@ Expr* SemanticsVisitor::CheckSwizzleExpr(
     }
     else
     {
-        getSink()->diagnose(
-            memberRefExpr,
-            Diagnostics::unimplemented,
-            "swizzle on vector of unknown size");
-        return CreateErrorExpr(memberRefExpr);
+        return nullptr;
     }
 }
 
@@ -4740,8 +4703,12 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
             handleLeafCase(nsType->getDeclRef(), nsType);
         else if (auto aggType = as<DeclRefType>(e->type))
             handleLeafCase(aggType->getDeclRef(), aggType);
-        else if (auto typetype = as<TypeType>(e->type))
-            handleLeafCase(DeclRef<Decl>(), typetype->getType());
+        else if (as<TypeType>(e->type))
+        {
+            auto properType = CoerceToProperType(TypeExp(e));
+            if (properType.type)
+                handleLeafCase(DeclRef<Decl>(), properType.type);
+        }
     };
 
     auto& baseType = baseExpression->type;
@@ -4836,17 +4803,21 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
     //
     baseExpr = maybeOpenExistential(baseExpr);
 
+    // In case our base expressin is still overloaded, we can perform
+    // some more refinement.
+    //
     // Handle the case of an overloaded base expression
     // here, in case we can use the name of the member to
     // disambiguate which of the candidates is meant, or if
     // we can return an overloaded result.
+    //
     if (auto overloadedExpr = as<OverloadedExpr>(baseExpr))
     {
         // If a member (dynamic or static) lookup result contains both the actual definition
         // and the interface definition obtained from inheritance, we want to filter out
         // the interface definitions.
         LookupResult filteredLookupResult;
-        for (auto lookupResult : overloadedExpr->lookupResult2)
+        for (auto lookupResult : overloadedExpr->lookupResult2.items)
         {
             bool shouldRemove = false;
             if (lookupResult.declRef.getParent().as<InterfaceDecl>())
@@ -4882,7 +4853,14 @@ Expr* SemanticsVisitor::checkBaseForMemberExpr(
     auto baseExpr = inBaseExpr;
     baseExpr = CheckTerm(baseExpr);
 
-    return maybeInsertImplicitOpForMemberBase(baseExpr, checkBaseContext, outNeedDeref);
+    auto resultBaseExpr =
+        maybeInsertImplicitOpForMemberBase(baseExpr, checkBaseContext, outNeedDeref);
+
+    // We might want to register differentiability on any implicit ops that we add in.
+    if (this->m_parentFunc && this->m_parentFunc->findModifier<DifferentiableAttribute>())
+        maybeRegisterDifferentiableType(getASTBuilder(), resultBaseExpr->type.type);
+
+    return resultBaseExpr;
 }
 
 Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* baseType)
@@ -4898,6 +4876,28 @@ Expr* SemanticsVisitor::checkGeneralMemberLookupExpr(MemberExpr* expr, Type* bas
     if (expr->name == getSession()->getCompletionRequestTokenName())
     {
         suggestCompletionItems(CompletionSuggestions::ScopeKind::Member, lookupResult);
+        if (expr->baseExpression)
+        {
+            if (auto vectorType = as<VectorExpressionType>(expr->baseExpression->type))
+            {
+                auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
+                suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
+                suggestions.elementCount[1] = 0;
+                suggestions.swizzleBaseType = vectorType;
+                if (auto elementCount = as<ConstantIntVal>(vectorType->getElementCount()))
+                    suggestions.elementCount[0] = elementCount->getValue();
+                else
+                    suggestions.elementCount[0] = 1;
+            }
+            else if (auto scalarType = as<BasicExpressionType>(expr->baseExpression->type))
+            {
+                auto& suggestions = getLinkage()->contentAssistInfo.completionSuggestions;
+                suggestions.scopeKind = CompletionSuggestions::ScopeKind::Swizzle;
+                suggestions.elementCount[1] = 0;
+                suggestions.elementCount[0] = 1;
+                suggestions.swizzleBaseType = scalarType;
+            }
+        }
     }
     return createLookupResultExpr(expr->name, lookupResult, expr->baseExpression, expr->loc, expr);
 }
@@ -4926,34 +4926,36 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     if (auto modifiedType = as<ModifiedType>(baseType))
         baseType = modifiedType->getBase();
 
-    // Note: Checking for vector types before declaration-reference types,
-    // because vectors are also declaration reference types...
+    // Try handle swizzle-able types (scalar,vector,matrix) first.
+    // If checking as a swizzle failed for these types,
+    // we will fallback to normal member lookup.
     //
-    // Also note: the way this is done right now means that the ability
-    // to swizzle vectors interferes with any chance of looking up
-    // members via extension, for vector or scalar types.
-    //
-    if (auto baseMatrixType = as<MatrixExpressionType>(baseType))
+    if (auto baseScalarType = as<BasicExpressionType>(baseType))
     {
-        return CheckMatrixSwizzleExpr(
+        // Treat scalar like a 1-element vector when swizzling
+        auto swizzle = CheckSwizzleExpr(expr, baseScalarType, 1);
+        if (swizzle)
+            return swizzle;
+    }
+    else if (auto baseVecType = as<VectorExpressionType>(baseType))
+    {
+        auto swizzle =
+            CheckSwizzleExpr(expr, baseVecType->getElementType(), baseVecType->getElementCount());
+        if (swizzle)
+            return swizzle;
+    }
+    else if (auto baseMatrixType = as<MatrixExpressionType>(baseType))
+    {
+        auto swizzle = CheckMatrixSwizzleExpr(
             expr,
             baseMatrixType->getElementType(),
             baseMatrixType->getRowCount(),
             baseMatrixType->getColumnCount());
+        if (swizzle)
+            return swizzle;
     }
-    if (auto baseVecType = as<VectorExpressionType>(baseType))
-    {
-        return CheckSwizzleExpr(
-            expr,
-            baseVecType->getElementType(),
-            baseVecType->getElementCount());
-    }
-    else if (auto baseScalarType = as<BasicExpressionType>(baseType))
-    {
-        // Treat scalar like a 1-element vector when swizzling
-        return CheckSwizzleExpr(expr, baseScalarType, 1);
-    }
-    else if (as<NamespaceType>(baseType))
+
+    if (as<NamespaceType>(baseType))
     {
         return _lookupStaticMember(expr, expr->baseExpression);
     }

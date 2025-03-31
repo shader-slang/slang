@@ -29,7 +29,7 @@ Sampler2DArray<float> t2DArray;
 SamplerCubeArray<float> tCubeArray;
 
 // Metal doc says "For depth texture types, T must be float."
-__generic<T : __BuiltinType, let sampleCount:int=0, let format:int=0>
+__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
 typealias depth2d = _Texture<
     T,
     __Shape2D,
@@ -42,7 +42,7 @@ typealias depth2d = _Texture<
     format
 >;
 
-__generic<T : __BuiltinType, let sampleCount:int=0, let format:int=0>
+__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
 typealias depth2d_array = _Texture<
     T,
     __Shape2D,
@@ -55,7 +55,7 @@ typealias depth2d_array = _Texture<
     format
 >;
 
-__generic<T : __BuiltinType, let sampleCount:int=0, let format:int=0>
+__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
 typealias depthcube = _Texture<
     T,
     __ShapeCube,
@@ -68,7 +68,7 @@ typealias depthcube = _Texture<
     format
 >;
 
-__generic<T : __BuiltinType, let sampleCount:int=0, let format:int=0>
+__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
 typealias depthcube_array = _Texture<
     T,
     __ShapeCube,
@@ -236,6 +236,24 @@ bool TEST_texture_float()
         // METALLIB: call {{.*}}.calculate_clamped_lod_texture_cube_array(
         && float(0) == tCubeArray.CalculateLevelOfDetail(normalize(float3(u, 1 - u, u)))
 
+        // Shadow variant
+
+        // METAL: d2D{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_depth_2d(
+        && float(0) == d2D.CalculateLevelOfDetail(float2(u, u))
+
+        // METAL: dCube{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_depth_cube(
+        && float(0) == dCube.CalculateLevelOfDetail(normalize(float3(u, 1 - u, u)))
+
+        // METAL: d2DArray{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_depth_2d_array(
+        && float(0) == d2DArray.CalculateLevelOfDetail(float2(u, u))
+
+        // METAL: dCubeArray{{.*}}.calculate_clamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_clamped_lod_depth_cube_array(
+        && float(0) == dCubeArray.CalculateLevelOfDetail(normalize(float3(u, 1 - u, u)))
+
         // ========================================
         // float CalculateLevelOfDetailUnclamped()
         // ========================================
@@ -259,6 +277,24 @@ bool TEST_texture_float()
         // METAL: tCubeArray{{.*}}.calculate_unclamped_lod({{.*}}
         // METALLIB: call {{.*}}.calculate_unclamped_lod_texture_cube_array(
         && float(0) >= tCubeArray.CalculateLevelOfDetailUnclamped(normalize(float3(u, 1 - u, u)))
+
+        // Shadow variant
+
+        // METAL: d2D{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_depth_2d(
+        && float(0) >= d2D.CalculateLevelOfDetailUnclamped(float2(u, u))
+
+        // METAL: dCube{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_depth_cube(
+        && float(0) >= dCube.CalculateLevelOfDetailUnclamped(normalize(float3(u, 1 - u, u)))
+
+        // METAL: d2DArray{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_depth_2d_array(
+        && float(0) >= d2DArray.CalculateLevelOfDetailUnclamped(float2(u, u))
+
+        // METAL: dCubeArray{{.*}}.calculate_unclamped_lod({{.*}}
+        // METALLIB: call {{.*}}.calculate_unclamped_lod_depth_cube_array(
+        && float(0) >= dCubeArray.CalculateLevelOfDetailUnclamped(normalize(float3(u, 1 - u, u)))
 
         // ===========
         // T Sample()
@@ -447,6 +483,33 @@ bool TEST_texture_float()
         // METAL: d2D{{.*}}.sample_compare(
         // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
         && float(1) == d2D.SampleCmpLevelZero(float2(u2, u), 0, int2(0, 0))
+
+        // ===================================
+        //  float SampleCmpLevel()
+        // ===================================
+
+        // METAL: d2D{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
+        && float(1) == d2D.SampleCmpLevel(float2(u, u), 0, 1.0)
+
+        // METAL: d2DArray{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_2d_array.f32(
+        && float(1) == d2DArray.SampleCmpLevel(float3(u, u, 0), 0, 1.0)
+
+        // METAL: dCube{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_cube.f32(
+        && float(1) == dCube.SampleCmpLevel(normalize(float3(u, 1 - u, u)), 0, 1.0)
+
+        // METAL: dCubeArray{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_cube_array.f32(
+        && float(1) == dCubeArray.SampleCmpLevel(float4(normalize(float3(u, 1-u, u)), 0), 0, 1.0)
+
+        // Offset variant
+
+        // METAL: d2D{{.*}}.sample_compare(
+        // METALLIB: call {{.*}}.sample_compare_depth_2d.f32(
+        && float(1) == d2D.SampleCmpLevel(float2(u2, u), 0, 1.0, int2(0, 0))
+
 
         // ==================================
         //  vector<T,4> Gather()

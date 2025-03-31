@@ -813,9 +813,13 @@ struct IRInst
     ///
     void _insertAt(IRInst* inPrev, IRInst* inNext, IRInst* inParent);
 
-    /// Print the IR to stdout for debugging purposes
+    /// Print the IR to stdout for debugging purposes.
     ///
     void dump();
+
+    /// Print the IR to a string for debugging purposes.
+    ///
+    void dump(String& outStr);
 
     /// Insert a basic block at the end of this func/code containing inst.
     void addBlock(IRBlock* block);
@@ -1654,6 +1658,11 @@ struct IRRateQualifiedType : IRType
     IR_LEAF_ISA(RateQualifiedType)
 };
 
+struct IRDescriptorHandleType : IRType
+{
+    IRType* getResourceType() { return (IRType*)getOperand(0); }
+    IR_LEAF_ISA(DescriptorHandleType)
+};
 
 // Unlike the AST-level type system where `TypeType` tracks the
 // underlying type, the "type of types" in the IR is a simple
@@ -1811,12 +1820,6 @@ struct IRRTTIPointerType : IRRawPointerTypeBase
     IR_LEAF_ISA(RTTIPointerType)
 };
 
-struct IRHLSLConstBufferPointerType : IRPtrTypeBase
-{
-    IR_LEAF_ISA(HLSLConstBufferPointerType)
-    IRInst* getBaseAlignment() { return getOperand(1); }
-};
-
 struct IRGlobalHashedStringLiterals : IRInst
 {
     IR_LEAF_ISA(GlobalHashedStringLiterals)
@@ -1855,6 +1858,14 @@ struct IRRayQueryType : IRType
 struct IRHitObjectType : IRType
 {
     IR_LEAF_ISA(HitObjectType)
+};
+
+struct IRCoopVectorType : IRType
+{
+    IRType* getElementType() { return (IRType*)getOperand(0); }
+    IRInst* getElementCount() { return getOperand(1); }
+
+    IR_LEAF_ISA(CoopVectorType)
 };
 
 bool isDefinition(IRInst* inVal);
@@ -2361,6 +2372,15 @@ public:
         m_obfuscatedSourceMap = sourceMap;
     }
 
+    ArrayView<IRInst*> findSymbolByMangledName(const ImmutableHashedString& mangledName) const
+    {
+        if (auto list = m_mapMangledNameToGlobalInst.tryGetValue(mangledName))
+            return list->getArrayView();
+        return {};
+    }
+
+    void buildMangledNameToGlobalInstMap();
+
     IRDeduplicationContext* getDeduplicationContext() const { return &m_deduplicationContext; }
 
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
@@ -2378,6 +2398,9 @@ public:
     void invalidateAllAnalysis() { m_mapInstToAnalysis.clear(); }
 
     IRInstListBase getGlobalInsts() const { return getModuleInst()->getChildren(); }
+
+    Name* getName() const { return m_name; }
+    void setName(Name* name) { m_name = name; }
 
     /// Create an empty instruction with the `op` opcode and space for
     /// a number of operands given by `operandCount`.
@@ -2431,6 +2454,9 @@ private:
     ///
     IRModuleInst* m_moduleInst = nullptr;
 
+    // The name of the module.
+    Name* m_name = nullptr;
+
     /// The memory arena from which all IR instructions (and any associated state) in this module
     /// are allocated.
     MemoryArena m_memoryArena;
@@ -2446,6 +2472,8 @@ private:
     ComPtr<IBoxValue<SourceMap>> m_obfuscatedSourceMap;
 
     Dictionary<IRInst*, IRAnalysis> m_mapInstToAnalysis;
+
+    Dictionary<ImmutableHashedString, List<IRInst*>> m_mapMangledNameToGlobalInst;
 };
 
 

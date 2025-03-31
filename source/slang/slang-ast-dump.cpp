@@ -645,7 +645,9 @@ struct ASTDumpContext
         m_writer->emit(info->m_name);
     }
 
-    void dump(KeyValuePair<DeclRefBase*, SubtypeWitness*> pair)
+    void dump(SourceLanguage language) { m_writer->emit((int)language); }
+
+    void dump(KeyValuePair<Type*, SubtypeWitness*> pair)
     {
         m_writer->emit("(");
         dump(pair.key);

@@ -249,6 +249,18 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             SLANG_RETURN_ON_FAIL(reader.expectArg(outOptions.entryPointName));
         }
+        else if (argValue == "-enable-debug-layers")
+        {
+            outOptions.enableDebugLayers = true;
+        }
+        else if (argValue == "-dx12-experimental")
+        {
+            outOptions.dx12Experimental = true;
+        }
+        else if (argValue == "-show-adapter-info")
+        {
+            outOptions.showAdapterInfo = true;
+        }
         else
         {
             // Lookup

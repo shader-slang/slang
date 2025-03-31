@@ -141,6 +141,7 @@ enum class TypeTag
     Unsized = 1,
     Incomplete = 2,
     LinkTimeSized = 4,
+    Opaque = 8,
 };
 
 // Declaration of a type that represents some sort of aggregate
@@ -164,6 +165,10 @@ class AggTypeDecl : public AggTypeDeclBase
 class StructDecl : public AggTypeDecl
 {
     SLANG_AST_CLASS(StructDecl);
+
+    SLANG_UNREFLECTED
+    // We will use these auxiliary to help in synthesizing the member initialize constructor.
+    Slang::HashSet<VarDeclBase*> m_membersVisibleInCtor;
 };
 
 class ClassDecl : public AggTypeDecl
@@ -209,6 +214,8 @@ class EnumCaseDecl : public Decl
 
     // Tag value
     Expr* tagExpr = nullptr;
+
+    IntVal* tagVal = nullptr;
 };
 
 // A member of InterfaceDecl representing the abstract ThisType.
@@ -371,9 +378,20 @@ class ConstructorDecl : public FunctionDeclBase
 {
     SLANG_AST_CLASS(ConstructorDecl)
 
-    // Indicates whether the declaration was synthesized by
-    // slang and not actually provided by the user
-    bool isSynthesized = false;
+    enum class ConstructorFlavor : int
+    {
+        UserDefined = 0x00,
+        // Indicates whether the declaration was synthesized by
+        // Slang and not explicitly provided by the user
+        SynthesizedDefault = 0x01,
+        // Member initialize constructor is a synthesized ctor,
+        // but it takes parameters.
+        SynthesizedMemberInit = 0x02
+    };
+
+    int m_flavor = (int)ConstructorFlavor::UserDefined;
+    void addFlavor(ConstructorFlavor flavor) { m_flavor |= (int)flavor; }
+    bool containsFlavor(ConstructorFlavor flavor) { return m_flavor & (int)flavor; }
 };
 
 // A subscript operation used to index instances of a type
@@ -592,6 +610,15 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
 
     // Overrides should be public so base classes can access
     const TypeExp& _getSupOverride() const { return sup; }
+};
+
+class TypeCoercionConstraintDecl : public Decl
+{
+    SLANG_AST_CLASS(TypeCoercionConstraintDecl)
+
+    SourceLoc whereTokenLoc = SourceLoc();
+    TypeExp fromType;
+    TypeExp toType;
 };
 
 class GenericValueParamDecl : public VarDeclBase

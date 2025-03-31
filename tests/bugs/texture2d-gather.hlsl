@@ -31,6 +31,7 @@ struct VertexStageOutput
 	float4			position		: SV_Position;
 };
 
+[shader("vertex")]
 VertexStageOutput vertexMain(VertexStageInput input) 
 {
     VertexStageOutput output;
@@ -41,7 +42,7 @@ VertexStageOutput vertexMain(VertexStageInput input)
     return output;
 }
 
-// Fragment Shader
+[shader("fragment")]
 float4 fragmentMain(VertexStageOutput input) : SV_Target
 {
     return g_texture.GatherRed(g_sampler, input.color.xy);

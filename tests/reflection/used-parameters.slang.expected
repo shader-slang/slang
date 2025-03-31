@@ -107,7 +107,15 @@ standard output = {
             "binding": {"kind": "shaderResource", "index": 0},
             "type": {
                 "kind": "resource",
-                "baseShape": "texture2D"
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         },
         {
@@ -115,12 +123,21 @@ standard output = {
             "binding": {"kind": "shaderResource", "index": 1},
             "type": {
                 "kind": "resource",
-                "baseShape": "texture2D"
+                "baseShape": "texture2D",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         },
         {
             "name": "UsedBuffer",
             "binding": {"kind": "shaderResource", "index": 2},
+            "format": "r32ui",
             "type": {
                 "kind": "resource",
                 "baseShape": "textureBuffer"
@@ -129,6 +146,7 @@ standard output = {
         {
             "name": "UnusedBuffer",
             "binding": {"kind": "shaderResource", "index": 3},
+            "format": "r32ui",
             "type": {
                 "kind": "resource",
                 "baseShape": "textureBuffer"
@@ -164,7 +182,15 @@ standard output = {
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
-                "access": "readWrite"
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         },
         {
@@ -173,12 +199,21 @@ standard output = {
             "type": {
                 "kind": "resource",
                 "baseShape": "texture2D",
-                "access": "readWrite"
+                "access": "readWrite",
+                "resultType": {
+                    "kind": "vector",
+                    "elementCount": 4,
+                    "elementType": {
+                        "kind": "scalar",
+                        "scalarType": "float32"
+                    }
+                }
             }
         },
         {
             "name": "UsedRWBuffer",
             "binding": {"kind": "unorderedAccess", "index": 2},
+            "format": "r32ui",
             "type": {
                 "kind": "resource",
                 "baseShape": "textureBuffer",
@@ -188,6 +223,7 @@ standard output = {
         {
             "name": "UnusedRWBuffer",
             "binding": {"kind": "unorderedAccess", "index": 3},
+            "format": "r32ui",
             "type": {
                 "kind": "resource",
                 "baseShape": "textureBuffer",
@@ -289,11 +325,13 @@ standard output = {
                 },
                 {
                     "name": "UsedBuffer",
-                    "binding": {"kind": "shaderResource", "index": 2, "used": 1}
+                    "binding": {"kind": "shaderResource", "index": 2, "used": 1},
+                    "format": "r32ui"
                 },
                 {
                     "name": "UnusedBuffer",
-                    "binding": {"kind": "shaderResource", "index": 3, "used": 0}
+                    "binding": {"kind": "shaderResource", "index": 3, "used": 0},
+                    "format": "r32ui"
                 },
                 {
                     "name": "UsedStructuredBuffer",
@@ -313,11 +351,13 @@ standard output = {
                 },
                 {
                     "name": "UsedRWBuffer",
-                    "binding": {"kind": "unorderedAccess", "index": 2, "used": 1}
+                    "binding": {"kind": "unorderedAccess", "index": 2, "used": 1},
+                    "format": "r32ui"
                 },
                 {
                     "name": "UnusedRWBuffer",
-                    "binding": {"kind": "unorderedAccess", "index": 3, "used": 0}
+                    "binding": {"kind": "unorderedAccess", "index": 3, "used": 0},
+                    "format": "r32ui"
                 },
                 {
                     "name": "UsedRWStructuredBuffer",

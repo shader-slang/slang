@@ -16,8 +16,6 @@ thread_local int slangTestThreadIndex = 0;
 
 TestContext::TestContext()
 {
-    m_session = nullptr;
-
     /// if we are testing on arm, debug, we may want to increase the connection timeout
 #if (SLANG_PROCESSOR_ARM || SLANG_PROCESSOR_ARM_64) && defined(_DEBUG)
     // 10 mins(!). This seems to be the order of time needed for timeout on a CI ARM test system on
@@ -85,11 +83,9 @@ SlangResult TestContext::locateFileCheck()
 
 Result TestContext::init(const char* inExePath)
 {
-    m_session = spCreateSession(nullptr);
-    if (!m_session)
-    {
-        return SLANG_FAIL;
-    }
+    SlangGlobalSessionDesc desc = {};
+    desc.enableGLSL = true;
+    slang::createGlobalSession(&desc, m_session.writeRef());
     exePath = inExePath;
     SLANG_RETURN_ON_FAIL(TestToolUtil::getExeDirectoryPath(inExePath, exeDirectoryPath));
     SLANG_RETURN_ON_FAIL(TestToolUtil::getDllDirectoryPath(inExePath, dllDirectoryPath));
@@ -106,10 +102,6 @@ TestContext::~TestContext()
         m_languageServerConnection->sendCall(
             LanguageServerProtocol::ExitParams::methodName,
             JSONValue::makeInt(0));
-    }
-    if (m_session)
-    {
-        spDestroySession(m_session);
     }
 }
 

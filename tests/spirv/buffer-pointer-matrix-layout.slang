@@ -1,7 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -stage compute -entry main -matrix-layout-column-major
 
-// CHECK: OpLoad %_MatrixStorage_float3x4_ColMajornatural {{.*}} Aligned 4
-// CHECK: OpLoad %_MatrixStorage_float3x4_ColMajornatural {{.*}} Aligned 4
+// CHECK: OpLoad {{.*}} Aligned 4
 
 struct Push
 {

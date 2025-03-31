@@ -139,13 +139,6 @@ static bool isDifferentiableFunc(IRInst* func)
     return false;
 }
 
-static IRInst* resolveSpecialization(IRSpecialize* spec)
-{
-    IRInst* base = spec->getBase();
-    IRGeneric* generic = as<IRGeneric>(base);
-    return findInnerMostGenericReturnVal(generic);
-}
-
 // The `upper` field contains the struct that the type is
 // is contained in. It is used to check for empty structs.
 static bool canIgnoreType(IRType* type, IRType* upper)
@@ -174,6 +167,10 @@ static bool canIgnoreType(IRType* type, IRType* upper)
     if (as<IRInterfaceType>(type))
         return true;
 
+    // We don't know what type it will be yet.
+    if (as<IRParam>(type))
+        return true;
+
     // For pointers, check the value type (primarily for globals)
     if (auto ptr = as<IRPtrType>(type))
     {
@@ -188,8 +185,8 @@ static bool canIgnoreType(IRType* type, IRType* upper)
     // In the case of specializations, check returned type
     if (auto spec = as<IRSpecialize>(type))
     {
-        IRInst* inner = resolveSpecialization(spec);
-        IRType* innerType = as<IRType>(inner);
+        IRInst* inner = getResolvedInstForDecorations(spec);
+        IRType* innerType = (IRType*)(inner);
         return canIgnoreType(innerType, upper);
     }
 
@@ -231,7 +228,7 @@ static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
     IRFunc* ftn = nullptr;
     IRFuncType* ftype = nullptr;
     if (auto spec = as<IRSpecialize>(callee))
-        ftn = as<IRFunc>(resolveSpecialization(spec));
+        ftn = as<IRFunc>(getResolvedInstForDecorations(spec));
 
     // Differentiable functions are mostly ignored, treated as having inout parameters
     else if (as<IRForwardDifferentiate>(callee))

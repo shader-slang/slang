@@ -98,6 +98,7 @@ struct PeepholeContext : InstPassBase
                 else if (remainingKeys.getCount() > 0)
                 {
                     IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                     builder.setInsertBefore(inst);
                     auto newValue =
                         builder.emitElementExtract(updateInst->getElementValue(), remainingKeys);
@@ -112,6 +113,7 @@ struct PeepholeContext : InstPassBase
                 // accessChain!=accessChain2, then we can replace the inst with extract(x,
                 // accessChain2).
                 IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                 builder.setInsertBefore(inst);
                 auto newInst =
                     builder.emitElementExtract(updateInst->getOldValue(), chainKey.getArrayView());
@@ -140,6 +142,8 @@ struct PeepholeContext : InstPassBase
                     if (vectorType->getElementType() != replacement->getFullType())
                         return false;
                     IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                     builder.setInsertBefore(inst);
                     replacement =
                         builder.emitMakeVectorFromScalar(inst->getFullType(), replacement);
@@ -175,6 +179,7 @@ struct PeepholeContext : InstPassBase
             else if (inst->getOperand(0) == inst->getOperand(1))
             {
                 IRBuilder builder(inst);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                 builder.setInsertBefore(inst);
                 return tryReplace(builder.emitDefaultConstruct(inst->getDataType()));
             }
@@ -280,6 +285,8 @@ struct PeepholeContext : InstPassBase
                     break;
 
                 IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                 builder.setInsertBefore(inst);
                 IRInst* resultVal = nullptr;
                 if (inst->getOp() == kIROp_AlignOf)
@@ -319,6 +326,8 @@ struct PeepholeContext : InstPassBase
             if (inst->getOperand(0)->getOp() == kIROp_MakeResultError)
             {
                 IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                 inst->replaceUsesWith(builder.getBoolValue(true));
                 maybeRemoveOldInst(inst);
                 changed = true;
@@ -326,6 +335,8 @@ struct PeepholeContext : InstPassBase
             else if (inst->getOperand(0)->getOp() == kIROp_MakeResultValue)
             {
                 IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                 inst->replaceUsesWith(builder.getBoolValue(false));
                 maybeRemoveOldInst(inst);
                 changed = true;
@@ -351,6 +362,33 @@ struct PeepholeContext : InstPassBase
                 }
             default:
                 break;
+            }
+            break;
+        case kIROp_MakeCoopVectorFromValuePack:
+            {
+                const auto pack = inst->getOperand(0);
+                if (const auto packType = as<IRTypePack>(pack->getDataType()))
+                {
+                    IRBuilder builder(inst);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
+                    builder.setInsertBefore(inst);
+                    List<IRInst*> args;
+                    for (UInt j = 0; j < packType->getOperandCount(); ++j)
+                    {
+                        const auto e = builder.emitGetTupleElement(
+                            cast<IRType>(packType->getOperand(j)),
+                            pack,
+                            j);
+                        args.add(e);
+                    }
+                    const auto cvt = builder.getCoopVectorType(
+                        args[0]->getDataType(),
+                        builder.getIntValue(builder.getIntType(), args.getCount()));
+                    const auto v = builder.emitMakeCoopVector(cvt, args.getCount(), args.begin());
+                    inst->replaceUsesWith(v);
+                    inst->removeAndDeallocate();
+                }
             }
             break;
         case kIROp_FieldExtract:
@@ -418,6 +456,8 @@ struct PeepholeContext : InstPassBase
                             index->getValue() < startIndex + vecSize->getValue())
                         {
                             IRBuilder builder(module);
+                            IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                             builder.setInsertBefore(inst);
                             auto newElement = builder.emitElementExtract(
                                 element,
@@ -492,6 +532,8 @@ struct PeepholeContext : InstPassBase
                         if (args.getCount() == arraySize->getValue())
                         {
                             IRBuilder builder(module);
+                            IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                             builder.setInsertBefore(inst);
                             auto makeArray = builder.emitMakeArray(
                                 arrayType,
@@ -548,6 +590,8 @@ struct PeepholeContext : InstPassBase
                         if (isComplete)
                         {
                             IRBuilder builder(module);
+                            IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                             builder.setInsertBefore(inst);
                             auto makeArray = builder.emitMakeArray(
                                 arrayType,
@@ -593,6 +637,8 @@ struct PeepholeContext : InstPassBase
                         if (isValid)
                         {
                             IRBuilder builder(module);
+                            IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                             builder.setInsertBefore(inst);
                             auto makeStruct = builder.emitMakeStruct(
                                 structType,
@@ -653,6 +699,8 @@ struct PeepholeContext : InstPassBase
                         // Create a makeStruct inst using args.
 
                         IRBuilder builder(module);
+                        IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                         builder.setInsertBefore(inst);
                         auto makeStruct = builder.emitMakeStruct(
                             structType,
@@ -669,6 +717,8 @@ struct PeepholeContext : InstPassBase
             {
                 auto ptr = inst->getOperand(0);
                 IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                 builder.setInsertBefore(inst);
                 auto neq = builder.emitNeq(ptr, builder.getNullPtrValue(ptr->getDataType()));
                 inst->replaceUsesWith(neq);
@@ -683,6 +733,8 @@ struct PeepholeContext : InstPassBase
                 if (isTypeEqual(actualType, (IRType*)isTypeInst->getTypeOperand()))
                 {
                     IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                     builder.setInsertBefore(inst);
                     auto trueVal = builder.getBoolValue(true);
                     inst->replaceUsesWith(trueVal);
@@ -745,6 +797,7 @@ struct PeepholeContext : InstPassBase
                 if (inst->getOperand(0)->getOp() == kIROp_MakeOptionalValue)
                 {
                     IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                     builder.setInsertBefore(inst);
                     auto trueVal = builder.getBoolValue(true);
                     inst->replaceUsesWith(trueVal);
@@ -754,6 +807,8 @@ struct PeepholeContext : InstPassBase
                 else if (inst->getOperand(0)->getOp() == kIROp_MakeOptionalNone)
                 {
                     IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                     builder.setInsertBefore(inst);
                     auto falseVal = builder.getBoolValue(false);
                     inst->replaceUsesWith(falseVal);
@@ -816,6 +871,7 @@ struct PeepholeContext : InstPassBase
         case kIROp_DefaultConstruct:
             {
                 IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                 builder.setInsertBefore(inst);
                 // See if we can replace the default construct inst with concrete values.
                 if (auto newCtor = builder.emitDefaultConstruct(inst->getFullType(), false))
@@ -826,9 +882,26 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_BuiltinCast:
+            {
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                // See if we can replace the default construct inst with concrete values.
+                if (auto newCast =
+                        builder.emitCast(inst->getFullType(), inst->getOperand(0), false))
+                {
+                    inst->replaceUsesWith(newCast);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
         case kIROp_VectorReshape:
             {
                 auto fromType = as<IRVectorType>(inst->getOperand(0)->getDataType());
+                if (!fromType)
+                    break;
                 auto resultType = as<IRVectorType>(inst->getDataType());
                 if (!resultType)
                 {
@@ -840,6 +913,7 @@ struct PeepholeContext : InstPassBase
                         break;
                     }
                     IRBuilder builder(inst);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                     builder.setInsertBefore(inst);
                     UInt index = 0;
                     auto newInst = builder.emitSwizzle(resultType, inst->getOperand(0), 1, &index);
@@ -855,6 +929,8 @@ struct PeepholeContext : InstPassBase
                 if (!toCount)
                     break;
                 IRBuilder builder(inst);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                 builder.setInsertBefore(inst);
                 auto newInst = builder.emitVectorReshape(resultType, inst->getOperand(0));
                 if (newInst != inst)
@@ -884,6 +960,7 @@ struct PeepholeContext : InstPassBase
                     break;
                 List<IRInst*> rows;
                 IRBuilder builder(inst);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                 builder.setInsertBefore(inst);
                 auto toRowType = builder.getVectorType(
                     resultType->getElementType(),
@@ -1008,6 +1085,8 @@ struct PeepholeContext : InstPassBase
                         break;
                     }
                     IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                     builder.setInsertBefore(inst);
                     auto newInst =
                         builder.emitMakeVectorFromScalar(vectorType, inst->getOperand(0));
@@ -1048,6 +1127,8 @@ struct PeepholeContext : InstPassBase
                 else
                 {
                     IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                     builder.setInsertBefore(inst);
                     auto newMakeVector = builder.emitMakeVector(
                         swizzle->getDataType(),
@@ -1073,6 +1154,8 @@ struct PeepholeContext : InstPassBase
                 if (isConcreteType(left) && isConcreteType(right))
                 {
                     IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                     builder.setInsertBefore(inst);
                     bool result = left == right;
                     inst->replaceUsesWith(builder.getBoolValue(result));
@@ -1089,8 +1172,15 @@ struct PeepholeContext : InstPassBase
                         break;
                     auto type = inst->getOperand(0)->getDataType();
                     IRSizeAndAlignment sizeAlignment;
-                    getNaturalSizeAndAlignment(targetProgram->getOptionSet(), type, &sizeAlignment);
+                    const auto res = getNaturalSizeAndAlignment(
+                        targetProgram->getOptionSet(),
+                        type,
+                        &sizeAlignment);
+                    if (!SLANG_SUCCEEDED(res))
+                        break;
                     IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                     builder.setInsertBefore(inst);
                     auto stride =
                         builder.getIntValue(inst->getDataType(), sizeAlignment.getStride());
@@ -1116,6 +1206,8 @@ struct PeepholeContext : InstPassBase
                 if (isConcreteType(type))
                 {
                     IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                     builder.setInsertBefore(inst);
                     bool result = false;
                     switch (inst->getOp())
@@ -1154,6 +1246,8 @@ struct PeepholeContext : InstPassBase
                 if (as<IRLoad>(inst)->getPtr()->getOp() == kIROp_undefined)
                 {
                     IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+
                     builder.setInsertBefore(inst);
                     auto undef = builder.emitUndefined(inst->getDataType());
                     inst->replaceUsesWith(undef);

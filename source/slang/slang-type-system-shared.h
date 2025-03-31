@@ -22,8 +22,6 @@ namespace Slang
     X(Char)                  \
     X(IntPtr)                \
     X(UIntPtr)               \
-    X(Int8x4Packed)          \
-    X(UInt8x4Packed)         \
     /* end */
 
 enum class BaseType
@@ -110,6 +108,8 @@ enum class AddressSpace : uint64_t
     Image,
     // Represents a SPIR-V specialization constant
     SpecializationConstant,
+    // Corresponds to SPIR-V's SpvStorageClassNodePayloadAMDX,
+    NodePayloadAMDX,
 
     // Default address space for a user-defined pointer
     UserPointer = 0x100000001ULL,

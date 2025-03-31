@@ -45,6 +45,7 @@
 <li data-link="convenience-features#if_let-syntax"><span>`if_let` syntax</span></li>
 <li data-link="convenience-features#reinterprett-operation"><span>`reinterpret&lt;T&gt;` operation</span></li>
 <li data-link="convenience-features#pointers-limited"><span>Pointers (limited)</span></li>
+<li data-link="convenience-features#descriptorhandle-for-bindless-descriptor-access"><span>`DescriptorHandle` for Bindless Descriptor Access</span></li>
 <li data-link="convenience-features#extensions"><span>Extensions</span></li>
 <li data-link="convenience-features#multi-level-break"><span>Multi-level break</span></li>
 <li data-link="convenience-features#force-inlining"><span>Force inlining</span></li>
@@ -57,6 +58,7 @@
 <li data-link="modules#defining-a-module"><span>Defining a Module</span></li>
 <li data-link="modules#importing-a-module"><span>Importing a Module</span></li>
 <li data-link="modules#access-control"><span>Access Control</span></li>
+<li data-link="modules#organizing-file-structure-of-modules"><span>Organizing File Structure of Modules</span></li>
 <li data-link="modules#legacy-modules"><span>Legacy Modules</span></li>
 </ul>
 </li>
@@ -91,17 +93,16 @@
 </li>
 <li data-link="autodiff"><span>Automatic Differentiation</span>
 <ul class="toc_list">
-<li data-link="autodiff#using-automatic-differentiation-in-slang"><span>Using Automatic Differentiation in Slang</span></li>
-<li data-link="autodiff#mathematic-concepts-and-terminologies"><span>Mathematic Concepts and Terminologies</span></li>
-<li data-link="autodiff#differentiable-value-types"><span>Differentiable Value Types</span></li>
-<li data-link="autodiff#forward-derivative-propagation-function"><span>Forward Derivative Propagation Function</span></li>
-<li data-link="autodiff#backward-derivative-propagation-function"><span>Backward Derivative Propagation Function</span></li>
-<li data-link="autodiff#builtin-differentiable-functions"><span>Builtin Differentiable Functions</span></li>
+<li data-link="autodiff#auto-diff-operations-fwd_diff-and-bwd_diff"><span>Auto-diff operations `fwd_diff` and `bwd_diff`</span></li>
+<li data-link="autodiff#differentiable-type-system"><span>Differentiable Type System</span></li>
+<li data-link="autodiff#user-defined-derivative-functions"><span>User-Defined Derivative Functions</span></li>
+<li data-link="autodiff#using-auto-diff-with-generics"><span>Using Auto-diff with Generics</span></li>
+<li data-link="autodiff#using-auto-diff-with-interface-requirements-and-interface-types"><span>Using Auto-diff with Interface Requirements and Interface Types</span></li>
 <li data-link="autodiff#primal-substitute-functions"><span>Primal Substitute Functions</span></li>
 <li data-link="autodiff#working-with-mixed-differentiable-and-non-differentiable-code"><span>Working with Mixed Differentiable and Non-Differentiable Code</span></li>
-<li data-link="autodiff#higher-order-differentiation"><span>Higher Order Differentiation</span></li>
-<li data-link="autodiff#interactions-with-generics-and-interfaces"><span>Interactions with Generics and Interfaces</span></li>
-<li data-link="autodiff#restrictions-of-automatic-differentiation"><span>Restrictions of Automatic Differentiation</span></li>
+<li data-link="autodiff#higher-order-differentiation"><span>Higher-Order Differentiation</span></li>
+<li data-link="autodiff#restrictions-and-known-issues"><span>Restrictions and Known Issues</span></li>
+<li data-link="autodiff#reference"><span>Reference</span></li>
 </ul>
 </li>
 <li data-link="compiling"><span>Compiling Code with Slang</span>
@@ -157,16 +158,6 @@
 <li data-link="a1-01-matrix-layout#discussion"><span>Discussion</span></li>
 <li data-link="a1-01-matrix-layout#matrix-layout"><span>Matrix Layout</span></li>
 <li data-link="a1-01-matrix-layout#overriding-default-matrix-layout"><span>Overriding default matrix layout</span></li>
-</ul>
-</li>
-<li data-link="a1-02-slangpy"><span>Using Slang to Write PyTorch Kernels</span>
-<ul class="toc_list">
-<li data-link="a1-02-slangpy#getting-started-with-slangtorch"><span>Getting Started with SlangTorch</span></li>
-<li data-link="a1-02-slangpy#specializing-shaders-using-slangtorch"><span>Specializing shaders using slangtorch</span></li>
-<li data-link="a1-02-slangpy#back-propagating-derivatives-through-complex-access-patterns"><span>Back-propagating Derivatives through Complex Access Patterns</span></li>
-<li data-link="a1-02-slangpy#manually-binding-kernels"><span>Manually binding kernels</span></li>
-<li data-link="a1-02-slangpy#builtin-library-support-for-pytorch-interop"><span>Builtin Library Support for PyTorch Interop</span></li>
-<li data-link="a1-02-slangpy#type-marshalling-between-slang-and-python"><span>Type Marshalling Between Slang and Python</span></li>
 </ul>
 </li>
 <li data-link="a1-03-obfuscation"><span>Obfuscation</span>

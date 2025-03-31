@@ -741,9 +741,9 @@ class ModifiableSyntaxNode : public SyntaxNode
     }
 };
 
-struct DeclReferenceWithLoc
+struct ProvenenceNodeWithLoc
 {
-    Decl* referencedDecl;
+    NodeBase* referencedNode;
     SourceLoc referenceLoc;
 };
 
@@ -789,7 +789,9 @@ public:
     bool isChildOf(Decl* other) const;
 
     // Track the decl reference that caused the requirement of a capability atom.
-    SLANG_UNREFLECTED List<DeclReferenceWithLoc> capabilityRequirementProvenance;
+    SLANG_UNREFLECTED List<ProvenenceNodeWithLoc> capabilityRequirementProvenance;
+
+    SLANG_UNREFLECTED bool hiddenFromLookup = false;
 
 private:
     SLANG_UNREFLECTED DeclRefBase* m_defaultDeclRef = nullptr;

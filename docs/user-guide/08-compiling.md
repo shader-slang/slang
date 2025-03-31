@@ -599,15 +599,23 @@ A global session is created using the function `slang::createGlobalSession()`:
 using namespace slang;
 
 Slang::ComPtr<IGlobalSession> globalSession;
-createGlobalSession(globalSession.writeRef());
+SlangGlobalSessionDesc desc = {};
+createGlobalSession(&desc, globalSession.writeRef());
 ```
 
 When a global session is created, the Slang system will load its internal representation of the _core module_ that the compiler provides to user code.
 The core module can take a significant amount of time to load, so applications are advised to use a single global session if possible, rather than creating and then disposing of one for each compile.
 
+If you want to enable GLSL compatibility mode, you need to set `SlangGlobalSessionDesc::enableGLSL` to `true` when calling `createGlobalSession()`. This will load the necessary GLSL intrinsic module
+for compiling GLSL code. Without this setting, compiling GLSL code will result in an error.
+
 > #### Note ####
 > Currently, the global session type is *not* thread-safe.
 > Applications that wish to compile on multiple threads will need to ensure that each concurrent thread compiles with a distinct global session.
+
+> #### Note ####
+> Currently, the global session should be freed after any objects created from it.
+> See [issue 6344](https://github.com/shader-slang/slang/issues/6344).
 
 ### Creating a Session
 
@@ -884,6 +892,7 @@ The only functions which are currently thread safe are
 ```C++
 SlangSession* spCreateSession(const char* deprecated);
 SlangResult slang_createGlobalSession(SlangInt apiVersion, slang::IGlobalSession** outGlobalSession);
+SlangResult slang_createGlobalSession2(const SlangGlobalSessionDesc* desc, slang::IGlobalSession** outGlobalSession);
 SlangResult slang_createGlobalSessionWithoutCoreModule(SlangInt apiVersion, slang::IGlobalSession** outGlobalSession);
 ISlangBlob* slang_getEmbeddedCoreModule();
 SlangResult slang::createGlobalSession(slang::IGlobalSession** outGlobalSession);

@@ -80,6 +80,7 @@ class SyntaxNode;
 SourceLoc getDiagnosticPos(SyntaxNode const* syntax);
 SourceLoc getDiagnosticPos(TypeExp const& typeExp);
 SourceLoc getDiagnosticPos(DeclRefBase* declRef);
+SourceLoc getDiagnosticPos(Decl* decl);
 
 typedef NodeBase* (*SyntaxParseCallback)(Parser* parser, void* userData);
 
@@ -169,8 +170,18 @@ enum : ConversionCost
     kConversionCost_ScalarIntegerToFloatMatrix =
         kConversionCost_IntegerToFloatConversion + kConversionCost_ScalarToMatrix,
 
+    // Additional conversion cost to add when promoting from a scalar to
+    // a CoopVector (this will be added to the cost, if any, of converting
+    // the element type of the CoopVector)
+    kConversionCost_ScalarToCoopVector = 1,
+
     // Additional cost when casting an LValue.
     kConversionCost_LValueCast = 800,
+
+    // The cost of this conversion is defined by the type coercion constraint.
+    kConversionCost_TypeCoercionConstraint = 1000,
+    kConversionCost_TypeCoercionConstraintPlusScalarToVector =
+        kConversionCost_TypeCoercionConstraint + kConversionCost_ScalarToVector,
 
     // Conversion is impossible
     kConversionCost_Impossible = 0xFFFFFFFF,
@@ -412,6 +423,10 @@ enum class DeclCheckState : uint8_t
     /// is otherwise completely unchecked.
     ///
     Unchecked,
+
+    /// The declaration is parsed and inserted into the initial scope,
+    /// ready for future lookups from within the parser for disambiguation purposes.
+    ReadyForParserLookup,
 
     /// Basic checks on the modifiers of the declaration have been applied.
     ///
@@ -1207,7 +1222,8 @@ enum class LookupMask : uint8_t
     Function = 0x2,
     Value = 0x4,
     Attribute = 0x8,
-    Default = type | Function | Value,
+    SyntaxDecl = 0x10,
+    Default = type | Function | Value | SyntaxDecl,
 };
 
 /// Flags for options to be used when looking up declarations
@@ -1225,6 +1241,7 @@ enum class LookupOptions : uint8_t
     /// checking to see if a keyword is shadowed.
     IgnoreInheritance =
         1 << 4, ///< Lookup only non inheritance children of a struct (including `extension`)
+    IgnoreTransparentMembers = 1 << 5,
 };
 inline LookupOptions operator&(LookupOptions a, LookupOptions b)
 {

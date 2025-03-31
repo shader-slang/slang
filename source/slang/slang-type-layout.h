@@ -975,6 +975,8 @@ enum class ShaderParameterKind
     AtomicUint,
 
     SubpassInput,
+    AccelerationStructure,
+    ParameterBlock,
 };
 
 struct SimpleLayoutRulesImpl
@@ -1180,6 +1182,13 @@ struct TypeLayoutContext
 
     // Options passed to object layout
     ObjectLayoutRulesImpl::Options objectLayoutOptions;
+
+    // Mangled names to DeclRefType, this is used to match up 'extern' types to
+    // their linked in definitions during layout generation
+    std::optional<Dictionary<String, DeclRefType*>> externTypeMap;
+
+    DeclRefType* lookupExternDeclRefType(DeclRefType* declRefType);
+    void buildExternTypeMap();
 
     LayoutRulesImpl* getRules() { return rules; }
     LayoutRulesFamilyImpl* getRulesFamily() const { return rules->getLayoutRulesFamily(); }

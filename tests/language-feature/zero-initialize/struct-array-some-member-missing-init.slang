@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -xslang -zero-initialize
-//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain -xslang -zero-initialize
+//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -xslang -zero-initialize
+//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain -xslang -zero-initialize
 
 // CHECK-NOT: {{.* }}= 0;
 

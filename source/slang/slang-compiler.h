@@ -27,6 +27,8 @@
 #include "slang-syntax.h"
 #include "slang.h"
 
+#include <chrono>
+
 namespace Slang
 {
 struct PathInfo;
@@ -1382,7 +1384,8 @@ enum class PassThroughMode : SlangPassThroughIntegral
     LLVM = SLANG_PASS_THROUGH_LLVM,                  ///< LLVM 'compiler'
     SpirvOpt = SLANG_PASS_THROUGH_SPIRV_OPT,         ///< pass thorugh spirv to spirv-opt
     MetalC = SLANG_PASS_THROUGH_METAL,
-    Tint = SLANG_PASS_THROUGH_TINT, ///< pass through spirv to Tint API
+    Tint = SLANG_PASS_THROUGH_TINT,            ///< pass through spirv to Tint API
+    SpirvLink = SLANG_PASS_THROUGH_SPIRV_LINK, ///< pass through spirv to spirv-link
     CountOf = SLANG_PASS_THROUGH_COUNT_OF,
 };
 void printDiagnosticArg(StringBuilder& sb, PassThroughMode val);
@@ -1829,6 +1832,18 @@ private:
 
     // Source files that have been pulled into the module with `__include`.
     Dictionary<SourceFile*, FileDecl*> m_mapSourceFileToFileDecl;
+
+public:
+    SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(slang::IBlob** outDisassembledBlob) override
+    {
+        if (!outDisassembledBlob)
+            return SLANG_E_INVALID_ARG;
+        String disassembly;
+        this->getIRModule()->getModuleInst()->dump(disassembly);
+        auto blob = StringUtil::createStringBlob(disassembly);
+        *outDisassembledBlob = blob.detach();
+        return SLANG_OK;
+    }
 };
 typedef Module LoadedModule;
 
@@ -1953,6 +1968,7 @@ bool isMetalTarget(TargetRequest* targetReq);
 
 /// Are we generating code for a Khronos API (OpenGL or Vulkan)?
 bool isKhronosTarget(TargetRequest* targetReq);
+bool isKhronosTarget(CodeGenTarget target);
 
 /// Are we generating code for a CUDA API (CUDA / OptiX)?
 bool isCUDATarget(TargetRequest* targetReq);
@@ -1962,6 +1978,7 @@ bool isCPUTarget(TargetRequest* targetReq);
 
 /// Are we generating code for the WebGPU API?
 bool isWGPUTarget(TargetRequest* targetReq);
+bool isWGPUTarget(CodeGenTarget target);
 
 /// A request to generate output in some target format.
 class TargetRequest : public RefObject
@@ -2209,7 +2226,7 @@ public:
     TypeCheckingCache* getTypeCheckingCache();
     void destroyTypeCheckingCache();
 
-    TypeCheckingCache* m_typeCheckingCache = nullptr;
+    RefPtr<RefObject> m_typeCheckingCache = nullptr;
 
     // Modules that have been dynamically loaded via `import`
     //
@@ -2884,6 +2901,12 @@ public:
     // removed between IR linking and target source generation.
     bool removeAvailableInDownstreamIR = false;
 
+    // Determines if program level compilation like getTargetCode() or getEntryPointCode()
+    // should return a fully linked downstream program or just the glue SPIR-V/DXIL that
+    // imports and uses the precompiled SPIR-V/DXIL from constituent modules.
+    // This is a no-op if modules are not precompiled.
+    bool shouldSkipDownstreamLinking();
+
 protected:
     CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
     ExtensionTracker* m_extensionTracker = nullptr;
@@ -3430,6 +3453,18 @@ public:
     SLANG_NO_THROW SlangResult SLANG_MCALL
     saveCoreModule(SlangArchiveType archiveType, ISlangBlob** outBlob) override;
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL compileBuiltinModule(
+        slang::BuiltinModuleName moduleName,
+        slang::CompileCoreModuleFlags flags) override;
+    SLANG_NO_THROW SlangResult SLANG_MCALL loadBuiltinModule(
+        slang::BuiltinModuleName moduleName,
+        const void* coreModule,
+        size_t coreModuleSizeInBytes) override;
+    SLANG_NO_THROW SlangResult SLANG_MCALL saveBuiltinModule(
+        slang::BuiltinModuleName moduleName,
+        SlangArchiveType archiveType,
+        ISlangBlob** outBlob) override;
+
     SLANG_NO_THROW SlangCapabilityID SLANG_MCALL findCapability(char const* name) override;
 
     SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerForTransition(
@@ -3470,7 +3505,8 @@ public:
     Scope* coreLanguageScope = nullptr;
     Scope* hlslLanguageScope = nullptr;
     Scope* slangLanguageScope = nullptr;
-    Scope* autodiffLanguageScope = nullptr;
+    Scope* glslLanguageScope = nullptr;
+    Name* glslModuleName = nullptr;
 
     ModuleDecl* baseModuleDecl = nullptr;
     List<RefPtr<Module>> coreModules;
@@ -3543,11 +3579,17 @@ public:
     /// Get the built in linkage -> handy to get the core module from
     Linkage* getBuiltinLinkage() const { return m_builtinLinkage; }
 
+    Module* getBuiltinModule(slang::BuiltinModuleName builtinModuleName);
+
     Name* getCompletionRequestTokenName() const { return m_completionTokenName; }
 
     void init();
 
-    void addBuiltinSource(Scope* scope, String const& path, ISlangBlob* sourceBlob);
+    void addBuiltinSource(
+        Scope* scope,
+        String const& path,
+        ISlangBlob* sourceBlob,
+        Module*& outModule);
     ~Session();
 
     void addDownstreamCompileTime(double time) { m_downstreamCompileTime += time; }
@@ -3570,10 +3612,26 @@ public:
 
     int m_typeDictionarySize = 0;
 
+    RefPtr<RefObject> m_typeCheckingCache;
+    TypeCheckingCache* getTypeCheckingCache();
+    std::mutex m_typeCheckingCacheMutex;
+
 private:
+    struct BuiltinModuleInfo
+    {
+        const char* name;
+        Scope* languageScope;
+    };
+
+    BuiltinModuleInfo getBuiltinModuleInfo(slang::BuiltinModuleName name);
+
     void _initCodeGenTransitionMap();
 
-    SlangResult _readBuiltinModule(ISlangFileSystem* fileSystem, Scope* scope, String moduleName);
+    SlangResult _readBuiltinModule(
+        ISlangFileSystem* fileSystem,
+        Scope* scope,
+        String moduleName,
+        Module*& outModule);
 
     SlangResult _loadRequest(EndToEndCompileRequest* request, const void* data, size_t size);
 
@@ -3591,6 +3649,8 @@ private:
     double m_downstreamCompileTime = 0.0;
     double m_totalCompileTime = 0.0;
 };
+
+const char* getBuiltinModuleNameStr(slang::BuiltinModuleName name);
 
 void checkTranslationUnit(
     TranslationUnitRequest* translationUnit,
@@ -3717,26 +3777,6 @@ SLANG_FORCE_INLINE SlangSourceLanguage asExternal(SourceLanguage sourceLanguage)
 {
     return (SlangSourceLanguage)sourceLanguage;
 }
-
-// Helper class for recording compile time.
-struct CompileTimerRAII
-{
-    std::chrono::high_resolution_clock::time_point startTime;
-    Session* session;
-    CompileTimerRAII(Session* inSession)
-    {
-        startTime = std::chrono::high_resolution_clock::now();
-        session = inSession;
-    }
-    ~CompileTimerRAII()
-    {
-        double elapsedTime = std::chrono::duration_cast<std::chrono::microseconds>(
-                                 std::chrono::high_resolution_clock::now() - startTime)
-                                 .count() /
-                             1e6;
-        session->addTotalCompileTime(elapsedTime);
-    }
-};
 
 // helpers for error/warning reporting
 enum class DiagnosticCategory

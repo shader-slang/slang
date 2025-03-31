@@ -171,6 +171,10 @@ struct HoistResult
         case Mode::Invert:
             SLANG_UNEXPECTED("Wrong constructor for HoistResult::Mode::Invert");
             break;
+        case Mode::None:
+            instToStore = nullptr;
+            instToRecompute = nullptr;
+            break;
         default:
             SLANG_UNEXPECTED("Unhandled hoist mode");
             break;
@@ -187,6 +191,8 @@ struct HoistResult
     static HoistResult recompute(IRInst* inst) { return HoistResult(Mode::Recompute, inst); }
 
     static HoistResult invert(InversionInfo inst) { return HoistResult(inst); }
+
+    static HoistResult none() { return HoistResult(Mode::None, nullptr); }
 };
 
 struct IndexTrackingInfo : public RefObject

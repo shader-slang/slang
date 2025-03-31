@@ -52,6 +52,10 @@ class UnparsedStmt : public Stmt
 
     // The tokens that were contained between `{` and `}`
     List<Token> tokens;
+    Scope* currentScope = nullptr;
+    Scope* outerScope = nullptr;
+    SourceLanguage sourceLanguage;
+    bool isInVariadicGenerics = false;
 };
 
 class EmptyStmt : public Stmt
@@ -107,6 +111,11 @@ class TargetSwitchStmt : public Stmt
     SLANG_AST_CLASS(TargetSwitchStmt)
 
     List<TargetCaseStmt*> targetCases;
+};
+
+class StageSwitchStmt : public TargetSwitchStmt
+{
+    SLANG_AST_CLASS(StageSwitchStmt)
 };
 
 class IntrinsicAsmStmt : public Stmt

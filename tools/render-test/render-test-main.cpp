@@ -13,6 +13,10 @@
 #include "slang-support.h"
 #include "window.h"
 
+#if defined(_WIN32)
+#include <d3d12.h>
+#endif
+
 #include <slang-rhi.h>
 #include <slang-rhi/acceleration-structure-utils.h>
 #include <slang-rhi/shader-cursor.h>
@@ -127,6 +131,7 @@ protected:
     ComPtr<IBuffer> m_vertexBuffer;
     ComPtr<IShaderProgram> m_shaderProgram;
     ComPtr<IPipeline> m_pipeline;
+    ComPtr<IShaderTable> m_shaderTable;
     ComPtr<ITexture> m_depthBuffer;
     ComPtr<ITextureView> m_depthBufferView;
     ComPtr<ITexture> m_colorBuffer;
@@ -150,27 +155,27 @@ protected:
 struct AssignValsFromLayoutContext
 {
     IDevice* device;
-    slang::ISession* slangSession;
+    slang::IComponentType* slangComponent;
     ShaderOutputPlan& outputPlan;
     TestResourceContext& resourceContext;
-    slang::ProgramLayout* slangReflection;
     IAccelerationStructure* accelerationStructure;
 
     AssignValsFromLayoutContext(
         IDevice* device,
-        slang::ISession* slangSession,
+        slang::IComponentType* slangComponent,
         ShaderOutputPlan& outputPlan,
         TestResourceContext& resourceContext,
-        slang::ProgramLayout* slangReflection,
         IAccelerationStructure* accelerationStructure)
         : device(device)
-        , slangSession(slangSession)
+        , slangComponent(slangComponent)
         , outputPlan(outputPlan)
         , resourceContext(resourceContext)
-        , slangReflection(slangReflection)
         , accelerationStructure(accelerationStructure)
     {
     }
+
+    slang::ProgramLayout* slangReflection() { return slangComponent->getLayout(); }
+    slang::ISession* slangSession() { return slangComponent->getSession(); }
 
     void maybeAddOutput(
         ShaderCursor const& dstCursor,
@@ -226,13 +231,18 @@ struct AssignValsFromLayoutContext
             device,
             bufferResource));
 
-        if (dstCursor.getTypeLayout()->getType()->getKind() == slang::TypeReflection::Kind::Pointer)
+        if ((dstCursor.getTypeLayout()->getType()->getKind() ==
+                 slang::TypeReflection::Kind::Scalar &&
+             dstCursor.getTypeLayout()->getType()->getScalarType() ==
+                 slang::TypeReflection::ScalarType::UInt64) ||
+            dstCursor.getTypeLayout()->getType()->getKind() == slang::TypeReflection::Kind::Pointer)
         {
             // dstCursor is pointer to an ordinary uniform data field,
             // we should write bufferResource as a pointer.
             uint64_t addr = bufferResource->getDeviceAddress();
             dstCursor.setData(&addr, sizeof(addr));
             resourceContext.resources.add(ComPtr<IResource>(bufferResource.get()));
+            maybeAddOutput(dstCursor, srcVal, bufferResource);
             return SLANG_OK;
         }
 
@@ -345,7 +355,7 @@ struct AssignValsFromLayoutContext
             if (field.name.getLength() == 0)
             {
                 // If no name was given, assume by-indexing matching is requested
-                auto fieldCursor = dstCursor.getElement((GfxIndex)fieldIndex);
+                auto fieldCursor = dstCursor.getElement((uint32_t)fieldIndex);
                 if (!fieldCursor.isValid())
                 {
                     StdWriters::getError().print(
@@ -380,7 +390,7 @@ struct AssignValsFromLayoutContext
             // If the input line specified the name of the type
             // to allocate, then we use it directly.
             //
-            slangType = slangReflection->findTypeByName(typeName.getBuffer());
+            slangType = slangReflection()->findTypeByName(typeName.getBuffer());
         }
         else
         {
@@ -409,7 +419,7 @@ struct AssignValsFromLayoutContext
 
         ComPtr<IShaderObject> shaderObject;
         device->createShaderObject(
-            slangSession,
+            slangSession(),
             slangType,
             ShaderObjectContainerType::None,
             shaderObject.writeRef());
@@ -428,7 +438,7 @@ struct AssignValsFromLayoutContext
         List<slang::SpecializationArg> args;
         for (auto& typeName : srcVal->typeArgs)
         {
-            auto slangType = slangReflection->findTypeByName(typeName.getBuffer());
+            auto slangType = slangReflection()->findTypeByName(typeName.getBuffer());
             if (!slangType)
             {
                 StdWriters::getError().print(
@@ -507,42 +517,30 @@ struct AssignValsFromLayoutContext
     }
 };
 
-SlangResult _assignVarsFromLayout(
+static SlangResult _assignVarsFromLayout(
     IDevice* device,
-    slang::ISession* slangSession,
+    slang::IComponentType* slangComponent,
     IShaderObject* shaderObject,
     ShaderInputLayout const& layout,
     ShaderOutputPlan& ioOutputPlan,
     TestResourceContext& ioResourceContext,
-    slang::ProgramLayout* slangReflection,
     IAccelerationStructure* accelerationStructure)
 {
-    AssignValsFromLayoutContext context(
-        device,
-        slangSession,
-        ioOutputPlan,
-        ioResourceContext,
-        slangReflection,
-        accelerationStructure);
+    AssignValsFromLayoutContext
+        context(device, slangComponent, ioOutputPlan, ioResourceContext, accelerationStructure);
     ShaderCursor rootCursor = ShaderCursor(shaderObject);
     return context.assign(rootCursor, layout.rootVal);
 }
 
 Result RenderTestApp::applyBinding(IShaderObject* rootObject)
 {
-    auto slangReflection = (slang::ProgramLayout*)spGetReflection(
-        m_compilationOutput.output.getRequestForReflection());
-    ComPtr<slang::ISession> slangSession;
-    m_compilationOutput.output.m_requestForKernels->getSession(slangSession.writeRef());
-
     return _assignVarsFromLayout(
         m_device,
-        slangSession,
+        m_compilationOutput.output.slangProgram,
         rootObject,
         m_compilationOutput.layout,
         m_outputPlan,
         m_resourceContext,
-        slangReflection,
         m_topLevelAccelerationStructure);
 }
 
@@ -640,7 +638,7 @@ SlangResult RenderTestApp::initialize(
                 SLANG_RETURN_ON_FAIL(
                     device->createBuffer(vertexBufferDesc, kVertexData, m_vertexBuffer.writeRef()));
 
-                ColorTargetState colorTarget;
+                ColorTargetDesc colorTarget;
                 colorTarget.format = Format::R8G8B8A8_UNORM;
                 RenderPipelineDesc desc;
                 desc.program = m_shaderProgram;
@@ -651,10 +649,11 @@ SlangResult RenderTestApp::initialize(
                 m_pipeline = device->createRenderPipeline(desc);
             }
             break;
+
         case Options::ShaderProgramType::GraphicsMeshCompute:
         case Options::ShaderProgramType::GraphicsTaskMeshCompute:
             {
-                ColorTargetState colorTarget;
+                ColorTargetDesc colorTarget;
                 colorTarget.format = Format::R8G8B8A8_UNORM;
                 RenderPipelineDesc desc;
                 desc.program = m_shaderProgram;
@@ -663,6 +662,33 @@ SlangResult RenderTestApp::initialize(
                 desc.depthStencil.format = Format::D32_FLOAT;
                 m_pipeline = device->createRenderPipeline(desc);
             }
+            break;
+
+        case Options::ShaderProgramType::RayTracing:
+            {
+                RayTracingPipelineDesc desc;
+                desc.program = m_shaderProgram;
+
+                m_pipeline = device->createRayTracingPipeline(desc);
+
+                const char* raygenNames[] = {"raygenMain"};
+
+                // We don't define a miss shader for this test. OptiX allows
+                // passing nullptr to indicate no miss shader, but something in
+                // slang-rhi assumes that the miss shader always has a name. To
+                // work around that, use a dummy name.
+                const char* missNames[] = {"missNull"};
+
+                ShaderTableDesc shaderTableDesc = {};
+                shaderTableDesc.program = m_shaderProgram;
+                shaderTableDesc.rayGenShaderCount = 1;
+                shaderTableDesc.rayGenShaderEntryPointNames = raygenNames;
+                shaderTableDesc.missShaderCount = 1;
+                shaderTableDesc.missShaderEntryPointNames = missNames;
+                SLANG_RETURN_ON_FAIL(
+                    device->createShaderTable(shaderTableDesc, m_shaderTable.writeRef()));
+            }
+            break;
         }
     }
     // If success must have a pipeline state
@@ -960,16 +986,25 @@ Result RenderTestApp::update()
     auto encoder = m_queue->createCommandEncoder();
     if (m_options.shaderType == Options::ShaderProgramType::Compute)
     {
-        auto rootObject = m_device->createRootShaderObject(m_pipeline);
-        applyBinding(rootObject);
-        rootObject->finalize();
-
         auto passEncoder = encoder->beginComputePass();
-        ComputeState state;
-        state.pipeline = static_cast<IComputePipeline*>(m_pipeline.get());
-        state.rootObject = rootObject;
-        passEncoder->setComputeState(state);
+        auto rootObject =
+            passEncoder->bindPipeline(static_cast<IComputePipeline*>(m_pipeline.get()));
+        applyBinding(rootObject);
         passEncoder->dispatchCompute(
+            m_options.computeDispatchSize[0],
+            m_options.computeDispatchSize[1],
+            m_options.computeDispatchSize[2]);
+        passEncoder->end();
+    }
+    else if (m_options.shaderType == Options::ShaderProgramType::RayTracing)
+    {
+        auto passEncoder = encoder->beginRayTracingPass();
+        auto rootObject = passEncoder->bindPipeline(
+            static_cast<IRayTracingPipeline*>(m_pipeline.get()),
+            m_shaderTable);
+        applyBinding(rootObject);
+        passEncoder->dispatchRays(
+            0,
             m_options.computeDispatchSize[0],
             m_options.computeDispatchSize[1],
             m_options.computeDispatchSize[2]);
@@ -977,11 +1012,6 @@ Result RenderTestApp::update()
     }
     else
     {
-        auto rootObject = m_device->createRootShaderObject(m_pipeline);
-        applyBinding(rootObject);
-        setProjectionMatrix(rootObject);
-        rootObject->finalize();
-
         RenderPassColorAttachment colorAttachment = {};
         colorAttachment.view = m_colorBufferView;
         colorAttachment.loadOp = LoadOp::Clear;
@@ -996,13 +1026,15 @@ Result RenderTestApp::update()
         renderPass.depthStencilAttachment = &depthStencilAttachment;
 
         auto passEncoder = encoder->beginRenderPass(renderPass);
+        auto rootObject =
+            passEncoder->bindPipeline(static_cast<IRenderPipeline*>(m_pipeline.get()));
+        applyBinding(rootObject);
+        setProjectionMatrix(rootObject);
 
         RenderState state;
-        state.pipeline = static_cast<IRenderPipeline*>(m_pipeline.get());
-        state.rootObject = rootObject;
-        state.viewports[0] = Viewport((float)gWindowWidth, (float)gWindowHeight);
+        state.viewports[0] = Viewport::fromSize(gWindowWidth, gWindowHeight);
         state.viewportCount = 1;
-        state.scissorRects[0] = ScissorRect(gWindowWidth, gWindowHeight);
+        state.scissorRects[0] = ScissorRect::fromSize(gWindowWidth, gWindowHeight);
         state.scissorRectCount = 1;
 
         if (m_options.shaderType == Options::ShaderProgramType::GraphicsMeshCompute ||
@@ -1075,11 +1107,9 @@ Result RenderTestApp::update()
             if (m_options.shaderType == Options::ShaderProgramType::Compute ||
                 m_options.shaderType == Options::ShaderProgramType::GraphicsCompute ||
                 m_options.shaderType == Options::ShaderProgramType::GraphicsMeshCompute ||
-                m_options.shaderType == Options::ShaderProgramType::GraphicsTaskMeshCompute)
+                m_options.shaderType == Options::ShaderProgramType::GraphicsTaskMeshCompute ||
+                m_options.shaderType == Options::ShaderProgramType::RayTracing)
             {
-                auto request = m_compilationOutput.output.getRequestForReflection();
-                auto slangReflection = (slang::ShaderReflection*)spGetReflection(request);
-
                 SLANG_RETURN_ON_FAIL(writeBindingOutput(m_options.outputPath));
             }
             else
@@ -1367,7 +1397,6 @@ static SlangResult _innerMain(
 
 #if _DEBUG
         desc.enableValidation = true;
-        desc.enableBackendValidation = true;
         desc.debugCallback = &debugCallback;
 #endif
 
@@ -1384,6 +1413,20 @@ static SlangResult _innerMain(
         desc.requiredFeatures = requiredFeatureList.getBuffer();
         desc.requiredFeatureCount = (int)requiredFeatureList.getCount();
 
+#if defined(_WIN32)
+        // When the experimental feature is enabled, things become unstable.
+        // It is enabled only when requested.
+        D3D12ExperimentalFeaturesDesc experimentalFD = {};
+        UUID features[1] = {D3D12ExperimentalShaderModels};
+        experimentalFD.featureCount = 1;
+        experimentalFD.featureIIDs = features;
+        experimentalFD.configurationStructs = nullptr;
+        experimentalFD.configurationStructSizes = nullptr;
+
+        if (options.dx12Experimental)
+            desc.next = &experimentalFD;
+#endif
+
         // Look for args going to slang
         {
             const auto& args = options.downstreamArgs.getArgsByName("slang");
@@ -1397,10 +1440,14 @@ static SlangResult _innerMain(
             }
         }
 
-        desc.nvapiExtnSlot = int(nvapiExtnSlot);
+        desc.nvapiExtUavSlot = uint32_t(nvapiExtnSlot);
         desc.slang.slangGlobalSession = session;
         desc.slang.targetProfile = options.profileName.getBuffer();
         {
+            if (options.enableDebugLayers)
+            {
+                getRHI()->enableDebugLayers();
+            }
             SlangResult res = getRHI()->createDevice(desc, device.writeRef());
             if (SLANG_FAILED(res))
             {
@@ -1437,6 +1484,14 @@ static SlangResult _innerMain(
                 return SLANG_E_NOT_AVAILABLE;
             }
         }
+    }
+
+    // Print adapter info after device creation but before any other operations
+    if (options.showAdapterInfo)
+    {
+        auto info = device->getDeviceInfo();
+        auto out = stdWriters->getOut();
+        out.print("Using graphics adapter: %s\n", info.adapterName);
     }
 
     // If the only test is we can startup, then we are done

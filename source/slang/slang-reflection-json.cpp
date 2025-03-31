@@ -2,6 +2,7 @@
 #include "slang-reflection-json.h"
 
 #include "../core/slang-blob.h"
+#include "slang-ast-support-types.h"
 
 template<typename T>
 struct Range
@@ -237,6 +238,15 @@ static void emitReflectionVarBindingInfoJSON(
             writer << "\"semanticIndex\": " << int(semanticIndex);
         }
     }
+
+    if (auto format = var->getImageFormat())
+    {
+        writer.maybeComma();
+        auto formatName = getImageFormatInfo((Slang::ImageFormat)format).name;
+        writer << "\"format\": \"";
+        writer << formatName;
+        writer << "\"";
+    }
 }
 
 static void emitReflectionNameInfoJSON(PrettyWriter& writer, char const* name)
@@ -323,6 +333,22 @@ static void emitUserAttributes(PrettyWriter& writer, slang::VariableReflection* 
             if (i > 0)
                 writer << ",\n";
             auto attrib = var->getUserAttributeByIndex(i);
+            emitUserAttributeJSON(writer, attrib);
+        }
+        writer << "]";
+    }
+}
+static void emitUserAttributes(PrettyWriter& writer, slang::FunctionReflection* func)
+{
+    auto attribCount = func->getUserAttributeCount();
+    if (attribCount)
+    {
+        writer << ",\n\"userAttribs\": [";
+        for (unsigned int i = 0; i < attribCount; i++)
+        {
+            if (i > 0)
+                writer << ",\n";
+            auto attrib = func->getUserAttributeByIndex(i);
             emitUserAttributeJSON(writer, attrib);
         }
         writer << "]";
@@ -416,6 +442,7 @@ static void emitReflectionResourceTypeBaseInfoJSON(
         CASE(TEXTURE_BUFFER, textureBuffer);
         CASE(STRUCTURED_BUFFER, structuredBuffer);
         CASE(BYTE_ADDRESS_BUFFER, byteAddressBuffer);
+        CASE(ACCELERATION_STRUCTURE, accelerationStructure);
 #undef CASE
     }
     writer << "\"";
@@ -497,6 +524,10 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
                 break;
 
             case SLANG_STRUCTURED_BUFFER:
+            case SLANG_TEXTURE_1D:
+            case SLANG_TEXTURE_2D:
+            case SLANG_TEXTURE_3D:
+            case SLANG_TEXTURE_CUBE:
                 if (auto resultType = type->getResourceResultType())
                 {
                     writer.maybeComma();
@@ -1089,6 +1120,8 @@ static void emitReflectionEntryPointJSON(
         writer.dedent();
         writer << "\n]";
     }
+
+    emitUserAttributes(writer, entryPoint->getFunction());
 
     writer.dedent();
     writer << "\n}";

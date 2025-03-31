@@ -159,7 +159,7 @@ typedef TestResult (*TestCallback)(TestContext* context, TestInput& input);
 // Globals
 
 // Pre declare
-static void _addRenderTestOptions(const Options& options, CommandLine& cmdLine);
+static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine);
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -1336,8 +1336,7 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
 
                 // Check that the session has the generic C/CPP compiler availability - which is all
                 // we should need for CPU target
-                if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(
-                        context->getSession(),
+                if (SLANG_SUCCEEDED(context->getSession()->checkPassThroughSupport(
                         SLANG_PASS_THROUGH_GENERIC_C_CPP)))
                 {
                     availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
@@ -1390,6 +1389,47 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                         StdWriters::getOut().print("%s\n", out.getBuffer());
                 }
             }
+        }
+
+        // After determining available APIs, print adapter info for each one
+        if (context->options.showAdapterInfo && availableRenderApiFlags)
+        {
+            StdWriters::getOut().print("\nAdapter Information for Available APIs:\n");
+            for (int i = 0; i < int(RenderApiType::CountOf); ++i)
+            {
+                const RenderApiType apiType = RenderApiType(i);
+                const RenderApiFlags apiFlag = RenderApiFlags(1) << int(apiType);
+
+                if (availableRenderApiFlags & apiFlag)
+                {
+                    // Create command line to query adapter info
+                    CommandLine cmdLine;
+                    cmdLine.setExecutableLocation(
+                        ExecutableLocation(context->options.binDir, "render-test"));
+
+                    // Add the API type
+                    StringBuilder builder;
+                    builder << "-" << RenderApiUtil::getApiName(apiType);
+                    cmdLine.addArg(builder);
+
+                    // Add flags to show adapter info and only startup
+                    cmdLine.addArg("-show-adapter-info");
+                    cmdLine.addArg("-only-startup");
+
+                    // Run render-test to get adapter info
+                    ExecuteResult exeRes;
+                    if (SLANG_SUCCEEDED(
+                            spawnAndWaitSharedLibrary(context, "adapter-info", cmdLine, exeRes)))
+                    {
+                        // Output the adapter info
+                        StdWriters::getOut().print(
+                            "\n%s:\n%s",
+                            RenderApiUtil::getApiName(apiType).begin(),
+                            exeRes.standardOutput.getBuffer());
+                    }
+                }
+            }
+            StdWriters::getOut().print("\n");
         }
 
         context->availableRenderApiFlags = availableRenderApiFlags;
@@ -1997,9 +2037,13 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
     int callId = 2;
     for (auto line : lines)
     {
-        if (line.startsWith("//COMPLETE:"))
+        line = line.trimStart();
+        if (!line.startsWith("//"))
+            continue;
+        line = line.tail(2).trimStart();
+        if (line.startsWith("COMPLETE:"))
         {
-            auto arg = line.tail(UnownedStringSlice("//COMPLETE:").getLength());
+            auto arg = line.tail(UnownedStringSlice("COMPLETE:").getLength());
             Int linePos, colPos;
             parseLocation(arg, 0, linePos, colPos);
 
@@ -2034,9 +2078,9 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                 }
             }
         }
-        else if (line.startsWith("//SIGNATURE:"))
+        else if (line.startsWith("SIGNATURE:"))
         {
-            auto arg = line.tail(UnownedStringSlice("//SIGNATURE:").getLength());
+            auto arg = line.tail(UnownedStringSlice("SIGNATURE:").getLength());
             Int linePos, colPos;
             parseLocation(arg, 0, linePos, colPos);
 
@@ -2076,9 +2120,9 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                 }
             }
         }
-        else if (line.startsWith("//HOVER:"))
+        else if (line.startsWith("HOVER:"))
         {
-            auto arg = line.tail(UnownedStringSlice("//HOVER:").getLength());
+            auto arg = line.tail(UnownedStringSlice("HOVER:").getLength());
             Int linePos, colPos;
             parseLocation(arg, 0, linePos, colPos);
 
@@ -2110,7 +2154,7 @@ TestResult runLanguageServerTest(TestContext* context, TestInput& input)
                 actualOutputSB << "\ncontent:\n" << hover.contents.value << "\n";
             }
         }
-        else if (line.startsWith("//DIAGNOSTICS"))
+        else if (line.startsWith("DIAGNOSTICS"))
         {
             if (!diagnosticsReceived)
             {
@@ -2838,7 +2882,7 @@ static TestResult generateExpectedOutput(
             TypeTextUtil::findCompileTargetFromName(args[targetIndex + 1].getUnownedSlice());
 
         // Check the session supports it. If not we ignore it
-        if (SLANG_FAILED(spSessionCheckCompileTargetSupport(context->getSession(), target)))
+        if (SLANG_FAILED(context->getSession()->checkCompileTargetSupport(target)))
         {
             return TestResult::Ignored;
         }
@@ -3261,11 +3305,6 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
 
 static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine)
 {
-    if (options.adapter.getLength())
-    {
-        ioCmdLine.addArg("-adapter");
-        ioCmdLine.addArg(options.adapter);
-    }
     if (!options.emitSPIRVDirectly)
     {
         ioCmdLine.addArg("-emit-spirv-via-glsl");
@@ -3477,6 +3516,15 @@ TestResult runComputeComparisonImpl(
     cmdLine.addArg("-o");
     auto actualOutputFile = outputStem + ".actual.txt";
     cmdLine.addArg(actualOutputFile);
+
+#if _DEBUG
+    // When using test server, any validation warning printed from the backend
+    // gets misinterpreted as the result from the test.
+    // This is due to the limitation that Slang RPC implementation expects only
+    // one time communication.
+    if (input.spawnType != SpawnType::UseTestServer)
+        cmdLine.addArg("-enable-debug-layers");
+#endif
 
     if (context->isExecuting())
     {
@@ -4740,7 +4788,7 @@ SlangResult innerMain(int argc, char** argv)
                 continue;
             }
 
-            if (SLANG_SUCCEEDED(spSessionCheckPassThroughSupport(session, passThru)))
+            if (SLANG_SUCCEEDED(session->checkPassThroughSupport(passThru)))
             {
                 context.availableBackendFlags |= PassThroughFlags(1) << int(i);
 

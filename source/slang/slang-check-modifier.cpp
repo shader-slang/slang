@@ -114,6 +114,36 @@ void SemanticsVisitor::visitModifier(Modifier*)
     // Do nothing with modifiers for now
 }
 
+DeclRef<VarDeclBase> SemanticsVisitor::tryGetIntSpecializationConstant(Expr* expr)
+{
+    // First type-check the expression as normal
+    expr = CheckExpr(expr);
+
+    if (IsErrorExpr(expr))
+        return DeclRef<VarDeclBase>();
+
+    if (!isScalarIntegerType(expr->type))
+        return DeclRef<VarDeclBase>();
+
+    auto specConstVar = as<VarExpr>(expr);
+    if (!specConstVar || !specConstVar->declRef)
+        return DeclRef<VarDeclBase>();
+
+    auto decl = specConstVar->declRef.getDecl();
+    if (!decl)
+        return DeclRef<VarDeclBase>();
+
+    for (auto modifier : decl->modifiers)
+    {
+        if (as<SpecializationConstantAttribute>(modifier) || as<VkConstantIdAttribute>(modifier))
+        {
+            return specConstVar->declRef.as<VarDeclBase>();
+        }
+    }
+
+    return DeclRef<VarDeclBase>();
+}
+
 static bool _isDeclAllowedAsAttribute(DeclRef<Decl> declRef)
 {
     if (as<AttributeDecl>(declRef.getDecl()))
@@ -282,6 +312,22 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope*
     return attrDecl;
 }
 
+bool SemanticsVisitor::hasFloatArgs(Attribute* attr, int numArgs)
+{
+    if (int(attr->args.getCount()) != numArgs)
+    {
+        return false;
+    }
+    for (int i = 0; i < numArgs; ++i)
+    {
+        if (!as<FloatingPointLiteralExpr>(attr->args[i]) && !as<IntegerLiteralExpr>(attr->args[i]))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool SemanticsVisitor::hasIntArgs(Attribute* attr, int numArgs)
 {
     if (int(attr->args.getCount()) != numArgs)
@@ -350,8 +396,6 @@ Modifier* SemanticsVisitor::validateAttribute(
     {
         SLANG_ASSERT(attr->args.getCount() == 3);
 
-        IntVal* values[3];
-
         for (int i = 0; i < 3; ++i)
         {
             IntVal* value = nullptr;
@@ -359,6 +403,14 @@ Modifier* SemanticsVisitor::validateAttribute(
             auto arg = attr->args[i];
             if (arg)
             {
+                auto specConstDecl = tryGetIntSpecializationConstant(arg);
+                if (specConstDecl)
+                {
+                    numThreadsAttr->extents[i] = nullptr;
+                    numThreadsAttr->specConstExtents[i] = specConstDecl;
+                    continue;
+                }
+
                 auto intValue = checkLinkTimeConstantIntVal(arg);
                 if (!intValue)
                 {
@@ -390,12 +442,8 @@ Modifier* SemanticsVisitor::validateAttribute(
             {
                 value = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1);
             }
-            values[i] = value;
+            numThreadsAttr->extents[i] = value;
         }
-
-        numThreadsAttr->x = values[0];
-        numThreadsAttr->y = values[1];
-        numThreadsAttr->z = values[2];
     }
     else if (auto waveSizeAttr = as<WaveSizeAttribute>(attr))
     {
@@ -660,9 +708,8 @@ Modifier* SemanticsVisitor::validateAttribute(
         }
     }
     else if (
-        (as<DomainAttribute>(attr)) || (as<MaxTessFactorAttribute>(attr)) ||
-        (as<OutputTopologyAttribute>(attr)) || (as<PartitioningAttribute>(attr)) ||
-        (as<PatchConstantFuncAttribute>(attr)))
+        (as<DomainAttribute>(attr)) || (as<OutputTopologyAttribute>(attr)) ||
+        (as<PartitioningAttribute>(attr)) || (as<PatchConstantFuncAttribute>(attr)))
     {
         // Let it go thru iff single string attribute
         if (!hasStringArgs(attr, 1))
@@ -690,6 +737,13 @@ Modifier* SemanticsVisitor::validateAttribute(
         else if (argsCount > 1 && !as<StringLiteralExpr>(opAttr->args[1]))
         {
             sink->diagnose(attr, Diagnostics::attributeExpectedStringArg, attr->keywordName, 1);
+        }
+    }
+    else if (as<MaxTessFactorAttribute>(attr))
+    {
+        if (!hasFloatArgs(attr, 1))
+        {
+            getSink()->diagnose(attr, Diagnostics::expectedSingleFloatArg, attr->keywordName);
         }
     }
     else if (as<OutputControlPointsAttribute>(attr))
@@ -1831,15 +1885,24 @@ Modifier* SemanticsVisitor::checkModifier(
     {
         SLANG_ASSERT(attr->args.getCount() == 3);
 
-        IntVal* values[3];
+        // GLSLLayoutLocalSizeAttribute is always attached to an EmptyDecl.
+        auto decl = as<EmptyDecl>(syntaxNode);
+        SLANG_ASSERT(decl);
 
         for (int i = 0; i < 3; ++i)
         {
-            IntVal* value = nullptr;
+            attr->extents[i] = nullptr;
 
             auto arg = attr->args[i];
             if (arg)
             {
+                auto specConstDecl = tryGetIntSpecializationConstant(arg);
+                if (specConstDecl)
+                {
+                    attr->specConstExtents[i] = specConstDecl;
+                    continue;
+                }
+
                 auto intValue = checkConstantIntVal(arg);
                 if (!intValue)
                 {
@@ -1847,7 +1910,45 @@ Modifier* SemanticsVisitor::checkModifier(
                 }
                 if (auto cintVal = as<ConstantIntVal>(intValue))
                 {
-                    if (cintVal->getValue() < 1)
+                    if (attr->axisIsSpecConstId[i])
+                    {
+                        // This integer should actually be a reference to a
+                        // specialization constant with this ID.
+                        Int specConstId = cintVal->getValue();
+
+                        for (auto member : decl->parentDecl->members)
+                        {
+                            auto constantId = member->findModifier<VkConstantIdAttribute>();
+                            if (constantId)
+                            {
+                                SLANG_ASSERT(constantId->args.getCount() == 1);
+                                auto id = checkConstantIntVal(constantId->args[0]);
+                                if (id->getValue() == specConstId)
+                                {
+                                    attr->specConstExtents[i] =
+                                        DeclRef<VarDeclBase>(member->getDefaultDeclRef());
+                                    break;
+                                }
+                            }
+                        }
+
+                        // If not found, we need to create a new specialization
+                        // constant with this ID.
+                        if (!attr->specConstExtents[i])
+                        {
+                            auto specConstVarDecl = getASTBuilder()->create<VarDecl>();
+                            auto constantIdModifier =
+                                getASTBuilder()->create<VkConstantIdAttribute>();
+                            constantIdModifier->location = (int32_t)specConstId;
+                            specConstVarDecl->type.type = getASTBuilder()->getIntType();
+                            addModifier(specConstVarDecl, constantIdModifier);
+                            decl->parentDecl->addMember(specConstVarDecl);
+                            attr->specConstExtents[i] =
+                                DeclRef<VarDeclBase>(specConstVarDecl->getDefaultDeclRef());
+                        }
+                        continue;
+                    }
+                    else if (cintVal->getValue() < 1)
                     {
                         getSink()->diagnose(
                             attr,
@@ -1856,18 +1957,13 @@ Modifier* SemanticsVisitor::checkModifier(
                         return nullptr;
                     }
                 }
-                value = intValue;
+                attr->extents[i] = intValue;
             }
             else
             {
-                value = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1);
+                attr->extents[i] = m_astBuilder->getIntVal(m_astBuilder->getIntType(), 1);
             }
-            values[i] = value;
         }
-
-        attr->x = values[0];
-        attr->y = values[1];
-        attr->z = values[2];
     }
 
     // Default behavior is to leave things as they are,

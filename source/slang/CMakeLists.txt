@@ -28,8 +28,10 @@ add_custom_command(
 slang_add_target(
     slang-capability-defs
     OBJECT
+    EXPORT_MACRO_PREFIX SLANG
     USE_EXTRA_WARNINGS
     EXPLICIT_SOURCE ${SLANG_CAPABILITY_GENERATED_HEADERS}
+    EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
     LINK_WITH_PRIVATE core
     INCLUDE_DIRECTORIES_PUBLIC
         "${SLANG_CAPABILITY_OUTPUT_DIR}"
@@ -40,8 +42,10 @@ slang_add_target(
 slang_add_target(
     slang-capability-lookup
     OBJECT
+    EXPORT_MACRO_PREFIX SLANG
     USE_EXTRA_WARNINGS
     EXPLICIT_SOURCE ${SLANG_CAPABILITY_GENERATED_SOURCE}
+    EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
     LINK_WITH_PRIVATE core slang-capability-defs
     EXCLUDE_FROM_ALL
     FOLDER generated
@@ -106,9 +110,15 @@ target_include_directories(
 #
 
 if(NOT SLANG_USE_SYSTEM_SPIRV_HEADERS)
-    set(SLANG_SPIRV_HEADERS_INCLUDE_DIR
-        "${slang_SOURCE_DIR}/external/spirv-headers/include"
-    )
+    if(NOT SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
+        set(SLANG_SPIRV_HEADERS_INCLUDE_DIR
+            "${slang_SOURCE_DIR}/external/spirv-headers/include"
+        )
+    else()
+        set(SLANG_SPIRV_HEADERS_INCLUDE_DIR
+            "${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/include"
+        )
+    endif()
 endif()
 
 set(SLANG_LOOKUP_GENERATOR_INPUT_JSON
@@ -157,10 +167,12 @@ add_custom_command(
 slang_add_target(
     slang-lookup-tables
     OBJECT
+    EXPORT_MACRO_PREFIX SLANG
     USE_EXTRA_WARNINGS
     EXPLICIT_SOURCE
         ${SLANG_LOOKUP_GENERATED_SOURCE}
         ${SLANG_SPIRV_CORE_GRAMMAR_SOURCE}
+    EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
     LINK_WITH_PRIVATE core SPIRV-Headers
     EXCLUDE_FROM_ALL
     FOLDER generated
@@ -191,6 +203,7 @@ add_custom_target(
         "${CMAKE_CURRENT_BINARY_DIR}/slang-version-header/slang-tag-version.h"
         "${CMAKE_BINARY_DIR}/$<CONFIG>/include/slang-tag-version.h"
 )
+set_target_properties(copy_slang_headers PROPERTIES FOLDER "generated")
 
 #
 # Slang itself
@@ -274,6 +287,7 @@ else()
     slang_add_target(
         .
         ${SLANG_LIB_TYPE}
+        EXPORT_MACRO_PREFIX SLANG
         ${slang_link_args}
         ${slang_interface_args}
         NO_SOURCE
@@ -291,6 +305,7 @@ else()
     slang_add_target(
         .
         ${SLANG_LIB_TYPE}
+        EXPORT_MACRO_PREFIX SLANG
         ${slang_link_args}
         ${slang_interface_args}
         ${slang_public_lib_args}

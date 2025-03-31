@@ -537,9 +537,17 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
         else
         {
-            // Only attempt to error if a user adds to slangc either `-profile` or `-capability`
-            if ((target->getOptionSet().hasOption(CompilerOptionName::Capability) ||
-                 target->getOptionSet().hasOption(CompilerOptionName::Profile)) &&
+            auto& targetOptionSet = target->getOptionSet();
+            bool specificProfileRequested =
+                targetOptionSet.hasOption(CompilerOptionName::Profile) &&
+                (targetOptionSet.getIntOption(CompilerOptionName::Profile) !=
+                 SLANG_PROFILE_UNKNOWN);
+            bool specificCapabilityRequested =
+                targetOptionSet.hasOption(CompilerOptionName::Capability) &&
+                (targetOptionSet.getIntOption(CompilerOptionName::Capability) !=
+                 SLANG_CAPABILITY_UNKNOWN);
+            // Only attempt to error if a specific profile or capability is requested
+            if ((specificCapabilityRequested || specificProfileRequested) &&
                 targetCaps.atLeastOneSetImpliedInOther(
                     entryPointFuncDecl->inferredCapabilityRequirements) ==
                     CapabilitySet::ImpliesReturnFlags::NotImplied)
@@ -683,6 +691,12 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     //
     validateEntryPoint(entryPoint, sink);
 
+    // We should return nullptr if entry point fails to validate
+    if (sink->getErrorCount())
+    {
+        return nullptr;
+    }
+
     return entryPoint;
 }
 
@@ -741,7 +755,19 @@ void Module::_collectShaderParams()
                 // things like `static` globals and `groupshared` variables.
                 //
                 if (!isGlobalShaderParameter(globalVar))
-                    continue;
+                {
+                    bool isVarying = false;
+                    for (auto m : globalVar->modifiers)
+                    {
+                        if (as<InModifier>(m) || as<OutModifier>(m))
+                        {
+                            isVarying = true;
+                            break;
+                        }
+                    }
+                    if (!isVarying)
+                        continue;
+                }
 
                 // At this point we know we have a global shader parameter.
 

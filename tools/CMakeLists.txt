@@ -62,9 +62,12 @@ generator(
     TARGET_NAME
     slang-bootstrap
     USE_FEWER_WARNINGS
+    EXTRA_COMPILE_DEFINITIONS_PRIVATE
+    SLANG_BOOTSTRAP=1
+    LINK_WITH_PUBLIC
+    slang-without-embedded-core-module
     LINK_WITH_PRIVATE
     prelude
-    slang-without-embedded-core-module
     slang-capability-lookup
     slang-lookup-tables
     Threads::Threads
@@ -73,6 +76,7 @@ generator(
 slang_add_target(
     slang-cpp-parser
     STATIC
+    EXPORT_MACRO_PREFIX SLANG
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core compiler-core
     INCLUDE_DIRECTORIES_PUBLIC .
@@ -104,7 +108,7 @@ if(SLANG_ENABLE_GFX)
     #
     slang_add_target(
         platform
-        SHARED
+        ${SLANG_LIB_TYPE}
         EXCLUDE_FROM_ALL
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE
@@ -128,7 +132,7 @@ if(SLANG_ENABLE_GFX)
     #
     slang_add_target(
         gfx
-        SHARED
+        ${SLANG_LIB_TYPE}
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE
             core
@@ -138,6 +142,7 @@ if(SLANG_ENABLE_GFX)
             stb
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:X11::X11>
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
+            $<$<BOOL:${SLANG_ENABLE_NVAPI}>:${NVAPI_LIBRARIES}>
         LINK_WITH_FRAMEWORK Foundation Cocoa QuartzCore Metal
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:GFX_ENABLE_CUDA>
@@ -152,29 +157,36 @@ if(SLANG_ENABLE_GFX)
         INCLUDE_DIRECTORIES_PUBLIC
             ${slang_SOURCE_DIR}
             ${slang_SOURCE_DIR}/include
-        REQUIRES copy-gfx-slang-modules
+        INCLUDE_DIRECTORIES_PRIVATE ${NVAPI_INCLUDE_DIRS}
         INSTALL
         EXPORT_SET_NAME SlangTargets
         FOLDER gfx
     )
-    set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
-    add_custom_target(
-        copy-gfx-slang-modules
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${modules_dest_dir}
-        COMMAND
-            ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/gfx/gfx.slang
-            ${modules_dest_dir}/gfx.slang
-        COMMAND
-            ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/gfx/slang.slang
-            ${modules_dest_dir}/slang.slang
-        WORKING_DIRECTORY ${slang_SOURCE_DIR}
-        VERBATIM
-    )
-    set_target_properties(copy-gfx-slang-modules PROPERTIES FOLDER generators)
-    install(
-        FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
-        DESTINATION ${runtime_subdir}
-    )
+    if(SLANG_ENABLE_TESTS)
+        set(modules_dest_dir $<TARGET_FILE_DIR:slang-test>)
+        add_custom_target(
+            copy-gfx-slang-modules
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${modules_dest_dir}
+            COMMAND
+                ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/gfx/gfx.slang
+                ${modules_dest_dir}/gfx.slang
+            COMMAND
+                ${CMAKE_COMMAND} -E copy
+                ${CMAKE_CURRENT_LIST_DIR}/gfx/slang.slang
+                ${modules_dest_dir}/slang.slang
+            WORKING_DIRECTORY ${slang_SOURCE_DIR}
+            VERBATIM
+        )
+        set_target_properties(
+            copy-gfx-slang-modules
+            PROPERTIES FOLDER generators
+        )
+        install(
+            FILES ${modules_dest_dir}/gfx.slang ${modules_dest_dir}/slang.slang
+            DESTINATION ${runtime_subdir}
+        )
+        add_dependencies(gfx copy-gfx-slang-modules)
+    endif()
 
     slang_add_target(
         gfx-util
@@ -235,6 +247,8 @@ if(SLANG_ENABLE_TESTS)
             slang-llvm
             copy-webgpu_dawn
             copy-slang-tint
+            # See issue 5305.
+            copy-prebuilt-binaries
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )

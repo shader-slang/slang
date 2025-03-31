@@ -394,6 +394,11 @@ class GLSLInputAttachmentType : public BuiltinType
 };
 
 
+class DescriptorHandleType : public PointerLikeType
+{
+    SLANG_AST_CLASS(DescriptorHandleType)
+};
+
 // Base class for types used when desugaring parameter block
 // declarations, includeing HLSL `cbuffer` or GLSL `uniform` blocks.
 class ParameterGroupType : public PointerLikeType
@@ -468,6 +473,17 @@ class AtomicType : public DeclRefType
     SLANG_AST_CLASS(AtomicType)
 
     Type* getElementType();
+};
+
+class CoopVectorExpressionType : public ArithmeticExpressionType
+{
+    SLANG_AST_CLASS(CoopVectorExpressionType)
+
+    void _toTextOverride(StringBuilder& out);
+    BasicExpressionType* _getScalarTypeOverride();
+
+    Type* getElementType();
+    IntVal* getElementCount();
 };
 
 // The "type" of an expression that resolves to a type.
@@ -614,13 +630,6 @@ class PtrType : public PtrTypeBase
     SLANG_AST_CLASS(PtrType)
 
     void _toTextOverride(StringBuilder& out);
-};
-
-// A GPU pointer type into global memory.
-
-class ConstBufferPointerType : public PtrTypeBase
-{
-    SLANG_AST_CLASS(ConstBufferPointerType)
 };
 
 /// A pointer-like type used to represent a parameter "direction"

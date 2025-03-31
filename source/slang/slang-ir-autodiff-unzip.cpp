@@ -93,6 +93,22 @@ struct ExtractPrimalFuncContext
             as<IRGeneric>(findOuterGeneric(destFunc)),
             destFunc);
 
+        if (auto origGeneric = as<IRGeneric>(findOuterGeneric(originalFunc)))
+        {
+            // Clone in everything else except the return value.
+            IRBuilder subBuilder(destFunc);
+            builder.setInsertAfter(findOuterGeneric(destFunc)->getFirstBlock()->getLastParam());
+
+            // Clone in any hoistable insts.
+            for (auto child = origGeneric->getFirstBlock()->getFirstOrdinaryInst(); child;
+                 child = child->getNextInst())
+            {
+                if ((child != originalFunc) && !as<IRReturn>(child) &&
+                    !as<IRGlobalValueWithCode>(child))
+                    migrationContext.cloneInst(&subBuilder, child);
+            }
+        }
+
         originalFuncType = as<IRFuncType>(originalFunc->getDataType());
 
         SLANG_RELEASE_ASSERT(originalFuncType);
@@ -316,8 +332,8 @@ bool isIntermediateContextType(IRInst* type)
     case kIROp_Specialize:
         return isIntermediateContextType(as<IRSpecialize>(type)->getBase());
     default:
-        if (as<IRPtrTypeBase>(type))
-            return isIntermediateContextType(as<IRPtrTypeBase>(type)->getValueType());
+        if (auto ptrType = asRelevantPtrType(type))
+            return isIntermediateContextType(ptrType->getValueType());
         return false;
     }
 }
@@ -326,7 +342,7 @@ void markNonContextParamsAsSideEffectFree(IRBuilder* builder, IRFunc* func)
 {
     for (auto param : func->getParams())
     {
-        if (!isIntermediateContextType(param->getDataType()))
+        if (!param->findDecorationImpl(kIROp_PrimalContextDecoration))
             builder->addDecoration(param, kIROp_IgnoreSideEffectsDecoration);
     }
 }
