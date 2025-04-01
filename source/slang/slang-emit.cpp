@@ -1281,15 +1281,6 @@ Result linkAndOptimizeIR(
         //
         legalizeResourceTypes(targetProgram, irModule, sink);
 
-        // We also need to legalize empty types for Metal targets.
-        switch (target)
-        {
-        case CodeGenTarget::Metal:
-        case CodeGenTarget::MetalLib:
-        case CodeGenTarget::MetalLibAssembly:
-            legalizeEmptyTypes(targetProgram, irModule, sink);
-            break;
-        }
         //  Debugging output of legalization
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "LEGALIZED");
