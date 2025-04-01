@@ -122,7 +122,7 @@ struct CleanUpVoidContext
         case kIROp_StructType:
             {
                 List<IRInst*> toRemove;
-                UInt fieldIndex = 0;
+                UInt fieldCount = 0;
                 ShortList<UInt> voidFieldIndex;
                 for (auto child : inst->getChildren())
                 {
@@ -131,10 +131,10 @@ struct CleanUpVoidContext
                         if (field->getFieldType()->getOp() == kIROp_VoidType)
                         {
                             toRemove.add(field);
-                            voidFieldIndex.add(fieldIndex);
+                            voidFieldIndex.add(fieldCount);
                         }
                     }
-                    fieldIndex++;
+                    fieldCount++;
                 }
                 for (auto ii : toRemove)
                     ii->removeAndDeallocate();
@@ -143,13 +143,17 @@ struct CleanUpVoidContext
                 // call sites to remove the arguments corresponding to the void fields.
                 if (inst->hasUses() && voidFieldIndex.getCount())
                 {
+                    UInt currentFieldCount = fieldCount - toRemove.getCount();
                     for (auto use = inst->firstUse; use; use = use->nextUse)
                     {
                         if (auto makeStructInst = as<IRMakeStruct>(use->user))
                         {
-                            for (Int i = 0; i < voidFieldIndex.getCount(); i++)
+                            if (makeStructInst->getOperandCount() != currentFieldCount)
                             {
-                                makeStructInst->removeOperand(voidFieldIndex[i]);
+                                for (Int i = 0; i < voidFieldIndex.getCount(); i++)
+                                {
+                                    makeStructInst->removeOperand(voidFieldIndex[i]);
+                                }
                             }
                         }
                     }
