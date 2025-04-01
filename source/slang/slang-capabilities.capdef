@@ -527,7 +527,11 @@ def SPV_NV_shader_image_footprint : _spirv_1_0;
 
 /// Represents the SPIR-V extension for compute shader derivatives.
 /// [EXT]
-def SPV_NV_compute_shader_derivatives : _spirv_1_0;
+def SPV_KHR_compute_shader_derivatives : _spirv_1_0;
+
+/// Represents the SPIR-V extension for compute shader derivatives.
+/// [EXT]
+alias SPV_NV_compute_shader_derivatives = SPV_KHR_compute_shader_derivatives;
 
 /// Represents the SPIR-V extension for SPV_GOOGLE_user_type.
 /// [EXT]
@@ -971,7 +975,7 @@ alias GL_KHR_shader_subgroup_vote = _GL_KHR_shader_subgroup_vote | spvGroupNonUn
 
 /// Represents the GL_NV_compute_shader_derivatives extension.
 /// [EXT]
-alias GL_NV_compute_shader_derivatives = _GL_NV_compute_shader_derivatives | SPV_NV_compute_shader_derivatives | _sm_6_6;
+alias GL_NV_compute_shader_derivatives = _GL_NV_compute_shader_derivatives | SPV_KHR_compute_shader_derivatives | _sm_6_6;
 
 /// Represents the GL_NV_fragment_shader_barycentric extension.
 /// [EXT]

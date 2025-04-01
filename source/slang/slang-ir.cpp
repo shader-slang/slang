@@ -1692,7 +1692,9 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
     // any parameters of the parent.
     //
     while (insertBeforeInst && insertBeforeInst->getOp() == kIROp_Param)
+    {
         insertBeforeInst = insertBeforeInst->getNextInst();
+    }
 
     // For instructions that will be placed at module scope,
     // we don't care about relative ordering, but for everything
@@ -2490,6 +2492,72 @@ static void canonicalizeInstOperands(IRBuilder& builder, IROp op, ArrayView<IRIn
     }
 }
 
+static void addGlobalValue(IRBuilder* builder, IRInst* value)
+{
+    // If the value is already in the parent, keep it as-is.
+    // Because when the inst is Hoistable, the parent can have
+    // only one instance of the inst. The order among
+    // siblings should remain because the later siblings may
+    // have dependency to the earlier siblings.
+    //
+    if (value->parent)
+    {
+        SLANG_ASSERT(getIROpInfo(value->getOp()).isHoistable());
+        return;
+    }
+
+    // Try to find a suitable parent for the
+    // global value we are emitting.
+    //
+    // We will start out search at the current
+    // parent instruction for the builder, and
+    // possibly work our way up.
+    //
+    auto defaultInsertLoc = builder->getInsertLoc();
+    auto defaultParent = defaultInsertLoc.getParent();
+    auto parent = defaultParent;
+    while (parent)
+    {
+        // Inserting into the top level of a module?
+        // That is fine, and we can stop searching.
+        if (as<IRModuleInst>(parent))
+            break;
+
+        // Inserting into a basic block inside of
+        // a generic? That is okay too.
+        if (auto block = as<IRBlock>(parent))
+        {
+            if (as<IRGeneric>(block->parent))
+                break;
+        }
+
+        // Otherwise, move up the chain.
+        parent = parent->parent;
+    }
+
+    // If we somehow ran out of parents (possibly
+    // because an instruction wasn't linked into
+    // the full hierarchy yet), then we will
+    // fall back to inserting into the overall module.
+    if (!parent)
+    {
+        parent = builder->getModule()->getModuleInst();
+    }
+
+    // If it turns out that we are inserting into the
+    // current "insert into" parent for the builder, then
+    // we need to respect its "insert before" setting
+    // as well.
+    if (parent == defaultParent)
+    {
+        value->insertAt(defaultInsertLoc);
+    }
+    else
+    {
+        value->insertAtEnd(parent);
+    }
+}
+
 IRInst* IRBuilder::_findOrEmitHoistableInst(
     IRType* type,
     IROp op,
@@ -2613,7 +2681,16 @@ IRInst* IRBuilder::_findOrEmitHoistableInst(
         }
     }
 
-    addHoistableInst(this, inst);
+    // When an hoistable inst is already a child, skip adding it.
+    if (inst->parent == nullptr)
+    {
+        // In order to de-duplicate them, Witness-table is marked as Hoistable.
+        // But it is not exactly a hoistable type and it should be added as a global value.
+        if (inst->getOp() == kIROp_WitnessTable)
+            addGlobalValue(this, inst);
+        else
+            addHoistableInst(this, inst);
+    }
 
     return inst;
 }
@@ -4579,60 +4656,6 @@ IRDominatorTree* IRModule::findOrCreateDominatorTree(IRGlobalValueWithCode* func
     }
     analysis->domTree = computeDominatorTree(func);
     return analysis->getDominatorTree();
-}
-
-void addGlobalValue(IRBuilder* builder, IRInst* value)
-{
-    // Try to find a suitable parent for the
-    // global value we are emitting.
-    //
-    // We will start out search at the current
-    // parent instruction for the builder, and
-    // possibly work our way up.
-    //
-    auto defaultInsertLoc = builder->getInsertLoc();
-    auto defaultParent = defaultInsertLoc.getParent();
-    auto parent = defaultParent;
-    while (parent)
-    {
-        // Inserting into the top level of a module?
-        // That is fine, and we can stop searching.
-        if (as<IRModuleInst>(parent))
-            break;
-
-        // Inserting into a basic block inside of
-        // a generic? That is okay too.
-        if (auto block = as<IRBlock>(parent))
-        {
-            if (as<IRGeneric>(block->parent))
-                break;
-        }
-
-        // Otherwise, move up the chain.
-        parent = parent->parent;
-    }
-
-    // If we somehow ran out of parents (possibly
-    // because an instruction wasn't linked into
-    // the full hierarchy yet), then we will
-    // fall back to inserting into the overall module.
-    if (!parent)
-    {
-        parent = builder->getModule()->getModuleInst();
-    }
-
-    // If it turns out that we are inserting into the
-    // current "insert into" parent for the builder, then
-    // we need to respect its "insert before" setting
-    // as well.
-    if (parent == defaultParent)
-    {
-        value->insertAt(defaultInsertLoc);
-    }
-    else
-    {
-        value->insertAtEnd(parent);
-    }
 }
 
 IRInst* IRBuilder::addDifferentiableTypeDictionaryDecoration(IRInst* target)
@@ -7985,7 +8008,11 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
 
             auto user = uu->getUser();
             bool userIsHoistable = getIROpInfo(user->getOp()).isHoistable();
-            if (userIsHoistable)
+
+            // We want to de-duplicate WitnessTable but we don't really want to hoist them.
+            bool userNeedToBeHoisted = userIsHoistable && (user->getOp() != kIROp_WitnessTable);
+
+            if (userNeedToBeHoisted)
             {
                 if (!dedupContext)
                 {
@@ -8002,7 +8029,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
             // to a point before `user`, if it is not already so.
             _maybeHoistOperand(uu);
 
-            if (userIsHoistable)
+            if (userNeedToBeHoisted)
             {
                 // Is the updated inst already exists in the global numbering map?
                 // If so, we need to continue work on replacing the updated inst with the existing
@@ -8950,24 +8977,33 @@ void IRInst::addBlock(IRBlock* block)
     block->insertAtEnd(this);
 }
 
-void IRInst::dump()
+void IRInst::dump(String& outStr)
 {
+    StringBuilder sb;
+
     if (auto intLit = as<IRIntLit>(this))
     {
-        std::cout << intLit->getValue() << std::endl;
+        sb << intLit->getValue();
     }
     else if (auto stringLit = as<IRStringLit>(this))
     {
-        std::cout << stringLit->getStringSlice().begin() << std::endl;
+        sb << stringLit->getStringSlice();
     }
     else
     {
-        StringBuilder sb;
         IRDumpOptions options;
         StringWriter writer(&sb, Slang::WriterFlag::AutoFlush);
         dumpIR(this, options, nullptr, &writer);
-        std::cout << sb.toString().begin() << std::endl;
     }
+
+    outStr = sb.toString();
+}
+
+void IRInst::dump()
+{
+    String s;
+    dump(s);
+    std::cout << s.begin() << std::endl;
 }
 } // namespace Slang
 
