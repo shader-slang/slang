@@ -479,47 +479,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
         args.add(compilerSpecific[i]);
     }
 
-    // According to DirectX Raytracing Specification, PAQs are supported in Shader Model 6.7 and
-    // above
-    bool enablePAQs = false;
-    String profileName = asString(options.profileName);
-    // Check if we're targeting SM 6.7 or higher
-    if (profileName.getLength() > 0)
-    {
-        const UnownedStringSlice profileSlice = profileName.getUnownedSlice();
-        if (profileSlice.startsWith("lib_") || profileSlice.startsWith("sm_"))
-        {
-            // Format is like "lib_6_7" - we want to extract the "6" and "7" parts
-
-            // Get everything after the prefix (e.g., "6_7")
-            const char* start = profileSlice.begin() + (profileSlice.startsWith("lib_") ? 4 : 3);
-            UnownedStringSlice versionString(start, profileSlice.end());
-
-            // Split by '_' to get major and minor
-            UnownedStringSlice majorSlice = StringUtil::getAtInSplit(versionString, '_', 0);
-            UnownedStringSlice minorSlice = StringUtil::getAtInSplit(versionString, '_', 1);
-
-            Int majorVersion = 0;
-            Int minorVersion = 0;
-
-            if (SLANG_SUCCEEDED(StringUtil::parseInt(majorSlice, majorVersion)))
-            {
-                if (majorVersion >= 7)
-                {
-                    // Any shader model 7.x or higher supports PAQs
-                    enablePAQs = true;
-                }
-                else if (
-                    majorVersion == 6 &&
-                    SLANG_SUCCEEDED(StringUtil::parseInt(minorSlice, minorVersion)))
-                {
-                    // For 6.x, we need to check the minor version (must be >= 7)
-                    enablePAQs = minorVersion >= 7;
-                }
-            }
-        }
-    }
-
+    bool enablePAQs = options.enablePAQ;
     if (!enablePAQs)
         args.add(L"-disable-payload-qualifiers");
     else
@@ -599,6 +559,7 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     //
     args.add(L"-no-warnings");
 
+    String profileName = asString(options.profileName);
     // If we are going to link we have to compile in the lib profile style
     if (libraries.getCount() && hasSource)
     {

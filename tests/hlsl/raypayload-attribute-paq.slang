@@ -1,6 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile lib_6_7 -stage raygeneration -entry rayGenShaderA
+//TEST:SIMPLE(filecheck=DXIL): -target dxil -profile lib_6_7 -stage raygeneration -entry rayGenShaderA
 
 // CHECK: struct [raypayload]
+// CHECK: float4 color_0 : read(anyhit) : write(caller);
+// DXIL: define void @
 
 struct [raypayload] RayPayload
 {
