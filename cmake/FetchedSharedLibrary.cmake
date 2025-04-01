@@ -27,17 +27,14 @@ function(download_and_extract archive_name url)
                 "Using existing archive for ${archive_name}: ${archive_path}"
             )
         else()
-            set(download_args
-                ${url}
-                ${archive_path}
-                STATUS
-                status
-            )
-            if (ARG_SLANG_GITHUB_TOKEN)
-                list(APPEND
-                     download_args
-                     HTTPHEADER
-                     "Authorization: token ${ARG_SLANG_GITHUB_TOKEN}")
+            set(download_args ${url} ${archive_path} STATUS status)
+            if(ARG_SLANG_GITHUB_TOKEN)
+                list(
+                    APPEND
+                    download_args
+                    HTTPHEADER
+                    "Authorization: token ${ARG_SLANG_GITHUB_TOKEN}"
+                )
             endif()
 
             file(DOWNLOAD ${download_args})
@@ -49,7 +46,10 @@ function(download_and_extract archive_name url)
                     WARNING
                     "Failed to download ${archive_name} from ${url}: ${status_string} with status code ${status_code}"
                 )
-                message(WARNING "If API rate limit is exceeded, Github allows a higher limit when you use token. Try a cmake option -DSLANG_GITHUB_TOKEN=your_token_here")
+                message(
+                    WARNING
+                    "If API rate limit is exceeded, Github allows a higher limit when you use token. Try a cmake option -DSLANG_GITHUB_TOKEN=your_token_here"
+                )
                 return()
             endif()
         endif()
@@ -113,8 +113,11 @@ function(copy_fetched_shared_library library_name url)
         set(source_object "${url}")
     else()
         # Otherwise, download and extract from whatever URL we have
-        download_and_extract("${library_name}" "${url}"
-                             SLANG_GITHUB_TOKEN ${ARG_SLANG_GITHUB_TOKEN})
+        download_and_extract(
+            "${library_name}"
+            "${url}"
+            SLANG_GITHUB_TOKEN ${ARG_SLANG_GITHUB_TOKEN}
+        )
         if(DEFINED ${library_name}_SOURCE_DIR)
             from_glob(${${library_name}_SOURCE_DIR})
         elseif(ARG_IGNORE_FAILURE)
