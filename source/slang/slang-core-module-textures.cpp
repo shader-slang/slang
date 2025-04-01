@@ -280,7 +280,8 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 params << t << "width";
                 metal << "(*($" << String(paramCount) << ") = $0.get_width("
                       << String(metalMipLevel) << ")),";
-                cuda << "uint32_t width; asm(\\\"txq.width.b32 %0, [%1];\\\" : \\\"=r\\\"(width) : \\\"l\\\"($0)); *($"
+                cuda << "uint32_t width; asm(\\\"txq.width.b32 %0, [%1];\\\" : \\\"=r\\\"(width) : "
+                        "\\\"l\\\"($0)); *($"
                      << String(paramCount) << ") = width;";
                 wgsl << "($" << String(paramCount) << ") = "
                      << wgslTextureAttributeConversion(
@@ -297,7 +298,8 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 params << t << "width,";
                 metal << "(*($" << String(paramCount) << ") = $0.get_width("
                       << String(metalMipLevel) << ")),";
-                cuda << "uint32_t w, h; asm(\\\"txq.width.b32 %0, [%2]; txq.height.b32 %1, [%2];\\\" : \\\"=r\\\"(w), \\\"=r\\\"(h) : \\\"l\\\"($0)); *($"
+                cuda << "uint32_t w, h; asm(\\\"txq.width.b32 %0, [%2]; txq.height.b32 %1, "
+                        "[%2];\\\" : \\\"=r\\\"(w), \\\"=r\\\"(h) : \\\"l\\\"($0)); *($"
                      << String(paramCount) << ") = w;";
                 wgsl << "var dim = textureDimensions($0" << (includeMipInfo ? ", $1" : "") << ");";
                 wgsl << "($" << String(paramCount)
@@ -321,7 +323,9 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 params << t << "width,";
                 metal << "(*($" << String(paramCount) << ") = $0.get_width("
                       << String(metalMipLevel) << ")),";
-                cuda << "uint32_t w, h, d; asm(\\\"txq.width.b32 %0, [%3]; txq.height.b32 %1, [%3]; txq.depth.b32 %2, [%3];\\\" : \\\"=r\\\"(w), \\\"=r\\\"(h), \\\"=r\\\"(d) : \\\"l\\\"($0)); *($"
+                cuda << "uint32_t w, h, d; asm(\\\"txq.width.b32 %0, [%3]; txq.height.b32 %1, "
+                        "[%3]; txq.depth.b32 %2, [%3];\\\" : \\\"=r\\\"(w), \\\"=r\\\"(h), "
+                        "\\\"=r\\\"(d) : \\\"l\\\"($0)); *($"
                      << String(paramCount) << ") = w;";
                 wgsl << "var dim = textureDimensions($0" << (includeMipInfo ? ", $1" : "") << ");";
                 wgsl << "($" << String(paramCount)
@@ -361,14 +365,14 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 ++paramCount;
                 params << ", " << t << "elements";
                 metal << "(*($" << String(paramCount) << ") = $0.get_array_size()),";
-                
+
                 // For cube map arrays, CUDA should include all 6 faces in the array size count
                 // but we can't currently implement this as txq.array_size isn't supported
                 if (cuda.getLength() > 1 && cuda[cuda.getLength() - 1] != ';')
                     cuda << "; ";
-                cuda << "/* txq.array_size not available in CUDA */ *($"
-                     << String(paramCount) << ") = 0;";
-                
+                cuda << "/* txq.array_size not available in CUDA */ *($" << String(paramCount)
+                     << ") = 0;";
+
                 wgsl << "($" << String(paramCount)
                      << ") = " << wgslTextureAttributeConversion(dimType, "textureNumLayers($0)")
                      << ";";
@@ -381,8 +385,8 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 metal << "(*($" << String(paramCount) << ") = $0.get_num_samples()),";
                 if (cuda.getLength() > 1 && cuda[cuda.getLength() - 1] != ';')
                     cuda << "; ";
-                cuda << "/* txq.samples not available in CUDA */ *($"
-                     << String(paramCount) << ") = 0;";
+                cuda << "/* txq.samples not available in CUDA */ *($" << String(paramCount)
+                     << ") = 0;";
                 wgsl << "($" << String(paramCount)
                      << ") = " << wgslTextureAttributeConversion(dimType, "textureNumSamples($0)")
                      << ";";
