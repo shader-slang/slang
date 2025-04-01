@@ -375,7 +375,8 @@ if(SLANG_WEBGPU_DAWN_BINARY_URL)
         "webgpu_dawn"
         "${SLANG_WEBGPU_DAWN_BINARY_URL}"
         IGNORE_FAILURE
-        SLANG_GITHUB_TOKEN ${SLANG_GITHUB_TOKEN}
+        SLANG_GITHUB_TOKEN
+        ${SLANG_GITHUB_TOKEN}
     )
 endif()
 
@@ -388,7 +389,8 @@ if(SLANG_SLANG_TINT_BINARY_URL)
         "slang-tint"
         "${SLANG_SLANG_TINT_BINARY_URL}"
         IGNORE_FAILURE
-        SLANG_GITHUB_TOKEN ${SLANG_GITHUB_TOKEN}
+        SLANG_GITHUB_TOKEN
+        ${SLANG_GITHUB_TOKEN}
     )
 endif()
 
