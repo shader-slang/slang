@@ -690,6 +690,7 @@ struct IRInst
             m_decorationsAndChildren.last);
     }
     void removeAndDeallocateAllDecorationsAndChildren();
+    bool hasDecorationOrChild() { return m_decorationsAndChildren.first != nullptr; }
 
 #ifdef SLANG_ENABLE_IR_BREAK_ALLOC
     // Unique allocation ID for this instruction since start of current process.
