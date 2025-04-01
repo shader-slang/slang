@@ -71,7 +71,10 @@ endfunction()
 function(copy_fetched_shared_library library_name url)
     cmake_parse_arguments(ARG "IGNORE_FAILURE" "" "" ${ARGN})
     cmake_parse_arguments(ARG "" "SLANG_GITHUB_TOKEN" "" ${ARGN})
-    if(ARG_IGNORE_FAILURE)
+
+    # Don't fail ignore failure if a Github token is provided;
+    # as we assume that the token will fix the rate limit issue.
+    if(ARG_IGNORE_FAILURE AND NOT ARG_SLANG_GITHUB_TOKEN)
         set(error_type STATUS)
     else()
         set(error_type SEND_ERROR)
