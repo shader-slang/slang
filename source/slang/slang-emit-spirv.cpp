@@ -608,7 +608,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         for (auto parent = inst; parent; parent = parent->getParent())
         {
-            if (!as<IRFunc>(parent) && !as<IRModuleInst>(parent))
+            if (!as<IRFunc>(parent) && !as<IRModuleInst>(parent) && !as<IRDebugFunction>(parent))
                 continue;
 
             SpvInst* spvInst = nullptr;
@@ -4041,6 +4041,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     operands.getArrayView());
             }
             break;
+        case kIROp_DebugFunction:
+            return emitDebugInlinedFunction(getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                as<IRDebugFunction>(inst));
         case kIROp_DebugInlinedAt:
             return emitDebugInlinedAt(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
@@ -7323,26 +7326,61 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return m_nullDwarfExpr;
     }
 
-    SpvInst* emitDebugScope(SpvInstParent* parent, IRDebugScope* scope)
+    SpvInst* emitDebugScope(SpvInstParent* parent, IRDebugScope* debugScope)
     {
-        if (!scope)
+        auto inlinedAt = ensureInst(debugScope->getInlinedAt());
+        if (!inlinedAt)
             return nullptr;
 
-        auto scopeNeeded = ensureInst(scope->getScope());
-        if (!scopeNeeded)
-            return nullptr;
-
-        auto scope1 = findDebugScope(scope->getScope());
-        if (!scope1)
-            return nullptr;
+        // We may have to restore an older scope.
+        auto restoreScope = as<IRDebugScope>(debugScope->getInlinedAt());
+        SpvInst* scope = nullptr;
+        if (restoreScope)
+        {
+            scope = findDebugScope(debugScope);
+        }
+        else
+        {
+            IRDebugFunction* debugFunc = as<IRDebugFunction>(debugScope->getScope());
+            scope = findDebugScope(debugFunc);
+        }
 
         return emitOpDebugScope(
             parent,
             nullptr,
             m_voidType,
             getNonSemanticDebugInfoExtInst(),
-            scope1,
-            scopeNeeded);
+            scope,
+            inlinedAt);
+    }
+
+
+    SpvInst* emitDebugInlinedFunction(SpvInstParent* parent, IRDebugFunction* debugFunc)
+    {
+        auto scope = findDebugScope(debugFunc);
+        if (!scope)
+            return nullptr;
+        
+        auto debugType = emitDebugType(as<IRType>(debugFunc->getDebugType()));
+        IRBuilder builder(debugFunc);
+
+        auto debugFuncInfo = emitOpDebugFunction(
+            parent,
+            nullptr,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            debugFunc->getName(),
+            debugType,
+            debugFunc->getFile(),
+            debugFunc->getLine(),
+            debugFunc->getCol(),
+            scope,
+            debugFunc->getName(),
+            builder.getIntValue(builder.getUIntType(), 0),
+            debugFunc->getLine());
+
+        registerDebugInst(debugFunc, debugFuncInfo);
+        return debugFuncInfo;
     }
 
     SpvInst* emitDebugNoScope(SpvInstParent* parent)

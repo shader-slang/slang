@@ -3336,16 +3336,22 @@ IRInst* IRBuilder::emitDebugInlinedAt(
     return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedAt, 4, args);
 }
 
+IRInst* IRBuilder::emitDebugFunction(IRInst* name, IRInst* line, IRInst* col, IRInst* file, IRInst* debugType)
+{
+    IRInst* args[] = {name, line, col, file, debugType};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 5, args);
+}
+
 IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)
 {
     IRInst* args[] = {variable, inlinedAt};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedVariable, 2, args);
 }
 
-IRInst* IRBuilder::emitDebugScope(IRInst* scope)
+IRInst* IRBuilder::emitDebugScope(IRInst* scope, IRInst* inlinedAt)
 {
-    IRInst* args[] = {scope};
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 1, args);
+    IRInst* args[] = {scope, inlinedAt};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 2, args);
 }
 
 IRInst* IRBuilder::emitDebugNoScope()

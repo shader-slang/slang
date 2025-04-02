@@ -3433,6 +3433,7 @@ struct IRDebugScope : IRInst
 {
     IR_LEAF_ISA(DebugScope)
     IRInst* getScope() { return getOperand(0); }
+    IRInst* getInlinedAt() { return getOperand(1); }
 };
 
 struct IRDebugNoScope : IRInst
@@ -3446,6 +3447,16 @@ struct IRDebugInlinedVariable : IRInst
     IR_LEAF_ISA(DebugInlinedVariable)
     IRInst* getVariable() { return getOperand(0); }
     IRInst* getInlinedAt() { return getOperand(1); }
+};
+
+struct IRDebugFunction : IRInst
+{
+    IR_LEAF_ISA(DebugFunction)
+    IRInst* getName() { return getOperand(0); }
+    IRInst* getLine() { return getOperand(1); }
+    IRInst* getCol() { return getOperand(2); }
+    IRInst* getFile() { return getOperand(3); }
+    IRInst* getDebugType() { return getOperand(4); }
 };
 
 struct IRDebugLocationDecoration : IRDecoration
@@ -3951,8 +3962,9 @@ public:
     IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue);
     IRInst* emitDebugInlinedAt(IRInst* line, IRInst* col, IRInst* file, IRInst* outerInlinedAt);
     IRInst* emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt);
-    IRInst* emitDebugScope(IRInst* scope);
+    IRInst* emitDebugScope(IRInst* scope, IRInst* inlinedAt);
     IRInst* emitDebugNoScope();
+    IRInst* emitDebugFunction(IRInst* name, IRInst* line, IRInst* col, IRInst* file, IRInst* debugType);
 
     /// Emit an LiveRangeStart instruction indicating the referenced item is live following this
     /// instruction
