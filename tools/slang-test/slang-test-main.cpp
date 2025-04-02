@@ -3746,9 +3746,8 @@ TestResult doImageComparison(TestContext* context, String const& filePath)
     if (SLANG_FAILED(expectedImage.read(expectedPath.getBuffer())))
     {
         reporter->messageFormat(
-            TestMessageType::TestFailure,
-            "Missing or invalid reference image '%s'. Reference images should exist and be "
-            "read-only.",
+            TestMessageType::RunError,
+            "Unable to load image ;%s'",
             expectedPath.getBuffer());
         return TestResult::Fail;
     }
@@ -3758,7 +3757,7 @@ TestResult doImageComparison(TestContext* context, String const& filePath)
     {
         reporter->messageFormat(
             TestMessageType::RunError,
-            "Unable to load image '%s'",
+            "Unable to load image ;%s'",
             actualPath.getBuffer());
         return TestResult::Fail;
     }
@@ -3861,9 +3860,22 @@ TestResult runHLSLRenderComparisonTestImpl(
     auto filePath = input.filePath;
     auto outputStem = input.outputStem;
 
+    String expectedOutput;
     String actualOutput;
 
-    // Only run the actual test case - don't generate .expected.png
+    // Run the expected test case only if we're not skipping reference image generation
+    TestResult hlslResult = TestResult::Pass;
+    if (!context->options.skipReferenceImageGeneration)
+    {
+        hlslResult =
+            doRenderComparisonTestRun(context, input, expectedArg, ".expected", &expectedOutput);
+        if (hlslResult != TestResult::Pass)
+        {
+            return hlslResult;
+        }
+    }
+
+    // Always run the actual test case
     TestResult slangResult =
         doRenderComparisonTestRun(context, input, actualArg, ".actual", &actualOutput);
     if (slangResult != TestResult::Pass)
@@ -3876,12 +3888,31 @@ TestResult runHLSLRenderComparisonTestImpl(
         return TestResult::Pass;
     }
 
+    // Save the expected output if we generated it
+    if (!context->options.skipReferenceImageGeneration)
+    {
+        Slang::File::writeAllText(outputStem + ".expected", expectedOutput);
+    }
+
     Slang::File::writeAllText(outputStem + ".actual", actualOutput);
 
+    if (hlslResult == TestResult::Fail)
+        return TestResult::Fail;
     if (slangResult == TestResult::Fail)
         return TestResult::Fail;
 
+    // Compare text output only if we generated the expected output
+    if (!context->options.skipReferenceImageGeneration && !StringUtil::areLinesEqual(
+                                                              actualOutput.getUnownedSlice(),
+                                                              expectedOutput.getUnownedSlice()))
+    {
+        context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
+
+        return TestResult::Fail;
+    }
+
     // Next do an image comparison on the expected output images!
+
     TestResult imageCompareResult = doImageComparison(context, outputStem);
     if (imageCompareResult != TestResult::Pass)
         return imageCompareResult;
