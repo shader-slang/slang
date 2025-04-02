@@ -294,7 +294,7 @@ INST(GlobalConstant, globalConstant, 0, GLOBAL)
 
 INST(StructKey, key, 0, GLOBAL)
 INST(GlobalGenericParam, global_generic_param, 0, GLOBAL)
-INST(WitnessTable, witness_table, 0, 0)
+INST(WitnessTable, witness_table, 0, HOISTABLE)
 
 INST(IndexedFieldKey, indexedFieldKey, 2, HOISTABLE)
 

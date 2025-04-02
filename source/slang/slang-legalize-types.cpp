@@ -1211,15 +1211,11 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
         LegalType legalElementType;
 
         if (isMetalTarget(context->targetProgram->getTargetReq()) &&
-            as<IRParameterBlockType>(uniformBufferType) &&
-            !context->shouldLegalizeParameterBlockElementType())
+            as<IRParameterBlockType>(uniformBufferType))
         {
             // On Metal, we do not need to legalize the element type of
             // a parameter block because we can translate it directly into
             // an argument buffer.
-            //
-            // But we do need empty type legalized for Metal, because Metal doesn't
-            // allow empty struct in argument buffer.
             legalElementType = LegalType::simple(originalElementType);
         }
         else
