@@ -96,37 +96,38 @@ struct DeferLoweringContext : InstPassBase
         return lastBlock;
     }
 
-    bool isBlockInScope(IRBlock* block, IRDominatorTree* dom, IRBlock* scopeEndBlock)
+    HashSet<IRBlock*> findSuccessorBlocks(IRGlobalValueWithCode* func, IRBlock* block)
     {
-        if (block == scopeEndBlock)
-            return false;
+        HashSet<IRBlock*> successorBlocksSet;
+        List<IRBlock*> workList;
+        workList.add(block);
 
-        // Technically, we'd like to know if 'scopeEndBlock' is a predecessor of
-        // 'block'. This is usually the same as 'scopeEndBlock' dominating the
-        // given block, except for when a statement can jump over the scope end
-        // without completely exiting the dominance of the 'defer' statement
-        // itself. The only case like this is the continue statement of a for
-        // loop.
-        if (dom->properlyDominates(scopeEndBlock, block))
-            return false;
-
-        // The continuation block is not always dominated by the end of the
-        // scope, since a continue statement is another way to get there.
-        // Luckily, we can just check if the scope end is directly succeeded by
-        // the target block, which is the case in for loops.
-        for (auto successor : scopeEndBlock->getSuccessors())
+        List<IRBlock*> postorder = getPostorder(func);
+        Index limitIndex = postorder.indexOf(block);
+        while (workList.getCount() > 0)
         {
-            if (successor == block)
-                return false;
-        }
+            IRBlock* predecessor = workList.getLast();
+            workList.removeLast();
+            if (successorBlocksSet.contains(predecessor))
+                continue;
 
-        return true;
+            Index predecessorIndex = postorder.indexOf(predecessor);
+            // Does not succeed if it is after the given block in postorder.
+            if (predecessorIndex > limitIndex)
+                continue;
+
+            successorBlocksSet.add(predecessor);
+            for (IRBlock* successor : predecessor->getSuccessors())
+                workList.add(successor);
+        }
+        return successorBlocksSet;
     }
 
     void processFunc(IRGlobalValueWithCode* func)
     {
         // Iterating over `defer` instructions in reverse order allows us to
         // expand them in the correct order, including nested `defer`s.
+        // We also use this to determine scope extents.
         List<IRBlock*> reverseBlocks = getReversePostorderOnReverseCFG(func);
         List<IRDefer*> unhandledDefers;
 
@@ -165,11 +166,14 @@ struct DeferLoweringContext : InstPassBase
             }
 
             auto dominatedBlocks = dom->getProperlyDominatedBlocks(mergeBlock);
+
+
+            HashSet<IRBlock*> scopeSuccessorBlocksSet = findSuccessorBlocks(func, scopeEndBlock);
             HashSet<IRBlock*> scopeBlocksSet;
             scopeBlocksSet.add(mergeBlock);
             for (IRBlock* block : dominatedBlocks)
             {
-                if (isBlockInScope(block, dom, scopeEndBlock))
+                if (!scopeSuccessorBlocksSet.contains(block))
                     scopeBlocksSet.add(block);
             }
 

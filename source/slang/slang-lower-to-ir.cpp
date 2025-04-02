@@ -6025,6 +6025,53 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         startBlock();
     }
 
+    /// Create a new scope end block and return the previous one.
+    ///
+    /// This is needed for `defer` to be aware of scopes. `preallocated` can
+    /// be specified if you already have a block at the end of the scope, like
+    /// in `for` loops.
+    IRBlock* pushScopeBlock(IRBlock* preallocated = nullptr)
+    {
+        IRBlock* prevScopeEndBlock = context->scopeEndBlock;
+
+        auto builder = getBuilder();
+        context->scopeEndBlock = preallocated ? preallocated : builder->createBlock();
+        return prevScopeEndBlock;
+    }
+
+    /// Pop the current scope end block and restore the previous one.
+    ///
+    /// This is needed for `defer` to be aware of scopes. `previous` should be
+    /// the block returned from the corresponding pushScopeBlock. `preallocated`
+    /// should be true if the corresponding pushScopeBlock was given a block
+    /// as a parameter.
+    void popScopeBlock(IRBlock* previous, bool preallocated)
+    {
+        if (!preallocated)
+        {
+            // If pushScopeBlock actually created the block, we have to insert
+            // or deallocate it here. Otherwise, we assume that the caller
+            // handles the end block.
+            auto builder = getBuilder();
+            if (context->scopeEndBlock->hasUses())
+            {
+                // The end of the scope was referenced, so we need to actually
+                // keep it around and jump through it.
+                // Move the terminator to the scope end block.
+                emitBranchIfNeeded(context->scopeEndBlock);
+                builder->insertBlock(context->scopeEndBlock);
+                builder->setInsertInto(context->scopeEndBlock);
+            }
+            else
+            {
+                // Scope end block was left unused, so we may as well delete it.
+                context->scopeEndBlock->removeAndDeallocate();
+            }
+        }
+
+        context->scopeEndBlock = previous;
+    }
+
     void visitIfStmt(IfStmt* stmt)
     {
         auto builder = getBuilder();
@@ -6154,7 +6201,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
+        IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
+        popScopeBlock(prevScopeEndBlock, true);
 
         if (auto inferredMaxIters = stmt->findModifier<InferredMaxItersAttribute>())
         {
@@ -6433,32 +6482,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     void visitBlockStmt(BlockStmt* stmt)
     {
-        // Blocks affect the `defer` statement, so we need to track their scopes
-        // with a decorator in the IR.
-        IRBlock* prevScopeEndBlock = context->scopeEndBlock;
-
-        auto builder = getBuilder();
-        context->scopeEndBlock = builder->createBlock();
+        IRBlock* prevScopeEndBlock = pushScopeBlock(nullptr);
 
         // To lower a block (scope) statement, just lower its body.
         lowerStmt(context, stmt->body);
 
-        if (context->scopeEndBlock->hasUses())
-        {
-            // The end of the scope was referenced, so we need to actually
-            // keep it around and jump through it.
-            // Move the terminator to the scope end block.
-            emitBranchIfNeeded(context->scopeEndBlock);
-            builder->insertBlock(context->scopeEndBlock);
-            builder->setInsertInto(context->scopeEndBlock);
-        }
-        else
-        {
-            // Scope end block was left unused, so we may as well delete it.
-            context->scopeEndBlock->removeAndDeallocate();
-        }
-
-        context->scopeEndBlock = prevScopeEndBlock;
+        popScopeBlock(prevScopeEndBlock, false);
     }
 
     void visitReturnStmt(ReturnStmt* stmt)
