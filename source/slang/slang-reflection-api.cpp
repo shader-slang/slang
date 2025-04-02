@@ -3305,6 +3305,23 @@ SLANG_API size_t spReflectionVariableLayout_GetSpace(
     return space;
 }
 
+SLANG_API SlangImageFormat
+spReflectionVariableLayout_GetImageFormat(SlangReflectionVariableLayout* inVarLayout)
+{
+    auto varLayout = convert(inVarLayout);
+    if (!varLayout)
+        return SLANG_IMAGE_FORMAT_unknown;
+
+    if (auto leafVar = varLayout->getVariable())
+    {
+        if (auto formatAttrib = leafVar->findModifier<FormatAttribute>())
+        {
+            return (SlangImageFormat)formatAttrib->format;
+        }
+    }
+    return SLANG_IMAGE_FORMAT_unknown;
+}
+
 SLANG_API char const* spReflectionVariableLayout_GetSemanticName(
     SlangReflectionVariableLayout* inVarLayout)
 {

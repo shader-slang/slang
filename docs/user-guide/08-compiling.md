@@ -179,6 +179,13 @@ we can compile the `computeMain()` entry point to SPIR-V using the following com
 slangc hello-world.slang -target spirv -o hello-world.spv
 ```
 
+> #### Note ####
+> Some targets require additional parameters. See [`slangc` Entry Points](#slangc-entry-points) for details. For example, to target HLSL, the equivalent command is:
+>
+> ```bat
+> slangc hello-world.slang -target hlsl -entry computeMain -o hello-world.hlsl
+> ```
+
 ### Source Files and Translation Units
 
 The `hello-world.slang` argument here is specifying an input file.
@@ -193,7 +200,7 @@ If multiple source files are passed to `slangc`, they will be grouped into trans
 
 * Each `.slang-module` file forms its own translation unit.
 
-### Entry Points
+### `slangc` Entry Points
 
 When using `slangc`, you will typically want to identify which entry point(s) you intend to compile.
 The `-entry computeMain` option selects an entry point to be compiled to output code in this invocation of `slangc`.
@@ -210,7 +217,10 @@ In code that does not use `[shader(...)]` attributes, a `-entry` option should b
 slangc hello-world.slang -entry computeMain -stage compute -target spirv -o hello-world.spv
 ```
 
-### Targets
+> #### Note ####
+> The `slangc` CLI [currently](https://github.com/shader-slang/slang/issues/5541) cannot automatically deduce `-entrypoint` and `-stage`/`-profile` options from `[shader(...)]` attributes when generating code for targets other than SPIRV, Metal, CUDA, or Optix. For targets such as HLSL, please continue to specify `-entry` and `-stage` options, even when compiling a file with the `[shader(...)]` attribute on its entry point.
+
+### `slangc` Targets
 
 Our example uses the option `-target spirv` to introduce a compilation target; in this case, code will be generated as SPIR-V.
 The argument of a `-target` option specified the format to use for the target; common values are `dxbc`, `dxil`, and `spirv`.
@@ -223,7 +233,7 @@ Slang provides two main kinds of profiles for use with `slangc`:
 
 * GLSL versions can be used as profile with names like `glsl_430` and `glsl_460`
 
-### Kernels
+### `slangc` Kernels
 
 A `-o` option indicates that kernel code should be written to a file on disk.
 In our example, the SPIR-V kernel code for the `computeMain()` entry point will be written to the file `hello-world.spv`.

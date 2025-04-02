@@ -20,9 +20,7 @@ endif()
 
 # Similarly, disable warnings for external projects
 if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
-    if(MSVC)
-        add_compile_options(/W0)
-    else()
+    if(NOT MSVC)
         add_compile_options(-w)
     endif()
 endif()

@@ -341,6 +341,7 @@ static Result _calcSizeAndAlignment(
     case kIROp_ComPtrType:
     case kIROp_NativeStringType:
     case kIROp_RaytracingAccelerationStructureType:
+    case kIROp_FuncType:
         {
             *outSizeAndAlignment = IRSizeAndAlignment(kPointerSize, kPointerSize);
             return SLANG_OK;

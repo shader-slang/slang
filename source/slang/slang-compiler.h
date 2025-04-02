@@ -1832,6 +1832,18 @@ private:
 
     // Source files that have been pulled into the module with `__include`.
     Dictionary<SourceFile*, FileDecl*> m_mapSourceFileToFileDecl;
+
+public:
+    SLANG_NO_THROW SlangResult SLANG_MCALL disassemble(slang::IBlob** outDisassembledBlob) override
+    {
+        if (!outDisassembledBlob)
+            return SLANG_E_INVALID_ARG;
+        String disassembly;
+        this->getIRModule()->getModuleInst()->dump(disassembly);
+        auto blob = StringUtil::createStringBlob(disassembly);
+        *outDisassembledBlob = blob.detach();
+        return SLANG_OK;
+    }
 };
 typedef Module LoadedModule;
 
@@ -1956,6 +1968,7 @@ bool isMetalTarget(TargetRequest* targetReq);
 
 /// Are we generating code for a Khronos API (OpenGL or Vulkan)?
 bool isKhronosTarget(TargetRequest* targetReq);
+bool isKhronosTarget(CodeGenTarget target);
 
 /// Are we generating code for a CUDA API (CUDA / OptiX)?
 bool isCUDATarget(TargetRequest* targetReq);
@@ -1965,6 +1978,7 @@ bool isCPUTarget(TargetRequest* targetReq);
 
 /// Are we generating code for the WebGPU API?
 bool isWGPUTarget(TargetRequest* targetReq);
+bool isWGPUTarget(CodeGenTarget target);
 
 /// A request to generate output in some target format.
 class TargetRequest : public RefObject

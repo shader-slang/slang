@@ -2,6 +2,7 @@
 #include "slang-reflection-json.h"
 
 #include "../core/slang-blob.h"
+#include "slang-ast-support-types.h"
 
 template<typename T>
 struct Range
@@ -236,6 +237,15 @@ static void emitReflectionVarBindingInfoJSON(
             writer.maybeComma();
             writer << "\"semanticIndex\": " << int(semanticIndex);
         }
+    }
+
+    if (auto format = var->getImageFormat())
+    {
+        writer.maybeComma();
+        auto formatName = getImageFormatInfo((Slang::ImageFormat)format).name;
+        writer << "\"format\": \"";
+        writer << formatName;
+        writer << "\"";
     }
 }
 

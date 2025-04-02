@@ -61,10 +61,8 @@ struct ReinterpretLoweringContext
         auto fromType = operand->getDataType();
         auto toType = inst->getDataType();
         SlangInt fromTypeSize = getAnyValueSize(fromType);
-        bool cantPack = false;
         if (fromTypeSize < 0)
         {
-            cantPack = true;
             sink->diagnose(
                 inst->sourceLoc,
                 Slang::Diagnostics::typeCannotBePackedIntoAnyValue,
@@ -73,21 +71,10 @@ struct ReinterpretLoweringContext
         SlangInt toTypeSize = getAnyValueSize(toType);
         if (toTypeSize < 0)
         {
-            cantPack = true;
             sink->diagnose(
                 inst->sourceLoc,
                 Slang::Diagnostics::typeCannotBePackedIntoAnyValue,
                 toType);
-        }
-        if (fromTypeSize != toTypeSize && !cantPack && !as<IRExtractExistentialType>(fromType))
-        {
-            sink->diagnose(
-                inst->sourceLoc,
-                Slang::Diagnostics::notEqualReinterpretCastSize,
-                fromType,
-                fromTypeSize,
-                toType,
-                toTypeSize);
         }
         SlangInt anyValueSize = Math::Max(fromTypeSize, toTypeSize);
 

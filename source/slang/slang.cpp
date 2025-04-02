@@ -2879,7 +2879,7 @@ static void collectExportedConstantInContainer(
         if (!varMember->val)
             continue;
         bool isExported = false;
-        bool isConst = true;
+        bool isConst = false;
         bool isExtern = false;
         for (auto modifier : m->modifiers)
         {
@@ -2892,8 +2892,6 @@ static void collectExportedConstantInContainer(
             }
             if (as<ConstModifier>(modifier))
                 isConst = true;
-            if (isExported && isConst)
-                break;
         }
         if (isExported && isConst)
         {
