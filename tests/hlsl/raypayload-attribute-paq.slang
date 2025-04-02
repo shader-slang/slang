@@ -2,16 +2,16 @@
 //TEST:SIMPLE(filecheck=DXIL): -target dxil -profile lib_6_7 -stage raygeneration -entry rayGenShaderA
 
 // CHECK: struct [raypayload]
-// CHECK: float4 color_0 : read(anyhit) : write(caller);
+// CHECK: float4 color_0 : read(caller, anyhit) : write(caller);
 // DXIL: define void @
+// DXIL: !dx.dxrPayloadAnnotations
 
 struct [raypayload] RayPayload
 {
-    float4 color : write(caller) : read(anyhit);
-
+    float4 color : read(caller, anyhit) : write(caller);
 };
 
-uniform RWTexture2D resultTexture;
+uniform RWTexture2D<float4> resultTexture;
 uniform RaytracingAccelerationStructure sceneBVH;
 
 [shader("raygeneration")]

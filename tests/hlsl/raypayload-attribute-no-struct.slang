@@ -1,6 +1,8 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile lib_6_7 -stage raygeneration -entry rayGenShaderA
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile lib_6_6 -stage raygeneration -entry rayGenShaderA
+//TEST:SIMPLE(filecheck=DXIL): -target dxil -profile lib_6_6 -stage raygeneration -entry rayGenShaderA
 
-// CHECK: struct [raypayload]
+// CHECK: struct RayPayload
+// DXIL: define void @
 
 uniform RWTexture2D resultTexture;
 uniform RaytracingAccelerationStructure sceneBVH;
