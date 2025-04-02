@@ -240,9 +240,7 @@ struct DeferLoweringContext : InstPassBase
 
     void processModule()
     {
-        processInstsOfType<IRFunc>(
-            kIROp_Func,
-            [&](IRFunc* func) { processFunc(func); });
+        processInstsOfType<IRFunc>(kIROp_Func, [&](IRFunc* func) { processFunc(func); });
     }
 };
 

@@ -1,6 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE: -vk -shaderobj -output-using-type
-//DISABLE_TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
