@@ -159,7 +159,7 @@ jobs:
             fi
           fi
       - name: Test Slang
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.platform != 'aarch64'
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
