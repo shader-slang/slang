@@ -126,7 +126,7 @@ jobs:
               popd
               cmake --workflow --preset generators --fresh
               mkdir generators
-              cmake --install build --prefix generators --component generators
+              cmake --install build --config Release --component generators --prefix generators
               emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
               cmake --build --preset emscripten --config "$cmake_config" --target slang-wasm
               [ -f "build.em/$cmake_config/bin/slang-wasm.wasm" ]
@@ -159,7 +159,7 @@ jobs:
             fi
           fi
       - name: Test Slang
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.platform != 'aarch64'
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1

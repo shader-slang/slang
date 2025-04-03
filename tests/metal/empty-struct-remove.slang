@@ -1,6 +1,6 @@
 
-//TEST:SIMPLE(filecheck=LIB):-target metallib -entry computeMain -stage compute -DMETAL
-//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute -DMETAL
+//TEST:SIMPLE(filecheck=LIB):-target metallib -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=METAL):-target metal -entry computeMain -stage compute
 
 // METAL-NOT: struct emptyStruct
 struct emptyStruct

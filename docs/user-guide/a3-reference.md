@@ -7,5 +7,5 @@ Reference
 ============================
 
 In this chapter:
-1. [Reference for all Capability Profiles](a3-01-Reference-Capability-Profiles.md)
-2. [Reference for all Capability Atoms](a3-02-Reference-Capability-Atoms.md)
+1. [Reference for all Capability Profiles](a3-01-reference-capability-profiles.md)
+2. [Reference for all Capability Atoms](a3-02-reference-capability-atoms.md)

@@ -334,4 +334,4 @@ If you're new to the project or looking for a good starting point, consider expl
 Join our [Discussions](https://github.com/shader-slang/slang/discussions).
 
 ## License
-By contributing to Shader-Slang, you agree that your contributions will be licensed under the MIT License. The full text of the License can be found in the [LICENSE](LICENSE) file in the root of the repository.
+By contributing to Shader-Slang, you agree that your contributions will be licensed under the Apache License 2.0 with LLVM Exception. The full text of the License can be found in the [LICENSE](LICENSE) file in the root of the repository.
