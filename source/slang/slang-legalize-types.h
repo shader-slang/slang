@@ -660,6 +660,10 @@ struct IRTypeLegalizationContext
         LegalType legalElementType,
         IRInst* layoutOperand) = 0;
 
+    /// Customization point to decide whether a parameter block type should be legalized.
+    ///
+    /// This function is called in `legalizeTypeImpl` to decide whether a parameter block
+    /// type should be legalized. Not all legalization passes need to legalize parameter block.
     virtual bool shouldLegalizeParameterBlockElementType() { return false; }
 };
 
