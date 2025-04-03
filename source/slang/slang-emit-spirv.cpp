@@ -1565,6 +1565,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     break;
                 case SpvStorageClassNodePayloadAMDX:
                     requireSPIRVCapability(SpvCapabilityShaderEnqueueAMDX);
+                    requireSPIRVCapability(SpvCapabilityVariablePointers); // TODO: need to relocate to a more proper place.
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_AMDX_shader_enqueue"));
                     break;
                 }
