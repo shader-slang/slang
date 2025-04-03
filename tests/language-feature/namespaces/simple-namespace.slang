@@ -3,9 +3,11 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 
 // Test that simple `namespace` declarations work as expected
+// Test that the global scope operator `::` works as expected
 
 namespace A
 {
+    static int num = 16;
     struct X
     {
         int val;
@@ -47,7 +49,10 @@ namespace A
 int test(int val)
 {
     A.X a = A::makeX(val);
-    B::X b = B.makeX(val*16, val*256);
+    // Use the global scope operator "::A::num" to access the static member of namespace A
+    // Test it with mul operator
+    int num = 16*::A::num;
+    B::X b = B.makeX(val*16, val*num);
 
     return a.getVal() + b.getHead() + b.getTail();
 }

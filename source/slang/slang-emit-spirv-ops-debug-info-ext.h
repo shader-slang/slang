@@ -401,6 +401,28 @@ SpvInst* emitOpDebugTypePointer(
 }
 
 template<typename T>
+SpvInst* emitOpDebugTypeQualifier(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& idResultType,
+    SpvInst* set,
+    SpvInst* baseType,
+    IRInst* typeQualifier)
+{
+    static_assert(isSingular<T>);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpExtInst,
+        idResultType,
+        kResultID,
+        set,
+        SpvWord(4),
+        baseType,
+        typeQualifier);
+}
+
+template<typename T>
 SpvInst* emitOpDebugScope(
     SpvInstParent* parent,
     IRInst* inst,

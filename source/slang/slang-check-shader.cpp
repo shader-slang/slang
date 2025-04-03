@@ -691,6 +691,12 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
     //
     validateEntryPoint(entryPoint, sink);
 
+    // We should return nullptr if entry point fails to validate
+    if (sink->getErrorCount())
+    {
+        return nullptr;
+    }
+
     return entryPoint;
 }
 

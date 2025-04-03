@@ -1962,8 +1962,6 @@ static LegalVal coerceToLegalType(IRTypeLegalizationContext* context, LegalType 
             ShortList<IRInst*> fields;
             for (auto field : structType->getFields())
             {
-                if (as<IRVoidType>(field->getFieldType()))
-                    continue;
                 auto fieldVal = coerceToLegalType(
                     context,
                     LegalType::simple(field->getFieldType()),
@@ -4125,6 +4123,11 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 
     bool isSimpleType(IRType* type) override
     {
+        if (isMetalTarget(targetProgram->getTargetReq()))
+        {
+            return false;
+        }
+
         // If type is used as public interface, then treat it as simple.
         for (auto decor : type->getDecorations())
         {
@@ -4146,6 +4149,11 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
     LegalType createLegalUniformBufferType(IROp, LegalType, IRInst*) override
     {
         return LegalType();
+    }
+
+    virtual bool shouldLegalizeParameterBlockElementType() override
+    {
+        return isMetalTarget(targetProgram->getTargetReq());
     }
 };
 
