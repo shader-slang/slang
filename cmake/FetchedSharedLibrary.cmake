@@ -69,10 +69,9 @@ endfunction()
 # Otherwise, the 'url' is interpreted as an URL, and the content of the URL will be fetched, extracted and searched
 # for the shared library to produce the install rule.
 function(copy_fetched_shared_library library_name url)
-    cmake_parse_arguments(ARG "IGNORE_FAILURE" "" "" ${ARGN})
-    cmake_parse_arguments(ARG "" "SLANG_GITHUB_TOKEN" "" ${ARGN})
+    cmake_parse_arguments(ARG "IGNORE_FAILURE" "SLANG_GITHUB_TOKEN" "" ${ARGN})
 
-    # Don't fail ignore failure if a Github token is provided;
+    # Don't ignore failure if a Github token is provided;
     # as we assume that the token will fix the rate limit issue.
     if(ARG_IGNORE_FAILURE AND NOT ARG_SLANG_GITHUB_TOKEN)
         set(error_type STATUS)
