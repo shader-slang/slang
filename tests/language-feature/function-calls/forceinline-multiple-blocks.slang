@@ -15,17 +15,18 @@ int inlineMultipleBasicBlocks(int value)
 {
     int result = 0;
     
-    // Create multiple basic blocks with conditional statements
-    if (value > 10)
+    result = value * 2;
+    result = calculateAdjustment(result);
+
+    // Add another branch to create more basic blocks
+    if (result > 20)
     {
-        result = value * 2;
-        result = calculateAdjustment(result);
+        result = result + 25;
     }
-    else
-    {
-        result = value + 5;
-    }
-    
+
+    result = value * 4;
+    //result = calculateAdjustment(result);
+
     // Add another branch to create more basic blocks
     if (result < 20)
     {
@@ -41,12 +42,16 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     int i = dispatchThreadID.x;
     
     // Call the forceinline function
-    int result = inlineMultipleBasicBlocks(16);
+    int result1 = inlineMultipleBasicBlocks(16);
+
+    //int result2 = inlineMultipleBasicBlocks(22);
+
+    int result3 = calculateAdjustment(2);
     
-    outputBuffer[i] = result;
+    outputBuffer[i] = result1+result3;
 }
 
 // CHECK-COUNT-3: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugFunction %{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} %uint_{{[0-9]+}} %uint_{{[0-9]+}} %{{[0-9]+}} %{{[0-9]+}} %uint_{{[0-9]+}} %uint_{{[0-9]+}}
 // CHECK-COUNT-1: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugInlinedAt %uint_{{[0-9]+}} %{{[0-9]+}}
-// CHECK-COUNT-7: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
-// CHECK-COUNT-1: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
+// CHECK-COUNT-2: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
+// CHECK-COUNT-1: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScoped

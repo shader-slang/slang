@@ -3071,6 +3071,7 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_DebugScope:
     case kIROp_DebugNoScope:
     case kIROp_DebugInlinedVariable:
+    case kIROp_DebugFunction:
         // Debug information instructions should be ignored during C-like emission
         break;
     default:

@@ -3427,6 +3427,7 @@ struct IRDebugInlinedAt : IRInst
     IRInst* getCol() { return getOperand(1); }
     IRInst* getFile() { return getOperand(2); }
     IRInst* getOuterInlinedAt() { return getOperand(3); }
+    IRInst* getDebugFunc() { return getOperand(4); }
 };
 
 struct IRDebugScope : IRInst
@@ -3960,7 +3961,7 @@ public:
         IRInst* col,
         IRInst* argIndex = nullptr);
     IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue);
-    IRInst* emitDebugInlinedAt(IRInst* line, IRInst* col, IRInst* file, IRInst* outerInlinedAt);
+    IRInst* emitDebugInlinedAt(IRInst* line, IRInst* col, IRInst* file, IRInst* outerInlinedAt, IRInst* debugFunc);
     IRInst* emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt);
     IRInst* emitDebugScope(IRInst* scope, IRInst* inlinedAt);
     IRInst* emitDebugNoScope();
