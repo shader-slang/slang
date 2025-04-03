@@ -180,7 +180,7 @@ bool TEST_sampler<T>(
         ;
 }
 
-bool TEST_load<T>(
+bool TEST_sparse<T>(
      Sampler2D<T> s2D,
      Sampler2DMS<T> s2DMS)
      where T : ITexelElement, IArithmetic
@@ -220,7 +220,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
             st2DArray_f32v4,
             )
         && TEST_combinedDepth()
-        && TEST_load(st2D_f32v4, st2DMS_f32v4)
+        && TEST_sparse(st2D_f32v4, st2DMS_f32v4)
         ;
 
     //CHK:1
