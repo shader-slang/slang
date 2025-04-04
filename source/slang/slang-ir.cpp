@@ -5750,6 +5750,13 @@ IRInst* IRBuilder::emitCheckpointObject(IRInst* value)
     return inst;
 }
 
+IRInst* IRBuilder::emitLoopExitValue(IRInst* value)
+{
+    auto inst = createInst<IRLoopExitValue>(this, kIROp_LoopExitValue, value->getFullType(), value);
+    addInst(inst);
+    return inst;
+}
+
 IRInst* IRBuilder::emitBranch(IRBlock* pBlock)
 {
     auto inst = createInst<IRUnconditionalBranch>(this, kIROp_unconditionalBranch, nullptr, pBlock);

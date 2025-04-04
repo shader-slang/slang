@@ -147,6 +147,20 @@ bool isNoDiffType(IRType* paramType)
     return false;
 }
 
+// Return true if the result type and all the parameter types are no_diff
+bool isNeverDiffFuncType(IRFuncType* const funcType)
+{
+    const auto resultType = funcType->getResultType();
+    if (!isNoDiffType(resultType))
+        return false;
+    for (const auto p : funcType->getParamTypes())
+    {
+        if (!isNoDiffType(p))
+            return false;
+    }
+    return true;
+}
+
 IRInst* lookupForwardDerivativeReference(IRInst* primalFunction)
 {
     if (auto jvpDefinition = primalFunction->findDecoration<IRForwardDerivativeDecoration>())
