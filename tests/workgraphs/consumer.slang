@@ -30,12 +30,8 @@ void computeMain(uint3 dispatchThreadId : SV_GroupThreadID)
 //CHK: [[PayloadType:%[a-zA-Z_0-9]+]] = OpTypeNodePayloadArrayAMDX [[StructType]]
 //CHK: [[NodePtrType:%[a-zA-Z_0-9]+]] = OpTypePointer NodePayloadAMDX [[PayloadType]]
 //CHK: [[NodePtrVar:%[a-zA-Z_0-9]+]] = OpVariable [[NodePtrType]] NodePayloadAMDX
-//CHK: [[TempPtrType:%[a-zA-Z_0-9]+]] = OpTypePointer Function [[PayloadType]]
-//CHK: [[FuncPtrType:%[a-zA-Z_0-9]+]] = OpTypePointer Function [[StructType]]
+//CHK: [[StructPtrType:%[a-zA-Z_0-9]+]] = OpTypePointer NodePayloadAMDX [[StructType]]
 
 //CHK: ; Function
-//CHK: [[TempPtrVar:%[a-zA-Z_0-9]+]] = OpVariable [[TempPtrType]] Function
-//CHK: [[Loaded:%[a-zA-Z_0-9]+]] = OpLoad [[PayloadType]] [[NodePtrVar]]
-//CHK: OpStore [[TempPtrVar]] [[Loaded]]
-//CHK: = OpAccessChain [[FuncPtrType]] [[TempPtrVar]]
+//CHK: = OpAccessChain [[StructPtrType]] [[NodePtrVar]]
 

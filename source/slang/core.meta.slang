@@ -4227,9 +4227,9 @@ struct __SPIRVNodePayloadArray;
 __generic<BaseType, let nodeID : int>
 typealias NodePayloadArrayPtr = Ptr<__SPIRVNodePayloadArray<BaseType, nodeID>, $( (uint64_t)AddressSpace::NodePayloadAMDX)>;
 
-/// @public
-/// FunctionPtr is a pointer type for "Function" storage-class and it points to a `BaseType`.
+/// @internal
+/// NodePayloadPtr is a pointer type for "NodePayloadAMDX" storage-class and it points to a `RecordType`.
 ///
-__generic<BaseType>
-typealias FunctionPtr = Ptr<BaseType, $( (uint64_t)AddressSpace::Function)>;
+__generic<RecordType>
+typealias NodePayloadPtr = Ptr<RecordType, $( (uint64_t)AddressSpace::NodePayloadAMDX)>;
 

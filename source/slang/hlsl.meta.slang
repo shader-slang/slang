@@ -24353,11 +24353,11 @@ int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
 __generic<RecordType, let nodeID : int>
 struct ThreadNodeOutputRecords
 {
-    FunctionPtr<__SPIRVNodePayloadArray<RecordType, nodeID>> alloc;
+    NodePayloadArrayPtr<RecordType, nodeID> alloc;
 
     [ForceInline]
     [require(hlsl_spirv)] // [require(hlsl_spirv, thread)]
-    __init(int recordCount, int nodeIndex = 0)
+    __init(int recordCount, int nodeIndex = 0) // , constexpr String nodeStr)
     {
         __target_switch
         {
@@ -24365,16 +24365,11 @@ struct ThreadNodeOutputRecords
         case spirv:
             alloc = spirv_asm
             {
-                %alloc = OpAllocateNodePayloadsAMDX $$NodePayloadArrayPtr<RecordType, nodeID> Workgroup $recordCount $nodeIndex;
-
-                %loaded = OpLoad $$__SPIRVNodePayloadArray<RecordType, nodeID> %alloc;
-
-                %tempPtrVar  = OpVariable $$FunctionPtr<__SPIRVNodePayloadArray<RecordType, nodeID>> Function;
-                OpStore %tempPtrVar %loaded;
-
-                result : $$FunctionPtr<__SPIRVNodePayloadArray<RecordType, nodeID>> = OpCopyObject %tempPtrVar;
+                //TODO: `String` doesn't seem to work inside of spirv_asm.
+                //%nodeStr = OpConstantStringAMDX $nodeStr;
+                //OpDecorateId $$__SPIRVNodePayloadArray<BaseType, nodeID> PayloadNodeNameAMDX %nodeStr;
+                result = OpAllocateNodePayloadsAMDX $$NodePayloadArrayPtr<RecordType, nodeID> Workgroup $recordCount $nodeIndex;
             };
-            return;
         }
     }
 
@@ -24389,14 +24384,15 @@ struct ThreadNodeOutputRecords
         }
     }
 
-    __subscript(uint index) -> FunctionPtr<RecordType>
+    __subscript(uint index) -> NodePayloadPtr<RecordType>
     {
         [ForceInline]
         get { return Get(index); }
     }
 
     [ForceInline]
-    FunctionPtr<RecordType> Get(int index = 0)
+    [require(hlsl_spirv)] // [require(hlsl_spirv, thread)]
+    NodePayloadPtr<RecordType> Get(int index = 0)
     {
         __target_switch
         {
@@ -24404,7 +24400,7 @@ struct ThreadNodeOutputRecords
         case spirv:
             return spirv_asm
             {
-                result : $$FunctionPtr<RecordType> = OpAccessChain $alloc $index
+                result : $$NodePayloadPtr<RecordType> = OpAccessChain $alloc $index
             };
         }
     }
@@ -24416,8 +24412,31 @@ struct ThreadNodeOutputRecords
 __generic<RecordType, let nodeID : int>
 struct DispatchNodeInputRecord
 {
+    NodePayloadArrayPtr<RecordType, nodeID> payload;
+
+    [ForceInline]
+    [require(hlsl_spirv)] // [require(hlsl_spirv, broadcasting)]
+    __init()
+    {
+        __target_switch
+        {
+        case hlsl: return;
+        case spirv:
+            //TODO: It may be simpler if we add a new __intrinsic_op for OpVariable with NodePayloadAMDX.
+            payload = spirv_asm
+            {
+                // The variable name, "%payload", is required here,
+                // because it needs to be send to OpEntryPoint as an interface.
+                %payload = OpVariable $$NodePayloadArrayPtr<RecordType, nodeID> NodePayloadAMDX;
+                result : $$NodePayloadArrayPtr<RecordType, nodeID> = OpCopyObject %payload;
+            };
+        }
+    }
+
     /// Provide an access to a record object that only holds a single record.
-    FunctionPtr<RecordType> Get()
+    [ForceInline]
+    [require(hlsl_spirv)] // [require(hlsl_spirv, broadcasting)]
+    NodePayloadPtr<RecordType> Get()
     {
         int index = 0;
 
@@ -24425,19 +24444,10 @@ struct DispatchNodeInputRecord
         {
         case hlsl: __intrinsic_asm ".Get";
         case spirv:
-            let ptr = spirv_asm
+            return spirv_asm
             {
-                %nodePtrType = OpTypePointer NodePayloadAMDX $$__SPIRVNodePayloadArray<RecordType, nodeID>;
-                %nodePtrVar = OpVariable %nodePtrType NodePayloadAMDX;
-
-                %tempPtrVar = OpVariable $$FunctionPtr<__SPIRVNodePayloadArray<RecordType, nodeID>> Function;
-
-                %loaded = OpLoad $$__SPIRVNodePayloadArray<RecordType, nodeID> %nodePtrVar;
-                OpStore %tempPtrVar %loaded;
-
-                result : $$FunctionPtr<RecordType> = OpAccessChain %tempPtrVar $index;
+                result : $$NodePayloadPtr<RecordType> = OpAccessChain $payload $index;
             };
-            return ptr;
         }
     }
 };

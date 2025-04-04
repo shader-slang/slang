@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHK): -target spirv-asm -stage compute -entry computeMain -profile sm_6_0 -capability spirv_1_4
+
 RWStructuredBuffer<int> inputBuffer;
 
 struct RecordData
@@ -32,16 +33,20 @@ void computeMain()
 //CHK-DAG: [[StructType:%[a-zA-Z_0-9]+]] = OpTypeStruct [[MemberType]]
 //CHK-DAG: [[PayloadType:%[a-zA-Z_0-9]+]] = OpTypeNodePayloadArrayAMDX [[StructType]]
 //CHK-DAG: [[NodePtrType:%[a-zA-Z_0-9]+]] = OpTypePointer NodePayloadAMDX [[PayloadType]]
-//CHK-DAG: [[StructPtrType:%[a-zA-Z_0-9]+]] = OpTypePointer NodePayloadAMDX [[StructType]]
+//CHK-DAG: [[TempPtrType:%[a-zA-Z_0-9]+]] = OpTypePointer Function [[PayloadType]]
+//CHK-DAG: [[FuncPtrType:%[a-zA-Z_0-9]+]] = OpTypePointer Function [[StructType]]
 
 //CHK: ; Function
 
 // ThreadNodeOutputRecords::__init()
+//CHK: [[TempPtrVar:%[a-zA-Z_0-9]+]] = OpVariable [[TempPtrType]] Function
 //CHK: [[Alloc:%[a-zA-Z_0-9]+]] = OpAllocateNodePayloadsAMDX [[NodePtrType]] %
+//CHK: [[Loaded:%[a-zA-Z_0-9]+]] = OpLoad [[PayloadType]] [[Alloc]]
+//CHK: OpStore [[TempPtrVar]] [[Loaded]]
 
 // ThreadNodeOutputRecords::Get()
-//CHK: = OpAccessChain [[StructPtrType]] [[Alloc]]
+//CHK: = OpAccessChain [[FuncPtrType]] %
 
 // ThreadNodeOutputRecords::OutputComplete()
-//CHK: OpEnqueueNodePayloadsAMDX [[Alloc]]
+//CHK: OpEnqueueNodePayloadsAMDX %
 
