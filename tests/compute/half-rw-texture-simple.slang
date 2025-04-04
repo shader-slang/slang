@@ -10,13 +10,13 @@
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj -render-features half
 
-//TEST_INPUT: RWTexture1D(format=R16_FLOAT, size=4, content = one, mipMaps = 1):name rwt1D
+//TEST_INPUT: RWTexture1D(format=R16Float, size=4, content = one, mipMaps = 1):name rwt1D
 RWTexture1D<half> rwt1D;
 
-//TEST_INPUT: RWTexture2D(format=R16_FLOAT, size=4, content = one, mipMaps = 1):name rwt2D
+//TEST_INPUT: RWTexture2D(format=R16Float, size=4, content = one, mipMaps = 1):name rwt2D
 RWTexture2D<half> rwt2D;
 
-//TEST_INPUT: RWTexture2D(format=R16G16B16A16_FLOAT, size=4, content = one, mipMaps = 1):name rwt2D_4
+//TEST_INPUT: RWTexture2D(format=RGBA16Float, size=4, content = one, mipMaps = 1):name rwt2D_4
 RWTexture2D<half4> rwt2D_4;
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer

@@ -8,11 +8,11 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type -shaderobj
 
-//TEST_INPUT: RWTexture1D(format=R32_FLOAT, size=4, content = one, mipMaps = 1):name rwt1D
+//TEST_INPUT: RWTexture1D(format=R32Float, size=4, content = one, mipMaps = 1):name rwt1D
 RWTexture1D<float> rwt1D;
-//TEST_INPUT: RWTexture2D(format=R32_FLOAT, size=4, content = one, mipMaps = 1):name rwt2D
+//TEST_INPUT: RWTexture2D(format=R32Float, size=4, content = one, mipMaps = 1):name rwt2D
 RWTexture2D<float> rwt2D;
-//TEST_INPUT: RWTexture3D(format=R32_FLOAT, size=4, content = one, mipMaps = 1):name rwt3D
+//TEST_INPUT: RWTexture3D(format=R32Float, size=4, content = one, mipMaps = 1):name rwt3D
 RWTexture3D<float> rwt3D;
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer

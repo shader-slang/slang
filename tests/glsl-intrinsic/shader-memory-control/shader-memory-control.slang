@@ -15,7 +15,7 @@ buffer MyBlockName1
 
 groupshared uint raceConditionShared;
 
-//TEST_INPUT: set raceConditionImage = RWTexture1D(format=R32_SINT, size=4, content=one, mipMaps = 1)
+//TEST_INPUT: set raceConditionImage = RWTexture1D(format=R32Sint, size=4, content=one, mipMaps = 1)
 uniform layout(binding=0,r32i) iimage1D raceConditionImage;
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
