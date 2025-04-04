@@ -6094,11 +6094,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             ifInst = builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
 
             insertBlock(thenBlock);
+            IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             lowerStmt(context, thenStmt);
             emitBranchIfNeeded(afterBlock);
 
             insertBlock(elseBlock);
             lowerStmt(context, elseStmt);
+            popScopeBlock(prevScopeEndBlock, true);
 
             insertBlock(afterBlock);
         }
@@ -6110,7 +6112,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             ifInst = builder->emitIf(irCond, thenBlock, afterBlock);
 
             insertBlock(thenBlock);
+
+            IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             lowerStmt(context, thenStmt);
+            popScopeBlock(prevScopeEndBlock, true);
 
             insertBlock(afterBlock);
         }
@@ -6309,7 +6314,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
+        IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
+        popScopeBlock(prevScopeEndBlock, true);
 
         // At the end of the body we need to jump back to the top.
         emitBranchIfNeeded(loopHead);
@@ -6353,7 +6360,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         insertBlock(loopHead);
 
         // Emit the body of the loop
+        IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
+        popScopeBlock(prevScopeEndBlock, true);
 
         insertBlock(testLabel);
 
@@ -6590,7 +6599,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         builder->insertBlock(deferBlock);
         builder->setInsertInto(deferBlock);
+
+        IRBlock* prevScopeEndBlock = pushScopeBlock(mergeBlock);
         lowerStmt(context, stmt->statement);
+        popScopeBlock(prevScopeEndBlock, true);
+
         builder->emitBranch(mergeBlock);
 
         builder->insertBlock(mergeBlock);
