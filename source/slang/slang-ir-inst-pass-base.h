@@ -137,6 +137,7 @@ public:
                 case kIROp_GenericSpecializationDictionary:
                 case kIROp_ExistentialFuncSpecializationDictionary:
                 case kIROp_ExistentialTypeSpecializationDictionary:
+                case kIROp_DebugInlinedAt:
                     continue;
                 default:
                     break;

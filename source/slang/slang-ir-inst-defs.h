@@ -1348,6 +1348,11 @@ INST(DebugSource, DebugSource, 2, HOISTABLE)
 INST(DebugLine, DebugLine, 5, 0)
 INST(DebugVar, DebugVar, 4, 0)
 INST(DebugValue, DebugValue, 2, 0)
+INST(DebugInlinedAt, DebugInlinedAt, 4, 0)
+INST(DebugFunction, DebugFunction, 3, 0)
+INST(DebugInlinedVariable, DebugInlinedVariable, 2, 0)
+INST(DebugScope, DebugScope, 1, 0)
+INST(DebugNoScope, DebugNoScope, 1, 0)
 
 /* Embedded Precompiled Libraries */
 INST(EmbeddedDownstreamIR, EmbeddedDownstreamIR, 2, 0)
