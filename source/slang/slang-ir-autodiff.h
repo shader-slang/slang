@@ -563,6 +563,7 @@ void stripAutoDiffDecorations(IRModule* module);
 void stripTempDecorations(IRInst* inst);
 
 bool isNoDiffType(IRType* paramType);
+bool isNeverDiffFuncType(IRFuncType* funcType);
 
 IRInst* lookupForwardDerivativeReference(IRInst* primalFunction);
 
