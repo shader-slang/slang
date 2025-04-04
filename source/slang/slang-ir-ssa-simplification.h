@@ -20,6 +20,7 @@ struct IRSimplificationOptions
 
     bool minimalOptimization = false;
     bool removeRedundancy = false;
+    bool tryToHoist = false;
 
     static IRSimplificationOptions getDefault(TargetProgram* targetProgram);
 

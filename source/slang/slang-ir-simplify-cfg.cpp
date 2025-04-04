@@ -11,13 +11,6 @@
 namespace Slang
 {
 
-struct CFGSimplificationContext
-{
-    RefPtr<RegionTree> regionTree;
-    RefPtr<IRDominatorTree> domTree;
-    Dictionary<IRInst*, List<IRInst*>> relatedAddrMap;
-};
-
 static bool isBlockInRegion(
     IRDominatorTree* domTree,
     IRTerminatorInst* regionHeader,
@@ -66,7 +59,7 @@ static IRInst* findBreakableRegionHeaderInst(IRDominatorTree* domTree, IRBlock* 
 // Test if a loop is trivial: a trivial loop runs for a single iteration without any back edges, and
 // there is only one break out of the loop at the very end. The function generates `regionTree` if
 // it is needed and hasn't been generated yet.
-static bool isTrivialSingleIterationLoop(
+bool isTrivialSingleIterationLoop(
     CFGSimplificationContext& context,
     IRGlobalValueWithCode* func,
     IRLoop* loop)

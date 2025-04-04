@@ -2183,7 +2183,7 @@ void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink,
                 funcChanged = false;
                 funcChanged |= applySparseConditionalConstantPropagation(func, sink);
                 funcChanged |= peepholeOptimize(target, func);
-                funcChanged |= removeRedundancyInFunc(func);
+                funcChanged |= removeRedundancyInFunc(func, false);
                 CFGSimplificationOptions options;
                 options.removeTrivialSingleIterationLoops = true;
                 options.removeSideEffectFreeLoops = false;
