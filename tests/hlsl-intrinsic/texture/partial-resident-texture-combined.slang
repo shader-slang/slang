@@ -37,6 +37,9 @@ Sampler1DArray<float4> st1DArray_f32v4;
 //TEST_INPUT: TextureSampler2D(size=4, content = one, arrayLength=2):name st2DArray_f32v4
 Sampler2DArray<float4> st2DArray_f32v4;
 
+//TEST_INPUT: TextureSampler2D(size=4, content = one):name st2DMS_f32v4
+ Sampler2DMS<float4> st2DMS_f32v4;
+
 //
 // Combined depth texture samplers.
 //
@@ -177,6 +180,25 @@ bool TEST_sampler<T>(
         ;
 }
 
+bool TEST_sparse<T>(
+     Sampler2D<T> s2D,
+     Sampler2DMS<T> s2DMS)
+     where T : ITexelElement, IArithmetic
+ {
+     typealias TN = T;
+     constexpr const int2 offset = int2(0, 0);
+     uint status;
+ 
+     int sampleIndex = 0;
+     int2 iuv = int2(1, 1);
+     int3 iuvs = int3(iuv, sampleIndex);
+ 
+     return true
+         && (status = getNotMapped(), all(TN(T(1)) == s2D.Load(iuvs, offset, status))) && CheckAccessFullyMapped(status)
+         && (status = getNotMapped(), all(TN(T(1)) == s2DMS.Load(iuv, sampleIndex, offset, status))) && CheckAccessFullyMapped(status)
+         ;
+ }
+
 [numthreads(4, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
@@ -198,6 +220,7 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
             st2DArray_f32v4,
             )
         && TEST_combinedDepth()
+        && TEST_sparse(st2D_f32v4, st2DMS_f32v4)
         ;
 
     //CHK:1

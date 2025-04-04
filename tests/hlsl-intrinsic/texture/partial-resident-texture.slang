@@ -235,10 +235,10 @@ bool TEST_load<T>(
     int3 iuvs = int3(iuv, sampleIndex);
 
     return true
-        // Currently not supported by Slang on VK.
-#if !defined(VK)
         && (status = getNotMapped(), all(TN(T(1)) == t2DMS.Load(iuv, sampleIndex, offset, status))) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(TN(T(1)) == t2D.Load(iuvs, offset, status))) && CheckAccessFullyMapped(status)
+            // SPIRV does not support sparse buffer loads.
+#if !defined(VK)
         && (status = getNotMapped(), 2 == outputBuffer.Load(0, status)) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), 1 == iBuf.Load(0, status)) && CheckAccessFullyMapped(status)
         && (status = getNotMapped(), all(int2(1) == iBuf.Load2(0, status))) && CheckAccessFullyMapped(status)

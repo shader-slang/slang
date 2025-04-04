@@ -31,7 +31,7 @@ void emit(ManglingContext* context, String const& value)
     context->sb.append(value);
 }
 
-void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
+void emitNameForLinkage(StringBuilder& sb, UnownedStringSlice str)
 {
     Index length = str.getLength();
     // If the name consists of only traditional "identifer characters"
@@ -61,8 +61,8 @@ void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
         // code points and the number of extended grapheme clusters,
         // since the entire name is within the ASCII subset.
         //
-        emit(context, length);
-        context->sb.append(str);
+        sb.append(length);
+        sb.append(str);
     }
     else
     {
@@ -98,9 +98,9 @@ void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
             }
         }
 
-        context->sb.append("R");
-        emit(context, encoded.getLength());
-        context->sb.append(encoded);
+        sb.append("R");
+        sb.append(encoded.getLength());
+        sb.append(encoded);
     }
 
     // TODO: This logic does not rule out consecutive underscores,
@@ -109,6 +109,11 @@ void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
     //
     // Realistically, that is best dealt with as a quirk of tha particular
     // target, rather than adding complexity here.
+}
+
+void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
+{
+    emitNameForLinkage(context->sb, str);
 }
 
 void emitName(ManglingContext* context, Name* name)
