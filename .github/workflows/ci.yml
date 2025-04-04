@@ -126,7 +126,7 @@ jobs:
               popd
               cmake --workflow --preset generators --fresh
               mkdir generators
-              cmake --install build --prefix generators --component generators
+              cmake --install build --config Release --component generators --prefix generators
               emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
               cmake --build --preset emscripten --config "$cmake_config" --target slang-wasm
               [ -f "build.em/$cmake_config/bin/slang-wasm.wasm" ]
@@ -159,7 +159,7 @@ jobs:
             fi
           fi
       - name: Test Slang
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.platform != 'aarch64'
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -170,6 +170,7 @@ jobs:
               -category ${{ matrix.test-category }} \
               -api all-cpu \
               -expected-failure-list tests/expected-failure-github.txt \
+              -skip-reference-image-generation \
               -show-adapter-info
           elif [[ "${{matrix.has-gpu}}" == "true" ]]; then
             "$bin_dir/slang-test" \
@@ -179,6 +180,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
+              -skip-reference-image-generation \
               -show-adapter-info
           else
             "$bin_dir/slang-test" \
@@ -188,6 +190,7 @@ jobs:
               -expected-failure-list tests/expected-failure-github.txt \
               -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
+              -skip-reference-image-generation \
               -show-adapter-info
           fi
       - name: Run Slang examples
@@ -215,6 +218,7 @@ jobs:
             -emit-spirv-via-glsl \
             -api vk \
             -expected-failure-list tests/expected-failure.txt \
+            -skip-reference-image-generation \
             -show-adapter-info
       - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests

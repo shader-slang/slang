@@ -252,6 +252,7 @@ struct CheckpointSetInfo : public RefObject
     HashSet<IRInst*> invertSet;
     Dictionary<IRInst*, LoopInductionValueInfo> loopInductionInfo;
     Dictionary<IRInst*, InversionInfo> invInfoMap;
+    Dictionary<IRInst*, IRInst*> loopExitValueInsts;
 };
 
 struct UseOrPseudoUse
@@ -323,7 +324,9 @@ public:
 protected:
     IRModule* module;
     Dictionary<IRInst*, LoopInductionValueInfo> inductionValueInsts;
+    Dictionary<IRInst*, IRInst*> loopExitValueInsts;
     void collectInductionValues(IRGlobalValueWithCode* func);
+    void collectLoopExitConditions(IRGlobalValueWithCode* func);
 };
 
 class DefaultCheckpointPolicy : public AutodiffCheckpointPolicyBase
