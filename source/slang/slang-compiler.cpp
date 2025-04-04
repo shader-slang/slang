@@ -1732,6 +1732,11 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     options.libraries = SliceUtil::asSlice(libraries);
     options.libraryPaths = allocator.allocate(libraryPaths);
 
+    if (m_targetProfile.getFamily() == ProfileFamily::DX)
+    {
+        options.enablePAQ = m_targetProfile.getVersion() >= ProfileVersion::DX_6_7;
+    }
+
     // Compile
     ComPtr<IArtifact> artifact;
     auto downstreamStartTime = std::chrono::high_resolution_clock::now();
