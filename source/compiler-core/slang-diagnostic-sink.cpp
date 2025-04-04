@@ -612,9 +612,19 @@ bool DiagnosticSink::diagnoseImpl(
     return true;
 }
 
-Severity DiagnosticSink::getEffectiveMessageSeverity(DiagnosticInfo const& info)
+Severity DiagnosticSink::getEffectiveMessageSeverity(
+    DiagnosticInfo const& info,
+    SourceLoc const& location)
 {
     Severity effectiveSeverity = info.severity;
+
+    if (effectiveSeverity <= Severity::Warning && m_sourceWarningStateTracker)
+    {
+        effectiveSeverity = m_sourceWarningStateTracker->consumeWarningSeverity(
+            location,
+            info.id,
+            effectiveSeverity);
+    }
 
     Severity* pSeverityOverride = m_severityOverrides.tryGetValue(info.id);
 
@@ -639,7 +649,7 @@ bool DiagnosticSink::diagnoseImpl(
     DiagnosticArg const* args)
 {
     // Override the severity in the 'info' structure to pass it further into formatDiagnostics
-    info.severity = getEffectiveMessageSeverity(info);
+    info.severity = getEffectiveMessageSeverity(info, pos);
 
     if (info.severity == Severity::Disable)
         return false;
