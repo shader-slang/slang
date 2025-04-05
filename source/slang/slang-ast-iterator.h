@@ -430,6 +430,12 @@ struct ASTIterator
             iterator->visitExpr(stmt->expression);
         }
 
+        void visitDeferStmt(DeferStmt* stmt)
+        {
+            iterator->maybeDispatchCallback(stmt);
+            dispatchIfNotNull(stmt->statement);
+        }
+
         void visitWhileStmt(WhileStmt* stmt)
         {
             iterator->maybeDispatchCallback(stmt);
