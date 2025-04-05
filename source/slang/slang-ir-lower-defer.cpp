@@ -99,15 +99,15 @@ struct DeferLoweringContext : InstPassBase
     HashSet<IRBlock*> findSuccessorBlocks(IRGlobalValueWithCode* func, IRBlock* block)
     {
         HashSet<IRBlock*> successorBlocksSet;
-        List<IRBlock*> workList;
-        workList.add(block);
+        List<IRBlock*> successorWorkList;
+        successorWorkList.add(block);
 
         List<IRBlock*> postorder = getPostorder(func);
         Index limitIndex = postorder.indexOf(block);
-        while (workList.getCount() > 0)
+        while (successorWorkList.getCount() > 0)
         {
-            IRBlock* predecessor = workList.getLast();
-            workList.removeLast();
+            IRBlock* predecessor = successorWorkList.getLast();
+            successorWorkList.removeLast();
             if (successorBlocksSet.contains(predecessor))
                 continue;
 
@@ -118,7 +118,7 @@ struct DeferLoweringContext : InstPassBase
 
             successorBlocksSet.add(predecessor);
             for (IRBlock* successor : predecessor->getSuccessors())
-                workList.add(successor);
+                successorWorkList.add(successor);
         }
         return successorBlocksSet;
     }
