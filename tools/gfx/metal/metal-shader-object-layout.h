@@ -175,6 +175,9 @@ public:
 
     slang::TypeLayoutReflection* getParameterBlockTypeLayout();
 
+    bool isParameterBlock() const { return m_isParameterBlock; }
+    void setIsParameterBlock() { m_isParameterBlock = true; }
+
 protected:
     Result _init(Builder const* builder);
 
@@ -188,6 +191,8 @@ protected:
     Index m_subObjectCount = 0;
     uint32_t m_totalOrdinaryDataSize = 0;
     List<SubObjectRangeInfo> m_subObjectRanges;
+
+    bool m_isParameterBlock = false;
     // The type layout to use when the shader object is bind as a parameter block.
     slang::TypeLayoutReflection* m_parameterBlockTypeLayout = nullptr;
 };
