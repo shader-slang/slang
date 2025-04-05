@@ -1927,6 +1927,8 @@ DIAGNOSTIC(
     vectorWithDisallowedElementTypeEncountered,
     "vector with disallowed element type '$0' encountered")
 
+DIAGNOSTIC(38204, Warning, moduleSelfImport, "module '$0' imported more than once")
+
 // 39xxx - Type layout and parameter binding.
 
 DIAGNOSTIC(

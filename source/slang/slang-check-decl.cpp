@@ -10499,19 +10499,30 @@ void SemanticsDeclHeaderVisitor::visitImportDecl(ImportDecl* decl)
     // the module's scope.
 
     auto name = decl->moduleNameAndLoc.name;
+    auto loc = decl->moduleNameAndLoc.loc;
     auto scope = getModuleDecl(decl)->ownedScope;
 
     // Try to load a module matching the name
     auto importedModule = findOrImportModule(
         getLinkage(),
         name,
-        decl->moduleNameAndLoc.loc,
+        loc,
         getSink(),
         getShared()->m_environmentModules);
 
     // If we didn't find a matching module, then bail out
     if (!importedModule)
         return;
+
+    // If we're attempting to import a module into itself then give a
+    // warning.
+    if (auto parentDecl = getModuleDecl(decl->parentDecl))
+    {
+        if (parentDecl && getText(parentDecl->getName()) == name->text)
+        {
+            getSink()->diagnose(loc, Diagnostics::moduleSelfImport, name);
+        }
+    }
 
     // Record the module that was imported, so that we can use
     // it later during code generation.
