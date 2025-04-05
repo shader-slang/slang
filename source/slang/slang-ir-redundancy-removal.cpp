@@ -2,6 +2,7 @@
 
 #include "slang-ir-dominators.h"
 #include "slang-ir-util.h"
+#include "slang-ir-simplify-cfg.h"
 
 namespace Slang
 {
@@ -20,6 +21,11 @@ struct RedundancyRemovalContext
             auto terminatorInst = parentBlock->getTerminator();
             if (auto loop = as<IRLoop>(terminatorInst))
             {
+                // Don't bother hoisting if a loop has only a single trivial iteration.
+                CFGSimplificationContext ctx;
+                if (isTrivialSingleIterationLoop(ctx, func, loop))
+                    continue;
+
                 // If `inst` is outside of the loop region, don't hoist it into the loop.
                 if (dom->dominates(loop->getBreakBlock(), inst))
                     continue;
@@ -62,7 +68,8 @@ struct RedundancyRemovalContext
     bool removeRedundancyInBlock(
         Dictionary<IRBlock*, DeduplicateContext>& mapBlockToDedupContext,
         IRGlobalValueWithCode* func,
-        IRBlock* block)
+        IRBlock* block,
+        bool tryToHoist)
     {
         bool result = false;
         auto& deduplicateContext = mapBlockToDedupContext.getValue(block);
@@ -89,7 +96,8 @@ struct RedundancyRemovalContext
             {
                 // This inst is unique, we should consider hoisting it
                 // if it is inside a loop.
-                result |= tryHoistInstToOuterMostLoop(func, resultInst);
+                if (tryToHoist)
+                    result |= tryHoistInstToOuterMostLoop(func, resultInst);
             }
         }
         for (auto child : dom->getImmediatelyDominatedBlocks(block))
@@ -101,25 +109,25 @@ struct RedundancyRemovalContext
     }
 };
 
-bool removeRedundancy(IRModule* module)
+bool removeRedundancy(IRModule* module, bool tryToHoist)
 {
     bool changed = false;
     for (auto inst : module->getGlobalInsts())
     {
         if (auto genericInst = as<IRGeneric>(inst))
         {
-            removeRedundancyInFunc(genericInst);
+            removeRedundancyInFunc(genericInst, tryToHoist);
             inst = findGenericReturnVal(genericInst);
         }
         if (auto func = as<IRFunc>(inst))
         {
-            changed |= removeRedundancyInFunc(func);
+            changed |= removeRedundancyInFunc(func, tryToHoist);
         }
     }
     return changed;
 }
 
-bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
+bool removeRedundancyInFunc(IRGlobalValueWithCode* func, bool tryToHoist)
 {
     auto root = func->getFirstBlock();
     if (!root)
@@ -139,7 +147,7 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func)
     {
         for (auto block : workList)
         {
-            result |= context.removeRedundancyInBlock(mapBlockToDeduplicateContext, func, block);
+            result |= context.removeRedundancyInBlock(mapBlockToDeduplicateContext, func, block, tryToHoist);
 
             for (auto child : context.dom->getImmediatelyDominatedBlocks(block))
             {
