@@ -147,6 +147,10 @@ public:
 
     SLANG_FORCE_INLINE bool operator==(const ThisType& rhs) const { return raw == rhs.raw; }
     SLANG_FORCE_INLINE bool operator!=(const ThisType& rhs) const { return !(raw == rhs.raw); }
+    SLANG_FORCE_INLINE bool operator<(const ThisType& rhs) const { return raw < rhs.raw; }
+    SLANG_FORCE_INLINE bool operator>(const ThisType& rhs) const { return raw > rhs.raw; }
+    SLANG_FORCE_INLINE bool operator<=(const ThisType& rhs) const { return raw <= rhs.raw; }
+    SLANG_FORCE_INLINE bool operator>=(const ThisType& rhs) const { return raw >= rhs.raw; }
 
     RawValue getRaw() const { return raw; }
     void setRaw(RawValue value) { raw = value; }
