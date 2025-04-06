@@ -11,6 +11,7 @@ void __requireTargetExtension(constexpr String extensionName);
 /// explicitly passed as entry point parameters.
 in uint __builtinWaveLaneIndex : SV_WaveLaneIndex;
 in uint __builtinWaveLaneCount : SV_WaveLaneCount;
+in uint __builtinQuadLaneIndex : SV_QuadLaneIndex;
 
 //@public:
 /// Represents an interface for buffer data layout.
@@ -3772,12 +3773,47 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, texture_sm_4_1_samplerless)]
+    [require(hlsl_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load";
+        case spirv:
+             const int lodLoc = Shape.dimensions+isArray;
+             let coord = __vectorReshape<Shape.dimensions+isArray>(location);
+             let lod = location[lodLoc];
+             if (isCombined != 0)
+             {
+                 return spirv_asm
+                 {
+                     OpCapability SparseResidency;
+                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                     %image:__imageType(this) = OpImage $this;
+ 
+                     %sparseResult:%sparseResultType = OpImageSparseFetch %image $coord Lod|ConstOffset $lod $offset;
+                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                     %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+ 
+                     OpStore &status %residentCode;
+                     __truncate $$T result __sampledType(T) %sampled;
+                 };
+             }
+             else
+             {
+                 return spirv_asm
+                 {
+                     OpCapability SparseResidency;
+                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+ 
+                     %sparseResult:%sparseResultType = OpImageSparseFetch $this $coord Lod|ConstOffset $lod $offset;
+                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                     %sampled:__sampledType(T) = OpCompositeExtract  %sparseResult 1;
+ 
+                     OpStore &status %residentCode;
+                     __truncate $$T result __sampledType(T) %sampled;
+                 };
+             }
         default:
             status = 0;
             return Load(location, offset);
@@ -3952,12 +3988,44 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, texture_sm_4_1_samplerless)]
+    [require(hlsl_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load";
+        case spirv:
+             if (isCombined != 0)
+             {
+                 return spirv_asm
+                 {
+                     OpCapability SparseResidency;
+                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                     %image:__imageType(this) = OpImage $this;
+ 
+                     %sparseResult:%sparseResultType = OpImageSparseFetch %image $location ConstOffset|Sample $offset $sampleIndex;
+                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                     %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+ 
+                     OpStore &status %residentCode;
+                     __truncate $$T result __sampledType(T) %sampled;
+                 };
+             }
+             else
+             {
+                 return spirv_asm
+                 {
+                     OpCapability SparseResidency;
+                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+ 
+                     %sparseResult:%sparseResultType = OpImageSparseFetch $this $location ConstOffset|Sample $offset $sampleIndex;
+                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                     %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+ 
+                     OpStore &status %residentCode;
+                     __truncate $$T result __sampledType(T) %sampled;
+                 };
+             }
         default:
             status = 0;
             return Load(location, sampleIndex, offset);
@@ -14632,13 +14700,16 @@ __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
-[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
+[ForceInline]
+[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 T QuadReadAcrossX(T localValue)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "QuadReadAcrossX";
     case glsl: __intrinsic_asm "subgroupQuadSwapHorizontal($0)";
+    case metal:
+        return QuadReadLaneAt(localValue, __builtinQuadLaneIndex ^ 1U);
     case spirv:
         uint direction = 0u;
         return spirv_asm 
@@ -14654,13 +14725,16 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
-[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
+[ForceInline]
+[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 vector<T,N> QuadReadAcrossX(vector<T,N> localValue)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "QuadReadAcrossX";
     case glsl: __intrinsic_asm "subgroupQuadSwapHorizontal($0)";
+    case metal:
+        return QuadReadLaneAt(localValue, __builtinQuadLaneIndex ^ 1U);
     case spirv:
         uint direction = 0u;
         return spirv_asm 
@@ -14678,13 +14752,16 @@ __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
-[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
+[ForceInline]
+[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 T QuadReadAcrossY(T localValue)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "QuadReadAcrossY";
     case glsl: __intrinsic_asm "subgroupQuadSwapVertical($0)";
+    case metal:
+        return QuadReadLaneAt(localValue, __builtinQuadLaneIndex ^ 2U);
     case spirv:
         uint direction = 1u;
         return spirv_asm 
@@ -14699,13 +14776,16 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
-[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
+[ForceInline]
+[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "QuadReadAcrossY";
     case glsl: __intrinsic_asm "subgroupQuadSwapVertical($0)";
+    case metal:
+        return QuadReadLaneAt(localValue, __builtinQuadLaneIndex ^ 2U);
     case spirv:
         uint direction = 1u;
         return spirv_asm 
@@ -14723,13 +14803,16 @@ __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
-[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
+[ForceInline]
+[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 T QuadReadAcrossDiagonal(T localValue)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "QuadReadAcrossDiagonal";
     case glsl: __intrinsic_asm "subgroupQuadSwapDiagonal($0)";
+    case metal:
+        return QuadReadLaneAt(localValue, __builtinQuadLaneIndex ^ 3U);
     case spirv:
         uint direction = 2u;
         return spirv_asm 
@@ -14744,13 +14827,16 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
-[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
+[ForceInline]
+[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "QuadReadAcrossDiagonal";
     case glsl: __intrinsic_asm "subgroupQuadSwapDiagonal($0)";
+    case metal:
+        return QuadReadLaneAt(localValue, __builtinQuadLaneIndex ^ 3U);
     case spirv:
         uint direction = 2u;
         return spirv_asm 

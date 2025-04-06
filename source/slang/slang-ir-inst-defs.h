@@ -295,7 +295,7 @@ INST(GlobalConstant, globalConstant, 0, GLOBAL)
 
 INST(StructKey, key, 0, GLOBAL)
 INST(GlobalGenericParam, global_generic_param, 0, GLOBAL)
-INST(WitnessTable, witness_table, 0, 0)
+INST(WitnessTable, witness_table, 0, HOISTABLE)
 
 INST(IndexedFieldKey, indexedFieldKey, 2, HOISTABLE)
 
@@ -719,6 +719,7 @@ INST(BitNot, bitnot, 1, 0)
 INST(Select, select, 3, 0)
 
 INST(CheckpointObject, checkpointObj, 1, 0)
+INST(LoopExitValue, loopExitValue, 1, 0)
 
 INST(GetStringHash, getStringHash, 1, 0)
 
