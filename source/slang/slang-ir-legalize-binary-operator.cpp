@@ -1,12 +1,81 @@
 #include "slang-ir-legalize-binary-operator.h"
 
+#include "compiler-core/slang-diagnostic-sink.h"
 #include "slang-ir-insts.h"
 
 namespace Slang
 {
 
-void legalizeBinaryOp(IRInst* inst)
+static bool isVectorOrMatrix(IRType* type)
 {
+    switch (type->getOp())
+    {
+    case kIROp_VectorType:
+    case kIROp_MatrixType:
+        return true;
+    default:
+        return false;
+    }
+};
+
+static bool isDivisionByMatrix(IRInst* inst)
+{
+    return (inst->getOp() == kIROp_Div) && (as<IRMatrixType>(inst->getOperand(1)->getDataType()));
+}
+
+static bool isDivisionByScalar(IRInst* inst)
+{
+    return (inst->getOp() == kIROp_Div) && (as<IRBasicType>(inst->getOperand(1)->getDataType()));
+}
+
+// If one operand is a composite type (vector or matrix), and the other one is a scalar
+// type, then the scalar is converted to a composite type.
+static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
+{
+    if (isVectorOrMatrix(inst->getOperand(0)->getDataType()) &&
+        as<IRBasicType>(inst->getOperand(1)->getDataType()))
+    {
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        IRType* compositeType = inst->getOperand(0)->getDataType();
+        IRInst* scalarValue = inst->getOperand(1);
+        // Retain the scalar type for shifts
+        if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
+        {
+            auto vectorType = as<IRVectorType>(compositeType);
+            compositeType =
+                builder.getVectorType(scalarValue->getDataType(), vectorType->getElementCount());
+        }
+        auto newRhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
+        builder.replaceOperand(inst->getOperands() + 1, newRhs);
+    }
+    else if (
+        as<IRBasicType>(inst->getOperand(0)->getDataType()) &&
+        isVectorOrMatrix(inst->getOperand(1)->getDataType()))
+    {
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        IRType* compositeType = inst->getOperand(1)->getDataType();
+        IRInst* scalarValue = inst->getOperand(0);
+        // Retain the scalar type for shifts
+        if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
+        {
+            auto vectorType = as<IRVectorType>(compositeType);
+            compositeType =
+                builder.getVectorType(scalarValue->getDataType(), vectorType->getElementCount());
+        }
+        auto newLhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
+        builder.replaceOperand(inst->getOperands(), newLhs);
+    }
+}
+
+void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink)
+{
+    if (isDivisionByMatrix(inst))
+    {
+        sink->diagnose(inst, Diagnostics::divisionByMatrixNotSupported);
+    }
+
     // For shifts, ensure that the shift amount is unsigned, as required by
     // https://www.w3.org/TR/WGSL/#bit-expr.
     if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
@@ -45,54 +114,14 @@ void legalizeBinaryOp(IRInst* inst)
         }
     }
 
-    auto isVectorOrMatrix = [](IRType* type)
+    // Do not convert scalar divisior to composite type. Division by matrix is not supported on
+    // Metal and WGSL, and division by scalar is always valid.
+    if (!isDivisionByScalar(inst))
     {
-        switch (type->getOp())
-        {
-        case kIROp_VectorType:
-        case kIROp_MatrixType:
-            return true;
-        default:
-            return false;
-        }
-    };
-    if (isVectorOrMatrix(inst->getOperand(0)->getDataType()) &&
-        as<IRBasicType>(inst->getOperand(1)->getDataType()))
-    {
-        IRBuilder builder(inst);
-        builder.setInsertBefore(inst);
-        IRType* compositeType = inst->getOperand(0)->getDataType();
-        IRInst* scalarValue = inst->getOperand(1);
-        // Retain the scalar type for shifts
-        if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
-        {
-            auto vectorType = as<IRVectorType>(compositeType);
-            compositeType =
-                builder.getVectorType(scalarValue->getDataType(), vectorType->getElementCount());
-        }
-        auto newRhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
-        builder.replaceOperand(inst->getOperands() + 1, newRhs);
+        legalizeScalarOperandsToMatchComposite(inst);
     }
-    else if (
-        as<IRBasicType>(inst->getOperand(0)->getDataType()) &&
-        isVectorOrMatrix(inst->getOperand(1)->getDataType()))
-    {
-        IRBuilder builder(inst);
-        builder.setInsertBefore(inst);
-        IRType* compositeType = inst->getOperand(1)->getDataType();
-        IRInst* scalarValue = inst->getOperand(0);
-        // Retain the scalar type for shifts
-        if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
-        {
-            auto vectorType = as<IRVectorType>(compositeType);
-            compositeType =
-                builder.getVectorType(scalarValue->getDataType(), vectorType->getElementCount());
-        }
-        auto newLhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
-        builder.replaceOperand(inst->getOperands(), newLhs);
-    }
-    else if (
-        isIntegralType(inst->getOperand(0)->getDataType()) &&
+
+    if (isIntegralType(inst->getOperand(0)->getDataType()) &&
         isIntegralType(inst->getOperand(1)->getDataType()))
     {
         // Unless the operator is a shift, and if the integer operands differ in signedness,

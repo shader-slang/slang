@@ -121,7 +121,7 @@ static void legalizeSwitch(IRSwitch* switchInst)
     switchInst->removeAndDeallocate();
 }
 
-static void processInst(IRInst* inst)
+static void processInst(IRInst* inst, DiagnosticSink* sink)
 {
     switch (inst->getOp())
     {
@@ -154,7 +154,7 @@ static void processInst(IRInst* inst)
     case kIROp_Less:
     case kIROp_Geq:
     case kIROp_Leq:
-        legalizeBinaryOp(inst);
+        legalizeBinaryOp(inst, sink);
         break;
 
     case kIROp_Func:
@@ -163,7 +163,7 @@ static void processInst(IRInst* inst)
     default:
         for (auto child : inst->getModifiableChildren())
         {
-            processInst(child);
+            processInst(child, sink);
         }
     }
 }
@@ -218,7 +218,7 @@ void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink)
     legalizeEntryPointVaryingParamsForWGSL(module, sink, entryPoints);
 
     // Go through every instruction in the module and legalize them as needed.
-    processInst(module->getModuleInst());
+    processInst(module->getModuleInst(), sink);
 
     // Some global insts are illegal, e.g. function calls.
     // We need to inline and remove those.
