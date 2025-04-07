@@ -650,6 +650,8 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitReturnStmt(ReturnStmt* stmt) { dispatchIfNotNull(stmt->expression); }
 
+    void visitDeferStmt(DeferStmt* stmt) { dispatchIfNotNull(stmt->statement); }
+
     void visitWhileStmt(WhileStmt* stmt)
     {
         dispatchIfNotNull(stmt->predicate);

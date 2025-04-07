@@ -596,6 +596,13 @@ static IRBlock::SuccessorList getSuccessors(IRInst* terminator)
         end = operands + terminator->getOperandCount() + 1;
         stride = 2;
         break;
+
+    case kIROp_Defer:
+        // defer <deferBlock> <mergeBlock> <scopeEndBlock>
+        begin = operands + 0;
+        end = begin + 1;
+        break;
+
     default:
         SLANG_UNEXPECTED("unhandled terminator instruction");
         UNREACHABLE_RETURN(IRBlock::SuccessorList(nullptr, nullptr));
@@ -869,6 +876,7 @@ bool isTerminatorInst(IROp op)
     case kIROp_Switch:
     case kIROp_Unreachable:
     case kIROp_MissingReturn:
+    case kIROp_Defer:
         return true;
     }
 }
@@ -5698,6 +5706,14 @@ IRInst* IRBuilder::emitReturn()
     return inst;
 }
 
+IRInst* IRBuilder::emitDefer(IRBlock* deferBlock, IRBlock* mergeBlock, IRBlock* scopeEndBlock)
+{
+    auto inst =
+        createInst<IRDefer>(this, kIROp_Defer, nullptr, deferBlock, mergeBlock, scopeEndBlock);
+    addInst(inst);
+    return inst;
+}
+
 IRInst* IRBuilder::emitThrow(IRInst* val)
 {
     auto inst = createInst<IRThrow>(this, kIROp_Throw, nullptr, val);
@@ -5730,6 +5746,13 @@ IRInst* IRBuilder::emitCheckpointObject(IRInst* value)
 {
     auto inst =
         createInst<IRCheckpointObject>(this, kIROp_CheckpointObject, value->getFullType(), value);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitLoopExitValue(IRInst* value)
+{
+    auto inst = createInst<IRLoopExitValue>(this, kIROp_LoopExitValue, value->getFullType(), value);
     addInst(inst);
     return inst;
 }
