@@ -4,7 +4,7 @@ namespace Slang
 {
 
 struct IRInst;
-struct DiagnosticSink;
+class DiagnosticSink;
 
 // Legalize binary operations for Metal and WGSL targets.
 //
