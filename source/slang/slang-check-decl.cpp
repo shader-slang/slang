@@ -13653,7 +13653,8 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         [this, varDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, varDecl, category); });
 
-    if (isGlobalDecl(varDecl)) {
+    if (isGlobalDecl(varDecl))
+    {
         auto declaredCaps = getDeclaredCapabilitySet(varDecl);
         auto inferedCaps = varDecl->inferredCapabilityRequirements;
         declaredCaps.nonDestructiveJoin(inferedCaps);
@@ -13677,7 +13678,6 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             }
         }
     }
-
 }
 
 CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* decl)
@@ -13688,8 +13688,8 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
     // For example:
     //    [require(glsl)]
     //    struct Parent {
-    //        [require(glsl, glsl_ext_1)] 
-    //        [require(spirv)] 
+    //        [require(glsl, glsl_ext_1)]
+    //        [require(spirv)]
     //        void foo();
     //    }
     // The requirement for `foo` should be glsl+glsl_ext_1 | spirv.
@@ -14227,17 +14227,17 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
         }
     }
 
-    // The second scenario is when the callee is using a capability that is not provided by the requirement.
-    // For example:
+    // The second scenario is when the callee is using a capability that is not provided by the
+    // requirement. For example:
     //     [require(hlsl,b,c)]
     //     void caller()
     //     {
     //         useD();    // requires capability (hlsl,d)
     //     }
-    // In this case we should report that useD() is using a capability that is not declared by caller.
-    // If we reach here, we are case 2.
-    // We will produce all failed atoms. This is important since provenance of multiple atoms
-    // can come from multiple referenced items in a function body.
+    // In this case we should report that useD() is using a capability that is not declared by
+    // caller. If we reach here, we are case 2. We will produce all failed atoms. This is important
+    // since provenance of multiple atoms can come from multiple referenced items in a function
+    // body.
 
     HashSet<Decl*> printedDecls;
     auto simplifiedFailedAtomsSet = failedAtomsInsideAvailableSet.newSetWithoutImpliedAtoms();
