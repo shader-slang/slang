@@ -854,6 +854,8 @@ NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
     typeDefDecl->nameAndLoc = NameLoc(nameToken);
     typeDefDecl->type = type;
 
+    expect(parser, TokenType::Semicolon);
+
     return typeDefDecl;
 }
 
