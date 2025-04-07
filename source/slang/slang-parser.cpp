@@ -841,24 +841,6 @@ bool AdvanceIfMatch(Parser* parser, MatchedTokenType type)
     return AdvanceIfMatch(parser, type, &ignored);
 }
 
-NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
-{
-    TypeDefDecl* typeDefDecl = parser->astBuilder->create<TypeDefDecl>();
-
-    // TODO(tfoley): parse an actual declarator
-    auto type = parser->ParseTypeExp();
-
-    auto nameToken = parser->ReadToken(TokenType::Identifier);
-    typeDefDecl->loc = nameToken.loc;
-
-    typeDefDecl->nameAndLoc = NameLoc(nameToken);
-    typeDefDecl->type = type;
-
-    expect(parser, TokenType::Semicolon);
-
-    return typeDefDecl;
-}
-
 // Add a modifier to a list of modifiers being built
 static void AddModifier(Modifier*** ioModifierLink, Modifier* modifier)
 {
@@ -4349,6 +4331,24 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
             parser->PopScope();
             return decl;
         });
+}
+
+NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
+{
+    TypeDefDecl* typeDefDecl = parser->astBuilder->create<TypeDefDecl>();
+
+    // TODO(tfoley): parse an actual declarator
+    auto type = parser->ParseTypeExp();
+
+    auto nameToken = parser->ReadToken(TokenType::Identifier);
+    typeDefDecl->loc = nameToken.loc;
+
+    typeDefDecl->nameAndLoc = NameLoc(nameToken);
+    typeDefDecl->type = type;
+
+    expect(parser, TokenType::Semicolon);
+
+    return typeDefDecl;
 }
 
 static NodeBase* parseTypeAliasDecl(Parser* parser, void* /*userData*/)
