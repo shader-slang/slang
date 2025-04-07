@@ -11355,6 +11355,257 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
     }
 }
 
+
+// Types comparison:
+// Three way comparisons
+// Not all comparison cases are implemented yet,
+// so the optional 'feedback' parameter is here to indicate when the comp is not implemented yet
+
+// <=> operator
+// lhs and rhs cannot be nullptr
+int compareTypes(ASTBuilder* astBuilder, Type& lhs, Type& rhs, int* feedback);
+
+// <=> operator
+// lhs and rhs cannot be nullptr
+int compareDecls(ASTBuilder* astBuilder, Decl& lhs, Decl& rhs, int* feedback);
+
+// <=> operator
+// lhs and rhs cannot be nullptr
+int compareIntVals(ASTBuilder* astBuilder, IntVal& lhs, IntVal& rhs, int* feedback);
+
+template<typename T, class Compare>
+int comparePtrs(T* lhs, T* rhs, Compare const& compare)
+{
+    int res = 0;
+    if (lhs == rhs)
+    {
+        res = 0;
+    }
+    else
+    {
+        if (!lhs)
+        {
+            res = -1;
+        }
+        else if (!rhs)
+        {
+            res = 1;
+        }
+        else
+        {
+            res = compare(*lhs, *rhs);
+        }
+    }
+    return res;
+}
+
+// <=> operator
+// lhs or rhs might be nullptr
+int compareTypes(ASTBuilder* astBuilder, Type* lhs, Type* rhs, int* feedback)
+{
+    return comparePtrs(
+        lhs,
+        rhs,
+        [&](Type& lhs, Type& rhs) { return compareTypes(astBuilder, lhs, rhs, feedback); });
+}
+
+// <=> operator
+// lhs or rhs might be nullptr
+int compareDecls(ASTBuilder* astBuilder, Decl* lhs, Decl* rhs, int* feedback)
+{
+    return comparePtrs(
+        lhs,
+        rhs,
+        [&](Decl& lhs, Decl& rhs) { return compareDecls(astBuilder, lhs, rhs, feedback); });
+}
+
+// <=> operator
+// lhs and rhs might be nullptr
+int compareIntVals(ASTBuilder* astBuilder, IntVal* lhs, IntVal* rhs, int* feedback)
+{
+    return comparePtrs(
+        lhs,
+        rhs,
+        [&](IntVal& lhs, IntVal& rhs) { return compareIntVals(astBuilder, lhs, rhs, feedback); });
+}
+
+int compareIntVals(ASTBuilder* astBuilder, IntVal& lhs, IntVal& rhs, int* feedback)
+{
+    // No risk of overflow, replace with <=> in C++20
+    int res = static_cast<int>(rhs.astNodeType) - static_cast<int>(lhs.astNodeType);
+    if (res == 0)
+    {
+        std::optional<int> specRes = {};
+
+        if (auto lC = dynamicCast<ConstantIntVal>(&lhs))
+        {
+            auto rC = dynamicCast<ConstantIntVal>(&rhs);
+            // avoid overflow, replace with <=> in C++20
+            auto diff = rC->getValue() - lC->getValue();
+            specRes = (diff == 0 ? 0 : (diff > 0 ? 1 : -1));
+        }
+        else if (auto lGP = dynamicCast<GenericParamIntVal>(&lhs))
+        {
+            auto rGP = dynamicCast<GenericParamIntVal>(&rhs);
+            specRes = compareDecls(
+                astBuilder,
+                lGP->getDeclRef().getDecl(),
+                rGP->getDeclRef().getDecl(),
+                feedback);
+        }
+
+        if (!specRes && feedback)
+        {
+            *feedback |= (1 << 0);
+        }
+        res = specRes.value_or(0);
+    }
+    return res;
+}
+
+int compareTypes(ASTBuilder* astBuilder, Type& lhs, Type& rhs, int* feedback)
+{
+    // No risk of overflow, replace with <=> in C++20
+    int res = static_cast<int>(rhs.astNodeType) - static_cast<int>(lhs.astNodeType);
+    if (res == 0)
+    {
+        std::optional<int> specRes = {};
+        if (auto lVec = dynamicCast<VectorExpressionType>(&lhs))
+        {
+            auto rVec = dynamicCast<VectorExpressionType>(&rhs);
+            auto lN = lVec->getElementCount();
+            auto rN = rVec->getElementCount();
+            int NComp = compareIntVals(astBuilder, lN, rN, feedback);
+            if (NComp != 0)
+            {
+                specRes = NComp;
+            }
+            else
+            {
+                auto lT = lVec->getElementType();
+                auto rT = rVec->getElementType();
+                specRes = compareTypes(astBuilder, lT, rT, feedback);
+            }
+        }
+        else if (auto lMat = dynamicCast<MatrixExpressionType>(&lhs))
+        {
+            auto rMat = dynamicCast<MatrixExpressionType>(&rhs);
+            auto lR = lMat->getRowCount();
+            auto rR = rMat->getRowCount();
+            int RComp = compareIntVals(astBuilder, lR, rR, feedback);
+            if (RComp != 0)
+            {
+                specRes = RComp;
+            }
+            else
+            {
+                auto lC = lMat->getColumnCount();
+                auto rC = rMat->getColumnCount();
+                int CComp = compareIntVals(astBuilder, lC, rC, feedback);
+                if (CComp != 0)
+                {
+                    specRes = CComp;
+                }
+                else
+                {
+                    auto lL = lMat->getLayout();
+                    auto rL = rMat->getLayout();
+                    int LComp = compareIntVals(astBuilder, lL, rL, feedback);
+                    if (LComp != 0)
+                    {
+                        specRes = LComp;
+                    }
+                    else
+                    {
+                        auto lT = lMat->getElementType();
+                        auto rT = rMat->getElementType();
+                        specRes = compareTypes(astBuilder, lT, rT, feedback);
+                    }
+                }
+            }
+        }
+        else if (auto lDRT = dynamicCast<DeclRefType>(&lhs))
+        {
+            auto rDRT = dynamicCast<DeclRefType>(&rhs);
+            auto lDecl = lDRT->getDeclRef().getDecl();
+            auto rDecl = rDRT->getDeclRef().getDecl();
+            specRes = compareDecls(astBuilder, lDecl, rDecl, feedback);
+        }
+        if (!specRes && feedback)
+        {
+            *feedback |= (1 << 1);
+        }
+        res = specRes.value_or(0);
+    }
+    return res;
+}
+
+int compareDecls(ASTBuilder* astBuilder, Decl& lhs, Decl& rhs, int* feedback)
+{
+    SLANG_UNUSED(astBuilder);
+    // No risk of overflow, replace with <=> in C++20
+    int res = static_cast<int>(rhs.astNodeType) - static_cast<int>(lhs.astNodeType);
+    if (res == 0)
+    {
+        std::optional<int> specRes = {};
+        bool compareNames = false;
+
+        if (auto lGTPD = dynamicCast<GenericTypeParamDeclBase>(&lhs))
+        {
+            auto rGTPD = dynamicCast<GenericTypeParamDeclBase>(&rhs);
+            specRes = rGTPD->parameterIndex - lGTPD->parameterIndex;
+        }
+        else if (auto lInterface = dynamicCast<InterfaceDecl>(&lhs))
+        {
+            auto rInterface = dynamicCast<InterfaceDecl>(&rhs);
+            SLANG_UNUSED(lInterface);
+            SLANG_UNUSED(rInterface);
+            compareNames = true;
+        }
+
+        if (compareNames || !specRes)
+        {
+            if (!compareNames && feedback)
+            {
+                // Fallback to name comparison for lack of an implementation
+                // If we had access to a sink, we could emit a warning signal
+                *feedback |= (1 << 2);
+            }
+
+            specRes = comparePtrs(
+                lhs.getName(),
+                rhs.getName(),
+                [](Name const& lName, Name const& rName) -> int
+                { return strcmp(lName.text.begin(), rName.text.begin()); });
+        }
+
+        res = specRes.value_or(0);
+    }
+    return res;
+}
+
+int compareTypes(ASTBuilder* astBuilder, Type* lhs, Type* rhs)
+{
+    int feedback = 0;
+    int res = compareTypes(astBuilder, lhs, rhs, &feedback);
+    if (feedback)
+    {
+        SLANG_BREAKPOINT(1);
+    }
+    return res;
+}
+
+int compareTypes(ASTBuilder* astBuilder, Type& lhs, Type& rhs)
+{
+    int feedback = 0;
+    int res = compareTypes(astBuilder, lhs, rhs, &feedback);
+    if (feedback)
+    {
+        SLANG_BREAKPOINT(1);
+    }
+    return res;
+}
+
 static void _getCanonicalConstraintTypes(List<Type*>& outTypeList, Type* type)
 {
     if (auto andType = as<AndType>(type))
@@ -11379,16 +11630,22 @@ OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericCon
     for (auto genericTypeConstraintDecl :
          getMembersOfType<GenericTypeConstraintDecl>(astBuilder, genericDecl))
     {
-        assert(
-            genericTypeConstraintDecl.getDecl()->sub.type->astNodeType == ASTNodeType::DeclRefType);
-        auto typeParamDecl =
-            as<DeclRefType>(genericTypeConstraintDecl.getDecl()->sub.type)->getDeclRef().getDecl();
-        List<Type*>* constraintTypes = genericConstraints.tryGetValue(typeParamDecl);
-        if (!constraintTypes)
-            continue;
-        constraintTypes->add(genericTypeConstraintDecl.getDecl()->getSup().type);
+        if (genericTypeConstraintDecl.getDecl()->sub.type->astNodeType == ASTNodeType::DeclRefType)
+        {
+            auto typeParamDecl = as<DeclRefType>(genericTypeConstraintDecl.getDecl()->sub.type)
+                                     ->getDeclRef()
+                                     .getDecl();
+            List<Type*>* constraintTypes = genericConstraints.tryGetValue(typeParamDecl);
+            if (!constraintTypes)
+                continue;
+            constraintTypes->add(genericTypeConstraintDecl.getDecl()->getSup().type);
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Cannot extract Cannonical Generic Constraints on non DeclRefTypes. "
+                             "Use getCanonicalGenericConstraints2(...) instead.");
+        }
     }
-
     OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> result;
     for (auto& constraints : genericConstraints)
     {
@@ -11397,8 +11654,58 @@ OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericCon
         {
             _getCanonicalConstraintTypes(typeList, type);
         }
-        // TODO: we also need to sort the types within the list for each generic type param.
-        result[constraints.key] = typeList;
+        const auto typeComparator = [&](Type* lhs, Type* rhs)
+        { return compareTypes(astBuilder, *lhs, *rhs) < 0; };
+        typeList.sort(typeComparator);
+        result[constraints.key] = std::move(typeList);
+    }
+    return result;
+}
+
+
+OrderedDictionary<Type*, List<Type*>> getCanonicalGenericConstraints2(
+    ASTBuilder* astBuilder,
+    DeclRef<ContainerDecl> genericDecl)
+{
+    Dictionary<Type*, HashSet<Type*>> genericConstraints;
+    for (auto genericTypeConstraintDecl :
+         getMembersOfType<GenericTypeConstraintDecl>(astBuilder, genericDecl))
+    {
+        auto subExpr = genericTypeConstraintDecl.getDecl()->sub;
+        auto supExpr = genericTypeConstraintDecl.getDecl()->sup;
+        Type* typeToAdd = subExpr.type;
+        if (typeToAdd)
+        {
+            if (!genericConstraints.containsKey(typeToAdd))
+            {
+                genericConstraints[typeToAdd] = HashSet<Type*>();
+            }
+            genericConstraints[typeToAdd].add(supExpr.type);
+        }
+    }
+    const auto typeComparator = [&](Type* lhs, Type* rhs)
+    { return compareTypes(astBuilder, *lhs, *rhs) < 0; };
+    const List<Type*> sortedKeys = [&]()
+    {
+        List<Type*> res;
+        res.reserve(genericConstraints.getCount());
+        for (auto& t : genericConstraints)
+        {
+            res.add(t.first);
+        }
+        res.sort(typeComparator);
+        return res;
+    }();
+    OrderedDictionary<Type*, List<Type*>> result;
+    for (auto& key : sortedKeys)
+    {
+        List<Type*> typeList;
+        for (auto type : genericConstraints[key])
+        {
+            _getCanonicalConstraintTypes(typeList, type);
+        }
+        typeList.sort(typeComparator);
+        result[key] = std::move(typeList);
     }
     return result;
 }
