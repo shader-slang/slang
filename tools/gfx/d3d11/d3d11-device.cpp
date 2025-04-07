@@ -267,6 +267,16 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
 #endif
     }
 
+    // Check double precision support
+    {
+        D3D11_FEATURE_DATA_DOUBLES doublePrecisionFeature = {};
+        if (SUCCEEDED(m_device->CheckFeatureSupport(D3D11_FEATURE_DOUBLES, &doublePrecisionFeature, sizeof(doublePrecisionFeature))) 
+            && doublePrecisionFeature.DoublePrecisionFloatShaderOps)
+        {
+            m_features.add("double");
+        }
+    }
+
     {
         // Create a TIMESTAMP_DISJOINT query object to query/update frequency info.
         D3D11_QUERY_DESC disjointQueryDesc = {};
