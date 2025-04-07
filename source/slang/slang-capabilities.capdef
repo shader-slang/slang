@@ -209,6 +209,7 @@ def _sm_6_5 : _sm_6_4;
 def _sm_6_6 : _sm_6_5;
 def _sm_6_7 : _sm_6_6;
 def _sm_6_8 : _sm_6_7;
+def _sm_6_9 : _sm_6_8;
 
 /// Represents HLSL NVAPI support.
 /// [Version]
@@ -1549,6 +1550,24 @@ alias sm_6_8 = sm_6_8_version
              | sm_6_7
              ;
 
+/// HLSL shader model 6.9 and related capabilities of other targets.
+/// Does not include related GLSL/SPIRV extensions.
+/// [Version]
+alias sm_6_9_version = _sm_6_9
+             | _GLSL_460
+             | spirv_1_5
+             | _cuda_sm_9_0
+             | metal
+             | cpp
+             ;
+
+/// HLSL shader model 6.9 and related capabilities of other targets.
+/// Includes related GLSL/SPIRV extensions.
+/// [Version]
+alias sm_6_9 = sm_6_9_version
+             | sm_6_8
+             ;
+
 // Profiles
 /// Use `sm_4_0` instead
 /// [Other]
@@ -1601,6 +1620,10 @@ alias DX_6_7 = sm_6_7;
 /// Use `sm_6_8` instead
 /// [Other]
 alias DX_6_8 = sm_6_8;
+
+/// Use `sm_6_9` instead
+/// [Other]
+alias DX_6_9 = sm_6_9;
 
 // GLSL profile capabilities
 //
@@ -2162,10 +2185,10 @@ alias ser_motion_raygen = raygen + ser_motion;
 
 /// User should not use this capability
 /// [Other]
-alias all = _sm_6_8 + hlsl_nvapi
-          | glsl_spirv_1_5 + sm_6_8
+alias all = _sm_6_9 + hlsl_nvapi
+          | glsl_spirv_1_5 + sm_6_9
              + ser + shaderclock + texturefootprint + fragmentshaderinterlock + _GL_NV_shader_subgroup_partitioned
              + _GL_NV_ray_tracing_motion_blur + _GL_NV_shader_texture_footprint
-          | spirv_1_5 + sm_6_8
+          | spirv_1_5 + sm_6_9
              + ser + shaderclock + texturefootprint + fragmentshaderinterlock + spvGroupNonUniformPartitionedNV
              + spvRayTracingMotionBlurNV + spvRayTracingMotionBlurNV;
