@@ -6,6 +6,7 @@ endif()
 
 # Helper function to download and extract an archive
 function(download_and_extract archive_name url)
+    cmake_parse_arguments(ARG "" "SLANG_GITHUB_TOKEN" "" ${ARGN})
     cmake_path(GET url FILENAME filename_with_ext)
     cmake_path(GET url STEM LAST_ONLY file_stem)
     set(archive_path "${CMAKE_CURRENT_BINARY_DIR}/${filename_with_ext}")
@@ -26,15 +27,28 @@ function(download_and_extract archive_name url)
                 "Using existing archive for ${archive_name}: ${archive_path}"
             )
         else()
-            message(STATUS "Fetching ${archive_name} from ${url}")
-            file(DOWNLOAD ${url} ${archive_path} STATUS status)
+            set(download_args ${url} ${archive_path} STATUS status)
+            if(ARG_SLANG_GITHUB_TOKEN)
+                list(
+                    APPEND
+                    download_args
+                    HTTPHEADER
+                    "Authorization: token ${ARG_SLANG_GITHUB_TOKEN}"
+                )
+            endif()
+
+            file(DOWNLOAD ${download_args})
 
             list(GET status 0 status_code)
             list(GET status 1 status_string)
             if(NOT status_code EQUAL 0)
                 message(
                     WARNING
-                    "Failed to download ${archive_name} from ${url}: ${status_string}"
+                    "Failed to download ${archive_name} from ${url}: ${status_string} with status code ${status_code}"
+                )
+                message(
+                    WARNING
+                    "If API rate limit is exceeded, Github allows a higher limit when you use token. Try a cmake option -DSLANG_GITHUB_TOKEN=your_token_here"
                 )
                 return()
             endif()
@@ -55,8 +69,11 @@ endfunction()
 # Otherwise, the 'url' is interpreted as an URL, and the content of the URL will be fetched, extracted and searched
 # for the shared library to produce the install rule.
 function(copy_fetched_shared_library library_name url)
-    cmake_parse_arguments(ARG "IGNORE_FAILURE" "" "" ${ARGN})
-    if(ARG_IGNORE_FAILURE)
+    cmake_parse_arguments(ARG "IGNORE_FAILURE" "SLANG_GITHUB_TOKEN" "" ${ARGN})
+
+    # Don't ignore failure if a Github token is provided;
+    # as we assume that the token will fix the rate limit issue.
+    if(ARG_IGNORE_FAILURE AND NOT ARG_SLANG_GITHUB_TOKEN)
         set(error_type STATUS)
     else()
         set(error_type SEND_ERROR)
@@ -95,7 +112,11 @@ function(copy_fetched_shared_library library_name url)
         set(source_object "${url}")
     else()
         # Otherwise, download and extract from whatever URL we have
-        download_and_extract("${library_name}" "${url}")
+        download_and_extract(
+            "${library_name}"
+            "${url}"
+            SLANG_GITHUB_TOKEN ${ARG_SLANG_GITHUB_TOKEN}
+        )
         if(DEFINED ${library_name}_SOURCE_DIR)
             from_glob(${${library_name}_SOURCE_DIR})
         elseif(ARG_IGNORE_FAILURE)

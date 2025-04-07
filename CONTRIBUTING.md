@@ -170,15 +170,11 @@ Call Stack (most recent call first):
   CMakeLists.txt:141 (get_best_slang_binary_release_url)
 ```
 
-The limit is higher when you use your personal account with a "Passkey".
+The limit is higher when you use your personal account with a "personal access token".
 
-To generate a "Passkey" on GitHub:
- 1. Go to GitHub "Settings" for your account.
- 2. Go to "Password and Authentication".
- 3. Click "Add a passkey" button.
- 4. GitHub will generate a "Passkey".
+To generate a "personal access token" on GitHub, follow steps in [Creating a personal access token (classic)](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens#creating-a-personal-access-token-classic)
 
-Use the generated "Passkey" with a cmake option "-DSLANG_GITHUB_TOKEN=your-pass-key-here".
+Use the generated "token" with a cmake option "-DSLANG_GITHUB_TOKEN=your-token-here".
 
 ### Making Changes
 Make your changes and ensure to follow our [Design Decisions](docs/design/README.md).

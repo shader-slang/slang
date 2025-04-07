@@ -650,6 +650,8 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitReturnStmt(ReturnStmt* stmt) { dispatchIfNotNull(stmt->expression); }
 
+    void visitDeferStmt(DeferStmt* stmt) { dispatchIfNotNull(stmt->statement); }
+
     void visitWhileStmt(WhileStmt* stmt)
     {
         dispatchIfNotNull(stmt->predicate);
@@ -12492,6 +12494,12 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
             DeclVisibility ctorVisibility = getDeclVisibility(structDecl);
             createCtor(structDecl, ctorVisibility);
         }
+    }
+
+    // Check if this is a ray payload struct and validate field access qualifiers
+    if (structDecl->findModifier<RayPayloadAttribute>())
+    {
+        checkRayPayloadStructFields(structDecl);
     }
 
     int backingWidth = 0;

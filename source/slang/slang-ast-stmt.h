@@ -253,6 +253,13 @@ class ReturnStmt : public Stmt
     Expr* expression = nullptr;
 };
 
+class DeferStmt : public Stmt
+{
+    SLANG_AST_CLASS(DeferStmt)
+
+    Stmt* statement = nullptr;
+};
+
 class ExpressionStmt : public Stmt
 {
     SLANG_AST_CLASS(ExpressionStmt)

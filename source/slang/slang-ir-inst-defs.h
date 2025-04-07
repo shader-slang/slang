@@ -661,7 +661,9 @@ INST(MissingReturn, missingReturn, 0, 0)
 INST(Unreachable, unreachable, 0, 0)
 INST_RANGE(Unreachable, MissingReturn, Unreachable)
 
-INST_RANGE(TerminatorInst, Return, Unreachable)
+INST(Defer, defer, 3, 0)
+
+INST_RANGE(TerminatorInst, Return, Defer)
 
 INST(discard, discard, 0, 0)
 
@@ -717,6 +719,7 @@ INST(BitNot, bitnot, 1, 0)
 INST(Select, select, 3, 0)
 
 INST(CheckpointObject, checkpointObj, 1, 0)
+INST(LoopExitValue, loopExitValue, 1, 0)
 
 INST(GetStringHash, getStringHash, 1, 0)
 
