@@ -71,9 +71,11 @@ static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
 
 void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink)
 {
+    // Division by matrix is not supported on Metal and WGSL.
     if (isDivisionByMatrix(inst))
     {
         sink->diagnose(inst, Diagnostics::divisionByMatrixNotSupported);
+        return;
     }
 
     // For shifts, ensure that the shift amount is unsigned, as required by
@@ -114,7 +116,7 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink)
         }
     }
 
-    // Do not convert scalar divisior to composite type. Division by matrix is not supported on
+    // Do not convert scalar divisor to composite type. Division by matrix is not supported on
     // Metal and WGSL, and division by scalar is always valid.
     if (!isDivisionByScalar(inst))
     {
