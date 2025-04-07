@@ -593,17 +593,8 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
         searchDirectories.searchDirectories.add(asString(includePath));
     }
 
-// TODO(JS):
-// We don't want to enable HLSL2021 on DXC by default even if it's available because it has
-// changes that break things. Such as with operator ?:. So for now we disable.
-#if 0
-    // TODO(JS): Enable in a better way perhaps?
     {
-        // Strictly speaking the HLSL2021 was available in 1.6.2112, in preview
-        // We enable on 1.7.2207 as that is the first official version, but 
-        // since we may not be able to get the patch version, we'll just assume any version
-        // over 1.7 has can support the feature.
-
+        // Specify -HV 2021 when using a DXC version that supports the newer language model.
         const SemanticVersion firstHlsl2021Version(1, 7);
 
         if (m_desc.version >= firstHlsl2021Version)
@@ -612,7 +603,6 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
             args.add(L"2021");
         }
     }
-#endif
 
     String sourcePath;
     ComPtr<IDxcBlob> dxcResultBlob = nullptr;

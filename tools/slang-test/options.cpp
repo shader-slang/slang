@@ -81,6 +81,7 @@ static bool _isSubCommand(const char* arg)
         "  -server-count <n>              Set number of test servers (default: 1)\n"
         "  -show-adapter-info             Show detailed adapter information\n"
         "  -generate-hlsl-baselines       Generate HLSL test baselines\n"
+        "  -skip-reference-image-generation Skip generating reference images for render tests\n"
         "  -emit-spirv-via-glsl           Emit SPIR-V through GLSL instead of directly\n"
         "  -expected-failure-list <file>  Specify file containing expected failures\n"
         "  -use-shared-library            Run tests in-process using shared library\n"
@@ -389,6 +390,10 @@ static bool _isSubCommand(const char* arg)
         else if (strcmp(arg, "-show-adapter-info") == 0)
         {
             optionsOut->showAdapterInfo = true;
+        }
+        else if (strcmp(arg, "-skip-reference-image-generation") == 0)
+        {
+            optionsOut->skipReferenceImageGeneration = true;
         }
         else
         {

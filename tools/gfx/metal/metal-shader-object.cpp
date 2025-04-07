@@ -74,6 +74,15 @@ ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* resourc
         SLANG_ASSERT(resourceViewImpl->m_type == ResourceViewImpl::ViewType::Texture);
         m_textures[bindingRange.baseIndex + offset.bindingArrayIndex] =
             static_cast<TextureResourceViewImpl*>(resourceView);
+
+        // For parameter blocks, we just need to set the resource ID of the texture to argument
+        // buffer
+        if (getLayout()->isParameterBlock())
+        {
+            auto resourceId =
+                static_cast<TextureResourceViewImpl*>(resourceView)->m_textureView->gpuResourceID();
+            setData(offset, &resourceId, sizeof(resourceId));
+        }
         break;
     case slang::BindingType::RawBuffer:
     case slang::BindingType::ConstantBuffer:
@@ -81,6 +90,15 @@ ShaderObjectImpl::setResource(ShaderOffset const& offset, IResourceView* resourc
         SLANG_ASSERT(resourceViewImpl->m_type == ResourceViewImpl::ViewType::Buffer);
         m_buffers[bindingRange.baseIndex + offset.bindingArrayIndex] =
             static_cast<BufferResourceViewImpl*>(resourceView);
+
+        // For parameter blocks, we just need to set the GPU address of the buffer to argument
+        // buffer
+        if (getLayout()->isParameterBlock())
+        {
+            DeviceAddress gpuAddress =
+                static_cast<BufferResourceViewImpl*>(resourceView)->m_buffer->getDeviceAddress();
+            setData(offset, &gpuAddress, sizeof(gpuAddress));
+        }
         break;
     case slang::BindingType::TypedBuffer:
     case slang::BindingType::MutableTypedBuffer:
@@ -106,6 +124,13 @@ ShaderObjectImpl::setSampler(ShaderOffset const& offset, ISamplerState* sampler)
 
     m_samplers[bindingRange.baseIndex + offset.bindingArrayIndex] =
         static_cast<SamplerStateImpl*>(sampler);
+
+    // For parameter blocks, we just need to set the GPU address of the buffer to argument buffer
+    if (layout->isParameterBlock())
+    {
+        auto resourceId = static_cast<SamplerStateImpl*>(sampler)->m_samplerState->gpuResourceID();
+        setData(offset, &resourceId, sizeof(resourceId));
+    }
     m_isArgumentBufferDirty = true;
     return SLANG_OK;
 }
@@ -123,7 +148,12 @@ Result ShaderObjectImpl::init(IDevice* device, ShaderObjectLayoutImpl* layout)
     // uniform data (which includes values from this object and
     // any existential-type sub-objects).
     //
-    size_t uniformSize = layout->getElementTypeLayout()->getSize();
+    size_t uniformSize = 0;
+    if (layout->isParameterBlock())
+        uniformSize = layout->getParameterBlockTypeLayout()->getSize();
+    else
+        uniformSize = layout->getElementTypeLayout()->getSize();
+
     if (uniformSize)
     {
         m_data.setCount(uniformSize);
@@ -161,6 +191,11 @@ Result ShaderObjectImpl::init(IDevice* device, ShaderObjectLayoutImpl* layout)
         for (Index i = 0; i < bindingRangeInfo.count; ++i)
         {
             RefPtr<ShaderObjectImpl> subObject;
+
+            if (bindingRangeInfo.bindingType == slang::BindingType::ParameterBlock ||
+                bindingRangeInfo.bindingType == slang::BindingType::ConstantBuffer)
+                subObjectLayout->setIsParameterBlock();
+
             SLANG_RETURN_ON_FAIL(
                 ShaderObjectImpl::create(device, subObjectLayout, subObject.writeRef()));
             m_objects[bindingRangeInfo.subObjectIndex + i] = subObject;
@@ -367,11 +402,11 @@ void ShaderObjectImpl::writeOrdinaryDataIntoArgumentBuffer(
 }
 
 BufferResourceImpl* ShaderObjectImpl::_ensureArgumentBufferUpToDate(
+    BindingContext* context,
     DeviceImpl* device,
     ShaderObjectLayoutImpl* layout)
 {
     auto typeLayout = layout->getParameterBlockTypeLayout();
-    auto defaultTypeLayout = m_layout->getElementTypeLayout();
 
     // If we have already created a buffer to hold the parmaeter block, then we should
     // simply re-use that buffer rather than re-create it.
@@ -401,94 +436,85 @@ BufferResourceImpl* ShaderObjectImpl::_ensureArgumentBufferUpToDate(
         void* argumentData;
         SLANG_RETURN_NULL_ON_FAIL(m_argumentBuffer->map(&range, &argumentData));
 
-        // Now fill in argument values to `argumentData`.
-        int bindingRangeIndex = 0;
-        SLANG_ASSERT(
-            defaultTypeLayout->getBindingRangeCount() == typeLayout->getBindingRangeCount());
+        // For parameter blocks, all the fields are flattened as ordinary data, so the size of the
+        // m_data must be equal to the size of the argument buffer, we just need to copy the data
+        // from m_data to argumentData, the only thing we need to specially handle is the parameter
+        // block and constant buffer, which will be a represented as device pointer in the argument
+        // buffer, we have to set the address of the argument buffer of nested parameter block to
+        // the corresponding offset in the argument buffer
+        SLANG_ASSERT(m_data.getCount() == dataSize);
+        memcpy(argumentData, m_data.getBuffer(), dataSize);
 
-        int bufferBindingIndexOffset = layout->getTotalOrdinaryDataSize() != 0 ? 1 : 0;
-
-        for (unsigned int bindingRangeIndex = 0;
-             bindingRangeIndex < defaultTypeLayout->getBindingRangeCount();
-             bindingRangeIndex++)
+        // Special handle the parameter block and constant buffer
+        for (uint32_t i = 0; i < typeLayout->getFieldCount(); i++)
         {
-            int bindingCount = defaultTypeLayout->getBindingRangeBindingCount(bindingRangeIndex);
-            int setIndex = defaultTypeLayout->getBindingRangeDescriptorSetIndex(bindingRangeIndex);
-            int rangeIndex =
-                defaultTypeLayout->getBindingRangeFirstDescriptorRangeIndex(bindingRangeIndex);
-            int bindingOffset =
-                defaultTypeLayout->getDescriptorSetDescriptorRangeIndexOffset(setIndex, rangeIndex);
-            auto bindingType = defaultTypeLayout->getBindingRangeType(bindingRangeIndex);
-            for (int i = 0; i < bindingCount; i++)
+            auto field = typeLayout->getFieldByIndex(i);
+            auto kind = field->getTypeLayout()->getKind();
+            switch (kind)
             {
-                auto argumentDataOffset =
-                    typeLayout->getDescriptorSetDescriptorRangeIndexOffset(setIndex, rangeIndex) +
-                    i * sizeof(uint64_t);
-                auto argumentPtr = (uint8_t*)argumentData + argumentDataOffset;
-                auto resourceIndex = bindingOffset + i;
-                switch (bindingType)
+            case slang::TypeReflection::Kind::ConstantBuffer:
+            case slang::TypeReflection::Kind::ParameterBlock:
                 {
-                case slang::BindingType::ConstantBuffer:
-                case slang::BindingType::ParameterBlock:
+                    // set address of argument buffer of nested parameter block to corresponding
+                    // offset in argument buffer
+                    auto offset = field->getOffset();
+                    uint32_t bindingRangeIndex = typeLayout->getFieldBindingRangeOffset(i);
+                    auto bindingRange = layout->getBindingRange(bindingRangeIndex);
+                    auto subObjectIndex = bindingRange.subObjectIndex;
+                    auto subObject = m_objects[subObjectIndex];
+                    BufferResourceImpl* argumentBufferPtr =
+                        subObject->_ensureArgumentBufferUpToDate(
+                            context,
+                            device,
+                            subObject->getLayout());
+                    if (argumentBufferPtr)
                     {
-                        if (m_objects[resourceIndex])
-                        {
-                            auto subArgumentBuffer =
-                                m_objects[resourceIndex]->_ensureArgumentBufferUpToDate(
-                                    device,
-                                    m_objects[resourceIndex]->getLayout());
-                            if (subArgumentBuffer)
-                            {
-                                gfx::DeviceAddress bufferPtr =
-                                    subArgumentBuffer->m_buffer->gpuAddress();
-                                memcpy(argumentPtr, &bufferPtr, sizeof(bufferPtr));
-                            }
-                        }
-                        break;
-                    }
-                case slang::BindingType::RawBuffer:
-                case slang::BindingType::MutableRawBuffer:
-                    {
-                        auto bufferViewImpl = static_cast<BufferResourceViewImpl*>(
-                            m_buffers[resourceIndex + bufferBindingIndexOffset].get());
+                        uint8_t* argumentBuffer = (uint8_t*)argumentData + offset;
+                        gfx::DeviceAddress bufferAddr = argumentBufferPtr->getDeviceAddress();
+                        memcpy(argumentBuffer, &bufferAddr, sizeof(bufferAddr));
 
-                        if (bufferViewImpl)
-                        {
-                            gfx::DeviceAddress bufferPtr =
-                                bufferViewImpl->m_buffer->getDeviceAddress() +
-                                bufferViewImpl->m_offset;
-                            memcpy(argumentPtr, &bufferPtr, sizeof(bufferPtr));
-                        }
-                        break;
+                        MTL::Resource const* resource[] = {argumentBufferPtr->m_buffer.get()};
+                        // Nested parameter block and constant buffer is also bindless resource, we
+                        // need to inform Metal to hazard track the resource
+                        context->useResources(
+                            resource,
+                            1,
+                            MTL::ResourceUsageWrite | MTL::ResourceUsageRead);
                     }
-                case slang::BindingType::Texture:
-                case slang::BindingType::MutableTexture:
-                    {
-                        auto textureViewImpl =
-                            static_cast<TextureResourceViewImpl*>(m_textures[resourceIndex].get());
-                        if (textureViewImpl)
-                        {
-                            auto resourceId = textureViewImpl->m_textureView->gpuResourceID();
-                            memcpy(argumentPtr, &resourceId, sizeof(resourceId));
-                        }
-                        break;
-                    }
-                case slang::BindingType::Sampler:
-                    {
-                        auto samplerStateImpl =
-                            static_cast<SamplerStateImpl*>(m_samplers[resourceIndex].get());
-                        auto resourceId = samplerStateImpl->m_samplerState->gpuResourceID();
-                        memcpy(argumentPtr, &resourceId, sizeof(resourceId));
-                        break;
-                    }
+                    break;
                 }
+            default:
+                break;
             }
         }
-        writeOrdinaryDataIntoArgumentBuffer(
-            typeLayout,
-            defaultTypeLayout,
-            (uint8_t*)argumentData,
-            (uint8_t*)m_data.getBuffer());
+
+        // Handle bindless resources
+        List<MTL::Resource const*> resources;
+        for (uint32_t i = 0; i < m_buffers.getCount(); i++)
+        {
+            if (m_buffers[i])
+            {
+                MTL::Buffer* mtlBuffer = m_buffers[i]->m_buffer->m_buffer.get();
+                resources.add(mtlBuffer);
+            }
+        }
+
+        for (uint32_t i = 0; i < m_textures.getCount(); i++)
+        {
+            if (m_textures[i])
+            {
+                MTL::Texture* mtlTexture = m_textures[i]->m_texture->m_texture.get();
+                resources.add(mtlTexture);
+            }
+        }
+        // It's important to call useResources because Metal will not automatically do the hazard
+        // tracking for bindless resources, we have to call useResources to inform Metal to track
+        // the resources.
+        context->useResources(
+            resources.getBuffer(),
+            resources.getCount(),
+            MTL::ResourceUsageWrite | MTL::ResourceUsageRead);
+
         m_argumentBuffer->unmap(&range);
         m_isArgumentBufferDirty = false;
     }
@@ -504,7 +530,7 @@ Result ShaderObjectImpl::bindAsParameterBlock(
     if (!context->device->m_hasArgumentBufferTier2)
         return SLANG_FAIL;
 
-    auto argumentBuffer = _ensureArgumentBufferUpToDate(context->device, layout);
+    auto argumentBuffer = _ensureArgumentBufferUpToDate(context, context->device, layout);
 
     if (m_argumentBuffer)
     {
