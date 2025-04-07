@@ -2702,4 +2702,14 @@ DIAGNOSTIC(
     noBlocksOrIntrinsic,
     "no blocks found for function definition, is there a '$0' intrinsic missing?")
 
+//
+// Ray tracing
+//
+
+DIAGNOSTIC(
+    40000,
+    Error,
+    rayPayloadFieldMissingAccessQualifiers,
+    "field '$0' in ray payload struct must have either 'read' OR 'write' access qualifiers")
+
 #undef DIAGNOSTIC
