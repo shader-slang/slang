@@ -1,6 +1,6 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -xslang -skip-spirv-validation
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
-//Test(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -use-dxil -output-using-type -profile cs_6_8 -Xslang... -Xdxc -Vd -X.
+//Test(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -use-dxil -output-using-type -profile cs_6_9 -Xslang... -Xdxc -Vd -X.
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 31
