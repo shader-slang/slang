@@ -2295,7 +2295,7 @@ SlangResult emitSPIRVForEntryPointsDirectly(
             break;
         case OptimizationLevel::Default:
             downstreamOptions.optimizationLevel =
-                DownstreamCompileOptions::OptimizationLevel::Default;
+                DownstreamCompileOptions::OptimizationLevel::None;
             break;
         case OptimizationLevel::High:
             downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::High;
