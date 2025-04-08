@@ -2347,7 +2347,16 @@ CapabilitySet TargetRequest::getTargetCaps()
 
     for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
     {
-        auto toAdd = CapabilitySet((CapabilityName)atomVal.intValue);
+        CapabilitySet toAdd;
+        switch (atomVal.kind)
+        {
+        case CompilerOptionValueKind::Int:
+            toAdd = CapabilitySet(CapabilityName(atomVal.intValue));
+            break;
+        case CompilerOptionValueKind::String:
+            toAdd = CapabilitySet(findCapabilityName(atomVal.stringValue.getUnownedSlice()));
+            break;
+        }
 
         if (isGLSLTarget)
             targetCap.addSpirvVersionFromOtherAsGlslSpirvVersion(toAdd);
