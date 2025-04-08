@@ -260,6 +260,9 @@ struct DownstreamCompileOptions
     /// Profile name to use, only required for compiles that need to compile against a a specific
     /// profiles. Profile names are tied to compilers and targets.
     TerminatedCharSlice profileName;
+    // According to DirectX Raytracing Specification, PAQs are supported in Shader Model 6.7 and
+    // above
+    bool enablePAQ = false;
 
     /// The stage being compiled for
     SlangStage stage = SLANG_STAGE_NONE;

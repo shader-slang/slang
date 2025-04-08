@@ -32,10 +32,17 @@ float infinitesimal(float x)
 
 // Test that computeLoop's intermediates have no float sitting
 // around (must not cache the outvar from 'compute()')
-// CHECK: struct s_bwd_prop_computeLoop_Intermediates
-// CHECK-NEXT: {
-// CHECK-NOT: {{[A-Za-z0-9_]+}} {{[A-Za-z0-9_]+}}[{{.*}}]
-// CHECK: }
+// 
+// Further, if loop exit value inference is working correctly, 
+// then there should be no context type at all.
+// 
+// CHECK-NOT: struct s_bwd_prop_computeLoop_Intermediates
+//
+// Check that the signature of the s_bwd_prop_computeLoop function only
+// contains an inout DiffPair_float_0 and a float.
+//
+// CHECK: void s_bwd_prop_computeLoop{{[_0-9]*}}(inout DiffPair_float{{[_0-9]*}} dpy{{[_0-9]*}}, float {{[_a-zA-Z0-9]*}})
+//
 
 [BackwardDifferentiable]
 [PreferRecompute]

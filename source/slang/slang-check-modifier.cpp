@@ -1413,9 +1413,20 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::ConstRefModifier:
     case ASTNodeType::GLSLBufferModifier:
     case ASTNodeType::GLSLPatchModifier:
+        return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
+               as<GLSLInterfaceBlockDecl>(decl);
     case ASTNodeType::RayPayloadAccessSemantic:
     case ASTNodeType::RayPayloadReadSemantic:
     case ASTNodeType::RayPayloadWriteSemantic:
+        // Allow on struct fields if the parent struct has the [raypayload] attribute
+        if (auto varDecl = as<VarDeclBase>(decl))
+        {
+            if (auto structDecl = as<StructDecl>(varDecl->parentDecl))
+            {
+                if (structDecl->findModifier<RayPayloadAttribute>())
+                    return true;
+            }
+        }
         return (as<VarDeclBase>(decl) && isGlobalDecl(decl)) || as<ParamDecl>(decl) ||
                as<GLSLInterfaceBlockDecl>(decl);
 
@@ -2177,6 +2188,37 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
     }
 
     postProcessingOnModifiers(syntaxNode->modifiers);
+}
+
+void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
+{
+    // Only check structs with the [raypayload] attribute
+    if (!structDecl->findModifier<RayPayloadAttribute>())
+    {
+        return;
+    }
+
+    // Check each field in the struct
+    for (auto member : structDecl->members)
+    {
+        auto fieldVarDecl = as<VarDeclBase>(member);
+        if (!fieldVarDecl)
+        {
+            continue;
+        }
+
+        bool hasReadModifier = fieldVarDecl->findModifier<RayPayloadReadSemantic>() != nullptr;
+        bool hasWriteModifier = fieldVarDecl->findModifier<RayPayloadWriteSemantic>() != nullptr;
+
+        if (!hasReadModifier && !hasWriteModifier)
+        {
+            // Emit the diagnostic error
+            getSink()->diagnose(
+                fieldVarDecl,
+                Diagnostics::rayPayloadFieldMissingAccessQualifiers,
+                fieldVarDecl->getName());
+        }
+    }
 }
 
 

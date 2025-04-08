@@ -3242,6 +3242,13 @@ protected:
                 result.permittedTypes.add(builder.getUInt16Type());
                 break;
             }
+        case SystemValueSemanticName::QuadLaneIndex:
+            {
+                result.systemValueName = toSlice("thread_index_in_quadgroup");
+                result.permittedTypes.add(builder.getUInt16Type());
+                result.permittedTypes.add(builder.getUIntType());
+                break;
+            }
         default:
             m_sink->diagnose(
                 parentVar,
