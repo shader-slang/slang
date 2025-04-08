@@ -118,13 +118,14 @@ void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMeta
     // and exported functions.
     for (const auto& inst : irModule->getGlobalInsts())
     {
+        if (inst->findDecoration<IRDownstreamModuleExportDecoration>())
+        {
+            auto name = inst->findDecoration<IRExportDecoration>()->getMangledName();
+            outMetadata.m_exportedFunctionMangledNames.add(name);
+        }
+
         if (auto func = as<IRFunc>(inst))
         {
-            if (func->findDecoration<IRDownstreamModuleExportDecoration>())
-            {
-                auto name = func->findDecoration<IRExportDecoration>()->getMangledName();
-                outMetadata.m_exportedFunctionMangledNames.add(name);
-            }
 
             // Collect metadata from entrypoint params.
             for (auto param : func->getParams())
