@@ -1013,19 +1013,24 @@ struct WarningTimeline
     struct Entry
     {
         PragmaWarningSpecifier specifier = {};
-        SourceLoc location = {};
+        SourceLoc::RawValue location = {}; // Absolute location
         // Used for the once specifier
         // -1 points to this, but not consumed
         // -2 points to this, but was consumed
         // >= 0 points to a previous once entry (sharing the payload)
-        int payload = 0;
+        // Used for the suppress specifier to store the original SourceLoc needed to emit a warning
+        union
+        {
+            int payload = 0;
+            SourceLoc::RawValue debugLocation; // Store the raw value for trivial copy
+        };
 
         bool operator<(Entry const& other) const { return location < other.location; }
     };
     // Sorted by location
     List<Entry> entries = {};
 
-    const Entry* findEntry(SourceLoc location) const
+    const Entry* findEntry(SourceLoc::RawValue location) const
     {
         const Entry* res = nullptr;
         if (entries.getCount() && location >= entries.getFirst().location)
@@ -1034,13 +1039,14 @@ struct WarningTimeline
                       entries.begin(),
                       entries.end(),
                       location,
-                      [](SourceLoc const& lhs, Entry const& rhs) { return lhs < rhs.location; }) -
+                      [](SourceLoc::RawValue const& lhs, Entry const& rhs)
+                      { return lhs < rhs.location; }) -
                   1;
         }
         return res;
     }
 
-    PragmaWarningSpecifier consumeSpecifier(SourceLoc location)
+    PragmaWarningSpecifier consumeSpecifier(SourceLoc::RawValue location)
     {
         PragmaWarningSpecifier res = PragmaWarningSpecifier::Default;
         Entry* entry = const_cast<Entry*>(findEntry(location));
@@ -1090,14 +1096,15 @@ struct WarningTimeline
     }
 
     void addEntry(
-        SourceLoc location,
+        SourceLoc::RawValue location,
         PragmaWarningSpecifier specifier,
         const Entry* poppingFrom,
         DiagnosticSink* sink,
-        int id)
+        int id,
+        SourceLoc debugLoc)
     {
-        SourceLoc max_known_location =
-            entries.getCount() ? entries.getLast().location : SourceLoc::fromRaw(0);
+        SourceLoc::RawValue max_known_location =
+            entries.getCount() ? entries.getLast().location : SourceLoc::RawValue(0);
         // Add on top
         if (location > max_known_location)
         {
@@ -1126,6 +1133,10 @@ struct WarningTimeline
                         e.payload = -1;
                     }
                 }
+                else
+                {
+                    e.debugLocation = debugLoc.getRaw();
+                }
                 entries.add(e);
             }
         }
@@ -1133,12 +1144,12 @@ struct WarningTimeline
         {
             if (sink)
             {
-                sink->diagnose(location, Diagnostics::pragmaWarningCannotInsertHere, id);
+                sink->diagnose(debugLoc, Diagnostics::pragmaWarningCannotInsertHere, id);
                 const Entry* prevEntry = findEntry(location);
                 if (prevEntry && prevEntry->specifier == PragmaWarningSpecifier::Suppress)
                 {
                     sink->diagnose(
-                        prevEntry->location,
+                        SourceLoc::fromRaw(prevEntry->debugLocation),
                         Diagnostics::pragmaWarningPointSuppress,
                         id);
                 }
@@ -1146,7 +1157,12 @@ struct WarningTimeline
         }
     }
 
-    void popEntry(SourceLoc location, SourceLoc pushedLocation, DiagnosticSink* sink, int id)
+    void popEntry(
+        SourceLoc::RawValue location,
+        SourceLoc::RawValue pushedLocation,
+        DiagnosticSink* sink,
+        int id,
+        SourceLoc debugLoc)
     {
         const Entry* poppingFrom = findEntry(pushedLocation);
         addEntry(
@@ -1154,22 +1170,35 @@ struct WarningTimeline
             poppingFrom ? poppingFrom->specifier : PragmaWarningSpecifier::Default,
             poppingFrom,
             sink,
-            id);
+            id,
+            debugLoc);
     }
 };
 
 struct WarningStateTracker : ISourceWarningStateTracker
 {
+    SourceManager* sourceManager = nullptr;
     Dictionary<int, WarningTimeline> entries = {};
     List<SourceLoc> stack = {};
 
+    WarningStateTracker(SourceManager* sourceManager = nullptr)
+        : sourceManager(sourceManager)
+    {
+    }
+
+    SourceLoc::RawValue getAbsoluteLocation(SourceLoc loc) const
+    {
+        return sourceManager ? sourceManager->getAbsoluteLocation(loc) : loc.getRaw();
+    }
+
     virtual Severity consumeWarningSeverity(SourceLoc location, int id, Severity severity) override
     {
+        SourceLoc::RawValue absoluteLoc = getAbsoluteLocation(location);
         Severity res = severity;
         WarningTimeline* timeline = entries.tryGetValue(id);
         if (timeline)
         {
-            PragmaWarningSpecifier spec = timeline->consumeSpecifier(location);
+            PragmaWarningSpecifier spec = timeline->consumeSpecifier(absoluteLoc);
             if (spec == PragmaWarningSpecifier::Disable || spec == PragmaWarningSpecifier::Suppress)
             {
                 res = Severity::Disable;
@@ -1189,7 +1218,7 @@ struct WarningStateTracker : ISourceWarningStateTracker
         DiagnosticSink* sink = nullptr)
     {
         WarningTimeline& timeline = entries.operator[](id);
-        timeline.addEntry(location, specifier, nullptr, sink, id);
+        timeline.addEntry(getAbsoluteLocation(location), specifier, nullptr, sink, id, location);
     }
 
     void addSuppress(
@@ -1201,8 +1230,14 @@ struct WarningStateTracker : ISourceWarningStateTracker
         WarningTimeline& timeline = entries.operator[](id);
         PragmaWarningSpecifier prev = timeline.getLatestSpecifier();
         auto lastEntry = timeline.getLatestEntry();
-        timeline.addEntry(location, PragmaWarningSpecifier::Suppress, nullptr, sink, id);
-        timeline.addEntry(nextLineEnd, prev, lastEntry, sink, id);
+        timeline.addEntry(
+            getAbsoluteLocation(location),
+            PragmaWarningSpecifier::Suppress,
+            nullptr,
+            sink,
+            id,
+            location);
+        timeline.addEntry(getAbsoluteLocation(nextLineEnd), prev, lastEntry, sink, id, nextLineEnd);
     }
 
     void push(SourceLoc location) { stack.add(location); }
@@ -1211,11 +1246,13 @@ struct WarningStateTracker : ISourceWarningStateTracker
     {
         if (stack.getCount())
         {
-            SourceLoc pushed = stack.getLast();
+            const SourceLoc pushed = stack.getLast();
+            const SourceLoc::RawValue absLoc = getAbsoluteLocation(location);
+            const SourceLoc::RawValue absPushed = getAbsoluteLocation(pushed);
             stack.removeLast();
             for (auto& [id, timeline] : entries)
             {
-                timeline.popEntry(location, pushed, sink, id);
+                timeline.popEntry(absLoc, absPushed, sink, id, location);
             }
         }
         else if (sink)
@@ -1279,8 +1316,10 @@ struct Preprocessor
     NamePool* getNamePool() { return namePool; }
     SourceManager* getSourceManager() { return sourceManager; }
 
+    SourceLoc::RawValue absoluteSourceLocCounter = 0;
+
     /// Push a new input file onto the input stack of the preprocessor
-    void pushInputFile(InputFile* inputFile);
+    void pushInputFile(InputFile* inputFile, SourceLoc location);
 
     /// Pop the inner-most input file from the stack of input files
     void popInputFile();
@@ -3443,8 +3482,21 @@ static SlangResult readFile(
     return SLANG_OK;
 }
 
-void Preprocessor::pushInputFile(InputFile* inputFile)
+void Preprocessor::pushInputFile(InputFile* inputFile, SourceLoc loc)
 {
+    if (m_currentInputFile)
+    {
+        SourceView* sourceView = m_currentInputFile->getLexer()->m_sourceView;
+        SourceLoc::RawValue offset = SourceRange(sourceView->getLastSegment().begin, loc).getSize();
+        ;
+        absoluteSourceLocCounter += offset;
+    }
+
+    {
+        SourceView* sourceView = inputFile->getLexer()->m_sourceView;
+        sourceView->setAbsoluteLocationBase(absoluteSourceLocCounter);
+    }
+
     inputFile->m_parent = m_currentInputFile;
     m_currentInputFile = inputFile;
 }
@@ -3567,7 +3619,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 
     InputFile* inputFile = new InputFile(context->m_preprocessor, sourceView);
 
-    context->m_preprocessor->pushInputFile(inputFile);
+    context->m_preprocessor->pushInputFile(inputFile, directiveLoc);
 }
 
 static void _parseMacroOps(
@@ -4482,6 +4534,13 @@ void Preprocessor::popInputFile()
             conditional->ifToken.getContent());
     }
 
+    {
+        SourceView* sourceView = inputFile->getLexer()->m_sourceView;
+        auto lastSegment = sourceView->getLastSegment();
+        absoluteSourceLocCounter +=
+            SourceRange(lastSegment.begin, sourceView->getRange().end).getSize();
+    }
+
     // We will update the current file to the parent of whatever
     // the `inputFile` was (usually the file that `#include`d it).
     //
@@ -4496,6 +4555,13 @@ void Preprocessor::popInputFile()
     if (!parentFile)
     {
         endOfFileToken = eofToken;
+    }
+    else
+    {
+        SourceView* sourceView = parentFile->getLexer()->m_sourceView;
+        sourceView->addAbsoluteSegment(
+            parentFile->getExpansionStream()->peekLoc(),
+            absoluteSourceLocCounter);
     }
 
     delete inputFile;
@@ -4726,7 +4792,8 @@ TokenList preprocessSource(
         desc.contentAssistInfo = &linkage->contentAssistInfo.preprocessorInfo;
     }
 
-    preprocessor::WarningStateTracker* wst = new preprocessor::WarningStateTracker();
+    preprocessor::WarningStateTracker* wst =
+        new preprocessor::WarningStateTracker(desc.sourceManager);
     desc.sink->setSourceWarningStateTracker(wst);
 
     return preprocessSource(file, desc, outDetectedLanguage);
@@ -4798,7 +4865,7 @@ TokenList preprocessSource(
 
         // create an initial input stream based on the provided buffer
         InputFile* primaryInputFile = new InputFile(&preprocessor, sourceView);
-        preprocessor.pushInputFile(primaryInputFile);
+        preprocessor.pushInputFile(primaryInputFile, sourceView->getRange().begin);
     }
 
     TokenList tokens = ReadAllTokens(&preprocessor);

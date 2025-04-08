@@ -1018,4 +1018,45 @@ PathInfo SourceManager::getPathInfo(SourceLoc loc, SourceLocType type)
     }
 }
 
+SourceLoc::RawValue SourceView::getAbsoluteLocation(SourceLoc location) const
+{
+    AbsoluteSegment segment;
+    if (m_absSegments.getCount())
+    {
+        if (m_absSegments.getFirst().begin > location)
+        {
+            segment.begin = m_range.begin;
+            segment.absoluteBegin = m_absoluteLocationBase;
+        }
+        else
+        {
+            auto it = std::upper_bound(
+                          m_absSegments.begin(),
+                          m_absSegments.end(),
+                          location,
+                          [](SourceLoc const& loc, AbsoluteSegment const& seg)
+                          { return loc < seg.begin; }) -
+                      1;
+            segment = *it;
+        }
+    }
+    else
+    {
+        segment = getLastSegment();
+    }
+    auto offset = SourceRange(segment.begin, location).getSize();
+    return segment.absoluteBegin + offset;
+}
+
+SourceLoc::RawValue SourceManager::getAbsoluteLocation(SourceLoc location) const
+{
+    SourceLoc::RawValue res = 0;
+    const SourceView* view = findSourceView(location);
+    if (view)
+    {
+        res = view->getAbsoluteLocation(location);
+    }
+    return res;
+}
+
 } // namespace Slang
