@@ -1698,6 +1698,16 @@ class PayloadAttribute : public Attribute
     SLANG_AST_CLASS(PayloadAttribute)
 };
 
+/// A `[raypayload]` attribute indicates that a `struct` type will be used as
+/// a ray payload for `TraceRay()` calls, and thus also as input/output
+/// for shaders in the ray tracing pipeline that might be invoked for
+/// such a ray.
+///
+class RayPayloadAttribute : public Attribute
+{
+    SLANG_AST_CLASS(RayPayloadAttribute)
+};
+
 /// A `[deprecated("message")]` attribute indicates the target is
 /// deprecated.
 /// A compiler warning including the message will be raised if the
