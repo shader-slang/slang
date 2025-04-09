@@ -611,7 +611,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             {
                 elementCount = (UInt)constElementCount->getValue();
             }
-            else
+            else if (!as<GenericParamIntVal>(as<TypeCastIntVal>(toElementCount)->getBase()))
             {
                 // We don't know the element count statically,
                 // so what are we supposed to be doing?
