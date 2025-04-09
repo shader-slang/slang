@@ -195,14 +195,89 @@ function(slang_add_target dir type)
     if(type STREQUAL "MODULE")
         set(library_subdir ${module_subdir})
     endif()
+
+    # Respect user-defined CMAKE_*_OUTPUT_DIRECTORY variables if they are set
+    if(DEFINED CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
+        set(archive_output_dir "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}")
+    else()
+        set(archive_output_dir "${output_dir}/${archive_subdir}")
+    endif()
+
+    if(DEFINED CMAKE_LIBRARY_OUTPUT_DIRECTORY)
+        set(library_output_dir "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+    else()
+        set(library_output_dir "${output_dir}/${library_subdir}")
+    endif()
+
+    if(DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+        set(runtime_output_dir "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+        set(pdb_output_dir "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+    else()
+        set(runtime_output_dir "${output_dir}/${runtime_subdir}")
+        set(pdb_output_dir "${output_dir}/${runtime_subdir}")
+    endif()
+
     set_target_properties(
         ${target}
         PROPERTIES
-            ARCHIVE_OUTPUT_DIRECTORY "${output_dir}/${archive_subdir}"
-            LIBRARY_OUTPUT_DIRECTORY "${output_dir}/${library_subdir}"
-            RUNTIME_OUTPUT_DIRECTORY "${output_dir}/${runtime_subdir}"
-            PDB_OUTPUT_DIRECTORY "${output_dir}/${runtime_subdir}"
+            ARCHIVE_OUTPUT_DIRECTORY "${archive_output_dir}"
+            LIBRARY_OUTPUT_DIRECTORY "${library_output_dir}"
+            RUNTIME_OUTPUT_DIRECTORY "${runtime_output_dir}"
+            PDB_OUTPUT_DIRECTORY "${pdb_output_dir}"
     )
+
+    # For Multi-Config generators we also need to set per-config output directories
+    # if user-defined paths are provided
+    if(DEFINED CMAKE_ARCHIVE_OUTPUT_DIRECTORY)
+        set_target_properties(
+            ${target}
+            PROPERTIES
+                ARCHIVE_OUTPUT_DIRECTORY_DEBUG
+                    "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}"
+                ARCHIVE_OUTPUT_DIRECTORY_RELEASE
+                    "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}"
+                ARCHIVE_OUTPUT_DIRECTORY_RELWITHDEBINFO
+                    "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}"
+                ARCHIVE_OUTPUT_DIRECTORY_MINSIZEREL
+                    "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}"
+        )
+    endif()
+
+    if(DEFINED CMAKE_LIBRARY_OUTPUT_DIRECTORY)
+        set_target_properties(
+            ${target}
+            PROPERTIES
+                LIBRARY_OUTPUT_DIRECTORY_DEBUG
+                    "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+                LIBRARY_OUTPUT_DIRECTORY_RELEASE
+                    "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+                LIBRARY_OUTPUT_DIRECTORY_RELWITHDEBINFO
+                    "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+                LIBRARY_OUTPUT_DIRECTORY_MINSIZEREL
+                    "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+        )
+    endif()
+
+    if(DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+        set_target_properties(
+            ${target}
+            PROPERTIES
+                RUNTIME_OUTPUT_DIRECTORY_DEBUG
+                    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+                RUNTIME_OUTPUT_DIRECTORY_RELEASE
+                    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+                RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO
+                    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+                RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL
+                    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+                PDB_OUTPUT_DIRECTORY_DEBUG "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+                PDB_OUTPUT_DIRECTORY_RELEASE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+                PDB_OUTPUT_DIRECTORY_RELWITHDEBINFO
+                    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+                PDB_OUTPUT_DIRECTORY_MINSIZEREL
+                    "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+        )
+    endif()
 
     set(debug_configs "Debug,RelWithDebInfo")
     if(SLANG_ENABLE_RELEASE_DEBUG_INFO)

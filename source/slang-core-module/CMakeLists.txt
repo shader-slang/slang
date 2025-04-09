@@ -152,7 +152,7 @@ set(core_module_common_args
 slang_add_target(
     ${core_module_common_args}
     TARGET_NAME slang-embedded-core-module
-    EXPLICIT_SOURCE ${core_module_generated_header}
+    REQUIRES generate_core_module_headers
     EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_EMBED_CORE_MODULE
     INCLUDE_DIRECTORIES_PRIVATE ${core_module_generated_header_dir}
 )

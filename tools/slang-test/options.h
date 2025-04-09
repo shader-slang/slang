@@ -72,6 +72,9 @@ struct Options
     // force generation of baselines for HLSL tests
     bool generateHLSLBaselines = false;
 
+    // Skip generation of reference images for render tests, assume they already exist
+    bool skipReferenceImageGeneration = false;
+
     // Whether to skip the step of creating test devices to check if an API is actually available.
     bool skipApiDetection = false;
 
@@ -129,6 +132,9 @@ struct Options
         TestCategorySet* categorySet,
         Slang::WriterHelper stdError,
         Options* optionsOut);
+
+    /// Display help message
+    static void showHelp(Slang::WriterHelper stdOut);
 };
 
 #endif // OPTIONS_H_INCLUDED

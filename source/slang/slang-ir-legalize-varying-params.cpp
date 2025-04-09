@@ -3242,6 +3242,13 @@ protected:
                 result.permittedTypes.add(builder.getUInt16Type());
                 break;
             }
+        case SystemValueSemanticName::QuadLaneIndex:
+            {
+                result.systemValueName = toSlice("thread_index_in_quadgroup");
+                result.permittedTypes.add(builder.getUInt16Type());
+                result.permittedTypes.add(builder.getUIntType());
+                break;
+            }
         default:
             m_sink->diagnose(
                 parentVar,
@@ -3518,27 +3525,8 @@ protected:
             SLANG_UNEXPECTED("Mesh shader output decoration missing");
             return;
         }
-        const auto topology = outputDeco->getTopology();
-        const auto topStr = topology->getStringSlice();
-        UInt topologyEnum = 0;
-        if (topStr.caseInsensitiveEquals(toSlice("point")))
-        {
-            topologyEnum = 1;
-        }
-        else if (topStr.caseInsensitiveEquals(toSlice("line")))
-        {
-            topologyEnum = 2;
-        }
-        else if (topStr.caseInsensitiveEquals(toSlice("triangle")))
-        {
-            topologyEnum = 3;
-        }
-        else
-        {
-            SLANG_UNEXPECTED("unknown topology");
-            return;
-        }
 
+        const auto topologyEnum = outputDeco->getTopologyType();
         IRInst* topologyConst = builder.getIntValue(builder.getIntType(), topologyEnum);
 
         IRType* vertexType = nullptr;

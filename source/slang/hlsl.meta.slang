@@ -11,6 +11,7 @@ void __requireTargetExtension(constexpr String extensionName);
 /// explicitly passed as entry point parameters.
 in uint __builtinWaveLaneIndex : SV_WaveLaneIndex;
 in uint __builtinWaveLaneCount : SV_WaveLaneCount;
+in uint __builtinQuadLaneIndex : SV_QuadLaneIndex;
 
 //@public:
 /// Represents an interface for buffer data layout.
@@ -67,15 +68,15 @@ __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
 uint2 __structuredBufferGetDimensions(ConsumeStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(StructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RWStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RasterizerOrderedStructuredBuffer<T,L> buffer);
 
 //@public:
@@ -143,7 +144,7 @@ struct ByteAddressBuffer
     ///@param[out] dim The number of bytes in the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer)]
     void GetDimensions(out uint dim)
     {
         __target_switch
@@ -151,9 +152,7 @@ struct ByteAddressBuffer
         case cpp: __intrinsic_asm ".GetDimensions";
         case cuda: __intrinsic_asm ".GetDimensions";
         case hlsl: __intrinsic_asm ".GetDimensions";
-        case glsl:
-        case metal:
-        case spirv:
+        default:
             dim = __structuredBufferGetDimensions(__getEquivalentStructuredBuffer<uint>(this)).x*4;
         }
     }
@@ -3774,12 +3773,47 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, texture_sm_4_1_samplerless)]
+    [require(hlsl_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load";
+        case spirv:
+             const int lodLoc = Shape.dimensions+isArray;
+             let coord = __vectorReshape<Shape.dimensions+isArray>(location);
+             let lod = location[lodLoc];
+             if (isCombined != 0)
+             {
+                 return spirv_asm
+                 {
+                     OpCapability SparseResidency;
+                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                     %image:__imageType(this) = OpImage $this;
+ 
+                     %sparseResult:%sparseResultType = OpImageSparseFetch %image $coord Lod|ConstOffset $lod $offset;
+                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                     %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+ 
+                     OpStore &status %residentCode;
+                     __truncate $$T result __sampledType(T) %sampled;
+                 };
+             }
+             else
+             {
+                 return spirv_asm
+                 {
+                     OpCapability SparseResidency;
+                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+ 
+                     %sparseResult:%sparseResultType = OpImageSparseFetch $this $coord Lod|ConstOffset $lod $offset;
+                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                     %sampled:__sampledType(T) = OpCompositeExtract  %sparseResult 1;
+ 
+                     OpStore &status %residentCode;
+                     __truncate $$T result __sampledType(T) %sampled;
+                 };
+             }
         default:
             status = 0;
             return Load(location, offset);
@@ -3954,12 +3988,44 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 
     [__readNone]
     [ForceInline]
-    [require(hlsl, texture_sm_4_1_samplerless)]
+    [require(hlsl_spirv, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray> location, int sampleIndex, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load";
+        case spirv:
+             if (isCombined != 0)
+             {
+                 return spirv_asm
+                 {
+                     OpCapability SparseResidency;
+                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+                     %image:__imageType(this) = OpImage $this;
+ 
+                     %sparseResult:%sparseResultType = OpImageSparseFetch %image $location ConstOffset|Sample $offset $sampleIndex;
+                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                     %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+ 
+                     OpStore &status %residentCode;
+                     __truncate $$T result __sampledType(T) %sampled;
+                 };
+             }
+             else
+             {
+                 return spirv_asm
+                 {
+                     OpCapability SparseResidency;
+                     %sparseResultType = OpTypeStruct $$uint __sampledType(T);
+ 
+                     %sparseResult:%sparseResultType = OpImageSparseFetch $this $location ConstOffset|Sample $offset $sampleIndex;
+                     %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                     %sampled:__sampledType(T) = OpCompositeExtract %sparseResult 1;
+ 
+                     OpStore &status %residentCode;
+                     __truncate $$T result __sampledType(T) %sampled;
+                 };
+             }
         default:
             status = 0;
             return Load(location, sampleIndex, offset);
@@ -4922,7 +4988,7 @@ struct $(item.name)
     /// Get the number of bytes in the buffer.
     ///@param[out] dim The number of bytes in the buffer.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer_rw)]
     void GetDimensions(out uint dim)
     {
         __target_switch
@@ -4930,8 +4996,7 @@ struct $(item.name)
         case cpp: __intrinsic_asm ".GetDimensions";
         case cuda: __intrinsic_asm ".GetDimensions";
         case hlsl: __intrinsic_asm ".GetDimensions";
-        case glsl:
-        case spirv:
+        default:
             dim = __structuredBufferGetDimensions(__getEquivalentStructuredBuffer<uint>(this)).x*4;
         }
     }
@@ -5939,7 +6004,7 @@ struct $(item.name)
     /// @param stride The stride, in bytes, of each structure element.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, structuredbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer_rw)]
     void GetDimensions(
         out uint numStructs,
         out uint stride)
@@ -14635,13 +14700,16 @@ __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
-[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
+[ForceInline]
+[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 T QuadReadAcrossX(T localValue)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "QuadReadAcrossX";
     case glsl: __intrinsic_asm "subgroupQuadSwapHorizontal($0)";
+    case metal:
+        return QuadReadLaneAt(localValue, __builtinQuadLaneIndex ^ 1U);
     case spirv:
         uint direction = 0u;
         return spirv_asm 
@@ -14657,13 +14725,16 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
-[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
+[ForceInline]
+[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 vector<T,N> QuadReadAcrossX(vector<T,N> localValue)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "QuadReadAcrossX";
     case glsl: __intrinsic_asm "subgroupQuadSwapHorizontal($0)";
+    case metal:
+        return QuadReadLaneAt(localValue, __builtinQuadLaneIndex ^ 1U);
     case spirv:
         uint direction = 0u;
         return spirv_asm 
@@ -14681,13 +14752,16 @@ __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
-[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
+[ForceInline]
+[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 T QuadReadAcrossY(T localValue)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "QuadReadAcrossY";
     case glsl: __intrinsic_asm "subgroupQuadSwapVertical($0)";
+    case metal:
+        return QuadReadLaneAt(localValue, __builtinQuadLaneIndex ^ 2U);
     case spirv:
         uint direction = 1u;
         return spirv_asm 
@@ -14702,13 +14776,16 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
-[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
+[ForceInline]
+[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 vector<T,N> QuadReadAcrossY(vector<T,N> localValue)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "QuadReadAcrossY";
     case glsl: __intrinsic_asm "subgroupQuadSwapVertical($0)";
+    case metal:
+        return QuadReadLaneAt(localValue, __builtinQuadLaneIndex ^ 2U);
     case spirv:
         uint direction = 1u;
         return spirv_asm 
@@ -14726,13 +14803,16 @@ __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
-[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
+[ForceInline]
+[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 T QuadReadAcrossDiagonal(T localValue)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "QuadReadAcrossDiagonal";
     case glsl: __intrinsic_asm "subgroupQuadSwapDiagonal($0)";
+    case metal:
+        return QuadReadLaneAt(localValue, __builtinQuadLaneIndex ^ 3U);
     case spirv:
         uint direction = 2u;
         return spirv_asm 
@@ -14747,13 +14827,16 @@ __generic<T : __BuiltinType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_quad)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
-[require(glsl_hlsl_spirv_wgsl, subgroup_quad)]
+[ForceInline]
+[require(glsl_hlsl_metal_spirv_wgsl, subgroup_quad)]
 vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "QuadReadAcrossDiagonal";
     case glsl: __intrinsic_asm "subgroupQuadSwapDiagonal($0)";
+    case metal:
+        return QuadReadLaneAt(localValue, __builtinQuadLaneIndex ^ 3U);
     case spirv:
         uint direction = 2u;
         return spirv_asm 
@@ -24172,7 +24255,7 @@ typealias int8_t4_packed = uint;
 /// Unpack 4 signed 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int16_t4 unpack_s8s16(int8_t4_packed packed)
 {
     return unpackInt4x8ToInt16(packed);
@@ -24181,7 +24264,7 @@ int16_t4 unpack_s8s16(int8_t4_packed packed)
 /// Unpack 4 unsigned 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint16_t4 unpack_u8u16(uint8_t4_packed packed)
 {
     return unpackUint4x8ToUint16(packed);
@@ -24190,7 +24273,7 @@ uint16_t4 unpack_u8u16(uint8_t4_packed packed)
 /// Unpack 4 signed 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int32_t4 unpack_s8s32(int8_t4_packed packed)
 {
     return unpackInt4x8ToInt32(packed);
@@ -24199,7 +24282,7 @@ int32_t4 unpack_s8s32(int8_t4_packed packed)
 /// Unpack 4 unsigned 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint32_t4 unpack_u8u32(uint8_t4_packed packed)
 {
     return unpackUint4x8ToUint32(packed);
@@ -24208,7 +24291,7 @@ uint32_t4 unpack_u8u32(uint8_t4_packed packed)
 /// Pack a vector of 4 unsigned 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint8_t4_packed pack_u8(uint32_t4 unpackedValue)
 {
     return packUint4x8(unpackedValue);
@@ -24217,7 +24300,7 @@ uint8_t4_packed pack_u8(uint32_t4 unpackedValue)
 /// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int8_t4_packed pack_s8(int32_t4 unpackedValue)
 {
     return packInt4x8(unpackedValue);
@@ -24226,7 +24309,7 @@ int8_t4_packed pack_s8(int32_t4 unpackedValue)
 /// Pack a vector of 4 unsigned 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint8_t4_packed pack_u8(uint16_t4 unpackedValue)
 {
     return packUint4x8(unpackedValue);
@@ -24235,7 +24318,7 @@ uint8_t4_packed pack_u8(uint16_t4 unpackedValue)
 /// Pack a vector of 4 signed 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int8_t4_packed pack_s8(int16_t4 unpackedValue)
 {
     return packInt4x8(unpackedValue);
@@ -24245,7 +24328,7 @@ int8_t4_packed pack_s8(int16_t4 unpackedValue)
 /// clamping each value to the range [0, 255] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint8_t4_packed pack_clamp_u8(int32_t4 unpackedValue)
 {
     return packUint4x8Clamp(unpackedValue);
@@ -24255,7 +24338,7 @@ uint8_t4_packed pack_clamp_u8(int32_t4 unpackedValue)
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int8_t4_packed pack_clamp_s8(int32_t4 unpackedValue)
 {
     return packInt4x8Clamp(unpackedValue);
@@ -24265,7 +24348,7 @@ int8_t4_packed pack_clamp_s8(int32_t4 unpackedValue)
 /// clamping each value to the range [0, 255] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint8_t4_packed pack_clamp_u8(int16_t4 unpackedValue)
 {
     return packUint4x8Clamp(unpackedValue);
@@ -24275,7 +24358,7 @@ uint8_t4_packed pack_clamp_u8(int16_t4 unpackedValue)
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
 {
     return packInt4x8Clamp(unpackedValue);
@@ -24350,13 +24433,41 @@ int32_t __lsbAsInt32(uint32_t val)
     return int32_t(__lsbAsInt8(val));
 }
 
+[__readNone]
+[ForceInline]
+uint32_t2 __unpackUint2x16ToUint32(uint packedValue)
+{
+    return uint32_t2(packedValue & 0xFFFFU, packedValue >> 16U);
+}
+
+[__readNone]
+[ForceInline]
+int32_t2 __unpackInt2x16ToInt32(uint packedValue)
+{
+    int signedValue = int(packedValue);
+    return int32_t2(signedValue << 16U, signedValue) >> 16U;
+}
+
+[__readNone]
+[ForceInline]
+uint __packUint2x16(uint32_t2 unpackedValue)
+{
+    return unpackedValue.x | (unpackedValue.y << 16U);
+}
+
+[__readNone]
+[ForceInline]
+uint __packInt2x16(int32_t2 unpackedValue)
+{
+    return uint(unpackedValue.x | (unpackedValue.y << 16U));
+}
+
 //@public:
 
 /// Unpack 4 unsigned 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint32_t4 unpackUint4x8ToUint32(uint packedValue)
 {
     __target_switch
@@ -24383,7 +24494,7 @@ uint32_t4 unpackUint4x8ToUint32(uint packedValue)
 /// Unpack 4 unsigned 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint16_t4 unpackUint4x8ToUint16(uint packedValue)
 {
     __target_switch
@@ -24409,7 +24520,7 @@ uint16_t4 unpackUint4x8ToUint16(uint packedValue)
 /// Unpack 4 signed 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int32_t4 unpackInt4x8ToInt32(uint packedValue)
 {
     __target_switch
@@ -24436,7 +24547,7 @@ int32_t4 unpackInt4x8ToInt32(uint packedValue)
 /// Unpack 4 signed 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 int16_t4 unpackInt4x8ToInt16(uint packedValue)
 {
     __target_switch
@@ -24462,7 +24573,7 @@ int16_t4 unpackInt4x8ToInt16(uint packedValue)
 /// Pack a vector of 4 unsigned 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packUint4x8(uint32_t4 unpackedValue)
 {
     __target_switch
@@ -24480,7 +24591,7 @@ uint packUint4x8(uint32_t4 unpackedValue)
 /// Pack a vector of 4 unsigned 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packUint4x8(uint16_t4 unpackedValue)
 {
     __target_switch
@@ -24494,7 +24605,7 @@ uint packUint4x8(uint16_t4 unpackedValue)
 /// Pack a vector of 4 signed 32 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packInt4x8(int32_t4 unpackedValue)
 {
     __target_switch
@@ -24509,7 +24620,7 @@ uint packInt4x8(int32_t4 unpackedValue)
 /// Pack a vector of 4 signed 16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packInt4x8(int16_t4 unpackedValue)
 {
     __target_switch
@@ -24524,7 +24635,7 @@ uint packInt4x8(int16_t4 unpackedValue)
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packUint4x8Clamp(int32_t4 unpackedValue)
 {
     __target_switch
@@ -24540,7 +24651,7 @@ uint packUint4x8Clamp(int32_t4 unpackedValue)
 /// clamping each value to the range [0, 255] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packUint4x8Clamp(int16_t4 unpackedValue)
 {
     __target_switch
@@ -24555,7 +24666,7 @@ uint packUint4x8Clamp(int16_t4 unpackedValue)
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packInt4x8Clamp(int32_t4 unpackedValue)
 {
     __target_switch
@@ -24571,7 +24682,7 @@ uint packInt4x8Clamp(int32_t4 unpackedValue)
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
 uint packInt4x8Clamp(int16_t4 unpackedValue)
 {
     __target_switch
@@ -24580,4 +24691,398 @@ uint packInt4x8Clamp(int16_t4 unpackedValue)
     default:
         return packInt4x8(clamp(unpackedValue, -128, 127));
     }
+}
+
+//
+// Floating-point Pack/Unpack Intrinsics
+//
+
+// @public:
+
+/// Unpack a 32-bit unsigned integer into four 8-bit unsigned integers.
+/// Then, each 8-bit value is converted to a normalized single-precision
+/// floating-point value to generate a 4-component vector.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+float4 unpackUnorm4x8ToFloat(uint packedValue)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackUnorm4x8";
+    case metal: __intrinsic_asm "unpack_unorm4x8_to_float";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float4 = OpExtInst glsl450 UnpackUnorm4x8 $packedValue;
+        };
+    case wgsl: __intrinsic_asm "unpack4x8unorm";
+    default:
+        uint4 unpackedIntegers = unpackUint4x8ToUint32(packedValue);
+        return float4(unpackedIntegers) / 255.0;
+    }
+}
+
+/// Unpack a 32-bit unsigned integer into four 8-bit unsigned integers.
+/// Then, each 8-bit value is converted to a normalized half-precision
+/// floating-point value to generate a 4-component vector.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+half4 unpackUnorm4x8ToHalf(uint packedValue)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "unpack_unorm4x8_to_half";
+    default:
+        return half4(unpackUnorm4x8ToFloat(packedValue));
+    }
+}
+
+/// Unpack a 32-bit unsigned integer into four 8-bit signed integers.
+/// Then, each 8-bit value is converted to a normalized single-precision
+/// floating-point value to generate a 4-component vector.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+float4 unpackSnorm4x8ToFloat(uint packedValue)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackSnorm4x8";
+    case metal: __intrinsic_asm "unpack_snorm4x8_to_float";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float4 = OpExtInst glsl450 UnpackSnorm4x8 $packedValue;
+        };
+    case wgsl: __intrinsic_asm "unpack4x8snorm";
+    default:
+        int4 unpackedIntegers = unpackInt4x8ToInt32(packedValue);
+        return clamp(float4(unpackedIntegers) / 127.0, -1.0, 1.0);
+    }
+}
+
+/// Unpack a 32-bit unsigned integer into four 8-bit signed integers.
+/// Then, each 8-bit value is converted to a normalized half-precision
+/// floating-point value to generate a 4-component vector.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+half4 unpackSnorm4x8ToHalf(uint packedValue)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "unpack_snorm4x8_to_half";
+    default:
+        return half4(unpackSnorm4x8ToFloat(packedValue));
+    }
+}
+
+/// Unpack a 32-bit unsigned integer into two 16-bit usigned integers.
+/// Then, each 16-bit value is converted to a normalized single-precision
+/// floating-point value to generate a 2-component vector.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+float2 unpackUnorm2x16ToFloat(uint packedValue)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackUnorm2x16";
+    case metal: __intrinsic_asm "unpack_unorm2x16_to_float";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float2 = OpExtInst glsl450 UnpackUnorm2x16 $packedValue;
+        };
+    case wgsl: __intrinsic_asm "unpack2x16unorm";
+    default:
+        uint2 unpackedIntegers = __unpackUint2x16ToUint32(packedValue);
+        return float2(unpackedIntegers) / 65535.0;
+    }
+}
+
+/// Unpack a 32-bit unsigned integer into two 16-bit usigned integers.
+/// Then, each 16-bit value is converted to a normalized half-precision
+/// floating-point value to generate a 2-component vector.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+half2 unpackUnorm2x16ToHalf(uint packedValue)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "unpack_unorm2x16_to_half";
+    default:
+        return half2(unpackUnorm2x16ToFloat(packedValue));
+    }
+}
+
+/// Unpack a 32-bit unsigned integer into two 16-bit signed integers.
+/// Then, each 16-bit value is converted to a normalized single-precision
+/// floating-point value to generate a 2-component vector.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+float2 unpackSnorm2x16ToFloat(uint packedValue)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackSnorm2x16";
+    case metal: __intrinsic_asm "unpack_snorm2x16_to_float";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float2 = OpExtInst glsl450 UnpackSnorm2x16 $packedValue;
+        };
+    case wgsl: __intrinsic_asm "unpack2x16snorm";
+    default:
+        int2 unpackedIntegers = __unpackInt2x16ToInt32(packedValue);
+        return clamp(float2(unpackedIntegers) / 32767.0, -1.0, 1.0);
+    }
+}
+
+/// Unpack a 32-bit unsigned integer into two 16-bit signed integers.
+/// Then, each 16-bit value is converted to a normalized half-precision
+/// floating-point value to generate a 2-component vector.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+half2 unpackSnorm2x16ToHalf(uint packedValue)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "unpack_snorm2x16_to_half";
+    default:
+        return half2(unpackSnorm2x16ToFloat(packedValue));
+    }
+}
+
+/// Unpack a 32-bit unsigned integer into two 16-bit signed integers.
+/// Then, each 16-bit value is converted to an IEEE-754 binary16 single-precision
+/// floating-point value to generate a 2-component vector.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+float2 unpackHalf2x16ToFloat(uint packedValue)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpackHalf2x16";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float2 = OpExtInst glsl450 UnpackHalf2x16 $packedValue;
+        };
+    case wgsl: __intrinsic_asm "unpack2x16float";
+    default:
+        uint2 unpackedIntegers = __unpackUint2x16ToUint32(packedValue);
+        return f16tof32(unpackedIntegers);
+    }
+}
+
+/// Unpack a 32-bit unsigned integer into two 16-bit signed integers.
+/// Then, each 16-bit value is converted to an IEEE-754 binary16 half-precision
+/// floating-point value to generate a 2-component vector.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+half2 unpackHalf2x16ToHalf(uint packedValue)
+{
+    return half2(unpackHalf2x16ToFloat(packedValue));
+}
+
+/// Convert a 4-component vector of normalized unsigned single-precision floating-point
+/// values to four 8-bit integer values, then pack these 8-bit values into a
+/// 32-bit unsigned integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+uint packUnorm4x8(float4 unpackedValue)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packUnorm4x8";
+    case metal: __intrinsic_asm "pack_float_to_unorm4x8";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$uint = OpExtInst glsl450 PackUnorm4x8 $unpackedValue
+        };
+    case wgsl: __intrinsic_asm "pack4x8unorm";
+    default:
+        uint4 values = uint4(round(saturate(unpackedValue) * 255.0));
+        return packUint4x8(values);
+    }
+}
+
+/// Convert a 4-component vector of normalized unsigned half-precision floating-point
+/// values to four 8-bit integer values, then pack these 8-bit values into a
+/// 32-bit unsigned integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+uint packUnorm4x8(half4 unpackedValue)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "pack_half_to_unorm4x8";
+    default:
+        return packUnorm4x8(float4(unpackedValue));
+    }
+}
+
+/// Convert a 4-component vector of normalized signed single-precision floating-point
+/// values to four 8-bit integer values, then pack these 8-bit values into a
+/// 32-bit unsigned integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+uint packSnorm4x8(float4 unpackedValue)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packSnorm4x8";
+    case metal: __intrinsic_asm "pack_float_to_snorm4x8";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$uint = OpExtInst glsl450 PackSnorm4x8 $unpackedValue
+        };
+    case wgsl: __intrinsic_asm "pack4x8snorm";
+    default:
+        int4 values = int4(round(clamp(unpackedValue, -1.0, 1.0) * 127.0)) & 0xFF;
+        return packInt4x8(values);
+    }
+}
+
+/// Convert a 4-component vector of normalized signed half-precision floating-point
+/// values to four 8-bit integer values, then pack these 8-bit values into a
+/// 32-bit unsigned integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+uint packSnorm4x8(half4 unpackedValue)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "pack_half_to_snorm4x8";
+    default:
+        return packSnorm4x8(float4(unpackedValue));
+    }
+}
+
+/// Convert a 2-component vector of normalized unsigned single-precision floating-point
+/// values to two 16-bit integer values, then pack these 16-bit values into a
+/// 32-bit unsigned integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+uint packUnorm2x16(float2 unpackedValue)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packUnorm2x16";
+    case metal: __intrinsic_asm "pack_float_to_unorm2x16";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$uint = OpExtInst glsl450 PackUnorm2x16 $unpackedValue;
+        };
+    case wgsl: __intrinsic_asm "pack2x16unorm";
+    default:
+        uint2 values = uint2(round(saturate(unpackedValue) * 65535.0));
+        return __packUint2x16(values);
+    }
+}
+
+/// Convert a 2-component vector of normalized unsigned half-precision floating-point
+/// values to two 16-bit integer values, then pack these 16-bit values into a
+/// 32-bit unsigned integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+uint packUnorm2x16(half2 unpackedValue)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "pack_half_to_unorm2x16";
+    default:
+        return packUnorm2x16(float2(unpackedValue));
+    }
+}
+
+/// Convert a 2-component vector of normalized signed single-precision floating-point
+/// values to two 16-bit integer values, then pack these 16-bit values into a
+/// 32-bit unsigned integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+uint packSnorm2x16(float2 unpackedValue)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packSnorm2x16";
+    case metal: __intrinsic_asm "pack_float_to_snorm2x16";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$uint = OpExtInst glsl450 PackSnorm2x16 $unpackedValue;
+        };
+    case wgsl: __intrinsic_asm "pack2x16snorm";
+    default:
+        int2 values = int2(round(clamp(unpackedValue, -1.0, 1.0) * 32767.0)) & 0xFFFF;
+        return __packInt2x16(values);
+    }
+}
+
+/// Convert a 2-component vector of normalized signed half-precision floating-point
+/// values to two 16-bit integer values, then pack these 16-bit values into a
+/// 32-bit unsigned integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+uint packSnorm2x16(half2 unpackedValue)
+{
+    __target_switch
+    {
+    case metal: __intrinsic_asm "pack_half_to_snorm2x16";
+    default:
+        return packSnorm2x16(float2(unpackedValue));
+    }
+}
+
+/// Convert a 2-component vector of IEEE-754 binary16 single-precision floating-point
+/// values to two 16-bit integer values, then pack these 16-bit values into a
+/// 32-bit unsigned integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+uint packHalf2x16(float2 unpackedValue)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "packHalf2x16";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$uint = OpExtInst glsl450 PackHalf2x16 $unpackedValue;
+        };
+    case wgsl: __intrinsic_asm "pack2x16float";
+    default:
+        uint2 values = f32tof16(unpackedValue);
+        return __packUint2x16(values);
+    }
+}
+
+/// Convert a 2-component vector of IEEE-754 binary16 half-precision floating-point
+/// values to two 16-bit integer values, then pack these 16-bit values into a
+/// 32-bit unsigned integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+uint packHalf2x16(half2 unpackedValue)
+{
+    return packHalf2x16(float2(unpackedValue));
 }

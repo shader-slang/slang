@@ -215,6 +215,7 @@ public:
     BreakStmt* ParseBreakStatement();
     ContinueStmt* ParseContinueStatement();
     ReturnStmt* ParseReturnStatement();
+    DeferStmt* ParseDeferStatement();
     ExpressionStmt* ParseExpressionStatement();
     Expr* ParseExpression(Precedence level = Precedence::Comma);
 
@@ -5770,6 +5771,10 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
     {
         statement = parseCompileTimeStmt(this);
     }
+    else if (LookAheadToken("defer"))
+    {
+        statement = ParseDeferStatement();
+    }
     else if (LookAheadToken("try"))
     {
         statement = ParseExpressionStatement();
@@ -6297,6 +6302,15 @@ ReturnStmt* Parser::ParseReturnStatement()
         returnStatement->expression = ParseExpression();
     ReadToken(TokenType::Semicolon);
     return returnStatement;
+}
+
+DeferStmt* Parser::ParseDeferStatement()
+{
+    DeferStmt* deferStatement = astBuilder->create<DeferStmt>();
+    FillPosition(deferStatement);
+    ReadToken("defer");
+    deferStatement->statement = ParseStatement();
+    return deferStatement;
 }
 
 ExpressionStmt* Parser::ParseExpressionStatement()
@@ -7719,6 +7733,30 @@ static Expr* parsePostfixExpr(Parser* parser)
                     expr = maybeParseGenericApp(parser, memberExpr);
                 else
                     expr = memberExpr;
+            }
+            break;
+        case TokenType::OpMul:
+            {
+                // We may have a pointer type expr, e.g. T*, or the `*` is a mul operator.
+                // We can easily disambiguate by looking ahead of `*`, if the token after it
+                // is `,`, `>`, `)` or `>>`, then it must be a type postfix.
+                auto lookahead = peekTokenType(parser, 1);
+                switch (lookahead)
+                {
+                case TokenType::Comma:
+                case TokenType::RParent:
+                case TokenType::OpGreater:
+                case TokenType::OpRsh:
+                case TokenType::Colon:
+                case TokenType::Semicolon:
+                case TokenType::LBracket:
+                case TokenType::OpMul:
+                case TokenType::Dot:
+                    expr = parsePostfixTypeSuffix(parser, expr);
+                    break;
+                default:
+                    return expr;
+                }
             }
             break;
         }

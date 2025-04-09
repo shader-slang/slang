@@ -1391,25 +1391,25 @@ class DifferentiableAttribute : public Attribute
 {
     SLANG_AST_CLASS(DifferentiableAttribute)
 
-    List<KeyValuePair<DeclRefBase*, SubtypeWitness*>> m_typeToIDifferentiableWitnessMappings;
+    List<KeyValuePair<Type*, SubtypeWitness*>> m_typeToIDifferentiableWitnessMappings;
 
-    void addType(DeclRefBase* declRef, SubtypeWitness* witness)
+    void addType(Type* declRef, SubtypeWitness* witness)
     {
         getMapTypeToIDifferentiableWitness();
         if (m_mapToIDifferentiableWitness.addIfNotExists(declRef, witness))
         {
             m_typeToIDifferentiableWitnessMappings.add(
-                KeyValuePair<DeclRefBase*, SubtypeWitness*>(declRef, witness));
+                KeyValuePair<Type*, SubtypeWitness*>(declRef, witness));
         }
     }
 
     /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
-    const OrderedDictionary<DeclRefBase*, SubtypeWitness*>& getMapTypeToIDifferentiableWitness();
+    const OrderedDictionary<Type*, SubtypeWitness*>& getMapTypeToIDifferentiableWitness();
 
     SLANG_UNREFLECTED ValSet m_typeRegistrationWorkingSet;
 
 private:
-    OrderedDictionary<DeclRefBase*, SubtypeWitness*> m_mapToIDifferentiableWitness;
+    OrderedDictionary<Type*, SubtypeWitness*> m_mapToIDifferentiableWitness;
 };
 
 class DllImportAttribute : public Attribute
@@ -1696,6 +1696,16 @@ class RequireFullQuadsAttribute : public Attribute
 class PayloadAttribute : public Attribute
 {
     SLANG_AST_CLASS(PayloadAttribute)
+};
+
+/// A `[raypayload]` attribute indicates that a `struct` type will be used as
+/// a ray payload for `TraceRay()` calls, and thus also as input/output
+/// for shaders in the ray tracing pipeline that might be invoked for
+/// such a ray.
+///
+class RayPayloadAttribute : public Attribute
+{
+    SLANG_AST_CLASS(RayPayloadAttribute)
 };
 
 /// A `[deprecated("message")]` attribute indicates the target is

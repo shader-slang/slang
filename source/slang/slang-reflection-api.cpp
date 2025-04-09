@@ -378,8 +378,8 @@ SLANG_API const char* spReflectionUserAttribute_GetArgumentValueString(
     if (auto cexpr = as<StringLiteralExpr>(userAttr->args[index]))
     {
         if (bufLen)
-            *bufLen = cexpr->token.getContentLength();
-        return cexpr->token.getContent().begin();
+            *bufLen = cexpr->value.getLength();
+        return cexpr->value.getBuffer();
     }
     return nullptr;
 }
@@ -3303,6 +3303,23 @@ SLANG_API size_t spReflectionVariableLayout_GetSpace(
     // will Just Work, so the best we can do is try to not lie.
 
     return space;
+}
+
+SLANG_API SlangImageFormat
+spReflectionVariableLayout_GetImageFormat(SlangReflectionVariableLayout* inVarLayout)
+{
+    auto varLayout = convert(inVarLayout);
+    if (!varLayout)
+        return SLANG_IMAGE_FORMAT_unknown;
+
+    if (auto leafVar = varLayout->getVariable())
+    {
+        if (auto formatAttrib = leafVar->findModifier<FormatAttribute>())
+        {
+            return (SlangImageFormat)formatAttrib->format;
+        }
+    }
+    return SLANG_IMAGE_FORMAT_unknown;
 }
 
 SLANG_API char const* spReflectionVariableLayout_GetSemanticName(

@@ -4214,3 +4214,6 @@ attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
 __generic<T>
 typealias NodePayloadPtr = Ptr<T, $( (uint64_t)AddressSpace::NodePayloadAMDX)>;
 
+__attributeTarget(StructDecl)
+attribute_syntax [raypayload] : RayPayloadAttribute;
+

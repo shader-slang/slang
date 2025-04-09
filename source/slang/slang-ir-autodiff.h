@@ -252,7 +252,8 @@ struct DifferentiableTypeConformanceContext
         IRBuilder* builder,
         IRType* origType,
         IRStructKey* key,
-        IRType* resultType = nullptr);
+        IRType* resultType = nullptr,
+        DiffConformanceKind kind = DiffConformanceKind::Any);
 
     IRType* differentiateType(IRBuilder* builder, IRInst* primalType);
 
@@ -411,7 +412,8 @@ struct DifferentiableTypeConformanceContext
             builder,
             origType,
             sharedContext->zeroMethodStructKey,
-            sharedContext->zeroMethodType);
+            sharedContext->zeroMethodType,
+            DiffConformanceKind::Value);
         return result;
     }
 
@@ -421,7 +423,8 @@ struct DifferentiableTypeConformanceContext
             builder,
             origType,
             sharedContext->addMethodStructKey,
-            sharedContext->addMethodType);
+            sharedContext->addMethodType,
+            DiffConformanceKind::Value);
         return result;
     }
 
@@ -560,6 +563,7 @@ void stripAutoDiffDecorations(IRModule* module);
 void stripTempDecorations(IRInst* inst);
 
 bool isNoDiffType(IRType* paramType);
+bool isNeverDiffFuncType(IRFuncType* funcType);
 
 IRInst* lookupForwardDerivativeReference(IRInst* primalFunction);
 
