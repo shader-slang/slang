@@ -1037,7 +1037,10 @@ Result linkAndOptimizeIR(
 
     // Report checkpointing information
     if (codeGenContext->shouldReportCheckpointIntermediates())
+    {
+        simplifyIR(targetProgram, irModule, fastIRSimplificationOptions, sink);
         reportCheckpointIntermediates(codeGenContext, sink, irModule);
+    }
 
     // Finalization is always run so AD-related instructions can be removed,
     // even if the AD pass itself is not run.
@@ -1278,6 +1281,15 @@ Result linkAndOptimizeIR(
         //
         legalizeResourceTypes(targetProgram, irModule, sink);
 
+        // We also need to legalize empty types for Metal targets.
+        switch (target)
+        {
+        case CodeGenTarget::Metal:
+        case CodeGenTarget::MetalLib:
+        case CodeGenTarget::MetalLibAssembly:
+            legalizeEmptyTypes(targetProgram, irModule, sink);
+            break;
+        }
         //  Debugging output of legalization
 #if 0
         dumpIRIfEnabled(codeGenContext, irModule, "LEGALIZED");
@@ -1704,6 +1716,8 @@ Result linkAndOptimizeIR(
     //
     eliminateDeadCode(irModule, deadCodeEliminationOptions);
 
+    cleanUpVoidType(irModule);
+
     if (isKhronosTarget(targetRequest))
     {
         // As a fallback, if the above specialization steps failed to remove resource type
@@ -1716,7 +1730,6 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    cleanUpVoidType(irModule);
 
     // Lower the `getRegisterIndex` and `getRegisterSpace` intrinsics.
     //

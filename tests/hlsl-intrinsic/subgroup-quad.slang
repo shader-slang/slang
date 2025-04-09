@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=SPIRV): -entry main -stage compute -target spirv
 //TEST:SIMPLE(filecheck=SPIRV): -entry main -stage compute -target spirv -emit-spirv-directly
 //TEST:SIMPLE(filecheck=HLSL): -entry main -stage compute -target hlsl
+//TEST:SIMPLE(filecheck=METAL): -entry main -stage compute -target metal
 
 RWStructuredBuffer<float> output;
 
@@ -38,4 +39,16 @@ void main()
     // SPIRV: OpGroupNonUniformQuadSwap {{.*}} %{{u?int_3}} {{.*}} %{{u?int_1}}
     // SPIRV: OpGroupNonUniformQuadSwap {{.*}} %{{u?int_3}} {{.*}} %{{u?int_2}}
     // SPIRV: OpGroupNonUniformQuadSwap {{.*}} %{{u?int_3}} {{.*}} %{{u?int_2}}
+
+    // METAL: quad_shuffle
+    // METAL: quad_shuffle
+    // METAL: ^ 1
+    // METAL: quad_shuffle
+    // METAL: quad_shuffle
+    // METAL: ^ 2
+    // METAL: quad_shuffle
+    // METAL: quad_shuffle
+    // METAL: ^ 3
+    // METAL: quad_shuffle
+    // METAL: quad_shuffle
 }
