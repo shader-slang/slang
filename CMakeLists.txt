@@ -375,6 +375,7 @@ if(SLANG_WEBGPU_DAWN_BINARY_URL)
         "webgpu_dawn"
         "${SLANG_WEBGPU_DAWN_BINARY_URL}"
         IGNORE_FAILURE
+        SLANG_GITHUB_TOKEN ${SLANG_GITHUB_TOKEN}
     )
 endif()
 
@@ -387,6 +388,7 @@ if(SLANG_SLANG_TINT_BINARY_URL)
         "slang-tint"
         "${SLANG_SLANG_TINT_BINARY_URL}"
         IGNORE_FAILURE
+        SLANG_GITHUB_TOKEN ${SLANG_GITHUB_TOKEN}
     )
 endif()
 
@@ -455,7 +457,7 @@ configure_package_config_file(
 # linkable targets. In this case do not export the targets. Otherwise, just
 # export the slang targets. 
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
-    if(NOT ${SLANG_BUILD_TYPE} STREQUAL "STATIC")
+    if(NOT ${SLANG_LIB_TYPE} STREQUAL "STATIC")
         install(
             EXPORT SlangTargets
             FILE ${PROJECT_NAME}Targets.cmake

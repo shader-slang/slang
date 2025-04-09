@@ -2710,6 +2710,13 @@ struct IRCheckpointObject : IRInst
     IRInst* getVal() { return getOperand(0); }
 };
 
+struct IRLoopExitValue : IRInst
+{
+    IR_LEAF_ISA(LoopExitValue);
+
+    IRInst* getVal() { return getOperand(0); }
+};
+
 // Signals that this point in the code should be unreachable.
 // We can/should emit a dataflow error if we can ever determine
 // that a block ending in one of these can actually be
@@ -2843,6 +2850,15 @@ struct IRTryCall : IRTerminatorInst
     UInt getArgCount() { return getOperandCount() - 3; }
     IRUse* getArgs() { return getOperands() + 3; }
     IRInst* getArg(UInt index) { return getOperand(index + 3); }
+};
+
+struct IRDefer : IRTerminatorInst
+{
+    IR_LEAF_ISA(Defer);
+
+    IRBlock* getDeferBlock() { return cast<IRBlock>(getOperand(0)); }
+    IRBlock* getMergeBlock() { return cast<IRBlock>(getOperand(1)); }
+    IRBlock* getScopeBlock() { return cast<IRBlock>(getOperand(2)); }
 };
 
 struct IRSwizzle : IRInst
@@ -2979,8 +2995,6 @@ struct IRWitnessTable : IRInst
     }
 
     IRType* getConcreteType() { return (IRType*)getOperand(0); }
-
-    void setConcreteType(IRType* t) { return setOperand(0, t); }
 
     IR_LEAF_ISA(WitnessTable)
 };
@@ -4457,9 +4471,12 @@ public:
 
     IRInst* emitThrow(IRInst* val);
 
+    IRInst* emitDefer(IRBlock* deferBlock, IRBlock* mergeBlock, IRBlock* scopeEndBlock);
+
     IRInst* emitDiscard();
 
     IRInst* emitCheckpointObject(IRInst* value);
+    IRInst* emitLoopExitValue(IRInst* value);
 
     IRInst* emitUnreachable();
     IRInst* emitMissingReturn();

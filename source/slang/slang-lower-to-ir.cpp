@@ -19,6 +19,7 @@
 #include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-loop-inversion.h"
+#include "slang-ir-lower-defer.h"
 #include "slang-ir-lower-error-handling.h"
 #include "slang-ir-lower-expand-type.h"
 #include "slang-ir-missing-return.h"
@@ -592,6 +593,9 @@ struct IRGenContext
 
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
+
+    // The current scope end for use with `defer`.
+    IRBlock* scopeEndBlock = nullptr;
 
     // Callback function to call when after lowering a type.
     std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> lowerTypeCallback =
@@ -6021,6 +6025,53 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         startBlock();
     }
 
+    /// Create a new scope end block and return the previous one.
+    ///
+    /// This is needed for `defer` to be aware of scopes. `preallocated` can
+    /// be specified if you already have a block at the end of the scope, like
+    /// in `for` loops.
+    IRBlock* pushScopeBlock(IRBlock* preallocated = nullptr)
+    {
+        IRBlock* prevScopeEndBlock = context->scopeEndBlock;
+
+        auto builder = getBuilder();
+        context->scopeEndBlock = preallocated ? preallocated : builder->createBlock();
+        return prevScopeEndBlock;
+    }
+
+    /// Pop the current scope end block and restore the previous one.
+    ///
+    /// This is needed for `defer` to be aware of scopes. `previous` should be
+    /// the block returned from the corresponding pushScopeBlock. `preallocated`
+    /// should be true if the corresponding pushScopeBlock was given a block
+    /// as a parameter.
+    void popScopeBlock(IRBlock* previous, bool preallocated)
+    {
+        if (!preallocated)
+        {
+            // If pushScopeBlock actually created the block, we have to insert
+            // or deallocate it here. Otherwise, we assume that the caller
+            // handles the end block.
+            auto builder = getBuilder();
+            if (context->scopeEndBlock->hasUses())
+            {
+                // The end of the scope was referenced, so we need to actually
+                // keep it around and jump through it.
+                // Move the terminator to the scope end block.
+                emitBranchIfNeeded(context->scopeEndBlock);
+                builder->insertBlock(context->scopeEndBlock);
+                builder->setInsertInto(context->scopeEndBlock);
+            }
+            else
+            {
+                // Scope end block was left unused, so we may as well delete it.
+                context->scopeEndBlock->removeAndDeallocate();
+            }
+        }
+
+        context->scopeEndBlock = previous;
+    }
+
     void visitIfStmt(IfStmt* stmt)
     {
         auto builder = getBuilder();
@@ -6043,11 +6094,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             ifInst = builder->emitIfElse(irCond, thenBlock, elseBlock, afterBlock);
 
             insertBlock(thenBlock);
+            IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             lowerStmt(context, thenStmt);
             emitBranchIfNeeded(afterBlock);
 
             insertBlock(elseBlock);
             lowerStmt(context, elseStmt);
+            popScopeBlock(prevScopeEndBlock, true);
 
             insertBlock(afterBlock);
         }
@@ -6059,7 +6112,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             ifInst = builder->emitIf(irCond, thenBlock, afterBlock);
 
             insertBlock(thenBlock);
+
+            IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             lowerStmt(context, thenStmt);
+            popScopeBlock(prevScopeEndBlock, true);
 
             insertBlock(afterBlock);
         }
@@ -6150,7 +6206,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
+        IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
+        popScopeBlock(prevScopeEndBlock, true);
 
         if (auto inferredMaxIters = stmt->findModifier<InferredMaxItersAttribute>())
         {
@@ -6256,7 +6314,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Emit the body of the loop
         insertBlock(bodyLabel);
+        IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
+        popScopeBlock(prevScopeEndBlock, true);
 
         // At the end of the body we need to jump back to the top.
         emitBranchIfNeeded(loopHead);
@@ -6300,7 +6360,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         insertBlock(loopHead);
 
         // Emit the body of the loop
+        IRBlock* prevScopeEndBlock = pushScopeBlock(continueLabel);
         lowerStmt(context, stmt->statement);
+        popScopeBlock(prevScopeEndBlock, true);
 
         insertBlock(testLabel);
 
@@ -6429,10 +6491,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
     void visitBlockStmt(BlockStmt* stmt)
     {
-        // To lower a block (scope) statement,
-        // just lower its body. The IR doesn't
-        // need to reflect the scoping of the AST.
+        IRBlock* prevScopeEndBlock = pushScopeBlock(nullptr);
+
+        // To lower a block (scope) statement, just lower its body.
         lowerStmt(context, stmt->body);
+
+        popScopeBlock(prevScopeEndBlock, false);
     }
 
     void visitReturnStmt(ReturnStmt* stmt)
@@ -6521,6 +6585,29 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             }
             getBuilder()->emitReturn();
         }
+    }
+
+    void visitDeferStmt(DeferStmt* stmt)
+    {
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+
+        IRBlock* deferBlock = builder->createBlock();
+        IRBlock* mergeBlock = builder->createBlock();
+
+        builder->emitDefer(deferBlock, mergeBlock, context->scopeEndBlock);
+
+        builder->insertBlock(deferBlock);
+        builder->setInsertInto(deferBlock);
+
+        IRBlock* prevScopeEndBlock = pushScopeBlock(mergeBlock);
+        lowerStmt(context, stmt->statement);
+        popScopeBlock(prevScopeEndBlock, true);
+
+        builder->emitBranch(mergeBlock);
+
+        builder->insertBlock(mergeBlock);
+        builder->setInsertInto(mergeBlock);
     }
 
     void visitDiscardStmt(DiscardStmt* stmt)
@@ -8042,30 +8129,40 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         // Need to construct a sub-witness-table
                         auto irWitnessTableBaseType =
                             lowerType(subContext, astReqWitnessTable->baseType);
-                        irSatisfyingWitnessTable = subBuilder->createWitnessTable(
-                            irWitnessTableBaseType,
-                            irWitnessTable->getConcreteType());
-                        auto mangledName = getMangledNameForConformanceWitness(
-                            subContext->astBuilder,
-                            astReqWitnessTable->witnessedType,
-                            astReqWitnessTable->baseType);
-                        subBuilder->addExportDecoration(
-                            irSatisfyingWitnessTable,
-                            mangledName.getUnownedSlice());
-                        if (isExportedType(astReqWitnessTable->witnessedType))
+
+                        auto concreteType = irWitnessTable->getConcreteType();
+
+                        irSatisfyingWitnessTable =
+                            subBuilder->createWitnessTable(irWitnessTableBaseType, concreteType);
+
+                        // Avoid adding same decorations and child more than once.
+                        if (!irSatisfyingWitnessTable->hasDecorationOrChild())
                         {
-                            subBuilder->addHLSLExportDecoration(irSatisfyingWitnessTable);
-                            subBuilder->addKeepAliveDecoration(irSatisfyingWitnessTable);
+                            auto mangledName = getMangledNameForConformanceWitness(
+                                subContext->astBuilder,
+                                astReqWitnessTable->witnessedType,
+                                astReqWitnessTable->baseType,
+                                concreteType->getOp());
+
+                            subBuilder->addExportDecoration(
+                                irSatisfyingWitnessTable,
+                                mangledName.getUnownedSlice());
+
+                            if (isExportedType(astReqWitnessTable->witnessedType))
+                            {
+                                subBuilder->addHLSLExportDecoration(irSatisfyingWitnessTable);
+                                subBuilder->addKeepAliveDecoration(irSatisfyingWitnessTable);
+                            }
+
+                            // Recursively lower the sub-table.
+                            lowerWitnessTable(
+                                subContext,
+                                astReqWitnessTable,
+                                irSatisfyingWitnessTable,
+                                mapASTToIRWitnessTable);
+
+                            irSatisfyingWitnessTable->moveToEnd();
                         }
-
-                        // Recursively lower the sub-table.
-                        lowerWitnessTable(
-                            subContext,
-                            astReqWitnessTable,
-                            irSatisfyingWitnessTable,
-                            mapASTToIRWitnessTable);
-
-                        irSatisfyingWitnessTable->moveToEnd();
                     }
                     irSatisfyingVal = irSatisfyingWitnessTable;
                 }
@@ -8148,14 +8245,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
-        // Construct the mangled name for the witness table, which depends
-        // on the type that is conforming, and the type that it conforms to.
-        //
-        // TODO: This approach doesn't really make sense for generic `extension` conformances.
-        auto mangledName =
-            getMangledNameForConformanceWitness(context->astBuilder, subType, superType);
-
-
         // A witness table may need to be generic, if the outer
         // declaration (either a type declaration or an `extension`)
         // is generic.
@@ -8174,59 +8263,81 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         auto irWitnessTableBaseType = lowerType(subContext, superType);
 
-        // Create the IR-level witness table
-        auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, nullptr);
+        // Register a dummy value to avoid infinite recursions.
+        // Without this, the call to lowerType() can get into an infinite recursion.
+        //
+        context->setGlobalValue(
+            inheritanceDecl,
+            LoweredValInfo::simple(findOuterMostGeneric(subBuilder->getInsertLoc().getParent())));
 
-        // Register the value now, rather than later, to avoid any possible infinite recursion.
+        auto irSubType = lowerType(subContext, subType);
+
+        // Create the IR-level witness table
+        auto irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, irSubType);
+
+        // Override with the correct witness-table
         context->setGlobalValue(
             inheritanceDecl,
             LoweredValInfo::simple(findOuterMostGeneric(irWitnessTable)));
 
-        auto irSubType = lowerType(subContext, subType);
-        irWitnessTable->setConcreteType(irSubType);
-
-        // TODO(JS):
-        // Should the mangled name take part in obfuscation if enabled?
-
-        addLinkageDecoration(
-            context,
-            irWitnessTable,
-            inheritanceDecl,
-            mangledName.getUnownedSlice());
-
-        // If the witness table is for a COM interface, always keep it alive.
-        if (irWitnessTableBaseType->findDecoration<IRComInterfaceDecoration>())
+        // Avoid adding same decorations and child more than once.
+        if (!irWitnessTable->hasDecorationOrChild())
         {
-            subBuilder->addHLSLExportDecoration(irWitnessTable);
-        }
+            // Construct the mangled name for the witness table, which depends
+            // on the type that is conforming, and the type that it conforms to.
+            //
+            // TODO: This approach doesn't really make sense for generic `extension`
+            // conformances.
+            auto mangledName = getMangledNameForConformanceWitness(
+                context->astBuilder,
+                subType,
+                superType,
+                irSubType->getOp());
 
-        for (auto mod : parentDecl->modifiers)
-        {
-            if (as<HLSLExportModifier>(mod))
+            // TODO(JS):
+            // Should the mangled name take part in obfuscation if enabled?
+
+            addLinkageDecoration(
+                context,
+                irWitnessTable,
+                inheritanceDecl,
+                mangledName.getUnownedSlice());
+
+            // If the witness table is for a COM interface, always keep it alive.
+            if (irWitnessTableBaseType->findDecoration<IRComInterfaceDecoration>())
             {
                 subBuilder->addHLSLExportDecoration(irWitnessTable);
-                subBuilder->addKeepAliveDecoration(irWitnessTable);
             }
-            else if (as<AutoDiffBuiltinAttribute>(mod))
-            {
-                subBuilder->addAutoDiffBuiltinDecoration(irWitnessTable);
-            }
-        }
 
-        // Make sure that all the entries in the witness table have been filled in,
-        // including any cases where there are sub-witness-tables for conformances
-        bool isExplicitExtern = false;
-        bool isImported = isImportedDecl(context, parentDecl, isExplicitExtern);
-        if (!isImported || isExplicitExtern)
-        {
-            Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
-            lowerWitnessTable(
-                subContext,
-                inheritanceDecl->witnessTable,
-                irWitnessTable,
-                mapASTToIRWitnessTable);
+            for (auto mod : parentDecl->modifiers)
+            {
+                if (as<HLSLExportModifier>(mod))
+                {
+                    subBuilder->addHLSLExportDecoration(irWitnessTable);
+                    subBuilder->addKeepAliveDecoration(irWitnessTable);
+                }
+                else if (as<AutoDiffBuiltinAttribute>(mod))
+                {
+                    subBuilder->addAutoDiffBuiltinDecoration(irWitnessTable);
+                }
+            }
+
+            // Make sure that all the entries in the witness table have been filled in,
+            // including any cases where there are sub-witness-tables for conformances
+            bool isExplicitExtern = false;
+            bool isImported = isImportedDecl(context, parentDecl, isExplicitExtern);
+            if (!isImported || isExplicitExtern)
+            {
+                Dictionary<WitnessTable*, IRWitnessTable*> mapASTToIRWitnessTable;
+                lowerWitnessTable(
+                    subContext,
+                    inheritanceDecl->witnessTable,
+                    irWitnessTable,
+                    mapASTToIRWitnessTable);
+            }
+
+            irWitnessTable->moveToEnd();
         }
-        irWitnessTable->moveToEnd();
 
         return LoweredValInfo::simple(
             finishOuterGenerics(subBuilder, irWitnessTable, outerGeneric));
@@ -9205,6 +9316,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         if (const auto payloadAttribute = decl->findModifier<PayloadAttribute>())
         {
             subBuilder->addDecoration(irAggType, kIROp_PayloadDecoration);
+        }
+
+        if (const auto rayPayloadAttribute = decl->findModifier<RayPayloadAttribute>())
+        {
+            subBuilder->addDecoration(irAggType, kIROp_RayPayloadDecoration);
         }
 
         subBuilder->setInsertInto(irAggType);
@@ -11689,6 +11805,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // returns a `Result<T,E>` value, translating `tryCall` into
     // normal `call` + `ifElse`, etc.
     lowerErrorHandling(module, compileRequest->getSink());
+
+    // Lower `defer` so that later passes need not be aware of it.
+    lowerDefer(module, compileRequest->getSink());
 
     // Synthesize some code we want to make sure is inlined and simplified
     synthesizeBitFieldAccessors(module);

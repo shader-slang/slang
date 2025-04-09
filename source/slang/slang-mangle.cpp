@@ -31,7 +31,7 @@ void emit(ManglingContext* context, String const& value)
     context->sb.append(value);
 }
 
-void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
+void emitNameForLinkage(StringBuilder& sb, UnownedStringSlice str)
 {
     Index length = str.getLength();
     // If the name consists of only traditional "identifer characters"
@@ -61,8 +61,8 @@ void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
         // code points and the number of extended grapheme clusters,
         // since the entire name is within the ASCII subset.
         //
-        emit(context, length);
-        context->sb.append(str);
+        sb.append(length);
+        sb.append(str);
     }
     else
     {
@@ -98,9 +98,9 @@ void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
             }
         }
 
-        context->sb.append("R");
-        emit(context, encoded.getLength());
-        context->sb.append(encoded);
+        sb.append("R");
+        sb.append(encoded.getLength());
+        sb.append(encoded);
     }
 
     // TODO: This logic does not rule out consecutive underscores,
@@ -109,6 +109,11 @@ void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
     //
     // Realistically, that is best dealt with as a quirk of tha particular
     // target, rather than adding complexity here.
+}
+
+void emitNameImpl(ManglingContext* context, UnownedStringSlice str)
+{
+    emitNameForLinkage(context->sb, str);
 }
 
 void emitName(ManglingContext* context, Name* name)
@@ -820,6 +825,37 @@ String getMangledNameForConformanceWitness(ASTBuilder* astBuilder, Type* sub, Ty
     ManglingContext context(astBuilder);
     emitRaw(&context, "_SW");
     emitType(&context, sub);
+    emitType(&context, sup);
+    return context.sb.produceString();
+}
+
+// This function takes an additional parameter to get a simplified
+// mangled name when the witness-table is for enum-type.
+//
+// In order to deduplicate the witness-tables, we need to apply a little different
+// rule for the mangled name when the `superType` is `enum` type.
+// All witness-table for enum types whose underlying type is same should get the same
+// manged name.
+//
+// TODO: We should remove this function and have a new IR for enum-type. The "option 2"
+// described on the issue 6364 is more proper and ideal solution for the issue.
+//
+String getMangledNameForConformanceWitness(ASTBuilder* astBuilder, Type* sub, Type* sup, IROp subOp)
+{
+    SLANG_AST_BUILDER_RAII(astBuilder);
+
+    ManglingContext context(astBuilder);
+    emitRaw(&context, "_SW");
+
+    if (as<EnumTypeType>(sup))
+    {
+        emitRaw(&context, getIROpInfo(subOp).name);
+    }
+    else
+    {
+        emitType(&context, sub);
+    }
+
     emitType(&context, sup);
     return context.sb.produceString();
 }
