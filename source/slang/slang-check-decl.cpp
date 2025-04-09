@@ -12945,8 +12945,29 @@ CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt)
 
 void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
-    if (isGlobalDecl(varDecl)) {
+    visitReferencedDecls(
+        *this,
+        varDecl->type.type,
+        varDecl->loc,
+        varDecl->findModifier<RequireCapabilityAttribute>(),
+        [this, varDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
+        {
+            _propagateRequirement(
+                this,
+                varDecl->inferredCapabilityRequirements,
+                varDecl,
+                node,
+                nodeCaps,
+                refLoc);
+        },
+        [this, varDecl](DiagnosticCategory category)
+        { _propagateSeeDefinitionOf(this, varDecl, category); });
+
+    if (isGlobalDecl(varDecl))
+    {
         auto declaredCaps = getDeclaredCapabilitySet(varDecl);
+        auto inferedCaps = varDecl->inferredCapabilityRequirements;
+        declaredCaps.nonDestructiveJoin(inferedCaps);
         auto module = getModule(varDecl);
         auto linkage = module->getLinkage();
         for (auto target : linkage->targets)
@@ -12967,24 +12988,6 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             }
         }
     }
-
-    visitReferencedDecls(
-        *this,
-        varDecl->type.type,
-        varDecl->loc,
-        varDecl->findModifier<RequireCapabilityAttribute>(),
-        [this, varDecl](SyntaxNode* node, const CapabilitySet& nodeCaps, SourceLoc refLoc)
-        {
-            _propagateRequirement(
-                this,
-                varDecl->inferredCapabilityRequirements,
-                varDecl,
-                node,
-                nodeCaps,
-                refLoc);
-        },
-        [this, varDecl](DiagnosticCategory category)
-        { _propagateSeeDefinitionOf(this, varDecl, category); });
 }
 
 CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* decl)
@@ -12993,8 +12996,12 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
     // For every existing target, we want to join their requirements together.
     // If the the parent defines additional targets, we want to add them to the disjunction set.
     // For example:
-    //    [require(glsl)] struct Parent { [require(glsl, glsl_ext_1)] [require(spirv)] void
-    //    foo(); }
+    //    [require(glsl)]
+    //    struct Parent {
+    //        [require(glsl, glsl_ext_1)]
+    //        [require(spirv)]
+    //        void foo();
+    //    }
     // The requirement for `foo` should be glsl+glsl_ext_1 | spirv.
     //
     CapabilitySet declaredCaps;
@@ -13529,17 +13536,17 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
         }
     }
 
-    // The second scenario is when the callee is using a capability that is not provided by the requirement.
-    // For example:
+    // The second scenario is when the callee is using a capability that is not provided by the
+    // requirement. For example:
     //     [require(hlsl,b,c)]
     //     void caller()
     //     {
     //         useD();    // requires capability (hlsl,d)
     //     }
-    // In this case we should report that useD() is using a capability that is not declared by caller.
-    // If we reach here, we are case 2.
-    // We will produce all failed atoms. This is important since provenance of multiple atoms
-    // can come from multiple referenced items in a function body.
+    // In this case we should report that useD() is using a capability that is not declared by
+    // caller. If we reach here, we are case 2. We will produce all failed atoms. This is important
+    // since provenance of multiple atoms can come from multiple referenced items in a function
+    // body.
 
     HashSet<Decl*> printedDecls;
     auto simplifiedFailedAtomsSet = failedAtomsInsideAvailableSet.newSetWithoutImpliedAtoms();

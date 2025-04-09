@@ -83,6 +83,7 @@ protected:
         ShaderObjectLayoutImpl* layout);
 
     BufferResourceImpl* _ensureArgumentBufferUpToDate(
+        BindingContext* context,
         DeviceImpl* device,
         ShaderObjectLayoutImpl* layout);
 
