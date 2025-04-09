@@ -16,7 +16,7 @@ RWStructuredBuffer<int32_t> inputBuffer;
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<int32_t> outputBuffer;
 
-typealias CoopMatType = CoopMat<int32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::A>;
+typealias CoopMatType = CoopMat<int32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>;
 
 [numthreads(32, 1, 1)]
 void computeMain()
