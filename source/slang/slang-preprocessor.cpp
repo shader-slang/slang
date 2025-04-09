@@ -1247,12 +1247,15 @@ struct WarningStateTracker : ISourceWarningStateTracker
         if (stack.getCount())
         {
             const SourceLoc pushed = stack.getLast();
-            const SourceLoc::RawValue absLoc = getAbsoluteLocation(location);
-            const SourceLoc::RawValue absPushed = getAbsoluteLocation(pushed);
             stack.removeLast();
-            for (auto& [id, timeline] : entries)
+            if (entries.getCount())
             {
-                timeline.popEntry(absLoc, absPushed, sink, id, location);
+                const SourceLoc::RawValue absLoc = getAbsoluteLocation(location);
+                const SourceLoc::RawValue absPushed = getAbsoluteLocation(pushed);
+                for (auto& [id, timeline] : entries)
+                {
+                    timeline.popEntry(absLoc, absPushed, sink, id, location);
+                }
             }
         }
         else if (sink)
@@ -4159,8 +4162,9 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaOnceDirective)
 
 SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
 {
-    SLANG_UNUSED(subDirectiveToken)
     auto directiveLoc = GetDirectiveLoc(context);
+    SLANG_UNUSED(subDirectiveToken)
+    SLANG_UNUSED(directiveLoc);
     Expect(context, TokenType::LParent, Diagnostics::syntaxError);
     Token tk = PeekToken(context);
     auto finish = [&]() -> void { SkipToEndOfLine(context); };
@@ -4169,12 +4173,12 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
         if (tk.getContent() == "push")
         {
             AdvanceToken(context);
-            context->m_preprocessor->warningStateTracker->push(directiveLoc);
+            context->m_preprocessor->warningStateTracker->push(tk.loc);
         }
         else if (tk.getContent() == "pop")
         {
             AdvanceToken(context);
-            context->m_preprocessor->warningStateTracker->pop(directiveLoc, GetSink(context));
+            context->m_preprocessor->warningStateTracker->pop(tk.loc, GetSink(context));
         }
         else
         {

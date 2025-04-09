@@ -1051,8 +1051,7 @@ SourceLoc::RawValue SourceView::getAbsoluteLocation(SourceLoc location) const
 SourceLoc::RawValue SourceManager::getAbsoluteLocation(SourceLoc location) const
 {
     SourceLoc::RawValue res = 0;
-    const SourceView* view = findSourceView(location);
-    if (view)
+    if (const SourceView* view = findSourceView(location))
     {
         res = view->getAbsoluteLocation(location);
     }
