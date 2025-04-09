@@ -663,7 +663,9 @@ INST(MissingReturn, missingReturn, 0, 0)
 INST(Unreachable, unreachable, 0, 0)
 INST_RANGE(Unreachable, MissingReturn, Unreachable)
 
-INST_RANGE(TerminatorInst, Return, Unreachable)
+INST(Defer, defer, 3, 0)
+
+INST_RANGE(TerminatorInst, Return, Defer)
 
 INST(discard, discard, 0, 0)
 
