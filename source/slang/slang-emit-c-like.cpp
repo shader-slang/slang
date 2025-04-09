@@ -3118,19 +3118,18 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         case kIROp_MakeCoopVector:
             {
                 emitType(coopVecType, getName(inst));
-                m_writer->emit(";\n");
+                m_writer->emit(" = { ");
 
                 auto elemCount = as<IRIntLit>(coopVecType->getOperand(1));
                 IRIntegerValue elemCountValue = elemCount->getValue();
-                for (IRIntegerValue i = 0; i < elemCountValue; ++i)
+                IRIntegerValue i = 0;
+                for (; i < elemCountValue - 1; ++i)
                 {
-                    m_writer->emit(getName(inst));
-                    m_writer->emit(".WriteToIndex(");
-                    m_writer->emit(i);
-                    m_writer->emit(", ");
                     emitDereferenceOperand(inst->getOperand(i), getInfo(EmitOp::General));
-                    m_writer->emit(");\n");
+                    m_writer->emit(", ");
                 }
+                emitDereferenceOperand(inst->getOperand(i), getInfo(EmitOp::General));
+                m_writer->emit(" };\n");
                 return;
             }
         case kIROp_Call:
@@ -3138,18 +3137,18 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             m_writer->emit(";\n");
 
             m_writer->emit(getName(inst));
-            m_writer->emit(".CopyFrom(");
+            m_writer->emit(" = ");
             emitCallExpr((IRCall*)inst, getInfo(EmitOp::General));
-            m_writer->emit(");\n");
+            m_writer->emit(";\n");
             return;
         case kIROp_Load:
             emitType(coopVecType, getName(inst));
             m_writer->emit(";\n");
 
             m_writer->emit(getName(inst));
-            m_writer->emit(".CopyFrom(");
+            m_writer->emit(" = ");
             emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(");\n");
+            m_writer->emit(";\n");
             return;
         default:
             break;
@@ -3402,21 +3401,12 @@ void CLikeSourceEmitter::_emitStoreImpl(IRStore* store)
 {
     auto srcVal = store->getVal();
     auto dstPtr = store->getPtr();
-    if (isPointerOfType(dstPtr->getDataType(), kIROp_CoopVectorType))
-    {
-        emitDereferenceOperand(dstPtr, getInfo(EmitOp::General));
-        m_writer->emit(".CopyFrom(");
-        emitDereferenceOperand(srcVal, getInfo(EmitOp::General));
-        m_writer->emit(");\n");
-    }
-    else
-    {
-        auto prec = getInfo(EmitOp::Assign);
-        emitDereferenceOperand(dstPtr, leftSide(getInfo(EmitOp::General), prec));
-        m_writer->emit(" = ");
-        emitOperand(srcVal, rightSide(prec, getInfo(EmitOp::General)));
-        m_writer->emit(";\n");
-    }
+
+    auto prec = getInfo(EmitOp::Assign);
+    emitDereferenceOperand(dstPtr, leftSide(getInfo(EmitOp::General), prec));
+    m_writer->emit(" = ");
+    emitOperand(srcVal, rightSide(prec, getInfo(EmitOp::General)));
+    m_writer->emit(";\n");
 }
 
 void CLikeSourceEmitter::_emitInstAsDefaultInitializedVar(IRInst* inst, IRType* type)
@@ -4700,17 +4690,15 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
             {
                 m_writer->emit(";\n");
                 m_writer->emit(getName(varDecl));
-                m_writer->emit(".CopyFrom(");
+                m_writer->emit(" = ");
                 emitDereferenceOperand(store->getVal()->getOperand(0), getInfo(EmitOp::General));
-                m_writer->emit(")");
             }
             else if (isCoopVectorType && store->getVal()->getOp() == kIROp_Call)
             {
                 m_writer->emit(";\n");
                 m_writer->emit(getName(varDecl));
-                m_writer->emit(".CopyFrom(");
+                m_writer->emit(" = ");
                 emitCallExpr((IRCall*)store->getVal(), getInfo(EmitOp::General));
-                m_writer->emit(")");
             }
             else if (isCoopVectorType && store->getVal()->getOp() == kIROp_MakeCoopVector)
             {
@@ -4721,13 +4709,12 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
                 {
                     m_writer->emit(";\n");
                     m_writer->emit(getName(varDecl));
-                    m_writer->emit(".WriteToIndex(");
+                    m_writer->emit("[");
                     m_writer->emit(i);
-                    m_writer->emit(", ");
+                    m_writer->emit("] = ");
                     emitDereferenceOperand(
                         store->getVal()->getOperand(i),
                         getInfo(EmitOp::General));
-                    m_writer->emit(")");
                 }
             }
             else
