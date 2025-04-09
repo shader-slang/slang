@@ -73,9 +73,9 @@ def run(command, key):
         try:
             results = subprocess.check_output(command, stderr=subprocess.STDOUT, shell=True).decode('utf-8')
         except subprocess.CalledProcessError as exc:
+            print(f"[Error] Failed to run command: {command}")
             print(exc.output.decode('utf-8'))
-            return
-            # exit(-1)
+            return  # Return without adding to timings
 
         p = parse(results)
         if len(profile) == 0:
@@ -85,10 +85,13 @@ def run(command, key):
                 profile.setdefault(k, 0)
                 profile[k] += v
 
-    for k in profile:
-        profile[k] /= samples
-
-    timings[key] = profile
+    # Only add to timings if we have data
+    if profile:
+        for k in profile:
+            profile[k] /= samples
+        timings[key] = profile
+    else:
+        print(f"[Warning] No timing data collected for {key}")
 
 def compile_cmd(file, output, stage=None, entry=None, emit=False):
     cmd = f'{slangc} -report-perf-benchmark {file}'
@@ -171,8 +174,8 @@ for k, v in timings.items():
 
     data = {
         'name': name,
-        'unit': 'milliseconds',
-        'value': v['compileInner']
+        'value': v['compileInner'],
+        'unit': 'milliseconds'
     }
 
     json_data.append(data)
@@ -185,7 +188,11 @@ with open(args.output, 'w') as file:
 print(4 * '\n')
 print('# Slang MDL benchmark results\n')
 print('## Module precompilation time\n')
-print(f'Total: **{timings[f'full/{target_ext}/precompilation']['compileInner']} ms**\n')
+precomp_key = f'full/{target_ext}/precompilation'
+if precomp_key in timings:
+    print(f'Total: **{timings[precomp_key]["compileInner"]} ms**\n')
+else:
+    print("No precompilation data available\n")
 
 print('## Module compilation for entry points\n')
 
@@ -199,11 +206,17 @@ table.field_names = [ 'Entry', 'Total' ]
 total = 0
 for entry, prefix in zip(entries, prefixes):
     row = [ entry ]
-    db = timings[f'full/{target_ext}/module/{prefix}']
-    spCompile = db['compileInner']
-    row.append(f'{spCompile:.3f}s')
-    table.add_row(row)
-    total += spCompile
+    key = f'full/{target_ext}/module/{prefix}'
+    if key in timings:
+        db = timings[key]
+        spCompile = db.get('compileInner', 0)
+        row.append(f'{spCompile:.3f}ms')
+        table.add_row(row)
+        total += spCompile
+    else:
+        row.append('Failed')
+        table.add_row(row)
+        print(f"[Warning] Compilation failed for module/{prefix}")
 
 print(f'Total: **{total} ms**\n')
 print(table, end='\n\n')
@@ -217,11 +230,17 @@ table.field_names = [ 'Entry', 'Total' ]
 total = 0
 for entry, prefix in zip(entries, prefixes):
     row = [ entry ]
-    db = timings[f'full/{target_ext}/mono/{prefix}']
-    spCompile = db['compileInner']
-    row.append(f'{spCompile:.3f}s')
-    table.add_row(row)
-    total += spCompile
+    key = f'full/{target_ext}/mono/{prefix}'
+    if key in timings:
+        db = timings[key]
+        spCompile = db.get('compileInner', 0)
+        row.append(f'{spCompile:.3f}ms')
+        table.add_row(row)
+        total += spCompile
+    else:
+        row.append('Failed')
+        table.add_row(row)
+        print(f"[Warning] Compilation failed for mono/{prefix}")
 
 print(f'Total: **{total} ms**\n')
 print(table, end='\n\n')
