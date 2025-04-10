@@ -7751,9 +7751,9 @@ IntInfo getIntTypeInfo(const IRType* intType)
         return {64, true};
     case kIROp_IntPtrType:
 #if SLANG_PTR_IS_32
-        return {32, false};
+        return {32, true};
 #else
-        return {64, false};
+        return {64, true};
 #endif
     default:
         SLANG_UNEXPECTED("Unhandled type passed to getIntTypeInfo");
