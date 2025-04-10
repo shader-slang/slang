@@ -1,6 +1,3 @@
-// #include <spirv/unified1/spirv.h>
-// #define SLANG_IN_SPIRV_EMIT_CONTEXT
-
 #ifdef SLANG_IN_SPIRV_EMIT_CONTEXT
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpUndef
 template<typename T>

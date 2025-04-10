@@ -1832,7 +1832,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         case kIROp_MakeVector:
         case kIROp_MakeCoopVector:
-        case kIROp_MakeCoopMatrixFromScalar:
         case kIROp_MakeArray:
         case kIROp_MakeStruct:
             return emitCompositeConstruct(getSection(SpvLogicalSectionID::ConstantsAndTypes), inst);
