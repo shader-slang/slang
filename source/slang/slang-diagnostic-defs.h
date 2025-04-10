@@ -761,6 +761,13 @@ DIAGNOSTIC(
     "cannot specialize generic '$0' with the provided arguments.")
 
 DIAGNOSTIC(30076, Error, globalVarCannotHaveOpaqueType, "global variable cannot have opaque type.")
+DIAGNOSTIC(
+    30077,
+    Error,
+    concreteArgumentToOutputInterface,
+    "argument passed to parameter '$0' is of concrete type '$1', but interface-typed output "
+    "parameters require interface-typed arguments. To allow passing a concrete type to this "
+    "function, you can replace '$2 $0' with a generic 'T $0' and a 'where T : $2' constraint.")
 DIAGNOSTIC(-1, Note, doYouMeanStaticConst, "do you intend to define a `static const` instead?")
 DIAGNOSTIC(-1, Note, doYouMeanUniform, "do you intend to define a `uniform` parameter instead?")
 
