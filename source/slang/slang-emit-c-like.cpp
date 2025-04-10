@@ -5158,6 +5158,17 @@ void CLikeSourceEmitter::ensureGlobalInst(
         return;
     case kIROp_ThisType:
         return;
+    // Skip debug information instructions to avoid circularity in functions with custom derivatives
+    case kIROp_DebugInlinedAt:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+    case kIROp_DebugFunction:
+    case kIROp_DebugVar:
+    case kIROp_DebugLine:
+    case kIROp_DebugSource:
+    case kIROp_DebugValue:
+    case kIROp_DebugInlinedVariable:
+        return;
     default:
         break;
     }
