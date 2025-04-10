@@ -292,6 +292,8 @@ void SpvInstParent::addInst(SpvInst* inst)
     SLANG_ASSERT(inst);
     SLANG_ASSERT(!inst->nextSibling);
 
+    inst->parent = this;
+
     if (m_firstChild == nullptr)
     {
         m_firstChild = m_lastChild = inst;
@@ -304,7 +306,6 @@ void SpvInstParent::addInst(SpvInst* inst)
     //
     m_lastChild->nextSibling = inst;
     inst->prevSibling = m_lastChild;
-    inst->parent = this;
     m_lastChild = inst;
 }
 
@@ -1561,6 +1562,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     break;
                 case SpvStorageClassNodePayloadAMDX:
                     requireSPIRVCapability(SpvCapabilityShaderEnqueueAMDX);
+                    requireSPIRVCapability(SpvCapabilityVariablePointers); // TODO: need to relocate to a more proper place.
                     ensureExtensionDeclaration(UnownedStringSlice("SPV_AMDX_shader_enqueue"));
                     break;
                 }
@@ -1581,12 +1583,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 else if (useForwardDeclaration)
                 {
                     valueTypeId = getIRInstSpvID(valueType);
-                }
-                else if (storageClass == SpvStorageClassNodePayloadAMDX)
-                {
-                    auto spvValueType = ensureInst(valueType);
-                    auto spvNodePayloadType = emitOpTypeNodePayloadArray(inst, spvValueType);
-                    valueTypeId = getID(spvNodePayloadType);
                 }
                 else
                 {
@@ -1929,6 +1925,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_IndicesType:
         case kIROp_PrimitivesType:
             return nullptr;
+        case kIROp_SPIRVNodePayloadArrayType:
+            {
+                auto nodePayloadArrayType = cast<IRSPIRVNodePayloadArrayType>(inst);
+                auto newType =
+                    emitOpTypeNodePayloadArray(inst, nodePayloadArrayType->getRecordType());
+                return newType;
+            }
         default:
             {
                 if (as<IRSPIRVAsmOperand>(inst))
@@ -4449,6 +4452,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         break;
                     }
                 }
+
+                // Pass in global OpVariable as interface to the entry point
+                // TODO: Pass in only when they are used by the entry point
+                for (auto entryInterface : m_entryPointInterfaces)
+                {
+                    SpvInst* spvInst;
+                    if (m_mapIRInstToSpvInst.tryGetValue(entryInterface, spvInst))
+                    {
+                        params.add(spvInst);
+                    }
+                }
+
                 emitOpEntryPoint(section, decoration, spvStage, dstID, name, params);
 
                 // Stage specific execution mode and capability declarations.
@@ -8179,7 +8194,42 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 default:
                     break;
                 }
-                const auto opParent = parentForOpCode(opcode, parent);
+
+                IRStringLit* resultID = nullptr;
+                SpvInstParent* opParent = nullptr;
+                if (opcode == SpvOpVariable)
+                {
+                    auto opStorageClass = spvInst->getOperand(3);
+                    if (opStorageClass && opStorageClass->getOp() == kIROp_SPIRVAsmOperandEnum)
+                    {
+                        if (auto enumStorageClass = cast<IRIntLit>(opStorageClass->getOperand(0)))
+                        {
+                            switch (SpvStorageClass(enumStorageClass->getValue()))
+                            {
+                            case SpvStorageClassNodePayloadAMDX:
+                                requireSPIRVCapability(SpvCapabilityShaderEnqueueAMDX);
+                                ensureExtensionDeclaration(
+                                    UnownedStringSlice("SPV_AMDX_shader_enqueue"));
+
+                                opParent = getSection(SpvLogicalSectionID::ConstantsAndTypes);
+
+                                if (auto resultOperand =
+                                        cast<IRSPIRVAsmOperand>(spvInst->getOperand(2)))
+                                {
+                                    resultID = cast<IRStringLit>(resultOperand->getValue());
+                                }
+
+                                m_entryPointInterfaces.add(spvInst);
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (opParent == nullptr)
+                {
+                    opParent = parentForOpCode(opcode, parent);
+                }
+
                 const auto opInfo = m_grammarInfo->opInfos.lookup(opcode);
 
                 // TODO: handle resultIdIndex == 1, for constants
@@ -8237,6 +8287,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             for (const auto operand : spvInst->getSPIRVOperands())
                                 emitSpvAsmOperand(operand);
                         });
+
+                    // TODO: We may be able to simplify without checking the string.
+                    if (resultID)
+                    {
+                        SpvWord id;
+                        if (last->id == 0 && idMap.tryGetValue(resultID->getStringSlice(), id))
+                            last->id = id;
+                    }
                 }
             }
         }
@@ -8246,6 +8304,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         return last;
     }
+    HashSet<IRInst*> m_entryPointInterfaces;
 
     OrderedHashSet<SpvCapability> m_capabilities;
     void requireSPIRVCapability(SpvCapability capability)
