@@ -24223,6 +24223,7 @@ CoopVec<T, M> coopVecMatMulPacked(
     }
 }
 
+// specialized coopVecMatMul for non-packed inputs
 [require(spirv, cooperative_vector)]
 __generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
 CoopVec<T, M> coopVecMatMul(
