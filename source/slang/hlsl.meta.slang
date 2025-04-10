@@ -22172,20 +22172,6 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
     [__NoSideEffect]
     [ForceInline]
     [require(cooperative_matrix)]
-    void store(ConstBufferPointer<T> buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
-    {
-        let basePointer = buffer.getPtr();
-        let alignment = 16U;
-        return spirv_asm
-        {
-            %pointer:$$T* = OpPtrAccessChain $basePointer $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
-        };
-    }
-
-    [__NoSideEffect]
-    [ForceInline]
-    [require(cooperative_matrix)]
     void store(T* buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
     {
         let alignment = 16U;
@@ -22286,21 +22272,6 @@ struct CoopMat<T : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, l
             result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
         };
     }
-
-    [__NoSideEffect]
-    [ForceInline]
-    [require(cooperative_matrix)]
-    static CoopMat<T, S, M, N, R> load(ConstBufferPointer<T> buffer, uint element, uint stride, CoopMatMatrixLayout matrixLayout)
-    {
-        let basePointer = buffer.getPtr();
-        let alignment = 16;
-        return spirv_asm
-        {
-            %pointer:$$T* = OpPtrAccessChain $basePointer $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
-    }
-
 
     [__NoSideEffect]
     [ForceInline]
@@ -22520,12 +22491,12 @@ enum CoopMatMatrixOperands
 
 [require(cooperative_matrix)]
 __generic<T : __BuiltinArithmeticType, U : __BuiltinArithmeticType, V : __BuiltinArithmeticType, let S : CoopMatScope, let M : int, let K : int, let N : int, let RA : CoopMatMatrixUse, let RB : CoopMatMatrixUse, let RC : CoopMatMatrixUse>
-CoopMat<V, S, M, N, RC> coopMatMulAdd(CoopMat<T, S, M, K, RA> matA, CoopMat<U, S, K, N, RB> matB, CoopMat<V, S, M, N, RC> matC, CoopMatMatrixOperands operands)
+CoopMat<V, S, M, N, RC> coopMatMulAdd(CoopMat<T, S, M, K, RA> matA, CoopMat<U, S, K, N, RB> matB, CoopMat<V, S, M, N, RC> matC, constexpr CoopMatMatrixOperands operands)
 {
-    // TODO: static assert matrix uses.
+    static_assert((RA == CoopMatMatrixUse::MatrixA) && (RB == CoopMatMatrixUse::MatrixB) && (RC == CoopMatMatrixUse::MatrixAccumulator), "matrix uses for `coopMatMulAdd` matrix parameters must be `MatrixA`, `MatrixB` and `MatrixAccumulator`");
     return spirv_asm
     {
-        result:$$CoopMat<V, S, M, N, RC> = OpCooperativeMatrixMulAddKHR $matA $matB $matC $operands;
+        result:$$CoopMat<V, S, M, N, RC> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
     };
 }
 
