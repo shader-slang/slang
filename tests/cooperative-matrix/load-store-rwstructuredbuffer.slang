@@ -16,14 +16,12 @@ RWStructuredBuffer<int32_t> inputBuffer;
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<int32_t> outputBuffer;
 
-typealias CoopMatType = CoopMat<int32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
-
 [numthreads(32, 1, 1)]
 void computeMain()
 {
     let stride = 16;
     let matrixLayout = CoopMatMatrixLayout::RowMajor;
 
-    let mat = CoopMatType.load(inputBuffer, 0, stride, matrixLayout);
+    let mat = coopMatLoad<int32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(inputBuffer, 0, stride, matrixLayout);
     mat.store(outputBuffer, 0, stride, matrixLayout);
 }

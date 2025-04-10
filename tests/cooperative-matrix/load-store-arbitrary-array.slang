@@ -33,7 +33,7 @@ void computeMain()
     let stride = 16;
     let matrixLayout = CoopMatMatrixLayout::RowMajor;
 
-    let mat = CoopMatType.load(input, 0, stride, matrixLayout);
+    let mat = coopMatLoad<uint32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(input, 0, stride, matrixLayout);
     mat.storeAny(tempShared, 0, stride, matrixLayout);
 
     let result = CoopMatType.loadAny(tempShared, 0, stride, matrixLayout);
