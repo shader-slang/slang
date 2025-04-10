@@ -503,6 +503,10 @@ static int pipeCLOEXEC(int pipefd[2])
         dup2(stderrPipe[1], STDERR_FILENO);
         ::close(stderrPipe[1]);
 
+        // Reset locale to ensure the output can be parsed regardless of user's
+        // locale.
+        setenv("LC_ALL", "C", 1);
+
         if (exe.m_type == ExecutableLocation::Type::Path)
         {
             // Use the specified path (ie don't search)
