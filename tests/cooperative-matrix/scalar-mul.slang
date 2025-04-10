@@ -12,7 +12,7 @@ ByteAddressBuffer inputBuffer;
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-typealias CoopMatType = CoopMat<float, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>;
+typealias CoopMatType = CoopMat<float, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
 
 [numthreads(32, 1, 1)]
 void computeMain()

@@ -9,7 +9,7 @@ RWStructuredBuffer<int32_t> outputBuffer;
 [numthreads(32, 1, 1)]
 void computeMain()
 {
-    var result : CoopMat<int32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>;
+    var result : CoopMat<int32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
     result.fill(10);
     result.store(outputBuffer, 0, 16, CoopMatMatrixLayout::RowMajor);
 }

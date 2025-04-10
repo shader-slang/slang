@@ -15,7 +15,7 @@ ByteAddressBuffer input1;
 //TEST_INPUT:ubuffer(data=[1 2 3 4], stride=4, count=256),name=input2
 ByteAddressBuffer input2;
 
-typealias CoopMatType = CoopMat<int32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>;
+typealias CoopMatType = CoopMat<int32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
 
 [numthreads(32, 1, 1)]
 void computeMain()

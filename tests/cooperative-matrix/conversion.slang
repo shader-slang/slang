@@ -19,10 +19,10 @@ void computeMain()
     let stride = 16;
     let matrixLayout = CoopMatMatrixLayout::RowMajor;
 
-    let intMat = CoopMat<int, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>.load(input, 0, stride, matrixLayout);
-    let floatMat = CoopMat<float, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>(intMat);
-    let uintMat = CoopMat<uint, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>(intMat);
-    let floatMat2 = CoopMat<float, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>(uintMat);
+    let intMat = CoopMat<int, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>.load(input, 0, stride, matrixLayout);
+    let floatMat = CoopMat<float, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(intMat);
+    let uintMat = CoopMat<uint, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(intMat);
+    let floatMat2 = CoopMat<float, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(uintMat);
 
     let result = floatMat + floatMat2;
     result.store(outputBuffer, 0, stride, matrixLayout);
