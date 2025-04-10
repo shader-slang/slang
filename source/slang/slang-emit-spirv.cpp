@@ -7357,10 +7357,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (!inlinedAt)
             return nullptr;
 
-        SpvInst* scope = nullptr;
-        IRDebugFunction* debugFunc = as<IRDebugFunction>(debugScope->getScope());
-        scope = findDebugScope(debugFunc);
-
+        SpvInst* scope = ensureInst(debugScope->getScope());
         if (!scope)
             return nullptr;
 
@@ -7383,7 +7380,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto debugType = emitDebugType(as<IRType>(debugFunc->getDebugType()));
         IRBuilder builder(debugFunc);
 
-        auto debugFuncInfo = emitOpDebugFunction(
+        IRInst* irFunc = debugFunc->getFunc();
+
+        SpvInst* debugFuncInfo = nullptr;
+        // We've already emitted, don't emit again.
+        if (m_mapIRInstToSpvDebugInst.tryGetValue(irFunc, debugFuncInfo))
+        {
+            return debugFuncInfo;
+        }
+
+        debugFuncInfo = emitOpDebugFunction(
             parent,
             nullptr,
             m_voidType,
@@ -7398,8 +7404,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             builder.getIntValue(builder.getUIntType(), 0),
             debugFunc->getLine());
 
-        if (!m_mapIRInstToSpvDebugInst.tryGetValue(debugFunc, debugFuncInfo))
-            registerDebugInst(debugFunc, debugFuncInfo);
+        registerDebugInst(irFunc, debugFuncInfo);
 
         return debugFuncInfo;
     }
@@ -7411,12 +7416,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugInlinedAt(SpvInstParent* parent, IRDebugInlinedAt* debugInlinedAt)
     {
+        if (!debugInlinedAt)
+            return nullptr;
         IRInst* lineInst = debugInlinedAt->getLine();
 
         SpvInst* scope = nullptr;
         if (as<IRDebugFunction>(debugInlinedAt->getDebugFunc()))
         {
             scope = ensureInst(debugInlinedAt->getDebugFunc());
+        }
+        if (scope == nullptr)
+        {
+            scope = findDebugScope(debugInlinedAt);
         }
 
         // If it's not chained to another IRDebugInlinedAt, we don't use this.
@@ -7935,7 +7946,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return nullptr;
         auto debugType = emitDebugType(function->getDataType());
         IRBuilder builder(function);
-        auto debugFunc = emitOpDebugFunction(
+
+        SpvInst* debugFunc = nullptr;
+        if (m_mapIRInstToSpvDebugInst.tryGetValue(function, debugFunc))
+        {
+            return debugFunc;
+        }
+
+        debugFunc = emitOpDebugFunction(
             getSection(SpvLogicalSectionID::ConstantsAndTypes),
             nullptr,
             m_voidType,

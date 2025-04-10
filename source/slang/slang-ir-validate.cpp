@@ -244,6 +244,7 @@ void validateIRInstOperand(IRValidateContext* context, IRInst* inst, IRUse* oper
     switch (inst->getOp())
     {
     case kIROp_DifferentiableTypeDictionaryItem:
+    case kIROp_DebugScope:
         return;
     }
     //
