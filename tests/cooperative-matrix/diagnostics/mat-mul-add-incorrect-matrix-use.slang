@@ -1,19 +1,16 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
+//DIAGNOSTIC_TEST(compute):SIMPLE(filecheck=CHECK): -entry computeMain -stage compute -target spirv
 
-// CHECK: type: float
-// CHECK-COUNT-256: 241.0
-
-//TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 typealias CoopMatAType = CoopMat<float16_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>;
-typealias CoopMatBType = CoopMat<float16_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixB>;
+typealias CoopMatBType = CoopMat<float16_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>;
 typealias CoopMatCType = CoopMat<float32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
+
+// CHECK: error 41400: static assertion failed, matrix uses for `coopMatMulAdd` matrix parameters must be `MatrixA`, `MatrixB` and `MatrixAccumulator`
 
 [numthreads(32, 1, 1)]
 void computeMain()
 {
-    // ( 3.0 * 5.0 ) * 16 + 1.0 = 241.0
     let matA = CoopMatAType(3.0);
     let matB = CoopMatBType(5.0);
     let matC = CoopMatCType(1.0);
