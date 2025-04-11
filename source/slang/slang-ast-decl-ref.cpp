@@ -318,6 +318,20 @@ void DeclRefBase::toText(StringBuilder& out)
         return;
     }
 
+    // Handle extension types - format as "ParentType.MemberName"
+    auto currentDecl = getDecl();
+    if (currentDecl && currentDecl->parentDecl && as<ExtensionDecl>(currentDecl->parentDecl))
+    {
+        auto extDecl = as<ExtensionDecl>(currentDecl->parentDecl);
+        if (extDecl->targetType)
+        {
+            extDecl->targetType->toText(out);
+            out << ".";
+            out << currentDecl->getName()->text;
+            return;
+        }
+    }
+
     if (as<GenericTypeParamDeclBase>(this->getDecl()))
     {
         SLANG_ASSERT(as<DirectDeclRef>(this));
@@ -386,8 +400,6 @@ void DeclRefBase::toText(StringBuilder& out)
                     out << ">";
                 }
             }
-
-            // TODO: What do we do about extensions?
         }
     }
 }
