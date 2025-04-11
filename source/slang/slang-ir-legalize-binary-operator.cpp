@@ -1,9 +1,7 @@
 #include "slang-ir-legalize-binary-operator.h"
 
 #include "compiler-core/slang-diagnostic-sink.h"
-#include "slang-compiler.h"
 #include "slang-ir-insts.h"
-#include "slang-ir.h"
 
 namespace Slang
 {
@@ -146,6 +144,10 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target)
     {
         // WGSL does not support matrix division by scalar, convert it to multiplication.
         replaceMatrixDividedByScalarWithMul(inst);
+    }
+    else
+    {
+        // Matrix divided by scalar is natively supported on Metal - leave it as is.
     }
 
     if (isIntegralType(inst->getOperand(0)->getDataType()) &&
