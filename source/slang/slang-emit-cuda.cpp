@@ -123,6 +123,18 @@ UnownedStringSlice CUDASourceEmitter::getVectorPrefix(IROp op)
     case kIROp_UInt64Type:
         return UnownedStringSlice("ulonglong");
 
+#if SLANG_PTR_IS_64
+    case kIROp_IntPtrType:
+        return UnownedStringSlice("longlong");
+    case kIROp_UIntPtrType:
+        return UnownedStringSlice("ulonglong");
+#else
+    case kIROp_IntPtrType:
+        return UnownedStringSlice("int");
+    case kIROp_UIntPtrType:
+        return UnownedStringSlice("uint");
+#endif
+
     case kIROp_HalfType:
         return UnownedStringSlice("__half");
 
