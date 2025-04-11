@@ -12,7 +12,7 @@ Slang exposes operations from all target platforms to allow the user to take max
 A consequence of this approach is that the user is now responsible for maintaining compatibility of their code. For example, if the user writes code that uses a Vulkan extension currently not
 available on D3D/HLSL, they will get an error when attempting to compile that code to D3D.
 
-To help the user to maintain compatibility of their shader code on platforms matter to their applications, Slang's type system can now infer and enforce capability requirements
+To help the user to maintain compatibility of their shader code on platforms that matter to their applications, Slang's type system can now infer and enforce capability requirements
 to provide assurance that the shader code will be compatible with the specific set of platforms before compiling for that platform.
 
 For example, `Texture2D.SampleCmp` is available on D3D and Vulkan, but not available on CUDA. If the user is intended to write cross-platform code that targets CUDA, they will

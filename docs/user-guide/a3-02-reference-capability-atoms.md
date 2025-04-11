@@ -953,7 +953,7 @@ Compound Capabilities
 > Collection of shader stages
 
 `meshshading`
-> Ccapabilities required to use mesh shading features
+> Capabilities required to use mesh shading features
 
 `shadermemorycontrol_compute`
 > (gfx targets) Capabilities required to use memory barriers that only work for raytracing & compute shader stages
@@ -1204,7 +1204,7 @@ Compound Capabilities
 
 Other
 ----------------------
-*Capabilities which may be deprecated*
+*Capabilities that may be deprecated*
 
 `SPIRV_1_0`
 > Use `spirv_1_0` instead

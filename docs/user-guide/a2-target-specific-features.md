@@ -2,9 +2,9 @@
 layout: user-guide
 ---
 
-# Target-specific features
+# Target-Specific Features
 
-Slang can produce code for a variety of targets. When producing code for a target, Slang attempts to translate HLSL intrinsics to the closes functionality provided by the target. In addition, Slang also support target specific intrinsics and language extensions that allow users to make best use of the target. This chapter documents all the important target-specific behaviors.
+Slang can produce code for a variety of targets. When producing code for a target, Slang attempts to translate HLSL intrinsics to the closest functionality provided by the target. In addition, Slang also supports target-specific intrinsics and language extensions that allow users to make best use of the target. This chapter documents all the important target-specific behaviors.
 
 In this chapter:
 
