@@ -1,6 +1,6 @@
 result code = -1
 standard error = {
-tests/diagnostics/concrete-argument-to-output-interface.slang(48): error 30077: argument passed to parameter 'x' is of concrete type 'MyThing', but interface-typed output parameters required interface-typed arguments. To allow passing a concrete type to this function, you can replace 'IThing x' with a generic 'T x' and a 'where T : IThing' constraint.
+tests/diagnostics/concrete-argument-to-output-interface.slang(48): error 30077: argument passed to parameter 'x' is of concrete type 'MyThing', but interface-typed output parameters require interface-typed arguments. To allow passing a concrete type to this function, you can replace 'IThing x' with a generic 'T x' and a 'where T : IThing' constraint.
     f(concrete); // ERROR!
      ^
 }
