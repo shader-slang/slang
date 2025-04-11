@@ -1877,6 +1877,7 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
         disableIRValidationAtInsert();
         auto simplifyOptions = IRSimplificationOptions::getDefault(nullptr);
         simplifyOptions.removeRedundancy = true;
+        simplifyOptions.hoistLoopInvariantInsts = true;
         simplifyFunc(autoDiffSharedContext->targetProgram, func, simplifyOptions);
         enableIRValidationAtInsert();
     }
