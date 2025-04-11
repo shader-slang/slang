@@ -24450,6 +24450,15 @@ struct DispatchNodeInputRecord
             };
         }
     }
+
+    [ForceInline]
+    uint Count()
+    {
+        return spirv_asm
+        {
+            result: $$uint = OpNodePayloadArrayLengthAMDX $payload;
+        };
+    }
 };
 
 //
