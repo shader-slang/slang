@@ -1,7 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE:-cuda -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cpu -output-using-type -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -output-using-type -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-dx11 -output-using-type -shaderobj -render-feature double
+//TEST(compute):COMPARE_COMPUTE: -output-using-type -shaderobj -render-feature double
 
 // Cos values are all 0 on D3d12(!)
 //DISABLE_TEST(compute):COMPARE_COMPUTE: -dx12 -output-using-type -shaderobj

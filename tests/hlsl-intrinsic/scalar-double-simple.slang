@@ -2,9 +2,8 @@
 // For simplicity we are not going to use any intrinsics, and not use any resources that use double
 
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -render-feature double
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx11 -shaderobj -render-feature double
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile sm_6_0 -use-dxil -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -render-feature double
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
