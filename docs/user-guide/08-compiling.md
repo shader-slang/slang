@@ -908,7 +908,7 @@ Much of the Slang API is available through [COM interfaces](https://en.wikipedia
 
 ## Compiler Options
 
-Both the `SessionDesc`, `TargetDesc` structures contain fields that encodes a `CompilerOptionEntry` array for additional compiler options to apply on the session or the target. In additional,
+Both the `SessionDesc`, `TargetDesc` structures contain fields that encodes a `CompilerOptionEntry` array for additional compiler options to apply on the session or the target. In addition,
 the `IComponentType::linkWithOptions()` method allow you to specify additional compiler options when linking a program. All these places accepts the same encoding of compiler options, which is
 documented in this section.
 
@@ -921,7 +921,7 @@ struct CompilerOptionEntry
 };
 ```
 Where `CompilerOptionName` is an `enum` specifying the compiler option to set, and `value` encodes the value of the option.
-`CompilerOptionValue` is a structure that allows you to end code up to two integer or string values for a compiler option:
+`CompilerOptionValue` is a structure that allows you to endcode up to two integer or string values for a compiler option:
 ```c++
 enum class CompilerOptionValueKind
 {
