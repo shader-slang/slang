@@ -933,6 +933,12 @@ DIAGNOSTIC(
     implementingMustReferencePrimaryModuleFile,
     "the source file referenced by 'implementing' must be a primary module file starting with a "
     "'module' declaration.")
+DIAGNOSTIC(
+    30506,
+    Warning,
+    moduleImplementationHasFileExtension,
+    "implementing directive contains file extension in module name '$0'. Module names should not "
+    "include extensions. The compiler will use '$1' as the module name.")
 
 // Visibilty
 DIAGNOSTIC(30600, Error, declIsNotVisible, "'$0' is not accessible from the current context.")
@@ -2706,5 +2712,15 @@ DIAGNOSTIC(
     Internal,
     noBlocksOrIntrinsic,
     "no blocks found for function definition, is there a '$0' intrinsic missing?")
+
+//
+// Ray tracing
+//
+
+DIAGNOSTIC(
+    40000,
+    Error,
+    rayPayloadFieldMissingAccessQualifiers,
+    "field '$0' in ray payload struct must have either 'read' OR 'write' access qualifiers")
 
 #undef DIAGNOSTIC

@@ -402,6 +402,12 @@ struct PeepholeContext : InstPassBase
                     Index i = 0;
                     for (auto sfield : structType->getFields())
                     {
+                        // skip the void field
+                        if (as<IRVoidType>(sfield->getFieldType()))
+                        {
+                            continue;
+                        }
+
                         if (sfield->getKey() == field)
                         {
                             fieldIndex = i;
