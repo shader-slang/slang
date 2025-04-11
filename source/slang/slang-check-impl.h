@@ -2835,6 +2835,8 @@ public:
     bool isCStyleType(Type* type, HashSet<Type*>& isVisit);
 
     void addVisibilityModifier(Decl* decl, DeclVisibility vis);
+
+    void checkRayPayloadStructFields(StructDecl* structDecl);
 };
 
 
@@ -2976,7 +2978,7 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
     void checkStmt(Stmt* stmt);
 
     template<typename T>
-    T* FindOuterStmt();
+    T* FindOuterStmt(Stmt* searchUntil = nullptr);
 
     Stmt* findOuterStmtWithLabel(Name* label);
 
@@ -3019,6 +3021,8 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
     void visitDiscardStmt(DiscardStmt*);
 
     void visitReturnStmt(ReturnStmt* stmt);
+
+    void visitDeferStmt(DeferStmt* stmt);
 
     void visitWhileStmt(WhileStmt* stmt);
 

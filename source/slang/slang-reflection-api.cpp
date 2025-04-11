@@ -378,8 +378,8 @@ SLANG_API const char* spReflectionUserAttribute_GetArgumentValueString(
     if (auto cexpr = as<StringLiteralExpr>(userAttr->args[index]))
     {
         if (bufLen)
-            *bufLen = cexpr->token.getContentLength();
-        return cexpr->token.getContent().begin();
+            *bufLen = cexpr->value.getLength();
+        return cexpr->value.getBuffer();
     }
     return nullptr;
 }

@@ -70,7 +70,8 @@ void depointerizeInputParams(IRFunc* entryPoint);
     M(StartInstanceLocation, SV_StartInstanceLocation)   \
     M(WaveLaneCount, SV_WaveLaneCount)                   \
     M(WaveLaneIndex, SV_WaveLaneIndex)                   \
-    /* end */
+    M(QuadLaneIndex, SV_QuadLaneIndex)                   \
+/* end */
 
 /// A known system-value semantic name that can be applied to a parameter
 ///

@@ -2812,7 +2812,9 @@ public:
     };
 
     CodeGenContext(Shared* shared)
-        : m_shared(shared), m_targetFormat(shared->targetProgram->getTargetReq()->getTarget())
+        : m_shared(shared)
+        , m_targetFormat(shared->targetProgram->getTargetReq()->getTarget())
+        , m_targetProfile(shared->targetProgram->getOptionSet().getProfile())
     {
     }
 
@@ -2909,6 +2911,7 @@ public:
 
 protected:
     CodeGenTarget m_targetFormat = CodeGenTarget::Unknown;
+    Profile m_targetProfile;
     ExtensionTracker* m_extensionTracker = nullptr;
 
     /// Will output assembly as well as the artifact if appropriate for the artifact type for

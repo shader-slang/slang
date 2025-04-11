@@ -650,6 +650,8 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitReturnStmt(ReturnStmt* stmt) { dispatchIfNotNull(stmt->expression); }
 
+    void visitDeferStmt(DeferStmt* stmt) { dispatchIfNotNull(stmt->statement); }
+
     void visitWhileStmt(WhileStmt* stmt)
     {
         dispatchIfNotNull(stmt->predicate);
@@ -10587,6 +10589,7 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
 
     if (fileDecl->members.getCount() == 0)
         return;
+
     auto firstMember = fileDecl->members[0];
     if (auto moduleDeclaration = as<ModuleDeclarationDecl>(firstMember))
     {
@@ -10608,6 +10611,7 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
         auto moduleName = getSimpleModuleName(implementing->moduleNameAndLoc.name);
         auto expectedModuleName = moduleDecl->getName();
         bool shouldSkipDiagnostic = false;
+
         if (moduleDecl->members.getCount())
         {
             if (auto moduleDeclarationDecl = as<ModuleDeclarationDecl>(moduleDecl->members[0]))
@@ -10627,16 +10631,44 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
                 }
             }
         }
-        if (!shouldSkipDiagnostic && !moduleName.getUnownedSlice().caseInsensitiveEquals(
-                                         getText(expectedModuleName).getUnownedSlice()))
+
+        if (!shouldSkipDiagnostic)
         {
-            getSink()->diagnose(
-                decl->moduleNameAndLoc.loc,
-                Diagnostics::includedFileDoesNotImplementCurrentModule,
-                expectedModuleName,
-                moduleName);
-            return;
+            // First check for the case when the user has put a file extension
+            // in the include path
+            String moduleNameStr = moduleName.getUnownedSlice();
+            String expectedModuleNameStr = getText(expectedModuleName).getUnownedSlice();
+
+            // Check if module name has a source file extension
+            if (moduleNameStr.endsWith(".slang"))
+            {
+                String normalizedName = moduleNameStr.subString(0, moduleNameStr.getLength() - 6);
+
+                // If the normalized name would match, emit warning but continue
+                if (normalizedName.getUnownedSlice().caseInsensitiveEquals(
+                        expectedModuleNameStr.getUnownedSlice()))
+                {
+                    getSink()->diagnose(
+                        implementing->moduleNameAndLoc.loc,
+                        Diagnostics::moduleImplementationHasFileExtension,
+                        moduleNameStr,
+                        normalizedName);
+                    return;
+                }
+            }
+
+            if (!moduleNameStr.getUnownedSlice().caseInsensitiveEquals(
+                    expectedModuleNameStr.getUnownedSlice()))
+            {
+                getSink()->diagnose(
+                    decl->moduleNameAndLoc.loc,
+                    Diagnostics::includedFileDoesNotImplementCurrentModule,
+                    expectedModuleName,
+                    moduleName);
+                return;
+            }
         }
+
         return;
     }
 
@@ -10645,6 +10677,7 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
         Diagnostics::includedFileMissingImplementing,
         name);
 }
+
 
 void SemanticsDeclScopeWiringVisitor::visitImplementingDecl(ImplementingDecl* decl)
 {
@@ -12492,6 +12525,12 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
             DeclVisibility ctorVisibility = getDeclVisibility(structDecl);
             createCtor(structDecl, ctorVisibility);
         }
+    }
+
+    // Check if this is a ray payload struct and validate field access qualifiers
+    if (structDecl->findModifier<RayPayloadAttribute>())
+    {
+        checkRayPayloadStructFields(structDecl);
     }
 
     int backingWidth = 0;

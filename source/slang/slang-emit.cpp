@@ -1716,6 +1716,8 @@ Result linkAndOptimizeIR(
     //
     eliminateDeadCode(irModule, deadCodeEliminationOptions);
 
+    cleanUpVoidType(irModule);
+
     if (isKhronosTarget(targetRequest))
     {
         // As a fallback, if the above specialization steps failed to remove resource type
@@ -1728,7 +1730,6 @@ Result linkAndOptimizeIR(
 #endif
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    cleanUpVoidType(irModule);
 
     // Lower the `getRegisterIndex` and `getRegisterSpace` intrinsics.
     //

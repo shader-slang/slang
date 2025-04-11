@@ -66,7 +66,7 @@ SLANG_UNIT_TEST(attributeReflection)
     size_t size = 0;
     auto guid = comAttribute->getArgumentValueString(0, &size);
     UnownedStringSlice stringSlice = UnownedStringSlice(guid, size);
-    SLANG_CHECK(stringSlice == "\"042BE50B-CB01-4DBB-8367-3A9CDCBE2F49\"");
+    SLANG_CHECK(stringSlice == "042BE50B-CB01-4DBB-8367-3A9CDCBE2F49");
 
     auto testType = reflection->findTypeByName("TS");
     SLANG_CHECK(testType != nullptr);

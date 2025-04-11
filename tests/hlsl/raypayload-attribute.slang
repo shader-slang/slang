@@ -1,8 +1,9 @@
-//enable when https://github.com/shader-slang/slang/issues/3448 is implemented
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage raygeneration -entry rayGenShaderA
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile lib_6_6 -stage raygeneration -entry rayGenShaderA
+//TEST:SIMPLE(filecheck=DXIL): -target dxil -profile lib_6_6 -stage raygeneration -entry rayGenShaderA
 
-// CHECK: struct [raypayload]
-
+// CHECK: struct RayPayload
+// CHECK: float4 color
+// DXIL: define void @
 struct RayPayload
 {
     float4 color;

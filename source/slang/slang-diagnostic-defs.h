@@ -761,6 +761,13 @@ DIAGNOSTIC(
     "cannot specialize generic '$0' with the provided arguments.")
 
 DIAGNOSTIC(30076, Error, globalVarCannotHaveOpaqueType, "global variable cannot have opaque type.")
+DIAGNOSTIC(
+    30077,
+    Error,
+    concreteArgumentToOutputInterface,
+    "argument passed to parameter '$0' is of concrete type '$1', but interface-typed output "
+    "parameters require interface-typed arguments. To allow passing a concrete type to this "
+    "function, you can replace '$2 $0' with a generic 'T $0' and a 'where T : $2' constraint.")
 DIAGNOSTIC(-1, Note, doYouMeanStaticConst, "do you intend to define a `static const` instead?")
 DIAGNOSTIC(-1, Note, doYouMeanUniform, "do you intend to define a `uniform` parameter instead?")
 
@@ -890,6 +897,14 @@ DIAGNOSTIC(
 DIAGNOSTIC(30106, Error, improperUseOfType, "type '$0' cannot be used in this context.")
 DIAGNOSTIC(30107, Error, parameterPackMustBeConst, "a parameter pack must be declared as 'const'.")
 
+DIAGNOSTIC(30108, Error, breakInsideDefer, "'break' must not appear inside a defer statement.")
+DIAGNOSTIC(
+    30109,
+    Error,
+    continueInsideDefer,
+    "'continue' must not appear inside a defer statement.")
+DIAGNOSTIC(30110, Error, returnInsideDefer, "'return' must not appear inside a defer statement.")
+
 
 // Include
 DIAGNOSTIC(
@@ -925,6 +940,12 @@ DIAGNOSTIC(
     implementingMustReferencePrimaryModuleFile,
     "the source file referenced by 'implementing' must be a primary module file starting with a "
     "'module' declaration.")
+DIAGNOSTIC(
+    30506,
+    Warning,
+    moduleImplementationHasFileExtension,
+    "implementing directive contains file extension in module name '$0'. Module names should not "
+    "include extensions. The compiler will use '$1' as the module name.")
 
 // Visibilty
 DIAGNOSTIC(30600, Error, declIsNotVisible, "'$0' is not accessible from the current context.")
@@ -2693,5 +2714,15 @@ DIAGNOSTIC(
     Internal,
     noBlocksOrIntrinsic,
     "no blocks found for function definition, is there a '$0' intrinsic missing?")
+
+//
+// Ray tracing
+//
+
+DIAGNOSTIC(
+    40000,
+    Error,
+    rayPayloadFieldMissingAccessQualifiers,
+    "field '$0' in ray payload struct must have either 'read' OR 'write' access qualifiers")
 
 #undef DIAGNOSTIC

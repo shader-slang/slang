@@ -10,6 +10,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -emit-spirv-directly
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-wgpu -compute -entry computeMain -allow-glsl -xslang -DWGPU
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-metal -compute -entry computeMain -allow-glsl -xslang -DMETAL
 
 #version 430
 
@@ -27,7 +28,7 @@ bool test1QuadX() {
         & subgroupQuadSwapHorizontal(T(2)) == T(2)
         & subgroupQuadSwapVertical(T(2)) == T(2)
         & subgroupQuadSwapDiagonal(T(3)) == T(3)
-        // subgroupQuadBroadcast is not implemented for WGSL as the WGSL intrinsic only accepts const integers expressions, as of time of writing.
+        // subgroupQuadBroadcast is not implemented for WGSL and Metal as their intrinsics only accepts const integers expressions.
 #if !defined(WGPU)
         & subgroupQuadBroadcast(T(1), 1) == T(1)
 #endif
@@ -41,7 +42,7 @@ bool testVQuadX() {
         & subgroupQuadSwapHorizontal(gvec(T(2))) == gvec(T(2))
         & subgroupQuadSwapVertical(gvec(T(2))) == gvec(T(2))
         & subgroupQuadSwapDiagonal(gvec(T(3))) == gvec(T(3))
-        // subgroupQuadBroadcast is not implemented for WGSL as the WGSL intrinsic only accepts const integers expressions, as of time of writing.
+        // subgroupQuadBroadcast is not implemented for WGSL and Metal as their intrinsics only accepts const integers expressions.
 #if !defined(WGPU)
         & subgroupQuadBroadcast(gvec(T(1)), 1) == gvec(T(1))
 #endif
@@ -54,7 +55,7 @@ bool test1QuadX() {
         & subgroupQuadSwapHorizontal(T(2)) == T(2)
         & subgroupQuadSwapVertical(T(2)) == T(2)
         & subgroupQuadSwapDiagonal(T(3)) == T(3)
-        // subgroupQuadBroadcast is not implemented for WGSL as the WGSL intrinsic only accepts const integers expressions, as of time of writing.
+        // subgroupQuadBroadcast is not implemented for WGSL and Metal as their intrinsics only accepts const integers expressions.
 #if !defined(WGPU)
         & subgroupQuadBroadcast(T(1), 1) == T(1)
 #endif
@@ -68,7 +69,7 @@ bool testVQuadX() {
         & subgroupQuadSwapHorizontal(gvec(T(2))) == gvec(T(2))
         & subgroupQuadSwapVertical(gvec(T(2))) == gvec(T(2))
         & subgroupQuadSwapDiagonal(gvec(T(3))) == gvec(T(3))
-        // subgroupQuadBroadcast is not implemented for WGSL as the WGSL intrinsic only accepts const integers expressions, as of time of writing.
+        // subgroupQuadBroadcast is not implemented for WGSL and Metal as their intrinsics only accepts const integers expressions.
 #if !defined(WGPU)
         & subgroupQuadBroadcast(gvec(T(1)), 1) == gvec(T(1))
 #endif
@@ -93,8 +94,8 @@ bool testQuadSwapX() {
         & testVQuadX<uint, 3>()
         & testVQuadX<uint, 4>()
 
-        // Disabled on WGPU as these built-in types are not supported as of time of writing.
-#if !defined (WGPU)
+        // Disabled on WGSL and Metal as these built-in types are not supported.
+#if !defined(WGPU) && !defined(METAL)
         & test1QuadX<double>() // WARNING: intel GPU's lack FP64 support
         & testVQuadX<double, 2>()
         & testVQuadX<double, 3>()
@@ -115,18 +116,24 @@ bool testQuadSwapX() {
         & testVQuadX<uint8_t, 2>()
         & testVQuadX<uint8_t, 3>()
         & testVQuadX<uint8_t, 4>()
+        & test1QuadX<uint64_t>() 
+        & testVQuadX<uint64_t, 2>()
+        & testVQuadX<uint64_t, 3>()
+        & testVQuadX<uint64_t, 4>() & test1QuadX<bool>() & testVQuadX<bool, 2>()
+        & testVQuadX<bool, 3>()
+        & testVQuadX<bool, 4>()
+#endif
+
+
+#if !defined(WGPU)
+        & test1QuadX<int16_t>() 
+        & testVQuadX<int16_t, 2>()
+        & testVQuadX<int16_t, 3>()
+        & testVQuadX<int16_t, 4>()
         & test1QuadX<uint16_t>() 
         & testVQuadX<uint16_t, 2>()
         & testVQuadX<uint16_t, 3>()
         & testVQuadX<uint16_t, 4>()
-        & test1QuadX<uint64_t>() 
-        & testVQuadX<uint64_t, 2>()
-        & testVQuadX<uint64_t, 3>()
-        & testVQuadX<uint64_t, 4>()
-        & test1QuadX<bool>()
-        & testVQuadX<bool, 2>()
-        & testVQuadX<bool, 3>()
-        & testVQuadX<bool, 4>()
 #endif
         ;
 }
