@@ -90,7 +90,7 @@ void simplifyIR(
                 funcChanged |= applySparseConditionalConstantPropagation(func, sink);
                 funcChanged |= peepholeOptimize(target, func);
                 if (options.removeRedundancy)
-                    funcChanged |= removeRedundancyInFunc(func);
+                    funcChanged |= removeRedundancyInFunc(func, options.hoistLoopInvariantInsts);
                 funcChanged |= simplifyCFG(func, options.cfgOptions);
                 // Note: we disregard the `changed` state from dead code elimination pass since
                 // SCCP pass could be generating temporarily evaluated constant values and never
@@ -122,7 +122,7 @@ void simplifyNonSSAIR(TargetProgram* target, IRModule* module, IRSimplificationO
         changed |= peepholeOptimize(target, module, options.peepholeOptions);
 
         if (!options.minimalOptimization)
-            changed |= removeRedundancy(module);
+            changed |= removeRedundancy(module, options.hoistLoopInvariantInsts);
         changed |= simplifyCFG(module, options.cfgOptions);
 
         // Note: we disregard the `changed` state from dead code elimination pass since
@@ -153,7 +153,7 @@ void simplifyFunc(
         changed |= applySparseConditionalConstantPropagation(func, sink);
         changed |= peepholeOptimize(target, func);
         if (!options.minimalOptimization)
-            changed |= removeRedundancyInFunc(func);
+            changed |= removeRedundancyInFunc(func, options.hoistLoopInvariantInsts);
         changed |= simplifyCFG(func, options.cfgOptions);
 
         // Note: we disregard the `changed` state from dead code elimination pass since

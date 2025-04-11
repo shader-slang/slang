@@ -167,7 +167,7 @@ struct DeferBufferLoadContext
 
     void deferBufferLoadInFunc(IRFunc* func)
     {
-        removeRedundancyInFunc(func);
+        removeRedundancyInFunc(func, false);
 
         currentFunc = func;
         dominatorTree = func->getModule()->findOrCreateDominatorTree(func);
