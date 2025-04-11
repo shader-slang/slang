@@ -609,7 +609,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         for (auto parent = inst; parent; parent = parent->getParent())
         {
-            if (!as<IRFunc>(parent) && !as<IRModuleInst>(parent))
+            if (!as<IRFunc>(parent) && !as<IRModuleInst>(parent) && !as<IRDebugFunction>(parent))
                 continue;
 
             SpvInst* spvInst = nullptr;
@@ -1929,6 +1929,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_IndicesType:
         case kIROp_PrimitivesType:
             return nullptr;
+        case kIROp_DebugFunction:
+            return emitDebugInlinedFunction(getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                as<IRDebugFunction>(inst));
+        case kIROp_DebugInlinedAt:
+            return emitDebugInlinedAt(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                as<IRDebugInlinedAt>(inst));
         default:
             {
                 if (as<IRSPIRVAsmOperand>(inst))
@@ -4059,6 +4066,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     operands.getArrayView());
             }
             break;
+        case kIROp_DebugFunction:
+            return emitDebugInlinedFunction(getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                as<IRDebugFunction>(inst));
+        case kIROp_DebugInlinedAt:
+            return emitDebugInlinedAt(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                as<IRDebugInlinedAt>(inst));
+        case kIROp_DebugScope:
+            return emitDebugScope(parent, as<IRDebugScope>(inst));
+        case kIROp_DebugNoScope:
+            return emitDebugNoScope(parent);
+        case kIROp_DebugInlinedVariable:
+            return emitDebugInlinedVariable(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                as<IRDebugInlinedVariable>(inst));
         }
         if (result)
             emitDecorations(inst, getID(result));
@@ -7303,6 +7325,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto scope = findDebugScope(debugLine);
         if (!scope)
             return nullptr;
+
         return emitOpDebugLine(
             parent,
             debugLine,
@@ -7326,6 +7349,121 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             getNonSemanticDebugInfoExtInst(),
             List<SpvInst*>());
         return m_nullDwarfExpr;
+    }
+
+    SpvInst* emitDebugScope(SpvInstParent* parent, IRDebugScope* debugScope)
+    {
+        auto inlinedAt = ensureInst(debugScope->getInlinedAt());
+        if (!inlinedAt)
+            return nullptr;
+
+        SpvInst* scope = ensureInst(debugScope->getScope());
+        if (!scope)
+            return nullptr;
+
+        return emitOpDebugScope(
+            parent,
+            nullptr,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            scope,
+            inlinedAt);
+    }
+
+
+    SpvInst* emitDebugInlinedFunction(SpvInstParent* parent, IRDebugFunction* debugFunc)
+    {
+        auto scope = findDebugScope(debugFunc);
+        if (!scope)
+            return nullptr;
+        
+        auto debugType = emitDebugType(as<IRType>(debugFunc->getDebugType()));
+        IRBuilder builder(debugFunc);
+
+        IRInst* irFunc = debugFunc->getFunc();
+
+        SpvInst* debugFuncInfo = nullptr;
+        // We've already emitted, don't emit again.
+        if (m_mapIRInstToSpvDebugInst.tryGetValue(irFunc, debugFuncInfo))
+        {
+            return debugFuncInfo;
+        }
+
+        debugFuncInfo = emitOpDebugFunction(
+            parent,
+            nullptr,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            debugFunc->getName(),
+            debugType,
+            debugFunc->getFile(),
+            debugFunc->getLine(),
+            debugFunc->getCol(),
+            scope,
+            debugFunc->getName(),
+            builder.getIntValue(builder.getUIntType(), 0),
+            debugFunc->getLine());
+
+        registerDebugInst(irFunc, debugFuncInfo);
+
+        return debugFuncInfo;
+    }
+
+    SpvInst* emitDebugNoScope(SpvInstParent* parent)
+    {
+        return emitOpDebugNoScope(parent, nullptr, m_voidType, getNonSemanticDebugInfoExtInst());
+    }
+
+    SpvInst* emitDebugInlinedAt(SpvInstParent* parent, IRDebugInlinedAt* debugInlinedAt)
+    {
+        IRInst* lineInst = debugInlinedAt->getLine();
+
+        SpvInst* scope = nullptr;
+        if (as<IRDebugFunction>(debugInlinedAt->getDebugFunc()))
+        {
+            scope = ensureInst(debugInlinedAt->getDebugFunc());
+        }
+        if (scope == nullptr)
+        {
+            scope = findDebugScope(debugInlinedAt);
+        }
+
+        // If it's not chained to another IRDebugInlinedAt, we don't use this.
+        SpvInst* inlined = nullptr;
+        if (as<IRDebugInlinedAt>(debugInlinedAt->getOuterInlinedAt()))
+        {
+            inlined = ensureInst(debugInlinedAt->getOuterInlinedAt());
+        }
+
+        return emitOpDebugInlinedAt(
+            parent,
+            debugInlinedAt,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            lineInst,
+            scope,
+            inlined);
+    }
+
+    SpvInst* emitDebugInlinedVariable(
+        SpvInstParent* parent,
+        IRDebugInlinedVariable* debugInlinedVar)
+    {
+        if (!debugInlinedVar)
+            return nullptr;
+
+        // Get the operands from the IRDebugInlinedVariable instruction
+        IRInst* variable = debugInlinedVar->getVariable();
+        IRInst* inlinedAt = debugInlinedVar->getInlinedAt();
+
+        // Emit the OpDebugInlinedVariable instruction
+        return emitOpDebugInlinedVariable(
+            parent,
+            debugInlinedVar,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            variable,
+            inlinedAt);
     }
 
     bool translateIRAccessChain(
@@ -7806,7 +7944,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return nullptr;
         auto debugType = emitDebugType(function->getDataType());
         IRBuilder builder(function);
-        auto debugFunc = emitOpDebugFunction(
+
+        SpvInst* debugFunc = nullptr;
+        if (m_mapIRInstToSpvDebugInst.tryGetValue(function, debugFunc))
+        {
+            return debugFunc;
+        }
+
+        debugFunc = emitOpDebugFunction(
             getSection(SpvLogicalSectionID::ConstantsAndTypes),
             nullptr,
             m_voidType,
@@ -7820,6 +7965,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             name,
             builder.getIntValue(builder.getUIntType(), 0),
             debugLoc->getLine());
+
         registerDebugInst(function, debugFunc);
 
         emitOpDebugFunctionDefinition(
