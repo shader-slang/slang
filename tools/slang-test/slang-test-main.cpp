@@ -3863,12 +3863,19 @@ TestResult runHLSLRenderComparisonTestImpl(
     String expectedOutput;
     String actualOutput;
 
-    TestResult hlslResult =
-        doRenderComparisonTestRun(context, input, expectedArg, ".expected", &expectedOutput);
-    if (hlslResult != TestResult::Pass)
+    // Run the expected test case only if we're not skipping reference image generation
+    TestResult hlslResult = TestResult::Pass;
+    if (!context->options.skipReferenceImageGeneration)
     {
-        return hlslResult;
+        hlslResult =
+            doRenderComparisonTestRun(context, input, expectedArg, ".expected", &expectedOutput);
+        if (hlslResult != TestResult::Pass)
+        {
+            return hlslResult;
+        }
     }
+
+    // Always run the actual test case
     TestResult slangResult =
         doRenderComparisonTestRun(context, input, actualArg, ".actual", &actualOutput);
     if (slangResult != TestResult::Pass)
@@ -3881,7 +3888,12 @@ TestResult runHLSLRenderComparisonTestImpl(
         return TestResult::Pass;
     }
 
-    Slang::File::writeAllText(outputStem + ".expected", expectedOutput);
+    // Save the expected output if we generated it
+    if (!context->options.skipReferenceImageGeneration)
+    {
+        Slang::File::writeAllText(outputStem + ".expected", expectedOutput);
+    }
+
     Slang::File::writeAllText(outputStem + ".actual", actualOutput);
 
     if (hlslResult == TestResult::Fail)
@@ -3889,9 +3901,10 @@ TestResult runHLSLRenderComparisonTestImpl(
     if (slangResult == TestResult::Fail)
         return TestResult::Fail;
 
-    if (!StringUtil::areLinesEqual(
-            actualOutput.getUnownedSlice(),
-            expectedOutput.getUnownedSlice()))
+    // Compare text output only if we generated the expected output
+    if (!context->options.skipReferenceImageGeneration && !StringUtil::areLinesEqual(
+                                                              actualOutput.getUnownedSlice(),
+                                                              expectedOutput.getUnownedSlice()))
     {
         context->getTestReporter()->dumpOutputDifference(expectedOutput, actualOutput);
 

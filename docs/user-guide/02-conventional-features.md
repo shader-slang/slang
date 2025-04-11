@@ -435,6 +435,12 @@ Slang supports the following statement forms with nearly identical syntax to HLS
 
 * `return` statements
 
+* `defer` statements
+
+> #### Note ####
+> The `defer` statement in Slang is tied to scope. The deferred statement runs at the end of the scope like in Swift, not just at the end of the function like in Go.
+> `defer` supports but does not require block statements: both `defer f();` and `defer { f(); g(); }` are legal.
+
 > #### Note ####
 > Slang does not support the C/C++ `goto` keyword.
 

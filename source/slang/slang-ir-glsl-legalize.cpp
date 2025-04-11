@@ -3541,6 +3541,15 @@ void legalizeEntryPointParameterForGLSL(
                         if (elem.key == key)
                         {
                             realGlobalVar = elem.val.irValue;
+                            if (!realGlobalVar &&
+                                ScalarizedVal::Flavor::typeAdapter == elem.val.flavor)
+                            {
+                                if (auto typeAdapterVal =
+                                        as<ScalarizedTypeAdapterValImpl>(elem.val.impl))
+                                {
+                                    realGlobalVar = typeAdapterVal->val.irValue;
+                                }
+                            }
                             break;
                         }
                     }
