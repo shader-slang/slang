@@ -1,5 +1,7 @@
 #pragma once
 
+#include "slang-compiler.h"
+
 namespace Slang
 {
 
@@ -14,7 +16,7 @@ class DiagnosticSink;
 //   type, then the scalar is converted to a composite type.
 // - If 'inst' is not a shift, and if operands are integers of mixed signedness, then the
 //   signed operand is converted to unsigned.
-void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink);
+void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target);
 
 // The logical binary operators such as AND and OR takes boolean types are its input.
 // If they are in integer type, as an example, we need to explicitly cast to bool type.

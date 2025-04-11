@@ -1,7 +1,9 @@
 #include "slang-ir-legalize-binary-operator.h"
 
 #include "compiler-core/slang-diagnostic-sink.h"
+#include "slang-compiler.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -23,9 +25,10 @@ static bool isDivisionByMatrix(IRInst* inst)
     return (inst->getOp() == kIROp_Div) && (as<IRMatrixType>(inst->getOperand(1)->getDataType()));
 }
 
-static bool isDivisionByScalar(IRInst* inst)
+static bool isMatrixDividedByScalar(IRInst* inst)
 {
-    return (inst->getOp() == kIROp_Div) && (as<IRBasicType>(inst->getOperand(1)->getDataType()));
+    return (inst->getOp() == kIROp_Div) && (as<IRMatrixType>(inst->getOperand(0)->getDataType())) &&
+           (as<IRBasicType>(inst->getOperand(1)->getDataType()));
 }
 
 // If one operand is a composite type (vector or matrix), and the other one is a scalar
@@ -69,8 +72,29 @@ static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
     }
 }
 
-void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink)
+// Replaces a division by scalar operation by a multiplication.
+// This is done for WGSL where matrix divided by scalar operations are not supported.
+static void replaceMatrixDividedByScalarWithMul(IRInst* inst)
 {
+    SLANG_ASSERT(isMatrixDividedByScalar(inst));
+
+    IRBuilder builder(inst);
+    builder.setInsertBefore(inst);
+
+    auto scalarType = inst->getOperand(1)->getDataType();
+    auto newRhs =
+        builder.emitDiv(scalarType, builder.getFloatValue(scalarType, 1.0), inst->getOperand(1));
+    auto newOp = builder.emitMul(inst->getDataType(), inst->getOperand(0), newRhs);
+
+    inst->replaceUsesWith(newOp);
+    inst->transferDecorationsTo(newOp);
+}
+
+void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target)
+{
+    IRBuilder builder(inst);
+    builder.setInsertBefore(inst);
+
     // Division by matrix is not supported on Metal and WGSL.
     if (isDivisionByMatrix(inst))
     {
@@ -90,8 +114,6 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink)
             IntInfo opIntInfo = getIntTypeInfo(shiftAmountElementType);
             if (opIntInfo.isSigned)
             {
-                IRBuilder builder(inst);
-                builder.setInsertBefore(inst);
                 opIntInfo.isSigned = false;
                 shiftAmountElementType = builder.getType(getIntTypeOpFromInfo(opIntInfo));
                 shiftAmountVectorType = builder.getVectorType(
@@ -106,8 +128,6 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink)
             IntInfo opIntInfo = getIntTypeInfo(shiftAmountType);
             if (opIntInfo.isSigned)
             {
-                IRBuilder builder(inst);
-                builder.setInsertBefore(inst);
                 opIntInfo.isSigned = false;
                 shiftAmountType = builder.getType(getIntTypeOpFromInfo(opIntInfo));
                 IRInst* newShiftAmount = builder.emitCast(shiftAmountType, shiftAmount);
@@ -116,11 +136,16 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink)
         }
     }
 
-    // Do not convert scalar divisor to composite type. Division by matrix is not supported on
-    // Metal and WGSL, and division by scalar is always valid.
-    if (!isDivisionByScalar(inst))
+    // For matrix divided by scalar operations, do not convert scalar divisor to dividend's matrix
+    // type. Division by matrix is not supported on Metal and WGSL.
+    if (!isMatrixDividedByScalar(inst))
     {
         legalizeScalarOperandsToMatchComposite(inst);
+    }
+    else if (isWGPUTarget(target))
+    {
+        // WGSL does not support matrix division by scalar, convert it to multiplication.
+        replaceMatrixDividedByScalarWithMul(inst);
     }
 
     if (isIntegralType(inst->getOperand(0)->getDataType()) &&
@@ -139,8 +164,6 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink)
         {
             int signedOpIndex = (int)opIntInfo[1].isSigned;
             opIntInfo[signedOpIndex].isSigned = false;
-            IRBuilder builder(inst);
-            builder.setInsertBefore(inst);
             auto newOp = builder.emitCast(
                 builder.getType(getIntTypeOpFromInfo(opIntInfo[signedOpIndex])),
                 inst->getOperand(signedOpIndex));

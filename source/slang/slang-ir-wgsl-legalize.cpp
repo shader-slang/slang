@@ -154,7 +154,7 @@ static void processInst(IRInst* inst, DiagnosticSink* sink)
     case kIROp_Less:
     case kIROp_Geq:
     case kIROp_Leq:
-        legalizeBinaryOp(inst, sink);
+        legalizeBinaryOp(inst, sink, CodeGenTarget::WGSL);
         break;
 
     case kIROp_Func:
