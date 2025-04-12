@@ -56,6 +56,7 @@ void depointerizeInputParams(IRFunc* entryPoint);
     M(IsFrontFace, SV_IsFrontFace)                       \
     M(OutputControlPointID, SV_OutputControlPointID)     \
     M(PointSize, SV_PointSize)                           \
+    M(PointCoord, SV_PointCoord)                         \
     M(PrimitiveID, SV_PrimitiveID)                       \
     M(DrawIndex, SV_DrawIndex)                           \
     M(RenderTargetArrayIndex, SV_RenderTargetArrayIndex) \

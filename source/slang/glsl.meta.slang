@@ -96,21 +96,7 @@ public typealias dmat4x4 = matrix<double, 4, 4>;
 
 public out float4 gl_Position : SV_Position;
 public out float gl_PointSize : SV_PointSize;
-public property float2 gl_PointCoord {
-    [require(glsl_spirv, fragment)]
-    get
-    {
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_PointCoord)";
-        case spirv:
-            return spirv_asm {
-                result:$$float2 = OpLoad builtin(PointCoord:float2);
-            };
-        }
-    }
-}
+public in float2 gl_PointCoord : SV_PointCoord;
 
 public in vec4 gl_FragCoord : SV_Position;
 public out float gl_FragDepth : SV_Depth;
