@@ -502,6 +502,12 @@ struct IRGLSLOffsetDecoration : IRDecoration
     IRIntLit* getOffset() { return cast<IRIntLit>(getOperand(0)); }
 };
 
+struct IRGLSLStructOffsetDecoration : IRDecoration
+{
+    IR_LEAF_ISA(GLSLStructOffsetDecoration)
+    IRIntLit* getOffset() { return cast<IRIntLit>(getOperand(0)); }
+};
+
 struct IRNVAPIMagicDecoration : IRDecoration
 {
     enum

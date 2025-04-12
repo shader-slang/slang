@@ -2360,6 +2360,13 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
                 kIROp_GLSLOffsetDecoration,
                 builder->getIntValue(builder->getIntType(), glslOffsetMod->offset));
         }
+        else if (auto glslStructOffsetMod = as<GLSLStructOffsetAttribute>(mod))
+        {
+            builder->addDecoration(
+                inst,
+                kIROp_GLSLStructOffsetDecoration,
+                builder->getIntValue(builder->getIntType(), glslStructOffsetMod->value));
+        }
         else if (auto hlslSemantic = as<HLSLSimpleSemantic>(mod))
         {
             builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
