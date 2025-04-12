@@ -901,14 +901,14 @@ const char* spGetBuildTagString();
 
 This assumes Slang has been built with the C++ multithreaded runtime, as is the default.
 
-All other functions and methods are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and can only execute on a single thread. More precisely function and methods can only be called on a *single* thread at *any one time*. This means for example a global session can be used across multiple threads, as long as some synchronisation enforces that only one thread can be in a Slang call at any one time.
+All other functions and methods are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and can only execute on a single thread. More precisely, functions and methods can only be called on a *single* thread at *any one time*. This means for example a global session can be used across multiple threads, as long as some synchronization enforces that only one thread can be in a Slang call at any one time.
 
-Much of the Slang API is available through [COM interfaces](https://en.wikipedia.org/wiki/Component_Object_Model). In strict COM interfaces should be atomically reference counted. Currently *MOST* Slang API COM interfaces are *NOT* atomic reference counted. One exception is the `ISlangSharedLibrary` interface when produced from [host-callable](cpu-target.md#host-callable). It is atomically reference counted, allowing it to persist and be used beyond the original compilation and be freed on a different thread. 
+Much of the Slang API is available through [COM interfaces](https://en.wikipedia.org/wiki/Component_Object_Model). In strict COM, interfaces should be atomically reference counted. Currently *MOST* Slang API COM interfaces are *NOT* atomic reference counted. One exception is the `ISlangSharedLibrary` interface when produced from [host-callable](cpu-target.md#host-callable). It is atomically reference counted, allowing it to persist and be used beyond the original compilation and be freed on a different thread. 
 
 
 ## Compiler Options
 
-Both the `SessionDesc`, `TargetDesc` structures contain fields that encodes a `CompilerOptionEntry` array for additional compiler options to apply on the session or the target. In additional,
+Both the `SessionDesc`, `TargetDesc` structures contain fields that encodes a `CompilerOptionEntry` array for additional compiler options to apply on the session or the target. In addition,
 the `IComponentType::linkWithOptions()` method allow you to specify additional compiler options when linking a program. All these places accepts the same encoding of compiler options, which is
 documented in this section.
 
@@ -921,7 +921,7 @@ struct CompilerOptionEntry
 };
 ```
 Where `CompilerOptionName` is an `enum` specifying the compiler option to set, and `value` encodes the value of the option.
-`CompilerOptionValue` is a structure that allows you to end code up to two integer or string values for a compiler option:
+`CompilerOptionValue` is a structure that allows you to endcode up to two integer or string values for a compiler option:
 ```c++
 enum class CompilerOptionValueKind
 {
