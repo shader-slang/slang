@@ -3710,6 +3710,10 @@ attribute_syntax [vk_location(location : int)] : GLSLLocationAttribute;
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
 
+/// Declare struct member offset.
+__attributeTarget(DeclBase)
+attribute_syntax [vk_offset(index: int)] : GLSLStructOffsetAttribute;
+
 /// @deprecated
 /// Use `spirv_asm` instead for inline SPIR-V assembly.
 __attributeTarget(FuncDecl)

@@ -1008,6 +1008,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(GlobalInputDecoration, input, 0, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
+    INST(GLSLStructOffsetDecoration, glslStructOffset, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
     INST(RayPayloadDecoration, raypayload, 0, 0)
 
