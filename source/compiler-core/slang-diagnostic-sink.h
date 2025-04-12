@@ -81,7 +81,7 @@ public:
     }
 };
 
-struct ISourceWarningStateTracker : public RefObject
+struct SourceWarningStateTrackerBase : public RefObject
 {
     virtual Severity consumeWarningSeverity(SourceLoc loc, int id, Severity severity) = 0;
 };
@@ -254,11 +254,11 @@ public:
     void setParentSink(DiagnosticSink* parentSink) { m_parentSink = parentSink; }
     DiagnosticSink* getParentSink() const { return m_parentSink; }
 
-    void setSourceWarningStateTracker(ISourceWarningStateTracker* ptr)
+    void setSourceWarningStateTracker(SourceWarningStateTrackerBase* ptr)
     {
         m_sourceWarningStateTracker = ptr;
     }
-    RefPtr<ISourceWarningStateTracker> getSourceWarningStateTracker() const
+    RefPtr<SourceWarningStateTrackerBase> getSourceWarningStateTracker() const
     {
         return m_sourceWarningStateTracker;
     }
@@ -319,7 +319,7 @@ protected:
     // Configuration that allows the user to control the severity of certain diagnostic messages
     Dictionary<int, Severity> m_severityOverrides;
 
-    RefPtr<ISourceWarningStateTracker> m_sourceWarningStateTracker = nullptr;
+    RefPtr<SourceWarningStateTrackerBase> m_sourceWarningStateTracker = nullptr;
 };
 
 /// An `ISlangWriter` that writes directly to a diagnostic sink.

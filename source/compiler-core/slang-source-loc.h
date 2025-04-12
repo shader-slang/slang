@@ -410,15 +410,17 @@ public:
                               ///< locations. Relative to the line number in the underlying file.
     };
 
-    // Represents a segment of a source
+    // Represents a segment of a source.
     // All SourceLoc in segment are linearly mapped relative to absoluteBegin
     struct AbsoluteSegment
     {
+        // SourceLoc in the file range.
         SourceLoc begin = {};
+        // Location in the absolute mapping of locations ordered by includes.
         SourceLoc::RawValue absoluteBegin = {};
     };
 
-    // Set the base of the absolute location mapping for this SourceView
+    // Set the base of the absolute location mapping for this SourceView.
     void setAbsoluteLocationBase(SourceLoc::RawValue absLoc) { m_absoluteLocationBase = absLoc; }
 
     AbsoluteSegment getLastSegment() const
@@ -436,7 +438,7 @@ public:
         return res;
     }
 
-    // Add a segment of absolute mapping afte the previous ones
+    // Add a segment of absolute mapping after the previous ones.
     void addAbsoluteSegment(SourceLoc begin, SourceLoc::RawValue absoluteBegin)
     {
         SLANG_ASSERT(m_range.contains(begin));
@@ -447,7 +449,7 @@ public:
         m_absSegments.add(seg);
     }
 
-    // Maps a SourceLoc to an absolute location inside this SourceView
+    // Maps a SourceLoc inside this SourceView to a unique absolute location ordered by includes.
     SourceLoc::RawValue getAbsoluteLocation(SourceLoc loc) const;
 
     /// Given a sourceLoc finds the entry associated with it. If returns -1 then no entry is

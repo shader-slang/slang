@@ -484,7 +484,10 @@ struct InputStreamStack
         res = top->findNextLineEndImpl(res, lineCount);
         if (lineCount > 0)
         {
-            // TODO pop the stack?
+            // We did not consume all the lines, but arrived at the end of the current Stream
+            // For now, return none.
+            // We could pop the inputStream stack and continue looking,
+            // but it is an unlikely edge case.
             res = {};
         }
         return res;
@@ -1175,7 +1178,7 @@ struct WarningTimeline
     }
 };
 
-struct WarningStateTracker : ISourceWarningStateTracker
+struct WarningStateTracker : SourceWarningStateTrackerBase
 {
     SourceManager* sourceManager = nullptr;
     Dictionary<int, WarningTimeline> entries = {};
@@ -4170,11 +4173,13 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
     auto finish = [&]() -> void { SkipToEndOfLine(context); };
     if (tk.type == TokenType::Identifier)
     {
+        // #pragma warning (push)
         if (tk.getContent() == "push")
         {
             AdvanceToken(context);
             context->m_preprocessor->warningStateTracker->push(tk.loc);
         }
+        // #pragma warning (pop)
         else if (tk.getContent() == "pop")
         {
             AdvanceToken(context);
@@ -4182,13 +4187,29 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
         }
         else
         {
+            // #pragma warning (spec : id-list [; ...]), examples:
+            // (disable : 123) : disables 123
+            // (disable : 1 2 ; error 4 5 6) disables 1, then disables 2, then errors 4, ...
+            // (disable : 1 ; default : 1) disables 1, then defaults 1
+            // Parse a list of 'specifier : id-list', separated by ';'
             while (true)
             {
+                // Read the specifier
+                // We need the raw token location because if the token is a #definition,
+                // PeekToken().loc would be where the definition is, not the invocation
+                // PeekRawToken().loc is where the invocation of the macro is located:
+                // Example:
+                // #define SPEC suppress // (a)
+                // #pragma warning (SPEC : 12) (b)
+                // Here the raw token is 'SPEC' located at its invocation on line (b)
+                // and the token is 'suppress' located at the macro definition on line (a)
+                // The #pragma warning should take effect from line (b), not line (a),
+                // So we need the raw token location.
                 SourceLoc specifierLocation = PeekRawToken(context).loc;
                 Token id;
                 Expect(context, TokenType::Identifier, Diagnostics::syntaxError, &id);
                 PragmaWarningSpecifier specifier;
-                SourceLoc nextLineEnd = {};
+                SourceLoc nextLineEnd = {}; // Needed for suppress
                 if (id.getContent() == "default")
                 {
                     specifier = PragmaWarningSpecifier::Default;
@@ -4228,8 +4249,10 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                     return finish();
                 }
                 Expect(context, TokenType::Colon, Diagnostics::syntaxError);
+                // Read the id list
                 while (true)
                 {
+                    // Same logic as for the specifierLocation
                     SourceLoc idLocation = PeekRawToken(context).loc;
                     Token warningNumberToken = PeekToken(context);
                     if (warningNumberToken.type == TokenType::IntegerLiteral)
@@ -4259,6 +4282,7 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                 Token end = PeekToken(context);
                 if (end.type == TokenType::Semicolon)
                 {
+                    // We need to parse the next 'spec : id-list'
                     AdvanceToken(context);
                     continue;
                 }
@@ -4280,6 +4304,7 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
     else
     {
         GetSink(context)->diagnose(tk, Diagnostics::syntaxError);
+        return finish();
     }
     Expect(context, TokenType::RParent, Diagnostics::syntaxError);
 }

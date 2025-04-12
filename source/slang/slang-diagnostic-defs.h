@@ -440,7 +440,7 @@ DIAGNOSTIC(
     Warning,
     pragmaWarningPushNotPopped,
     "Detected #pragma warning(push) with no corresponding #pragma warning(pop)")
-DIAGNOSTIC(15613, Warning, pragmaWarningUnknownSpecifier, "Unknown #pragma waning specifier '$0'")
+DIAGNOSTIC(15613, Warning, pragmaWarningUnknownSpecifier, "Unknown #pragma warning specifier '$0'")
 DIAGNOSTIC(
     15614,
     Warning,
