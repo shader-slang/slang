@@ -161,7 +161,7 @@ standard output = {
                             "arguments": [
                                 0,
                                 2.000000,
-                                "B"
+                                "\""
                             ]
                         }
                     ]
@@ -213,7 +213,7 @@ standard output = {
                                 "arguments": [
                                     0,
                                     2.000000,
-                                    "B"
+                                    "\""
                                 ]
                             }
                         ]

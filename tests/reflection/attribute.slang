@@ -28,7 +28,7 @@ struct A
     float y;
 };
 
-[MyStruct(0, 2.0, "B")]
+[MyStruct(0, 2.0, "\"")]
 struct B
 {
     float x;

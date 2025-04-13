@@ -295,9 +295,7 @@ static void emitUserAttributeJSON(PrettyWriter& writer, slang::UserAttribute* us
         }
         else if (auto str = userAttribute->getArgumentValueString(i, &bufSize))
         {
-            writer << "\"";
-            writer.write(str, bufSize);
-            writer << "\"";
+            writer.writeEscapedString(UnownedStringSlice(str, bufSize));
         }
         else
             writer << "\"invalid value\"";
