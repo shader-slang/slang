@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK_SPIRV): -entry main -stage fragment -target spirv
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -entry main -stage fragment -target glsl
+//TEST:SIMPLE(filecheck=CHECK_METAL): -entry main -stage fragment -target metal
 
 #version 460
 
@@ -11,5 +12,6 @@ void main()
 
     // CHECK_SPIRV: BuiltIn PointCoord
     // CHECK_GLSL: gl_PointCoord
+    // CHECK_METAL: point_coord
 }
 
