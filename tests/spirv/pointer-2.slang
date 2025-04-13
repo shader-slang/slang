@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK_SPV): -entry vertexMain -stage vertex -emit-spirv-directly -target spirv
+//TEST:SIMPLE(filecheck=CHECK_SPV_VIA_GLSL): -entry vertexMain -stage vertex -emit-spirv-via-glsl -target spirv
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -entry vertexMain -stage vertex -target glsl
 
 struct Inner1
@@ -35,7 +36,12 @@ PushConstants pushConstants;
 ConstantBuffer<PushConstants> constantBuffer;
 
 // CHECK_SPV: OpEntryPoint
+// CHECK_SPV: OpTypePointer PhysicalStorageBuffer
 // CHECK_SPV: OpPtrAccessChain
+
+// CHECK_SPV_VIA_GLSL: Glslang
+// CHECK_SPV_VIA_GLSL: OpEntryPoint
+// CHECK_SPV_VIA_GLSL: OpTypePointer PhysicalStorageBuffer
 
 [shader("vertex")]
 VSOutput vertexMain(int vertexIndex: SV_VertexID)
