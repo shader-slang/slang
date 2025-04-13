@@ -27,30 +27,34 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "userAttribs": [{
-                                "name": "DefaultValue",
-                                "arguments": [
-                                    1
-                                ]
-                            }
+                            "userAttribs": [
+                                {
+                                    "name": "DefaultValue",
+                                    "arguments": [
+                                        1
+                                    ]
+                                }
                             ],
                             "binding": {"kind": "uniform", "offset": 4, "size": 4},
-                            "userAttribs": [{
-                                "name": "DefaultValue",
-                                "arguments": [
-                                    1
-                                ]
-                            }
+                            "userAttribs": [
+                                {
+                                    "name": "DefaultValue",
+                                    "arguments": [
+                                        1
+                                    ]
+                                }
                             ]
                         }
                     ],
-                    "userAttribs": [{
-                        "name": "MyStruct",
-                        "arguments": [
-                            0,
-                            1.000000
-                        ]
-                    }
+                    "userAttribs": [
+                        {
+                            "name": "MyStruct",
+                            "arguments": [
+                                0,
+                                1.000000,
+                                "A"
+                            ]
+                        }
                     ]
                 },
                 "containerVarLayout": {
@@ -75,30 +79,34 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "userAttribs": [{
-                                    "name": "DefaultValue",
-                                    "arguments": [
-                                        1
-                                    ]
-                                }
+                                "userAttribs": [
+                                    {
+                                        "name": "DefaultValue",
+                                        "arguments": [
+                                            1
+                                        ]
+                                    }
                                 ],
                                 "binding": {"kind": "uniform", "offset": 4, "size": 4},
-                                "userAttribs": [{
-                                    "name": "DefaultValue",
-                                    "arguments": [
-                                        1
-                                    ]
-                                }
+                                "userAttribs": [
+                                    {
+                                        "name": "DefaultValue",
+                                        "arguments": [
+                                            1
+                                        ]
+                                    }
                                 ]
                             }
                         ],
-                        "userAttribs": [{
-                            "name": "MyStruct",
-                            "arguments": [
-                                0,
-                                1.000000
-                            ]
-                        }
+                        "userAttribs": [
+                            {
+                                "name": "MyStruct",
+                                "arguments": [
+                                    0,
+                                    1.000000,
+                                    "A"
+                                ]
+                            }
                         ]
                     },
                     "binding": {"kind": "uniform", "offset": 0, "size": 8}
@@ -128,30 +136,34 @@ standard output = {
                                 "kind": "scalar",
                                 "scalarType": "float32"
                             },
-                            "userAttribs": [{
-                                "name": "DefaultValue",
-                                "arguments": [
-                                    2
-                                ]
-                            }
+                            "userAttribs": [
+                                {
+                                    "name": "DefaultValue",
+                                    "arguments": [
+                                        2
+                                    ]
+                                }
                             ],
                             "binding": {"kind": "uniform", "offset": 4, "size": 4},
-                            "userAttribs": [{
-                                "name": "DefaultValue",
-                                "arguments": [
-                                    2
-                                ]
-                            }
+                            "userAttribs": [
+                                {
+                                    "name": "DefaultValue",
+                                    "arguments": [
+                                        2
+                                    ]
+                                }
                             ]
                         }
                     ],
-                    "userAttribs": [{
-                        "name": "MyStruct",
-                        "arguments": [
-                            0,
-                            2.000000
-                        ]
-                    }
+                    "userAttribs": [
+                        {
+                            "name": "MyStruct",
+                            "arguments": [
+                                0,
+                                2.000000,
+                                "B"
+                            ]
+                        }
                     ]
                 },
                 "containerVarLayout": {
@@ -176,30 +188,34 @@ standard output = {
                                     "kind": "scalar",
                                     "scalarType": "float32"
                                 },
-                                "userAttribs": [{
-                                    "name": "DefaultValue",
-                                    "arguments": [
-                                        2
-                                    ]
-                                }
+                                "userAttribs": [
+                                    {
+                                        "name": "DefaultValue",
+                                        "arguments": [
+                                            2
+                                        ]
+                                    }
                                 ],
                                 "binding": {"kind": "uniform", "offset": 4, "size": 4},
-                                "userAttribs": [{
-                                    "name": "DefaultValue",
-                                    "arguments": [
-                                        2
-                                    ]
-                                }
+                                "userAttribs": [
+                                    {
+                                        "name": "DefaultValue",
+                                        "arguments": [
+                                            2
+                                        ]
+                                    }
                                 ]
                             }
                         ],
-                        "userAttribs": [{
-                            "name": "MyStruct",
-                            "arguments": [
-                                0,
-                                2.000000
-                            ]
-                        }
+                        "userAttribs": [
+                            {
+                                "name": "MyStruct",
+                                "arguments": [
+                                    0,
+                                    2.000000,
+                                    "B"
+                                ]
+                            }
                         ]
                     },
                     "binding": {"kind": "uniform", "offset": 0, "size": 8}
@@ -208,12 +224,13 @@ standard output = {
         },
         {
             "name": "globalInt",
-            "userAttribs": [{
-                "name": "DefaultValue",
-                "arguments": [
-                    2
-                ]
-            }
+            "userAttribs": [
+                {
+                    "name": "DefaultValue",
+                    "arguments": [
+                        2
+                    ]
+                }
             ],
             "binding": {"kind": "uniform", "offset": 0, "size": 4},
             "type": {
@@ -237,23 +254,25 @@ standard output = {
                         "binding": {"kind": "uniform", "offset": 0, "size": 4}
                     }
                 ],
-                "userAttribs": [{
-                    "name": "StructVarParam",
-                    "arguments": [
-                        0
-                    ]
-                }
+                "userAttribs": [
+                    {
+                        "name": "StructVarParam",
+                        "arguments": [
+                            0
+                        ]
+                    }
                 ]
             }
         },
         {
             "name": "globalInt2",
-            "userAttribs": [{
-                "name": "StructVarParam",
-                "arguments": [
-                    1
-                ]
-            }
+            "userAttribs": [
+                {
+                    "name": "StructVarParam",
+                    "arguments": [
+                        1
+                    ]
+                }
             ],
             "binding": {"kind": "uniform", "offset": 20, "size": 4},
             "type": {
@@ -281,12 +300,13 @@ standard output = {
                 },
                 {
                     "name": "a",
-                    "userAttribs": [{
-                        "name": "DefaultValue",
-                        "arguments": [
-                            3
-                        ]
-                    }
+                    "userAttribs": [
+                        {
+                            "name": "DefaultValue",
+                            "arguments": [
+                                3
+                            ]
+                        }
                     ],
                     "binding": {"kind": "uniform", "offset": 0, "size": 4},
                     "type": {
@@ -296,12 +316,13 @@ standard output = {
                 },
                 {
                     "name": "b",
-                    "userAttribs": [{
-                        "name": "StructVarParam",
-                        "arguments": [
-                            2
-                        ]
-                    }
+                    "userAttribs": [
+                        {
+                            "name": "StructVarParam",
+                            "arguments": [
+                                2
+                            ]
+                        }
                     ],
                     "binding": {"kind": "uniform", "offset": 4, "size": 4},
                     "type": {
@@ -311,13 +332,23 @@ standard output = {
                 }
             ],
             "threadGroupSize": [1, 1, 1],
-            "userAttribs": [{
-                "name": "MyStruct",
-                "arguments": [
-                    2,
-                    3.000000
-                ]
-            }
+            "userAttribs": [
+                {
+                    "name": "MyStruct",
+                    "arguments": [
+                        2,
+                        3.000000,
+                        "main"
+                    ]
+                },
+                {
+                    "name": "MyStruct",
+                    "arguments": [
+                        -2,
+                        -3.000000,
+                        ""
+                    ]
+                }
             ]
         }
     ]
