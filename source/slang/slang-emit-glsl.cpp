@@ -5,7 +5,6 @@
 #include "slang-emit-source-writer.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-entry-point-decorations.h"
-#include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-legalize-types.h"
