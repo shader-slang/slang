@@ -1,5 +1,6 @@
 // slang-check-modifier.cpp
 #include "../core/slang-char-util.h"
+#include "slang-ast-decl.h"
 #include "slang-check-impl.h"
 
 // This file implements semantic checking behavior for
@@ -8,7 +9,9 @@
 // At present, the semantic checking we do on modifiers is primarily
 // focused on `[attributes]`.
 
+#include "slang-generated-ast.h"
 #include "slang-lookup.h"
+#include "slang-syntax.h"
 
 namespace Slang
 {
@@ -1266,7 +1269,6 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     //
     // The attribute declaration will have one or more `AttributeTargetModifier`s
     // that each specify a syntax class that the attribute can be applied to.
-    // If any of these match `attrTarget`, then we are good.
     //
     bool validTarget = false;
     for (auto attrTargetMod : attrDecl->getModifiersOfType<AttributeTargetModifier>())
@@ -1277,6 +1279,18 @@ AttributeBase* SemanticsVisitor::checkAttribute(
             break;
         }
     }
+
+    // Some attributes impose contrains on where they can be placed that cannot be captured by the
+    // only checking the syntax class. Perform more checks here.
+    switch (attr->astNodeType)
+    {
+    // Allowed only on struct fields.
+    case ASTNodeType::GLSLStructOffsetAttribute:
+        auto targetDecl = as<Decl>(attrTarget);
+        validTarget = validTarget && targetDecl && as<StructDecl>(getParentDecl(targetDecl));
+        break;
+    };
+
     if (!validTarget)
     {
         getSink()->diagnose(attr, Diagnostics::attributeNotApplicable, attrName);
@@ -1327,6 +1341,7 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::GLSLLayoutModifierGroupBegin:
     case ASTNodeType::GLSLLayoutModifierGroupEnd:
     case ASTNodeType::GLSLBufferModifier:
+    case ASTNodeType::GLSLStructOffsetAttribute:
     case ASTNodeType::MemoryQualifierSetModifier:
     case ASTNodeType::GLSLWriteOnlyModifier:
     case ASTNodeType::GLSLReadOnlyModifier:
@@ -1663,7 +1678,8 @@ Modifier* SemanticsVisitor::checkModifier(
         bool isGLSLInput = getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL);
         if (!isGLSLInput && moduleDecl && moduleDecl->findModifier<GLSLModuleModifier>())
             isGLSLInput = true;
-        if (!isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl))
+        auto modAllowed = isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl);
+        if (!modAllowed)
         {
             if (!ignoreUnallowedModifier)
             {

@@ -3710,8 +3710,8 @@ attribute_syntax [vk_location(location : int)] : GLSLLocationAttribute;
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
 
-/// Declare struct member offset.
-__attributeTarget(DeclBase)
+/// Declare offset for a struct member. Only applies to Vulkan and GLSL targets.
+__attributeTarget(VarDeclBase)
 attribute_syntax [vk_offset(index: int)] : GLSLStructOffsetAttribute;
 
 /// @deprecated

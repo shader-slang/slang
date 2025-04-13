@@ -5,6 +5,7 @@
 #include "slang-emit-source-writer.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-entry-point-decorations.h"
+#include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-legalize-types.h"
@@ -232,6 +233,26 @@ void GLSLSourceEmitter::_emitMemoryQualifierDecorations(IRInst* varDecl)
 void GLSLSourceEmitter::emitMemoryQualifiers(IRInst* varDecl)
 {
     _emitMemoryQualifierDecorations(varDecl);
+}
+
+
+void GLSLSourceEmitter::emitStructFieldAttributes(
+    IRStructType* structType,
+    IRStructField* field,
+    bool allowOffsetLayout)
+{
+    SLANG_UNUSED(structType);
+    auto structKey = field->getKey();
+
+    if (allowOffsetLayout)
+    {
+        if (auto offsetDecoration = structKey->findDecoration<IRGLSLStructOffsetDecoration>())
+        {
+            m_writer->emit("layout(offset = ");
+            m_writer->emit(offsetDecoration->getOffset()->getValue());
+            m_writer->emit(") ");
+        }
+    }
 }
 
 void GLSLSourceEmitter::_emitGLSLStructuredBuffer(
