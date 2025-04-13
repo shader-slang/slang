@@ -1,6 +1,5 @@
 // slang-check-modifier.cpp
 #include "../core/slang-char-util.h"
-#include "slang-ast-decl.h"
 #include "slang-check-impl.h"
 
 // This file implements semantic checking behavior for
@@ -9,9 +8,7 @@
 // At present, the semantic checking we do on modifiers is primarily
 // focused on `[attributes]`.
 
-#include "slang-generated-ast.h"
 #include "slang-lookup.h"
-#include "slang-syntax.h"
 
 namespace Slang
 {
@@ -1280,7 +1277,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
         }
     }
 
-    // Some attributes impose contrains on where they can be placed that cannot be captured by the
+    // Some attributes impose constraints on where they can be placed that cannot be captured by the
     // only checking the syntax class. Perform more checks here.
     switch (attr->astNodeType)
     {
@@ -1678,8 +1675,7 @@ Modifier* SemanticsVisitor::checkModifier(
         bool isGLSLInput = getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL);
         if (!isGLSLInput && moduleDecl && moduleDecl->findModifier<GLSLModuleModifier>())
             isGLSLInput = true;
-        auto modAllowed = isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl);
-        if (!modAllowed)
+        if (!isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl))
         {
             if (!ignoreUnallowedModifier)
             {

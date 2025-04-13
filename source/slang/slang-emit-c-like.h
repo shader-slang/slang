@@ -413,7 +413,7 @@ public:
     /// Emit type attributes that should appear after, e.g., a `struct` keyword
     void emitPostKeywordTypeAttributes(IRInst* inst) { emitPostKeywordTypeAttributesImpl(inst); }
 
-    virtual void emitMemoryQualifiers(IRInst* /*varInst*/) {};
+    virtual void emitMemoryQualifiers(IRInst* /*varInst*/){};
     virtual void emitStructFieldAttributes(
         IRStructType* /* structType */,
         IRStructField* /* field */,
@@ -424,7 +424,7 @@ public:
         IRInst* /*varInst*/,
         IRType* /*valueType*/,
         IRPackOffsetDecoration* /*decoration*/
-    ) {};
+    ){};
 
 
     /// Emit modifiers that should apply even for a declaration of an SSA temporary.
