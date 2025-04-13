@@ -33,7 +33,6 @@ struct PushConstants
 PushConstants pushConstants;
 
 ConstantBuffer<PushConstants> constantBuffer;
-StructuredBuffer<PushConstants> structuredBuffer;
 
 // CHECK_SPV: OpEntryPoint
 // CHECK_SPV: OpPtrAccessChain
@@ -51,9 +50,8 @@ VSOutput vertexMain(int vertexIndex: SV_VertexID)
     // CHECK_GLSL: (((((constantBuffer_0.verts_0 + 7)._data.inner_1) + 3)._data.inner_0) + 4)._data.position_0
     let position2 = constantBuffer.verts[7].inner[3].inner[4].position;
 
-    // CHECK_GLSL: (((structuredBuffer_0._data[uint(2)].verts_0 + gl_VertexIndex)._data.inner_1) + 12)._data.position_1
-    let position3 = structuredBuffer[2].verts[vertexIndex].inner[12].position;
-
+    // CHECK_GLSL: (((constantBuffer_0.verts_0 + gl_VertexIndex)._data.inner_1) + 12)._data.position_1
+    let position3 = constantBuffer.verts[vertexIndex].inner[12].position;
 
     //
     // Test accesing from a variable.
