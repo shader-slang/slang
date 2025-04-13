@@ -417,7 +417,7 @@ public:
     virtual void emitStructFieldAttributes(
         IRStructType* /* structType */,
         IRStructField* /* field */,
-        bool /* allowOffsetLayout */) {};
+        bool /* allowOffsetLayout */){};
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
     void emitMeshShaderModifiers(IRInst* varInst);
     virtual void emitPackOffsetModifier(
