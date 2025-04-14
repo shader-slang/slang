@@ -2139,7 +2139,15 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 EmitOpInfo outerPrec = inOuterPrec;
                 bool needClose = maybeEmitParens(outerPrec, prec);
                 emitOperand(inst->getOperand(0), prec);
-                m_writer->emit("._data");
+
+                // `_data` member extraction is not required for `FieldAddress` instructions because
+                // it is already emitted alongside the user requested field during `FieldAddress`
+                // emit. See `kIROp_FieldAddress` case below.
+                if (!as<IRFieldAddress>(addr))
+                {
+                    m_writer->emit("._data");
+                }
+
                 maybeCloseParens(needClose);
                 return true;
             }
@@ -2158,7 +2166,7 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 bool needClose = maybeEmitParens(outerPrec, prec);
                 emitOperand(inst->getOperand(0), prec);
                 m_writer->emit("._data.");
-                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+                m_writer->emit(getName(as<IRFieldAddress>(inst)->getField()));
                 maybeCloseParens(needClose);
                 return true;
             }
