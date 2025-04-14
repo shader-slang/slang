@@ -3,10 +3,10 @@ layout: user-guide
 permalink: /user-guide/wgsl-target-specific
 ---
 
-WGSL specific functionalities
+WGSL-Specific Functionalities
 =============================
 
-This chapter provides information for WGSL (WebGPU Shading Language) -specific functionalities and behaviors.
+This chapter provides information for WGSL (WebGPU Shading Language)-specific functionalities and behaviors.
 
 
 System-Value semantics
@@ -161,7 +161,7 @@ Since the WGSL matrix multiplication convention is the normal one, where inner p
 
 The `[vk::binding(index,set)]` attribute is respected when emitting WGSL code, and will translate to `@binding(index) @group(set)` in WGSL.
 
-If the `[vk::binding()]` attribute is not specified by a `:register()` semantic is present, Slang will derive the binding from the `register` semantic the same way as the SPIRV and GLSL backends.
+If the `[vk::binding()]` attribute is not specified but a `:register()` semantic is present, Slang will derive the binding from the `register` semantic the same way as the SPIR-V and GLSL backends.
 
 The `[vk::location(N)]` attributes on stage input/output parameters are respected.
 

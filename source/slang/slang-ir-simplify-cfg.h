@@ -5,6 +5,8 @@ namespace Slang
 {
 struct IRModule;
 struct IRGlobalValueWithCode;
+struct IRLoop;
+struct IRDominatorTree;
 
 struct CFGSimplificationOptions
 {
@@ -13,6 +15,11 @@ struct CFGSimplificationOptions
     static CFGSimplificationOptions getDefault() { return CFGSimplificationOptions(); }
     static CFGSimplificationOptions getFast() { return CFGSimplificationOptions{false, false}; }
 };
+
+bool isTrivialSingleIterationLoop(
+    IRDominatorTree* domTree,
+    IRGlobalValueWithCode* func,
+    IRLoop* loop);
 
 /// Simplifies control flow graph by merging basic blocks that
 /// forms a simple linear chain.

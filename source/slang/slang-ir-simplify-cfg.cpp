@@ -66,8 +66,8 @@ static IRInst* findBreakableRegionHeaderInst(IRDominatorTree* domTree, IRBlock* 
 // Test if a loop is trivial: a trivial loop runs for a single iteration without any back edges, and
 // there is only one break out of the loop at the very end. The function generates `regionTree` if
 // it is needed and hasn't been generated yet.
-static bool isTrivialSingleIterationLoop(
-    CFGSimplificationContext& context,
+bool isTrivialSingleIterationLoop(
+    IRDominatorTree* domTree,
     IRGlobalValueWithCode* func,
     IRLoop* loop)
 {
@@ -91,21 +91,21 @@ static bool isTrivialSingleIterationLoop(
     //
     // We need to verify this is a trivial loop by checking if there is any multi-level breaks
     // that skips out of this loop.
-    if (!context.domTree)
-        context.domTree = computeDominatorTree(func);
+    if (!domTree)
+        domTree = computeDominatorTree(func);
     bool hasMultiLevelBreaks = false;
-    auto loopBlocks = collectBlocksInRegion(context.domTree, loop, &hasMultiLevelBreaks);
+    auto loopBlocks = collectBlocksInRegion(domTree, loop, &hasMultiLevelBreaks);
     if (hasMultiLevelBreaks)
         return false;
     for (auto block : loopBlocks)
     {
         for (auto branchTarget : block->getSuccessors())
         {
-            if (!context.domTree->dominates(loop->getParent(), branchTarget))
+            if (!domTree->dominates(loop->getParent(), branchTarget))
                 return false;
             if (branchTarget != loop->getBreakBlock())
                 continue;
-            if (findBreakableRegionHeaderInst(context.domTree, block) != loop)
+            if (findBreakableRegionHeaderInst(domTree, block) != loop)
             {
                 // If the break is initiated from a nested region, this is not trivial.
                 return false;
@@ -127,7 +127,7 @@ static bool isTrivialSingleIterationLoop(
         auto breakOriginBlock = *loop->getBreakBlock()->getPredecessors().begin();
 
         for (auto currBlock = breakOriginBlock; currBlock;
-             currBlock = context.domTree->getImmediateDominator(currBlock))
+             currBlock = domTree->getImmediateDominator(currBlock))
         {
             auto terminator = currBlock->getTerminator();
             if (terminator == loop)
@@ -139,11 +139,11 @@ static bool isTrivialSingleIterationLoop(
             switch (terminator->getOp())
             {
             case kIROp_loop:
-                if (isBlockInRegion(context.domTree, as<IRLoop>(terminator), breakOriginBlock))
+                if (isBlockInRegion(domTree, as<IRLoop>(terminator), breakOriginBlock))
                     return false;
                 break;
             case kIROp_Switch:
-                if (isBlockInRegion(context.domTree, as<IRSwitch>(terminator), breakOriginBlock))
+                if (isBlockInRegion(domTree, as<IRSwitch>(terminator), breakOriginBlock))
                     return false;
                 break;
             default:
@@ -853,8 +853,10 @@ static bool processFunc(IRGlobalValueWithCode* func, CFGSimplificationOptions op
                     // break at the end of the loop, we can remove the header and turn it into
                     // a normal branch.
                     auto targetBlock = loop->getTargetBlock();
+                    if (!simplificationContext.domTree)
+                        simplificationContext.domTree = computeDominatorTree(func);
                     if (options.removeTrivialSingleIterationLoops &&
-                        isTrivialSingleIterationLoop(simplificationContext, func, loop))
+                        isTrivialSingleIterationLoop(simplificationContext.domTree, func, loop))
                     {
                         builder.setInsertBefore(loop);
                         List<IRInst*> args;
