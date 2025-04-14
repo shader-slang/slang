@@ -11361,17 +11361,21 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
 // Not all comparison cases are implemented yet,
 // so the optional 'feedback' parameter is here to indicate when the comp is not implemented yet
 
-// <=> operator
+// lhs and rhs cannot be nullptr
+int compareIntVals(ASTBuilder* astBuilder, IntVal& lhs, IntVal& rhs, int* feedback);
+
 // lhs and rhs cannot be nullptr
 int compareTypes(ASTBuilder* astBuilder, Type& lhs, Type& rhs, int* feedback);
 
-// <=> operator
 // lhs and rhs cannot be nullptr
 int compareDecls(ASTBuilder* astBuilder, Decl& lhs, Decl& rhs, int* feedback);
 
-// <=> operator
 // lhs and rhs cannot be nullptr
-int compareIntVals(ASTBuilder* astBuilder, IntVal& lhs, IntVal& rhs, int* feedback);
+int compareDeclRefBases(ASTBuilder* astBuilder, DeclRefBase& lhs, DeclRefBase& rhs, int* feedback);
+
+int compareWitnesses(ASTBuilder* astBuilder, Witness& lhs, Witness& rhs, int* feedback);
+
+int compareVals(ASTBuilder* astBuilder, Val& lhs, Val& rhs, int* feedback);
 
 template<typename T, class Compare>
 int comparePtrs(T* lhs, T* rhs, Compare const& compare)
@@ -11399,7 +11403,15 @@ int comparePtrs(T* lhs, T* rhs, Compare const& compare)
     return res;
 }
 
-// <=> operator
+// lhs and rhs might be nullptr
+int compareIntVals(ASTBuilder* astBuilder, IntVal* lhs, IntVal* rhs, int* feedback)
+{
+    return comparePtrs(
+        lhs,
+        rhs,
+        [&](IntVal& lhs, IntVal& rhs) { return compareIntVals(astBuilder, lhs, rhs, feedback); });
+}
+
 // lhs or rhs might be nullptr
 int compareTypes(ASTBuilder* astBuilder, Type* lhs, Type* rhs, int* feedback)
 {
@@ -11409,7 +11421,6 @@ int compareTypes(ASTBuilder* astBuilder, Type* lhs, Type* rhs, int* feedback)
         [&](Type& lhs, Type& rhs) { return compareTypes(astBuilder, lhs, rhs, feedback); });
 }
 
-// <=> operator
 // lhs or rhs might be nullptr
 int compareDecls(ASTBuilder* astBuilder, Decl* lhs, Decl* rhs, int* feedback)
 {
@@ -11419,14 +11430,31 @@ int compareDecls(ASTBuilder* astBuilder, Decl* lhs, Decl* rhs, int* feedback)
         [&](Decl& lhs, Decl& rhs) { return compareDecls(astBuilder, lhs, rhs, feedback); });
 }
 
-// <=> operator
 // lhs and rhs might be nullptr
-int compareIntVals(ASTBuilder* astBuilder, IntVal* lhs, IntVal* rhs, int* feedback)
+int compareDeclRefBases(ASTBuilder* astBuilder, DeclRefBase* lhs, DeclRefBase* rhs, int* feedback)
 {
     return comparePtrs(
         lhs,
         rhs,
-        [&](IntVal& lhs, IntVal& rhs) { return compareIntVals(astBuilder, lhs, rhs, feedback); });
+        [&](DeclRefBase& lhs, DeclRefBase& rhs)
+        { return compareDeclRefBases(astBuilder, lhs, rhs, feedback); });
+}
+
+int compareWitnesses(ASTBuilder* astBuilder, Witness* lhs, Witness* rhs, int* feedback)
+{
+    return comparePtrs(
+        lhs,
+        rhs,
+        [&](Witness& lhs, Witness& rhs)
+        { return compareWitnesses(astBuilder, lhs, rhs, feedback); });
+}
+
+int compareVals(ASTBuilder* astBuilder, Val* lhs, Val* rhs, int* feedback)
+{
+    return comparePtrs(
+        lhs,
+        rhs,
+        [&](Val& lhs, Val& rhs) { return compareVals(astBuilder, lhs, rhs, feedback); });
 }
 
 int compareIntVals(ASTBuilder* astBuilder, IntVal& lhs, IntVal& rhs, int* feedback)
@@ -11470,66 +11498,23 @@ int compareTypes(ASTBuilder* astBuilder, Type& lhs, Type& rhs, int* feedback)
     if (res == 0)
     {
         std::optional<int> specRes = {};
-        if (auto lVec = dynamicCast<VectorExpressionType>(&lhs))
-        {
-            auto rVec = dynamicCast<VectorExpressionType>(&rhs);
-            auto lN = lVec->getElementCount();
-            auto rN = rVec->getElementCount();
-            int NComp = compareIntVals(astBuilder, lN, rN, feedback);
-            if (NComp != 0)
-            {
-                specRes = NComp;
-            }
-            else
-            {
-                auto lT = lVec->getElementType();
-                auto rT = rVec->getElementType();
-                specRes = compareTypes(astBuilder, lT, rT, feedback);
-            }
-        }
-        else if (auto lMat = dynamicCast<MatrixExpressionType>(&lhs))
-        {
-            auto rMat = dynamicCast<MatrixExpressionType>(&rhs);
-            auto lR = lMat->getRowCount();
-            auto rR = rMat->getRowCount();
-            int RComp = compareIntVals(astBuilder, lR, rR, feedback);
-            if (RComp != 0)
-            {
-                specRes = RComp;
-            }
-            else
-            {
-                auto lC = lMat->getColumnCount();
-                auto rC = rMat->getColumnCount();
-                int CComp = compareIntVals(astBuilder, lC, rC, feedback);
-                if (CComp != 0)
-                {
-                    specRes = CComp;
-                }
-                else
-                {
-                    auto lL = lMat->getLayout();
-                    auto rL = rMat->getLayout();
-                    int LComp = compareIntVals(astBuilder, lL, rL, feedback);
-                    if (LComp != 0)
-                    {
-                        specRes = LComp;
-                    }
-                    else
-                    {
-                        auto lT = lMat->getElementType();
-                        auto rT = rMat->getElementType();
-                        specRes = compareTypes(astBuilder, lT, rT, feedback);
-                    }
-                }
-            }
-        }
-        else if (auto lDRT = dynamicCast<DeclRefType>(&lhs))
+        if (auto lDRT = dynamicCast<DeclRefType>(&lhs))
         {
             auto rDRT = dynamicCast<DeclRefType>(&rhs);
             auto lDecl = lDRT->getDeclRef().getDecl();
             auto rDecl = rDRT->getDeclRef().getDecl();
-            specRes = compareDecls(astBuilder, lDecl, rDecl, feedback);
+            int declComp = compareDecls(astBuilder, lDecl, rDecl, feedback);
+            if (declComp)
+            {
+                specRes = declComp;
+            }
+            else
+            {
+                auto lDRB = lDRT->getDeclRefBase();
+                auto rDRB = rDRT->getDeclRefBase();
+                int declRefBaseComp = compareDeclRefBases(astBuilder, lDRB, rDRB, feedback);
+                specRes = declRefBaseComp;
+            }
         }
         if (!specRes && feedback)
         {
@@ -11579,6 +11564,139 @@ int compareDecls(ASTBuilder* astBuilder, Decl& lhs, Decl& rhs, int* feedback)
                 { return strcmp(lName.text.begin(), rName.text.begin()); });
         }
 
+        res = specRes.value_or(0);
+    }
+    return res;
+}
+
+int compareDeclRefBases(ASTBuilder* astBuilder, DeclRefBase& lhs, DeclRefBase& rhs, int* feedback)
+{
+    SLANG_UNUSED(astBuilder);
+    // No risk of overflow, replace with <=> in C++20
+    int res = static_cast<int>(rhs.astNodeType) - static_cast<int>(lhs.astNodeType);
+    if (res == 0)
+    {
+        std::optional<int> specRes = {};
+
+        if (auto lDirect = dynamicCast<DirectDeclRef>(&lhs))
+        {
+            auto rDirect = dynamicCast<DirectDeclRef>(&rhs);
+            SLANG_UNUSED(lDirect);
+            SLANG_UNUSED(rDirect);
+            specRes = 0;
+        }
+        if (auto lGeneric = dynamicCast<GenericAppDeclRef>(&lhs))
+        {
+            auto rGeneric = dynamicCast<GenericAppDeclRef>(&rhs);
+            if (lGeneric->getArgCount() == rGeneric->getArgCount())
+            {
+                for (Index i = 0; i < lGeneric->getArgCount(); ++i)
+                {
+                    auto lArg = lGeneric->getArg(i);
+                    auto rArg = rGeneric->getArg(i);
+                    int compArgs = compareVals(astBuilder, lArg, rArg, feedback);
+                    if (compArgs)
+                    {
+                        specRes = compArgs;
+                        break;
+                    }
+                }
+                if (!specRes)
+                {
+                    specRes = 0;
+                }
+            }
+            else
+            {
+                // No risk of overflow, replace with <=> in C++20
+                specRes = static_cast<int>(rGeneric->getArgCount() - rGeneric->getArgCount());
+            }
+        }
+        else if (auto lLookup = dynamicCast<LookupDeclRef>(&lhs))
+        {
+            auto rLookup = dynamicCast<LookupDeclRef>(&rhs);
+            specRes = compareWitnesses(
+                astBuilder,
+                lLookup->getWitness(),
+                rLookup->getWitness(),
+                feedback);
+        }
+        else if (auto lMember = dynamicCast<MemberDeclRef>(&lhs))
+        {
+            auto rMember = dynamicCast<MemberDeclRef>(&rhs);
+            specRes = compareDeclRefBases(
+                astBuilder,
+                lMember->getParentOperand(),
+                rMember->getParentOperand(),
+                feedback);
+        }
+
+        if (!specRes.has_value() && feedback)
+        {
+            *feedback |= (1 << 3);
+        }
+        res = specRes.value_or(0);
+    }
+    return res;
+}
+
+int compareWitnesses(ASTBuilder* astBuilder, Witness& lhs, Witness& rhs, int* feedback)
+{
+    SLANG_UNUSED(astBuilder);
+    // No risk of overflow, replace with <=> in C++20
+    int res = static_cast<int>(rhs.astNodeType) - static_cast<int>(lhs.astNodeType);
+    if (res == 0)
+    {
+        std::optional<int> specRes = {};
+
+        if (auto lSubtype = dynamicCast<SubtypeWitness>(&lhs))
+        {
+            auto rSubtype = dynamicCast<SubtypeWitness>(&rhs);
+        }
+
+        if (!specRes && feedback)
+        {
+            *feedback |= (1 << 4);
+        }
+        res = specRes.value_or(0);
+    }
+    return res;
+}
+
+int compareVals(ASTBuilder* astBuilder, Val& lhs, Val& rhs, int* feedback)
+{
+    SLANG_UNUSED(astBuilder);
+    // No risk of overflow, replace with <=> in C++20
+    int res = static_cast<int>(rhs.astNodeType) - static_cast<int>(lhs.astNodeType);
+    if (res == 0)
+    {
+        std::optional<int> specRes = {};
+
+        if (auto lType = dynamicCast<Type>(&lhs))
+        {
+            auto rType = dynamicCast<Type>(&rhs);
+            specRes = compareTypes(astBuilder, *lType, *rType, feedback);
+        }
+        else if (auto lInt = dynamicCast<IntVal>(&lhs))
+        {
+            auto rInt = dynamicCast<IntVal>(&rhs);
+            specRes = compareIntVals(astBuilder, *lInt, *rInt, feedback);
+        }
+        else if (auto lDRB = dynamicCast<DeclRefBase>(&lhs))
+        {
+            auto rDRB = dynamicCast<DeclRefBase>(&rhs);
+            specRes = compareDeclRefBases(astBuilder, *lDRB, *rDRB, feedback);
+        }
+        else if (auto lWitness = dynamicCast<Witness>(&lhs))
+        {
+            auto rWitness = dynamicCast<Witness>(&rhs);
+            specRes = compareWitnesses(astBuilder, *lWitness, *rWitness, feedback);
+        }
+
+        if (!specRes && feedback)
+        {
+            *feedback |= (1 << 5);
+        }
         res = specRes.value_or(0);
     }
     return res;
@@ -11684,7 +11802,7 @@ OrderedDictionary<Type*, List<Type*>> getCanonicalGenericConstraints2(
         }
     }
     const auto typeComparator = [&](Type* lhs, Type* rhs)
-    { return compareTypes(astBuilder, *lhs, *rhs) < 0; };
+    { return compareTypes(astBuilder, lhs, rhs) < 0; };
     const List<Type*> sortedKeys = [&]()
     {
         List<Type*> res;
