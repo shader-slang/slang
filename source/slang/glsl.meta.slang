@@ -96,6 +96,8 @@ public typealias dmat4x4 = matrix<double, 4, 4>;
 
 public out float4 gl_Position : SV_Position;
 public out float gl_PointSize : SV_PointSize;
+public in float2 gl_PointCoord : SV_PointCoord;
+
 public in vec4 gl_FragCoord : SV_Position;
 public out float gl_FragDepth : SV_Depth;
 public out int gl_FragStencilRef : SV_StencilRef;
