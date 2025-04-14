@@ -6,7 +6,7 @@ permalink: /user-guide/interfaces-generics
 Interfaces and Generics
 ===========================
 
-This chapter covers two interrelated Slang language features: interfaces and generics. We will talk about what they are, how do they relate to similar features in other languages, how are they parsed and translated by the compiler, and show examples on how these features simplifies and modularizes shader code.
+This chapter covers two interrelated Slang language features: interfaces and generics. We will talk about what they are, how they relate to similar features in other languages, how they are parsed and translated by the compiler, and show examples on how these features simplify and modularize shader code.
 
 Interfaces
 ----------
@@ -423,7 +423,7 @@ struct MultiArrayFloatContainer : IFloatContainer
     }
     float getElementAt(Iterator iter)
     {
-        if (ite.indexr.x == 0) return firstBuffer[iter.index.y];
+        if (iter.index.x == 0) return firstBuffer[iter.index.y];
         else return secondBuffer[iter.index.y];
     }
 }
@@ -979,7 +979,7 @@ void printNumbers<each T>(expand each T args) where T == int
 }
 void compute<each T>(expand each T args) where T == int
 {
-    // Maps every element in `args` to `elementValue + 1`, and forward the
+    // Maps every element in `args` to `elementValue + 1`, and forwards the
     // new values as arguments to `printNumber`.
     printNumber(expand (each args) + 1);
 

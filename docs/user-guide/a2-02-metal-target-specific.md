@@ -3,7 +3,7 @@ layout: user-guide
 permalink: /user-guide/metal-target-specific
 ---
 
-# Metal-specific functionalities
+# Metal-Specific Functionalities
 
 This chapter provides information for Metal-specific functionalities and
 behaviors in Slang.
@@ -34,6 +34,8 @@ The system-value semantics are translated to the following Metal attributes:
 | `SV_GroupIndex`             | Calculated from `SV_GroupThreadID` and group extents |
 | `SV_InstanceID`             | `[[instance_id]]`                                    |
 | `SV_IsFrontFace`            | `[[front_facing]]`                                   |
+| `SV_PointSize`              | `[[point_size]]`                                     |
+| `SV_PointCoord`             | `[[point_coord]]`                                    |
 | `SV_PrimitiveID`            | `[[primitive_id]]`                                   |
 | `SV_RenderTargetArrayIndex` | `[[render_target_array_index]]`                      |
 | `SV_SampleIndex`            | `[[sample_id]]`                                      |
@@ -153,7 +155,7 @@ using namespace metal;
 ## Parameter blocks and Argument Buffers
 
 `ParameterBlock` values are translated into _Argument Buffers_ potentially
-containing nested resources. For example this Slang code...
+containing nested resources. For example, this Slang code...
 
 ```slang
 struct MyParameters
@@ -242,8 +244,8 @@ FragmentOutput main()
 Metal enforces strict type requirements for certain operations. Slang
 automatically performs the following conversions:
 
-- Vector size expansion (e.g., float2 to float4), for example when the user
-  specified `float2` but the semantic type in Metal is float4.
+- Vector size expansion (e.g., `float2` to `float4`), for example when the user
+  specified `float2` but the semantic type in Metal is `float4`.
 - Image store value expansion to 4-components
 
 For example:
@@ -274,7 +276,7 @@ Metal requires explicit address space qualifiers. Slang automatically assigns ap
 
 The HLSL `:register()` semantic is respected when emitting Metal code.
 
-Since metal does not differentiate a constant buffer, a shader resource (read-only) buffer and an unordered access buffer, Slang will map `register(tN)`, `register(uN)` and `register(bN)` to `[[buffer(N)]]` when such `register` semantic is declared on a buffer typed parameter.
+Since Metal does not differentiate between a constant buffer, a shader resource (read-only) buffer and an unordered access buffer, Slang will map `register(tN)`, `register(uN)` and `register(bN)` to `[[buffer(N)]]` when such `register` semantic is declared on a buffer-typed parameter.
 
 `spaceN` specifiers inside `register` semantics are ignored.
 
