@@ -115,6 +115,7 @@ static const char* hlslSemanticNames[] = {
     "SV_OutputControlPointID",
     "SV_Position",
     "SV_PointSize",
+    "SV_PointCoord",
     "SV_PrimitiveID",
     "SV_DrawIndex",
     "SV_RenderTargetArrayIndex",
