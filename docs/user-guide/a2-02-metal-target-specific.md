@@ -34,6 +34,8 @@ The system-value semantics are translated to the following Metal attributes:
 | `SV_GroupIndex`             | Calculated from `SV_GroupThreadID` and group extents |
 | `SV_InstanceID`             | `[[instance_id]]`                                    |
 | `SV_IsFrontFace`            | `[[front_facing]]`                                   |
+| `SV_PointSize`              | `[[point_size]]`                                     |
+| `SV_PointCoord`             | `[[point_coord]]`                                    |
 | `SV_PrimitiveID`            | `[[primitive_id]]`                                   |
 | `SV_RenderTargetArrayIndex` | `[[render_target_array_index]]`                      |
 | `SV_SampleIndex`            | `[[sample_id]]`                                      |
