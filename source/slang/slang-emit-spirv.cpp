@@ -5461,6 +5461,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     // float in hlsl & glsl
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPointSize, inst);
                 }
+                else if (semanticName == "sv_pointcoord")
+                {
+                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInPointCoord, inst);
+                }
                 else if (semanticName == "sv_drawindex")
                 {
                     requireSPIRVCapability(SpvCapabilityDrawParameters);
