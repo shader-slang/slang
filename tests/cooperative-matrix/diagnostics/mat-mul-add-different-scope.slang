@@ -11,9 +11,9 @@ typealias CoopMatCType = CoopMat<float32_t, CoopMatScope::Subgroup, 16, 16, Coop
 [numthreads(32, 1, 1)]
 void computeMain()
 {
-    const let matA = CoopMatAType(3.0);
-    const let matB = CoopMatBType(5.0);
-    const let matC = CoopMatCType(1.0);
+    let matA = CoopMatAType(3.0);
+    let matB = CoopMatBType(5.0);
+    let matC = CoopMatCType(1.0);
 
     const let result = coopMatMulAdd(matA, matB, matC, CoopMatMatrixOperands::None);
     result.store(outputBuffer, 0, 16, CoopMatMatrixLayout::RowMajor);

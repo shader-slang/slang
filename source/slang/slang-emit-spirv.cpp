@@ -6573,8 +6573,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         const auto fromTypeV = inst->getOperand(0)->getDataType();
         const auto toTypeV = inst->getDataType();
         SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
-        const auto fromType = getVectorElementType(fromTypeV);
-        const auto toType = getVectorElementType(toTypeV);
+        const auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
+        const auto toType = getVectorOrCoopMatrixElementType(toTypeV);
 
         if (as<IRBoolType>(fromType))
         {
@@ -6707,10 +6707,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         bool isMatrixCast = false;
         if (as<IRVectorType>(fromTypeV) || as<IRVectorType>(toTypeV) ||
-            as<IRCoopVectorType>(fromTypeV) || as<IRCoopVectorType>(toTypeV))
+            as<IRCoopVectorType>(fromTypeV) || as<IRCoopVectorType>(toTypeV) ||
+            // Cooperative matrices behave like vectors where arithmetic operations can be performed
+            // directly without having to loop through the matrix and performing operations on the
+            // vectors.
+            as<IRCoopMatrixType>(fromTypeV) || as<IRCoopMatrixType>(toTypeV))
         {
-            fromType = getVectorElementType(fromTypeV);
-            toType = getVectorElementType(toTypeV);
+            fromType = getVectorOrCoopMatrixElementType(fromTypeV);
+            toType = getVectorOrCoopMatrixElementType(toTypeV);
         }
         else if (as<IRMatrixType>(fromTypeV) || as<IRMatrixType>(toTypeV))
         {
@@ -6757,8 +6761,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         const auto fromTypeV = inst->getOperand(0)->getDataType();
         const auto toTypeV = inst->getDataType();
         SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
-        const auto fromType = getVectorElementType(fromTypeV);
-        const auto toType = getVectorElementType(toTypeV);
+        const auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
+        const auto toType = getVectorOrCoopMatrixElementType(toTypeV);
+
         SLANG_ASSERT(isFloatingType(toType));
 
         if (isIntegralType(fromType))
@@ -6801,8 +6806,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         const auto fromTypeV = inst->getOperand(0)->getDataType();
         const auto toTypeV = inst->getDataType();
         SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
-        const auto fromType = getVectorElementType(fromTypeV);
-        const auto toType = getVectorElementType(toTypeV);
+        const auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
+        const auto toType = getVectorOrCoopMatrixElementType(toTypeV);
         SLANG_ASSERT(isFloatingType(fromType));
 
         if (as<IRBoolType>(toType))
@@ -7105,7 +7110,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         UInt operandCount,
         ArrayView<IRInst*> operands)
     {
-        IRType* elementType = getVectorElementType(operands[0]->getDataType());
+        IRType* elementType = getVectorOrCoopMatrixElementType(operands[0]->getDataType());
         IRBasicType* basicType = as<IRBasicType>(elementType);
         bool isFloatingPoint = false;
         bool isBool = false;
