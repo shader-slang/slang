@@ -2431,6 +2431,45 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 
     auto operatorName = getName("operator[]");
 
+    // First, let's check if we're trying to index into a texture in CUDA mode
+    // This is needed to emit error for texture[idx] operator in CUDA as discussed in:
+    // https://github.com/shader-slang/slang/issues/6782
+    if (auto declRefType = as<DeclRefType>(baseType))
+    {
+        auto declRef = declRefType->getDeclRef();
+        if (auto aggTypeDecl = as<AggTypeDecl>(declRef.getDecl()))
+        {
+            auto nameStr = getText(aggTypeDecl->getName());
+            bool isTexture = nameStr.startsWith("_Texture") || nameStr.startsWith("Texture");
+            
+            bool isCudaTarget = false;
+            if (isTexture)
+            {
+                auto linkage = getLinkage();
+                if (linkage)
+                {
+                    // Check if any of the targets in the linkage are CUDA targets
+                    for (auto& targetReq : linkage->targets)
+                    {
+                        auto targetFormat = targetReq->getTarget();
+                        if (targetFormat == CodeGenTarget::CUDASource || 
+                            targetFormat == CodeGenTarget::PTX)
+                        {
+                            isCudaTarget = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            if (isTexture && isCudaTarget)
+            {
+                getSink()->diagnose(subscriptExpr, Diagnostics::unsupportedTextureSubscriptForCUDA);
+                return CreateErrorExpr(subscriptExpr);
+            }
+        }
+    }
+
     LookupResult lookupResult = lookUpMember(
         m_astBuilder,
         this,

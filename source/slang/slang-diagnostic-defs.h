@@ -2590,6 +2590,11 @@ DIAGNOSTIC(
     "Specialization constants are not supported in the 'numthreads' attribute for the current "
     "target.")
 DIAGNOSTIC(
+    55206,
+    Error,
+    unsupportedTextureSubscriptForCUDA,
+    "texture subscript operator is not supported for CUDA targets.")
+DIAGNOSTIC(
     56001,
     Error,
     unableToAutoMapCUDATypeToHostType,
