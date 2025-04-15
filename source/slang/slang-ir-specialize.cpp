@@ -1789,11 +1789,12 @@ struct SpecializationContext
                 auto valType = val->getFullType();
                 if (!isCompileTimeConstantType(valType))
                 {
-                    // If the `argument` is not specialized yet, don't aggressively specialize the parameter.
+                    // If the `argument` is not specialized yet, don't aggressively specialize the
+                    // parameter.
                     //
-                    // If we specialize the parameter type too early, we will lose the opportunity to specialize the
-                    // callee later. The principal is to always let the specialization happen at the same time for both
-                    // on argument and parameter.
+                    // If we specialize the parameter type too early, we will lose the opportunity
+                    // to specialize the callee later. The principal is to always let the
+                    // specialization happen at the same time for both on argument and parameter.
                     continue;
                 }
                 else if (auto extractExistentialType = as<IRExtractExistentialType>(valType))
