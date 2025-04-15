@@ -7069,7 +7069,8 @@ bool SemanticsVisitor::checkInterfaceConformance(
     // the time we are compiling and handle those, and punt on the larger issue
     // for a bit longer.
     //
-    for (auto candidateExt : getCandidateExtensions(superInterfaceDeclRef, this))
+    auto candidateExtensions = getCandidateExtensions(superInterfaceDeclRef, this);
+    for (const auto& candidateExt : candidateExtensions)
     {
         // We need to apply the extension to the interface type that our
         // concrete type is inheriting from.
@@ -11272,7 +11273,8 @@ void _foreachDirectOrExtensionMemberOfType(
     if (auto aggTypeDeclRef = containerDeclRef.as<AggTypeDecl>())
     {
         auto aggType = DeclRefType::create(semantics->getASTBuilder(), aggTypeDeclRef);
-        for (auto extDecl : getCandidateExtensions(aggTypeDeclRef, semantics))
+        auto candidateExtensions = getCandidateExtensions(aggTypeDeclRef, semantics);
+        for (auto extDecl : candidateExtensions)
         {
             // Note that `extDecl` may have been declared for a type
             // base on the declaration that `aggTypeDeclRef` refers
