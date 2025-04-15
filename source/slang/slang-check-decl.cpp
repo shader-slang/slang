@@ -2626,9 +2626,8 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
         auto assocTypeDef = m_astBuilder->create<TypeDefDecl>();
         assocTypeDef->nameAndLoc.name = getName("Differential");
         assocTypeDef->type.type = context->conformingType;
-        assocTypeDef->parentDecl = context->parentDecl;
+        context->parentDecl->addMember(assocTypeDef);
         assocTypeDef->setCheckState(DeclCheckState::DefinitionChecked);
-        context->parentDecl->members.add(assocTypeDef);
 
         markSelfDifferentialMembersOfType(
             as<AggTypeDecl>(context->parentDecl),
@@ -2660,8 +2659,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
     if (!aggTypeDecl)
     {
         aggTypeDecl = m_astBuilder->create<StructDecl>();
-        aggTypeDecl->parentDecl = context->parentDecl;
-        context->parentDecl->members.add((aggTypeDecl));
+        context->parentDecl->addMember(aggTypeDecl);
         aggTypeDecl->nameAndLoc.name = requirementDeclRef.getName();
         aggTypeDecl->loc = context->parentDecl->nameAndLoc.loc;
         context->parentDecl->invalidateMemberDictionary();
@@ -2719,8 +2717,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
         diffField->nameAndLoc = member->nameAndLoc;
         diffField->type.type = diffMemberType;
         diffField->checkState = DeclCheckState::SignatureChecked;
-        diffField->parentDecl = aggTypeDecl;
-        aggTypeDecl->members.add(diffField);
+        aggTypeDecl->addMember(diffField);
 
         auto visibility = getDeclVisibility(member);
         addVisibilityModifier(diffField, visibility);
@@ -2775,8 +2772,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
     {
         auto inheritanceIDiffernetiable = m_astBuilder->create<InheritanceDecl>();
         inheritanceIDiffernetiable->base.type = m_astBuilder->getDiffInterfaceType();
-        inheritanceIDiffernetiable->parentDecl = aggTypeDecl;
-        aggTypeDecl->members.add(inheritanceIDiffernetiable);
+        aggTypeDecl->addMember(inheritanceIDiffernetiable);
     }
 
     // The `Differential` type of a `Differential` type is always itself.
@@ -2797,9 +2793,8 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
         auto assocTypeDef = m_astBuilder->create<TypeDefDecl>();
         assocTypeDef->nameAndLoc.name = getName("Differential");
         assocTypeDef->type.type = satisfyingType;
-        assocTypeDef->parentDecl = aggTypeDecl;
+        aggTypeDecl->addMember(assocTypeDef);
         assocTypeDef->setCheckState(DeclCheckState::DefinitionChecked);
-        aggTypeDecl->members.add(assocTypeDef);
     }
 
     // Go through all members and collect their differential types.
@@ -4319,7 +4314,7 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
                 typeParamDeclBase->astNodeType);
             synTypeParamDeclBase->nameAndLoc = typeParamDeclBase->getNameAndLoc();
             synTypeParamDeclBase->parameterIndex = typeParamDeclBase->parameterIndex;
-            synTypeParamDeclBase->parentDecl = synGenericDecl;
+            synGenericDecl->addMember(synTypeParamDeclBase);
 
             // Note: we intentionally do not copy GenericTypeParamDecl::initType here,
             // because initType maybe dependent on the original type parameters,
@@ -4327,7 +4322,6 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             // synthesized ones. It shouldn't be required for the implementing declaration to define
             // initType anyways, so we'll just save ourselves from the trouble.
             //
-            synGenericDecl->members.add(synTypeParamDeclBase);
 
             mapOrigToSynTypeParams.add(typeParamDeclBase, synTypeParamDeclBase);
 
@@ -4345,7 +4339,7 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
         {
             auto synValParamDecl = m_astBuilder->create<GenericValueParamDecl>();
             synValParamDecl->nameAndLoc = valParamDecl->nameAndLoc;
-            synValParamDecl->parentDecl = synGenericDecl;
+            synGenericDecl->addMember(synValParamDecl);
             synValParamDecl->parameterIndex = valParamDecl->parameterIndex;
             synValParamDecl->type = valParamDecl->type;
 
@@ -4355,7 +4349,6 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             // synthesized ones. It shouldn't be required for the implementing declaration to define
             // initType anyways, so we'll just save ourselves from the trouble.
             //
-            synGenericDecl->members.add(synValParamDecl);
 
             mapOrigToSynTypeParams.add(valParamDecl, synGenericDecl);
 
@@ -4537,8 +4530,7 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
         // We need to add the parameter as a child declaration of
         // the method we are building.
         //
-        synParamDecl->parentDecl = synthesized;
-        synthesized->members.add(synParamDecl);
+        synthesized->addMember(synParamDecl);
 
         // Add modifiers
         paramType.isLeftValue = true;
@@ -5508,8 +5500,7 @@ bool SemanticsVisitor::trySynthesizeWrapperTypePropertyRequirementWitness(
             // We need to add the parameter as a child declaration of
             // the accessor we are building.
             //
-            synParamDecl->parentDecl = synAccessorDecl;
-            synAccessorDecl->members.add(synParamDecl);
+            synAccessorDecl->addMember(synParamDecl);
 
             // For each paramter, we will create an argument expression
             // to represent it in the body of the accessor.
@@ -5567,8 +5558,7 @@ bool SemanticsVisitor::trySynthesizeWrapperTypePropertyRequirementWitness(
         addModifier(synAccessorDecl, m_astBuilder->create<ForceInlineAttribute>());
         synAccessorDecl->body = synBodyStmt;
 
-        synAccessorDecl->parentDecl = synPropertyDecl;
-        synPropertyDecl->members.add(synAccessorDecl);
+        synPropertyDecl->addMember(synAccessorDecl);
 
         // Register the synthesized accessor.
         //
@@ -5709,8 +5699,7 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
             // We need to add the parameter as a child declaration of
             // the accessor we are building.
             //
-            synParamDecl->parentDecl = synAccessorDecl;
-            synAccessorDecl->members.add(synParamDecl);
+            synAccessorDecl->addMember(synParamDecl);
 
             // For each paramter, we will create an argument expression
             // to represent it in the body of the accessor.
@@ -5869,8 +5858,7 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
 
         synAccessorDecl->body = synBodyStmt;
 
-        synAccessorDecl->parentDecl = synAccesorContainer;
-        synAccesorContainer->members.add(synAccessorDecl);
+        synAccesorContainer->addMember(synAccessorDecl);
 
         // If synthesis of an accessor worked, then we will record it into
         // a local dictionary. We do *not* install the accessor into the
@@ -6377,7 +6365,9 @@ bool SemanticsVisitor::trySynthesizeEnumTypeMethodRequirementWitness(
     }
     synFunc->loc = context->parentDecl->closingSourceLoc;
     synFunc->nameAndLoc.loc = synFunc->loc;
-    context->parentDecl->members.add(synFunc);
+    // synFunc already has its parent set
+    SLANG_ASSERT(context->parentDecl == synFunc->parentDecl);
+    context->parentDecl->addMember(synFunc);
     context->parentDecl->invalidateMemberDictionary();
     addModifier(synFunc, intrinsicOpModifier);
     witnessTable->add(
@@ -6561,7 +6551,8 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     seqStmt->stmts.add(synReturn);
 
     Decl* witnessDecl = synGeneric ? (Decl*)synGeneric : synFunc;
-    context->parentDecl->members.add(witnessDecl);
+    SLANG_ASSERT(context->parentDecl == witnessDecl->parentDecl);
+    context->parentDecl->addMember(witnessDecl);
     context->parentDecl->invalidateMemberDictionary();
     addModifier(synFunc, m_astBuilder->create<SynthesizedModifier>());
 
@@ -7577,11 +7568,10 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
                     IsSubTypeOptions::NoCaching))
             {
                 InheritanceDecl* conformanceDecl = m_astBuilder->create<InheritanceDecl>();
-                conformanceDecl->parentDecl = decl;
                 conformanceDecl->loc = decl->loc;
                 conformanceDecl->base.type = defaultInitializableType;
                 conformanceDecl->nameAndLoc.name = getName("$inheritance");
-                decl->members.add(conformanceDecl);
+                decl->addMember(conformanceDecl);
             }
         }
 
@@ -7940,10 +7930,9 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
         Type* enumTypeType = getASTBuilder()->getEnumTypeType();
 
         InheritanceDecl* enumConformanceDecl = m_astBuilder->create<InheritanceDecl>();
-        enumConformanceDecl->parentDecl = decl;
         enumConformanceDecl->loc = decl->loc;
         enumConformanceDecl->base.type = getASTBuilder()->getEnumTypeType();
-        decl->members.add(enumConformanceDecl);
+        decl->addMember(enumConformanceDecl);
 
         // The `__EnumType` interface has one required member, the `__Tag` type.
         // We need to satisfy this requirement automatically, rather than require
@@ -9556,8 +9545,7 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
         default:
             break;
         }
-        decl->members.add(param);
-        param->parentDecl = decl;
+        decl->addMember(param);
     }
 }
 
@@ -9576,8 +9564,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                                .as<CallableDecl>();
             auto diffFuncType = getForwardDiffFuncType(getFuncType(m_astBuilder, declRef));
             setFuncTypeIntoRequirementDecl(reqDecl, as<FuncType>(diffFuncType));
-            interfaceDecl->members.add(reqDecl);
-            reqDecl->parentDecl = interfaceDecl;
+            interfaceDecl->addMember(reqDecl);
 
             if (!decl->hasModifier<NoDiffThisAttribute>())
             {
@@ -9596,8 +9583,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
 
             auto reqRef = m_astBuilder->create<DerivativeRequirementReferenceDecl>();
             reqRef->referencedDecl = reqDecl;
-            reqRef->parentDecl = decl;
-            decl->members.add(reqRef);
+            decl->addMember(reqRef);
             isDiffFunc = true;
         }
         if (decl->hasModifier<BackwardDifferentiableAttribute>())
@@ -9612,8 +9598,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                 reqDecl->originalRequirementDecl = decl;
                 cloneModifiers(reqDecl, decl);
                 setFuncTypeIntoRequirementDecl(reqDecl, diffFuncType);
-                interfaceDecl->members.add(reqDecl);
-                reqDecl->parentDecl = interfaceDecl;
+                interfaceDecl->addMember(reqDecl);
                 if (!decl->hasModifier<NoDiffThisAttribute>())
                 {
                     // Build decl-ref-type for this-type.
@@ -9631,8 +9616,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
 
                 auto reqRef = m_astBuilder->create<DerivativeRequirementReferenceDecl>();
                 reqRef->referencedDecl = reqDecl;
-                reqRef->parentDecl = decl;
-                decl->members.add(reqRef);
+                decl->addMember(reqRef);
             }
             isDiffFunc = true;
         }
@@ -10123,8 +10107,7 @@ void SemanticsDeclHeaderVisitor::visitAbstractStorageDeclCommon(ContainerDecl* d
         GetterDecl* getterDecl = m_astBuilder->create<GetterDecl>();
         getterDecl->loc = decl->loc;
 
-        getterDecl->parentDecl = decl;
-        decl->members.add(getterDecl);
+        decl->addMember(getterDecl);
     }
 }
 
@@ -10263,8 +10246,7 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
         newValueParam->nameAndLoc.name = getName("newValue");
         newValueParam->nameAndLoc.loc = decl->loc;
 
-        newValueParam->parentDecl = decl;
-        decl->members.add(newValueParam);
+        decl->addMember(newValueParam);
     }
 
     // The new-value parameter is expected to have the
@@ -11361,6 +11343,18 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
 // Not all comparison cases are implemented yet,
 // so the optional 'feedback' parameter is here to indicate when the comp is not implemented yet
 
+// Replace with <=> in C++20
+template<typename T>
+int compareThreeWays(T a, T b)
+{
+    if (a > b)
+        return -1;
+    else if (b > a)
+        return 1;
+    else
+        return 0;
+}
+
 // lhs and rhs cannot be nullptr
 int compareIntVals(ASTBuilder* astBuilder, IntVal& lhs, IntVal& rhs, int* feedback);
 
@@ -11371,10 +11365,12 @@ int compareTypes(ASTBuilder* astBuilder, Type& lhs, Type& rhs, int* feedback);
 int compareDecls(ASTBuilder* astBuilder, Decl& lhs, Decl& rhs, int* feedback);
 
 // lhs and rhs cannot be nullptr
-int compareDeclRefBases(ASTBuilder* astBuilder, DeclRefBase& lhs, DeclRefBase& rhs, int* feedback);
+int compareDeclRefs(ASTBuilder* astBuilder, DeclRefBase& lhs, DeclRefBase& rhs, int* feedback);
 
+// lhs and rhs cannot be nullptr
 int compareWitnesses(ASTBuilder* astBuilder, Witness& lhs, Witness& rhs, int* feedback);
 
+// lhs and rhs cannot be nullptr
 int compareVals(ASTBuilder* astBuilder, Val& lhs, Val& rhs, int* feedback);
 
 template<typename T, class Compare>
@@ -11382,24 +11378,13 @@ int comparePtrs(T* lhs, T* rhs, Compare const& compare)
 {
     int res = 0;
     if (lhs == rhs)
-    {
         res = 0;
-    }
+    else if (!lhs)
+        res = -1;
+    else if (!rhs)
+        res = 1;
     else
-    {
-        if (!lhs)
-        {
-            res = -1;
-        }
-        else if (!rhs)
-        {
-            res = 1;
-        }
-        else
-        {
-            res = compare(*lhs, *rhs);
-        }
-    }
+        res = compare(*lhs, *rhs);
     return res;
 }
 
@@ -11431,13 +11416,13 @@ int compareDecls(ASTBuilder* astBuilder, Decl* lhs, Decl* rhs, int* feedback)
 }
 
 // lhs and rhs might be nullptr
-int compareDeclRefBases(ASTBuilder* astBuilder, DeclRefBase* lhs, DeclRefBase* rhs, int* feedback)
+int compareDeclRefs(ASTBuilder* astBuilder, DeclRefBase* lhs, DeclRefBase* rhs, int* feedback)
 {
     return comparePtrs(
         lhs,
         rhs,
         [&](DeclRefBase& lhs, DeclRefBase& rhs)
-        { return compareDeclRefBases(astBuilder, lhs, rhs, feedback); });
+        { return compareDeclRefs(astBuilder, lhs, rhs, feedback); });
 }
 
 int compareWitnesses(ASTBuilder* astBuilder, Witness* lhs, Witness* rhs, int* feedback)
@@ -11459,246 +11444,271 @@ int compareVals(ASTBuilder* astBuilder, Val* lhs, Val* rhs, int* feedback)
 
 int compareIntVals(ASTBuilder* astBuilder, IntVal& lhs, IntVal& rhs, int* feedback)
 {
-    // No risk of overflow, replace with <=> in C++20
-    int res = static_cast<int>(rhs.astNodeType) - static_cast<int>(lhs.astNodeType);
-    if (res == 0)
+    int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
+    if (res)
+        return res;
+    std::optional<int> specRes = {};
+    if (auto lC = dynamicCast<ConstantIntVal>(&lhs))
     {
-        std::optional<int> specRes = {};
-
-        if (auto lC = dynamicCast<ConstantIntVal>(&lhs))
-        {
-            auto rC = dynamicCast<ConstantIntVal>(&rhs);
-            // avoid overflow, replace with <=> in C++20
-            auto diff = rC->getValue() - lC->getValue();
-            specRes = (diff == 0 ? 0 : (diff > 0 ? 1 : -1));
-        }
-        else if (auto lGP = dynamicCast<GenericParamIntVal>(&lhs))
-        {
-            auto rGP = dynamicCast<GenericParamIntVal>(&rhs);
-            specRes = compareDecls(
-                astBuilder,
-                lGP->getDeclRef().getDecl(),
-                rGP->getDeclRef().getDecl(),
-                feedback);
-        }
-
-        if (!specRes && feedback)
-        {
-            *feedback |= (1 << 0);
-        }
-        res = specRes.value_or(0);
+        auto rC = dynamicCast<ConstantIntVal>(&rhs);
+        specRes = compareThreeWays(lC->getValue(), rC->getValue());
     }
+    else if (auto lGP = dynamicCast<GenericParamIntVal>(&lhs))
+    {
+        auto rGP = dynamicCast<GenericParamIntVal>(&rhs);
+        specRes = compareDeclRefs(astBuilder, lGP->getDeclRef(), rGP->getDeclRef(), feedback);
+    }
+    if (!specRes && feedback)
+    {
+        *feedback |= (1 << 0);
+    }
+    res = specRes.value_or(0);
     return res;
 }
 
 int compareTypes(ASTBuilder* astBuilder, Type& lhs, Type& rhs, int* feedback)
 {
-    // No risk of overflow, replace with <=> in C++20
-    int res = static_cast<int>(rhs.astNodeType) - static_cast<int>(lhs.astNodeType);
-    if (res == 0)
+    int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
+    if (res)
+        return res;
+    std::optional<int> specRes = {};
+    if (auto lDRT = dynamicCast<DeclRefType>(&lhs))
     {
-        std::optional<int> specRes = {};
-        if (auto lDRT = dynamicCast<DeclRefType>(&lhs))
-        {
-            auto rDRT = dynamicCast<DeclRefType>(&rhs);
-            auto lDecl = lDRT->getDeclRef().getDecl();
-            auto rDecl = rDRT->getDeclRef().getDecl();
-            int declComp = compareDecls(astBuilder, lDecl, rDecl, feedback);
-            if (declComp)
-            {
-                specRes = declComp;
-            }
-            else
-            {
-                auto lDRB = lDRT->getDeclRefBase();
-                auto rDRB = rDRT->getDeclRefBase();
-                int declRefBaseComp = compareDeclRefBases(astBuilder, lDRB, rDRB, feedback);
-                specRes = declRefBaseComp;
-            }
-        }
-        if (!specRes && feedback)
-        {
-            *feedback |= (1 << 1);
-        }
-        res = specRes.value_or(0);
+        auto rDRT = dynamicCast<DeclRefType>(&rhs);
+        auto lDRB = lDRT->getDeclRefBase();
+        auto rDRB = rDRT->getDeclRefBase();
+        specRes = compareDeclRefs(astBuilder, lDRB, rDRB, feedback);
     }
+    if (!specRes && feedback)
+    {
+        *feedback |= (1 << 1);
+    }
+    res = specRes.value_or(0);
     return res;
+}
+
+// Find the lowest common ancestor (LCA) of nodes a and b
+// Uppon return, a and b are modified to be direct children of the LCA
+// Returns nullptr if a and b have no common ancestor
+// (e.g. a and b are not in the same module)
+// a and b are set to each respective module
+ContainerDecl* findDeclsLowestCommonAncestor(Decl*& a, Decl*& b)
+{
+    auto ascendToRoot = [](Decl*& d)
+    {
+        UIndex depth = 0;
+        while (d->parentDecl)
+        {
+            ++depth;
+            d = d->parentDecl;
+        }
+        return depth;
+    };
+
+    Decl* aRoot = a;
+    Decl* bRoot = b;
+    auto aDepth = ascendToRoot(aRoot);
+    auto bDepth = ascendToRoot(bRoot);
+    if (aRoot != bRoot) // Not in the same tree / module
+    {
+        a = aRoot;
+        b = bRoot;
+        return nullptr;
+    }
+    // Level nodes
+    Decl** toAscend = nullptr;
+    Decl** reference = nullptr;
+    UIndex n = 0;
+    if (aDepth > bDepth)
+    {
+        toAscend = &a;
+        reference = &b;
+        n = aDepth - bDepth;
+    }
+    else if (bDepth > aDepth)
+    {
+        toAscend = &b;
+        reference = &a;
+        n = bDepth - aDepth;
+    }
+    if (n)
+    {
+        // Level until toAscend is one level under reference
+        while (n > UIndex(1))
+        {
+            *toAscend = (*toAscend)->parentDecl;
+            --n;
+        }
+        // If toAscend was a child of reference
+        if ((*toAscend)->parentDecl == *reference)
+        {
+            return (*toAscend)->parentDecl;
+        }
+        else
+        {
+            *toAscend = (*toAscend)->parentDecl;
+        }
+    }
+    while (a->parentDecl != b->parentDecl)
+    {
+        a = a->parentDecl;
+        b = b->parentDecl;
+    }
+    return a->parentDecl;
 }
 
 int compareDecls(ASTBuilder* astBuilder, Decl& lhs, Decl& rhs, int* feedback)
 {
     SLANG_UNUSED(astBuilder);
-    // No risk of overflow, replace with <=> in C++20
-    int res = static_cast<int>(rhs.astNodeType) - static_cast<int>(lhs.astNodeType);
-    if (res == 0)
+    SLANG_UNUSED(feedback);
+    int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
+    if (res)
+        return res;
+    Decl* lLCAChild = &lhs;
+    Decl* rLCAChild = &rhs;
+    if (ContainerDecl* lca = findDeclsLowestCommonAncestor(lLCAChild, rLCAChild))
     {
-        std::optional<int> specRes = {};
-        bool compareNames = false;
-
-        if (auto lGTPD = dynamicCast<GenericTypeParamDeclBase>(&lhs))
-        {
-            auto rGTPD = dynamicCast<GenericTypeParamDeclBase>(&rhs);
-            specRes = rGTPD->parameterIndex - lGTPD->parameterIndex;
-        }
-        else if (auto lInterface = dynamicCast<InterfaceDecl>(&lhs))
-        {
-            auto rInterface = dynamicCast<InterfaceDecl>(&rhs);
-            SLANG_UNUSED(lInterface);
-            SLANG_UNUSED(rInterface);
-            compareNames = true;
-        }
-
-        if (compareNames || !specRes)
-        {
-            if (!compareNames && feedback)
-            {
-                // Fallback to name comparison for lack of an implementation
-                // If we had access to a sink, we could emit a warning signal
-                *feedback |= (1 << 2);
-            }
-
-            specRes = comparePtrs(
-                lhs.getName(),
-                rhs.getName(),
-                [](Name const& lName, Name const& rName) -> int
-                { return strcmp(lName.text.begin(), rName.text.begin()); });
-        }
-
-        res = specRes.value_or(0);
+        res = compareThreeWays(lca->getDeclIndex(lLCAChild), lca->getDeclIndex(rLCAChild));
+    }
+    else
+    {
+        res = comparePtrs(
+            lLCAChild->getName(),
+            rLCAChild->getName(),
+            [](Name const& lName, Name const& rName)
+            { return strcmp(lName.text.begin(), rName.text.begin()); });
     }
     return res;
 }
 
-int compareDeclRefBases(ASTBuilder* astBuilder, DeclRefBase& lhs, DeclRefBase& rhs, int* feedback)
+int compareDeclRefs(ASTBuilder* astBuilder, DeclRefBase& lhs, DeclRefBase& rhs, int* feedback)
 {
     SLANG_UNUSED(astBuilder);
-    // No risk of overflow, replace with <=> in C++20
-    int res = static_cast<int>(rhs.astNodeType) - static_cast<int>(lhs.astNodeType);
-    if (res == 0)
+    int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
+    if (res)
+        return res;
+    auto lDecl = lhs.getDecl();
+    auto rDecl = rhs.getDecl();
+    res = compareDecls(astBuilder, lDecl, rDecl, feedback);
+    if (res)
+        return res;
+    std::optional<int> specRes = {};
+    if (auto lDirect = as<DirectDeclRef>(&lhs))
     {
-        std::optional<int> specRes = {};
-
-        if (auto lDirect = dynamicCast<DirectDeclRef>(&lhs))
-        {
-            auto rDirect = dynamicCast<DirectDeclRef>(&rhs);
-            SLANG_UNUSED(lDirect);
-            SLANG_UNUSED(rDirect);
-            specRes = 0;
-        }
-        if (auto lGeneric = dynamicCast<GenericAppDeclRef>(&lhs))
-        {
-            auto rGeneric = dynamicCast<GenericAppDeclRef>(&rhs);
-            if (lGeneric->getArgCount() == rGeneric->getArgCount())
-            {
-                for (Index i = 0; i < lGeneric->getArgCount(); ++i)
-                {
-                    auto lArg = lGeneric->getArg(i);
-                    auto rArg = rGeneric->getArg(i);
-                    int compArgs = compareVals(astBuilder, lArg, rArg, feedback);
-                    if (compArgs)
-                    {
-                        specRes = compArgs;
-                        break;
-                    }
-                }
-                if (!specRes)
-                {
-                    specRes = 0;
-                }
-            }
-            else
-            {
-                // No risk of overflow, replace with <=> in C++20
-                specRes = static_cast<int>(rGeneric->getArgCount() - rGeneric->getArgCount());
-            }
-        }
-        else if (auto lLookup = dynamicCast<LookupDeclRef>(&lhs))
-        {
-            auto rLookup = dynamicCast<LookupDeclRef>(&rhs);
-            specRes = compareWitnesses(
-                astBuilder,
-                lLookup->getWitness(),
-                rLookup->getWitness(),
-                feedback);
-        }
-        else if (auto lMember = dynamicCast<MemberDeclRef>(&lhs))
-        {
-            auto rMember = dynamicCast<MemberDeclRef>(&rhs);
-            specRes = compareDeclRefBases(
-                astBuilder,
-                lMember->getParentOperand(),
-                rMember->getParentOperand(),
-                feedback);
-        }
-
-        if (!specRes.has_value() && feedback)
-        {
-            *feedback |= (1 << 3);
-        }
-        res = specRes.value_or(0);
+        auto rDirect = as<DirectDeclRef>(&rhs);
+        SLANG_UNUSED(lDirect);
+        SLANG_UNUSED(rDirect);
+        specRes = 0;
     }
+    else if (auto lGeneric = as<GenericAppDeclRef>(&lhs))
+    {
+        auto rGeneric = as<GenericAppDeclRef>(&rhs);
+        if (lGeneric->getArgCount() == rGeneric->getArgCount())
+        {
+            for (Index i = 0; i < lGeneric->getArgCount(); ++i)
+            {
+                auto lArg = lGeneric->getArg(i);
+                auto rArg = rGeneric->getArg(i);
+                int compArgs = compareVals(astBuilder, lArg, rArg, feedback);
+                if (compArgs)
+                {
+                    specRes = compArgs;
+                    break;
+                }
+            }
+            if (!specRes)
+            {
+                specRes = 0;
+            }
+        }
+        else
+        {
+            specRes = compareThreeWays(lGeneric->getArgCount(), rGeneric->getArgCount());
+        }
+    }
+    else if (auto lLookup = as<LookupDeclRef>(&lhs))
+    {
+        auto rLookup = as<LookupDeclRef>(&rhs);
+        specRes =
+            compareWitnesses(astBuilder, lLookup->getWitness(), rLookup->getWitness(), feedback);
+    }
+    else if (auto lMember = as<MemberDeclRef>(&lhs))
+    {
+        auto rMember = as<MemberDeclRef>(&rhs);
+        specRes = compareDeclRefs(
+            astBuilder,
+            lMember->getParentOperand(),
+            rMember->getParentOperand(),
+            feedback);
+    }
+    if (!specRes.has_value() && feedback)
+    {
+        *feedback |= (1 << 3);
+    }
+    res = specRes.value_or(0);
     return res;
 }
 
 int compareWitnesses(ASTBuilder* astBuilder, Witness& lhs, Witness& rhs, int* feedback)
 {
     SLANG_UNUSED(astBuilder);
-    // No risk of overflow, replace with <=> in C++20
-    int res = static_cast<int>(rhs.astNodeType) - static_cast<int>(lhs.astNodeType);
-    if (res == 0)
+    int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
+    if (res)
+        return res;
+    std::optional<int> specRes = {};
+    if (auto lSubtype = dynamicCast<SubtypeWitness>(&lhs))
     {
-        std::optional<int> specRes = {};
-
-        if (auto lSubtype = dynamicCast<SubtypeWitness>(&lhs))
+        auto rSubtype = dynamicCast<SubtypeWitness>(&rhs);
+        int compSub = compareTypes(astBuilder, lSubtype->getSub(), rSubtype->getSub(), feedback);
+        if (compSub)
         {
-            auto rSubtype = dynamicCast<SubtypeWitness>(&rhs);
+            specRes = compSub;
         }
-
-        if (!specRes && feedback)
+        else
         {
-            *feedback |= (1 << 4);
+            specRes = compareTypes(astBuilder, lSubtype->getSup(), rSubtype->getSup(), feedback);
         }
-        res = specRes.value_or(0);
     }
+    if (!specRes && feedback)
+    {
+        *feedback |= (1 << 4);
+    }
+    res = specRes.value_or(0);
     return res;
 }
 
 int compareVals(ASTBuilder* astBuilder, Val& lhs, Val& rhs, int* feedback)
 {
     SLANG_UNUSED(astBuilder);
-    // No risk of overflow, replace with <=> in C++20
-    int res = static_cast<int>(rhs.astNodeType) - static_cast<int>(lhs.astNodeType);
-    if (res == 0)
+    int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
+    if (res)
+        return res;
+    std::optional<int> specRes = {};
+    if (auto lType = dynamicCast<Type>(&lhs))
     {
-        std::optional<int> specRes = {};
-
-        if (auto lType = dynamicCast<Type>(&lhs))
-        {
-            auto rType = dynamicCast<Type>(&rhs);
-            specRes = compareTypes(astBuilder, *lType, *rType, feedback);
-        }
-        else if (auto lInt = dynamicCast<IntVal>(&lhs))
-        {
-            auto rInt = dynamicCast<IntVal>(&rhs);
-            specRes = compareIntVals(astBuilder, *lInt, *rInt, feedback);
-        }
-        else if (auto lDRB = dynamicCast<DeclRefBase>(&lhs))
-        {
-            auto rDRB = dynamicCast<DeclRefBase>(&rhs);
-            specRes = compareDeclRefBases(astBuilder, *lDRB, *rDRB, feedback);
-        }
-        else if (auto lWitness = dynamicCast<Witness>(&lhs))
-        {
-            auto rWitness = dynamicCast<Witness>(&rhs);
-            specRes = compareWitnesses(astBuilder, *lWitness, *rWitness, feedback);
-        }
-
-        if (!specRes && feedback)
-        {
-            *feedback |= (1 << 5);
-        }
-        res = specRes.value_or(0);
+        auto rType = dynamicCast<Type>(&rhs);
+        specRes = compareTypes(astBuilder, *lType, *rType, feedback);
     }
+    else if (auto lInt = dynamicCast<IntVal>(&lhs))
+    {
+        auto rInt = dynamicCast<IntVal>(&rhs);
+        specRes = compareIntVals(astBuilder, *lInt, *rInt, feedback);
+    }
+    else if (auto lDRB = dynamicCast<DeclRefBase>(&lhs))
+    {
+        auto rDRB = dynamicCast<DeclRefBase>(&rhs);
+        specRes = compareDeclRefs(astBuilder, *lDRB, *rDRB, feedback);
+    }
+    else if (auto lWitness = dynamicCast<Witness>(&lhs))
+    {
+        auto rWitness = dynamicCast<Witness>(&rhs);
+        specRes = compareWitnesses(astBuilder, *lWitness, *rWitness, feedback);
+    }
+    if (!specRes && feedback)
+    {
+        *feedback |= (1 << 5);
+    }
+    res = specRes.value_or(0);
     return res;
 }
 

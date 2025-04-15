@@ -179,8 +179,7 @@ DeclStmt* ASTSynthesizer::emitVarDeclStmt(Type* type, Name* name, Expr* initVal)
     varDecl->type.type = type;
     varDecl->nameAndLoc.name = name;
     varDecl->initExpr = initVal;
-    varDecl->parentDecl = scope.m_scope->containerDecl;
-    varDecl->parentDecl->members.add(varDecl);
+    scope.m_scope->containerDecl->addMember(varDecl);
     auto stmt = m_builder->create<DeclStmt>();
     stmt->decl = varDecl;
     _addStmtToScope(stmt);

@@ -663,8 +663,7 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 auto structDecl = m_astBuilder->create<StructDecl>();
                 auto conformanceDecl = m_astBuilder->create<InheritanceDecl>();
                 conformanceDecl->base.type = m_astBuilder->getDiffInterfaceType();
-                conformanceDecl->parentDecl = structDecl;
-                structDecl->members.add(conformanceDecl);
+                structDecl->addMember(conformanceDecl);
                 structDecl->parentDecl = parent;
 
                 synthesizedDecl = structDecl;
@@ -697,7 +696,6 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 //
                 auto typeDef = m_astBuilder->create<TypeAliasDecl>();
                 typeDef->nameAndLoc.name = item.declRef.getName();
-                typeDef->parentDecl = parent;
 
                 // Compute the decl's type as if it is referred to from itself. This is important
                 // because subType may have substitutions from the context it is used in, while this
@@ -708,7 +706,7 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
 
                 synthesizedDecl = parent;
 
-                parent->members.add(typeDef);
+                parent->addMember(typeDef);
                 parent->invalidateMemberDictionary();
 
                 markSelfDifferentialMembersOfType(parent, subType);
