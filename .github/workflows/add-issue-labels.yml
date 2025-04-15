@@ -21,7 +21,7 @@ jobs:
         id: check_team
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.SLANGBOT_PAT }}
+          github-token: ${{ secrets.SLANGBOT_MEMBERS_READONLY }}
           script: |
             const response = await github.rest.teams.listMembersInOrg({
               org: 'shader-slang',
@@ -46,7 +46,7 @@ jobs:
         if: steps.check_team.outputs.is_team_member == 'true'
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.SLANGBOT_PAT }}
+          github-token: ${{ secrets.SLANGBOT_ISSUES_WRITE }}
           script: |
             // Only add label if this is a real issue and not a test run
             if (context.eventName === 'issues') {

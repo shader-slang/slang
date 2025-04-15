@@ -295,7 +295,7 @@ static void emitUserAttributeJSON(PrettyWriter& writer, slang::UserAttribute* us
         }
         else if (auto str = userAttribute->getArgumentValueString(i, &bufSize))
         {
-            writer.write(str, bufSize);
+            writer.writeEscapedString(UnownedStringSlice(str, bufSize));
         }
         else
             writer << "\"invalid value\"";
@@ -303,7 +303,7 @@ static void emitUserAttributeJSON(PrettyWriter& writer, slang::UserAttribute* us
     writer.dedent();
     writer << "\n]\n";
     writer.dedent();
-    writer << "}\n";
+    writer << "}";
 }
 
 static void emitUserAttributes(PrettyWriter& writer, slang::TypeReflection* type)
@@ -311,7 +311,8 @@ static void emitUserAttributes(PrettyWriter& writer, slang::TypeReflection* type
     auto attribCount = type->getUserAttributeCount();
     if (attribCount)
     {
-        writer << ",\n\"userAttribs\": [";
+        writer << ",\n\"userAttribs\": [\n";
+        writer.indent();
         for (unsigned int i = 0; i < attribCount; i++)
         {
             if (i > 0)
@@ -319,7 +320,8 @@ static void emitUserAttributes(PrettyWriter& writer, slang::TypeReflection* type
             auto attrib = type->getUserAttributeByIndex(i);
             emitUserAttributeJSON(writer, attrib);
         }
-        writer << "]";
+        writer.dedent();
+        writer << "\n]";
     }
 }
 static void emitUserAttributes(PrettyWriter& writer, slang::VariableReflection* var)
@@ -327,7 +329,8 @@ static void emitUserAttributes(PrettyWriter& writer, slang::VariableReflection* 
     auto attribCount = var->getUserAttributeCount();
     if (attribCount)
     {
-        writer << ",\n\"userAttribs\": [";
+        writer << ",\n\"userAttribs\": [\n";
+        writer.indent();
         for (unsigned int i = 0; i < attribCount; i++)
         {
             if (i > 0)
@@ -335,7 +338,8 @@ static void emitUserAttributes(PrettyWriter& writer, slang::VariableReflection* 
             auto attrib = var->getUserAttributeByIndex(i);
             emitUserAttributeJSON(writer, attrib);
         }
-        writer << "]";
+        writer.dedent();
+        writer << "\n]";
     }
 }
 static void emitUserAttributes(PrettyWriter& writer, slang::FunctionReflection* func)
@@ -343,7 +347,8 @@ static void emitUserAttributes(PrettyWriter& writer, slang::FunctionReflection* 
     auto attribCount = func->getUserAttributeCount();
     if (attribCount)
     {
-        writer << ",\n\"userAttribs\": [";
+        writer << ",\n\"userAttribs\": [\n";
+        writer.indent();
         for (unsigned int i = 0; i < attribCount; i++)
         {
             if (i > 0)
@@ -351,7 +356,8 @@ static void emitUserAttributes(PrettyWriter& writer, slang::FunctionReflection* 
             auto attrib = func->getUserAttributeByIndex(i);
             emitUserAttributeJSON(writer, attrib);
         }
-        writer << "]";
+        writer.dedent();
+        writer << "\n]";
     }
 }
 

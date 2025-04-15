@@ -3154,6 +3154,14 @@ protected:
                 result.permittedTypes.add(builder.getBasicType(BaseType::Float));
                 break;
             }
+        case SystemValueSemanticName::PointCoord:
+            {
+                result.systemValueName = toSlice("point_coord");
+                result.permittedTypes.add(builder.getVectorType(
+                    builder.getBasicType(BaseType::Float),
+                    builder.getIntValue(builder.getIntType(), 2)));
+                break;
+            }
         case SystemValueSemanticName::PrimitiveID:
             {
                 result.systemValueName = toSlice("primitive_id");
@@ -3804,6 +3812,7 @@ protected:
 
         case SystemValueSemanticName::OutputControlPointID:
         case SystemValueSemanticName::PointSize:
+        case SystemValueSemanticName::PointCoord:
             {
                 result.isUnsupported = true;
             }

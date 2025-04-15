@@ -2622,6 +2622,11 @@ DIAGNOSTIC(
     resourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal,
     "nesting a 'ConstantBuffer' containing resource types inside a 'ParameterBlock' is not "
     "supported on Metal, please use 'ParameterBlock' instead.")
+DIAGNOSTIC(
+    56102,
+    Error,
+    divisionByMatrixNotSupported,
+    "division by matrix is not supported for Metal and WGSL targets.")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")

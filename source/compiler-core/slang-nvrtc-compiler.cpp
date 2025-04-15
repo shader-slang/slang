@@ -705,6 +705,19 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
         }
     }
 
+#if SLANG_LINUX_FAMILY
+    // Try /usr/include
+    {
+        String includePath = "/usr/include";
+
+        if (File::exists(Path::combine(includePath, g_fp16HeaderName)))
+        {
+            outPath = includePath;
+            return SLANG_OK;
+        }
+    }
+#endif
+
     return SLANG_E_NOT_FOUND;
 }
 

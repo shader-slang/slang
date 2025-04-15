@@ -651,6 +651,13 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         name = "gl_PointSize";
         requiredType = builder->getBasicType(BaseType::Float);
     }
+    else if (semanticName == "sv_pointcoord")
+    {
+        name = "gl_PointCoord";
+        requiredType = builder->getVectorType(
+            builder->getBasicType(BaseType::Float),
+            builder->getIntValue(builder->getIntType(), 2));
+    }
     else if (semanticName == "sv_drawindex")
     {
         name = "gl_DrawID";

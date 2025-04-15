@@ -62,6 +62,7 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_IsFrontFace`              | `BuiltIn FrontFacing`             |
 | `SV_OutputControlPointID`     | `BuiltIn InvocationId`            |
 | `SV_PointSize`<sup>*</sup>    | `BuiltIn PointSize`               |
+| `SV_PointCoord`<sup>*</sup>   | `BuiltIn PointCoord`              |
 | `SV_Position`                 | `BuiltIn Position/FragCoord`      |
 | `SV_PrimitiveID`              | `BuiltIn PrimitiveId`             |
 | `SV_RenderTargetArrayIndex`   | `BuiltIn Layer`                   |
@@ -76,7 +77,7 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_ViewID`                   | `BuiltIn ViewIndex`               |
 | `SV_ViewportArrayIndex`       | `BuiltIn ViewportIndex`           |
 
-*Note* that `SV_DrawIndex` and `SV_PointSize` are Slang-specific semantics that are not defined in HLSL.
+*Note* that `SV_DrawIndex`, `SV_PointSize` and `SV_PointCoord` are Slang-specific semantics that are not defined in HLSL.
 
 
 Behavior of `discard` after SPIR-V 1.6
