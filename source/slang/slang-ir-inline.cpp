@@ -431,8 +431,7 @@ struct InliningPassBase
                         locationDecor->getLine(),
                         locationDecor->getCol(),
                         locationDecor->getSource(),
-                        debugType,
-                        callee);
+                        debugType);
                 }
 
                 // Find or create debug function for parent function
@@ -449,8 +448,7 @@ struct InliningPassBase
                         locationDecor->getLine(),
                         locationDecor->getCol(),
                         locationDecor->getSource(),
-                        debugType,
-                        parentFunc);
+                        debugType);
                 }
 
                 // The debugInlinedAt needs to be cloned for each inlining call because our algorithm
@@ -461,7 +459,7 @@ struct InliningPassBase
                     lastDebugLine->getColStart(),
                     lastDebugLine->getSource(),
                     debugFuncParent,
-                    debugFuncParent);
+                    nullptr);
 
                 if (outDebugFunc)
                     *outDebugFunc = debugFuncCurrent;
@@ -507,11 +505,6 @@ struct InliningPassBase
         if (auto intrinsicOpDecor = callee->findDecoration<IRIntrinsicOpDecoration>())
         {
             IRDebugLine* lastDebugLine = nullptr;
-            IRInst* debugInlinedAt = nullptr;
-            // TODO: Lot of CI failures with Slang IR validation fails with debug info for intrinsics.
-            // eg: autodiff/generic-accessors. So disabling this for now.
-            bool enableDebugInfoForIntrinsics = false;
-            
             for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
             {
                 if (auto debugLine = as<IRDebugLine>(inst))
@@ -519,22 +512,6 @@ struct InliningPassBase
                     lastDebugLine = debugLine;
                     break;
                 }
-            }
-            
-            if (lastDebugLine && enableDebugInfoForIntrinsics)
-            {
-                debugInlinedAt = builder.emitDebugInlinedAt(
-                    lastDebugLine->getLineStart(),
-                    lastDebugLine->getColStart(),
-                    lastDebugLine->getSource(),
-                    callee,
-                    nullptr);
-            }
-            
-            // Only emit debug scope if we have valid debug information
-            if (debugInlinedAt)
-            {
-                builder.emitDebugScope(call, debugInlinedAt);
             }
 
             List<IRInst*> args;
@@ -554,11 +531,16 @@ struct InliningPassBase
                     args.getCount(),
                     args.getBuffer());
                 call->replaceUsesWith(newCall);
-            }
 
-            if (debugInlinedAt)
-            {
-                builder.emitDebugNoScope();
+                if (lastDebugLine)
+                {
+                    builder.emitDebugInlinedAt(
+                        lastDebugLine->getLineStart(),
+                        lastDebugLine->getColStart(),
+                        lastDebugLine->getSource(),
+                        newCall,
+                        nullptr);
+                }
             }
 
             call->removeAndDeallocate();
@@ -721,7 +703,7 @@ struct InliningPassBase
         SLANG_ASSERT(!firstBlock->getNextBlock());
 
         // emit debug information
-        if (callee->findDecoration<IRDebugLocationDecoration>())
+        if (callee->findDecoration<IRDebugLocationDecoration>() && debugInlinedAt)
         {
             IRInst* firstOrdinaryInst = callee->getFirstBlock()->getFirstOrdinaryInst();
             IRInst* lastOrdinaryInst = callee->getFirstBlock()->getLastOrdinaryInst();

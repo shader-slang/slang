@@ -79,7 +79,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
 
 // TODO: Verified manually that the count in the .actual file is 21. 
-// But the pattern matcher complains to match.
+// Seems like the pattern matcher has an issue. It points to the line after 
+// the last debugscope.
 // _CHECK-COUNT-21: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
 // _CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
 

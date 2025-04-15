@@ -1,5 +1,5 @@
-// TODO: Emitting intrinsics fails many autodiff tests. Disable for now.
-//TEST_DISABLED:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -O0 -g3
+// TODO: This test fails on mtl. Enabling it only on Windows.
+//TEST(windows):SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -O0 -g3
 RWStructuredBuffer<int> outputBuffer;
 
 // This tests debug information for intrinsic operations with enum conversions.
@@ -32,6 +32,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
 // CHECK-COUNT-1: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugInlinedAt %uint_{{[0-9]+}} %{{[0-9]+}}
 // CHECK-NOT:  %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugInlinedAt %uint_{{[0-9]+}} %{{[0-9]+}}
-// CHECK: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope
-// CHECK-COUNT-1: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
-// CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope

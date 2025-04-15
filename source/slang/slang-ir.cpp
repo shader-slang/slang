@@ -3422,10 +3422,10 @@ IRInst* IRBuilder::emitDebugInlinedAt(
     return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedAt, 5, args);
 }
 
-IRInst* IRBuilder::emitDebugFunction(IRInst* name, IRInst* line, IRInst* col, IRInst* file, IRInst* debugType, IRInst* func)
+IRInst* IRBuilder::emitDebugFunction(IRInst* name, IRInst* line, IRInst* col, IRInst* file, IRInst* debugType)
 {
-    IRInst* args[] = {name, line, col, file, debugType, func};
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 6, args);
+    IRInst* args[] = {name, line, col, file, debugType};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 5, args);
 }
 
 IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)

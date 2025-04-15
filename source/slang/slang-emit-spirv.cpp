@@ -7380,11 +7380,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto debugType = emitDebugType(as<IRType>(debugFunc->getDebugType()));
         IRBuilder builder(debugFunc);
 
-        IRInst* irFunc = debugFunc->getFunc();
-
         SpvInst* debugFuncInfo = nullptr;
         // We've already emitted, don't emit again.
-        if (m_mapIRInstToSpvDebugInst.tryGetValue(irFunc, debugFuncInfo))
+        if (m_mapIRInstToSpvDebugInst.tryGetValue(debugFunc->getName(), debugFuncInfo))
         {
             return debugFuncInfo;
         }
@@ -7404,7 +7402,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             builder.getIntValue(builder.getUIntType(), 0),
             debugFunc->getLine());
 
-        registerDebugInst(irFunc, debugFuncInfo);
+        registerDebugInst(debugFunc->getName(), debugFuncInfo);
 
         return debugFuncInfo;
     }
@@ -7948,7 +7946,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRBuilder builder(function);
 
         SpvInst* debugFunc = nullptr;
-        if (m_mapIRInstToSpvDebugInst.tryGetValue(function, debugFunc))
+        if (m_mapIRInstToSpvDebugInst.tryGetValue(name, debugFunc))
         {
             return debugFunc;
         }
@@ -7968,7 +7966,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             builder.getIntValue(builder.getUIntType(), 0),
             debugLoc->getLine());
 
-        registerDebugInst(function, debugFunc);
+        registerDebugInst(name, debugFunc);
 
         emitOpDebugFunctionDefinition(
             firstBlock,
