@@ -1930,7 +1930,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_PrimitivesType:
             return nullptr;
         case kIROp_DebugFunction:
-            return emitDebugInlinedFunction(getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            return emitDebugInlinedFunction(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 as<IRDebugFunction>(inst));
         case kIROp_DebugInlinedAt:
             return emitDebugInlinedAt(
@@ -4067,7 +4068,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             break;
         case kIROp_DebugFunction:
-            return emitDebugInlinedFunction(getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            return emitDebugInlinedFunction(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 as<IRDebugFunction>(inst));
         case kIROp_DebugInlinedAt:
             return emitDebugInlinedAt(
@@ -7376,7 +7378,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto scope = findDebugScope(debugFunc);
         if (!scope)
             return nullptr;
-        
+
         auto debugType = emitDebugType(as<IRType>(debugFunc->getDebugType()));
         IRBuilder builder(debugFunc);
 

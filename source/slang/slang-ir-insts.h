@@ -3977,11 +3977,21 @@ public:
         IRInst* col,
         IRInst* argIndex = nullptr);
     IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue);
-    IRInst* emitDebugInlinedAt(IRInst* line, IRInst* col, IRInst* file, IRInst* outerInlinedAt, IRInst* debugFunc);
+    IRInst* emitDebugInlinedAt(
+        IRInst* line,
+        IRInst* col,
+        IRInst* file,
+        IRInst* outerInlinedAt,
+        IRInst* debugFunc);
     IRInst* emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt);
     IRInst* emitDebugScope(IRInst* scope, IRInst* inlinedAt);
     IRInst* emitDebugNoScope();
-    IRInst* emitDebugFunction(IRInst* name, IRInst* line, IRInst* col, IRInst* file, IRInst* debugType);
+    IRInst* emitDebugFunction(
+        IRInst* name,
+        IRInst* line,
+        IRInst* col,
+        IRInst* file,
+        IRInst* debugType);
 
     /// Emit an LiveRangeStart instruction indicating the referenced item is live following this
     /// instruction
