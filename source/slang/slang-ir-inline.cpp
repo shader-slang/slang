@@ -35,49 +35,11 @@ struct InliningPassBase
 
     HashSet<IRInst*>* m_modifiedFuncs = nullptr;
 
-    // Flag to control debugging output
-    bool m_dumpDebugIR = false;
-
     /// Initialize an inlining pass to operate on the given `module`
     InliningPassBase(IRModule* module)
         : m_module(module)
     {
     }
-
-#if 0
-    // Helper function to dump IR during inlining if debug is enabled
-    void dumpInlineIR(const char* label, IRInst* relevantInst = nullptr)
-    {
-        char tempFilename[256];
-        snprintf(tempFilename, sizeof(tempFilename), "slang-inline-debug-%s.ir", label);
-
-        FILE* file = fopen(tempFilename, "a");
-        if (!file)
-            return;
-
-        FileWriter fileWriter(file, 0);
-        if (label)
-        {
-            fileWriter.write("### ", 4);
-            fileWriter.write(label, strlen(label));
-            fileWriter.write(":\n", 2);
-        }
-
-        if (relevantInst)
-        {
-            dumpIR(relevantInst, IRDumpOptions(), nullptr, &fileWriter);
-        }
-        else
-        {
-            dumpIR(m_module, IRDumpOptions(), nullptr, &fileWriter);
-        }
-            
-        if (label)
-        {
-            fileWriter.write("\n###\n", 5);
-        }
-    }
-#endif
 
     /// Consider all the call sites in the module for inlining
     bool considerAllCallSites() { return considerAllCallSitesRec(m_module->getModuleInst()); }
@@ -333,42 +295,20 @@ struct InliningPassBase
         return true;
     }
 
-    /// Find an existing debug function with the given name in the module
-    IRInst* findExistingDebugFunc(IRStringLit* nameOperand)
+    /// Find an existing debug function for the given function
+    IRInst* findExistingDebugFunc(IRFunc* func)
     {
-        // If no name is provided, we can't find a matching debug function
-        if (!nameOperand)
+        if (!func)
             return nullptr;
 
-        UnownedStringSlice name = nameOperand->getStringSlice();
-        if (name.getLength() == 0)
-            return nullptr;
-
-        // Start at the first instruction after the debug source
-        IRInst* inst = m_module->getModuleInst()->getFirstChild();
-        while (inst && !as<IRDebugSource>(inst))
+        // Look for a DebugFunctionDecoration on the function
+        for (auto decor : func->getDecorations())
         {
-            inst = inst->getNextInst();
-        }
-
-        // If we found the debug source, start checking from the next instruction
-        if (inst)
-            inst = inst->getNextInst();
-
-        // Check all instructions after the debug source
-        while (inst)
-        {
-            // If we found a debug function with a matching name, return it
-            if (auto debugFunc = as<IRDebugFunction>(inst))
+            if (decor->getOp() == kIROp_DebugFunctionDecoration)
             {
-                if (name == as<IRStringLit>(debugFunc->getName())->getStringSlice())
-                {
-                    return debugFunc;
-                }
+                return decor->getOperand(0);
             }
-            inst = inst->getNextInst();
         }
-
         return nullptr;
     }
 
@@ -384,7 +324,11 @@ struct InliningPassBase
         IRInst* debugFuncParent = nullptr;
         IRInst* debugFuncCurrent = nullptr;
 
-        if (callee->findDecoration<IRDebugLocationDecoration>())
+        if (!callee->findDecoration<IRDebugLocationDecoration>())
+        {
+            return nullptr;
+        }
+        else
         {
             // Set insertion point to module's global scope. Insert it right after
             // the DebugSource instruction.
@@ -410,55 +354,55 @@ struct InliningPassBase
 
             if (lastDebugLine)
             {
-                IRStringLit* nameOperandCurrent = nullptr;
-                IRStringLit* nameOperandParent = nullptr;
                 auto parentFunc = getParentFunc(call);
 
-                // Get name operands for current and parent functions
-                if (auto nameHint = callee->findDecoration<IRNameHintDecoration>())
-                {
-                    nameOperandCurrent = as<IRStringLit>(nameHint->getNameOperand());
-                }
-
-                if (auto nameHint =
-                        parentFunc ? parentFunc->findDecoration<IRNameHintDecoration>() : nullptr)
-                {
-                    nameOperandParent = as<IRStringLit>(nameHint->getNameOperand());
-                }
-
                 // Find or create debug function for current function
-                debugFuncCurrent = findExistingDebugFunc(nameOperandCurrent);
-                if (!debugFuncCurrent && nameOperandCurrent)
+                debugFuncCurrent = findExistingDebugFunc(callee);
+                if (!debugFuncCurrent)
                 {
-                    auto locationDecor = callee->findDecoration<IRDebugLocationDecoration>();
-                    IRInst* debugType = callee->getDataType();
+                    auto nameHint = callee->findDecoration<IRNameHintDecoration>();
+                    IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
+                    if (nameOperand)
+                    {
+                        auto locationDecor = callee->findDecoration<IRDebugLocationDecoration>();
+                        IRInst* debugType = callee->getDataType();
 
-                    debugFuncCurrent = builder.emitDebugFunction(
-                        nameOperandCurrent,
-                        locationDecor->getLine(),
-                        locationDecor->getCol(),
-                        locationDecor->getSource(),
-                        debugType);
+                        debugFuncCurrent = builder.emitDebugFunction(
+                            nameOperand,
+                            locationDecor->getLine(),
+                            locationDecor->getCol(),
+                            locationDecor->getSource(),
+                            debugType);
+                        
+                        // Add a decoration to link the function to its debug function
+                        builder.addDecoration(callee, kIROp_DebugFunctionDecoration, debugFuncCurrent);
+                    }
                 }
 
                 // Find or create debug function for parent function
-                debugFuncParent = findExistingDebugFunc(nameOperandParent);
-                if (!debugFuncParent && nameOperandParent)
+                debugFuncParent = findExistingDebugFunc(parentFunc);
+                if (!debugFuncParent && parentFunc)
                 {
-                    IRInst* debugType = callee->getDataType();
+                    auto nameHint = parentFunc->findDecoration<IRNameHintDecoration>();
+                    IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
+                    if (nameOperand)
+                    {
+                        IRInst* debugType = parentFunc->getDataType();
 
-                    auto locationDecor =
-                        parentFunc ? parentFunc->findDecoration<IRDebugLocationDecoration>()
-                                   : callee->findDecoration<IRDebugLocationDecoration>();
-                    if (!locationDecor)
-                        locationDecor = callee->findDecoration<IRDebugLocationDecoration>();
+                        auto locationDecor = parentFunc->findDecoration<IRDebugLocationDecoration>();
+                        if (!locationDecor)
+                            locationDecor = callee->findDecoration<IRDebugLocationDecoration>();
 
-                    debugFuncParent = builder.emitDebugFunction(
-                        nameOperandParent,
-                        locationDecor->getLine(),
-                        locationDecor->getCol(),
-                        locationDecor->getSource(),
-                        debugType);
+                        debugFuncParent = builder.emitDebugFunction(
+                            nameOperand,
+                            locationDecor->getLine(),
+                            locationDecor->getCol(),
+                            locationDecor->getSource(),
+                            debugType);
+                        
+                        // Add a decoration to link the function to its debug function
+                        builder.addDecoration(parentFunc, kIROp_DebugFunctionDecoration, debugFuncParent);
+                    }
                 }
 
                 // The debugInlinedAt needs to be cloned for each inlining call because our
@@ -468,13 +412,11 @@ struct InliningPassBase
                     lastDebugLine->getLineStart(),
                     lastDebugLine->getColStart(),
                     lastDebugLine->getSource(),
-                    debugFuncParent,
-                    nullptr);
+                    nullptr,
+                    debugFuncParent);
 
                 if (outDebugFunc)
                     *outDebugFunc = debugFuncCurrent;
-
-                // dumpInlineIR("emit-func", m_module->getModuleInst());
             }
 
             if (debugInlinedAt)
@@ -548,8 +490,8 @@ struct InliningPassBase
                         lastDebugLine->getLineStart(),
                         lastDebugLine->getColStart(),
                         lastDebugLine->getSource(),
-                        newCall,
-                        nullptr);
+                        nullptr,
+                        newCall);
                 }
             }
 
@@ -728,7 +670,7 @@ struct InliningPassBase
             }
             else
             {
-                debugScope->setOperand(1, debugInlinedAt);
+                debugScope->setInlinedAt(debugInlinedAt);
             }
             // Check if the last ordinary instruction is a terminator
             if (as<IRTerminatorInst>(lastOrdinaryInst))
@@ -915,7 +857,6 @@ struct InliningPassBase
         {
             auto clonedBlock = env->mapOldValToNew.getValue(calleeBlock);
             builder->setInsertInto(clonedBlock);
-
             // We will loop over the instructions of the each block,
             // and clone each of them appropriately.
             //
@@ -1014,7 +955,6 @@ struct InliningPassBase
             IRInst* firstDebugScope = nullptr;
             for (auto inst : calleeBlock->getChildren())
             {
-                // dumpInlineIR("inst", inst);
                 if (as<IRDebugScope>(inst))
                 {
                     firstDebugScope = inst;
@@ -1043,7 +983,7 @@ struct InliningPassBase
             // debugInlinedAt.
             else
             {
-                firstDebugScope->setOperand(1, debugInlinedAt);
+                as<IRDebugScope>(firstDebugScope)->setInlinedAt(debugInlinedAt);
             }
 
             // Emit a debugNoScope if needed:
@@ -1109,7 +1049,7 @@ struct InliningPassBase
 
                     if (outerInlinedAt && (inlinedAt != outerInlinedAt))
                     {
-                        inlinedAt->setOperand(3, outerInlinedAt);
+                        inlinedAt->setOuterInlinedAt(outerInlinedAt);
                         inlinedAtStack.push(inlinedAt);
                     }
                     else

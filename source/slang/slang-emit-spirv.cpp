@@ -7327,7 +7327,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto scope = findDebugScope(debugLine);
         if (!scope)
             return nullptr;
-
         return emitOpDebugLine(
             parent,
             debugLine,
@@ -7384,7 +7383,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         SpvInst* debugFuncInfo = nullptr;
         // We've already emitted, don't emit again.
-        if (m_mapIRInstToSpvDebugInst.tryGetValue(debugFunc->getName(), debugFuncInfo))
+        if (m_mapIRInstToSpvDebugInst.tryGetValue(debugFunc, debugFuncInfo))
         {
             return debugFuncInfo;
         }
@@ -7404,7 +7403,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             builder.getIntValue(builder.getUIntType(), 0),
             debugFunc->getLine());
 
-        registerDebugInst(debugFunc->getName(), debugFuncInfo);
+        registerDebugInst(debugFunc, debugFuncInfo);
 
         return debugFuncInfo;
     }
@@ -7947,10 +7946,35 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto debugType = emitDebugType(function->getDataType());
         IRBuilder builder(function);
 
+        // Look for a DebugFunctionDecoration on the function. If it has,
+        // then it means that we have emitted a IRDebugFunction for this func.
+        // So, instead of storing the func in the m_mapIRInstToSpvDebugInst,
+        // we instead store the IRDebugFunction. This way, we avoid the same
+        // function getting emitted again via emitDebugInlinedFunction.
+        IRDebugFunction* irDebugFunc = nullptr;
         SpvInst* debugFunc = nullptr;
-        if (m_mapIRInstToSpvDebugInst.tryGetValue(name, debugFunc))
+        for (auto decor : function->getDecorations())
         {
-            return debugFunc;
+            if (decor->getOp() == kIROp_DebugFunctionDecoration)
+            {
+                irDebugFunc = as<IRDebugFunction>(decor->getOperand(0));
+                break;
+            }
+        }
+
+        if (irDebugFunc)
+        {
+            if (m_mapIRInstToSpvDebugInst.tryGetValue(irDebugFunc, debugFunc))
+            {
+                return debugFunc;
+            }
+        }
+        else
+        {
+            if (m_mapIRInstToSpvDebugInst.tryGetValue(function, debugFunc))
+            {
+                return debugFunc;
+            }
         }
 
         debugFunc = emitOpDebugFunction(
@@ -7968,7 +7992,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             builder.getIntValue(builder.getUIntType(), 0),
             debugLoc->getLine());
 
-        registerDebugInst(name, debugFunc);
+        if (irDebugFunc)
+            registerDebugInst(irDebugFunc, debugFunc);
+        else
+            registerDebugInst(function, debugFunc);
 
         emitOpDebugFunctionDefinition(
             firstBlock,

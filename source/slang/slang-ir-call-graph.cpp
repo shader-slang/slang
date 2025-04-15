@@ -83,17 +83,17 @@ void buildEntryPointReferenceGraph(
         for (UInt i = 0; i < inst->getOperandCount(); i++)
         {
             auto operand = inst->getOperand(i);
-            if (operand)
+            if (!operand)
+                continue;
+
+            switch (operand->getOp())
             {
-                switch (operand->getOp())
-                {
-                case kIROp_GlobalParam:
-                case kIROp_GlobalVar:
-                case kIROp_SPIRVAsmOperandBuiltinVar:
-                case kIROp_Generic:
-                    addToWorkList({entryPoint, operand});
-                    break;
-                }
+            case kIROp_GlobalParam:
+            case kIROp_GlobalVar:
+            case kIROp_SPIRVAsmOperandBuiltinVar:
+            case kIROp_Generic:
+                addToWorkList({entryPoint, operand});
+                break;
             }
         }
     };

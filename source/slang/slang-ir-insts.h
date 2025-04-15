@@ -3444,6 +3444,7 @@ struct IRDebugInlinedAt : IRInst
     IRInst* getFile() { return getOperand(2); }
     IRInst* getOuterInlinedAt() { return getOperand(3); }
     IRInst* getDebugFunc() { return getOperand(4); }
+    void setOuterInlinedAt(IRInst* outer) { setOperand(3, outer); }
 };
 
 struct IRDebugScope : IRInst
@@ -3451,6 +3452,7 @@ struct IRDebugScope : IRInst
     IR_LEAF_ISA(DebugScope)
     IRInst* getScope() { return getOperand(0); }
     IRInst* getInlinedAt() { return getOperand(1); }
+    void setInlinedAt(IRInst* inlinedAt) { setOperand(1, inlinedAt); }
 };
 
 struct IRDebugNoScope : IRInst
@@ -5056,6 +5058,11 @@ public:
             debugSource,
             getIntValue(getUIntType(), line),
             getIntValue(getUIntType(), col));
+    }
+
+    void addDebugFunctionDecoration(IRInst* value, IRInst* debugFunction)
+    {
+        addDecoration(value, kIROp_DebugFunctionDecoration, debugFunction);
     }
 
     void addUnsafeForceInlineDecoration(IRInst* value)

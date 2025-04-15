@@ -1162,6 +1162,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         /// Decorates an inst with a debug source location (IRDebugSource, IRIntLit(line), IRIntLit(col)).
     INST(DebugLocationDecoration, DebugLocation, 3, 0)
 
+        /// Decorates a function with a link to its debug function representation
+    INST(DebugFunctionDecoration, DebugFunction, 1, 0)
+
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `Block` decoration.
     INST(SPIRVBlockDecoration, spvBlock, 0, 0)
 
