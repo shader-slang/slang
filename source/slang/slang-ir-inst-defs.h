@@ -235,6 +235,7 @@ INST(Nop, nop, 0, 0)
 INST(RayQueryType, RayQuery, 1, HOISTABLE)
 INST(HitObjectType, HitObject, 0, HOISTABLE)
 INST(CoopVectorType, CoopVectorType, 2, HOISTABLE)
+INST(CoopMatrixType, CoopMatrixType, 5, HOISTABLE)
 
 // Opaque type that can be dynamically cast to other resource types.
 INST(DynamicResourceType, DynamicResource, 0, HOISTABLE)

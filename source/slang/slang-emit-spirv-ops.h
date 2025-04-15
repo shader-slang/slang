@@ -151,6 +151,28 @@ SpvInst* emitOpTypeCoopVec(IRInst* inst, const T1& componentType, const T2& comp
         componentCount);
 }
 
+template<typename T1, typename T2>
+SpvInst* emitOpTypeCoopMat(
+    IRInst* inst,
+    const T1& componentType,
+    const T2& scope,
+    const T2& rowCount,
+    const T2& columnCount,
+    const T2& matrixUse)
+{
+    static_assert(isSingular<T1>);
+    return emitInstMemoized(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeCooperativeMatrixKHR,
+        kResultID,
+        componentType,
+        scope,
+        rowCount,
+        columnCount,
+        matrixUse);
+}
+
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeMatrix
 template<typename T>
 SpvInst* emitOpTypeMatrix(IRInst* inst, const T& columnType, const SpvLiteralInteger& columnCount)
