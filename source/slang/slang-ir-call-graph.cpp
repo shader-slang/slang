@@ -91,7 +91,7 @@ void buildEntryPointReferenceGraph(
                 case kIROp_GlobalVar:
                 case kIROp_SPIRVAsmOperandBuiltinVar:
                 case kIROp_Generic:
-                    addToWorkList({ entryPoint, operand });
+                    addToWorkList({entryPoint, operand});
                     break;
                 }
             }
