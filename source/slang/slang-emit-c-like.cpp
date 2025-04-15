@@ -3067,7 +3067,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             emitRequireExtension(as<IRRequireTargetExtension>(inst));
             break;
         }
-        break;
     default:
         diagnoseUnhandledInst(inst);
         break;
@@ -5157,7 +5156,6 @@ void CLikeSourceEmitter::ensureGlobalInst(
         return;
     case kIROp_ThisType:
         return;
-    // Skip debug information instructions to avoid circularity in functions with custom derivatives
     case kIROp_DebugInlinedAt:
     case kIROp_DebugScope:
     case kIROp_DebugNoScope:
