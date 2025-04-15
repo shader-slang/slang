@@ -22171,6 +22171,18 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     }
 
     [ForceInline]
+    [require(spirv, cooperative_vector)]
+    void store(T* buffer, int32_t byteOffset16ByteAligned = 0)
+    {
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16;
+        return spirv_asm
+        {
+            OpCooperativeVectorStoreNV $pointer $byteOffset16ByteAligned $this Aligned !alignment;
+        };
+    }
+
+    [ForceInline]
     [require(cooperative_vector)]
     void store<let M : int>(__ref groupshared T[M] data, int32_t byteOffset16ByteAligned = 0)
     {
@@ -22326,6 +22338,19 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 vec[i] = buffer[__byteToElemOffset<T>(byteOffset16ByteAligned) + i];
             return vec;
         }
+    }
+
+    [ForceInline]
+    [__NoSideEffect]
+    [require(spirv, cooperative_vector)]
+    static CoopVec<T, N> load(T* buffer, int32_t byteOffset16ByteAligned = 0)
+    {
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16;
+        return spirv_asm
+        {
+            result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned Aligned $alignment;
+        };
     }
 
     // Groupshared
@@ -23419,6 +23444,13 @@ CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(StructuredBu
 [ForceInline]
 [require(cooperative_vector)]
 CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+{
+    return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
+}
+
+[ForceInline]
+[require(spirv, cooperative_vector)]
+CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(T* buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }
