@@ -2441,7 +2441,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         {
             auto nameStr = getText(aggTypeDecl->getName());
             bool isTexture = nameStr.startsWith("_Texture") || nameStr.startsWith("Texture");
-            
+
             bool isCudaTarget = false;
             if (isTexture)
             {
@@ -2452,7 +2452,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                     for (auto& targetReq : linkage->targets)
                     {
                         auto targetFormat = targetReq->getTarget();
-                        if (targetFormat == CodeGenTarget::CUDASource || 
+                        if (targetFormat == CodeGenTarget::CUDASource ||
                             targetFormat == CodeGenTarget::PTX)
                         {
                             isCudaTarget = true;
@@ -2461,7 +2461,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                     }
                 }
             }
-            
+
             if (isTexture && isCudaTarget)
             {
                 getSink()->diagnose(subscriptExpr, Diagnostics::unsupportedTextureSubscriptForCUDA);
