@@ -1795,6 +1795,14 @@ struct SpecializationContext
                     // If we specialize the parameter type too early, we will lose the opportunity
                     // to specialize the callee later. The principal is to always let the
                     // specialization happen at the same time for both on argument and parameter.
+                    //
+                    // Note we should not use `createParam` here, because this call won't assign the
+                    // parent to the new parameter, therefore during the cloning process, some
+                    // existential related IR inst could be hoisted to the global scope, which is
+                    // unexpected. Instead, we should use cloneInst here, such that the new
+                    // parameter will be inserted into the function scope.
+                    auto newParam = (IRParam*)cloneInst(&cloneEnv, builder, oldParam);
+                    newParams.add(newParam);
                     continue;
                 }
                 else if (auto extractExistentialType = as<IRExtractExistentialType>(valType))
