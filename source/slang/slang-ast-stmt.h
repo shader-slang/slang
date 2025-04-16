@@ -101,7 +101,7 @@ class BreakableStmt : public ScopeStmt
     ///
     UniqueStmtIDNode* uniqueID = kInvalidUniqueID;
 
-SLANG_UNREFLECTED
+    SLANG_UNREFLECTED
     typedef UniqueStmtIDNode* UniqueID;
     static constexpr UniqueID kInvalidUniqueID = nullptr;
 };
