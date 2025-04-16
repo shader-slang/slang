@@ -424,6 +424,9 @@ Extensions
 `SPV_NV_cooperative_vector`
 > Represents the SPIR-V extension for SPV_NV_cooperative_vector.
 
+`SPV_KHR_cooperative_matrix`
+> Represents the SPIR-V extension for SPV_KHR_cooperative_matrix.
+
 `spvAtomicFloat32AddEXT`
 > Represents the SPIR-V capability for atomic float 32 add operations.
 
@@ -534,6 +537,9 @@ Extensions
 
 `spvCooperativeVectorTrainingNV`
 > Represents the SPIR-V capability for cooperative vector training
+
+`spvCooperativeMatrixKHR`
+> Represents the SPIR-V capability for cooperative matrices
 
 `spvMaximalReconvergenceKHR`
 > Represents the SPIR-V capability for maximal reconvergence.
@@ -1205,6 +1211,9 @@ Compound Capabilities
 Other
 ----------------------
 *Capabilities that may be deprecated*
+
+`cooperative_matrix`
+> Capabilities needed to use cooperative matrices
 
 `SPIRV_1_0`
 > Use `spirv_1_0` instead
