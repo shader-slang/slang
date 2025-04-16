@@ -872,6 +872,8 @@ void initCommandOptions(CommandOptions& options)
          "-load-core-module",
          "-load-core-module <filename>",
          "Load the core module from file."},
+
+        // TODO(tfoley): deprecate this...
         {OptionKind::ReferenceModule, "-r", "-r <name>", "reference module <name>"},
         {OptionKind::SaveCoreModule,
          "-save-core-module",
@@ -930,11 +932,9 @@ void initCommandOptions(CommandOptions& options)
         UserValue(ValueCategory::CountOf)));
 }
 
-SlangResult _addLibraryReference(
+SlangResult _addModuleReference(
     EndToEndCompileRequest* req,
-    String path,
-    IArtifact* artifact,
-    bool includeEntryPoint);
+    String path);
 
 class ReproPathVisitor : public Slang::Path::Visitor
 {
@@ -1132,8 +1132,6 @@ struct OptionsParser
     void _appendMinimalUsage(StringBuilder& out);
     void _outputMinimalUsage();
 
-    SlangResult addReferencedModule(String path, SourceLoc loc, bool includeEntryPoint);
-    SlangResult _parseReferenceModule(const CommandLineArg& arg);
     SlangResult _parseReproFileSystem(const CommandLineArg& arg);
     SlangResult _parseLoadRepro(const CommandLineArg& arg);
     SlangResult _parseDebugInformation(const CommandLineArg& arg);
@@ -1329,11 +1327,7 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     // how we should handle it.
     String path = String(inPath);
 
-    if (path.endsWith(".slang-module") || path.endsWith(".slang-lib"))
-    {
-        return addReferencedModule(path, SourceLoc(), false);
-    }
-    else if (path.endsWith(".slang") || langOverride == SourceLanguage::Slang)
+    if (path.endsWith(".slang") || langOverride == SourceLanguage::Slang)
     {
         // Plain old slang code
         addInputSlangPath(path);
@@ -1749,6 +1743,7 @@ SlangResult OptionsParser::_expectInt(const CommandLineArg& initArg, Int& outInt
     return SLANG_OK;
 }
 
+#if 0
 SlangResult createArtifactFromReferencedModule(
     String path,
     SourceLoc loc,
@@ -1816,50 +1811,7 @@ SlangResult createArtifactFromReferencedModule(
     *outArtifact = artifact.detach();
     return SLANG_OK;
 }
-
-SlangResult OptionsParser::addReferencedModule(String path, SourceLoc loc, bool includeEntryPoint)
-{
-    ComPtr<IArtifact> artifact;
-    SLANG_RETURN_ON_FAIL(
-        createArtifactFromReferencedModule(path, loc, m_sink, artifact.writeRef()));
-
-    SLANG_RETURN_ON_FAIL(_addLibraryReference(m_requestImpl, path, artifact, includeEntryPoint));
-    for (Index i = m_rawTranslationUnits.getCount(); i < m_requestImpl->getTranslationUnitCount();
-         i++)
-    {
-        RawTranslationUnit rawTU;
-        rawTU.translationUnitID = (int)i;
-        rawTU.impliedStage = Stage::Unknown;
-        rawTU.sourceLanguage = SLANG_SOURCE_LANGUAGE_SLANG;
-        m_rawTranslationUnits.add(rawTU);
-    }
-    m_currentTranslationUnitIndex = m_requestImpl->getTranslationUnitCount() - 1;
-    m_slangTranslationUnitIndex = m_currentTranslationUnitIndex;
-    return SLANG_OK;
-}
-
-SlangResult OptionsParser::_parseReferenceModule(const CommandLineArg& arg)
-{
-    SLANG_UNUSED(arg);
-
-    CommandLineArg referenceModuleName;
-    SLANG_RETURN_ON_FAIL(m_reader.expectArg(referenceModuleName));
-
-    // Add the module to the request
-    SLANG_RETURN_ON_FAIL(
-        addReferencedModule(referenceModuleName.value, referenceModuleName.loc, true));
-
-    // In addition to adding the module to the request, we also add to the options set, because
-    // the same options parser is also used for IGlobalSession::parseCommandLineArguments, which
-    // parses options via a dummy request that is destroyed once the command line options are
-    // obtained. Therefore, also add the option here so that
-    // IGlobalSession::parseCommandLineArguments can return them.
-    m_requestImpl->getLinkage()->m_optionSet.add(
-        CompilerOptionName::ReferenceModule,
-        referenceModuleName.value);
-
-    return SLANG_OK;
-}
+#endif
 
 SlangResult OptionsParser::_parseReproFileSystem(const CommandLineArg& arg)
 {
@@ -2787,7 +2739,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 break;
             }
         case OptionKind::ReferenceModule:
-            SLANG_RETURN_ON_FAIL(_parseReferenceModule(arg));
+            {
+                CommandLineArg referencedModulePath;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(referencedModulePath));
+                // TODO(tfoley): diagnose the use of a deprecated option
+            }
             break;
         case OptionKind::Version:
             {

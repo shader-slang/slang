@@ -2379,9 +2379,6 @@ public:
 
     bool m_requireCacheFileSystem = false;
 
-    // Modules that have been read in with the -r option
-    List<ComPtr<IArtifact>> m_libModules;
-
     void _stopRetainingParentSession() { m_retainedSession = nullptr; }
 
     // Get shared semantics information for reflection purposes.
@@ -2569,17 +2566,6 @@ public:
 
     /// The irDumpOptions
     IRDumpOptions m_irDumpOptions;
-
-    /// An "extra" entry point that was added via a library reference
-    struct ExtraEntryPointInfo
-    {
-        Name* name;
-        Profile profile;
-        String mangledName;
-    };
-
-    /// A list of "extra" entry points added via a library reference
-    List<ExtraEntryPointInfo> m_extraEntryPoints;
 
 private:
     /// A component type that includes only the global scopes of the translation unit(s) that were

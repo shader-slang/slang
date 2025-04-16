@@ -1562,8 +1562,6 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     // Need to configure for the compilation
 
     {
-        auto linkage = getLinkage();
-
         switch (getTargetProgram()->getOptionSet().getEnumOption<OptimizationLevel>(
             CompilerOptionName::Optimization))
         {
@@ -1693,9 +1691,6 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             }
             options.defines = makeSlice(dst, count);
         }
-
-        // Add all of the module libraries
-        libraries.addRange(linkage->m_libModules.getBuffer(), linkage->m_libModules.getCount());
     }
 
     auto program = getProgram();
