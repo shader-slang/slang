@@ -1282,7 +1282,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     switch (attr->astNodeType)
     {
     // Allowed only on struct fields.
-    case ASTNodeType::GLSLStructOffsetAttribute:
+    case ASTNodeType::VkStructOffsetAttribute:
         auto targetDecl = as<Decl>(attrTarget);
         validTarget = validTarget && targetDecl && as<StructDecl>(getParentDecl(targetDecl));
         break;
@@ -1338,7 +1338,7 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::GLSLLayoutModifierGroupBegin:
     case ASTNodeType::GLSLLayoutModifierGroupEnd:
     case ASTNodeType::GLSLBufferModifier:
-    case ASTNodeType::GLSLStructOffsetAttribute:
+    case ASTNodeType::VkStructOffsetAttribute:
     case ASTNodeType::MemoryQualifierSetModifier:
     case ASTNodeType::GLSLWriteOnlyModifier:
     case ASTNodeType::GLSLReadOnlyModifier:

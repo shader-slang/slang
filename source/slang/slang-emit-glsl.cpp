@@ -245,7 +245,7 @@ void GLSLSourceEmitter::emitStructFieldAttributes(
 
     if (allowOffsetLayout)
     {
-        if (auto offsetDecoration = structKey->findDecoration<IRGLSLStructOffsetDecoration>())
+        if (auto offsetDecoration = structKey->findDecoration<IRVkStructOffsetDecoration>())
         {
             m_writer->emit("layout(offset = ");
             m_writer->emit(offsetDecoration->getOffset()->getValue());

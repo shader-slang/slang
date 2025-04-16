@@ -3715,7 +3715,7 @@ attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
 /// when targeting GLSL, as GLSL does not support the `offset` qualifier on regular structs.
 /// This attribute has no effect on other targets.
 __attributeTarget(VarDeclBase)
-attribute_syntax [vk_offset(index: int)] : GLSLStructOffsetAttribute;
+attribute_syntax [vk_offset(index: int)] : VkStructOffsetAttribute;
 
 /// @deprecated
 /// Use `spirv_asm` instead for inline SPIR-V assembly.

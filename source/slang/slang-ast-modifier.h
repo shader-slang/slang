@@ -956,9 +956,9 @@ class GLSLIndexAttribute : public GLSLSimpleIntegerLayoutAttribute
 };
 
 // [[vk_offset]]
-class GLSLStructOffsetAttribute : public GLSLSimpleIntegerLayoutAttribute
+class VkStructOffsetAttribute : public GLSLSimpleIntegerLayoutAttribute
 {
-    SLANG_AST_CLASS(GLSLStructOffsetAttribute)
+    SLANG_AST_CLASS(VkStructOffsetAttribute)
 };
 
 // [[vk_spirv_instruction]]
