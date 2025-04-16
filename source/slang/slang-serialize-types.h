@@ -40,16 +40,6 @@ struct SerialOptionFlag
 };
 typedef SerialOptionFlag::Type SerialOptionFlags;
 
-
-// Compression styles
-
-enum class SerialCompressionType : uint8_t
-{
-    None,
-    VariableByteLite,
-};
-
-
 struct SerialStringData
 {
     enum class StringIndex : uint32_t;
@@ -91,16 +81,6 @@ struct SerialStringTableUtil
         const List<UnownedStringSlice>& slices,
         StringSlicePool& pool,
         List<StringSlicePool::Handle>& indexMap);
-};
-
-struct SerialParseUtil
-{
-    /// Given text, finds the compression type
-    static SlangResult parseCompressionType(
-        const UnownedStringSlice& text,
-        SerialCompressionType& outType);
-    /// Given a compression type, return text
-    static UnownedStringSlice getText(SerialCompressionType type);
 };
 
 struct SerialListUtil
@@ -160,30 +140,14 @@ struct SerialBinary
     /// An entry point
     static const FourCC kEntryPointFourCc = SLANG_FOUR_CC('E', 'P', 'n', 't');
 
-    /// Container
-    static const FourCC kContainerHeaderFourCc = SLANG_FOUR_CC('S', 'c', 'h', 'd');
-
     // Module header
     static const FourCC kModuleHeaderFourCc = SLANG_FOUR_CC('S', 'm', 'h', 'd');
-
-    struct ContainerHeader
-    {
-        uint32_t compressionType; ///< Holds the compression type used (if used at all)
-    };
 
     struct ArrayHeader
     {
         uint32_t numEntries;
     };
-    struct CompressedArrayHeader
-    {
-        uint32_t numEntries;           ///< The number of entries
-        uint32_t numCompressedEntries; ///< The amount of compressed entries
-    };
 };
-
-// Replace first char with 's'
-#define SLANG_MAKE_COMPRESSED_FOUR_CC(fourCc) SLANG_FOUR_CC_REPLACE_FIRST_CHAR(fourCc, 's')
 
 struct SerialRiffUtil
 {
@@ -223,7 +187,6 @@ struct SerialRiffUtil
     };
 
     static Result writeArrayChunk(
-        SerialCompressionType compressionType,
         FourCC chunkId,
         const void* data,
         size_t numEntries,
@@ -231,14 +194,9 @@ struct SerialRiffUtil
         RiffContainer* container);
 
     template<typename T>
-    static Result writeArrayChunk(
-        SerialCompressionType compressionType,
-        FourCC chunkId,
-        const List<T>& array,
-        RiffContainer* container)
+    static Result writeArrayChunk(FourCC chunkId, const List<T>& array, RiffContainer* container)
     {
         return writeArrayChunk(
-            compressionType,
             chunkId,
             array.begin(),
             size_t(array.getCount()),
@@ -246,47 +204,13 @@ struct SerialRiffUtil
             container);
     }
 
-    template<typename T>
-    static Result writeArrayUncompressedChunk(
-        FourCC chunkId,
-        const List<T>& array,
-        RiffContainer* container)
-    {
-        return writeArrayChunk(
-            SerialCompressionType::None,
-            chunkId,
-            array.begin(),
-            size_t(array.getCount()),
-            sizeof(T),
-            container);
-    }
-
-    static Result readArrayChunk(
-        SerialCompressionType compressionType,
-        RiffContainer::DataChunk* dataChunk,
-        ListResizer& listOut);
+    static Result readArrayChunk(RiffContainer::DataChunk* dataChunk, ListResizer& listOut);
 
     template<typename T>
-    static Result readArrayChunk(
-        SerialCompressionType moduleCompressionType,
-        RiffContainer::DataChunk* dataChunk,
-        List<T>& arrayOut)
-    {
-        SerialCompressionType compressionType = SerialCompressionType::None;
-        if (dataChunk->m_fourCC == SLANG_MAKE_COMPRESSED_FOUR_CC(dataChunk->m_fourCC))
-        {
-            // If it has compression, use the compression type set in the header
-            compressionType = moduleCompressionType;
-        }
-        ListResizerForType<T> resizer(arrayOut);
-        return readArrayChunk(compressionType, dataChunk, resizer);
-    }
-
-    template<typename T>
-    static Result readArrayUncompressedChunk(RiffContainer::DataChunk* chunk, List<T>& arrayOut)
+    static Result readArrayChunk(RiffContainer::DataChunk* dataChunk, List<T>& arrayOut)
     {
         ListResizerForType<T> resizer(arrayOut);
-        return readArrayChunk(SerialCompressionType::None, chunk, resizer);
+        return readArrayChunk(dataChunk, resizer);
     }
 };
 
