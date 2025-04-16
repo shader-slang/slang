@@ -160,7 +160,7 @@ static Result _calcSizeAndAlignment(
                 SLANG_ASSERT(!seenFinalUnsizedArrayField);
 
                 if (auto offsetDecor =
-                        field->getKey()->findDecoration<IRGLSLStructOffsetDecoration>())
+                        field->getKey()->findDecoration<IRVkStructOffsetDecoration>())
                 {
                     offset = offsetDecor->getOffset()->getValue();
                 }

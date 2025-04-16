@@ -502,9 +502,9 @@ struct IRGLSLOffsetDecoration : IRDecoration
     IRIntLit* getOffset() { return cast<IRIntLit>(getOperand(0)); }
 };
 
-struct IRGLSLStructOffsetDecoration : IRDecoration
+struct IRVkStructOffsetDecoration : IRDecoration
 {
-    IR_LEAF_ISA(GLSLStructOffsetDecoration)
+    IR_LEAF_ISA(VkStructOffsetDecoration)
     IRIntLit* getOffset() { return cast<IRIntLit>(getOperand(0)); }
 };
 

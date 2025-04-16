@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv -emit-spirv-directly -entry vertexMain -stage vertex
+//TEST:SIMPLE(filecheck=CHECK_SPV): -target spirv -emit-spirv-via-glsl -entry vertexMain -stage vertex
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -entry vertexMain -stage vertex
 
 struct S1
@@ -20,10 +21,10 @@ struct VertexOutput
     float3 position : SV_Position;
 }
 
-// CHECK_SPV: OpDecorate %S1_std430 Block
-// CHECK_SPV-NEXT: OpMemberDecorate %S1_std430 0 Offset 32
-// CHECK_SPV-NEXT: OpMemberDecorate %S1_std430 1 Offset 48
-// CHECK_SPV-NEXT: OpMemberDecorate %S1_std430 2 Offset 16
+// CHECK_SPV: OpDecorate [[STRUCT:%[a-zA-Z0-9_]+]] Block
+// CHECK_SPV-NEXT: OpMemberDecorate [[STRUCT]] 0 Offset 32
+// CHECK_SPV-NEXT: OpMemberDecorate [[STRUCT]] 1 Offset 48
+// CHECK_SPV-NEXT: OpMemberDecorate [[STRUCT]] 2 Offset 16
 
 // CHECK_GLSL: layout(std430) uniform
 // CHECK_GLSL-NEXT: {
