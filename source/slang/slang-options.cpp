@@ -932,9 +932,7 @@ void initCommandOptions(CommandOptions& options)
         UserValue(ValueCategory::CountOf)));
 }
 
-SlangResult _addModuleReference(
-    EndToEndCompileRequest* req,
-    String path);
+SlangResult _addModuleReference(EndToEndCompileRequest* req, String path);
 
 class ReproPathVisitor : public Slang::Path::Visitor
 {
