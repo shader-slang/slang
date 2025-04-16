@@ -343,8 +343,7 @@ namespace Slang
                     sourceLocWriter,
                     options.optionFlags,
                     &serialData));
-                SLANG_RETURN_ON_FAIL(
-                    IRSerialWriter::writeContainer(serialData, container));
+                SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, container));
             }
 
             // Write the AST information
@@ -585,9 +584,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                 if (!options.readHeaderOnly)
                 {
                     IRSerialData serialData;
-                    SLANG_RETURN_ON_FAIL(IRSerialReader::readContainer(
-                        irChunk,
-                        &serialData));
+                    SLANG_RETURN_ON_FAIL(IRSerialReader::readContainer(irChunk, &serialData));
 
                     // Read IR back from serialData
                     IRSerialReader reader;
@@ -935,8 +932,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
             SLANG_RETURN_ON_FAIL(
                 writer.write(module, sourceLocWriter, options.optionFlags, &irData));
         }
-        SLANG_RETURN_ON_FAIL(
-            IRSerialWriter::writeContainer(irData, &riffContainer));
+        SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(irData, &riffContainer));
 
         // Write the debug info Riff container
         if (sourceLocWriter)
@@ -944,8 +940,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
             SerialSourceLocData serialData;
             sourceLocWriter->write(&serialData);
 
-            SLANG_RETURN_ON_FAIL(
-                serialData.writeContainer(&riffContainer));
+            SLANG_RETURN_ON_FAIL(serialData.writeContainer(&riffContainer));
         }
 
         SLANG_RETURN_ON_FAIL(RiffUtil::write(&riffContainer, &memoryStream));
@@ -994,8 +989,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
             {
                 IRSerialData irReadData;
                 IRSerialReader reader;
-                SLANG_RETURN_ON_FAIL(
-                    reader.readContainer(irList, &irReadData));
+                SLANG_RETURN_ON_FAIL(reader.readContainer(irList, &irReadData));
 
                 // Check the stream read data is the same
                 if (irData != irReadData)

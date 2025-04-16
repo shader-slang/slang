@@ -356,12 +356,9 @@ Result _writeInstArrayChunk(
 
     ScopeChunk scopeModule(container, Chunk::Kind::List, Bin::kIRModuleFourCc);
 
+    SLANG_RETURN_ON_FAIL(_writeInstArrayChunk(Bin::kInstFourCc, data.m_insts, container));
     SLANG_RETURN_ON_FAIL(
-        _writeInstArrayChunk(Bin::kInstFourCc, data.m_insts, container));
-    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
-        Bin::kChildRunFourCc,
-        data.m_childRuns,
-        container));
+        SerialRiffUtil::writeArrayChunk(Bin::kChildRunFourCc, data.m_childRuns, container));
     SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
         Bin::kExternalOperandsFourCc,
         data.m_externalOperands,
@@ -448,22 +445,19 @@ static Result _readInstArrayChunk(
         {
         case Bin::kInstFourCc:
             {
-                SLANG_RETURN_ON_FAIL(
-                    _readInstArrayChunk(dataChunk, outData->m_insts));
+                SLANG_RETURN_ON_FAIL(_readInstArrayChunk(dataChunk, outData->m_insts));
                 break;
             }
         case Bin::kChildRunFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(
-                    dataChunk,
-                    outData->m_childRuns));
+                SLANG_RETURN_ON_FAIL(
+                    SerialRiffUtil::readArrayChunk(dataChunk, outData->m_childRuns));
                 break;
             }
         case Bin::kExternalOperandsFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(
-                    dataChunk,
-                    outData->m_externalOperands));
+                SLANG_RETURN_ON_FAIL(
+                    SerialRiffUtil::readArrayChunk(dataChunk, outData->m_externalOperands));
                 break;
             }
         case SerialBinary::kStringTableFourCc:
@@ -474,16 +468,14 @@ static Result _readInstArrayChunk(
             }
         case Bin::kUInt32RawSourceLocFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(
-                    dataChunk,
-                    outData->m_rawSourceLocs));
+                SLANG_RETURN_ON_FAIL(
+                    SerialRiffUtil::readArrayChunk(dataChunk, outData->m_rawSourceLocs));
                 break;
             }
         case Bin::kDebugSourceLocRunFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(
-                    dataChunk,
-                    outData->m_debugSourceLocRuns));
+                SLANG_RETURN_ON_FAIL(
+                    SerialRiffUtil::readArrayChunk(dataChunk, outData->m_debugSourceLocRuns));
                 break;
             }
         default:

@@ -26,9 +26,7 @@ struct IRSerialWriter
         IRSerialData* serialData);
 
     /// Write to a container
-    static Result writeContainer(
-        const IRSerialData& data,
-        RiffContainer* container);
+    static Result writeContainer(const IRSerialData& data, RiffContainer* container);
 
     /// Get an instruction index from an instruction
     Ser::InstIndex getInstIndex(IRInst* inst) const
@@ -95,9 +93,7 @@ struct IRSerialReader
     typedef IRSerialData Ser;
 
     /// Read a stream to fill in dataOut IRSerialData
-    static Result readContainer(
-        RiffContainer::ListChunk* module,
-        IRSerialData* outData);
+    static Result readContainer(RiffContainer::ListChunk* module, IRSerialData* outData);
 
     /// Read a module from serial data
     Result read(
