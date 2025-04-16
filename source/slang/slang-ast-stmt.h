@@ -84,24 +84,26 @@ class IfStmt : public Stmt
     Stmt* negativeStatement = nullptr;
 };
 
+class UniqueStmtIDNode : public Decl
+{
+    SLANG_AST_CLASS(UniqueStmtIDNode)
+};
+
 // A statement that can be escaped with a `break`
 class BreakableStmt : public ScopeStmt
 {
     SLANG_ABSTRACT_AST_CLASS(BreakableStmt)
-
-    typedef Int32 UniqueID;
-
-    static const UniqueID kInvalidUniqueID = UniqueID(-1);
 
     /// A unique ID for this statement.
     ///
     /// Used by `ChildStmt` to reference the
     /// enclosing statement.
     ///
-    /// The ID here is only guaranteed to be
-    /// unique within a given `ASTBuilder`.
-    ///
-    UniqueID uniqueID = kInvalidUniqueID;
+    UniqueStmtIDNode* uniqueID = kInvalidUniqueID;
+
+SLANG_UNREFLECTED
+    typedef UniqueStmtIDNode* UniqueID;
+    static constexpr UniqueID kInvalidUniqueID = nullptr;
 };
 
 class SwitchStmt : public BreakableStmt
