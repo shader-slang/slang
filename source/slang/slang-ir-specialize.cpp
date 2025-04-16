@@ -1787,7 +1787,8 @@ struct SpecializationContext
                 // created.
                 //
                 auto valType = val->getFullType();
-                if (isCompileTimeConstantType(valType))
+                if (isCompileTimeConstantType(valType) &&
+                    isCompileTimeConstantType(oldParam->getFullType()))
                 {
                     if (auto extractExistentialType = as<IRExtractExistentialType>(valType))
                     {
@@ -1847,14 +1848,14 @@ struct SpecializationContext
             }
 
             // If we go here, then the parameter is either not an existential type,
-            // or the argument is not a specialized yet.
+            // or the argument/parameter is not specialized yet.
             //
             // For first case there is nothing interesting to do. The new function
             // will also have a parameter of the exact same type, and we'll use that
             // instead of the original parameter.
             //
             //
-            // For the second case if the argument is not specialized yet, don't
+            // For the second case if the argument/parameter is not specialized yet, don't
             // aggressively specialize the parameter.
             //
             // If we specialize the parameter type too early, we will lose the opportunity
