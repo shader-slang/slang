@@ -1,4 +1,4 @@
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -xslang -skip-spirv-validation
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector
 
 // CHECK: 1
 // CHECK-NEXT: 2
