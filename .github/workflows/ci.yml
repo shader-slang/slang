@@ -58,7 +58,7 @@ jobs:
             platform: aarch64
             test-category: smoke
             full-gpu-tests: false
-            runs-on: ubuntu-latest-arm
+            runs-on: ubuntu-24.04-arm
             has-gpu: false
             build-llvm: false
           # Self-hosted full gpu build

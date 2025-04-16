@@ -33,7 +33,7 @@ jobs:
           - {
               os: linux,
               platform: aarch64,
-              runs-on: ubuntu-latest-arm,
+              runs-on: ubuntu-24.04-arm,
               compiler: gcc,
             }
           - { os: windows, runs-on: windows-latest, compiler: cl }
