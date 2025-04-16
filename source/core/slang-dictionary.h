@@ -148,6 +148,8 @@ public:
     // Erases the value at the specified key if it exists
     void remove(const TKey& key) { map.erase(key); }
 
+    auto erase(ConstIterator const& it) { return map.erase(it); }
+
     // Reserves enough space for the specified number of values
     void reserve(Index size) { map.reserve(std::size_t(size)); };
 
