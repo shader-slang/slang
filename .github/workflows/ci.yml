@@ -105,6 +105,12 @@ jobs:
             echo "Only documentation files changed, skipping remaining steps"
             echo "should-run=false" >> $GITHUB_OUTPUT
           fi
+      - name: Install dependencies
+        run: |
+          if [[ "${{ matrix.os }}" = "linux" ]]; then
+              sudo apt-get update
+              sudo apt-get install -y libx11-dev
+          fi
       - name: Setup
         if: steps.filter.outputs.should-run == 'true'
         uses: ./.github/actions/common-setup
