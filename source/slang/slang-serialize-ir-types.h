@@ -29,11 +29,6 @@ struct IRSerialBinary
     static const FourCC kChildRunFourCc = SLANG_FOUR_CC('S', 'L', 'c', 'r');
     static const FourCC kExternalOperandsFourCc = SLANG_FOUR_CC('S', 'L', 'e', 'o');
 
-    static const FourCC kCompressedInstFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kInstFourCc);
-    static const FourCC kCompressedChildRunFourCc = SLANG_MAKE_COMPRESSED_FOUR_CC(kChildRunFourCc);
-    static const FourCC kCompressedExternalOperandsFourCc =
-        SLANG_MAKE_COMPRESSED_FOUR_CC(kExternalOperandsFourCc);
-
     static const FourCC kUInt32RawSourceLocFourCc = SLANG_FOUR_CC('S', 'r', 's', '4');
 
     /// Debug information is held elsewhere, but if this optional section exists, it maps
