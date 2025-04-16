@@ -84,6 +84,11 @@ public:
         return m_thisTypeName;
     }
 
+    BreakableStmt::UniqueID generateUniqueIDForStmt()
+    {
+        return m_nextUniqueStmtID++;
+    }
+
 protected:
     // State shared between ASTBuilders
 
@@ -123,6 +128,8 @@ protected:
     // This is a private builder used for these shared types
     ASTBuilder* m_astBuilder = nullptr;
     Session* m_session = nullptr;
+
+    BreakableStmt::UniqueID m_nextUniqueStmtID = 0;
 
     Index m_id = 1;
 };
@@ -348,9 +355,9 @@ public:
             case ASTNodeType::ExtensionDecl:
             case ASTNodeType::AssocTypeDecl:
                 return getLookupDeclRef(
-                           lookupDeclRef->getLookupSource(),
-                           lookupDeclRef->getWitness(),
-                           memberDecl)
+                    lookupDeclRef->getLookupSource(),
+                    lookupDeclRef->getWitness(),
+                    memberDecl)
                     .template as<T>();
             default:
                 break;
@@ -669,6 +676,11 @@ public:
     Session* getGlobalSession() { return m_sharedASTBuilder->m_session; }
 
     Index getId() { return m_id; }
+
+    BreakableStmt::UniqueID generateUniqueIDForStmt()
+    {
+        return m_sharedASTBuilder->generateUniqueIDForStmt();
+    }
 
     /// Ctor
     ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name);

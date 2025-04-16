@@ -88,6 +88,20 @@ class IfStmt : public Stmt
 class BreakableStmt : public ScopeStmt
 {
     SLANG_ABSTRACT_AST_CLASS(BreakableStmt)
+
+    typedef Int32 UniqueID;
+
+    static const UniqueID kInvalidUniqueID = UniqueID(-1);
+
+    /// A unique ID for this statement.
+    ///
+    /// Used by `ChildStmt` to reference the
+    /// enclosing statement.
+    ///
+    /// The ID here is only guaranteed to be
+    /// unique within a given `ASTBuilder`.
+    ///
+    UniqueID uniqueID = kInvalidUniqueID;
 };
 
 class SwitchStmt : public BreakableStmt
@@ -98,7 +112,20 @@ class SwitchStmt : public BreakableStmt
     Stmt* body = nullptr;
 };
 
-class TargetCaseStmt : public Stmt
+// A statement that is expected to appear lexically nested inside
+// some other construct, and thus needs to keep track of the
+// outer statement that it is associated with...
+class ChildStmt : public Stmt
+{
+    SLANG_ABSTRACT_AST_CLASS(ChildStmt)
+
+    /// The unique ID of the enclosing statement this
+    /// child statement refers to.
+    ///
+    BreakableStmt::UniqueID targetOuterStmtID = BreakableStmt::kInvalidUniqueID;
+};
+
+class TargetCaseStmt : public ChildStmt
 {
     SLANG_AST_CLASS(TargetCaseStmt)
     int32_t capability;
@@ -106,7 +133,7 @@ class TargetCaseStmt : public Stmt
     Stmt* body = nullptr;
 };
 
-class TargetSwitchStmt : public Stmt
+class TargetSwitchStmt : public BreakableStmt
 {
     SLANG_AST_CLASS(TargetSwitchStmt)
 
@@ -125,16 +152,6 @@ class IntrinsicAsmStmt : public Stmt
     String asmText;
 
     List<Expr*> args;
-};
-
-// A statement that is expected to appear lexically nested inside
-// some other construct, and thus needs to keep track of the
-// outer statement that it is associated with...
-class ChildStmt : public Stmt
-{
-    SLANG_ABSTRACT_AST_CLASS(ChildStmt)
-
-    Stmt* parentStmt = nullptr;
 };
 
 // a `case` or `default` statement inside a `switch`

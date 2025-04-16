@@ -959,7 +959,7 @@ Compound Capabilities
 > Collection of shader stages
 
 `meshshading`
-> Capabilities required to use mesh shading features
+> Ccapabilities required to use mesh shading features
 
 `shadermemorycontrol_compute`
 > (gfx targets) Capabilities required to use memory barriers that only work for raytracing & compute shader stages
@@ -1210,7 +1210,7 @@ Compound Capabilities
 
 Other
 ----------------------
-*Capabilities that may be deprecated*
+*Capabilities which may be deprecated*
 
 `cooperative_matrix`
 > Capabilities needed to use cooperative matrices
