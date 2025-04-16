@@ -11338,11 +11338,6 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
 }
 
 
-// Types comparison:
-// Three way comparisons
-// Not all comparison cases are implemented yet,
-// so the optional 'feedback' parameter is here to indicate when the comp is not implemented yet
-
 // Replace with <=> in C++20
 template<typename T>
 int compareThreeWays(T a, T b)
@@ -11356,22 +11351,10 @@ int compareThreeWays(T a, T b)
 }
 
 // lhs and rhs cannot be nullptr
-int compareIntVals(ASTBuilder* astBuilder, IntVal& lhs, IntVal& rhs, int* feedback);
+int compareDecls(ASTBuilder* astBuilder, Decl& lhs, Decl& rhs);
 
 // lhs and rhs cannot be nullptr
-int compareTypes(ASTBuilder* astBuilder, Type& lhs, Type& rhs, int* feedback);
-
-// lhs and rhs cannot be nullptr
-int compareDecls(ASTBuilder* astBuilder, Decl& lhs, Decl& rhs, int* feedback);
-
-// lhs and rhs cannot be nullptr
-int compareDeclRefs(ASTBuilder* astBuilder, DeclRefBase& lhs, DeclRefBase& rhs, int* feedback);
-
-// lhs and rhs cannot be nullptr
-int compareWitnesses(ASTBuilder* astBuilder, Witness& lhs, Witness& rhs, int* feedback);
-
-// lhs and rhs cannot be nullptr
-int compareVals(ASTBuilder* astBuilder, Val& lhs, Val& rhs, int* feedback);
+int compareVals(ASTBuilder* astBuilder, Val& lhs, Val& rhs);
 
 template<typename T, class Compare>
 int comparePtrs(T* lhs, T* rhs, Compare const& compare)
@@ -11388,69 +11371,27 @@ int comparePtrs(T* lhs, T* rhs, Compare const& compare)
     return res;
 }
 
-// lhs and rhs might be nullptr
-int compareIntVals(ASTBuilder* astBuilder, IntVal* lhs, IntVal* rhs, int* feedback)
+// lhs or rhs might be nullptr
+int compareDecls(ASTBuilder* astBuilder, Decl* lhs, Decl* rhs)
 {
     return comparePtrs(
         lhs,
         rhs,
-        [&](IntVal& lhs, IntVal& rhs) { return compareIntVals(astBuilder, lhs, rhs, feedback); });
+        [&](Decl& lhs, Decl& rhs) { return compareDecls(astBuilder, lhs, rhs); });
 }
 
 // lhs or rhs might be nullptr
-int compareTypes(ASTBuilder* astBuilder, Type* lhs, Type* rhs, int* feedback)
+int compareVals(ASTBuilder* astBuilder, Val* lhs, Val* rhs)
 {
     return comparePtrs(
         lhs,
         rhs,
-        [&](Type& lhs, Type& rhs) { return compareTypes(astBuilder, lhs, rhs, feedback); });
-}
-
-// lhs or rhs might be nullptr
-int compareDecls(ASTBuilder* astBuilder, Decl* lhs, Decl* rhs, int* feedback)
-{
-    return comparePtrs(
-        lhs,
-        rhs,
-        [&](Decl& lhs, Decl& rhs) { return compareDecls(astBuilder, lhs, rhs, feedback); });
-}
-
-// lhs and rhs might be nullptr
-int compareDeclRefs(ASTBuilder* astBuilder, DeclRefBase* lhs, DeclRefBase* rhs, int* feedback)
-{
-    return comparePtrs(
-        lhs,
-        rhs,
-        [&](DeclRefBase& lhs, DeclRefBase& rhs)
-        { return compareDeclRefs(astBuilder, lhs, rhs, feedback); });
-}
-
-int compareWitnesses(ASTBuilder* astBuilder, Witness* lhs, Witness* rhs, int* feedback)
-{
-    return comparePtrs(
-        lhs,
-        rhs,
-        [&](Witness& lhs, Witness& rhs)
-        { return compareWitnesses(astBuilder, lhs, rhs, feedback); });
-}
-
-int compareVals(ASTBuilder* astBuilder, Val* lhs, Val* rhs, int* feedback)
-{
-    return comparePtrs(
-        lhs,
-        rhs,
-        [&](Val& lhs, Val& rhs) { return compareVals(astBuilder, lhs, rhs, feedback); });
+        [&](Val& lhs, Val& rhs) { return compareVals(astBuilder, lhs, rhs); });
 }
 
 // Compare operands of lhs and rhs from offset,
 // and at most count operands, if the capacity allows it.
-int compareValOperands(
-    ASTBuilder* astBuilder,
-    Val& lhs,
-    Val& rhs,
-    Index offset,
-    Index count,
-    int* feedback)
+int compareValOperands(ASTBuilder* astBuilder, Val& lhs, Val& rhs, Index offset, Index count)
 {
     const Index lN = std::clamp<Index>(lhs.getOperandCount() - offset, 0, count);
     const Index rN = std::clamp<Index>(rhs.getOperandCount() - offset, 0, count);
@@ -11459,9 +11400,25 @@ int compareValOperands(
         return res;
     for (Index i = 0; i < lN; ++i)
     {
-        auto lOp = lhs.getOperand(offset + i);
-        auto rOp = rhs.getOperand(offset + i);
-        res = compareVals(astBuilder, lOp, rOp, feedback);
+        auto lOp = lhs.m_operands[offset + i];
+        auto rOp = rhs.m_operands[offset + i];
+        res = compareThreeWays(lOp.kind, rOp.kind);
+        if (res)
+        {
+            break;
+        }
+        switch (lOp.kind)
+        {
+        case ValNodeOperandKind::ConstantValue:
+            res = compareThreeWays(lOp.getIntConstant(), rOp.getIntConstant());
+            break;
+        case ValNodeOperandKind::ValNode:
+            res = compareVals(astBuilder, lOp.getVal(), rOp.getVal());
+            break;
+        case ValNodeOperandKind::ASTNode:
+            res = compareDecls(astBuilder, lOp.getDecl(), rOp.getDecl());
+            break;
+        }
         if (res)
         {
             break;
@@ -11470,61 +11427,10 @@ int compareValOperands(
     return res;
 }
 
-// compare operands of lhs and rhs from offset to the end
-int compareValOperands(ASTBuilder* astBuilder, Val& lhs, Val& rhs, Index offset, int* feedback)
+// Compare operands of lhs and rhs from offset to the end
+int compareValOperands(ASTBuilder* astBuilder, Val& lhs, Val& rhs, Index offset)
 {
-    return compareValOperands(
-        astBuilder,
-        lhs,
-        rhs,
-        offset,
-        std::numeric_limits<Index>::max(),
-        feedback);
-}
-
-int compareIntVals(ASTBuilder* astBuilder, IntVal& lhs, IntVal& rhs, int* feedback)
-{
-    int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
-    if (res)
-        return res;
-    std::optional<int> specRes = {};
-    if (auto lC = dynamicCast<ConstantIntVal>(&lhs))
-    {
-        auto rC = dynamicCast<ConstantIntVal>(&rhs);
-        specRes = compareThreeWays(lC->getValue(), rC->getValue());
-    }
-    else if (auto lGP = dynamicCast<GenericParamIntVal>(&lhs))
-    {
-        auto rGP = dynamicCast<GenericParamIntVal>(&rhs);
-        specRes = compareDeclRefs(astBuilder, lGP->getDeclRef(), rGP->getDeclRef(), feedback);
-    }
-    if (!specRes && feedback)
-    {
-        *feedback |= (1 << 0);
-    }
-    res = specRes.value_or(0);
-    return res;
-}
-
-int compareTypes(ASTBuilder* astBuilder, Type& lhs, Type& rhs, int* feedback)
-{
-    int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
-    if (res)
-        return res;
-    std::optional<int> specRes = {};
-    if (auto lDRT = dynamicCast<DeclRefType>(&lhs))
-    {
-        auto rDRT = dynamicCast<DeclRefType>(&rhs);
-        auto lDRB = lDRT->getDeclRefBase();
-        auto rDRB = rDRT->getDeclRefBase();
-        specRes = compareDeclRefs(astBuilder, lDRB, rDRB, feedback);
-    }
-    if (!specRes && feedback)
-    {
-        *feedback |= (1 << 1);
-    }
-    res = specRes.value_or(0);
-    return res;
+    return compareValOperands(astBuilder, lhs, rhs, offset, std::numeric_limits<Index>::max());
 }
 
 // Find the lowest common ancestor (LCA) of nodes a and b
@@ -11597,10 +11503,9 @@ ContainerDecl* findDeclsLowestCommonAncestor(Decl*& a, Decl*& b)
     return a->parentDecl;
 }
 
-int compareDecls(ASTBuilder* astBuilder, Decl& lhs, Decl& rhs, int* feedback)
+int compareDecls(ASTBuilder* astBuilder, Decl& lhs, Decl& rhs)
 {
     SLANG_UNUSED(astBuilder);
-    SLANG_UNUSED(feedback);
     int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
     if (res)
         return res;
@@ -11621,136 +11526,23 @@ int compareDecls(ASTBuilder* astBuilder, Decl& lhs, Decl& rhs, int* feedback)
     return res;
 }
 
-int compareDeclRefs(ASTBuilder* astBuilder, DeclRefBase& lhs, DeclRefBase& rhs, int* feedback)
+int compareVals(ASTBuilder* astBuilder, Val& lhs, Val& rhs)
 {
-    SLANG_UNUSED(astBuilder);
     int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
     if (res)
         return res;
-    auto lDecl = lhs.getDecl();
-    auto rDecl = rhs.getDecl();
-    res = compareDecls(astBuilder, lDecl, rDecl, feedback);
-    if (res)
-        return res;
-    std::optional<int> specRes = {};
-    if (auto lDirect = as<DirectDeclRef>(&lhs))
-    {
-        auto rDirect = as<DirectDeclRef>(&rhs);
-        SLANG_UNUSED(lDirect);
-        SLANG_UNUSED(rDirect);
-        specRes = 0;
-    }
-    else if (auto lGeneric = as<GenericAppDeclRef>(&lhs))
-    {
-        auto rGeneric = as<GenericAppDeclRef>(&rhs);
-        specRes = compareValOperands(astBuilder, lhs, rhs, 2, feedback);
-    }
-    else if (auto lLookup = as<LookupDeclRef>(&lhs))
-    {
-        auto rLookup = as<LookupDeclRef>(&rhs);
-        specRes =
-            compareWitnesses(astBuilder, lLookup->getWitness(), rLookup->getWitness(), feedback);
-    }
-    else if (auto lMember = as<MemberDeclRef>(&lhs))
-    {
-        auto rMember = as<MemberDeclRef>(&rhs);
-        specRes = compareDeclRefs(
-            astBuilder,
-            lMember->getParentOperand(),
-            rMember->getParentOperand(),
-            feedback);
-    }
-    if (!specRes.has_value() && feedback)
-    {
-        *feedback |= (1 << 3);
-    }
-    res = specRes.value_or(0);
-    return res;
-}
-
-int compareWitnesses(ASTBuilder* astBuilder, Witness& lhs, Witness& rhs, int* feedback)
-{
-    SLANG_UNUSED(astBuilder);
-    int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
-    if (res)
-        return res;
-    std::optional<int> specRes = {};
-    if (auto lSubtype = dynamicCast<SubtypeWitness>(&lhs))
-    {
-        auto rSubtype = dynamicCast<SubtypeWitness>(&rhs);
-        int compSub = compareTypes(astBuilder, lSubtype->getSub(), rSubtype->getSub(), feedback);
-        if (compSub)
-        {
-            specRes = compSub;
-        }
-        else
-        {
-            specRes = compareTypes(astBuilder, lSubtype->getSup(), rSubtype->getSup(), feedback);
-        }
-    }
-    if (!specRes && feedback)
-    {
-        *feedback |= (1 << 4);
-    }
-    res = specRes.value_or(0);
-    return res;
-}
-
-int compareVals(ASTBuilder* astBuilder, Val& lhs, Val& rhs, int* feedback)
-{
-    SLANG_UNUSED(astBuilder);
-    int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
-    if (res)
-        return res;
-    std::optional<int> specRes = {};
-    if (auto lType = dynamicCast<Type>(&lhs))
-    {
-        auto rType = dynamicCast<Type>(&rhs);
-        specRes = compareTypes(astBuilder, *lType, *rType, feedback);
-    }
-    else if (auto lInt = dynamicCast<IntVal>(&lhs))
-    {
-        auto rInt = dynamicCast<IntVal>(&rhs);
-        specRes = compareIntVals(astBuilder, *lInt, *rInt, feedback);
-    }
-    else if (auto lDRB = dynamicCast<DeclRefBase>(&lhs))
-    {
-        auto rDRB = dynamicCast<DeclRefBase>(&rhs);
-        specRes = compareDeclRefs(astBuilder, *lDRB, *rDRB, feedback);
-    }
-    else if (auto lWitness = dynamicCast<Witness>(&lhs))
-    {
-        auto rWitness = dynamicCast<Witness>(&rhs);
-        specRes = compareWitnesses(astBuilder, *lWitness, *rWitness, feedback);
-    }
-    if (!specRes && feedback)
-    {
-        *feedback |= (1 << 5);
-    }
-    res = specRes.value_or(0);
+    res = compareValOperands(astBuilder, lhs, rhs, 0);
     return res;
 }
 
 int compareTypes(ASTBuilder* astBuilder, Type* lhs, Type* rhs)
 {
-    int feedback = 0;
-    int res = compareTypes(astBuilder, lhs, rhs, &feedback);
-    if (feedback)
-    {
-        SLANG_BREAKPOINT(1);
-    }
-    return res;
+    return compareVals(astBuilder, lhs, rhs);
 }
 
 int compareTypes(ASTBuilder* astBuilder, Type& lhs, Type& rhs)
 {
-    int feedback = 0;
-    int res = compareTypes(astBuilder, lhs, rhs, &feedback);
-    if (feedback)
-    {
-        SLANG_BREAKPOINT(1);
-    }
-    return res;
+    return compareVals(astBuilder, lhs, rhs);
 }
 
 static void _getCanonicalConstraintTypes(List<Type*>& outTypeList, Type* type)
