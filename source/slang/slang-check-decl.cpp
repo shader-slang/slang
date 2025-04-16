@@ -11442,6 +11442,46 @@ int compareVals(ASTBuilder* astBuilder, Val* lhs, Val* rhs, int* feedback)
         [&](Val& lhs, Val& rhs) { return compareVals(astBuilder, lhs, rhs, feedback); });
 }
 
+// Compare operands of lhs and rhs from offset,
+// and at most count operands, if the capacity allows it.
+int compareValOperands(
+    ASTBuilder* astBuilder,
+    Val& lhs,
+    Val& rhs,
+    Index offset,
+    Index count,
+    int* feedback)
+{
+    const Index lN = std::clamp<Index>(lhs.getOperandCount() - offset, 0, count);
+    const Index rN = std::clamp<Index>(rhs.getOperandCount() - offset, 0, count);
+    int res = compareThreeWays(lN, rN);
+    if (res)
+        return res;
+    for (Index i = 0; i < lN; ++i)
+    {
+        auto lOp = lhs.getOperand(offset + i);
+        auto rOp = rhs.getOperand(offset + i);
+        res = compareVals(astBuilder, lOp, rOp, feedback);
+        if (res)
+        {
+            break;
+        }
+    }
+    return res;
+}
+
+// compare operands of lhs and rhs from offset to the end
+int compareValOperands(ASTBuilder* astBuilder, Val& lhs, Val& rhs, Index offset, int* feedback)
+{
+    return compareValOperands(
+        astBuilder,
+        lhs,
+        rhs,
+        offset,
+        std::numeric_limits<Index>::max(),
+        feedback);
+}
+
 int compareIntVals(ASTBuilder* astBuilder, IntVal& lhs, IntVal& rhs, int* feedback)
 {
     int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
@@ -11603,28 +11643,7 @@ int compareDeclRefs(ASTBuilder* astBuilder, DeclRefBase& lhs, DeclRefBase& rhs, 
     else if (auto lGeneric = as<GenericAppDeclRef>(&lhs))
     {
         auto rGeneric = as<GenericAppDeclRef>(&rhs);
-        if (lGeneric->getArgCount() == rGeneric->getArgCount())
-        {
-            for (Index i = 0; i < lGeneric->getArgCount(); ++i)
-            {
-                auto lArg = lGeneric->getArg(i);
-                auto rArg = rGeneric->getArg(i);
-                int compArgs = compareVals(astBuilder, lArg, rArg, feedback);
-                if (compArgs)
-                {
-                    specRes = compArgs;
-                    break;
-                }
-            }
-            if (!specRes)
-            {
-                specRes = 0;
-            }
-        }
-        else
-        {
-            specRes = compareThreeWays(lGeneric->getArgCount(), rGeneric->getArgCount());
-        }
+        specRes = compareValOperands(astBuilder, lhs, rhs, 2, feedback);
     }
     else if (auto lLookup = as<LookupDeclRef>(&lhs))
     {
