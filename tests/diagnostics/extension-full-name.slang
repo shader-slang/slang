@@ -161,6 +161,12 @@ extension Container.Nested
 [shader("compute")][numthreads(1, 1, 1)] void main(uint3 dispatchThreadID
                                                    : SV_DispatchThreadID)
 {
+    // Test array extensions with constraints
+    testArrayExtension();
+
+    // Test namespace extensions
+    testNamespaceExtensions();
+
     // Type instantiation tests
     GenericType<half>.State state1;
     GenericType<float>.InnerType.Options options1;
@@ -224,4 +230,128 @@ extension Container.Nested
                                         // got 'NonGenericType.Config'
     config1 = nested.createSettings();  // Error: expected expr of type 'NonGenericType.Config', got
                                         // 'Container.Nested.Settings'
+}
+
+// Define an interface for constraint
+interface IFoo
+{
+    float getValue();
+}
+
+// Struct that implements IFoo
+struct Bar : IFoo
+{
+    float value;
+
+    float getValue() { return value; }
+}
+
+// Struct that doesn't implement IFoo
+struct Baz
+{
+    float value;
+}
+
+// Extension with constrained generic type parameter
+extension<T : IFoo, let N : int> Array<T, N>
+{
+    // Add a struct type inside the extension
+    struct DataStats
+    {
+        float average;
+        float maximum;
+        float minimum;
+    }
+
+    // Add a function that uses the struct type
+    DataStats computeStats()
+    {
+        DataStats stats;
+        stats.average = 0;
+        stats.maximum = -1e38;
+        stats.minimum = 1e38;
+
+        for(int i = 0; i < N; i++)
+        {
+            float val = this[i].getValue();
+            stats.average += val;
+            stats.maximum = max(stats.maximum, val);
+            stats.minimum = min(stats.minimum, val);
+        }
+
+        if(N > 0)
+            stats.average /= float(N);
+
+        return stats;
+    }
+
+    // Add a field
+    static DataStats defaultStats;
+}
+
+void testArrayExtension()
+{
+    // Create an array of a type that implements IFoo
+    Bar barArray[3] = { {1.0}, {2.0}, {3.0} };
+
+    // Create an array of a type that doesn't implement IFoo
+    Baz bazArray[3] = { {1.0}, {2.0}, {3.0} };
+
+    // This should work - using the extension on a valid type
+    Array<Bar, 3>.DataStats barStats;
+    barStats = barArray.computeStats(); // Valid
+
+    // Type mismatch errors
+    barStats = 0; // Error: expected expr of type 'Bar[3].DataStats', got 'int'
+
+    // This won't compile - Baz doesn't implement IFoo
+    //Array<Baz, 3>.DataStats bazStats;  // This should fail because Baz doesn't implement IFoo
+    //bazStats = bazArray.computeStats(); // This also won't compile
+
+    // Type mismatch between different extension instantiations
+    Array<Bar, 2>.DataStats bar2Stats;
+    bar2Stats = barArray.computeStats(); // Error: expected expr of type 'Bar[2].DataStats', got 'Bar[3].DataStats'
+}
+
+// Test namespace extensions
+// Define a simple base struct
+struct SimpleBase
+{
+    float value;
+}
+
+// Define a namespace with an extension
+namespace TestNamespace
+{
+    extension SimpleBase
+    {
+        struct NamedConfig
+        {
+            float factor;
+        }
+
+        NamedConfig createConfig()
+        {
+            NamedConfig config;
+            config.factor = value * 2.0;
+            return config;
+        }
+    }
+}
+
+// Test function for namespace extensions
+void testNamespaceExtensions()
+{
+    // Need to use the namespace to access the extension methods
+    using namespace TestNamespace;
+
+    SimpleBase base;
+    base.value = 5.0;
+
+    // The type is just "SimpleBase.NamedConfig", not "TestNamespace.SimpleBase.NamedConfig"
+    SimpleBase.NamedConfig config;
+    config.factor = 2.0;
+
+    // Generate a type error to check the output format
+    config = 0; // Error: expected expr of type 'SimpleBase.NamedConfig', got 'int'
 }
