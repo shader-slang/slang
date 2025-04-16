@@ -161,6 +161,24 @@ struct ValNodeOperand
 
     ValNodeOperand() { values.intOperand = 0; }
 
+    int64_t getIntConstant() const
+    {
+        SLANG_ASSERT(kind == ValNodeOperandKind::ConstantValue);
+        return values.intOperand;
+    }
+
+    Val* getVal() const
+    {
+        SLANG_ASSERT(kind == ValNodeOperandKind::ValNode);
+        return (Val*)values.nodeOperand;
+    }
+
+    Decl* getDecl() const
+    {
+        SLANG_ASSERT(kind == ValNodeOperandKind::ASTNode);
+        return (Decl*)values.nodeOperand;
+    }
+
     explicit ValNodeOperand(NodeBase* node)
     {
         if constexpr (sizeof(values.nodeOperand) < sizeof(values.intOperand))
@@ -442,23 +460,11 @@ class Val : public NodeBase
     Val* resolveImpl();
     Val* resolve();
 
-    Val* getOperand(Index index) const
-    {
-        SLANG_ASSERT(m_operands[index].kind == ValNodeOperandKind::ValNode);
-        return (Val*)m_operands[index].values.nodeOperand;
-    }
+    Val* getOperand(Index index) const { return m_operands[index].getVal(); }
 
-    Decl* getDeclOperand(Index index) const
-    {
-        SLANG_ASSERT(m_operands[index].kind == ValNodeOperandKind::ASTNode);
-        return (Decl*)(m_operands[index].values.nodeOperand);
-    }
+    Decl* getDeclOperand(Index index) const { return m_operands[index].getDecl(); }
 
-    int64_t getIntConstOperand(Index index) const
-    {
-        SLANG_ASSERT(m_operands[index].kind == ValNodeOperandKind::ConstantValue);
-        return m_operands[index].values.intOperand;
-    }
+    int64_t getIntConstOperand(Index index) const { return m_operands[index].getIntConstant(); }
 
     Index getOperandCount() const { return m_operands.getCount(); }
 
