@@ -46,6 +46,11 @@ function(generator dir)
 endfunction()
 
 generator(
+    slang-fiddle
+    LINK_WITH_PRIVATE
+    compiler-core
+)
+generator(
     slang-cpp-extractor
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE
@@ -94,7 +99,7 @@ if(SLANG_ENABLE_SLANGD)
             core
             compiler-core
             slang
-            slang-reflect-headers
+            slang-fiddle-output
             slang-capability-defs
             Threads::Threads
         INSTALL
