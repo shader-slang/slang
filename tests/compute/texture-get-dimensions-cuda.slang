@@ -22,6 +22,7 @@ TextureCubeArray<float> cudaTCubeArray;
 RWStructuredBuffer<uint> cudaOutputBuffer;
 
 [numthreads(7, 1, 1)]
+[shader("compute")]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
@@ -35,9 +36,8 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
         case 0:
         {
             // Test 1D texture width
-            cudaT1D.GetDimensions(width);
-            cudaOutputBuffer[idx] = width;
-            break;
+           width = cudaT1D[0];
+           break;
         }
         case 1:
         {

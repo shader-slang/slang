@@ -1,12 +1,10 @@
-//TEST:SIMPLE(filecheck=METAL): -target metal -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=METALLIB): -target metallib -entry computeMain -stage compute
-// Metal lacks RWTexture GFX backend support. 
-// Due to this, Metal compute test is disabled
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -mtl
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -slang -output-using-type -shaderobj -vk
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -cuda -output-using-type -shaderobj O0
 
 //METAL-NOT: error 41402
 //METALLIB: @computeMain
+
+//TEST_INPUT: Texture1D(size=4, content = one):name t1D
+Texture1D<uint> t1D;
 
 //TEST_INPUT: RWTexture1D(format=R8G8B8A8_SINT, size=8, content = zero, mipMaps = 1):name outputTexture1D
 RWTexture1D<int4> outputTexture1D;
@@ -24,12 +22,14 @@ RWTexture2DArray<int4> outputTexture2DArray;
 RWStructuredBuffer<uint> outputBuffer;
 
 
+
 [numthreads(1,1,1)]
+[shader("compute")]
 void computeMain()
 {
-    outputTexture1D[0].xz = int2(1, 2).xx;
+    outputTexture1D[1].x = t1D[0];
     AllMemoryBarrier();
-    outputTexture1D[1].x = int2(3, 4).y;
+    outputTexture1D[0].xz = int2(1, 2).xx;
     AllMemoryBarrier();
     outputTexture2D[0].xz = int2(1, 2).xx;
     AllMemoryBarrier();

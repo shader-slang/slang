@@ -3,11 +3,16 @@
 
 Texture1D<float> tex1D;
 
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<uint> outputBuffer;
+
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint idx = dispatchThreadID.x;
     
     float value = tex1D[idx];
+    
+    outputBuffer[0] = value;
 }
-// CHECK: error 55206: texture subscript operator is not supported for CUDA targets.
+// CHECK: 

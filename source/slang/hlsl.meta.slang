@@ -3610,14 +3610,42 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 //@public:
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location)
     {
         __target_switch
         {
         case cpp:
         case hlsl:
-            __intrinsic_asm ".Load";
+		case cuda:
+            if (isArray != 0)
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "surf1DLayeredread$C<$T0>($0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "surf2DLayeredread$C<$T0>($0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "surf3DLayeredread$C<$T0>($0, ($1).x * $E, ($1).y, ($1).z, ($1).w, SLANG_CUDA_BOUNDARY_MODE)";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
+                else
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_1D):
+                        __intrinsic_asm "surf1Dread$C<$T0>($0, ($1) * $E, SLANG_CUDA_BOUNDARY_MODE)";
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "surf2Dread$C<$T0>($0, ($1).x * $E, ($1).y, SLANG_CUDA_BOUNDARY_MODE)";
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "surf3Dread$C<$T0>($0, ($1).x * $E, ($1).y, ($1).z, SLANG_CUDA_BOUNDARY_MODE)";
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
         case metal:
             switch (Shape.flavor)
             {
@@ -3824,7 +3852,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
         get
         {
             __target_switch
@@ -3833,6 +3861,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 case hlsl:
                     __intrinsic_asm ".operator[]";
                 case metal:
+				case cuda:
                     return Load(__makeVector(location, 0));
                 case glsl:
                     if (isCombined == 0)

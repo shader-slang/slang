@@ -2464,8 +2464,13 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
             
             if (isTexture && isCudaTarget)
             {
-                getSink()->diagnose(subscriptExpr, Diagnostics::unsupportedTextureSubscriptForCUDA);
-                return CreateErrorExpr(subscriptExpr);
+                // TODO: support texture subscript for CUDA.
+                // For now we disallow it.
+                // We need to check if the target is CUDA and issue an error.
+                //if (getTarget()->getOptionSet().getTargetProfile().getFamily() == ProfileFamily::CUDA)
+                //{
+                //    getSink()->diagnose(subscriptExpr, Diagnostics::unsupportedTextureSubscriptForCUDA);
+                //}
             }
         }
     }
@@ -2780,7 +2785,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                 // ```
                                 // That strictly speaking it's not allowed, but we are going to
                                 // allow it for now for situations were the types are uint/int and
-                                // vector/matrix varieties of those types
+                                // vector/matrix varieties of those types.
                                 //
                                 // Then in lowering we are going to insert code to do something like
                                 // ```
