@@ -107,18 +107,14 @@ void ContainerDecl::buildMemberDictionary()
 
 Index ContainerDecl::getDeclIndex(Decl* decl)
 {
-    Index res = Index(-1);
-    if (!mapDeclMemberToIndex.containsKey(decl))
+    if (Index* ptr = mapDeclMemberToIndex.tryGetValue(decl))
     {
-        res = members.findFirstIndex([&](Decl* d) { return d == decl; });
-        if (res >= Index(0))
-        {
-            mapDeclMemberToIndex[decl] = res;
-        }
+        return *ptr;
     }
-    else
+    Index res = members.findFirstIndex([&](Decl* d) { return d == decl; });
+    if (res >= Index(0))
     {
-        res = mapDeclMemberToIndex[decl];
+        mapDeclMemberToIndex[decl] = res;
     }
     return res;
 }

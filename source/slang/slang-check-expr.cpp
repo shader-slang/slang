@@ -677,10 +677,9 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 typeDef->type.type = DeclRefType::create(m_astBuilder, synthDeclRef);
                 structDecl->members.add(typeDef);
 
-                synthesizedDecl->parentDecl = parent;
                 synthesizedDecl->nameAndLoc.name = item.declRef.getName();
                 synthesizedDecl->loc = parent->loc;
-                parent->members.add(synthesizedDecl);
+                parent->addMember(synthesizedDecl);
                 parent->invalidateMemberDictionary();
 
                 // Mark the newly synthesized decl as `ToBeSynthesized` so future checking can

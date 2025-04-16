@@ -72,7 +72,7 @@ class ContainerDecl : public Decl
         }
     }
 
-    static void SetParent(ContainerDecl* parent, Decl* child)
+    static void setParent(ContainerDecl* parent, Decl* child)
     {
         if (child)
             child->parentDecl = parent;
