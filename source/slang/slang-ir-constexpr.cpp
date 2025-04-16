@@ -423,8 +423,7 @@ bool checkInstConstExprRecursively(PropagateConstExprContext* context, IRInst* i
             if (auto calleeFirstBlock = calleeFunc->getFirstBlock())
             {
                 UInt paramCounter = 0;
-                for (auto pp = calleeFirstBlock->getFirstParam(); pp;
-                    pp = pp->getNextParam())
+                for (auto pp = calleeFirstBlock->getFirstParam(); pp; pp = pp->getNextParam())
                 {
                     UInt paramIndex = paramCounter++;
 
@@ -440,15 +439,18 @@ bool checkInstConstExprRecursively(PropagateConstExprContext* context, IRInst* i
                     }
                 }
             }
-                // Iterate through all instructions in all blocks
-                for (auto block : calleeFunc->getBlocks()) {
-                    for (auto ii : block->getOrdinaryInsts()) {
-                        // If we find a call instruction
-                        if (as<IRCall>(ii)) {
-                            changedInThisInst = checkInstConstExprRecursively(context, ii);
-                        }
+            // Iterate through all instructions in all blocks
+            for (auto block : calleeFunc->getBlocks())
+            {
+                for (auto ii : block->getOrdinaryInsts())
+                {
+                    // If we find a call instruction
+                    if (as<IRCall>(ii))
+                    {
+                        changedInThisInst = checkInstConstExprRecursively(context, ii);
                     }
                 }
+            }
         }
         else
         {
@@ -508,7 +510,6 @@ bool propagateConstExprBackward(PropagateConstExprContext* context, IRGlobalValu
             for (auto ii = bb->getLastInst(); ii; ii = ii->getPrevInst())
             {
                 changedThisIteration = checkInstConstExprRecursively(context, ii);
-
             }
 
             if (bb != code->getFirstBlock())
