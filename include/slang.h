@@ -985,7 +985,9 @@ typedef uint32_t SlangSizeT;
         ArchiveType,
         CompileCoreModule,
         Doc,
-        IrCompression,
+
+        IrCompression, //< deprecated
+
         LoadCoreModule,
         ReferenceModule,
         SaveCoreModule,

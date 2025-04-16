@@ -135,9 +135,9 @@ public:
 
     bool operator==(const ThisType& rhs) const;
 
-    Result writeContainer(SerialCompressionType moduleCompressionType, RiffContainer* container);
+    Result writeContainer(
+        RiffContainer* container);
     Result readContainer(
-        SerialCompressionType moduleCompressionType,
         RiffContainer::ListChunk* listChunk);
 
     List<char> m_stringTable;                   ///< String table for debug use only

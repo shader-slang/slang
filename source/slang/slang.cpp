@@ -3486,7 +3486,6 @@ void FrontEndCompileRequest::generateIR()
         {
             SerialContainerUtil::WriteOptions options;
 
-            options.compressionType = SerialCompressionType::None;
             options.sourceManager = getSourceManager();
             options.optionFlags |= SerialOptionFlag::SourceLocation;
 

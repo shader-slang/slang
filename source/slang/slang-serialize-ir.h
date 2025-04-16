@@ -28,7 +28,6 @@ struct IRSerialWriter
     /// Write to a container
     static Result writeContainer(
         const IRSerialData& data,
-        SerialCompressionType compressionType,
         RiffContainer* container);
 
     /// Get an instruction index from an instruction
@@ -98,7 +97,6 @@ struct IRSerialReader
     /// Read a stream to fill in dataOut IRSerialData
     static Result readContainer(
         RiffContainer::ListChunk* module,
-        SerialCompressionType containerCompressionType,
         IRSerialData* outData);
 
     /// Read a module from serial data

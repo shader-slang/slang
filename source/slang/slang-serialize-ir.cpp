@@ -331,111 +331,7 @@ Result IRSerialWriter::write(
     return SLANG_OK;
 }
 
-Result _encodeInsts(
-    SerialCompressionType compressionType,
-    const List<IRSerialData::Inst>& instsIn,
-    List<uint8_t>& encodeArrayOut)
-{
-    typedef IRSerialData::Inst::PayloadType PayloadType;
-
-    if (compressionType != SerialCompressionType::VariableByteLite)
-    {
-        return SLANG_FAIL;
-    }
-
-    encodeArrayOut.clear();
-
-    const size_t numInsts = size_t(instsIn.getCount());
-    const IRSerialData::Inst* insts = instsIn.begin();
-
-    uint8_t* encodeOut = encodeArrayOut.begin();
-    uint8_t* encodeEnd = encodeArrayOut.end();
-
-    // Calculate the maximum instruction size with worst case possible encoding
-    // 2 bytes hold the payload size, and the result type
-    // Note that if there were some free bits, we could encode some of this stuff into bits, but if
-    // we remove payloadType, then there are no free bits
-    const size_t maxInstSize = 1 + ByteEncodeUtil::kMaxLiteEncodeUInt16 +
-                               Math::Max(
-                                   sizeof(insts->m_payload.m_float64),
-                                   size_t(2 * ByteEncodeUtil::kMaxLiteEncodeUInt32));
-
-    for (size_t i = 0; i < numInsts; ++i)
-    {
-        const auto& inst = insts[i];
-
-        // Make sure there is space for the largest possible instruction
-        if (encodeOut + maxInstSize >= encodeEnd)
-        {
-            const size_t offset = size_t(encodeOut - encodeArrayOut.begin());
-
-            const UInt oldCapacity = encodeArrayOut.getCapacity();
-
-            encodeArrayOut.reserve(oldCapacity + (oldCapacity >> 1) + maxInstSize);
-            const UInt capacity = encodeArrayOut.getCapacity();
-            encodeArrayOut.setCount(capacity);
-
-            encodeOut = encodeArrayOut.begin() + offset;
-            encodeEnd = encodeArrayOut.end();
-        }
-        encodeOut += ByteEncodeUtil::encodeLiteUInt32(inst.m_op, encodeOut);
-
-        *encodeOut++ = uint8_t(inst.m_payloadType);
-
-        encodeOut += ByteEncodeUtil::encodeLiteUInt32((uint32_t)inst.m_resultTypeIndex, encodeOut);
-
-        switch (inst.m_payloadType)
-        {
-        case PayloadType::Empty:
-            {
-                break;
-            }
-        case PayloadType::Operand_1:
-        case PayloadType::String_1:
-        case PayloadType::UInt32:
-            {
-                // 1 UInt32
-                encodeOut += ByteEncodeUtil::encodeLiteUInt32(
-                    (uint32_t)inst.m_payload.m_operands[0],
-                    encodeOut);
-                break;
-            }
-        case PayloadType::Operand_2:
-        case PayloadType::OperandAndUInt32:
-        case PayloadType::OperandExternal:
-        case PayloadType::String_2:
-            {
-                // 2 UInt32
-                encodeOut += ByteEncodeUtil::encodeLiteUInt32(
-                    (uint32_t)inst.m_payload.m_operands[0],
-                    encodeOut);
-                encodeOut += ByteEncodeUtil::encodeLiteUInt32(
-                    (uint32_t)inst.m_payload.m_operands[1],
-                    encodeOut);
-                break;
-            }
-        case PayloadType::Float64:
-            {
-                memcpy(encodeOut, &inst.m_payload.m_float64, sizeof(inst.m_payload.m_float64));
-                encodeOut += sizeof(inst.m_payload.m_float64);
-                break;
-            }
-        case PayloadType::Int64:
-            {
-                memcpy(encodeOut, &inst.m_payload.m_int64, sizeof(inst.m_payload.m_int64));
-                encodeOut += sizeof(inst.m_payload.m_int64);
-                break;
-            }
-        }
-    }
-
-    // Fix the size
-    encodeArrayOut.setCount(UInt(encodeOut - encodeArrayOut.begin()));
-    return SLANG_OK;
-}
-
 Result _writeInstArrayChunk(
-    SerialCompressionType compressionType,
     FourCC chunkId,
     const List<IRSerialData::Inst>& array,
     RiffContainer* container)
@@ -448,37 +344,11 @@ Result _writeInstArrayChunk(
         return SLANG_OK;
     }
 
-    switch (compressionType)
-    {
-    case SerialCompressionType::None:
-        {
-            return SerialRiffUtil::writeArrayChunk(compressionType, chunkId, array, container);
-        }
-    case SerialCompressionType::VariableByteLite:
-        {
-            List<uint8_t> compressedPayload;
-            SLANG_RETURN_ON_FAIL(_encodeInsts(compressionType, array, compressedPayload));
-
-            ScopeChunk scope(container, Chunk::Kind::Data, SLANG_MAKE_COMPRESSED_FOUR_CC(chunkId));
-
-            SerialBinary::CompressedArrayHeader header;
-            header.numEntries = uint32_t(array.getCount());
-            header.numCompressedEntries = 0;
-
-            container->write(&header, sizeof(header));
-            container->write(compressedPayload.getBuffer(), compressedPayload.getCount());
-
-            return SLANG_OK;
-        }
-    default:
-        break;
-    }
-    return SLANG_FAIL;
+    return SerialRiffUtil::writeArrayChunk(chunkId, array, container);
 }
 
 /* static */ Result IRSerialWriter::writeContainer(
     const IRSerialData& data,
-    SerialCompressionType compressionType,
     RiffContainer* container)
 {
     typedef RiffContainer::Chunk Chunk;
@@ -487,25 +357,21 @@ Result _writeInstArrayChunk(
     ScopeChunk scopeModule(container, Chunk::Kind::List, Bin::kIRModuleFourCc);
 
     SLANG_RETURN_ON_FAIL(
-        _writeInstArrayChunk(compressionType, Bin::kInstFourCc, data.m_insts, container));
+        _writeInstArrayChunk(Bin::kInstFourCc, data.m_insts, container));
     SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
-        compressionType,
         Bin::kChildRunFourCc,
         data.m_childRuns,
         container));
     SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
-        compressionType,
         Bin::kExternalOperandsFourCc,
         data.m_externalOperands,
         container));
     SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
-        SerialCompressionType::None,
         SerialBinary::kStringTableFourCc,
         data.m_stringTable,
         container));
 
     SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
-        SerialCompressionType::None,
         Bin::kUInt32RawSourceLocFourCc,
         data.m_rawSourceLocs,
         container));
@@ -513,7 +379,6 @@ Result _writeInstArrayChunk(
     if (data.m_debugSourceLocRuns.getCount())
     {
         SerialRiffUtil::writeArrayChunk(
-            compressionType,
             Bin::kDebugSourceLocRunFourCc,
             data.m_debugSourceLocRuns,
             container);
@@ -555,133 +420,16 @@ Result _writeInstArrayChunk(
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialReader !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-static Result _decodeInsts(
-    SerialCompressionType compressionType,
-    const uint8_t* encodeCur,
-    size_t encodeInSize,
-    List<IRSerialData::Inst>& instsOut)
-{
-    const uint8_t* encodeEnd = encodeCur + encodeInSize;
-
-    typedef IRSerialData::Inst::PayloadType PayloadType;
-
-    if (compressionType != SerialCompressionType::VariableByteLite)
-    {
-        return SLANG_FAIL;
-    }
-
-    const size_t numInsts = size_t(instsOut.getCount());
-    IRSerialData::Inst* insts = instsOut.begin();
-
-    for (size_t i = 0; i < numInsts; ++i)
-    {
-        if (encodeCur >= encodeEnd)
-        {
-            SLANG_ASSERT(!"Invalid decode");
-            return SLANG_FAIL;
-        }
-
-        auto& inst = insts[i];
-        uint32_t instOp = 0;
-        encodeCur += ByteEncodeUtil::decodeLiteUInt32(encodeCur, &instOp);
-        inst.m_op = (uint16_t)instOp;
-
-        const PayloadType payloadType = PayloadType(*encodeCur++);
-        inst.m_payloadType = payloadType;
-
-        // Read the result value
-        encodeCur +=
-            ByteEncodeUtil::decodeLiteUInt32(encodeCur, (uint32_t*)&inst.m_resultTypeIndex);
-
-        switch (inst.m_payloadType)
-        {
-        case PayloadType::Empty:
-            {
-                break;
-            }
-        case PayloadType::Operand_1:
-        case PayloadType::String_1:
-        case PayloadType::UInt32:
-            {
-                // 1 UInt32
-                encodeCur += ByteEncodeUtil::decodeLiteUInt32(
-                    encodeCur,
-                    (uint32_t*)&inst.m_payload.m_operands[0]);
-                break;
-            }
-        case PayloadType::Operand_2:
-        case PayloadType::OperandAndUInt32:
-        case PayloadType::OperandExternal:
-        case PayloadType::String_2:
-            {
-                // 2 UInt32
-                encodeCur += ByteEncodeUtil::decodeLiteUInt32(
-                    encodeCur,
-                    2,
-                    (uint32_t*)&inst.m_payload.m_operands[0]);
-                break;
-            }
-        case PayloadType::Float64:
-            {
-                memcpy(&inst.m_payload.m_float64, encodeCur, sizeof(inst.m_payload.m_float64));
-                encodeCur += sizeof(inst.m_payload.m_float64);
-                break;
-            }
-        case PayloadType::Int64:
-            {
-                memcpy(&inst.m_payload.m_int64, encodeCur, sizeof(inst.m_payload.m_int64));
-                encodeCur += sizeof(inst.m_payload.m_int64);
-                break;
-            }
-        }
-    }
-
-    return SLANG_OK;
-}
-
 static Result _readInstArrayChunk(
-    SerialCompressionType containerCompressionType,
     RiffContainer::DataChunk* chunk,
     List<IRSerialData::Inst>& arrayOut)
 {
-    SerialCompressionType compressionType = SerialCompressionType::None;
-    if (chunk->m_fourCC == SLANG_MAKE_COMPRESSED_FOUR_CC(chunk->m_fourCC))
-    {
-        compressionType = SerialCompressionType(containerCompressionType);
-    }
-
-    switch (compressionType)
-    {
-    case SerialCompressionType::None:
-        {
-            SerialRiffUtil::ListResizerForType<IRSerialData::Inst> resizer(arrayOut);
-            return SerialRiffUtil::readArrayChunk(compressionType, chunk, resizer);
-        }
-    case SerialCompressionType::VariableByteLite:
-        {
-            RiffReadHelper read = chunk->asReadHelper();
-
-            SerialBinary::CompressedArrayHeader header;
-            SLANG_RETURN_ON_FAIL(read.read(header));
-
-            arrayOut.setCount(header.numEntries);
-
-            SLANG_RETURN_ON_FAIL(
-                _decodeInsts(compressionType, read.getData(), read.getRemainingSize(), arrayOut));
-            break;
-        }
-    default:
-        {
-            return SLANG_FAIL;
-        }
-    }
-
-    return SLANG_OK;
+    SerialRiffUtil::ListResizerForType<IRSerialData::Inst> resizer(arrayOut);
+    return SerialRiffUtil::readArrayChunk(chunk, resizer);
 }
 
 /* static */ Result IRSerialReader::readContainer(
     RiffContainer::ListChunk* module,
-    SerialCompressionType containerCompressionType,
     IRSerialData* outData)
 {
     typedef IRSerialBinary Bin;
@@ -698,27 +446,22 @@ static Result _readInstArrayChunk(
 
         switch (dataChunk->m_fourCC)
         {
-        case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kInstFourCc):
         case Bin::kInstFourCc:
             {
                 SLANG_RETURN_ON_FAIL(
-                    _readInstArrayChunk(containerCompressionType, dataChunk, outData->m_insts));
+                    _readInstArrayChunk(dataChunk, outData->m_insts));
                 break;
             }
-        case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kChildRunFourCc):
         case Bin::kChildRunFourCc:
             {
                 SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(
-                    containerCompressionType,
                     dataChunk,
                     outData->m_childRuns));
                 break;
             }
-        case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kExternalOperandsFourCc):
         case Bin::kExternalOperandsFourCc:
             {
                 SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(
-                    containerCompressionType,
                     dataChunk,
                     outData->m_externalOperands));
                 break;
@@ -726,21 +469,19 @@ static Result _readInstArrayChunk(
         case SerialBinary::kStringTableFourCc:
             {
                 SLANG_RETURN_ON_FAIL(
-                    SerialRiffUtil::readArrayUncompressedChunk(dataChunk, outData->m_stringTable));
+                    SerialRiffUtil::readArrayChunk(dataChunk, outData->m_stringTable));
                 break;
             }
         case Bin::kUInt32RawSourceLocFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayUncompressedChunk(
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(
                     dataChunk,
                     outData->m_rawSourceLocs));
                 break;
             }
-        case SLANG_MAKE_COMPRESSED_FOUR_CC(Bin::kDebugSourceLocRunFourCc):
         case Bin::kDebugSourceLocRunFourCc:
             {
                 SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(
-                    containerCompressionType,
                     dataChunk,
                     outData->m_debugSourceLocRuns));
                 break;

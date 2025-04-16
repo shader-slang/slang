@@ -83,9 +83,6 @@ struct SerialContainerUtil
 {
     struct WriteOptions
     {
-        SerialCompressionType compressionType =
-            SerialCompressionType::VariableByteLite; ///< If compression is used what type to use
-                                                     ///< (only some parts can be compressed)
         SerialOptionFlags optionFlags =
             SerialOptionFlag::ASTModule |
             SerialOptionFlag::IRModule; ///< Flags controlling what is written

@@ -290,19 +290,6 @@ namespace Slang
         RiffContainer::Chunk::Kind::List,
         SerialBinary::kContainerFourCc);
 
-    // Write the header
-    {
-        SerialBinary::ContainerHeader containerHeader;
-        // Save the compression type if used - as can only serialize with a single compression type
-        containerHeader.compressionType = uint32_t(options.compressionType);
-
-        RiffContainer::ScopeChunk scopeHeader(
-            container,
-            RiffContainer::Chunk::Kind::Data,
-            SerialBinary::kContainerHeaderFourCc);
-        container->write(&containerHeader, sizeof(containerHeader));
-    }
-
     if (data.modules.getCount() &&
         (options.optionFlags & (SerialOptionFlag::IRModule | SerialOptionFlag::ASTModule)))
     {
@@ -357,7 +344,7 @@ namespace Slang
                     options.optionFlags,
                     &serialData));
                 SLANG_RETURN_ON_FAIL(
-                    IRSerialWriter::writeContainer(serialData, options.compressionType, container));
+                    IRSerialWriter::writeContainer(serialData, container));
             }
 
             // Write the AST information
@@ -451,7 +438,7 @@ namespace Slang
         SerialSourceLocData debugData;
         sourceLocWriter->write(&debugData);
 
-        debugData.writeContainer(options.compressionType, container);
+        debugData.writeContainer(container);
     }
 
     // Write the container string table
@@ -501,18 +488,6 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
         return SLANG_FAIL;
     }
 
-    SerialBinary::ContainerHeader* containerHeader =
-        containerChunk->findContainedData<SerialBinary::ContainerHeader>(
-            SerialBinary::kContainerHeaderFourCc);
-    if (!containerHeader)
-    {
-        // Didn't find the header
-        return SLANG_FAIL;
-    }
-
-    const SerialCompressionType containerCompressionType =
-        SerialCompressionType(containerHeader->compressionType);
-
     StringSlicePool containerStringPool(StringSlicePool::Style::Default);
 
     if (RiffContainer::Data* stringTableData =
@@ -532,7 +507,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
     {
         // Read into data
         SerialSourceLocData sourceLocData;
-        SLANG_RETURN_ON_FAIL(sourceLocData.readContainer(containerCompressionType, debugChunk));
+        SLANG_RETURN_ON_FAIL(sourceLocData.readContainer(debugChunk));
 
         // Turn into DebugReader
         sourceLocReader = new SerialSourceLocReader;
@@ -612,7 +587,6 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                     IRSerialData serialData;
                     SLANG_RETURN_ON_FAIL(IRSerialReader::readContainer(
                         irChunk,
-                        containerCompressionType,
                         &serialData));
 
                     // Read IR back from serialData
@@ -962,7 +936,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                 writer.write(module, sourceLocWriter, options.optionFlags, &irData));
         }
         SLANG_RETURN_ON_FAIL(
-            IRSerialWriter::writeContainer(irData, options.compressionType, &riffContainer));
+            IRSerialWriter::writeContainer(irData, &riffContainer));
 
         // Write the debug info Riff container
         if (sourceLocWriter)
@@ -971,7 +945,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
             sourceLocWriter->write(&serialData);
 
             SLANG_RETURN_ON_FAIL(
-                serialData.writeContainer(options.compressionType, &riffContainer));
+                serialData.writeContainer(&riffContainer));
         }
 
         SLANG_RETURN_ON_FAIL(RiffUtil::write(&riffContainer, &memoryStream));
@@ -1003,7 +977,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                 return SLANG_FAIL;
             }
             SerialSourceLocData sourceLocData;
-            SLANG_RETURN_ON_FAIL(sourceLocData.readContainer(options.compressionType, debugList));
+            SLANG_RETURN_ON_FAIL(sourceLocData.readContainer(debugList));
 
             sourceLocReader = new SerialSourceLocReader;
             SLANG_RETURN_ON_FAIL(sourceLocReader->read(&sourceLocData, &workSourceManager));
@@ -1021,7 +995,7 @@ static List<ExtensionDecl*>& _getCandidateExtensionList(
                 IRSerialData irReadData;
                 IRSerialReader reader;
                 SLANG_RETURN_ON_FAIL(
-                    reader.readContainer(irList, options.compressionType, &irReadData));
+                    reader.readContainer(irList, &irReadData));
 
                 // Check the stream read data is the same
                 if (irData != irReadData)
