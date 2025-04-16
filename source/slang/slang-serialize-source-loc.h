@@ -135,10 +135,8 @@ public:
 
     bool operator==(const ThisType& rhs) const;
 
-    Result writeContainer(
-        RiffContainer* container);
-    Result readContainer(
-        RiffContainer::ListChunk* listChunk);
+    Result writeContainer(RiffContainer* container);
+    Result readContainer(RiffContainer::ListChunk* listChunk);
 
     List<char> m_stringTable;                   ///< String table for debug use only
     List<LineInfo> m_lineInfos;                 ///< Line information

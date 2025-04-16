@@ -385,8 +385,7 @@ SlangResult SerialSourceLocReader::read(
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DebugSerialData !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-/* static */ Result SerialSourceLocData::writeContainer(
-    RiffContainer* container)
+/* static */ Result SerialSourceLocData::writeContainer(RiffContainer* container)
 {
     RiffContainer::ScopeChunk debugChunkScope(
         container,
@@ -413,8 +412,7 @@ SlangResult SerialSourceLocReader::read(
     return SLANG_OK;
 }
 
-/* static */ Result SerialSourceLocData::readContainer(
-    RiffContainer::ListChunk* listChunk)
+/* static */ Result SerialSourceLocData::readContainer(RiffContainer::ListChunk* listChunk)
 {
     SLANG_ASSERT(listChunk->getSubType() == SerialSourceLocData::kDebugFourCc);
 
@@ -431,14 +429,12 @@ SlangResult SerialSourceLocReader::read(
         {
         case SerialSourceLocData::kDebugStringFourCc:
             {
-                SLANG_RETURN_ON_FAIL(
-                    SerialRiffUtil::readArrayChunk(dataChunk, m_stringTable));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(dataChunk, m_stringTable));
                 break;
             }
         case SerialSourceLocData::kDebugLineInfoFourCc:
             {
-                SLANG_RETURN_ON_FAIL(
-                    SerialRiffUtil::readArrayChunk(dataChunk, m_lineInfos));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(dataChunk, m_lineInfos));
                 break;
             }
         case SerialSourceLocData::kDebugAdjustedLineInfoFourCc:
@@ -449,9 +445,7 @@ SlangResult SerialSourceLocReader::read(
             }
         case SerialSourceLocData::kDebugSourceInfoFourCc:
             {
-                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(
-                    dataChunk,
-                    m_sourceInfos));
+                SLANG_RETURN_ON_FAIL(SerialRiffUtil::readArrayChunk(dataChunk, m_sourceInfos));
                 break;
             }
         }

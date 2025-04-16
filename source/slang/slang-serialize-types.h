@@ -194,10 +194,7 @@ struct SerialRiffUtil
         RiffContainer* container);
 
     template<typename T>
-    static Result writeArrayChunk(
-        FourCC chunkId,
-        const List<T>& array,
-        RiffContainer* container)
+    static Result writeArrayChunk(FourCC chunkId, const List<T>& array, RiffContainer* container)
     {
         return writeArrayChunk(
             chunkId,
@@ -207,14 +204,10 @@ struct SerialRiffUtil
             container);
     }
 
-    static Result readArrayChunk(
-        RiffContainer::DataChunk* dataChunk,
-        ListResizer& listOut);
+    static Result readArrayChunk(RiffContainer::DataChunk* dataChunk, ListResizer& listOut);
 
     template<typename T>
-    static Result readArrayChunk(
-        RiffContainer::DataChunk* dataChunk,
-        List<T>& arrayOut)
+    static Result readArrayChunk(RiffContainer::DataChunk* dataChunk, List<T>& arrayOut)
     {
         ListResizerForType<T> resizer(arrayOut);
         return readArrayChunk(dataChunk, resizer);
