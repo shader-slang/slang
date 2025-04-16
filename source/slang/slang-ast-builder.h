@@ -84,10 +84,7 @@ public:
         return m_thisTypeName;
     }
 
-    BreakableStmt::UniqueID generateUniqueIDForStmt()
-    {
-        return m_nextUniqueStmtID++;
-    }
+    BreakableStmt::UniqueID generateUniqueIDForStmt() { return m_nextUniqueStmtID++; }
 
 protected:
     // State shared between ASTBuilders
@@ -355,9 +352,9 @@ public:
             case ASTNodeType::ExtensionDecl:
             case ASTNodeType::AssocTypeDecl:
                 return getLookupDeclRef(
-                    lookupDeclRef->getLookupSource(),
-                    lookupDeclRef->getWitness(),
-                    memberDecl)
+                           lookupDeclRef->getLookupSource(),
+                           lookupDeclRef->getWitness(),
+                           memberDecl)
                     .template as<T>();
             default:
                 break;
