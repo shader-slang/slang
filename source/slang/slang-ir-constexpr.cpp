@@ -229,7 +229,7 @@ bool maybeMarkConstExprBackwardPass(PropagateConstExprContext* context, IRInst* 
         {
             // We've just changed a function parameter to
             // be `constexpr`. We need to remember that
-            // fact so taht we can mark callers of this
+            // fact so that we can mark callers of this
             // function as `constexpr` themselves.
 
             for (auto u = code->firstUse; u; u = u->nextUse)
@@ -442,7 +442,12 @@ bool checkInstConstExprRecursively(PropagateConstExprContext* context, IRInst* i
             {
                 for (auto ii : block->getOrdinaryInsts())
                 {
-                    // If we find a call instruction
+                    // skip for recursive calls
+                    if (ii == inst)
+                    {
+                        continue;
+                    }
+                    // If we find a call instruction to check
                     if (as<IRCall>(ii))
                     {
                         changedInThisInst = checkInstConstExprRecursively(context, ii);
@@ -507,7 +512,7 @@ bool propagateConstExprBackward(PropagateConstExprContext* context, IRGlobalValu
         {
             for (auto ii = bb->getLastInst(); ii; ii = ii->getPrevInst())
             {
-                changedThisIteration = checkInstConstExprRecursively(context, ii);
+                changedThisIteration |= checkInstConstExprRecursively(context, ii);
             }
 
             if (bb != code->getFirstBlock())
