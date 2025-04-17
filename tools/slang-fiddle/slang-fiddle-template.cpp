@@ -449,7 +449,8 @@ private:
         }
         else
         {
-            SLANG_ABORT_COMPILATION("fiddle encountered an unknown construct when converting a text template to Lua");
+            SLANG_ABORT_COMPILATION(
+                "fiddle encountered an unknown construct when converting a text template to Lua");
         }
     }
 };
