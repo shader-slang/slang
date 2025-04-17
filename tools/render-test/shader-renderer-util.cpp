@@ -14,9 +14,9 @@ inline int calcMipSize(int size, int level)
     return size > 0 ? size : 1;
 }
 
-inline Extents calcMipSize(Extents size, int mipLevel)
+inline Extent3D calcMipSize(Extent3D size, int mipLevel)
 {
-    Extents rs;
+    Extent3D rs;
     rs.width = calcMipSize(size.width, mipLevel);
     rs.height = calcMipSize(size.height, mipLevel);
     rs.depth = calcMipSize(size.depth, mipLevel);
@@ -24,7 +24,7 @@ inline Extents calcMipSize(Extents size, int mipLevel)
 }
 
 /// Given the type works out the maximum dimension size
-inline int calcMaxDimension(Extents size, TextureType type)
+inline int calcMaxDimension(Extent3D size, TextureType type)
 {
     switch (type)
     {
@@ -43,7 +43,7 @@ inline int calcMaxDimension(Extents size, TextureType type)
 }
 
 /// Given the type, calculates the number of mip maps. 0 on error
-inline int calcNumMipLevels(TextureType type, Extents size)
+inline int calcNumMipLevels(TextureType type, Extent3D size)
 {
     const int maxDimensionSize = calcMaxDimension(size, type);
     return (maxDimensionSize > 0) ? (Math::Log2Floor(maxDimensionSize) + 1) : 0;
@@ -145,13 +145,13 @@ inline int calcNumMipLevels(TextureType type, Extents size)
             const int mipWidth = calcMipSize(textureDesc.size.width, m);
             const int mipHeight = calcMipSize(textureDesc.size.height, m);
 
-            auto strideY = mipWidth * sizeof(uint32_t);
-            auto strideZ = mipHeight * strideY;
+            size_t rowPitch = mipWidth * sizeof(uint32_t);
+            size_t slicePitch = mipHeight * rowPitch;
 
             SubresourceData subresourceData;
             subresourceData.data = texData.m_slices[subResourceIndex].values;
-            subresourceData.strideY = strideY;
-            subresourceData.strideZ = strideZ;
+            subresourceData.rowPitch = rowPitch;
+            subresourceData.slicePitch = slicePitch;
 
             initSubresources.add(subresourceData);
         }
