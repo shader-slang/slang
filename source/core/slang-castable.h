@@ -77,7 +77,10 @@ public:
 
     // IBoxValue
     virtual SLANG_NO_THROW void* SLANG_MCALL getValuePtr() SLANG_OVERRIDE { return &m_value; }
-    virtual SLANG_NO_THROW SlangUUID SLANG_MCALL getValueTypeGuid() SLANG_OVERRIDE { return T::getTypeGuid(); }
+    virtual SLANG_NO_THROW SlangUUID SLANG_MCALL getValueTypeGuid() SLANG_OVERRIDE
+    {
+        return T::getTypeGuid();
+    }
 
     BoxValue() {}
 

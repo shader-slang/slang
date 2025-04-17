@@ -1523,8 +1523,8 @@ protected:
         {
             return (GfxCount)m_entryPoints.getCount();
         }
-        SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
-            SLANG_OVERRIDE
+        SLANG_NO_THROW SlangResult SLANG_MCALL
+        getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) SLANG_OVERRIDE
         {
             *outEntryPoint = m_entryPoints[index];
             m_entryPoints[index]->addRef();

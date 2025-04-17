@@ -177,8 +177,8 @@ public:
     {
         return (GfxCount)m_entryPoints.getCount();
     }
-    SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
-        SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) SLANG_OVERRIDE
     {
         returnComPtr(outEntryPoint, m_entryPoints[index]);
         return SLANG_OK;
