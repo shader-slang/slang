@@ -42,7 +42,7 @@ public:
 struct App
 {
 public:
-    App(SourceManager& sourceManager, DiagnosticSink& sink, RootNamePool rootNamePool)
+    App(SourceManager& sourceManager, DiagnosticSink& sink, RootNamePool& rootNamePool)
         : sourceManager(sourceManager), sink(sink), rootNamePool(rootNamePool)
     {
     }
