@@ -153,6 +153,21 @@ typealias int64_t4x2 = matrix<int64_t, 4, 2>;
 > While it may seem that this choice of convention is confusing, it is necessary to ensure that subscripting with `[]` can be efficiently implemented on all target platforms.
 > This decision in the Slang language is consistent with the compilation of HLSL to SPIR-V performed by other compilers.
 
+
+### Matrix Operations
+
+Matrix types support several operations:
+
+* Element-wise operations (addition, subtraction, multiplication) using the standard operators (`+`, `-`, `*`). These operations require matrices of the same dimensions.
+* Matrix multiplication using the `mul()` function, which supports matrices of compatible dimensions (e.g., `float2x3 * float3x4`).
+* Matrix-vector multiplication using `mul()`, where the vector can be interpreted as either a row or column vector depending on the parameter order:
+  * `mul(v, m)` - v is interpreted as a row vector
+  * `mul(m, v)` - v is interpreted as a column vector
+
+For proper matrix multiplication, always use the `mul()` function. The `operator*` performs element-wise multiplication and should only be used when you want to multiply corresponding elements of same-sized matrices.
+
+> Note: This differs from GLSL, where the `*` operator performs matrix multiplication. When porting code from GLSL to Slang, you'll need to replace matrix multiplications using `*` with calls to `mul()`.
+
 ### Legacy Syntax
 
 For compatibility with older codebases, the generic `matrix` type includes default values for `T`, `R`, and `C`, being declared as:
