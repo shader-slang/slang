@@ -627,6 +627,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         name = "gl_InstanceIndex";
         targetVarName = IRTargetBuiltinVarName::HlslInstanceID;
         context->requireSPIRVVersion(SemanticVersion(1, 3));
+        context->requireGLSLVersion(ProfileVersion::GLSL_460);
         context->requireGLSLExtension(toSlice("GL_ARB_shader_draw_parameters"));
     }
     else if (semanticName == "sv_isfrontface")
