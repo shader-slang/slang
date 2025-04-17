@@ -1099,7 +1099,6 @@ struct EmitContext
 private:
     SourceManager& _sourceManager;
     RefPtr<LogicalModule> _module;
-    DiagnosticSink& _sink;
     StringBuilder& _builder;
 
 public:
@@ -1108,8 +1107,9 @@ public:
         DiagnosticSink& sink,
         SourceManager& sourceManager,
         LogicalModule* module)
-        : _builder(builder), _sink(sink), _sourceManager(sourceManager), _module(module)
+        : _builder(builder), _sourceManager(sourceManager), _module(module)
     {
+        SLANG_UNUSED(sink);
     }
 
     void emitMacrosRec(Decl* decl)
