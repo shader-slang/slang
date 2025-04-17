@@ -7415,8 +7415,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugInlinedAt(SpvInstParent* parent, IRDebugInlinedAt* debugInlinedAt)
     {
-        if (!debugInlinedAt)
-            return nullptr;
         IRInst* lineInst = debugInlinedAt->getLine();
 
         SpvInst* scope = nullptr;
