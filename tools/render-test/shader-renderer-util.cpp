@@ -134,6 +134,14 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
         textureDesc.mipLevelCount = calcNumMipLevels(textureDesc.type, textureDesc.size);
     }
 
+    // Metal doesn't support mip maps for 1D textures.
+    if (device->getDeviceType() == DeviceType::Metal &&
+        (textureDesc.type == TextureType::Texture1D ||
+         textureDesc.type == TextureType::Texture1DArray))
+    {
+        textureDesc.mipLevelCount = 1;
+    }
+
     List<SubresourceData> initSubresources;
     int layerCount = textureDesc.getLayerCount();
     int subResourceCounter = 0;
