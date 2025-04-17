@@ -7,12 +7,12 @@
 
 namespace fiddle
 {
-    using namespace Slang;
+using namespace Slang;
 
-    namespace Diagnostics
-    {
+namespace Diagnostics
+{
 
 #define DIAGNOSTIC(id, severity, name, messageFormat) extern const DiagnosticInfo name;
 #include "slang-fiddle-diagnostic-defs.h"
-    }
-}
+} // namespace Diagnostics
+} // namespace fiddle

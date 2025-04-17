@@ -45,11 +45,7 @@ function(generator dir)
     endif()
 endfunction()
 
-generator(
-    slang-fiddle
-    LINK_WITH_PRIVATE
-    compiler-core
-)
+generator(slang-fiddle LINK_WITH_PRIVATE compiler-core)
 generator(
     slang-cpp-extractor
     USE_FEWER_WARNINGS
