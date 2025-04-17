@@ -340,8 +340,8 @@ void DeclRefBase::toText(StringBuilder& out)
     {
         auto dd = dr->getDecl();
 
-        // If this declaration is inside an extension, add it and then stop gathering parents
-        if (dd->parentDecl && as<ExtensionDecl>(dd->parentDecl))
+        // If this declaration is an extension, add it and then stop gathering parents
+        if (as<ExtensionDecl>(dd))
         {
             declRefs.add(dr);
             break; // Stop gathering parent DeclRefs to exclude namespace
@@ -366,21 +366,6 @@ void DeclRefBase::toText(StringBuilder& out)
     for (auto declRef : declRefs)
     {
         auto decl = declRef->getDecl();
-
-        if (decl && decl->parentDecl && as<ExtensionDecl>(decl->parentDecl))
-        {
-            auto extDecl = as<ExtensionDecl>(decl->parentDecl);
-            if (extDecl->targetType)
-            {
-                getTargetType(getCurrentASTBuilder(), DeclRef<ExtensionDecl>(getParent()))
-                    ->toText(out);
-                out << ".";
-                out << decl->getName()->text;
-                first = false;
-                continue;
-            }
-        }
-
         if (!first)
             out << ".";
         first = false;
@@ -410,6 +395,13 @@ void DeclRefBase::toText(StringBuilder& out)
                     }
                     out << ">";
                 }
+            }
+        }
+        else if (auto extDecl = as<ExtensionDecl>(decl))
+        {
+            if (extDecl->targetType)
+            {
+                getTargetType(getCurrentASTBuilder(), getParent())->toText(out);
             }
         }
     }
