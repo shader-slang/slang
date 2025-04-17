@@ -1,84 +1,81 @@
 // slang-fiddle-template.h
 #pragma once
 
-#include "slang-fiddle-diagnostics.h"
-
-#include "core/slang-string.h"
-#include "core/slang-list.h"
 #include "compiler-core/slang-source-loc.h"
+#include "core/slang-list.h"
+#include "core/slang-string.h"
+#include "slang-fiddle-diagnostics.h"
 
 namespace fiddle
 {
-    using namespace Slang;
+using namespace Slang;
 
-    class TextTemplateStmt : public RefObject
-    {
-    public:
-    };
+class TextTemplateStmt : public RefObject
+{
+public:
+};
 
-    class TextTemplateScriptStmt : public TextTemplateStmt
-    {
-    public:
-        UnownedStringSlice scriptSource;
-    };
+class TextTemplateScriptStmt : public TextTemplateStmt
+{
+public:
+    UnownedStringSlice scriptSource;
+};
 
-    class TextTemplateRawStmt : public TextTemplateStmt
-    {
-    public:
-        // TODO(tfoley): Add a `SourceLoc` here, so
-        // that we can emit approriate `#line` directives
-        // to the output...
+class TextTemplateRawStmt : public TextTemplateStmt
+{
+public:
+    // TODO(tfoley): Add a `SourceLoc` here, so
+    // that we can emit approriate `#line` directives
+    // to the output...
 
-        UnownedStringSlice text;
-    };
+    UnownedStringSlice text;
+};
 
-    class TextTemplateSpliceStmt : public TextTemplateStmt
-    {
-    public:
-        UnownedStringSlice scriptExprSource;
-    };
+class TextTemplateSpliceStmt : public TextTemplateStmt
+{
+public:
+    UnownedStringSlice scriptExprSource;
+};
 
-    class TextTemplateSeqStmt : public TextTemplateStmt
-    {
-    public:
-        List<RefPtr<TextTemplateStmt>> stmts;
-    };
+class TextTemplateSeqStmt : public TextTemplateStmt
+{
+public:
+    List<RefPtr<TextTemplateStmt>> stmts;
+};
 
-    class TextTemplate : public RefObject
-    {
-    public:
-        /// ID of this template within the enclosing file
-        Index id;
+class TextTemplate : public RefObject
+{
+public:
+    /// ID of this template within the enclosing file
+    Index id;
 
-        UnownedStringSlice templateStartLine;
-        UnownedStringSlice outputStartLine;
-        UnownedStringSlice endLine;
+    UnownedStringSlice templateStartLine;
+    UnownedStringSlice outputStartLine;
+    UnownedStringSlice endLine;
 
-        UnownedStringSlice templateSource;
-        UnownedStringSlice existingOutputContent;
+    UnownedStringSlice templateSource;
+    UnownedStringSlice existingOutputContent;
 
-        RefPtr<TextTemplateStmt> body;
-    };
+    RefPtr<TextTemplateStmt> body;
+};
 
-    class TextTemplateFile : public RefObject
-    {
-    public:
-        UnownedStringSlice originalFileContent;
-        List<RefPtr<TextTemplate>> textTemplates;
-    };
+class TextTemplateFile : public RefObject
+{
+public:
+    UnownedStringSlice originalFileContent;
+    List<RefPtr<TextTemplate>> textTemplates;
+};
 
-    RefPtr<TextTemplateFile> parseTextTemplateFile(
-        SourceView* inputSourceView,
-        DiagnosticSink* sink);
+RefPtr<TextTemplateFile> parseTextTemplateFile(SourceView* inputSourceView, DiagnosticSink* sink);
 
-    void generateTextTemplateOutputs(
-        String originalFileName,
-        TextTemplateFile* file,
-        StringBuilder& builder,
-        DiagnosticSink* sink);
+void generateTextTemplateOutputs(
+    String originalFileName,
+    TextTemplateFile* file,
+    StringBuilder& builder,
+    DiagnosticSink* sink);
 
-    String generateModifiedInputFileForTextTemplates(
-        String templateOutputFileName,
-        TextTemplateFile* file,
-        DiagnosticSink* sink);
-}
+String generateModifiedInputFileForTextTemplates(
+    String templateOutputFileName,
+    TextTemplateFile* file,
+    DiagnosticSink* sink);
+} // namespace fiddle

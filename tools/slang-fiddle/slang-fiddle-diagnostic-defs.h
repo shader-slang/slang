@@ -37,21 +37,33 @@ DIAGNOSTIC(200002, Error, couldNotWriteOutputFile, "could not write output file 
 
 // Template Parsing
 
-DIAGNOSTIC(300001, Error, expectedOutputStartMarker, "start line for template not followed by a line marking output with '$0'")
+DIAGNOSTIC(
+    300001,
+    Error,
+    expectedOutputStartMarker,
+    "start line for template not followed by a line marking output with '$0'")
 DIAGNOSTIC(300002, Error, expectedEndMarker, "expected a template end line ('$0')")
 
 // Scraper: Parsing
 
 DIAGNOSTIC(500001, Error, unexpected, "unexpected $0, expected $1")
 
-DIAGNOSTIC(501001, Error, expectedFiddleEllipsisInvocation, "expected 'FIDDLE(...)' at start of body of '$0'")
+DIAGNOSTIC(
+    501001,
+    Error,
+    expectedFiddleEllipsisInvocation,
+    "expected 'FIDDLE(...)' at start of body of '$0'")
 
-DIAGNOSTIC(502001, Error, expectedIncludeOfOutputHeader, "expected a '#include' of generated output file '$0' in file containing 'FIDDLE(...)' invocations")
+DIAGNOSTIC(
+    502001,
+    Error,
+    expectedIncludeOfOutputHeader,
+    "expected a '#include' of generated output file '$0' in file containing 'FIDDLE(...)' "
+    "invocations")
 
 // Scraper: Semantic Checking
 
 DIAGNOSTIC(600001, Error, undefinedIdentifier, "undefined identifier '$0'")
-
 
 
 DIAGNOSTIC(999999, Fatal, internalError, "internal error in 'fiddle' tool")

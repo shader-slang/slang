@@ -5,62 +5,57 @@
 
 namespace fiddle
 {
-    using namespace Slang;
+using namespace Slang;
 
-    //
+//
 
-    struct Options
+struct Options
+{
+public:
+    static const char* expectArg(char const* const*& cursor, char const* const* end)
     {
-    public:
-        static const char* expectArg(
-            char const* const*& cursor,
-            char const* const* end)
+        if (cursor != end)
+            return *cursor++;
+        return nullptr;
+    }
+
+    void parse(DiagnosticSink& sink, int argc, char const* const* argv)
+    {
+        auto argCursor = argv++;
+        auto argEnd = argCursor + argc;
+
+        if (argCursor != argEnd)
         {
-            if (cursor != end)
-                return *cursor++;
-            return nullptr;
+            appName = *argCursor++;
         }
 
-        void parse(
-            DiagnosticSink& sink,
-            int argc,
-            char const* const* argv)
+        while (argCursor != argEnd)
         {
-            auto argCursor = argv++;
-            auto argEnd = argCursor + argc;
-
-            if (argCursor != argEnd)
+            UnownedTerminatedStringSlice arg = *argCursor++;
+            if (arg[0] != '-')
             {
-                appName = *argCursor++;
+                inputPaths.add(String(arg));
+                continue;
             }
 
-            while (argCursor != argEnd)
+            if (arg == UnownedTerminatedStringSlice("-i"))
             {
-                UnownedTerminatedStringSlice arg = *argCursor++;
-                if (arg[0] != '-')
-                {
-                    inputPaths.add(String(arg));
-                    continue;
-                }
-
-                if (arg == UnownedTerminatedStringSlice("-i"))
-                {
-                    inputPathPrefix = expectArg(argCursor, argEnd);
-                }
-                else if (arg == UnownedTerminatedStringSlice("-o"))
-                {
-                    outputPathPrefix = expectArg(argCursor, argEnd);
-                }
-                else
-                {
-                    sink.diagnose(SourceLoc(), Diagnostics::unknownOption, arg);
-                }
+                inputPathPrefix = expectArg(argCursor, argEnd);
+            }
+            else if (arg == UnownedTerminatedStringSlice("-o"))
+            {
+                outputPathPrefix = expectArg(argCursor, argEnd);
+            }
+            else
+            {
+                sink.diagnose(SourceLoc(), Diagnostics::unknownOption, arg);
             }
         }
+    }
 
-        String appName = "slang-fiddle";
-        String inputPathPrefix = "";
-        String outputPathPrefix = "";
-        List<String> inputPaths;
-    };
-}
+    String appName = "slang-fiddle";
+    String inputPathPrefix = "";
+    String outputPathPrefix = "";
+    List<String> inputPaths;
+};
+} // namespace fiddle
