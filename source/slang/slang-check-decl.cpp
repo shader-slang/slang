@@ -11351,10 +11351,10 @@ int compareThreeWays(T a, T b)
 }
 
 // lhs and rhs cannot be nullptr
-int compareDecls(ASTBuilder* astBuilder, Decl& lhs, Decl& rhs);
+int compareDecls(Decl& lhs, Decl& rhs);
 
 // lhs and rhs cannot be nullptr
-int compareVals(ASTBuilder* astBuilder, Val& lhs, Val& rhs);
+int compareVals(Val& lhs, Val& rhs);
 
 template<typename T, class Compare>
 int comparePtrs(T* lhs, T* rhs, Compare const& compare)
@@ -11372,26 +11372,20 @@ int comparePtrs(T* lhs, T* rhs, Compare const& compare)
 }
 
 // lhs or rhs might be nullptr
-int compareDecls(ASTBuilder* astBuilder, Decl* lhs, Decl* rhs)
+int compareDecls(Decl* lhs, Decl* rhs)
 {
-    return comparePtrs(
-        lhs,
-        rhs,
-        [&](Decl& lhs, Decl& rhs) { return compareDecls(astBuilder, lhs, rhs); });
+    return comparePtrs(lhs, rhs, [&](Decl& lhs, Decl& rhs) { return compareDecls(lhs, rhs); });
 }
 
 // lhs or rhs might be nullptr
-int compareVals(ASTBuilder* astBuilder, Val* lhs, Val* rhs)
+int compareVals(Val* lhs, Val* rhs)
 {
-    return comparePtrs(
-        lhs,
-        rhs,
-        [&](Val& lhs, Val& rhs) { return compareVals(astBuilder, lhs, rhs); });
+    return comparePtrs(lhs, rhs, [&](Val& lhs, Val& rhs) { return compareVals(lhs, rhs); });
 }
 
 // Compare operands of lhs and rhs from offset,
 // and at most count operands, if the capacity allows it.
-int compareValOperands(ASTBuilder* astBuilder, Val& lhs, Val& rhs, Index offset, Index count)
+int compareValOperands(Val& lhs, Val& rhs, Index offset, Index count)
 {
     const Index lN = std::clamp<Index>(lhs.getOperandCount() - offset, 0, count);
     const Index rN = std::clamp<Index>(rhs.getOperandCount() - offset, 0, count);
@@ -11413,10 +11407,10 @@ int compareValOperands(ASTBuilder* astBuilder, Val& lhs, Val& rhs, Index offset,
             res = compareThreeWays(lOp.getIntConstant(), rOp.getIntConstant());
             break;
         case ValNodeOperandKind::ValNode:
-            res = compareVals(astBuilder, lOp.getVal(), rOp.getVal());
+            res = compareVals(lOp.getVal(), rOp.getVal());
             break;
         case ValNodeOperandKind::ASTNode:
-            res = compareDecls(astBuilder, lOp.getDecl(), rOp.getDecl());
+            res = compareDecls(lOp.getDecl(), rOp.getDecl());
             break;
         }
         if (res)
@@ -11428,9 +11422,9 @@ int compareValOperands(ASTBuilder* astBuilder, Val& lhs, Val& rhs, Index offset,
 }
 
 // Compare operands of lhs and rhs from offset to the end
-int compareValOperands(ASTBuilder* astBuilder, Val& lhs, Val& rhs, Index offset)
+int compareValOperands(Val& lhs, Val& rhs, Index offset)
 {
-    return compareValOperands(astBuilder, lhs, rhs, offset, std::numeric_limits<Index>::max());
+    return compareValOperands(lhs, rhs, offset, std::numeric_limits<Index>::max());
 }
 
 // Find the lowest common ancestor (LCA) of nodes a and b
@@ -11503,9 +11497,8 @@ ContainerDecl* findDeclsLowestCommonAncestor(Decl*& a, Decl*& b)
     return a->parentDecl;
 }
 
-int compareDecls(ASTBuilder* astBuilder, Decl& lhs, Decl& rhs)
+int compareDecls(Decl& lhs, Decl& rhs)
 {
-    SLANG_UNUSED(astBuilder);
     int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
     if (res)
         return res;
@@ -11526,23 +11519,23 @@ int compareDecls(ASTBuilder* astBuilder, Decl& lhs, Decl& rhs)
     return res;
 }
 
-int compareVals(ASTBuilder* astBuilder, Val& lhs, Val& rhs)
+int compareVals(Val& lhs, Val& rhs)
 {
     int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
     if (res)
         return res;
-    res = compareValOperands(astBuilder, lhs, rhs, 0);
+    res = compareValOperands(lhs, rhs, 0);
     return res;
 }
 
-int compareTypes(ASTBuilder* astBuilder, Type* lhs, Type* rhs)
+int compareTypes(Type* lhs, Type* rhs)
 {
-    return compareVals(astBuilder, lhs, rhs);
+    return compareVals(lhs, rhs);
 }
 
-int compareTypes(ASTBuilder* astBuilder, Type& lhs, Type& rhs)
+int compareTypes(Type& lhs, Type& rhs)
 {
-    return compareVals(astBuilder, lhs, rhs);
+    return compareVals(lhs, rhs);
 }
 
 static void _getCanonicalConstraintTypes(List<Type*>& outTypeList, Type* type)
@@ -11594,7 +11587,7 @@ OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericCon
             _getCanonicalConstraintTypes(typeList, type);
         }
         const auto typeComparator = [&](Type* lhs, Type* rhs)
-        { return compareTypes(astBuilder, *lhs, *rhs) < 0; };
+        { return compareTypes(*lhs, *rhs) < 0; };
         typeList.sort(typeComparator);
         result[constraints.key] = std::move(typeList);
     }
@@ -11622,8 +11615,7 @@ OrderedDictionary<Type*, List<Type*>> getCanonicalGenericConstraints2(
             genericConstraints[typeToAdd].add(supExpr.type);
         }
     }
-    const auto typeComparator = [&](Type* lhs, Type* rhs)
-    { return compareTypes(astBuilder, lhs, rhs) < 0; };
+    const auto typeComparator = [&](Type* lhs, Type* rhs) { return compareTypes(lhs, rhs) < 0; };
     const List<Type*> sortedKeys = [&]()
     {
         List<Type*> res;
