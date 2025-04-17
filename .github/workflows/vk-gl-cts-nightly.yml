@@ -1,8 +1,10 @@
 name: VK-GL-CTS Nightly
 
 on:
-  schedule:
-    - cron: "00 07 * * *"
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -23,7 +25,7 @@ jobs:
             warnings-as-errors: true
             test-category: full
             full-gpu-tests: false
-            runs-on: [Windows, self-hosted]
+            runs-on: [Windows, self-hosted, GCP-T4]
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 180
     defaults:
