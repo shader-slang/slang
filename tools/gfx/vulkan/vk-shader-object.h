@@ -250,8 +250,8 @@ public:
 
     List<RefPtr<EntryPointShaderObject>> const& getEntryPoints() const;
 
-    virtual GfxCount SLANG_MCALL getEntryPointCount() override;
-    virtual Result SLANG_MCALL
+    virtual SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL
     getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) override;
 
     virtual SLANG_NO_THROW Result SLANG_MCALL
