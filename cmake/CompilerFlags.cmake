@@ -152,8 +152,8 @@ function(set_default_compile_options target)
 
     add_supported_cxx_flags(${target} PRIVATE ${warning_flags})
 
-    if(NOT WIN32)
-        # valid linker options only for GNU/Linux
+    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+        # valid linker options only for GNU/Clang
         add_supported_cxx_linker_flags(
             ${target}
             PRIVATE
