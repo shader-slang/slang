@@ -150,6 +150,25 @@ public:
 
     auto erase(ConstIterator const& it) { return map.erase(it); }
 
+    // Removes all values satifying the predicate:
+    // bool predicate(pair<Key, Value>)
+    template<class Predicate>
+    void removeIf(Predicate&& predicate)
+    {
+        auto it = begin();
+        while (it != end())
+        {
+            if (predicate(*it))
+            {
+                it = erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+    }
+
     // Reserves enough space for the specified number of values
     void reserve(Index size) { map.reserve(std::size_t(size)); };
 

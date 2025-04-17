@@ -252,18 +252,8 @@ void StatementSet::disjunct(StatementSet other)
     // Remove any insts that don't have a corresponding statement in the other set,
     // since this effectively means "any".
     //
-    auto statement = statements.begin();
-    while (statement != statements.end())
-    {
-        if (!other.statements.containsKey(statement->first))
-        {
-            statement = statements.erase(statement);
-        }
-        else
-        {
-            ++statement;
-        }
-    }
+    statements.removeIf([&](auto const& statement)
+                        { return !other.statements.containsKey(statement.first); });
 }
 
 void StatementSet::conjunct(StatementSet other)
