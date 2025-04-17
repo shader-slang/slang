@@ -8098,7 +8098,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     }
 
     if (ret.opcode.flavor == SPIRVAsmOperand::Flavor::NamedValue &&
-        ret.opcode.knownValue == SpvOp(0xffffffff))
+        ret.opcode.knownValue == (SpvWord)(SpvOp(0xffffffff)))
     {
         if (ret.opcode.token.type == TokenType::IntegerLiteral)
         {
