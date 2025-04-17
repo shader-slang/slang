@@ -1,35 +1,29 @@
-//TEST:SIMPLE(filecheck=CHECK):-entry computeMain -stage compute -target SPIRV
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type
 
-// HLSL doesn't support structured buffers for CoopVec
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -dx12-experimental -use-dxil -output-using-type -profile cs_6_8 -Xslang... -Xdxc -Vd -X.
+//TEST_INPUT: set inputBuffer = ubuffer(data=[1 2 3 4 5 6 7 8 9 10 11 12], stride=4);
+uniform int32_t* inputBuffer;
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<int32_t> outputBuffer;
 
 // CHECK: type: int32_t
-// CHECK-NEXT: 5
-// CHECK-NEXT: 6
-// CHECK-NEXT: 7
-// CHECK-NEXT: 8
+// CHECK-NEXT: 9
+// CHECK-NEXT: 10
+// CHECK-NEXT: 11
+// CHECK-NEXT: 12
 // CHECK-NEXT: 1
 // CHECK-NEXT: 2
 // CHECK-NEXT: 3
 // CHECK-NEXT: 4
 
-struct A
-{
-int32_t* ptr;
-}
-
-//TEST_INPUT:ubuffer(data=[1 2 3 4 5 6 7 8], stride=4),name=buf
-ConstantBuffer<A> inputBuffer;
-
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
-ConstantBuffer<int32_t*> outputBuffer;
-
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    let a = CoopVec<int32_t, 4>.load(inputBuffer.ptr, 0);
-    let b = coopVecLoad<4>(inputBuffer.ptr, 4*4);
+    let a = CoopVec<int32_t, 4>.load(inputBuffer, 0);
+    let b = coopVecLoad<4>(inputBuffer + 4, 4*4);
+
     b.store(outputBuffer, 0);
     a.store(outputBuffer, 4*4);
 }
+

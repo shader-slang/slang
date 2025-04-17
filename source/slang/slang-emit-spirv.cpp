@@ -1707,10 +1707,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     inst->getOp() == kIROp_ArrayType
                         ? emitOpTypeArray(inst, elementType, irArrayType->getElementCount())
                         : emitOpTypeRuntimeArray(inst, elementType);
-                auto strideInst = irArrayType->getArrayStride();
-                if (strideInst && shouldEmitArrayStride(irArrayType->getElementType()))
+                if (shouldEmitArrayStride(irArrayType->getElementType()))
                 {
-                    int stride = (int)getIntVal(strideInst);
+                    auto stride = 0;
+                    if (auto strideInst = irArrayType->getArrayStride())
+                    {
+                        stride = getIntVal(strideInst);
+                    }
+                    else
+                    {
+                        // Unsized arrays are lowered to IR before target specific passes and do not
+                        // have a stride operand, hence `stride` is zero. Calculate stride here.
+                        IRSizeAndAlignment sizeAndAlignment;
+                        getNaturalSizeAndAlignment(
+                            m_targetProgram->getOptionSet(),
+                            elementType,
+                            &sizeAndAlignment);
+                        stride = sizeAndAlignment.getStride();
+                    }
+
                     emitOpDecorateArrayStride(
                         getSection(SpvLogicalSectionID::Annotations),
                         nullptr,
