@@ -1520,12 +1520,12 @@ public:
         return SLANG_OK;
     }
 
-    virtual SlangInt32 SLANG_MCALL getDefinedEntryPointCount() override
+    virtual SLANG_NO_THROW SlangInt32 SLANG_MCALL getDefinedEntryPointCount() override
     {
         return (SlangInt32)m_entryPoints.getCount();
     }
 
-    virtual SlangResult SLANG_MCALL
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getDefinedEntryPoint(SlangInt32 index, slang::IEntryPoint** outEntryPoint) override
     {
         if (index < 0 || index >= m_entryPoints.getCount())
@@ -1625,7 +1625,7 @@ public:
 
     virtual void buildHash(DigestBuilder<SHA1>& builder) SLANG_OVERRIDE;
 
-    virtual slang::DeclReflection* SLANG_MCALL getModuleReflection() SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW slang::DeclReflection* SLANG_MCALL getModuleReflection() SLANG_OVERRIDE;
 
     void setDigest(SHA1::Digest const& digest) { m_digest = digest; }
     SHA1::Digest computeDigest();

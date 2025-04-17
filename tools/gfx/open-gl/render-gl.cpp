@@ -1519,12 +1519,12 @@ protected:
             return static_cast<RootShaderObjectLayoutImpl*>(m_layout.Ptr());
         }
 
-        GfxCount SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE
+        SLANG_NO_THROW GfxCount SLANG_MCALL getEntryPointCount() SLANG_OVERRIDE
         {
             return (GfxCount)m_entryPoints.getCount();
         }
-        SlangResult SLANG_MCALL getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint)
-            SLANG_OVERRIDE
+        SLANG_NO_THROW SlangResult SLANG_MCALL
+        getEntryPoint(GfxIndex index, IShaderObject** outEntryPoint) SLANG_OVERRIDE
         {
             *outEntryPoint = m_entryPoints[index];
             m_entryPoints[index]->addRef();
@@ -2510,6 +2510,12 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
                 {
                     for (int j = 0; j < srcDesc.numMipLevels; j++)
                     {
+                        const void* dataPtr = nullptr;
+                        if (initData)
+                        {
+                            dataPtr = initData[slice].data;
+                            ++slice;
+                        }
                         glTexImage3D(
                             target,
                             j,
@@ -2520,7 +2526,7 @@ SLANG_NO_THROW Result SLANG_MCALL GLDevice::createTextureResource(
                             0,
                             format,
                             formatType,
-                            initData ? initData[slice++].data : nullptr);
+                            dataPtr);
                     }
                 }
             }
