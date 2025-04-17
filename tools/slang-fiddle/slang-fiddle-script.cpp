@@ -153,7 +153,7 @@ String evaluateScriptCode(String originalFileName, String scriptSource, Diagnost
         String message = UnownedStringSlice(buffer, size);
         message = message + "\n";
         sink->diagnoseRaw(Severity::Error, message.getBuffer());
-        throw 99;
+        SLANG_ABORT_COMPILATION("fiddle failed during Lua script loading");
     }
 
     if (LUA_OK != lua_pcall(L, 0, 0, 0))
@@ -163,7 +163,7 @@ String evaluateScriptCode(String originalFileName, String scriptSource, Diagnost
         String message = UnownedStringSlice(buffer, size);
         message = message + "\n";
         sink->diagnoseRaw(Severity::Error, message.getBuffer());
-        throw 99;
+        SLANG_ABORT_COMPILATION("fiddle failed during Lua script execution");
     }
 
     _builder = nullptr;

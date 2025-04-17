@@ -179,7 +179,7 @@ public:
                 if (isInScriptLine)
                     continue;
                 if (depthInSplice)
-                    throw 99;
+                    SLANG_ABORT_COMPILATION("fiddle encountered a '$' nested inside a splice");
 
                 if (*_cursor == '(')
                 {
@@ -449,7 +449,7 @@ private:
         }
         else
         {
-            throw 99;
+            SLANG_ABORT_COMPILATION("fiddle encountered an unknown construct when converting a text template to Lua");
         }
     }
 };
