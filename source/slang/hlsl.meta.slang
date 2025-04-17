@@ -14523,6 +14523,7 @@ bool WaveMaskAllEqual(WaveMask mask, matrix<T,N,M> value)
 // Prefix
 
 __generic<T : __BuiltinArithmeticType>
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixProduct(WaveMask mask, T expr)
 {
@@ -14535,6 +14536,7 @@ T WaveMaskPrefixProduct(WaveMask mask, T expr)
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
 {
@@ -14547,6 +14549,7 @@ vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixProduct(WaveMask mask, matrix<T,N,M> expr)
 {
@@ -14560,6 +14563,7 @@ matrix<T,N,M> WaveMaskPrefixProduct(WaveMask mask, matrix<T,N,M> expr)
 }
 
 __generic<T : __BuiltinArithmeticType>
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixSum(WaveMask mask, T expr)
 {
@@ -14573,6 +14577,7 @@ T WaveMaskPrefixSum(WaveMask mask, T expr)
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
 {
@@ -14585,6 +14590,7 @@ vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixSum(WaveMask mask, matrix<T,N,M> expr)
 {
@@ -14701,7 +14707,8 @@ WaveMask WaveMaskMatch(WaveMask mask, matrix<T,N,M> value)
 }
 
 __generic<T : __BuiltinIntegerType>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixBitAnd(WaveMask mask, T expr)
 {
     __target_switch
@@ -14714,9 +14721,8 @@ T WaveMaskPrefixBitAnd(WaveMask mask, T expr)
 }
 
 __generic<T : __BuiltinIntegerType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitAnd(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
@@ -14729,7 +14735,8 @@ vector<T,N> WaveMaskPrefixBitAnd(WaveMask mask, vector<T,N> expr)
 }
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_hlsl, wave_multi_prefix)]
+[ForceInline]
+[require(cuda_hlsl, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitAnd(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
@@ -14742,6 +14749,7 @@ matrix<T,N,M> WaveMaskPrefixBitAnd(WaveMask mask, matrix<T,N,M> expr)
 }
 
 __generic<T : __BuiltinIntegerType>
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixBitOr(WaveMask mask, T expr)
 {
@@ -14755,6 +14763,7 @@ T WaveMaskPrefixBitOr(WaveMask mask, T expr)
 }
 
 __generic<T : __BuiltinIntegerType, let N : int>
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitOr(WaveMask mask, vector<T,N> expr)
 {
@@ -14768,6 +14777,7 @@ vector<T,N> WaveMaskPrefixBitOr(WaveMask mask, vector<T,N> expr)
 }
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitOr(WaveMask mask, matrix<T,N,M> expr)
 {
@@ -14781,6 +14791,7 @@ matrix<T,N,M> WaveMaskPrefixBitOr(WaveMask mask, matrix<T,N,M> expr)
 }
 
 __generic<T : __BuiltinIntegerType>
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixBitXor(WaveMask mask, T expr)
 {
@@ -14794,6 +14805,7 @@ T WaveMaskPrefixBitXor(WaveMask mask, T expr)
 }
 
 __generic<T : __BuiltinIntegerType, let N : int>
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr)
 {
@@ -14807,6 +14819,7 @@ vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr)
 }
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
+[ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr)
 {
@@ -16115,7 +16128,7 @@ uint4 WaveMatch(matrix<T,N,M> value)
 }
 
 /// @category wave
-[require(cuda_hlsl, wave_multi_prefix)]
+[require(cuda_hlsl, subgroup_partitioned)]
 uint WaveMultiPrefixCountBits(bool value, uint4 mask)
 {
     __target_switch
@@ -16129,7 +16142,7 @@ uint WaveMultiPrefixCountBits(bool value, uint4 mask)
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMultiPrefixBitAnd(T expr, uint4 mask)
 {
     __target_switch
@@ -16150,7 +16163,7 @@ T WaveMultiPrefixBitAnd(T expr, uint4 mask)
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMultiPrefixBitAnd(vector<T,N> expr, uint4 mask)
 {
     __target_switch
@@ -16169,7 +16182,7 @@ vector<T,N> WaveMultiPrefixBitAnd(vector<T,N> expr, uint4 mask)
 }
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMultiPrefixBitAnd(matrix<T,N,M> expr, uint4 mask)
 {
     __target_switch
@@ -16189,7 +16202,7 @@ matrix<T,N,M> WaveMultiPrefixBitAnd(matrix<T,N,M> expr, uint4 mask)
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMultiPrefixBitOr(T expr, uint4 mask)
 {
     __target_switch
@@ -16210,7 +16223,7 @@ T WaveMultiPrefixBitOr(T expr, uint4 mask)
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMultiPrefixBitOr(vector<T,N> expr, uint4 mask)
 {
     __target_switch
@@ -16229,7 +16242,7 @@ vector<T,N> WaveMultiPrefixBitOr(vector<T,N> expr, uint4 mask)
 }
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMultiPrefixBitOr(matrix<T,N,M> expr, uint4 mask)
 {
     __target_switch
@@ -16249,7 +16262,7 @@ matrix<T,N,M> WaveMultiPrefixBitOr(matrix<T,N,M> expr, uint4 mask)
 __generic<T : __BuiltinIntegerType>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMultiPrefixBitXor(T expr, uint4 mask)
 {
     __target_switch
@@ -16270,7 +16283,7 @@ T WaveMultiPrefixBitXor(T expr, uint4 mask)
 __generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMultiPrefixBitXor(vector<T,N> expr, uint4 mask)
 {
     __target_switch
@@ -16289,7 +16302,7 @@ vector<T,N> WaveMultiPrefixBitXor(vector<T,N> expr, uint4 mask)
 }
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMultiPrefixBitXor(matrix<T,N,M> expr, uint4 mask)
 {
     __target_switch
@@ -16309,7 +16322,7 @@ matrix<T,N,M> WaveMultiPrefixBitXor(matrix<T,N,M> expr, uint4 mask)
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMultiPrefixProduct(T value, uint4 mask)
 {
     __target_switch
@@ -16346,7 +16359,7 @@ T WaveMultiPrefixProduct(T value, uint4 mask)
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMultiPrefixProduct(vector<T,N> value, uint4 mask)
 {
     __target_switch
@@ -16381,7 +16394,7 @@ vector<T,N> WaveMultiPrefixProduct(vector<T,N> value, uint4 mask)
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMultiPrefixProduct(matrix<T,N,M> value, uint4 mask)
 {
     __target_switch
@@ -16401,7 +16414,7 @@ matrix<T,N,M> WaveMultiPrefixProduct(matrix<T,N,M> value, uint4 mask)
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMultiPrefixSum(T value, uint4 mask)
 {
     __target_switch
@@ -16437,7 +16450,7 @@ T WaveMultiPrefixSum(T value, uint4 mask)
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __glsl_extension(GL_NV_shader_subgroup_partitioned)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 __spirv_version(1.3)
 vector<T,N> WaveMultiPrefixSum(vector<T,N> value, uint4 mask)
 {
@@ -16473,7 +16486,7 @@ vector<T,N> WaveMultiPrefixSum(vector<T,N> value, uint4 mask)
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask)
 {
     __target_switch
@@ -16655,6 +16668,269 @@ vector<T, N> WaveClusteredRotate(vector<T, N> value, uint delta, constexpr uint 
         };
     }
 }
+
+//
+// WaveMulti intrinsics. These are masked subgroup operations that operate on a 128-bit `uint4` mask.
+// These are non-prefixed variants of HLSL's WaveMultiPrefix* intrinsics.
+//
+
+//
+// WaveMultiSum/WaveMultiProduct.
+//
+${{{{
+struct WaveMultiSumProductEntry { const char* name; const char* spirvName; };
+const WaveMultiSumProductEntry kWaveMultiSumProductNames[] = { {"Sum", "Add"}, {"Product", "Mul"} };
+for (auto opName : kWaveMultiSumProductNames) {
+}}}}
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+T WaveMulti$(opName.name)(T value, uint4 mask)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.spirvName)NV";
+    case spirv:
+        {
+            spirv_asm
+            {
+                OpExtension "SPV_NV_shader_subgroup_partitioned";
+                OpCapability GroupNonUniformPartitionedNV;
+            };
+
+            if (__isFloat<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformF$(opName.spirvName) Subgroup PartitionedReduceNV $value $mask };
+            else
+                return spirv_asm { result:$$T = OpGroupNonUniformI$(opName.spirvName) Subgroup PartitionedReduceNV $value $mask };
+        }
+    case cuda:
+        return WaveMask$(opName.name)(mask.x, value);
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+vector<T, N> WaveMulti$(opName.name)(vector<T, N> value, uint4 mask)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.spirvName)NV";
+    case spirv:
+        {
+            spirv_asm
+            {
+                OpExtension "SPV_NV_shader_subgroup_partitioned";
+                OpCapability GroupNonUniformPartitionedNV;
+            };
+
+            if (__isFloat<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformF$(opName.spirvName) Subgroup PartitionedReduceNV $value $mask };
+            else
+                return spirv_asm { result:$$T = OpGroupNonUniformI$(opName.spirvName) Subgroup PartitionedReduceNV $value $mask };
+        }
+    case cuda:
+        return WaveMask$(opName.name)(mask.x, value);
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+matrix<T,N,M> WaveMulti$(opName.name)(matrix<T,N,M> value, uint4 mask)
+{
+    __target_switch
+    {
+    case cuda: 
+        return WaveMask$(opName.name)(mask.x, value);
+    default:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMulti$(opName.name)(value[i], mask);
+        return result;
+    }
+}
+
+${{{{
+} // WaveMultiSum/WaveMultiProduct.
+}}}}
+
+
+//
+// WaveMultiMin/WaveMultiMax.
+//
+${{{{
+struct WaveMultiMinMaxEntry { const char* name; };
+const WaveMultiMinMaxEntry kWaveMultiMinMaxNames[] = { {"Min"}, {"Max"} };
+for (auto opName : kWaveMultiMinMaxNames) {
+}}}}
+
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+T WaveMulti$(opName.name)(T value, uint4 mask)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
+    case spirv:
+        {
+            spirv_asm
+            {
+                OpExtension "SPV_NV_shader_subgroup_partitioned";
+                OpCapability GroupNonUniformPartitionedNV;
+            };
+
+            if (__isFloat<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformF$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+            else if (__isUnsignedInt<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformU$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+            else
+                return spirv_asm { result:$$T = OpGroupNonUniformS$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+        }
+    case cuda:
+        return WaveMask$(opName.name)(mask.x, value);
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+vector<T, N> WaveMulti$(opName.name)(vector<T, N> value, uint4 mask)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
+    case spirv:
+        {
+            spirv_asm
+            {
+                OpExtension "SPV_NV_shader_subgroup_partitioned";
+                OpCapability GroupNonUniformPartitionedNV;
+            };
+
+            if (__isFloat<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformF$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+            else if (__isUnsignedInt<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformU$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+            else
+                return spirv_asm { result:$$T = OpGroupNonUniformS$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+        }
+    case cuda:
+        return WaveMask$(opName.name)(mask.x, value);
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+matrix<T, N, M> WaveMulti$(opName.name)(matrix<T, N, M> value, uint4 mask)
+{
+    __target_switch
+    {
+    case cuda:
+        return WaveMask$(opName.name)(mask.x, value);
+    default:
+        matrix<T, N, M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMulti$(opName.name)(value[i], mask);
+        return result;
+    }
+}
+
+${{{{
+} // WaveMultiMin/WaveMultiMax.
+}}}}
+
+
+//
+// WaveMultiBitAnd/WaveMultiBitOR/WaveMultiBitXor.
+//
+${{{{
+struct WaveMultiBitsEntry { const char* name; };
+const WaveMultiBitsEntry kWaveMultiBitsNames[] = { {"And"}, {"Or"} , {"Xor"} };
+for (auto opName : kWaveMultiBitsNames) {
+}}}}
+
+__generic<T : __BuiltinIntegerType>
+__glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+T WaveMultiBit$(opName.name)(T value, uint4 mask)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_NV_shader_subgroup_partitioned";
+            OpCapability GroupNonUniformPartitionedNV;
+            result:$$T = OpGroupNonUniformBitwise$(opName.name) Subgroup PartitionedReduceNV $value $mask;
+        };
+    case cuda:
+        return WaveMaskBit$(opName.name)(mask.x, value);
+    }
+}
+
+__generic<T : __BuiltinIntegerType, let N : int>
+__glsl_extension(GL_NV_shader_subgroup_partitioned)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+vector<T, N> WaveMultiBit$(opName.name)(vector<T, N> value, uint4 mask)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_NV_shader_subgroup_partitioned";
+            OpCapability GroupNonUniformPartitionedNV;
+            result:$$T = OpGroupNonUniformBitwise$(opName.name) Subgroup PartitionedReduceNV $value $mask;
+        };
+    case cuda:
+        return WaveMaskBit$(opName.name)(mask.x, value);
+    }
+}
+
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+matrix<T, N, M> WaveMultiBit$(opName.name)(matrix<T, N, M> value, uint4 mask)
+{
+    __target_switch
+    {
+    case cuda:
+        return WaveMaskBit$(opName.name)(mask.x, value);
+    default:
+        matrix<T,N,M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiBit$(opName.name)(value[i], mask);
+        return result;
+    }
+}
+
+${{{{
+} // WaveMultiBitAnd/WaveMultiBitOR/WaveMultiBitXor.
+}}}}
+
 
 //
 // Quad Control intrinsics
