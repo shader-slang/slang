@@ -73,6 +73,8 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
     const Format format =
         (inputDesc.format == Format::Undefined) ? Format::RGBA8Unorm : inputDesc.format;
 
+    const FormatInfo& formatInfo = getFormatInfo(format);
+
     bool isArray = inputDesc.arrayLength > 1;
 
     textureDesc.sampleCount = inputDesc.sampleCount;
@@ -153,7 +155,7 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
             const int mipWidth = calcMipSize(textureDesc.size.width, m);
             const int mipHeight = calcMipSize(textureDesc.size.height, m);
 
-            size_t rowPitch = mipWidth * sizeof(uint32_t);
+            size_t rowPitch = mipWidth * formatInfo.blockSizeInBytes;
             size_t slicePitch = mipHeight * rowPitch;
 
             SubresourceData subresourceData;
