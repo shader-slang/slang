@@ -304,7 +304,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                                  Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitness)
     {
         bool result = false;
-        for (auto extDecl : getCandidateExtensions(extensionTargetDeclRef, &visitor))
+        auto candidateExtensions = getCandidateExtensions(extensionTargetDeclRef, &visitor);
+        for (auto extDecl : candidateExtensions)
         {
             // The list of *candidate* extensions is computed and
             // cached based on the identity of the declaration alone,
