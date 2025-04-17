@@ -1735,7 +1735,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     auto stride = 0;
                     if (auto strideInst = irArrayType->getArrayStride())
                     {
-                        stride = getIntVal(strideInst);
+                        stride = (int)getIntVal(strideInst);
                     }
                     else
                     {
@@ -1746,7 +1746,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             m_targetProgram->getOptionSet(),
                             elementType,
                             &sizeAndAlignment);
-                        stride = sizeAndAlignment.getStride();
+                        stride = (int)sizeAndAlignment.getStride();
                     }
 
                     emitOpDecorateArrayStride(
