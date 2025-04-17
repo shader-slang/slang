@@ -4,7 +4,7 @@
 // Not supported in WGSL: read-write storage texture with "rg16f" format
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-wgpu
 
-//TEST_INPUT: RWTexture2D(format=R16G16_FLOAT, size=4, content = one, mipMaps = 1):name g_test
+//TEST_INPUT: RWTexture2D(format=RG16Float, size=4, content = one, mipMaps = 1):name g_test
 [format("rg16f")]
 RWTexture2D<float2> g_test;
 

@@ -11,15 +11,15 @@
 // Note that this test is a little silly. The output does not confirm that the write actually worked.
 // half-rw-texture-convert2.slang tests this
 
-//TEST_INPUT: RWTexture2D(format=R16_FLOAT, size=4, content = one, mipMaps = 1):name rwt2D
+//TEST_INPUT: RWTexture2D(format=R16Float, size=4, content = one, mipMaps = 1):name rwt2D
 [format("r16f")]
 RWTexture2D<float> rwt2D;
 
-//TEST_INPUT: RWTexture2D(format=R16G16_FLOAT, size=4, content = one, mipMaps = 1):name rwt2D_2
+//TEST_INPUT: RWTexture2D(format=RG16Float, size=4, content = one, mipMaps = 1):name rwt2D_2
 [format("rg16f")]
 RWTexture2D<float2> rwt2D_2;
 
-//TEST_INPUT: RWTexture2D(format=R16G16B16A16_FLOAT, size=4, content = one, mipMaps = 1):name rwt2D_4
+//TEST_INPUT: RWTexture2D(format=RGBA16Float, size=4, content = one, mipMaps = 1):name rwt2D_4
 [format("rgba16f")]
 RWTexture2D<float4> rwt2D_4;
 

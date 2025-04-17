@@ -7,23 +7,23 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute  -shaderobj
 
 // Doesn't work on CUDA, not clear why yet
-//DISABLE_TEST_INPUT: Texture1D(format=R16_FLOAT, size=4, content = one, mipMaps=1):name tLoad1D
+//DISABLE_TEST_INPUT: Texture1D(format=R16Float, size=4, content = one, mipMaps=1):name tLoad1D
 //Texture1D<float> tLoad1D;
 
-//TEST_INPUT: Texture1D(format=R16_FLOAT, size=4, content = one):name t1D
+//TEST_INPUT: Texture1D(format=R16Float, size=4, content = one):name t1D
 Texture1D<float> t1D;
-//TEST_INPUT: Texture2D(format=R16_FLOAT, size=4, content = one):name t2D
+//TEST_INPUT: Texture2D(format=R16Float, size=4, content = one):name t2D
 Texture2D<float> t2D;
-//TEST_INPUT: Texture3D(format=R16_FLOAT, size=4, content = one):name t3D
+//TEST_INPUT: Texture3D(format=R16Float, size=4, content = one):name t3D
 Texture3D<float> t3D;
-//TEST_INPUT: TextureCube(format=R16_FLOAT, size=4, content = one):name tCube
+//TEST_INPUT: TextureCube(format=R16Float, size=4, content = one):name tCube
 TextureCube<float> tCube;
 
-//TEST_INPUT: Texture1D(format=R16_FLOAT, size=4, content = one, arrayLength=2):name t1DArray
+//TEST_INPUT: Texture1D(format=R16Float, size=4, content = one, arrayLength=2):name t1DArray
 Texture1DArray<float> t1DArray;
-//TEST_INPUT: Texture2D(format=R16_FLOAT, size=4, content = one, arrayLength=2):name t2DArray
+//TEST_INPUT: Texture2D(format=R16Float, size=4, content = one, arrayLength=2):name t2DArray
 Texture2DArray<float> t2DArray;
-//TEST_INPUT: TextureCube(format=R16_FLOAT, size=4, content = one, arrayLength=2):name tCubeArray
+//TEST_INPUT: TextureCube(format=R16Float, size=4, content = one, arrayLength=2):name tCubeArray
 TextureCubeArray<float> tCubeArray;
 
 //TEST_INPUT: Sampler:name samplerState
