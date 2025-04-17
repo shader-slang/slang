@@ -14523,133 +14523,77 @@ bool WaveMaskAllEqual(WaveMask mask, matrix<T,N,M> value)
 // Prefix
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixProduct(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupExclusiveMul($1)";
-    case cuda: __intrinsic_asm "_wavePrefixProduct($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$T result Subgroup ExclusiveScan $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformIMul $$T result Subgroup ExclusiveScan $expr;
-            };
-        }
-        else return expr;
+    case cuda:
+        __intrinsic_asm "_wavePrefixProduct($0, $1)";
+    default:
+        return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupExclusiveMul($1)";
-    case cuda: __intrinsic_asm "_wavePrefixProductMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$vector<T,N> result Subgroup ExclusiveScan $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformIMul $$vector<T,N> result Subgroup ExclusiveScan $expr;
-            };
-        }
-        else return expr;
+    case cuda:
+        __intrinsic_asm "_wavePrefixProductMultiple($0, $1)";
+    default:
+        return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixProduct(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_wavePrefixProductMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
+    case cuda:
+        __intrinsic_asm "_wavePrefixProductMultiple($0, $1)";
+    default:
+        return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixSum(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupExclusiveAdd($1)";
-    case cuda: __intrinsic_asm "_wavePrefixSum($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixSum($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$T result Subgroup ExclusiveScan $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                result:$$T = OpGroupNonUniformIAdd Subgroup ExclusiveScan $expr;
-            };
-        }
-        else return expr;
+    case cuda:
+        __intrinsic_asm "_wavePrefixSum($0, $1)";
+    default:
+        return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupExclusiveAdd($1)";
-    case cuda: __intrinsic_asm "_wavePrefixSumMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixSum($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$vector<T,N> result Subgroup ExclusiveScan $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                result:$$vector<T,N> = OpGroupNonUniformIAdd Subgroup ExclusiveScan $expr;
-            };
-        }
-        else return expr;
+    case cuda:
+        __intrinsic_asm "_wavePrefixSumMultiple($0, $1)";
+    default:
+        return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixSum(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_wavePrefixSumMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixSum($1)";
+    case cuda:
+        __intrinsic_asm "_wavePrefixSumMultiple($0, $1)";
+    default:
+        return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
     }
 }
 
@@ -14756,132 +14700,122 @@ WaveMask WaveMaskMatch(WaveMask mask, matrix<T,N,M> value)
     }
 }
 
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinIntegerType>
+[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 T WaveMaskPrefixBitAnd(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveAnd($1)";
-    case cuda: __intrinsic_asm "_wavePrefixAnd($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup ExclusiveScan $expr};
+    case cuda:
+        __intrinsic_asm "_wavePrefixAnd($0, $1)";
+    default:
+        return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
     }
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
+__generic<T : __BuiltinIntegerType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
 vector<T,N> WaveMaskPrefixBitAnd(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveAnd($1)";
-    case cuda: __intrinsic_asm "_wavePrefixAndMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ExclusiveScan $expr};
+    case cuda:
+        __intrinsic_asm "_wavePrefixAndMultiple($0, $1)";
+    default:
+        return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
     }
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+[require(cuda_hlsl, wave_multi_prefix)]
 matrix<T,N,M> WaveMaskPrefixBitAnd(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_wavePrefixAndMultiple(_getMultiPrefixMask($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd($1, uint4($0, 0, 0, 0))";
+    case cuda:
+        __intrinsic_asm "_wavePrefixAndMultiple($0, $1)";
+    default:
+        return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
     }
 }
 
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinIntegerType>
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixBitOr(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveOr($1)";
-    case cuda: __intrinsic_asm "_wavePrefixOr($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup ExclusiveScan $expr};
+    case cuda:
+        __intrinsic_asm "_wavePrefixOr($0, $1)";
+    default:
+        return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
     }
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinIntegerType, let N : int>
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitOr(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveOr($1)";
-    case cuda: __intrinsic_asm "_wavePrefixOrMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ExclusiveScan $expr};
+    case cuda:
+        __intrinsic_asm "_wavePrefixOrMultiple($0, $1)";
+    default:
+        return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
     }
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitOr(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_wavePrefixOrMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))";
+    case cuda:
+        __intrinsic_asm "_wavePrefixOrMultiple($0, $1)";
+    default:
+        return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
     }
 }
 
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinIntegerType>
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixBitXor(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveXor($1)";
-    case cuda: __intrinsic_asm "_wavePrefixXor($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$T result Subgroup ExclusiveScan $expr};
+    case cuda:
+        __intrinsic_asm "_wavePrefixXor($0, $1)";
+    default:
+        return WaveMultiPrefixBitXor(expr, uint4(mask, 0, 0, 0));
     }
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinIntegerType, let N : int>
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupExclusiveXor($1)";
-    case cuda: __intrinsic_asm "_wavePrefixXorMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ExclusiveScan $expr};
+    case cuda:
+        __intrinsic_asm "_wavePrefixXorMultiple($0, $1)";
+    default:
+        return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
     }
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_wavePrefixXorMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor($1, uint4($0, 0, 0, 0))";
+    case cuda:
+        __intrinsic_asm "_wavePrefixXorMultiple($0, $1)";
+    default:
+        return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
     }
 }
 
