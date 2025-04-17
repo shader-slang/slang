@@ -770,6 +770,14 @@ Result RendererBase::getTextureRowAlignment(Size* outAlignment)
     return SLANG_E_NOT_AVAILABLE;
 }
 
+Result RendererBase::getCooperativeVectorProperties(
+    CooperativeVectorProperties* properties,
+    uint32_t* propertyCount)
+{
+    *propertyCount = 0;
+    return SLANG_E_NOT_AVAILABLE;
+}
+
 Result RendererBase::getShaderObjectLayout(
     slang::ISession* session,
     slang::TypeReflection* type,
