@@ -95,6 +95,7 @@ if(SLANG_ENABLE_SLANGD)
             core
             compiler-core
             slang
+            slang-reflect-headers
             slang-fiddle-output
             slang-capability-defs
             Threads::Threads

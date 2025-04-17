@@ -177,6 +177,7 @@ public:
         default:
             expect(TokenType::Identifier);
             _sink.diagnose(SourceLoc(), fiddle::Diagnostics::internalError);
+            return nullptr;
         }
     }
 
@@ -248,6 +249,7 @@ public:
         default:
             expect(TokenType::Identifier);
             _sink.diagnose(SourceLoc(), fiddle::Diagnostics::internalError);
+            return nullptr;
         }
     }
 
@@ -354,6 +356,7 @@ public:
         else
         {
             _sink.diagnose(SourceLoc(), Diagnostics::unexpected, "declarator type", "known");
+            return UnwrappedDeclarator();
         }
     }
 
@@ -1065,6 +1068,7 @@ private:
         else
         {
             sink.diagnose(SourceLoc(), Diagnostics::unexpected, "case in checkExpr", "known type");
+            return nullptr;
         }
     }
 
