@@ -1787,32 +1787,38 @@ struct SpecializationContext
                 // created.
                 //
                 auto valType = val->getFullType();
-                if (auto extractExistentialType = as<IRExtractExistentialType>(valType))
+                if (isCompileTimeConstantType(valType) &&
+                    isCompileTimeConstantType(oldParam->getFullType()))
                 {
-                    valType = extractExistentialType->getOperand(0)->getDataType();
-                    auto newParam = builder->createParam(valType);
-                    newParams.add(newParam);
-                    replacementVal = newParam;
-                }
-                else
-                {
-                    auto newParam = builder->createParam(valType);
-                    newParams.add(newParam);
+                    if (auto extractExistentialType = as<IRExtractExistentialType>(valType))
+                    {
+                        valType = extractExistentialType->getOperand(0)->getDataType();
+                        auto newParam = builder->createParam(valType);
+                        newParams.add(newParam);
+                        replacementVal = newParam;
+                    }
+                    else
+                    {
+                        auto newParam = builder->createParam(valType);
+                        newParams.add(newParam);
 
-                    // Within the body of the function we cannot just use `val`
-                    // directly, because the existing code expects an existential
-                    // value, including its witness table.
-                    //
-                    // Therefore we will create a `makeExistential(newParam, witnessTable)`
-                    // in the body of the new function and use *that* as the replacement
-                    // value for the original parameter (since it will have the
-                    // correct existential type, and stores the right witness table).
-                    //
-                    auto newMakeExistential = builder->emitMakeExistential(
-                        oldParam->getFullType(),
-                        newParam,
-                        witnessTable);
-                    replacementVal = newMakeExistential;
+                        // Within the body of the function we cannot just use `val`
+                        // directly, because the existing code expects an existential
+                        // value, including its witness table.
+                        //
+                        // Therefore we will create a `makeExistential(newParam, witnessTable)`
+                        // in the body of the new function and use *that* as the replacement
+                        // value for the original parameter (since it will have the
+                        // correct existential type, and stores the right witness table).
+                        //
+                        auto newMakeExistential = builder->emitMakeExistential(
+                            oldParam->getFullType(),
+                            newParam,
+                            witnessTable);
+                        replacementVal = newMakeExistential;
+                    }
+                    cloneEnv.mapOldValToNew.add(oldParam, replacementVal);
+                    continue;
                 }
             }
             else if (auto oldWrapExistential = as<IRWrapExistential>(arg))
@@ -1837,24 +1843,32 @@ struct SpecializationContext
                     newParam,
                     oldWrapExistential->getSlotOperandCount(),
                     oldWrapExistential->getSlotOperands());
-                replacementVal = newWrapExistential;
-            }
-            else
-            {
-                // For parameters that don't have an existential type,
-                // there is nothing interesting to do. The new function
-                // will also have a parameter of the exact same type,
-                // and we'll use that instead of the original parameter.
-                //
-                auto newParam = builder->createParam(oldParam->getFullType());
-                newParams.add(newParam);
-                replacementVal = newParam;
+                cloneEnv.mapOldValToNew.add(oldParam, newWrapExistential);
+                continue;
             }
 
-            // Whatever replacement value was constructed, we need to
-            // register it as the replacement for the original parameter.
+            // If we go here, then the parameter is either not an existential type,
+            // or the argument/parameter is not specialized yet.
             //
-            cloneEnv.mapOldValToNew.add(oldParam, replacementVal);
+            // For first case there is nothing interesting to do. The new function
+            // will also have a parameter of the exact same type, and we'll use that
+            // instead of the original parameter.
+            //
+            //
+            // For the second case if the argument/parameter is not specialized yet, don't
+            // aggressively specialize the parameter.
+            //
+            // If we specialize the parameter type too early, we will lose the opportunity
+            // to specialize the callee later. The principal is to always let the
+            // specialization happen at the same time for both on argument and parameter.
+            //
+            // Note we should not use `createParam` here, because this call won't assign the
+            // parent to the new parameter, therefore during the cloning process, some
+            // existential related IR inst could be hoisted to the global scope, which is
+            // unexpected. Instead, we should use cloneInst here, such that the new
+            // parameter will be inserted into the function scope.
+            auto newParam = (IRParam*)cloneInst(&cloneEnv, builder, oldParam);
+            newParams.add(newParam);
         }
 
         // The above steps have accomplished the "first phase"
