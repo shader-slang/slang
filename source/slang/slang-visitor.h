@@ -155,7 +155,7 @@ struct ExprVisitor
 };
 
 template<typename Derived, typename Arg>
-struct ExprVisitorWithArg : IExprVisitor
+struct ExprVisitorWithArg
 {
     void dispatch(Expr* expr, Arg const& arg)
     {
@@ -218,7 +218,7 @@ struct DeclVisitor
 };
 
 template<typename Derived, typename Arg>
-struct DeclVisitorWithArg : IDeclVisitor
+struct DeclVisitorWithArg
 {
     void dispatch(DeclBase* decl, Arg const& arg)
     {
