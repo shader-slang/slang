@@ -159,7 +159,7 @@ typealias int64_t4x2 = matrix<int64_t, 4, 2>;
 Matrix types support several operations:
 
 * Element-wise operations (addition, subtraction, multiplication) using the standard operators (`+`, `-`, `*`). These operations require matrices of the same dimensions.
-* Matrix multiplication using the `mul()` function, which supports matrices of compatible dimensions (e.g., `float2x3 * float3x4`).
+* Algebraic matrix-matrix multiplication using the `mul()` function, which supports matrices of compatible dimensions (e.g., `float2x3 * float3x4`).
 * Matrix-vector multiplication using `mul()`, where the vector can be interpreted as either a row or column vector depending on the parameter order:
   * `mul(v, m)` - v is interpreted as a row vector
   * `mul(m, v)` - v is interpreted as a column vector
