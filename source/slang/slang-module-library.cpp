@@ -45,6 +45,8 @@ SlangResult loadModuleLibrary(
     EndToEndCompileRequest* req,
     ComPtr<IModuleLibrary>& outLibrary)
 {
+    SLANG_UNUSED(path);
+
     auto library = new ModuleLibrary;
     ComPtr<IModuleLibrary> scopeLibrary(library);
 
