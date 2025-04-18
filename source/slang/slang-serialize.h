@@ -344,13 +344,11 @@ public:
         if (!listChunk)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
-            UNREACHABLE_RETURN("");
         }
 
         if (listChunk->m_fourCC != typeCode)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
-            UNREACHABLE_RETURN("");
         }
 
         _chunk = listChunk->getFirstContainedChunk();
@@ -362,14 +360,12 @@ public:
         if (!listChunk)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
-            UNREACHABLE_RETURN("");
         }
 
         auto found = listChunk->findContainedList(propertyCode);
         if (!found)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
-            UNREACHABLE_RETURN("");
         }
 
         _chunk = found->getFirstContainedChunk();
