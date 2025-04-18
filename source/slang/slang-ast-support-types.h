@@ -653,6 +653,12 @@ FIDDLE() namespace Slang
         Info const* _info = nullptr;
     };
 
+    template<typename T>
+    struct SyntaxClass;
+
+    template<typename T>
+    SyntaxClass<T> getSyntaxClass();
+
     template<typename T = NodeBase>
     struct SyntaxClass : SyntaxClassBase
     {
