@@ -166,7 +166,7 @@ Matrix types support several operations:
 
 For proper matrix multiplication, always use the `mul()` function. The `operator*` performs element-wise multiplication and should only be used when you want to multiply corresponding elements of same-sized matrices.
 
-> Note: This differs from GLSL, where the `*` operator performs matrix multiplication. When porting code from GLSL to Slang, you'll need to replace matrix multiplications using `*` with calls to `mul()`.
+> Note: This differs from GLSL, where the `*` operator performs matrix multiplication. When porting code from GLSL or CUDA to Slang, you'll need to replace matrix multiplications using `*` with calls to `mul()`.
 
 ### Legacy Syntax
 
