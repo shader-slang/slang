@@ -52,9 +52,9 @@ namespace Slang
 %function SLANG_VISITOR_DISPATCH_ARG_IMPL(baseType)
 %  for _, T in ipairs(baseType.subclasses) do
 %    if not T.isAbstract then
-virtual void _dispatchImpl($T* obj)
+virtual void _dispatchImpl($T* obj, Arg const& arg)
 {
-    ((Derived*)this)->visit$T(obj, *(Arg*)arg);
+    ((Derived*)this)->visit$T(obj, arg);
 }
 %    end
 %  end
