@@ -25547,14 +25547,14 @@ int32_t2 __unpackInt2x16ToInt32(uint packedValue)
 [ForceInline]
 uint __packUint2x16(uint32_t2 unpackedValue)
 {
-    return unpackedValue.x | (unpackedValue.y << 16U);
+    return (unpackedValue.x & 0xFFFF) | (unpackedValue.y << 16U);
 }
 
 [__readNone]
 [ForceInline]
 uint __packInt2x16(int32_t2 unpackedValue)
 {
-    return uint(unpackedValue.x | (unpackedValue.y << 16U));
+    return uint((unpackedValue.x & 0xFFFF) | (unpackedValue.y << 16U));
 }
 
 //@public:

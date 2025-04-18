@@ -17,6 +17,10 @@
 // Section 4.1. 'asic Types'
 //
 
+public typealias f16vec2 = half2;
+public typealias f16vec3 = half3;
+public typealias f16vec4 = half4;
+
 public typealias vec2 = vector<float, 2>;
 public typealias vec3 = vector<float, 3>;
 public typealias vec4 = vector<float, 4>;
@@ -92,6 +96,10 @@ public typealias dmat3x4 = matrix<double, 3, 4>;
 public typealias dmat4x2 = matrix<double, 4, 2>;
 public typealias dmat4x3 = matrix<double, 4, 3>;
 public typealias dmat4x4 = matrix<double, 4, 4>;
+
+public typealias f16mat2x2 = matrix<half, 2, 2>;
+public typealias f16mat2x3 = matrix<half, 2, 3>;
+public typealias f16mat2x4 = matrix<half, 2, 4>;
 
 
 public out float4 gl_Position : SV_Position;
@@ -721,6 +729,183 @@ public uvec2 unpackDouble2x32(double v)
         // TODO: there is no "asuint64()"
         uint64_t u = 0; // asuint64(v);
         return uvec2(uint(u & 0xFFFFFFFF), uint(u >> 32));
+    }
+}
+
+/// Unpack a 32-bit unsigned integer into 4 8-bit unsigned integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+public u8vec4 unpack8(uint32_t u)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpack8";
+    default:
+        uint32_t4 unpackRes = unpackUint4x8ToUint32(u);
+        u8vec4 res = u8vec4(unpackRes);
+        return res;
+    }
+}
+
+/// Unpack a 32-bit signed integer into 4 8-bit signed integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+public i8vec4 unpack8(int32_t u)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpack8";
+    default:
+        uint32_t4 unpackRes = unpackInt4x8ToInt32(u);
+        i8vec4 res = i8vec4(unpackRes);
+        return res;
+    }
+}
+
+/// Unpack a 16-bit unsigned integer into 2 8-bit unsigned integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+public u8vec2 unpack8(uint16_t u)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpack8";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$vector<uint8_t, 2> = OpBitcast $u;
+        };
+    default:
+        return u8vec2
+        (
+            uint8_t(u),
+            uint8_t(u >> 8U),
+        );
+    }
+}
+
+/// Unpack a 16-bit signed integer into 2 8-bit signed integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+public i8vec2 unpack8(int16_t u)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpack8";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$vector<int8_t, 2> = OpBitcast $u;
+        };
+    default:
+        return i8vec2
+        (
+            int8_t(u),
+            int8_t(u >> 8U),
+        );
+    }
+}
+
+/// Unpack a 32-bit unsigned integer into 2 16-bit unsigned integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+public u16vec2 unpack16(uint32_t u)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpack16";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$vector<uint16_t, 2> = OpBitcast $u;
+        };
+    default:
+        return u16vec2
+        (
+            uint16_t(u),
+            uint16_t(u >> 16U),
+        );
+    }
+}
+
+/// Unpack a 32-bit signed integer into 2 16-bit signed integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+public i16vec2 unpack16(int32_t u)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "unpack16";
+    default:
+        int32_t2 unpackRes = __unpackInt2x16ToInt32(u);
+        i16vec2 res = i16vec2(unpackRes);
+        return res;
+    }
+}
+
+/// Pack 2 16-bit unsigned integers into a 32-bit unsigned integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+public uint32_t pack32(u16vec2 v)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "pack32";
+    default:
+        uint32_t res = __packUint2x16(v);
+        return res;
+    }
+}
+
+/// Pack 2 16-bit signed integers into a 32-bit signed integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+public int32_t pack32(i16vec2 v)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "pack32";
+    default:
+        int32_t res = __packInt2x16(v);
+        return res;
+    }
+}
+
+/// Pack 4 8-bit unsigned integers into a 32-bit unsigned integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+public uint32_t pack32(u8vec4 v)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "pack32";
+    default:
+        uint32_t res = packUint4x8(uint32_t4(v)) ;
+        return res;
+    }
+}
+
+/// Pack 4 8-bit signed integers into a 32-bit signed integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+public int32_t pack32(i8vec4 v)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "pack32";
+    default:
+        int32_t res = packInt4x8(int32_t4(v)) ;
+        return res;
     }
 }
 
