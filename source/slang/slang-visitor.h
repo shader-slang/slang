@@ -119,7 +119,7 @@ struct TypeVisitorWithArg
 {
     void dispatch(Type* type, Arg const& arg)
     {
-        ASTNodeDispatcher<Type, void>::dispatch([&](type, auto obj) { _dispatchImpl(obj); });
+        ASTNodeDispatcher<Type, void>::dispatch(type, [&](auto obj) { _dispatchImpl(obj, arg); });
     }
 
 #if 0 // FIDDLE TEMPLATE:
@@ -157,9 +157,9 @@ struct ExprVisitor
 template<typename Derived, typename Arg>
 struct ExprVisitorWithArg : IExprVisitor
 {
-    void dispatch(Expr* obj, Arg const& arg)
+    void dispatch(Expr* expr, Arg const& arg)
     {
-        ASTNodeDispatcher<Expr, void>::dispatch(expr, [&](auto obj) { _dispatchImpl(obj); });
+        ASTNodeDispatcher<Expr, void>::dispatch(expr, [&](auto obj) { _dispatchImpl(obj, arg); });
     }
 
 #if 0 // FIDDLE TEMPLATE:
@@ -220,7 +220,7 @@ struct DeclVisitor
 template<typename Derived, typename Arg>
 struct DeclVisitorWithArg : IDeclVisitor
 {
-    void dispatch(DeclBase* obj, Arg const& arg)
+    void dispatch(DeclBase* decl, Arg const& arg)
     {
         ASTNodeDispatcher<Expr, void>::dispatch(decl, [&](auto obj) { _dispatchImpl(obj, arg); });
     }
