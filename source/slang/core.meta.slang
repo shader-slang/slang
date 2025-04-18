@@ -4211,8 +4211,27 @@ attribute_syntax [QuadDerivatives] : QuadDerivativesAttribute;
 __attributeTarget(FuncDecl)
 attribute_syntax [RequireFullQuads] : RequireFullQuadsAttribute;
 
-__generic<T>
-typealias NodePayloadPtr = Ptr<T, $( (uint64_t)AddressSpace::NodePayloadAMDX)>;
+// Work-graphs
+
+/// @internal
+/// __SPIRVNodePayloadArray is to emit OpTypeNodePayloadArrayAMDX and
+/// SpvDecorationPayloadNodeNameAMDX for it.
+///
+__generic<BaseType, let nodeID : int>
+__intrinsic_type($(kIROp_SPIRVNodePayloadArrayType))
+struct __SPIRVNodePayloadArray;
+
+/// @internal
+/// NodePayloadArrayPtr is a pointer type for "NodePayloadAMDX" storage-class and it points to an array of work-graph nodes
+///
+__generic<BaseType, let nodeID : int>
+typealias NodePayloadArrayPtr = Ptr<__SPIRVNodePayloadArray<BaseType, nodeID>, $( (uint64_t)AddressSpace::NodePayloadAMDX)>;
+
+/// @internal
+/// NodePayloadPtr is a pointer type for "NodePayloadAMDX" storage-class and it points to a `RecordType`.
+///
+__generic<RecordType>
+typealias NodePayloadPtr = Ptr<RecordType, $( (uint64_t)AddressSpace::NodePayloadAMDX)>;
 
 __attributeTarget(StructDecl)
 attribute_syntax [raypayload] : RayPayloadAttribute;
