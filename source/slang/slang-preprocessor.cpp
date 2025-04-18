@@ -1038,13 +1038,13 @@ struct WarningTimeline
         const Entry* res = nullptr;
         if (entries.getCount() && location >= entries.getFirst().location)
         {
-            res = ::std::upper_bound(
-                      entries.begin(),
-                      entries.end(),
-                      location,
-                      [](SourceLoc::RawValue const& lhs, Entry const& rhs)
-                      { return lhs < rhs.location; }) -
-                  1;
+            auto nextEntryIndex = ::std::upper_bound(
+                entries.begin(),
+                entries.end(),
+                location,
+                [](SourceLoc::RawValue const& lhs, Entry const& rhs)
+                { return lhs < rhs.location; });
+            res = nextEntryIndex - 1;
         }
         return res;
     }
@@ -1106,10 +1106,10 @@ struct WarningTimeline
         int id,
         SourceLoc debugLoc)
     {
-        SourceLoc::RawValue max_known_location =
+        SourceLoc::RawValue maxKnownLocation =
             entries.getCount() ? entries.getLast().location : SourceLoc::RawValue(0);
         // Add on top
-        if (location > max_known_location)
+        if (location > maxKnownLocation)
         {
             // Add a new entry only if necessary
             if (getLatestSpecifier() != specifier || specifier == PragmaWarningSpecifier::Once)
@@ -1160,7 +1160,7 @@ struct WarningTimeline
         }
     }
 
-    void popEntry(
+    void addEntryForPragmaPop(
         SourceLoc::RawValue location,
         SourceLoc::RawValue pushedLocation,
         DiagnosticSink* sink,
@@ -1181,7 +1181,7 @@ struct WarningTimeline
 struct WarningStateTracker : SourceWarningStateTrackerBase
 {
     SourceManager* sourceManager = nullptr;
-    Dictionary<int, WarningTimeline> entries = {};
+    Dictionary<int, WarningTimeline> mapDiagnosticIdToTimeline = {};
     List<SourceLoc> stack = {};
 
     WarningStateTracker(SourceManager* sourceManager = nullptr)
@@ -1196,68 +1196,57 @@ struct WarningStateTracker : SourceWarningStateTrackerBase
 
     virtual Severity consumeWarningSeverity(SourceLoc location, int id, Severity severity) override
     {
-        SourceLoc::RawValue absoluteLoc = getAbsoluteLocation(location);
         Severity res = severity;
-        WarningTimeline* timeline = entries.tryGetValue(id);
-        if (timeline)
+        WarningTimeline* timeline = mapDiagnosticIdToTimeline.tryGetValue(id);
+        if (!timeline)
+            return res;
+        SourceLoc::RawValue absoluteLoc = getAbsoluteLocation(location);
+        PragmaWarningSpecifier spec = timeline->consumeSpecifier(absoluteLoc);
+        if (spec == PragmaWarningSpecifier::Disable || spec == PragmaWarningSpecifier::Suppress)
         {
-            PragmaWarningSpecifier spec = timeline->consumeSpecifier(absoluteLoc);
-            if (spec == PragmaWarningSpecifier::Disable || spec == PragmaWarningSpecifier::Suppress)
-            {
-                res = Severity::Disable;
-            }
-            else if (spec == PragmaWarningSpecifier::Error)
-            {
-                res = Severity::Error;
-            }
+            res = Severity::Disable;
+        }
+        else if (spec == PragmaWarningSpecifier::Error)
+        {
+            res = Severity::Error;
         }
         return res;
     }
 
     void addEntry(
         SourceLoc location,
+        SourceLoc nextLineEnd,
         int id,
         PragmaWarningSpecifier specifier,
         DiagnosticSink* sink = nullptr)
     {
-        WarningTimeline& timeline = entries.operator[](id);
-        timeline.addEntry(getAbsoluteLocation(location), specifier, nullptr, sink, id, location);
-    }
-
-    void addSuppress(
-        SourceLoc location,
-        SourceLoc nextLineEnd,
-        int id,
-        DiagnosticSink* sink = nullptr)
-    {
-        WarningTimeline& timeline = entries.operator[](id);
+        WarningTimeline& timeline = mapDiagnosticIdToTimeline[id];
+        auto absLoc = getAbsoluteLocation(location);
         PragmaWarningSpecifier prev = timeline.getLatestSpecifier();
         auto lastEntry = timeline.getLatestEntry();
-        timeline.addEntry(
-            getAbsoluteLocation(location),
-            PragmaWarningSpecifier::Suppress,
-            nullptr,
-            sink,
-            id,
-            location);
-        timeline.addEntry(getAbsoluteLocation(nextLineEnd), prev, lastEntry, sink, id, nextLineEnd);
+        timeline.addEntry(absLoc, specifier, nullptr, sink, id, location);
+        if (specifier == PragmaWarningSpecifier::Suppress)
+        {
+            auto nextAbsLoc = getAbsoluteLocation(nextLineEnd);
+            timeline.addEntry(nextAbsLoc, prev, lastEntry, sink, id, nextLineEnd);
+        }
     }
 
-    void push(SourceLoc location) { stack.add(location); }
+    void addPragmaPush(SourceLoc location) { stack.add(location); }
 
-    void pop(SourceLoc location, DiagnosticSink* sink = nullptr)
+    void addPragmaPop(SourceLoc location, DiagnosticSink* sink = nullptr)
     {
         if (stack.getCount())
         {
             const SourceLoc pushed = stack.getLast();
             stack.removeLast();
-            if (entries.getCount())
+            if (mapDiagnosticIdToTimeline.getCount())
             {
                 const SourceLoc::RawValue absLoc = getAbsoluteLocation(location);
                 const SourceLoc::RawValue absPushed = getAbsoluteLocation(pushed);
-                for (auto& [id, timeline] : entries)
+                for (auto& [id, timeline] : mapDiagnosticIdToTimeline)
                 {
-                    timeline.popEntry(absLoc, absPushed, sink, id, location);
+                    timeline.addEntryForPragmaPop(absLoc, absPushed, sink, id, location);
                 }
             }
         }
@@ -3494,7 +3483,6 @@ void Preprocessor::pushInputFile(InputFile* inputFile, SourceLoc loc)
     {
         SourceView* sourceView = m_currentInputFile->getLexer()->m_sourceView;
         SourceLoc::RawValue offset = SourceRange(sourceView->getLastSegment().begin, loc).getSize();
-        ;
         absoluteSourceLocCounter += offset;
     }
 
@@ -4177,13 +4165,13 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
         if (tk.getContent() == "push")
         {
             AdvanceToken(context);
-            context->m_preprocessor->warningStateTracker->push(tk.loc);
+            context->m_preprocessor->warningStateTracker->addPragmaPush(tk.loc);
         }
         // #pragma warning (pop)
         else if (tk.getContent() == "pop")
         {
             AdvanceToken(context);
-            context->m_preprocessor->warningStateTracker->pop(tk.loc, GetSink(context));
+            context->m_preprocessor->warningStateTracker->addPragmaPop(tk.loc, GetSink(context));
         }
         else
         {
@@ -4259,19 +4247,12 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                     {
                         AdvanceToken(context);
                         int warningNumber = stringToInt(warningNumberToken.getContent());
-                        if (specifier == PragmaWarningSpecifier::Suppress)
-                        {
-                            context->m_preprocessor->warningStateTracker->addSuppress(
-                                idLocation,
-                                nextLineEnd,
-                                warningNumber,
-                                GetSink(context));
-                        }
-                        else
-                        {
-                            context->m_preprocessor->warningStateTracker
-                                ->addEntry(idLocation, warningNumber, specifier, GetSink(context));
-                        }
+                        context->m_preprocessor->warningStateTracker->addEntry(
+                            idLocation,
+                            nextLineEnd,
+                            warningNumber,
+                            specifier,
+                            GetSink(context));
                     }
                     else
                     {
