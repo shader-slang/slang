@@ -90,6 +90,7 @@ jobs:
         shell: pwsh
         working-directory: ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64
         run: |
+          $env:DISABLE_CTS_SLANG_SERVER_MODE = "1"
           .\deqp-vk.exe --deqp-archive-dir=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64 --deqp-caselist-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang-passing-tests.txt --deqp-waiver-file=${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang-waiver-tests.xml
 
       - name: Dump TestResults.qpa if failed
