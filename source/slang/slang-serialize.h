@@ -255,7 +255,6 @@ public:
         }
 
         SLANG_UNEXPECTED("invalid format in RIFF");
-        UNREACHABLE_RETURN("");
     }
 
     template<typename T>
@@ -308,13 +307,11 @@ public:
         if (!listChunk)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
-            UNREACHABLE_RETURN("");
         }
 
         if (listChunk->m_fourCC != typeCode)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
-            UNREACHABLE_RETURN("");
         }
 
         _chunk = listChunk->getFirstContainedChunk();
@@ -326,13 +323,11 @@ public:
         if (!listChunk)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
-            UNREACHABLE_RETURN("");
         }
 
         if (listChunk->m_fourCC != typeCode)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
-            UNREACHABLE_RETURN("");
         }
 
         _chunk = listChunk->getFirstContainedChunk();
