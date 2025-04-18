@@ -207,10 +207,10 @@ FIDDLE() namespace Slang
     {
         SlangScalarType scalarType; ///< If image format is not made up of channels of set sizes
                                     ///< this will be SLANG_SCALAR_TYPE_NONE
-        uint8_t channelCount;    ///< The number of channels
-        uint8_t sizeInBytes;     ///< Size in bytes
-        UnownedStringSlice name; ///< The name associated with this type. NOTE! Currently these
-                                 ///< names *are* the GLSL format names.
+        uint8_t channelCount;       ///< The number of channels
+        uint8_t sizeInBytes;        ///< Size in bytes
+        UnownedStringSlice name;    ///< The name associated with this type. NOTE! Currently these
+                                    ///< names *are* the GLSL format names.
     };
 
     const ImageFormatInfo& getImageFormatInfo(ImageFormat format);
