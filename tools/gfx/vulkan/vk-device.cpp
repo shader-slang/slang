@@ -758,16 +758,6 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
             deviceCreateInfo.pNext = &extendedFeatures.vulkan12Features;
         }
 
-        if (extendedFeatures.cooperativeVectorFeatures.cooperativeVector)
-        {
-            deviceExtensions.add(VK_NV_COOPERATIVE_VECTOR_EXTENSION_NAME);
-
-            extendedFeatures.cooperativeVectorFeatures.pNext = (void*)deviceCreateInfo.pNext;
-            deviceCreateInfo.pNext = &extendedFeatures.cooperativeVectorFeatures;
-
-            m_features.add("cooperative-vector");
-        }
-
         VkPhysicalDeviceProperties2 extendedProps = {
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
         VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProps = {
