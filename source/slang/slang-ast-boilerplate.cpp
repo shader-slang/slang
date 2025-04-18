@@ -1,23 +1,17 @@
 // slang-ast-boilerplate.cpp
 
-#include "slang-ast-forward-declarations.h"
 #include "slang-ast-all.h"
 #include "slang-ast-builder.h"
+#include "slang-ast-forward-declarations.h"
 
 namespace Slang
 {
 template<typename T>
 struct Helper
 {
-    static void* create(ASTBuilder* builder)
-    {
-        return builder->createImpl<T>();
-    }
+    static void* create(ASTBuilder* builder) { return builder->createImpl<T>(); }
 
-    static void destruct(void* obj)
-    {
-        ((T*)obj)->~T();
-    }
+    static void destruct(void* obj) { ((T*)obj)->~T(); }
 };
 
 #if 0 // FIDDLE TEMPLATE:
@@ -57,4 +51,4 @@ SyntaxClassBase::SyntaxClassBase(ASTNodeType tag)
     _info = kAllSyntaxClasses[int(tag)];
 }
 
-}
+} // namespace Slang

@@ -62,9 +62,7 @@ SlangResult loadModuleLibrary(
 
     for (auto moduleChunk : container.getModules())
     {
-        auto loadedModule = linkage->findOrLoadSerializedModuleForModuleLibrary(
-            moduleChunk,
-            sink);
+        auto loadedModule = linkage->findOrLoadSerializedModuleForModuleLibrary(moduleChunk, sink);
         if (!loadedModule)
             return SLANG_FAIL;
 

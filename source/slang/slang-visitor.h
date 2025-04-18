@@ -5,8 +5,8 @@
 // This file defines the basic "Visitor" pattern for doing dispatch
 // over the various categories of syntax node.
 
-#include "slang-ast-forward-declarations.h"
 #include "slang-ast-dispatch.h"
+#include "slang-ast-forward-declarations.h"
 #include "slang-syntax.h"
 
 namespace Slang
@@ -93,12 +93,16 @@ struct TypeVisitor
 {
     Result dispatch(Type* type)
     {
-        return ASTNodeDispatcher<Type, Result>::dispatch(type, [&](auto obj) { return _dispatchImpl(obj); });
+        return ASTNodeDispatcher<Type, Result>::dispatch(
+            type,
+            [&](auto obj) { return _dispatchImpl(obj); });
     }
 
     Result dispatchType(Type* type)
     {
-        return ASTNodeDispatcher<Type, Result>::dispatch(type, [&](auto obj) { return _dispatchImpl(obj); });
+        return ASTNodeDispatcher<Type, Result>::dispatch(
+            type,
+            [&](auto obj) { return _dispatchImpl(obj); });
     }
 
 #if 0 // FIDDLE TEMPLATE:
@@ -136,7 +140,9 @@ struct ExprVisitor
 {
     Result dispatch(Expr* expr)
     {
-        return ASTNodeDispatcher<Expr, Result>::dispatch(expr, [&](auto obj) { return _dispatchImpl(obj); });
+        return ASTNodeDispatcher<Expr, Result>::dispatch(
+            expr,
+            [&](auto obj) { return _dispatchImpl(obj); });
     }
 
 #if 0 // FIDDLE TEMPLATE:
@@ -174,7 +180,9 @@ struct StmtVisitor
 {
     Result dispatch(Stmt* stmt)
     {
-        return ASTNodeDispatcher<Stmt, Result>::dispatch(stmt, [&](auto obj) { return _dispatchImpl(obj); });
+        return ASTNodeDispatcher<Stmt, Result>::dispatch(
+            stmt,
+            [&](auto obj) { return _dispatchImpl(obj); });
     }
 
 #if 0 // FIDDLE TEMPLATE:
@@ -195,7 +203,9 @@ struct DeclVisitor
 {
     Result dispatch(DeclBase* decl)
     {
-        return ASTNodeDispatcher<DeclBase, Result>::dispatch(decl, [&](auto obj) { return _dispatchImpl(obj); });
+        return ASTNodeDispatcher<DeclBase, Result>::dispatch(
+            decl,
+            [&](auto obj) { return _dispatchImpl(obj); });
     }
 
 #if 0 // FIDDLE TEMPLATE:
@@ -234,7 +244,9 @@ struct ModifierVisitor
 {
     Result dispatch(Modifier* modifier)
     {
-        return ASTNodeDispatcher<Modifier, Result>::dispatch(modifier, [&](auto obj) { return _dispatchImpl(obj); });
+        return ASTNodeDispatcher<Modifier, Result>::dispatch(
+            modifier,
+            [&](auto obj) { return _dispatchImpl(obj); });
     }
 
 #if 0 // FIDDLE TEMPLATE:
@@ -255,7 +267,9 @@ struct ValVisitor : TypeVisitor<Derived, TypeResult>
 {
     Result dispatch(Val* val)
     {
-        return ASTNodeDispatcher<Val, Result>::dispatch(val, [&](auto obj) { return _dispatchImpl(obj); });
+        return ASTNodeDispatcher<Val, Result>::dispatch(
+            val,
+            [&](auto obj) { return _dispatchImpl(obj); });
     }
 
 #if 0 // FIDDLE TEMPLATE:

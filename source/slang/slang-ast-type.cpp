@@ -2,8 +2,8 @@
 #include "slang-ast-type.h"
 
 #include "slang-ast-builder.h"
-#include "slang-ast-modifier.h"
 #include "slang-ast-dispatch.h"
+#include "slang-ast-modifier.h"
 #include "slang-syntax.h"
 
 #include <assert.h>

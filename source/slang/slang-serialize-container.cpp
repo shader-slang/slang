@@ -15,397 +15,375 @@
 
 namespace Slang
 {
-    struct ModuleEncodingContext
+struct ModuleEncodingContext
+{
+public:
+    ModuleEncodingContext(SerialContainerUtil::WriteOptions const& options, Stream* stream)
+        : options(options), encoder(stream), containerStringPool(StringSlicePool::Style::Default)
     {
-    public:
-        ModuleEncodingContext(
-            SerialContainerUtil::WriteOptions const& options,
-            Stream* stream)
-            : options(options)
-            , encoder(stream)
-            , containerStringPool(StringSlicePool::Style::Default)
+        if (options.optionFlags & SerialOptionFlag::SourceLocation)
         {
-            if (options.optionFlags & SerialOptionFlag::SourceLocation)
-            {
-                sourceLocWriter = new SerialSourceLocWriter(options.sourceManager);
-            }
+            sourceLocWriter = new SerialSourceLocWriter(options.sourceManager);
         }
+    }
 
-        ~ModuleEncodingContext()
+    ~ModuleEncodingContext()
+    {
+        encoder.setRIFFChunk(encoder.getRIFF()->getRoot());
+        encodeFinalPieces();
+    }
+
+    SlangResult encodeModuleList(FrontEndCompileRequest* frontEndReq)
+    {
+        // Encoding a front-end compile request into a RIFF
+        // is simply a matter of encoding the module for each
+        // of the translation units that got compiled.
+        //
+        Encoder::WithKeyValuePair withArray(&encoder, SerialBinary::kModuleListFourCc);
+        for (TranslationUnitRequest* translationUnit : frontEndReq->translationUnits)
         {
-            encoder.setRIFFChunk(encoder.getRIFF()->getRoot());
-            encodeFinalPieces();
+            SLANG_RETURN_ON_FAIL(encode(translationUnit->module));
         }
+        return SLANG_OK;
+    }
 
-        SlangResult encodeModuleList(
-            FrontEndCompileRequest* frontEndReq)
+    SlangResult encode(FrontEndCompileRequest* frontEndReq)
+    {
+        Encoder::WithObject withObject(&encoder, SerialBinary::kContainerFourCc);
+        SLANG_RETURN_ON_FAIL(encodeModuleList(frontEndReq));
+        return SLANG_OK;
+    }
+
+    SlangResult encode(EndToEndCompileRequest* request)
+    {
+        Encoder::WithObject withObject(&encoder, SerialBinary::kContainerFourCc);
+
+        // Encoding an end-to-end compile request starts with the same
+        // work as for a front-end request: we encode each of
+        // the modules for the translation units.
+        //
+        SLANG_RETURN_ON_FAIL(encodeModuleList(request->getFrontEndReq()));
+        //
+        // If code generation is disabled, then we can skip all further
+        // steps, and the encoding process is no different
+        // than for a front-end request.
+        //
+        if (request->getOptionSet().getBoolOption(CompilerOptionName::SkipCodeGen))
         {
-            // Encoding a front-end compile request into a RIFF
-            // is simply a matter of encoding the module for each
-            // of the translation units that got compiled.
-            //
-            Encoder::WithKeyValuePair withArray(&encoder, SerialBinary::kModuleListFourCc);
-            for (TranslationUnitRequest* translationUnit : frontEndReq->translationUnits)
-            {
-                SLANG_RETURN_ON_FAIL(encode(translationUnit->module));
-            }
             return SLANG_OK;
         }
 
-        SlangResult encode(
-            FrontEndCompileRequest* frontEndReq)
+        // If code generation is enabled, then we need to encode
+        // information on each of the code generation targets, as well
+        // as the entry points.
+        //
+        // We start with the targets, each of which will have a Slang IR
+        // representation of the layout information for the program
+        // on that target.
+        //
+        auto linkage = request->getLinkage();
+        auto sink = request->getSink();
+        auto program = request->getSpecializedGlobalAndEntryPointsComponentType();
         {
-            Encoder::WithObject withObject(&encoder, SerialBinary::kContainerFourCc);
-            SLANG_RETURN_ON_FAIL(encodeModuleList(frontEndReq));
-            return SLANG_OK;
-        }
+            Encoder::WithArray withArray(&encoder); // kContainerFourCc
 
-        SlangResult encode(
-            EndToEndCompileRequest* request)
-        {
-            Encoder::WithObject withObject(&encoder, SerialBinary::kContainerFourCc);
-
-            // Encoding an end-to-end compile request starts with the same
-            // work as for a front-end request: we encode each of
-            // the modules for the translation units.
-            //
-            SLANG_RETURN_ON_FAIL(encodeModuleList(request->getFrontEndReq()));
-            //
-            // If code generation is disabled, then we can skip all further
-            // steps, and the encoding process is no different
-            // than for a front-end request.
-            //
-            if (request->getOptionSet().getBoolOption(CompilerOptionName::SkipCodeGen))
+            for (auto target : linkage->targets)
             {
-                return SLANG_OK;
+                auto targetProgram = program->getTargetProgram(target);
+                encode(targetProgram, sink);
             }
+        }
 
-            // If code generation is enabled, then we need to encode
-            // information on each of the code generation targets, as well
-            // as the entry points.
-            //
-            // We start with the targets, each of which will have a Slang IR
-            // representation of the layout information for the program
-            // on that target.
-            //
-            auto linkage = request->getLinkage();
-            auto sink = request->getSink();
-            auto program = request->getSpecializedGlobalAndEntryPointsComponentType();
+        // The compiled `program` may also have zero or more entry points,
+        // and we need to encode information about each of them.
+        //
+        {
+            Encoder::WithArray withArray(&encoder, SerialBinary::kEntryPointListFourCc);
+
+            auto entryPointCount = program->getEntryPointCount();
+            for (Index ii = 0; ii < entryPointCount; ++ii)
             {
-                Encoder::WithArray withArray(&encoder); // kContainerFourCc
-
-                for (auto target : linkage->targets)
-                {
-                    auto targetProgram = program->getTargetProgram(target);
-                    encode(targetProgram, sink);
-                }
+                auto entryPoint = program->getEntryPoint(ii);
+                auto entryPointMangledName = program->getEntryPointMangledName(ii);
+                encode(entryPoint, entryPointMangledName);
             }
+        }
 
-            // The compiled `program` may also have zero or more entry points,
-            // and we need to encode information about each of them.
+        return SLANG_OK;
+    }
+
+    SlangResult encode(TargetProgram* targetProgram, DiagnosticSink* sink)
+    {
+        // TODO:
+        // Serialization of target component IR is causing the embedded precompiled binary
+        // feature to fail. The resulting data modules contain both TU IR and TC IR, with only
+        // one module header. Yong suggested to ignore the TC IR for now, though also that
+        // OV was using the feature, so disabling this might cause problems.
+
+        IRModule* irModule = targetProgram->getOrCreateIRModuleForLayout(sink);
+
+        // Okay, we need to serialize this target program and its IR too...
+        IRSerialData serialData;
+        IRSerialWriter writer;
+
+        SLANG_RETURN_ON_FAIL(
+            writer.write(irModule, sourceLocWriter, options.optionFlags, &serialData));
+        SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, encoder.getRIFF()));
+
+        return SLANG_OK;
+    }
+
+    void encode(Name* name) { encoder.encode(name->text); }
+
+    void encode(String const& value) { encoder.encode(value); }
+
+    void encode(uint32_t value) { encoder.encode(UInt(value)); }
+
+    void encodeData(void const* data, size_t size) { encoder.encodeData(data, size); }
+
+    SlangResult encode(EntryPoint* entryPoint, String const& entryPointMangledName)
+    {
+        Encoder::WithObject withObject(&encoder, SerialBinary::kEntryPointFourCc);
+
+        {
+            Encoder::WithObject withProperty(&encoder, SerialBinary::kNameFourCC);
+            encode(entryPoint->getName());
+        }
+        {
+            Encoder::WithObject withProperty(&encoder, SerialBinary::kProfileFourCC);
+            encode(entryPoint->getProfile().raw);
+        }
+        {
+            Encoder::WithObject withProperty(&encoder, SerialBinary::kMangledNameFourCC);
+            encode(entryPointMangledName);
+        }
+
+        return SLANG_OK;
+    }
+
+
+    SlangResult encode(Module* module)
+    {
+        if (!(options.optionFlags & (SerialOptionFlag::IRModule | SerialOptionFlag::ASTModule)))
+            return SLANG_OK;
+
+        Encoder::WithObject withModule(&encoder, SerialBinary::kModuleFourCC);
+
+        // The first piece that we write for a module is its header.
+        // The header is intended to provide information that can be
+        // used to determine if a precompiled module is up-to-date.
+        //
+        // Update(tfoley): Okay, let's skip the whole header idea and just
+        // serialize these things as properties of the module itself...
+        {
+            // So many things need the module name, that it makes
+            // sense to serialize it separately from all the rest.
             //
-            {
-                Encoder::WithArray withArray(&encoder, SerialBinary::kEntryPointListFourCc);
-
-                auto entryPointCount = program->getEntryPointCount();
-                for (Index ii = 0; ii < entryPointCount; ++ii)
-                {
-                    auto entryPoint = program->getEntryPoint(ii);
-                    auto entryPointMangledName = program->getEntryPointMangledName(ii);
-                    encode(entryPoint, entryPointMangledName);
-                }
-            }
-
-            return SLANG_OK;
-        }
-
-        SlangResult encode(TargetProgram* targetProgram, DiagnosticSink* sink)
-        {
-            // TODO:
-            // Serialization of target component IR is causing the embedded precompiled binary
-            // feature to fail. The resulting data modules contain both TU IR and TC IR, with only
-            // one module header. Yong suggested to ignore the TC IR for now, though also that
-            // OV was using the feature, so disabling this might cause problems.
-
-            IRModule* irModule = targetProgram->getOrCreateIRModuleForLayout(sink);
-
-            // Okay, we need to serialize this target program and its IR too...
-            IRSerialData serialData;
-            IRSerialWriter writer;
-
-            SLANG_RETURN_ON_FAIL(writer.write(irModule, sourceLocWriter, options.optionFlags, &serialData));
-            SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, encoder.getRIFF()));
-
-            return SLANG_OK;
-        }
-
-        void encode(Name* name)
-        {
-            encoder.encode(name->text);
-        }
-
-        void encode(String const& value)
-        {
-            encoder.encode(value);
-        }
-
-        void encode(uint32_t value)
-        {
-            encoder.encode(UInt(value));
-        }
-
-        void encodeData(void const* data, size_t size)
-        {
-            encoder.encodeData(data, size);
-        }
-
-        SlangResult encode(EntryPoint* entryPoint, String const& entryPointMangledName)
-        {
-            Encoder::WithObject withObject(&encoder, SerialBinary::kEntryPointFourCc);
-
             {
                 Encoder::WithObject withProperty(&encoder, SerialBinary::kNameFourCC);
-                encode(entryPoint->getName());
-            }
-            {
-                Encoder::WithObject withProperty(&encoder, SerialBinary::kProfileFourCC);
-                encode(entryPoint->getProfile().raw);
-            }
-            {
-                Encoder::WithObject withProperty(&encoder, SerialBinary::kMangledNameFourCC);
-                encode(entryPointMangledName);
+                encoder.encodeString(module->getNameObj()->text);
             }
 
-            return SLANG_OK;
+            // The header includes a digest of all the compile options and
+            // the files that the compiled result depended on.
+            //
+            auto digest = module->computeDigest();
+            encoder.encodeData(PropertyKeys<Module>::Digest, digest.data, sizeof(digest.data));
+
+            // The header includes an array of the paths of all of the
+            // files that the compiled result depended on.
+            //
+            encodeModuleDependencyPaths(module);
         }
 
-
-        SlangResult encode(Module* module)
+        // If serialization of Slang IR modules is enabled, and there
+        // is IR available for this module, then we we encode it.
+        //
+        if ((options.optionFlags & SerialOptionFlag::IRModule))
         {
-            if (!(options.optionFlags & (SerialOptionFlag::IRModule | SerialOptionFlag::ASTModule)))
-                return SLANG_OK;
-
-            Encoder::WithObject withModule(&encoder, SerialBinary::kModuleFourCC);
-
-            // The first piece that we write for a module is its header.
-            // The header is intended to provide information that can be
-            // used to determine if a precompiled module is up-to-date.
-            //
-            // Update(tfoley): Okay, let's skip the whole header idea and just
-            // serialize these things as properties of the module itself...
+            if (auto irModule = module->getIRModule())
             {
-                // So many things need the module name, that it makes
-                // sense to serialize it separately from all the rest.
-                //
-                {
-                    Encoder::WithObject withProperty(&encoder, SerialBinary::kNameFourCC);
-                    encoder.encodeString(module->getNameObj()->text);
-                }
+                Encoder::WithKeyValuePair withKey(&encoder, PropertyKeys<Module>::IRModule);
 
-                // The header includes a digest of all the compile options and
-                // the files that the compiled result depended on.
-                //
-                auto digest = module->computeDigest();
-                encoder.encodeData(PropertyKeys<Module>::Digest, digest.data, sizeof(digest.data));
-
-                // The header includes an array of the paths of all of the
-                // files that the compiled result depended on.
-                //
-                encodeModuleDependencyPaths(module);
+                IRSerialData serialData;
+                IRSerialWriter writer;
+                SLANG_RETURN_ON_FAIL(
+                    writer.write(irModule, sourceLocWriter, options.optionFlags, &serialData));
+                SLANG_RETURN_ON_FAIL(IRSerialWriter::writeContainer(serialData, encoder.getRIFF()));
             }
-
-            // If serialization of Slang IR modules is enabled, and there
-            // is IR available for this module, then we we encode it.
-            //
-            if ((options.optionFlags & SerialOptionFlag::IRModule))
-            {
-                if (auto irModule = module->getIRModule())
-                {
-                    Encoder::WithKeyValuePair withKey(&encoder, PropertyKeys<Module>::IRModule);
-
-                    IRSerialData serialData;
-                    IRSerialWriter writer;
-                    SLANG_RETURN_ON_FAIL(writer.write(
-                        irModule,
-                        sourceLocWriter,
-                        options.optionFlags,
-                        &serialData));
-                    SLANG_RETURN_ON_FAIL(
-                        IRSerialWriter::writeContainer(serialData, encoder.getRIFF()));
-                }
-            }
-
-            // If serialization of AST information is enabled, and we have AST
-            // information available, then we serialize it here.
-            //
-            if (options.optionFlags & SerialOptionFlag::ASTModule)
-            {
-                if (auto moduleDecl = module->getModuleDecl())
-                {
-                    Encoder::WithKeyValuePair withKey(&encoder, PropertyKeys<Module>::ASTModule);
-
-                    writeSerializedModuleAST(&encoder, moduleDecl, sourceLocWriter);
-                }
-            }
-
-            return SLANG_OK;
         }
 
-        SlangResult encodeModuleDependencyPaths(Module* module)
+        // If serialization of AST information is enabled, and we have AST
+        // information available, then we serialize it here.
+        //
+        if (options.optionFlags & SerialOptionFlag::ASTModule)
         {
-            Encoder::WithObject withProperty(&encoder, PropertyKeys<Module>::FileDependencies);
-
-            // TODO(tfoley): This is some of the most complicated logic
-            // in the encoding system, because it tries to translate
-            // the file dependency paths into something that isn't
-            // specific to the machine on which a module was built.
-            //
-            // The comments that follow are from the original implementation
-            // of this logic, because I cannot state with confidence
-            // that I know what's happening in all of this.
-
-
-            // Here we assume that the first file in the file dependencies is the module's file path.
-            // We store the module's file path as a relative path with respect to the first search
-            // directory that contains the module, and store the paths of dependent files as relative
-            // paths with respect to the module's path.
-
-            // First, we try to extract the module's main file path from the file dependency list.
-            auto fileDependencies = module->getFileDependencies();
-            String canonicalModulePath, moduleDir;
-            if (fileDependencies.getCount() != 0)
+            if (auto moduleDecl = module->getModuleDecl())
             {
-                IncludeSystem includeSystem(
-                    &module->getLinkage()->getSearchDirectories(),
-                    module->getLinkage()->getFileSystemExt(),
-                    module->getLinkage()->getSourceManager());
-                PathInfo outFoundSourcePath;
-                // If we can find the first file, use that as the module's path.
-                if (SLANG_SUCCEEDED(includeSystem.findFile(
+                Encoder::WithKeyValuePair withKey(&encoder, PropertyKeys<Module>::ASTModule);
+
+                writeSerializedModuleAST(&encoder, moduleDecl, sourceLocWriter);
+            }
+        }
+
+        return SLANG_OK;
+    }
+
+    SlangResult encodeModuleDependencyPaths(Module* module)
+    {
+        Encoder::WithObject withProperty(&encoder, PropertyKeys<Module>::FileDependencies);
+
+        // TODO(tfoley): This is some of the most complicated logic
+        // in the encoding system, because it tries to translate
+        // the file dependency paths into something that isn't
+        // specific to the machine on which a module was built.
+        //
+        // The comments that follow are from the original implementation
+        // of this logic, because I cannot state with confidence
+        // that I know what's happening in all of this.
+
+
+        // Here we assume that the first file in the file dependencies is the module's file path.
+        // We store the module's file path as a relative path with respect to the first search
+        // directory that contains the module, and store the paths of dependent files as relative
+        // paths with respect to the module's path.
+
+        // First, we try to extract the module's main file path from the file dependency list.
+        auto fileDependencies = module->getFileDependencies();
+        String canonicalModulePath, moduleDir;
+        if (fileDependencies.getCount() != 0)
+        {
+            IncludeSystem includeSystem(
+                &module->getLinkage()->getSearchDirectories(),
+                module->getLinkage()->getFileSystemExt(),
+                module->getLinkage()->getSourceManager());
+            PathInfo outFoundSourcePath;
+            // If we can find the first file, use that as the module's path.
+            if (SLANG_SUCCEEDED(includeSystem.findFile(
                     fileDependencies[0]->getPathInfo().foundPath,
                     "",
                     outFoundSourcePath)))
+            {
+                canonicalModulePath = outFoundSourcePath.foundPath;
+                Path::getCanonical(canonicalModulePath, canonicalModulePath);
+                moduleDir = Path::getParentDirectory(canonicalModulePath);
+            }
+        }
+
+        // If we can't find the module's path from the file dependencies list above,
+        // use the file path stored on the module as a fallback.
+        // Note that if the module is loaded from a binary precompiled module,
+        // this path will be pointing to that binary file instead of the original source file.
+        if (!canonicalModulePath.getLength())
+        {
+            if (auto modulePath = module->getFilePath())
+            {
+                canonicalModulePath = modulePath;
+                Path::getCanonical(canonicalModulePath, canonicalModulePath);
+                moduleDir = Path::getParentDirectory(canonicalModulePath);
+            }
+        }
+
+        // Find the first search directory that contains the module's main file path,
+        // so we can store the module's path (the first entry in the dependent files list)
+        // as a relative path with respect to that directory.
+
+        String linkageRoot = ".";
+        if (auto linkage = module->getLinkage())
+        {
+            for (const auto& searchDir : linkage->getSearchDirectories().searchDirectories)
+            {
+                String fullSearchDir;
+                Path::getCanonical(searchDir.path, fullSearchDir);
+                String relativePath = Path::getRelativePath(fullSearchDir, canonicalModulePath);
+                if (!Path::hasRelativeElement(relativePath))
                 {
-                    canonicalModulePath = outFoundSourcePath.foundPath;
-                    Path::getCanonical(canonicalModulePath, canonicalModulePath);
-                    moduleDir = Path::getParentDirectory(canonicalModulePath);
+                    linkageRoot = searchDir.path;
+                    break;
                 }
             }
+        }
+        Path::getCanonical(linkageRoot, linkageRoot);
 
-            // If we can't find the module's path from the file dependencies list above,
-            // use the file path stored on the module as a fallback.
-            // Note that if the module is loaded from a binary precompiled module,
-            // this path will be pointing to that binary file instead of the original source file.
-            if (!canonicalModulePath.getLength())
+        Encoder::WithArray withArray(&encoder);
+        for (auto file : fileDependencies)
+        {
+            if (file->getPathInfo().hasFoundPath())
             {
-                if (auto modulePath = module->getFilePath())
-                {
-                    canonicalModulePath = modulePath;
-                    Path::getCanonical(canonicalModulePath, canonicalModulePath);
-                    moduleDir = Path::getParentDirectory(canonicalModulePath);
-                }
-            }
+                String canonicalFilePath = file->getPathInfo().foundPath;
+                Path::getCanonical(file->getPathInfo().foundPath, canonicalFilePath);
 
-            // Find the first search directory that contains the module's main file path,
-            // so we can store the module's path (the first entry in the dependent files list)
-            // as a relative path with respect to that directory.
-
-            String linkageRoot = ".";
-            if (auto linkage = module->getLinkage())
-            {
-                for (const auto& searchDir : linkage->getSearchDirectories().searchDirectories)
+                // If the dependnet file is the same as the module's file path, store it as a
+                // relative path with respect to the search directory discovered above.
+                if (file->getPathInfo().hasFileFoundPath())
                 {
-                    String fullSearchDir;
-                    Path::getCanonical(searchDir.path, fullSearchDir);
-                    String relativePath = Path::getRelativePath(fullSearchDir, canonicalModulePath);
-                    if (!Path::hasRelativeElement(relativePath))
+                    if (canonicalFilePath == canonicalModulePath)
                     {
-                        linkageRoot = searchDir.path;
-                        break;
-                    }
-                }
-            }
-            Path::getCanonical(linkageRoot, linkageRoot);
+                        auto relativeModulePath =
+                            Path::getRelativePath(linkageRoot, canonicalModulePath);
 
-            Encoder::WithArray withArray(&encoder);
-            for (auto file : fileDependencies)
-            {
-                if (file->getPathInfo().hasFoundPath())
-                {
-                    String canonicalFilePath = file->getPathInfo().foundPath;
-                    Path::getCanonical(file->getPathInfo().foundPath, canonicalFilePath);
-
-                    // If the dependnet file is the same as the module's file path, store it as a
-                    // relative path with respect to the search directory discovered above.
-                    if (file->getPathInfo().hasFileFoundPath())
-                    {
-                        if (canonicalFilePath == canonicalModulePath)
-                        {
-                            auto relativeModulePath =
-                                Path::getRelativePath(linkageRoot, canonicalModulePath);
-
-                            encoder.encodeString(relativeModulePath);
-                        }
-                        else
-                        {
-                            // For all other dependnet files, store them as relative paths with respect
-                            // to the module's path.
-                            canonicalFilePath = Path::getRelativePath(moduleDir, canonicalFilePath);
-                            encoder.encodeString(canonicalFilePath);
-                        }
+                        encoder.encodeString(relativeModulePath);
                     }
                     else
                     {
-                        // If the module is coming from string instead of an actual file, store it as
-                        // is.
-                        encoder.encodeString(canonicalModulePath);
+                        // For all other dependnet files, store them as relative paths with respect
+                        // to the module's path.
+                        canonicalFilePath = Path::getRelativePath(moduleDir, canonicalFilePath);
+                        encoder.encodeString(canonicalFilePath);
                     }
                 }
                 else
                 {
-                    encoder.encodeString(file->getPathInfo().getMostUniqueIdentity());
+                    // If the module is coming from string instead of an actual file, store it as
+                    // is.
+                    encoder.encodeString(canonicalModulePath);
                 }
             }
-
-            return SLANG_OK;
+            else
+            {
+                encoder.encodeString(file->getPathInfo().getMostUniqueIdentity());
+            }
         }
 
-        SlangResult encodeFinalPieces()
+        return SLANG_OK;
+    }
+
+    SlangResult encodeFinalPieces()
+    {
+        // We can now output the debug information. This is for all IR and AST
+        if (sourceLocWriter)
         {
-            // We can now output the debug information. This is for all IR and AST
-            if (sourceLocWriter)
-            {
-                // Write out the debug info
-                SerialSourceLocData debugData;
-                sourceLocWriter->write(&debugData);
+            // Write out the debug info
+            SerialSourceLocData debugData;
+            sourceLocWriter->write(&debugData);
 
-                debugData.writeContainer(encoder.getRIFF());
-            }
-
-            // Write the container string table
-            if (containerStringPool.getAdded().getCount() > 0)
-            {
-                Encoder::WithKeyValuePair withKey(&encoder, SerialBinary::kStringTableFourCc);
-
-                List<char> encodedTable;
-                SerialStringTableUtil::encodeStringTable(containerStringPool, encodedTable);
-
-                encoder.encodeData(encodedTable.getBuffer(), encodedTable.getCount());
-            }
-
-            return SLANG_OK;
+            debugData.writeContainer(encoder.getRIFF());
         }
 
+        // Write the container string table
+        if (containerStringPool.getAdded().getCount() > 0)
+        {
+            Encoder::WithKeyValuePair withKey(&encoder, SerialBinary::kStringTableFourCc);
 
-    private:
-        SerialContainerUtil::WriteOptions const& options;
-        RefPtr<SerialSourceLocWriter> sourceLocWriter;
+            List<char> encodedTable;
+            SerialStringTableUtil::encodeStringTable(containerStringPool, encodedTable);
 
-        // The string pool used across the whole of the container
-        StringSlicePool containerStringPool;
+            encoder.encodeData(encodedTable.getBuffer(), encodedTable.getCount());
+        }
 
-        Encoder encoder;
-    };
+        return SLANG_OK;
+    }
+
+
+private:
+    SerialContainerUtil::WriteOptions const& options;
+    RefPtr<SerialSourceLocWriter> sourceLocWriter;
+
+    // The string pool used across the whole of the container
+    StringSlicePool containerStringPool;
+
+    Encoder encoder;
+};
 
 //
 // To serialize a module (or compile request) to a stream, we first
@@ -463,7 +441,8 @@ ModuleChunkRef ModuleChunkRef::find(RiffContainer* container)
 
 SHA1::Digest ModuleChunkRef::getDigest()
 {
-    auto foundChunk = static_cast<RiffContainer::DataChunk*>(ptr()->findContained(PropertyKeys<Module>::Digest));
+    auto foundChunk =
+        static_cast<RiffContainer::DataChunk*>(ptr()->findContained(PropertyKeys<Module>::Digest));
     if (!foundChunk)
     {
         SLANG_UNEXPECTED("module chunk had no digest");
@@ -494,15 +473,19 @@ String ModuleChunkRef::getName()
 IRModuleChunkRef ModuleChunkRef::findIR()
 {
     auto foundProperty = ptr()->findContainedList(PropertyKeys<Module>::IRModule);
-    if (!foundProperty) return IRModuleChunkRef(nullptr);
-    return IRModuleChunkRef(static_cast<RiffContainer::ListChunk*>(foundProperty->getFirstContainedChunk()));
+    if (!foundProperty)
+        return IRModuleChunkRef(nullptr);
+    return IRModuleChunkRef(
+        static_cast<RiffContainer::ListChunk*>(foundProperty->getFirstContainedChunk()));
 }
 
 ASTModuleChunkRef ModuleChunkRef::findAST()
 {
     auto foundProperty = ptr()->findContainedList(PropertyKeys<Module>::ASTModule);
-    if (!foundProperty) return ASTModuleChunkRef(nullptr);
-    return ASTModuleChunkRef(static_cast<RiffContainer::ListChunk*>(foundProperty->getFirstContainedChunk()));
+    if (!foundProperty)
+        return ASTModuleChunkRef(nullptr);
+    return ASTModuleChunkRef(
+        static_cast<RiffContainer::ListChunk*>(foundProperty->getFirstContainedChunk()));
 }
 
 ContainerChunkRef ContainerChunkRef::find(RiffContainer* container)
@@ -617,7 +600,7 @@ SlangResult readSourceLocationsFromDebugChunk(
     // location information to other deserialization tasks (both IR
     // and AST deserialization).
     //
-    auto reader = RefPtr( new SerialSourceLocReader() );
+    auto reader = RefPtr(new SerialSourceLocReader());
     SLANG_RETURN_ON_FAIL(reader->read(&intermediateData, sourceManager));
 
     outReader = reader;
@@ -646,17 +629,14 @@ SlangResult decodeModuleIR(
     if (!listChunk)
         return SLANG_FAIL;
     IRSerialData serialData;
-    SLANG_RETURN_ON_FAIL(IRSerialReader::readContainer(
-        listChunk,
-        &serialData));
+    SLANG_RETURN_ON_FAIL(IRSerialReader::readContainer(listChunk, &serialData));
 
     // Next we read the actual IR representation out from the
     // `serialData`. This is the step that may pull source-location
     // information from the provided `sourceLocReader`.
     //
     IRSerialReader reader;
-    SLANG_RETURN_ON_FAIL(
-        reader.read(serialData, session, sourceLocReader, outIRModule));
+    SLANG_RETURN_ON_FAIL(reader.read(serialData, session, sourceLocReader, outIRModule));
 
     return SLANG_OK;
 }

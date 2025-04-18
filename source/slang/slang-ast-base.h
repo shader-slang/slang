@@ -2,11 +2,10 @@
 
 #pragma once
 
+#include "slang-ast-base.h.fiddle"
 #include "slang-ast-forward-declarations.h"
 #include "slang-ast-support-types.h"
 #include "slang-capability.h"
-
-#include "slang-ast-base.h.fiddle"
 
 // This file defines the primary base classes for the hierarchy of
 // AST nodes and related objects. For example, this is where the
@@ -37,10 +36,7 @@ class NodeBase
 
     void _initDebug(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder);
 
-    SyntaxClass<NodeBase> getClass() const
-    {
-        return SyntaxClass<NodeBase>(astNodeType);
-    }
+    SyntaxClass<NodeBase> getClass() const { return SyntaxClass<NodeBase>(astNodeType); }
 
     /// The type of the node. ASTNodeType(-1) is an invalid node type, and shouldn't appear on any
     /// correctly constructed (through ASTBuilder) NodeBase derived class.
@@ -57,37 +53,25 @@ class NodeBase
 template<typename T>
 SLANG_FORCE_INLINE T* dynamicCast(NodeBase* node)
 {
-    return (node &&
-            node->getClass().isSubClassOf<T>())
-               ? static_cast<T*>(node)
-               : nullptr;
+    return (node && node->getClass().isSubClassOf<T>()) ? static_cast<T*>(node) : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE const T* dynamicCast(const NodeBase* node)
 {
-    return (node &&
-            node->getClass().isSubClassOf<T>())
-               ? static_cast<const T*>(node)
-               : nullptr;
+    return (node && node->getClass().isSubClassOf<T>()) ? static_cast<const T*>(node) : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE T* as(NodeBase* node)
 {
-    return (node &&
-            node->getClass().isSubClassOf<T>())
-               ? static_cast<T*>(node)
-               : nullptr;
+    return (node && node->getClass().isSubClassOf<T>()) ? static_cast<T*>(node) : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE const T* as(const NodeBase* node)
 {
-    return (node &&
-            node->getClass().isSubClassOf<T>())
-               ? static_cast<const T*>(node)
-               : nullptr;
+    return (node && node->getClass().isSubClassOf<T>()) ? static_cast<const T*>(node) : nullptr;
 }
 
 // Because DeclRefBase is now a `Val`, we prevent casting it directly into other nodes
@@ -746,7 +730,9 @@ struct ProvenenceNodeWithLoc
 // An intermediate type to represent either a single declaration, or a group of declarations
 FIDDLE(abstract)
 class DeclBase : public ModifiableSyntaxNode
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE(abstract)
 class Decl : public DeclBase

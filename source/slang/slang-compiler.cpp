@@ -2172,8 +2172,7 @@ SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
         options.sourceManager = linkage->getSourceManager();
     }
 
-    SLANG_RETURN_ON_FAIL(
-        SerialContainerUtil::write(this, options, stream));
+    SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(this, options, stream));
 
     return SLANG_OK;
 }

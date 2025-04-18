@@ -30,27 +30,19 @@ struct ValNodeDesc;
 struct Encoder
 {
 public:
-    Encoder(
-        Stream* stream)
+    Encoder(Stream* stream)
         : _stream(stream)
-    {}
-
-    ~Encoder()
     {
-        RiffUtil::write(&_riff, _stream);
     }
+
+    ~Encoder() { RiffUtil::write(&_riff, _stream); }
 
     void beginArray(FourCC typeCode)
     {
-        _riff.startChunk(
-            RiffContainer::Chunk::Kind::List,
-            typeCode);
+        _riff.startChunk(RiffContainer::Chunk::Kind::List, typeCode);
     }
 
-    void beginArray()
-    {
-        beginArray(SerialBinary::kArrayFourCC);
-    }
+    void beginArray() { beginArray(SerialBinary::kArrayFourCC); }
 
     void endArray()
     {
@@ -60,45 +52,28 @@ public:
 
     void beginObject(FourCC typeCode)
     {
-        _riff.startChunk(
-            RiffContainer::Chunk::Kind::List,
-            typeCode);
+        _riff.startChunk(RiffContainer::Chunk::Kind::List, typeCode);
     }
 
-    void beginObject()
-    {
-        beginObject(SerialBinary::kObjectFourCC);
-    }
+    void beginObject() { beginObject(SerialBinary::kObjectFourCC); }
 
-    void endObject()
-    {
-        _riff.endChunk();
-    }
+    void endObject() { _riff.endChunk(); }
 
     void beginKeyValuePair()
     {
-        _riff.startChunk(
-            RiffContainer::Chunk::Kind::List,
-            SerialBinary::kPairFourCC);
+        _riff.startChunk(RiffContainer::Chunk::Kind::List, SerialBinary::kPairFourCC);
     }
 
-    void endKeyValuePair()
-    {
-        _riff.endChunk();
-    }
+    void endKeyValuePair() { _riff.endChunk(); }
 
     void beginKeyValuePair(FourCC keyCode)
     {
-        _riff.startChunk(
-            RiffContainer::Chunk::Kind::List,
-            keyCode);
+        _riff.startChunk(RiffContainer::Chunk::Kind::List, keyCode);
     }
 
     void encodeData(FourCC typeCode, void const* data, size_t size)
     {
-        _riff.startChunk(
-            RiffContainer::Chunk::Kind::Data,
-            typeCode);
+        _riff.startChunk(RiffContainer::Chunk::Kind::Data, typeCode);
         _riff.write(data, size);
         _riff.endChunk();
     }
@@ -108,49 +83,24 @@ public:
         encodeData(SerialBinary::kDataFourCC, data, size);
     }
 
-    void encode(nullptr_t)
-    {
-        encodeData(
-            SerialBinary::kNullFourCC,
-            nullptr, 0);
-    }
+    void encode(nullptr_t) { encodeData(SerialBinary::kNullFourCC, nullptr, 0); }
 
     void encodeBool(bool value)
     {
-        encodeData(
-            value ? SerialBinary::kTrueFourCC : SerialBinary::kFalseFourCC,
-            nullptr, 0);
+        encodeData(value ? SerialBinary::kTrueFourCC : SerialBinary::kFalseFourCC, nullptr, 0);
     }
 
-    void encode(Int32 value)
-    {
-        encodeData(SerialBinary::kInt32FourCC, &value, sizeof(value));
-    }
+    void encode(Int32 value) { encodeData(SerialBinary::kInt32FourCC, &value, sizeof(value)); }
 
-    void encode(UInt32 value)
-    {
-        encodeData(SerialBinary::kUInt32FourCC, &value, sizeof(value));
-    }
+    void encode(UInt32 value) { encodeData(SerialBinary::kUInt32FourCC, &value, sizeof(value)); }
 
-    void encode(Int64 value)
-    {
-        encodeData(SerialBinary::kInt64FourCC, &value, sizeof(value));
-    }
+    void encode(Int64 value) { encodeData(SerialBinary::kInt64FourCC, &value, sizeof(value)); }
 
-    void encode(UInt64 value)
-    {
-        encodeData(SerialBinary::kUInt64FourCC, &value, sizeof(value));
-    }
+    void encode(UInt64 value) { encodeData(SerialBinary::kUInt64FourCC, &value, sizeof(value)); }
 
-    void encode(float value)
-    {
-        encodeData(SerialBinary::kFloat32FourCC, &value, sizeof(value));
-    }
+    void encode(float value) { encodeData(SerialBinary::kFloat32FourCC, &value, sizeof(value)); }
 
-    void encode(double value)
-    {
-        encodeData(SerialBinary::kFloat64FourCC, &value, sizeof(value));
-    }
+    void encode(double value) { encodeData(SerialBinary::kFloat64FourCC, &value, sizeof(value)); }
 
     void encodeString(String const& value)
     {
@@ -159,10 +109,7 @@ public:
     }
 
 
-    void encode(String const& value)
-    {
-        encodeString(value);
-    }
+    void encode(String const& value) { encodeString(value); }
 
     struct WithArray
     {
@@ -179,14 +126,10 @@ public:
             encoder->beginArray(typeCode);
         }
 
-        ~WithArray()
-        {
-            _encoder->endArray();
-        }
+        ~WithArray() { _encoder->endArray(); }
 
     private:
         Encoder* _encoder;
-
     };
 
     struct WithObject
@@ -204,10 +147,7 @@ public:
             encoder->beginObject(typeCode);
         }
 
-        ~WithObject()
-        {
-            _encoder->endObject();
-        }
+        ~WithObject() { _encoder->endObject(); }
 
     private:
         Encoder* _encoder;
@@ -228,10 +168,7 @@ public:
             encoder->beginKeyValuePair(typeCode);
         }
 
-        ~WithKeyValuePair()
-        {
-            _encoder->endKeyValuePair();
-        }
+        ~WithKeyValuePair() { _encoder->endKeyValuePair(); }
 
     private:
         Encoder* _encoder;
@@ -244,17 +181,11 @@ private:
     RiffContainer _riff;
 
 public:
-    RiffContainer* getRIFF() {
-        return &_riff;
-    }
+    RiffContainer* getRIFF() { return &_riff; }
 
-    RiffContainer::Chunk* getRIFFChunk() {
-        return _riff.getCurrentChunk();
-    }
+    RiffContainer::Chunk* getRIFFChunk() { return _riff.getCurrentChunk(); }
 
-    void setRIFFChunk(RiffContainer::Chunk* chunk) {
-        _riff.setCurrentChunk(chunk);
-    }
+    void setRIFFChunk(RiffContainer::Chunk* chunk) { _riff.setCurrentChunk(chunk); }
 };
 
 struct Decoder
@@ -262,7 +193,8 @@ struct Decoder
 public:
     Decoder(RiffContainer::Chunk* chunk)
         : _chunk(chunk)
-    {}
+    {
+    }
 
     bool decodeBool()
     {
@@ -300,7 +232,7 @@ public:
 
         String value;
         value.appendRepeatedChar(' ', size);
-        dataChunk->getPayload((char*) value.getBuffer());
+        dataChunk->getPayload((char*)value.getBuffer());
 
         _chunk = _chunk->m_next;
         return value;
@@ -334,42 +266,20 @@ public:
         return value;
     }
 
-    Int64 decodeInt64()
-    {
-        return _decodeSimpleValue<Int64>(SerialBinary::kInt64FourCC);
-    }
+    Int64 decodeInt64() { return _decodeSimpleValue<Int64>(SerialBinary::kInt64FourCC); }
 
-    UInt64 decodeUInt64()
-    {
-        return _decodeSimpleValue<UInt64>(SerialBinary::kUInt64FourCC);
-    }
+    UInt64 decodeUInt64() { return _decodeSimpleValue<UInt64>(SerialBinary::kUInt64FourCC); }
 
-    Int32 decodeInt32()
-    {
-        return _decodeSimpleValue<Int32>(SerialBinary::kInt32FourCC);
-    }
+    Int32 decodeInt32() { return _decodeSimpleValue<Int32>(SerialBinary::kInt32FourCC); }
 
-    UInt32 decodeUInt32()
-    {
-        return _decodeSimpleValue<UInt32>(SerialBinary::kUInt32FourCC);
-    }
+    UInt32 decodeUInt32() { return _decodeSimpleValue<UInt32>(SerialBinary::kUInt32FourCC); }
 
-    float decodeFloat32()
-    {
-        return _decodeSimpleValue<float>(SerialBinary::kFloat32FourCC);
-    }
+    float decodeFloat32() { return _decodeSimpleValue<float>(SerialBinary::kFloat32FourCC); }
 
-    double decodeFloat64()
-    {
-        return _decodeSimpleValue<double>(SerialBinary::kFloat64FourCC);
-    }
+    double decodeFloat64() { return _decodeSimpleValue<double>(SerialBinary::kFloat64FourCC); }
 
 
-
-    FourCC getTag()
-    {
-        return _chunk ? _chunk->m_fourCC : 0;
-    }
+    FourCC getTag() { return _chunk ? _chunk->m_fourCC : 0; }
 
     Int32 _decodeImpl(Int32*) { return decodeInt32(); }
     UInt32 _decodeImpl(UInt32*) { return decodeUInt32(); }
@@ -389,7 +299,7 @@ public:
     template<typename T>
     void decode(T& outValue)
     {
-        outValue = _decodeImpl((T*) nullptr);
+        outValue = _decodeImpl((T*)nullptr);
     }
 
     void beginArray(FourCC typeCode = SerialBinary::kArrayFourCC)
@@ -465,15 +375,14 @@ public:
         _chunk = found->getFirstContainedChunk();
     }
 
-    bool hasElements()
-    {
-        return _chunk != nullptr;
-    }
+    bool hasElements() { return _chunk != nullptr; }
 
     bool isNull()
     {
-        if (_chunk == nullptr) return true;
-        if (getTag() == SerialBinary::kNullFourCC) return true;
+        if (_chunk == nullptr)
+            return true;
+        if (getTag() == SerialBinary::kNullFourCC)
+            return true;
         return false;
     }
 
@@ -506,15 +415,11 @@ public:
             decoder.beginArray(typeCode);
         }
 
-        ~WithArray()
-        {
-            _decoder._chunk = _saved->m_next;
-        }
+        ~WithArray() { _decoder._chunk = _saved->m_next; }
 
     private:
         RiffContainer::Chunk* _saved;
         Decoder& _decoder;
-
     };
 
     struct WithObject
@@ -534,10 +439,7 @@ public:
             decoder.beginObject(typeCode);
         }
 
-        ~WithObject()
-        {
-            _decoder._chunk = _saved->m_next;
-        }
+        ~WithObject() { _decoder._chunk = _saved->m_next; }
 
     private:
         RiffContainer::Chunk* _saved;
@@ -561,10 +463,7 @@ public:
             _decoder.beginKeyValuePair(typeCode);
         }
 
-        ~WithKeyValuePair()
-        {
-            _decoder._chunk = _saved->m_next;
-        }
+        ~WithKeyValuePair() { _decoder._chunk = _saved->m_next; }
 
     private:
         RiffContainer::Chunk* _saved;
@@ -581,10 +480,7 @@ public:
             _decoder.beginProperty(typeCode);
         }
 
-        ~WithProperty()
-        {
-            _decoder._chunk = _saved->m_next;
-        }
+        ~WithProperty() { _decoder._chunk = _saved->m_next; }
 
     private:
         RiffContainer::Chunk* _saved;
@@ -593,10 +489,7 @@ public:
 
 
     RiffContainer::Chunk* getCursor() { return _chunk; }
-    void setCursor(RiffContainer::Chunk* chunk)
-    {
-        _chunk = chunk;
-    }
+    void setCursor(RiffContainer::Chunk* chunk) { _chunk = chunk; }
 
 private:
     RiffContainer::Chunk* _chunk = nullptr;

@@ -53,10 +53,7 @@ struct SerialContainerUtil
         EndToEndCompileRequest* request,
         const WriteOptions& options,
         Stream* stream);
-    static SlangResult write(
-        Module* module,
-        const WriteOptions& options,
-        Stream* stream);
+    static SlangResult write(Module* module, const WriteOptions& options, Stream* stream);
 };
 
 
@@ -65,7 +62,8 @@ struct ChunkRef
 public:
     ChunkRef(RiffContainer::Chunk* chunk)
         : _chunk(chunk)
-    {}
+    {
+    }
 
     RiffContainer::Chunk* ptr() const { return _chunk; }
 
@@ -78,11 +76,12 @@ struct DataChunkRef : ChunkRef
 public:
     DataChunkRef(RiffContainer::DataChunk* chunk)
         : ChunkRef(chunk)
-    {}
+    {
+    }
 
     RiffContainer::DataChunk* ptr() const { return static_cast<RiffContainer::DataChunk*>(_chunk); }
 
-    operator RiffContainer::DataChunk* () const { return ptr(); }
+    operator RiffContainer::DataChunk*() const { return ptr(); }
 };
 
 
@@ -95,17 +94,12 @@ public:
     public:
         Iterator(RiffContainer::Chunk* chunk)
             : _chunk(chunk)
-        {}
-
-        bool operator!=(Iterator const& other) const
         {
-            return _chunk != other._chunk;
         }
 
-        void operator++()
-        {
-            _chunk = _chunk->m_next;
-        }
+        bool operator!=(Iterator const& other) const { return _chunk != other._chunk; }
+
+        void operator++() { _chunk = _chunk->m_next; }
 
         T operator*()
         {
@@ -128,19 +122,16 @@ public:
         return count;
     }
 
-    T getFirst()
-    {
-        return *begin();
-    }
+    T getFirst() { return *begin(); }
 
-    ChunkRefList()
-    {}
+    ChunkRefList() {}
 
     ChunkRefList(RiffContainer::ListChunk* list)
         : _list(list)
-    {}
+    {
+    }
 
-    operator RiffContainer::ListChunk* () const { return _list; }
+    operator RiffContainer::ListChunk*() const { return _list; }
 
 private:
     RiffContainer::ListChunk* _list = nullptr;
@@ -151,13 +142,13 @@ struct ListChunkRef : ChunkRef
 public:
     ListChunkRef(RiffContainer::Chunk* chunk)
         : ChunkRef(chunk)
-    {}
+    {
+    }
 
     RiffContainer::ListChunk* ptr() const { return static_cast<RiffContainer::ListChunk*>(_chunk); }
 
-    operator RiffContainer::ListChunk* () const { return ptr(); }
+    operator RiffContainer::ListChunk*() const { return ptr(); }
 };
-
 
 
 struct StringChunkRef : DataChunkRef
@@ -171,7 +162,8 @@ struct IRModuleChunkRef : ListChunkRef
 public:
     explicit IRModuleChunkRef(RiffContainer::ListChunk* chunk)
         : ListChunkRef(chunk)
-    {}
+    {
+    }
 };
 
 struct ASTModuleChunkRef : ListChunkRef
@@ -179,7 +171,8 @@ struct ASTModuleChunkRef : ListChunkRef
 public:
     explicit ASTModuleChunkRef(RiffContainer::ListChunk* chunk)
         : ListChunkRef(chunk)
-    {}
+    {
+    }
 };
 
 struct ModuleChunkRef : ListChunkRef
@@ -199,7 +192,8 @@ public:
 protected:
     ModuleChunkRef(RiffContainer::Chunk* chunk)
         : ListChunkRef(chunk)
-    {}
+    {
+    }
 };
 
 struct EntryPointChunkRef : ListChunkRef
@@ -212,7 +206,8 @@ public:
 protected:
     EntryPointChunkRef(RiffContainer::Chunk* chunk)
         : ListChunkRef(chunk)
-    {}
+    {
+    }
 };
 
 struct ContainerChunkRef : ListChunkRef
@@ -227,14 +222,14 @@ public:
 protected:
     ContainerChunkRef(RiffContainer::Chunk* chunk)
         : ListChunkRef(chunk)
-    {}
+    {
+    }
 };
 
 /// Attempt to find a debug-info chunk relative to
 /// the given `startingChunk`.
 ///
-RiffContainer::ListChunk* findDebugChunk(
-    RiffContainer::Chunk* startingChunk);
+RiffContainer::ListChunk* findDebugChunk(RiffContainer::Chunk* startingChunk);
 
 SlangResult readSourceLocationsFromDebugChunk(
     RiffContainer::ListChunk* debugChunk,

@@ -12,8 +12,8 @@
 // logic also orchestrates the overall flow and how
 // and when things get checked.
 
-#include "slang-ast-iterator.h"
 #include "slang-ast-forward-declarations.h"
+#include "slang-ast-iterator.h"
 #include "slang-ast-synthesis.h"
 #include "slang-lookup.h"
 #include "slang-parser.h"
