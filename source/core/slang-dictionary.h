@@ -148,11 +148,9 @@ public:
     // Erases the value at the specified key if it exists
     void remove(const TKey& key) { map.erase(key); }
 
-    auto erase(ConstIterator const& it) { return map.erase(it); }
-
     // Removes all values satifying the predicate:
     // bool predicate(pair<Key, Value>)
-    template<class Predicate>
+    template<typename Predicate>
     void removeIf(Predicate&& predicate)
     {
         auto it = begin();
@@ -160,7 +158,7 @@ public:
         {
             if (predicate(*it))
             {
-                it = erase(it);
+                it = map.erase(it);
             }
             else
             {
