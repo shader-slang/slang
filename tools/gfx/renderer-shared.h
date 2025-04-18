@@ -1339,8 +1339,9 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getTextureRowAlignment(size_t* outAlignment) override;
 
     // Provides a default implementation that returns SLANG_E_NOT_AVAILABLE.
-    virtual SLANG_NO_THROW Result SLANG_MCALL
-    getCooperativeVectorProperties(CooperativeVectorProperties* properties, uint32_t* propertyCount) override;
+    virtual SLANG_NO_THROW Result SLANG_MCALL getCooperativeVectorProperties(
+        CooperativeVectorProperties* properties,
+        uint32_t* propertyCount) override;
 
     Result getEntryPointCodeFromShaderCache(
         slang::IComponentType* program,
