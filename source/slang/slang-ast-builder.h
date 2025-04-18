@@ -687,12 +687,12 @@ protected:
             // Keep such that dtor can be run on ASTBuilder being dtored
             m_dtorNodes.add(node);
         }
-        if (node->getClass().isSubClassOf<Val>())
+        if (node->getClass().isSubClassOf(getSyntaxClass<Val>()))
         {
             auto val = (Val*)(node);
             val->m_resolvedValEpoch = getEpoch();
         }
-        else if (node->getClass().isSubClassOf<Decl>())
+        else if (node->getClass().isSubClassOf(getSyntaxClass<Decl>()))
         {
             ((Decl*)node)->m_defaultDeclRef = getOrCreate<DirectDeclRef>((Decl*)node);
         }
