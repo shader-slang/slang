@@ -266,7 +266,10 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 // diagnostic.
 
                 // Get the AST node type info, so we can output a 'got' name
-                diagSink->diagnose(originalExpr, Diagnostics::expectedAType, originalExpr->getClass().getName());
+                diagSink->diagnose(
+                    originalExpr,
+                    Diagnostics::expectedAType,
+                    originalExpr->getClass().getName());
             }
         }
 

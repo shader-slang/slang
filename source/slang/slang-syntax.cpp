@@ -15,30 +15,34 @@ bool SyntaxClassBase::isSubClassOf(SyntaxClassBase const& other) const
     auto otherInfo = other.getInfo();
     if (!selfInfo || !otherInfo)
         return false;
-    return unsigned((int)selfInfo->firstTag - (int)otherInfo->firstTag) < unsigned(otherInfo->tagCount);
+    return unsigned((int)selfInfo->firstTag - (int)otherInfo->firstTag) <
+           unsigned(otherInfo->tagCount);
 }
 
 UnownedTerminatedStringSlice SyntaxClassBase::getName() const
 {
-        return _info ? UnownedTerminatedStringSlice(_info->name) : UnownedTerminatedStringSlice();
+    return _info ? UnownedTerminatedStringSlice(_info->name) : UnownedTerminatedStringSlice();
 }
 
 void* SyntaxClassBase::createInstanceImpl(ASTBuilder* astBuilder) const
 {
-    if (!_info) return nullptr;
-    if (!_info->createFunc) return nullptr;
+    if (!_info)
+        return nullptr;
+    if (!_info->createFunc)
+        return nullptr;
 
     return _info->createFunc(astBuilder);
 }
 
 void SyntaxClassBase::destructInstanceImpl(void* instance) const
 {
-    if (!_info) return;
-    if (!_info->destructFunc) return;
+    if (!_info)
+        return;
+    if (!_info->destructFunc)
+        return;
 
     return _info->destructFunc(instance);
 }
-
 
 
 /* static */ const TypeExp TypeExp::empty;

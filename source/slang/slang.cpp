@@ -658,8 +658,10 @@ SlangResult Session::saveBuiltinModule(
     //
     // TODO(tfoley): why can't the file system let us open the file for output?
     //
-    SLANG_RETURN_ON_FAIL(
-        fileSystem->saveFile(moduleFileName.getBuffer(), contents.getBuffer(), contents.getCount()));
+    SLANG_RETURN_ON_FAIL(fileSystem->saveFile(
+        moduleFileName.getBuffer(),
+        contents.getBuffer(),
+        contents.getCount()));
 
     // And finally, we can ask the archive file system to serialize itself
     // out as a blob of bytes, which yields the final serialized representation
@@ -724,10 +726,8 @@ SlangResult Session::_readBuiltinModule(
     RefPtr<SerialSourceLocReader> sourceLocReader;
     if (auto debugChunk = findDebugChunk(moduleChunk.ptr()))
     {
-        SLANG_RETURN_ON_FAIL(readSourceLocationsFromDebugChunk(
-            debugChunk,
-            sourceManager,
-            sourceLocReader));
+        SLANG_RETURN_ON_FAIL(
+            readSourceLocationsFromDebugChunk(debugChunk, sourceManager, sourceLocReader));
     }
 
     // At this point we create the `Module` object that will
@@ -1596,7 +1596,8 @@ slang::IModule* Linkage::loadModuleFromBlob(
                 pathInfo = PathInfo::makeNormal(pathStr, cannonicalPath);
             }
         }
-        RefPtr<Module> module = loadModuleImpl(name, pathInfo, source, SourceLoc(), &sink, nullptr, blobType);
+        RefPtr<Module> module =
+            loadModuleImpl(name, pathInfo, source, SourceLoc(), &sink, nullptr, blobType);
         sink.getBlobIfNeeded(outDiagnostics);
         return asExternal(module.detach());
     }
@@ -4170,12 +4171,7 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
     // will go ahead and load the module from the serialized form.
     //
     PathInfo filePathInfo;
-    return loadSerializedModule(
-        moduleName,
-        modulePathInfo,
-        moduleChunk,
-        SourceLoc(),
-        sink);
+    return loadSerializedModule(moduleName, modulePathInfo, moduleChunk, SourceLoc(), sink);
 }
 
 RefPtr<Module> Linkage::loadSerializedModule(
@@ -4210,11 +4206,8 @@ RefPtr<Module> Linkage::loadSerializedModule(
     mapNameToLoadedModules.add(moduleName, module);
     try
     {
-        if (SLANG_FAILED(loadSerializedModuleContents(
-            module,
-            moduleFilePathInfo,
-            moduleChunk,
-            sink)))
+        if (SLANG_FAILED(
+                loadSerializedModuleContents(module, moduleFilePathInfo, moduleChunk, sink)))
         {
             mapPathToLoadedModule.remove(mostUniqueIdentity);
             mapNameToLoadedModules.remove(moduleName);
@@ -4282,12 +4275,8 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     // If everything seems reasonable, then we will go ahead and load
     // the module more completely from that serialized representation.
     //
-    RefPtr<Module> module = loadSerializedModule(
-        moduleName,
-        moduleFilePathInfo,
-        moduleChunkRef,
-        requestingLoc,
-        sink);
+    RefPtr<Module> module =
+        loadSerializedModule(moduleName, moduleFilePathInfo, moduleChunkRef, requestingLoc, sink);
 
     return module;
 }
@@ -4316,12 +4305,7 @@ RefPtr<Module> Linkage::loadModuleImpl(
     switch (blobType)
     {
     case ModuleBlobType::IR:
-        return loadBinaryModuleImpl(
-            moduleName,
-            modulePathInfo,
-            moduleBlob,
-            requestingLoc,
-            sink);
+        return loadBinaryModuleImpl(moduleName, modulePathInfo, moduleBlob, requestingLoc, sink);
 
     case ModuleBlobType::Source:
         return loadSourceModuleImpl(
@@ -4594,24 +4578,21 @@ RefPtr<Module> Linkage::findOrImportModule(
     //
     auto defaultSourceFileName = getFileNameFromModuleName(moduleName, false);
     auto alternativeSourceFileName = getFileNameFromModuleName(moduleName, true);
-    String sourceFileNamesToTry[] = { defaultSourceFileName, alternativeSourceFileName };
+    String sourceFileNamesToTry[] = {defaultSourceFileName, alternativeSourceFileName};
 
     // We are going to look for the candidate file using the same
     // logic that would be used for a preprocessor `#include`,
     // so we set up the necessary state.
     //
-    IncludeSystem includeSystem(
-        &getSearchDirectories(),
-        getFileSystemExt(),
-        getSourceManager());
+    IncludeSystem includeSystem(&getSearchDirectories(), getFileSystemExt(), getSourceManager());
 
     // Just like with a `#include`, the search will take into
     // account the path to the file where the request to import
     // this module came from (e.g. the source file with the
     // `import` declaration), if such a path is available.
     //
-    PathInfo requestingPathInfo = getSourceManager()->getPathInfo(
-        requestingLoc, SourceLocType::Actual);
+    PathInfo requestingPathInfo =
+        getSourceManager()->getPathInfo(requestingLoc, SourceLocType::Actual);
 
     for (auto type : typesToTry)
     {
@@ -4647,7 +4628,7 @@ RefPtr<Module> Linkage::findOrImportModule(
             //
             PathInfo filePathInfo;
             if (SLANG_FAILED(
-                includeSystem.findFile(fileName, requestingPathInfo.foundPath, filePathInfo)))
+                    includeSystem.findFile(fileName, requestingPathInfo.foundPath, filePathInfo)))
             {
                 // If we failed to find the file at this step, we
                 // will continue the search for our other options.
@@ -4672,8 +4653,8 @@ RefPtr<Module> Linkage::findOrImportModule(
             // will re-use the existing module if we find one here.
             //
             if (mapPathToLoadedModule.tryGetValue(
-                filePathInfo.getMostUniqueIdentity(),
-                previouslyLoadedModule))
+                    filePathInfo.getMostUniqueIdentity(),
+                    previouslyLoadedModule))
             {
                 // TODO: If we find a previously-loaded module at this step,
                 // then we should probably register that module under the
@@ -4734,8 +4715,7 @@ RefPtr<Module> Linkage::findOrImportModule(
     // list of the file names that were tried, if
     // nothing was even found via the include system).
     //
-    sink->diagnose(
-        requestingLoc, Diagnostics::cannotOpenFile, defaultSourceFileName);
+    sink->diagnose(requestingLoc, Diagnostics::cannotOpenFile, defaultSourceFileName);
 
     // If the attempt to import the module failed, then
     // we will stick a null pointer into the map of loaded
@@ -6559,10 +6539,8 @@ SlangResult Linkage::loadSerializedModuleContents(
     RefPtr<SerialSourceLocReader> sourceLocReader;
     if (auto debugChunk = findDebugChunk(moduleChunk.ptr()))
     {
-        SLANG_RETURN_ON_FAIL(readSourceLocationsFromDebugChunk(
-            debugChunk,
-            sourceManager,
-            sourceLocReader));
+        SLANG_RETURN_ON_FAIL(
+            readSourceLocationsFromDebugChunk(debugChunk, sourceManager, sourceLocReader));
     }
 
     auto astChunk = moduleChunk.findAST();
@@ -6598,13 +6576,15 @@ SlangResult Linkage::loadSerializedModuleContents(
     //
     SourceLoc serializedModuleLoc;
     {
-        auto sourceFile = sourceManager->findSourceFileByPathRecursively(moduleFilePathInfo.foundPath);
+        auto sourceFile =
+            sourceManager->findSourceFileByPathRecursively(moduleFilePathInfo.foundPath);
         if (!sourceFile)
         {
             sourceFile = sourceManager->createSourceFileWithString(moduleFilePathInfo, String());
             sourceManager->addSourceFile(moduleFilePathInfo.getMostUniqueIdentity(), sourceFile);
         }
-        auto sourceView = sourceManager->createSourceView(sourceFile, &moduleFilePathInfo, SourceLoc());
+        auto sourceView =
+            sourceManager->createSourceView(sourceFile, &moduleFilePathInfo, SourceLoc());
         serializedModuleLoc = sourceView->getRange().begin;
     }
 
@@ -6620,11 +6600,7 @@ SlangResult Linkage::loadSerializedModuleContents(
     module->setModuleDecl(moduleDecl);
 
     RefPtr<IRModule> irModule;
-    SLANG_RETURN_ON_FAIL(decodeModuleIR(
-        irModule,
-        irChunk,
-        session,
-        sourceLocReader));
+    SLANG_RETURN_ON_FAIL(decodeModuleIR(irModule, irChunk, session, sourceLocReader));
     module->setIRModule(irModule);
 
     // The handling of file dependencies is complicated, because of
@@ -6637,7 +6613,7 @@ SlangResult Linkage::loadSerializedModuleContents(
     module->clearFileDependency();
     String moduleSourcePath = moduleFilePathInfo.foundPath;
     bool isFirst = true;
-    for(auto depenencyFileChunk : moduleChunk.getFileDependencies())
+    for (auto depenencyFileChunk : moduleChunk.getFileDependencies())
     {
         auto encodedDependencyFilePath = depenencyFileChunk.getValue();
 

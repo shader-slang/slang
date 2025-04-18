@@ -6,23 +6,23 @@
 #include "slang-ast-all.h"
 #include "slang-ast-builder.h"
 #include "slang-ast-support-types.h"
-#include "slang-serialize.h"
 #include "slang-serialize-source-loc.h"
+#include "slang-serialize.h"
 
 namespace Slang
 {
-    void writeSerializedModuleAST(
-        Encoder* encoder,
-        ModuleDecl* moduleDecl,
-        SerialSourceLocWriter* sourceLocWriter);
+void writeSerializedModuleAST(
+    Encoder* encoder,
+    ModuleDecl* moduleDecl,
+    SerialSourceLocWriter* sourceLocWriter);
 
-    ModuleDecl* readSerializedModuleAST(
-        Linkage* linkage,
-        ASTBuilder* astBuilder,
-        DiagnosticSink* sink,
-        RiffContainer::Chunk* chunk,
-        SerialSourceLocReader* sourceLocReader,
-        SourceLoc requestingSourceLoc);
+ModuleDecl* readSerializedModuleAST(
+    Linkage* linkage,
+    ASTBuilder* astBuilder,
+    DiagnosticSink* sink,
+    RiffContainer::Chunk* chunk,
+    SerialSourceLocReader* sourceLocReader,
+    SourceLoc requestingSourceLoc);
 
 } // namespace Slang
 

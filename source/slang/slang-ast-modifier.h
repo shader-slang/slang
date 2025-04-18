@@ -2,7 +2,6 @@
 #pragma once
 
 #include "slang-ast-base.h"
-
 #include "slang-ast-modifier.h.fiddle"
 
 FIDDLE()
@@ -15,106 +14,156 @@ namespace Slang
 
 FIDDLE()
 class InModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class OutModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class ConstModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class BuiltinModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class InlineModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE(abstract)
 class VisibilityModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class PublicModifier : public VisibilityModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class PrivateModifier : public VisibilityModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class InternalModifier : public VisibilityModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class RequireModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class ParamModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class ExternModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class HLSLExportModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class TransparentModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class FromCoreModuleModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class PrefixModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class PostfixModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class ExportedModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class ConstExprModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class ExternCppModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLPrecisionModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLModuleModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // Marks that the definition of a decl is not yet synthesized.
 FIDDLE()
 class ToBeSynthesizedModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // Marks that the definition of a decl is synthesized.
 FIDDLE()
 class SynthesizedModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // Marks a synthesized variable as local temporary variable.
 FIDDLE()
 class LocalTempVarModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // An `extern` variable in an extension is used to introduce additional attributes on an existing
 // field.
@@ -122,20 +171,24 @@ FIDDLE()
 class ExtensionExternVarModifier : public Modifier
 {
     FIDDLE(...)
-    FIDDLE()     DeclRef<Decl> originalDecl;
+    FIDDLE() DeclRef<Decl> originalDecl;
 };
 
 // An 'ActualGlobal' is a global that is output as a normal global in CPU code.
 // Globals in HLSL/Slang are constant state passed into kernel execution
 FIDDLE()
 class ActualGlobalModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// A modifier that indicates an `InheritanceDecl` should be ignored during name lookup (and related
 /// checks).
 FIDDLE()
 class IgnoreForLookupModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // A modifier that marks something as an operation that
 // has a one-to-one translation to the IR, and thus
@@ -235,18 +288,24 @@ class RequiredCUDASMVersionModifier : public Modifier
 
 FIDDLE()
 class InOutModifier : public OutModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // `__ref` modifier for by-reference parameter passing
 FIDDLE()
 class RefModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // `__ref` modifier for by-reference parameter passing
 FIDDLE()
 class ConstRefModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // This is a special sentinel modifier that gets added
 // to the list when we have multiple variable declarations
@@ -264,60 +323,84 @@ class ConstRefModifier : public Modifier
 //
 FIDDLE()
 class SharedModifiers : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // AST nodes to represent the begin/end of a `layout` modifier group
 FIDDLE(abstract)
 class GLSLLayoutModifierGroupMarker : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLLayoutModifierGroupBegin : public GLSLLayoutModifierGroupMarker
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLLayoutModifierGroupEnd : public GLSLLayoutModifierGroupMarker
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLUnparsedLayoutModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLBufferDataLayoutModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLStd140Modifier : public GLSLBufferDataLayoutModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLStd430Modifier : public GLSLBufferDataLayoutModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLScalarModifier : public GLSLBufferDataLayoutModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // A catch-all for single-keyword modifiers
 FIDDLE()
 class SimpleModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // Indicates that this is a variable declaration that corresponds to
 // a parameter block declaration in the source program.
 FIDDLE()
 class ImplicitParameterGroupVariableModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // Indicates that this is a type that corresponds to the element
 // type of a parameter block declaration in the source program.
 FIDDLE()
 class ImplicitParameterGroupElementTypeModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // An HLSL semantic
@@ -357,7 +440,9 @@ class HLSLPackOffsetSemantic : public HLSLLayoutSemantic
 // An HLSL semantic that just associated a declaration with a semantic name
 FIDDLE()
 class HLSLSimpleSemantic : public HLSLSemantic
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // A semantic applied to a field of a ray-payload type, to control access
 FIDDLE()
@@ -369,11 +454,15 @@ class RayPayloadAccessSemantic : public HLSLSemantic
 
 FIDDLE()
 class RayPayloadReadSemantic : public RayPayloadAccessSemantic
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class RayPayloadWriteSemantic : public RayPayloadAccessSemantic
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // GLSL
@@ -382,7 +471,9 @@ class RayPayloadWriteSemantic : public RayPayloadAccessSemantic
 // that we need to keep around for later steps
 FIDDLE()
 class GLSLPreprocessorDirective : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // A GLSL `#version` directive
@@ -469,26 +560,36 @@ class IntrinsicTypeModifier : public Modifier
 // Modifiers that affect the storage layout for matrices
 FIDDLE(abstract)
 class MatrixLayoutModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // Modifiers that specify row- and column-major layout, respectively
 FIDDLE(abstract)
 class RowMajorLayoutModifier : public MatrixLayoutModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE(abstract)
 class ColumnMajorLayoutModifier : public MatrixLayoutModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // The HLSL flavor of those modifiers
 FIDDLE()
 class HLSLRowMajorLayoutModifier : public RowMajorLayoutModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class HLSLColumnMajorLayoutModifier : public ColumnMajorLayoutModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // The GLSL flavor of those modifiers
@@ -500,91 +601,121 @@ class HLSLColumnMajorLayoutModifier : public ColumnMajorLayoutModifier
 // GLSL specifies them.
 FIDDLE()
 class GLSLRowMajorLayoutModifier : public ColumnMajorLayoutModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLColumnMajorLayoutModifier : public RowMajorLayoutModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // More HLSL Keyword
 
 FIDDLE(abstract)
 class InterpolationModeModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // HLSL `nointerpolation` modifier
 FIDDLE()
 class HLSLNoInterpolationModifier : public InterpolationModeModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // HLSL `noperspective` modifier
 FIDDLE()
 class HLSLNoPerspectiveModifier : public InterpolationModeModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // HLSL `linear` modifier
 FIDDLE()
 class HLSLLinearModifier : public InterpolationModeModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // HLSL `sample` modifier
 FIDDLE()
 class HLSLSampleModifier : public InterpolationModeModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // HLSL `centroid` modifier
 FIDDLE()
 class HLSLCentroidModifier : public InterpolationModeModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// Slang-defined `pervertex` modifier
 FIDDLE()
 class PerVertexModifier : public InterpolationModeModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // HLSL `precise` modifier
 FIDDLE()
 class PreciseModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // HLSL `shared` modifier (which is used by the effect system,
 // and shouldn't be confused with `groupshared`)
 FIDDLE()
 class HLSLEffectSharedModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // HLSL `groupshared` modifier
 FIDDLE()
 class HLSLGroupSharedModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // HLSL `static` modifier (probably doesn't need to be
 // treated as HLSL-specific)
 FIDDLE()
 class HLSLStaticModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // HLSL `uniform` modifier (distinct meaning from GLSL
 // use of the keyword)
 FIDDLE()
 class HLSLUniformModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // HLSL `volatile` modifier (ignored)
 FIDDLE()
 class HLSLVolatileModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 FIDDLE()
@@ -724,7 +855,9 @@ class Attribute : public AttributeBase
 
 FIDDLE()
 class UserDefinedAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class AttributeUsageAttribute : public Attribute
@@ -735,7 +868,9 @@ class AttributeUsageAttribute : public Attribute
 
 FIDDLE()
 class NonDynamicUniformAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class RequireCapabilityAttribute : public Attribute
@@ -748,7 +883,9 @@ class RequireCapabilityAttribute : public Attribute
 // An `[unroll]` or `[unroll(count)]` attribute
 FIDDLE()
 class UnrollAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // An `[unroll]` or `[unroll(count)]` attribute
 FIDDLE()
@@ -777,57 +914,79 @@ class InferredMaxItersAttribute : public Attribute
 
 FIDDLE()
 class LoopAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 // `[loop]`
 
 FIDDLE()
 class FastOptAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 // `[fastopt]`
 
 FIDDLE()
 class AllowUAVConditionAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 // `[allow_uav_condition]`
 
 FIDDLE()
 class BranchAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 // `[branch]`
 
 FIDDLE()
 class FlattenAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 // `[flatten]`
 
 FIDDLE()
 class ForceCaseAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 // `[forcecase]`
 
 FIDDLE()
 class CallAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 // `[call]`
 
 FIDDLE()
 class UnscopedEnumAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // Marks a enum to have `flags` semantics, where each enum case is a bitfield.
 FIDDLE()
 class FlagsAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // [[vk_push_constant]] [[push_constant]]
 FIDDLE()
 class PushConstantAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // [[vk_specialization_constant]] [[specialization_constant]]
 FIDDLE()
 class SpecializationConstantAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // [[vk_constant_id]]
 FIDDLE()
@@ -840,7 +999,9 @@ class VkConstantIdAttribute : public Attribute
 // [[vk_shader_record]] [[shader_record]]
 FIDDLE()
 class ShaderRecordAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // [[vk_binding]]
@@ -854,11 +1015,15 @@ class GLSLBindingAttribute : public Attribute
 
 FIDDLE()
 class VkAliasedPointerAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class VkRestrictPointerAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLOffsetLayoutAttribute : public Attribute
@@ -893,28 +1058,38 @@ class GLSLInputAttachmentIndexLayoutAttribute : public Attribute
 // [[vk_location]]
 FIDDLE()
 class GLSLLocationAttribute : public GLSLSimpleIntegerLayoutAttribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // [[vk_index]]
 FIDDLE()
 class GLSLIndexAttribute : public GLSLSimpleIntegerLayoutAttribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // [[vk_spirv_instruction]]
 FIDDLE()
 class SPIRVInstructionOpAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // [[spv_target_env_1_3]]
 FIDDLE()
 class SPIRVTargetEnv13Attribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // [[disable_array_flattening]]
 FIDDLE()
 class DisableArrayFlatteningAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // A GLSL layout(local_size_x = 64, ... attribute)
 FIDDLE()
@@ -937,30 +1112,42 @@ class GLSLLayoutLocalSizeAttribute : public Attribute
 
 FIDDLE()
 class GLSLLayoutDerivativeGroupQuadAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLLayoutDerivativeGroupLinearAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // TODO: for attributes that take arguments, the syntax node
 // classes should provide accessors for the values of those arguments.
 
 FIDDLE()
 class MaxTessFactorAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class OutputControlPointsAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class OutputTopologyAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class PartitioningAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class PatchConstantFuncAttribute : public Attribute
@@ -971,12 +1158,16 @@ class PatchConstantFuncAttribute : public Attribute
 
 FIDDLE()
 class DomainAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 FIDDLE()
 class EarlyDepthStencilAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 // `[earlydepthstencil]`
 
 // An HLSL `[numthreads(x,y,z)]` attribute
@@ -1080,7 +1271,9 @@ class VulkanCallablePayloadInAttribute : public Attribute
 // intersection shader to pass hit attribute information.
 FIDDLE()
 class VulkanHitAttributesAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // A `[__vulkanHitObjectAttributes(location)]` attribute, which is used in the
 // core module implementation to indicate that a variable
@@ -1099,7 +1292,9 @@ class VulkanHitObjectAttributesAttribute : public Attribute
 //
 FIDDLE()
 class MutatingAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // A `[nonmutating]` attribute, which indicates that a
 // `set` accessor does not need to modify anything through
@@ -1107,21 +1302,27 @@ class MutatingAttribute : public Attribute
 //
 FIDDLE()
 class NonmutatingAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // A `[constref]` attribute, which indicates that the `this` parameter of
 // a member function should be passed by const reference.
 //
 FIDDLE()
 class ConstRefAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // A `[ref]` attribute, which indicates that the `this` parameter of
 // a member function should be passed by reference.
 //
 FIDDLE()
 class RefAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // A `[__readNone]` attribute, which indicates that a function
 // computes its results strictly based on argument values, without
@@ -1130,7 +1331,9 @@ class RefAttribute : public Attribute
 //
 FIDDLE()
 class ReadNoneAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // A `[__GLSLRequireShaderInputParameter]` attribute to annotate
@@ -1146,49 +1349,71 @@ class GLSLRequireShaderInputParameterAttribute : public Attribute
 // HLSL modifiers for geometry shader input topology
 FIDDLE()
 class HLSLGeometryShaderInputPrimitiveTypeModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class HLSLPointModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class HLSLLineModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class HLSLTriangleModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class HLSLLineAdjModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class HLSLTriangleAdjModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // Mesh shader paramters
 
 FIDDLE()
 class HLSLMeshShaderOutputModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class HLSLVerticesModifier : public HLSLMeshShaderOutputModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class HLSLIndicesModifier : public HLSLMeshShaderOutputModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class HLSLPrimitivesModifier : public HLSLMeshShaderOutputModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class HLSLPayloadModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // A modifier to indicate that a constructor/initializer can be used
 // to perform implicit type conversion, and to specify the cost of
@@ -1223,7 +1448,9 @@ class AllowAttribute : public Attribute
 //
 FIDDLE()
 class ExternAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 // An `[__unsafeForceInlineExternal]` attribute indicates that the callee should be inlined
@@ -1231,43 +1458,57 @@ class ExternAttribute : public Attribute
 //
 FIDDLE()
 class UnsafeForceInlineEarlyAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // A `[ForceInline]` attribute indicates that the callee should be inlined
 // by the Slang compiler.
 //
 FIDDLE()
 class ForceInlineAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 
 /// An attribute that marks a type declaration as either allowing or
 /// disallowing the type to be inherited from in other modules.
 FIDDLE(abstract)
 class InheritanceControlAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// An attribute that marks a type declaration as allowing the type to be inherited from in other
 /// modules.
 FIDDLE()
 class OpenAttribute : public InheritanceControlAttribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// An attribute that marks a type declaration as disallowing the type to be inherited from in other
 /// modules.
 FIDDLE()
 class SealedAttribute : public InheritanceControlAttribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// An attribute that marks a decl as a compiler built-in object.
 FIDDLE()
 class BuiltinAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// An attribute that marks a decl as a compiler built-in object for the autodiff system.
 FIDDLE()
 class AutoDiffBuiltinAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// An attribute that defines the size of `AnyValue` type to represent a polymoprhic value that
 /// conforms to the decorated interface type.
@@ -1295,7 +1536,9 @@ class OverloadRankAttribute : public Attribute
 /// dynamic dispatch through the interface is a compile-time error.
 FIDDLE()
 class SpecializeAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// An attribute that marks a type, function or variable as differentiable.
 FIDDLE()
@@ -1335,27 +1578,39 @@ class DllImportAttribute : public Attribute
 
 FIDDLE()
 class DllExportAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class TorchEntryPointAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class CudaDeviceExportAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class CudaKernelAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class CudaHostAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class AutoPyBindCudaAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class PyExportAttribute : public Attribute
@@ -1380,7 +1635,9 @@ class PreferRecomputeAttribute : public Attribute
 
 FIDDLE()
 class PreferCheckpointAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class DerivativeMemberAttribute : public Attribute
@@ -1401,7 +1658,9 @@ class ComInterfaceAttribute : public Attribute
 /// requires NVAPI operations for its implementation on D3D.
 FIDDLE()
 class RequiresNVAPIAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// A `[RequirePrelude(target, "string")]` attribute indicates that the declaration being modifed
 /// requires a textual prelude to be injected in the resulting target code.
@@ -1417,19 +1676,25 @@ class RequirePreludeAttribute : public Attribute
 /// function should always be folded into use sites during source emit.
 FIDDLE()
 class AlwaysFoldIntoUseSiteAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // A `[TreatAsDifferentiableAttribute]` attribute indicates that a function or an interface
 // should be treated as differentiable in IR validation step.
 //
 FIDDLE()
 class TreatAsDifferentiableAttribute : public DifferentiableAttribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// The `[ForwardDifferentiable]` attribute indicates that a function can be forward-differentiated.
 FIDDLE()
 class ForwardDifferentiableAttribute : public DifferentiableAttribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class UserDefinedDerivativeAttribute : public DifferentiableAttribute
@@ -1442,7 +1707,9 @@ class UserDefinedDerivativeAttribute : public DifferentiableAttribute
 /// be used as the derivative for the decorated function.
 FIDDLE()
 class ForwardDerivativeAttribute : public UserDefinedDerivativeAttribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class DerivativeOfAttribute : public DifferentiableAttribute
@@ -1450,7 +1717,8 @@ class DerivativeOfAttribute : public DifferentiableAttribute
     FIDDLE(...)
     FIDDLE() Expr* funcExpr;
 
-    FIDDLE() Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
+    FIDDLE()
+    Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
 };
 
 /// The `[ForwardDerivativeOf(primalFunction)]` attribute marks the decorated function as custom
@@ -1459,7 +1727,9 @@ class DerivativeOfAttribute : public DifferentiableAttribute
 /// function itself is considered differentiable.
 FIDDLE()
 class ForwardDerivativeOfAttribute : public DerivativeOfAttribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// The `[BackwardDifferentiable]` attribute indicates that a function can be
 /// backward-differentiated.
@@ -1474,13 +1744,17 @@ class BackwardDifferentiableAttribute : public DifferentiableAttribute
 /// be used as the backward-derivative for the decorated function.
 FIDDLE()
 class BackwardDerivativeAttribute : public UserDefinedDerivativeAttribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// The `[BackwardDerivativeOf(primalFunction)]` attribute marks the decorated function as custom
 /// backward-derivative implementation for `primalFunction`.
 FIDDLE()
 class BackwardDerivativeOfAttribute : public DerivativeOfAttribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// The `[PrimalSubstitute(function)]` attribute specifies a custom function that should
 /// be used as the primal function substitute when differentiating code that calls the primal
@@ -1499,14 +1773,17 @@ class PrimalSubstituteOfAttribute : public Attribute
 {
     FIDDLE(...)
     FIDDLE() Expr* funcExpr;
-    FIDDLE() Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
+    FIDDLE()
+    Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
 };
 
 /// The `[NoDiffThis]` attribute is used to specify that the `this` parameter should not be
 /// included for differentiation.
 FIDDLE()
 class NoDiffThisAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// Indicates that the modified declaration is one of the "magic" declarations
 /// that NVAPI uses to communicate extended operations. When NVAPI is being included
@@ -1514,7 +1791,9 @@ class NoDiffThisAttribute : public Attribute
 /// will not be emitted, instead allowing the versions from the prelude to be used.
 FIDDLE()
 class NVAPIMagicModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// A modifier that attaches to a `ModuleDecl` to indicate the register/space binding
 /// that NVAPI wants to use, as indicated by, e.g., the `NV_SHADER_EXTN_SLOT` and
@@ -1551,33 +1830,47 @@ class NVAPISlotModifier : public Modifier
 ///
 FIDDLE()
 class NoInlineAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// A `[noRefInline]` attribute represents a request to not force inline a
 /// function specifically due to a refType parameter.
 FIDDLE()
 class NoRefInlineAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class DerivativeGroupQuadAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class DerivativeGroupLinearAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class MaximallyReconvergesAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class QuadDerivativesAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class RequireFullQuadsAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// A `[payload]` attribute indicates that a `struct` type will be used as
 /// a ray payload for `TraceRay()` calls, and thus also as input/output
@@ -1586,7 +1879,9 @@ class RequireFullQuadsAttribute : public Attribute
 ///
 FIDDLE()
 class PayloadAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// A `[raypayload]` attribute indicates that a `struct` type will be used as
 /// a ray payload for `TraceRay()` calls, and thus also as input/output
@@ -1613,11 +1908,15 @@ class DeprecatedAttribute : public Attribute
 
 FIDDLE()
 class NonCopyableTypeAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class NoSideEffectAttribute : public Attribute
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// A `[KnownBuiltin("name")]` attribute allows the compiler to
 /// identify this declaration during compilation, despite obfuscation or
@@ -1647,63 +1946,89 @@ class KnownBuiltinAttribute : public Attribute
 ///
 FIDDLE()
 class TypeModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// A kind of syntax element which appears as a modifier in the syntax, but
 /// we represent as a function over type expressions
 FIDDLE()
 class WrappingTypeModifier : public TypeModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// A modifier that applies to a type and implies information about the
 /// underlying format of a resource that uses that type as its element type.
 ///
 FIDDLE()
 class ResourceElementFormatModifier : public TypeModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// HLSL `unorm` modifier
 FIDDLE()
 class UNormModifier : public ResourceElementFormatModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 /// HLSL `snorm` modifier
 FIDDLE()
 class SNormModifier : public ResourceElementFormatModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class NoDiffModifier : public TypeModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GloballyCoherentModifier : public SimpleModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 // Some GLSL-specific modifiers
 FIDDLE()
 class GLSLBufferModifier : public WrappingTypeModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLWriteOnlyModifier : public SimpleModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLReadOnlyModifier : public SimpleModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLVolatileModifier : public SimpleModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLRestrictModifier : public SimpleModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class GLSLPatchModifier : public SimpleModifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 //
 FIDDLE()
@@ -1719,7 +2044,9 @@ class BitFieldModifier : public Modifier
 
 FIDDLE()
 class DynamicUniformModifier : public Modifier
-{ FIDDLE(...) };
+{
+    FIDDLE(...)
+};
 
 FIDDLE()
 class MemoryQualifierSetModifier : public Modifier

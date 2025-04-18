@@ -4,8 +4,8 @@
 namespace Slang
 {
 
-    enum class ASTNodeType
-    {
+enum class ASTNodeType
+{
 #if 0 // FIDDLE TEMPLATE:
 %for _, T in ipairs(Slang.NodeBase.subclasses) do
         $T,
@@ -14,8 +14,8 @@ namespace Slang
 #define FIDDLE_GENERATED_OUTPUT_ID 0
 #include "slang-ast-forward-declarations.h.fiddle"
 #endif // FIDDLE END
-        CountOf
-    };
+    CountOf
+};
 
 #if 0 // FIDDLE TEMPLATE:
 %for _, T in ipairs(Slang.NodeBase.subclasses) do
@@ -26,4 +26,4 @@ namespace Slang
 #include "slang-ast-forward-declarations.h.fiddle"
 #endif // FIDDLE END
 
-}
+} // namespace Slang

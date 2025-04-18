@@ -2,9 +2,9 @@
 #include "slang-ast-val.h"
 
 #include "slang-ast-builder.h"
+#include "slang-ast-dispatch.h"
 #include "slang-check-impl.h"
 #include "slang-diagnostics.h"
-#include "slang-ast-dispatch.h"
 #include "slang-mangle.h"
 #include "slang-syntax.h"
 

@@ -314,10 +314,7 @@ struct ASTIterator
             }
         }
 
-        void visitDetachExpr(DetachExpr* expr)
-        {
-            iterator->maybeDispatchCallback(expr);
-        }
+        void visitDetachExpr(DetachExpr* expr) { iterator->maybeDispatchCallback(expr); }
     };
 
     struct ASTIteratorStmtVisitor : public StmtVisitor<ASTIteratorStmtVisitor>

@@ -790,16 +790,11 @@ struct ASTDumpAccess
 
     static void dump(NodeBase* base, ASTDumpContext& context)
     {
-        ASTNodeDispatcher<NodeBase, void>::dispatch(base, [&](auto b)
-        {
-            dump_(b, context);
-        });
+        ASTNodeDispatcher<NodeBase, void>::dispatch(base, [&](auto b) { dump_(b, context); });
     }
 };
 
-void ASTDumpContext::dumpObjectReference(
-    NodeBase* obj,
-    Index objIndex)
+void ASTDumpContext::dumpObjectReference(NodeBase* obj, Index objIndex)
 {
     SLANG_UNUSED(obj);
     ScopeWrite(this).getBuf() << obj->getClass().getName() << ":" << objIndex;
@@ -858,4 +853,3 @@ void ASTDumpContext::dumpObjectFull(NodeBase* node)
 }
 
 } // namespace Slang
-

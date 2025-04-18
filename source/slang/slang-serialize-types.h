@@ -116,7 +116,9 @@ struct SerialListUtil
 };
 
 template<typename T>
-struct PropertyKeys {};
+struct PropertyKeys
+{
+};
 
 template<>
 struct PropertyKeys<Module>

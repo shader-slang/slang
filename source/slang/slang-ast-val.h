@@ -3,7 +3,6 @@
 
 #include "slang-ast-base.h"
 #include "slang-ast-decl.h"
-
 #include "slang-ast-val.h.fiddle"
 
 FIDDLE()
