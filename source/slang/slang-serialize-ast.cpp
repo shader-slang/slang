@@ -1109,7 +1109,11 @@ private:
             break;
 
         case RequirementWitness::Flavor::witnessTable:
-            decode(*(RefPtr<WitnessTable>*)(&witness.m_obj), decoder);
+            {
+                RefPtr<WitnessTable> object;
+                decode(object, decoder);
+                witness.m_obj = object;
+            }
             break;
         }
     }
