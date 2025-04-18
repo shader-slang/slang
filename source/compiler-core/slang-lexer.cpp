@@ -374,9 +374,14 @@ static void _lexIdentifier(Lexer* lexer)
     }
 }
 
-static SourceLoc _getSourceLoc(Lexer* lexer)
+static SourceLoc _getSourceLoc(const Lexer& lexer, const char* it)
 {
-    return lexer->m_startLoc + (lexer->m_cursor - lexer->m_begin);
+    return lexer.m_startLoc + (it - lexer.m_begin);
+}
+
+static SourceLoc _getSourceLoc(const Lexer* lexer)
+{
+    return _getSourceLoc(*lexer, lexer->m_cursor);
 }
 
 static void _lexDigits(Lexer* lexer, int base)
@@ -1855,6 +1860,34 @@ TokenList Lexer::lexAllTokens()
     SLANG_ASSERT(Index(offset + tok.charsCount) <= in.getLength());
 
     return UnownedStringSlice(in.begin() + offset, in.begin() + offset + tok.charsCount);
+}
+
+SourceLoc Lexer::findNextLineEnd(SourceLoc from, UInt& lineCount) const
+{
+    const char* it = m_begin + (from.getRaw() - m_startLoc.getRaw());
+    if (it >= m_begin && it < m_end)
+    {
+        while (it != m_end)
+        {
+            const char c = *it;
+            if (c == '\n' || c == '\r')
+            {
+                const char next = ((it + 1) == m_end) ? char(kEOF) : *(it + 1);
+                if ((next ^ c) == ('\n' ^ '\r'))
+                {
+                    ++it;
+                }
+                --lineCount;
+                if (lineCount == 0)
+                {
+                    SourceLoc res = _getSourceLoc(*this, it);
+                    return res;
+                }
+            }
+            ++it;
+        }
+    }
+    return {};
 }
 
 } // namespace Slang

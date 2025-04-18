@@ -429,6 +429,34 @@ DIAGNOSTIC(
     Warning,
     pragmaOnceIgnored,
     "pragma once was ignored - this is typically because is not placed in an include")
+DIAGNOSTIC(15610, Error, pragmaWarningGenericError, "Error in #pragma warning processing: $0")
+DIAGNOSTIC(
+    15611,
+    Warning,
+    pragmaWarningPopEmpty,
+    "Detected #pragma warning(pop) with no corresponding #pragma warning(push)")
+DIAGNOSTIC(
+    15612,
+    Warning,
+    pragmaWarningPushNotPopped,
+    "Detected #pragma warning(push) with no corresponding #pragma warning(pop)")
+DIAGNOSTIC(15613, Warning, pragmaWarningUnknownSpecifier, "Unknown #pragma warning specifier '$0'")
+DIAGNOSTIC(
+    15614,
+    Warning,
+    pragmaWarningSuppressCannotIdentifyNextLine,
+    "Cannot identify the next line to suppress in #pragma warning suppress")
+DIAGNOSTIC(
+    15615,
+    Warning,
+    pragmaWarningCannotInsertHere,
+    "Cannot insert #pragma warning here for id '$0'")
+DIAGNOSTIC(
+    15616,
+    Note,
+    pragmaWarningPointSuppress,
+    "#pragma warning for id '$0' was suppressed here")
+
 
 // 159xx - user-defined error/warning
 DIAGNOSTIC(15900, Error, userDefinedError, "#error: $0")
