@@ -1049,19 +1049,6 @@ RefPtr<ComponentType> createUnspecializedGlobalAndEntryPointsComponentType(
         }
     }
 
-    // Also consider entry points that were introduced via adding
-    // a library reference...
-    //
-    for (auto extraEntryPoint : compileRequest->m_extraEntryPoints)
-    {
-        auto entryPoint = EntryPoint::createDummyForDeserialize(
-            linkage,
-            extraEntryPoint.name,
-            extraEntryPoint.profile,
-            extraEntryPoint.mangledName);
-        allComponentTypes.add(entryPoint);
-    }
-
     if (allComponentTypes.getCount() > 1)
     {
         auto composite = CompositeComponentType::create(linkage, allComponentTypes);
