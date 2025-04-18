@@ -1022,10 +1022,7 @@ struct PeepholeContext : InstPassBase
                     SLANG_ASSERT(terminator->getArgCount() > paramIndex);
                     auto arg = terminator->getArg(paramIndex);
                     if (arg->getOp() == kIROp_undefined)
-                    {
-                        argValue = nullptr;
-                        break;
-                    }
+                        continue;
                     if (argValue == nullptr)
                         argValue = arg;
                     else if (argValue == arg)
