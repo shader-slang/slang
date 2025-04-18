@@ -497,20 +497,12 @@ ContainerChunkRef ContainerChunkRef::find(RiffContainer* container)
 ChunkRefList<ModuleChunkRef> ContainerChunkRef::getModules()
 {
     auto found = ptr()->findContainedList(SerialBinary::kModuleListFourCc);
-    if (!found)
-    {
-        SLANG_UNEXPECTED("container chunk had no module list");
-    }
     return ChunkRefList<ModuleChunkRef>(found);
 }
 
 ChunkRefList<EntryPointChunkRef> ContainerChunkRef::getEntryPoints()
 {
     auto found = ptr()->findContainedList(SerialBinary::kEntryPointListFourCc);
-    if (!found)
-    {
-        SLANG_UNEXPECTED("container chunk had no entry point list");
-    }
     return ChunkRefList<EntryPointChunkRef>(found);
 }
 
