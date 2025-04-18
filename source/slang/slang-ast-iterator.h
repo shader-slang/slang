@@ -38,7 +38,7 @@ struct ASTIterator
         {
             if (!expr)
                 return;
-            dispatch(expr);
+            this->dispatch(expr);
         }
         void visitExpr(Expr*) {}
         void visitBoolLiteralExpr(BoolLiteralExpr* expr) { iterator->maybeDispatchCallback(expr); }
@@ -329,7 +329,7 @@ struct ASTIterator
         {
             if (!stmt)
                 return;
-            dispatch(stmt);
+            this->dispatch(stmt);
         }
 
         void visitDeclStmt(DeclStmt* stmt)
