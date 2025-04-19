@@ -11826,11 +11826,24 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         insertDebugValueStore(module);
     }
 
+    IRDeadCodeEliminationOptions dceOptions = IRDeadCodeEliminationOptions();
+    dceOptions.keepExportsAlive = true;
+    dceOptions.keepLayoutsAlive = true;
+    dceOptions.useFastAnalysis = true;
+
+    // Do first pass of dead code elimination before SSA to prevent dead code
+    // blocks creating unnecessary and even broken phi nodes.
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto func = as<IRGlobalValueWithCode>(inst))
+            eliminateDeadCode(func, dceOptions);
+    }
 
     // Next, attempt to promote local variables to SSA
     // temporaries and do basic simplifications.
     //
     constructSSA(module);
+
     applySparseConditionalConstantPropagation(module, compileRequest->getSink());
 
     bool minimumOptimizations =
@@ -11841,11 +11854,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         auto peepholeOptions = PeepholeOptimizationOptions::getPrelinking();
         peepholeOptimize(nullptr, module, peepholeOptions);
     }
-
-    IRDeadCodeEliminationOptions dceOptions = IRDeadCodeEliminationOptions();
-    dceOptions.keepExportsAlive = true;
-    dceOptions.keepLayoutsAlive = true;
-    dceOptions.useFastAnalysis = true;
 
     for (auto inst : module->getGlobalInsts())
     {
