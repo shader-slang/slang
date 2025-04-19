@@ -433,10 +433,17 @@ IRInst* tryRemoveTrivialPhi(ConstructSSAContext* context, PhiInfo* phiInfo)
         auto usedVal = u.get();
         SLANG_ASSERT(usedVal);
 
-        if (usedVal == same || usedVal == phi)
+        auto parentBlock = as<IRBlock>(usedVal->parent);
+        bool deadCode = usedVal->getOp() == kIROp_undefined && parentBlock &&
+            parentBlock->getPredecessors().getCount() == 0 &&
+            parentBlock->getPrevBlock() != nullptr;
+
+        if (usedVal == same || usedVal == phi || deadCode)
         {
             // Either this is a self-reference, or it refers
-            // to the same value we've seen already.
+            // to the same value we've seen already, or the
+            // value is from dead code and can therefore be
+            // ignored.
             continue;
         }
         if (same != nullptr)
