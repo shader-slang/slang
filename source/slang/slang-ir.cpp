@@ -8459,7 +8459,6 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
                      // `volatile` loads
     case kIROp_LoadReverseGradient:
     case kIROp_ReverseGradientDiffPairRef:
-    case kIROp_ImageSubscript:
     case kIROp_FieldExtract:
     case kIROp_FieldAddress:
     case kIROp_GetElement:
@@ -8530,6 +8529,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetPerVertexInputArray:
     case kIROp_MetalCastToDepthTexture:
     case kIROp_GetCurrentStage:
+        return false;
+
+    case kIROp_ImageSubscript:
         return false;
 
     case kIROp_ForwardDifferentiate:
