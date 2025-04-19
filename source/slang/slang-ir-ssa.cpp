@@ -435,8 +435,8 @@ IRInst* tryRemoveTrivialPhi(ConstructSSAContext* context, PhiInfo* phiInfo)
 
         auto parentBlock = as<IRBlock>(usedVal->parent);
         bool deadCode = usedVal->getOp() == kIROp_undefined && parentBlock &&
-            parentBlock->getPredecessors().getCount() == 0 &&
-            parentBlock->getPrevBlock() != nullptr;
+                        parentBlock->getPredecessors().getCount() == 0 &&
+                        parentBlock->getPrevBlock() != nullptr;
 
         if (usedVal == same || usedVal == phi || deadCode)
         {

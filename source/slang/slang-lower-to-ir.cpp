@@ -11826,6 +11826,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         insertDebugValueStore(module);
     }
 
+
     // Next, attempt to promote local variables to SSA
     // temporaries and do basic simplifications.
     //
