@@ -234,6 +234,26 @@ void GLSLSourceEmitter::emitMemoryQualifiers(IRInst* varDecl)
     _emitMemoryQualifierDecorations(varDecl);
 }
 
+
+void GLSLSourceEmitter::emitStructFieldAttributes(
+    IRStructType* structType,
+    IRStructField* field,
+    bool allowOffsetLayout)
+{
+    SLANG_UNUSED(structType);
+    auto structKey = field->getKey();
+
+    if (allowOffsetLayout)
+    {
+        if (auto offsetDecoration = structKey->findDecoration<IRVkStructOffsetDecoration>())
+        {
+            m_writer->emit("layout(offset = ");
+            m_writer->emit(offsetDecoration->getOffset()->getValue());
+            m_writer->emit(") ");
+        }
+    }
+}
+
 void GLSLSourceEmitter::_emitGLSLStructuredBuffer(
     IRGlobalParam* varDecl,
     IRHLSLStructuredBufferTypeBase* structuredBufferType)
