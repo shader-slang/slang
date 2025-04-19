@@ -3383,7 +3383,8 @@ struct AutoDiffPass : public InstPassBase
                         for (UInt i = 0; i < inst->getOperandCount(); i++)
                         {
                             auto operand = inst->getOperand(i);
-                            addToWorkList(operand);
+                            if (operand)
+                                addToWorkList(operand);
                         }
                         break;
                     }
