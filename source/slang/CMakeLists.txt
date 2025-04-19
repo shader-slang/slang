@@ -97,60 +97,6 @@ slang_add_target(
 )
 
 #
-# generated headers for reflection
-#
-
-set(SLANG_REFLECT_INPUT
-    slang-ast-support-types.h
-    slang-ast-base.h
-    slang-ast-decl.h
-    slang-ast-expr.h
-    slang-ast-modifier.h
-    slang-ast-stmt.h
-    slang-ast-type.h
-    slang-ast-val.h
-)
-# Make them absolute
-list(TRANSFORM SLANG_REFLECT_INPUT PREPEND "${CMAKE_CURRENT_LIST_DIR}/")
-
-set(SLANG_REFLECT_GENERATED_HEADERS
-    slang-generated-obj.h
-    slang-generated-obj-macro.h
-    slang-generated-ast.h
-    slang-generated-ast-macro.h
-    slang-generated-value.h
-    slang-generated-value-macro.h
-)
-set(SLANG_REFLECT_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/ast-reflect")
-list(
-    TRANSFORM SLANG_REFLECT_GENERATED_HEADERS
-    PREPEND "${SLANG_REFLECT_OUTPUT_DIR}/"
-)
-
-add_custom_command(
-    OUTPUT ${SLANG_REFLECT_GENERATED_HEADERS}
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_REFLECT_OUTPUT_DIR}
-    COMMAND
-        slang-cpp-extractor ${SLANG_REFLECT_INPUT} -strip-prefix slang- -o
-        ${SLANG_REFLECT_OUTPUT_DIR}/slang-generated -output-fields -mark-suffix
-        _CLASS
-    DEPENDS ${SLANG_REFLECT_INPUT} slang-cpp-extractor
-    VERBATIM
-)
-
-add_library(
-    slang-reflect-headers
-    INTERFACE
-    EXCLUDE_FROM_ALL
-    ${SLANG_REFLECT_GENERATED_HEADERS}
-)
-set_target_properties(slang-reflect-headers PROPERTIES FOLDER generated)
-target_include_directories(
-    slang-reflect-headers
-    INTERFACE ${SLANG_REFLECT_OUTPUT_DIR}
-)
-
-#
 # generated lookup tables
 #
 
@@ -279,7 +225,6 @@ set(slang_link_args
     slang-capability-defs
     slang-capability-lookup
     slang-fiddle-output
-    slang-reflect-headers
     slang-lookup-tables
     SPIRV-Headers
 )

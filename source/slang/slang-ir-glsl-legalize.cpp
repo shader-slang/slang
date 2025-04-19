@@ -2041,10 +2041,12 @@ ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType*
                 // Get array sizes once
                 auto fromSize = getIntVal(fromArray->getElementCount());
                 auto toSize = getIntVal(toArray->getElementCount());
-                SLANG_ASSERT(fromSize <= toSize);
 
-                // Extract elements one at a time up to the source array size
-                for (Index i = 0; i < fromSize; i++)
+                // Extract elements one at a time up to the minimum
+                // size, between the source and destination.
+                //
+                auto limit = fromSize < toSize ? fromSize : toSize;
+                for (Index i = 0; i < limit; i++)
                 {
                     auto element = builder->emitElementExtract(
                         fromArray->getElementType(),

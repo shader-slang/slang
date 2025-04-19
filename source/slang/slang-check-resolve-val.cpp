@@ -2,7 +2,8 @@
 
 // Logic for resolving/simplifying Types and DeclRefs.
 
-#include "slang-ast-reflect.h"
+#include "slang-ast-dispatch.h"
+#include "slang-ast-forward-declarations.h"
 #include "slang-ast-synthesis.h"
 #include "slang-check-impl.h"
 #include "slang-lookup.h"

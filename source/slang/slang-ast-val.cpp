@@ -2,9 +2,9 @@
 #include "slang-ast-val.h"
 
 #include "slang-ast-builder.h"
+#include "slang-ast-dispatch.h"
 #include "slang-check-impl.h"
 #include "slang-diagnostics.h"
-#include "slang-generated-ast-macro.h"
 #include "slang-mangle.h"
 #include "slang-syntax.h"
 
@@ -17,7 +17,7 @@ namespace Slang
 void ValNodeDesc::init()
 {
     Hasher hasher;
-    hasher.hashValue(Int(type));
+    hasher.hashValue(type.getTag());
     for (Index i = 0; i < operands.getCount(); ++i)
     {
         // Note: we are hashing the raw pointer value rather
@@ -90,7 +90,7 @@ Val* Val::defaultResolveImpl()
     // Default resolve implementation is to recursively resolve all operands, and lookup in
     // deduplication cache.
     ValNodeDesc newDesc;
-    newDesc.type = astNodeType;
+    newDesc.type = SyntaxClass<NodeBase>(astNodeType);
     bool diff = false;
     for (auto operand : m_operands)
     {

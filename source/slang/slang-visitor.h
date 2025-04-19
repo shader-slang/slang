@@ -5,75 +5,82 @@
 // This file defines the basic "Visitor" pattern for doing dispatch
 // over the various categories of syntax node.
 
-#include "slang-generated-ast-macro.h"
+#include "slang-ast-dispatch.h"
+#include "slang-ast-forward-declarations.h"
 #include "slang-syntax.h"
 
 namespace Slang
 {
 
-// Macros to generate from ast-generated-macro file the vistors
-
-// Only runs 'param' macro if the marker is NONE (ie not ABSTRACT here)
-#define SLANG_CLASS_ONLY_ABSTRACT_AST(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)
-#define SLANG_CLASS_ONLY_AST(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-    param(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)
-
-#define SLANG_CLASS_ONLY(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-    SLANG_CLASS_ONLY_##MARKER(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param)
-
-// Dispatch decl
-#define SLANG_VISITOR_DISPATCH_DECL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-    virtual void dispatch_##NAME(NAME* obj, void* extra) = 0;
-
 // Dispatch
 
-#define SLANG_VISITOR_DISPATCH_RESULT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-    virtual void dispatch_##NAME(NAME* obj, void* extra) override                          \
-    {                                                                                      \
-        *(Result*)extra = ((Derived*)this)->visit##NAME(obj);                              \
+#if 0 // FIDDLE TEMPLATE:
+%function SLANG_VISITOR_DISPATCH_RESULT_IMPL(baseType)
+%  for _,T in ipairs(baseType.subclasses) do
+%    if not T.isAbstract then
+    Result _dispatchImpl($T* obj)
+    {
+        return ((Derived*)this)->visit$T(obj);
     }
-
-#define SLANG_VISITOR_DISPATCH_VOID_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-    virtual void dispatch_##NAME(NAME* obj, void*) override                              \
-    {                                                                                    \
-        ((Derived*)this)->visit##NAME(obj);                                              \
-    }
+%    end
+%  end
+%end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 0
+#include "slang-visitor.h.fiddle"
+#endif // FIDDLE END
 
 // Visitor with and without result
 
-#define SLANG_VISITOR_RESULT_VISIT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-    Result visit##NAME(NAME* obj)                                                       \
-    {                                                                                   \
-        return ((Derived*)this)->visit##SUPER(obj);                                     \
+#if 0 // FIDDLE TEMPLATE:
+%function SLANG_VISITOR_VISIT_RESULT_IMPL(baseType)
+%  for _,T in ipairs(baseType.subclasses) do
+    Result visit$T($T* obj)
+    {
+        return ((Derived*)this)->visit$(T.directSuperClass)(obj);
     }
-
-#define SLANG_VISITOR_VOID_VISIT_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-    void visit##NAME(NAME* obj)                                                       \
-    {                                                                                 \
-        ((Derived*)this)->visit##SUPER(obj);                                          \
-    }
+%  end
+%end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 1
+#include "slang-visitor.h.fiddle"
+#endif // FIDDLE END
 
 // Args
 
-#define SLANG_VISITOR_DISPATCH_ARG_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-    virtual void dispatch_##NAME(NAME* obj, void* arg) override                         \
-    {                                                                                   \
-        ((Derived*)this)->visit##NAME(obj, *(Arg*)arg);                                 \
-    }
+#if 0 // FIDDLE TEMPLATE:
+%function SLANG_VISITOR_DISPATCH_ARG_IMPL(baseType)
+%  for _, T in ipairs(baseType.subclasses) do
+%    if not T.isAbstract then
+virtual void _dispatchImpl($T* obj, Arg const& arg)
+{
+    ((Derived*)this)->visit$T(obj, arg);
+}
+%    end
+%  end
+%end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 2
+#include "slang-visitor.h.fiddle"
+#endif // FIDDLE END
 
-#define SLANG_VISITOR_VOID_VISIT_ARG_IMPL(NAME, SUPER, ORIGIN, LAST, MARKER, TYPE, param) \
-    void visit##NAME(NAME* obj, Arg const& arg)                                           \
-    {                                                                                     \
-        ((Derived*)this)->visit##SUPER(obj, arg);                                         \
-    }
+#if 0 // FIDDLE TEMPLATE:
+%function SLANG_VISITOR_VISIT_ARG_IMPL(baseType)
+% for _, T in ipairs(baseType.subclasses) do
+void visit$T($T* obj, Arg const& arg)
+{
+    ((Derived*)this)->visit$(T.directSuperClass)(obj, arg);
+}
+%  end
+%end
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 3
+#include "slang-visitor.h.fiddle"
+#endif // FIDDLE END
+
 //
 // type Visitors
 //
-
-struct ITypeVisitor
-{
-    SLANG_CHILDREN_ASTNode_Type(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
-};
 
 // Suppress VS2017 Unreachable code warning
 #ifdef _MSC_VER
@@ -81,159 +88,150 @@ struct ITypeVisitor
 #pragma warning(disable : 4702)
 #endif
 
-template<typename Derived, typename Result = void, typename Base = ITypeVisitor>
-struct TypeVisitor : Base
+template<typename Derived, typename Result = void>
+struct TypeVisitor
 {
     Result dispatch(Type* type)
     {
-        Result result;
-        type->accept(this, &result);
-        return result;
+        return ASTNodeDispatcher<Type, Result>::dispatch(
+            type,
+            [&](auto obj) { return _dispatchImpl(obj); });
     }
 
     Result dispatchType(Type* type)
     {
-        Result result;
-        type->accept(this, &result);
-        return result;
+        return ASTNodeDispatcher<Type, Result>::dispatch(
+            type,
+            [&](auto obj) { return _dispatchImpl(obj); });
     }
 
-    SLANG_CHILDREN_ASTNode_Type(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_RESULT_IMPL)
-        SLANG_CHILDREN_ASTNode_Type(SLANG_VISITOR_RESULT_VISIT_IMPL, _)
+#if 0 // FIDDLE TEMPLATE:
+        % SLANG_VISITOR_DISPATCH_RESULT_IMPL(Slang.Type)
+        % SLANG_VISITOR_VISIT_RESULT_IMPL(Slang.Type)
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 4
+#include "slang-visitor.h.fiddle"
+#endif // FIDDLE END
 };
 
-template<typename Derived, typename Base>
-struct TypeVisitor<Derived, void, Base> : Base
+template<typename Derived, typename Arg>
+struct TypeVisitorWithArg
 {
-    void dispatch(Type* type) { type->accept(this, 0); }
+    void dispatch(Type* type, Arg const& arg)
+    {
+        ASTNodeDispatcher<Type, void>::dispatch(type, [&](auto obj) { _dispatchImpl(obj, arg); });
+    }
 
-    void dispatchType(Type* type) { type->accept(this, 0); }
-
-    SLANG_CHILDREN_ASTNode_Type(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_VOID_IMPL)
-        SLANG_CHILDREN_ASTNode_Type(SLANG_VISITOR_VOID_VISIT_IMPL, _)
-};
-
-template<typename Derived, typename Arg, typename Base = ITypeVisitor>
-struct TypeVisitorWithArg : Base
-{
-    void dispatch(Type* type, Arg const& arg) { type->accept(this, (void*)&arg); }
-
-    SLANG_CHILDREN_ASTNode_Type(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_ARG_IMPL)
-        SLANG_CHILDREN_ASTNode_Type(SLANG_VISITOR_VOID_VISIT_ARG_IMPL, _)
+#if 0 // FIDDLE TEMPLATE:
+    % SLANG_VISITOR_DISPATCH_ARG_IMPL(Slang.Type)
+    % SLANG_VISITOR_VISIT_ARG_IMPL(Slang.Type)
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 5
+#include "slang-visitor.h.fiddle"
+#endif // FIDDLE END
 };
 
 //
 // Expression Visitors
 //
 
-struct IExprVisitor
-{
-    SLANG_CHILDREN_ASTNode_Expr(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
-};
-
 template<typename Derived, typename Result = void>
-struct ExprVisitor : IExprVisitor
+struct ExprVisitor
 {
     Result dispatch(Expr* expr)
     {
-        Result result;
-        expr->accept(this, &result);
-        return result;
+        return ASTNodeDispatcher<Expr, Result>::dispatch(
+            expr,
+            [&](auto obj) { return _dispatchImpl(obj); });
     }
 
-    SLANG_CHILDREN_ASTNode_Expr(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_RESULT_IMPL)
-        SLANG_CHILDREN_ASTNode_Expr(SLANG_VISITOR_RESULT_VISIT_IMPL, _)
-};
-
-template<typename Derived>
-struct ExprVisitor<Derived, void> : IExprVisitor
-{
-    void dispatch(Expr* expr) { expr->accept(this, 0); }
-
-    SLANG_CHILDREN_ASTNode_Expr(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_VOID_IMPL)
-        SLANG_CHILDREN_ASTNode_Expr(SLANG_VISITOR_VOID_VISIT_IMPL, _)
+#if 0 // FIDDLE TEMPLATE:
+    % SLANG_VISITOR_DISPATCH_RESULT_IMPL(Slang.Expr)
+    % SLANG_VISITOR_VISIT_RESULT_IMPL(Slang.Expr)
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 6
+#include "slang-visitor.h.fiddle"
+#endif // FIDDLE END
 };
 
 template<typename Derived, typename Arg>
-struct ExprVisitorWithArg : IExprVisitor
+struct ExprVisitorWithArg
 {
-    void dispatch(Expr* obj, Arg const& arg) { obj->accept(this, (void*)&arg); }
+    void dispatch(Expr* expr, Arg const& arg)
+    {
+        ASTNodeDispatcher<Expr, void>::dispatch(expr, [&](auto obj) { _dispatchImpl(obj, arg); });
+    }
 
-    SLANG_CHILDREN_ASTNode_Expr(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_ARG_IMPL)
-        SLANG_CHILDREN_ASTNode_Expr(SLANG_VISITOR_VOID_VISIT_ARG_IMPL, _)
+#if 0 // FIDDLE TEMPLATE:
+    % SLANG_VISITOR_DISPATCH_ARG_IMPL(Slang.Expr)
+    % SLANG_VISITOR_VISIT_ARG_IMPL(Slang.Expr)
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 7
+#include "slang-visitor.h.fiddle"
+#endif // FIDDLE END
 };
 
 //
 // Statement Visitors
 //
 
-struct IStmtVisitor
-{
-    SLANG_CHILDREN_ASTNode_Stmt(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
-};
-
 template<typename Derived, typename Result = void>
-struct StmtVisitor : IStmtVisitor
+struct StmtVisitor
 {
     Result dispatch(Stmt* stmt)
     {
-        Result result;
-        stmt->accept(this, &result);
-        return result;
+        return ASTNodeDispatcher<Stmt, Result>::dispatch(
+            stmt,
+            [&](auto obj) { return _dispatchImpl(obj); });
     }
 
-    SLANG_CHILDREN_ASTNode_Stmt(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_RESULT_IMPL)
-        SLANG_CHILDREN_ASTNode_Stmt(SLANG_VISITOR_RESULT_VISIT_IMPL, _)
-};
-
-template<typename Derived>
-struct StmtVisitor<Derived, void> : IStmtVisitor
-{
-    void dispatch(Stmt* stmt) { stmt->accept(this, 0); }
-
-    SLANG_CHILDREN_ASTNode_Stmt(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_VOID_IMPL)
-        SLANG_CHILDREN_ASTNode_Stmt(SLANG_VISITOR_VOID_VISIT_IMPL, _)
+#if 0 // FIDDLE TEMPLATE:
+    % SLANG_VISITOR_DISPATCH_RESULT_IMPL(Slang.Stmt)
+    % SLANG_VISITOR_VISIT_RESULT_IMPL(Slang.Stmt)
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 8
+#include "slang-visitor.h.fiddle"
+#endif // FIDDLE END
 };
 
 //
 // Declaration Visitors
 //
 
-struct IDeclVisitor
-{
-    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
-};
-
 template<typename Derived, typename Result = void>
-struct DeclVisitor : IDeclVisitor
+struct DeclVisitor
 {
     Result dispatch(DeclBase* decl)
     {
-        Result result;
-        decl->accept(this, &result);
-        return result;
+        return ASTNodeDispatcher<DeclBase, Result>::dispatch(
+            decl,
+            [&](auto obj) { return _dispatchImpl(obj); });
     }
 
-    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_RESULT_IMPL)
-        SLANG_CHILDREN_ASTNode_DeclBase(SLANG_VISITOR_RESULT_VISIT_IMPL, _)
-};
-
-template<typename Derived>
-struct DeclVisitor<Derived, void> : IDeclVisitor
-{
-    void dispatch(DeclBase* decl) { decl->accept(this, 0); }
-
-    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_VOID_IMPL)
-        SLANG_CHILDREN_ASTNode_DeclBase(SLANG_VISITOR_VOID_VISIT_IMPL, _)
+#if 0 // FIDDLE TEMPLATE:
+    % SLANG_VISITOR_DISPATCH_RESULT_IMPL(Slang.DeclBase)
+    % SLANG_VISITOR_VISIT_RESULT_IMPL(Slang.DeclBase)
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 9
+#include "slang-visitor.h.fiddle"
+#endif // FIDDLE END
 };
 
 template<typename Derived, typename Arg>
-struct DeclVisitorWithArg : IDeclVisitor
+struct DeclVisitorWithArg
 {
-    void dispatch(DeclBase* obj, Arg const& arg) { obj->accept(this, (void*)&arg); }
+    void dispatch(DeclBase* decl, Arg const& arg)
+    {
+        ASTNodeDispatcher<Expr, void>::dispatch(decl, [&](auto obj) { _dispatchImpl(obj, arg); });
+    }
 
-    SLANG_CHILDREN_ASTNode_DeclBase(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_ARG_IMPL)
-        SLANG_CHILDREN_ASTNode_DeclBase(SLANG_VISITOR_VOID_VISIT_ARG_IMPL, _)
+#if 0 // FIDDLE TEMPLATE:
+    % SLANG_VISITOR_DISPATCH_ARG_IMPL(Slang.DeclBase)
+    % SLANG_VISITOR_VISIT_ARG_IMPL(Slang.DeclBase)
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 10
+#include "slang-visitor.h.fiddle"
+#endif // FIDDLE END
 };
 
 
@@ -241,64 +239,46 @@ struct DeclVisitorWithArg : IDeclVisitor
 // Modifier Visitors
 //
 
-struct IModifierVisitor
-{
-    SLANG_CHILDREN_ASTNode_Modifier(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
-};
-
 template<typename Derived, typename Result = void>
-struct ModifierVisitor : IModifierVisitor
+struct ModifierVisitor
 {
     Result dispatch(Modifier* modifier)
     {
-        Result result;
-        modifier->accept(this, &result);
-        return result;
+        return ASTNodeDispatcher<Modifier, Result>::dispatch(
+            modifier,
+            [&](auto obj) { return _dispatchImpl(obj); });
     }
 
-    SLANG_CHILDREN_ASTNode_Modifier(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_RESULT_IMPL)
-        SLANG_CHILDREN_ASTNode_Modifier(SLANG_VISITOR_RESULT_VISIT_IMPL, _)
-};
-
-template<typename Derived>
-struct ModifierVisitor<Derived, void> : IModifierVisitor
-{
-    void dispatch(Modifier* modifier) { modifier->accept(this, 0); }
-
-    SLANG_CHILDREN_ASTNode_Modifier(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_VOID_IMPL)
-        SLANG_CHILDREN_ASTNode_Modifier(SLANG_VISITOR_VOID_VISIT_IMPL, _)
+#if 0 // FIDDLE TEMPLATE:
+    % SLANG_VISITOR_DISPATCH_RESULT_IMPL(Slang.Modifier)
+    % SLANG_VISITOR_VISIT_RESULT_IMPL(Slang.Modifier)
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 11
+#include "slang-visitor.h.fiddle"
+#endif // FIDDLE END
 };
 
 //
 // Val Visitors
 //
 
-struct IValVisitor : ITypeVisitor
-{
-    SLANG_CHILDREN_ASTNode_Val(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_DECL)
-};
-
 template<typename Derived, typename Result = void, typename TypeResult = void>
-struct ValVisitor : TypeVisitor<Derived, TypeResult, IValVisitor>
+struct ValVisitor : TypeVisitor<Derived, TypeResult>
 {
     Result dispatch(Val* val)
     {
-        Result result;
-        val->accept(this, &result);
-        return result;
+        return ASTNodeDispatcher<Val, Result>::dispatch(
+            val,
+            [&](auto obj) { return _dispatchImpl(obj); });
     }
 
-    SLANG_CHILDREN_ASTNode_Val(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_RESULT_IMPL)
-        SLANG_CHILDREN_ASTNode_Val(SLANG_VISITOR_RESULT_VISIT_IMPL, _)
-};
-
-template<typename Derived>
-struct ValVisitor<Derived, void, void> : TypeVisitor<Derived, void, IValVisitor>
-{
-    void dispatch(Val* val) { val->accept(this, 0); }
-
-    SLANG_CHILDREN_ASTNode_Val(SLANG_CLASS_ONLY, SLANG_VISITOR_DISPATCH_VOID_IMPL)
-        SLANG_CHILDREN_ASTNode_Val(SLANG_VISITOR_VOID_VISIT_IMPL, _)
+#if 0 // FIDDLE TEMPLATE:
+    % SLANG_VISITOR_DISPATCH_RESULT_IMPL(Slang.Val)
+    % SLANG_VISITOR_VISIT_RESULT_IMPL(Slang.Val)
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 12
+#include "slang-visitor.h.fiddle"
+#endif // FIDDLE END
 };
 
 // Re-activate VS2017 warning settings

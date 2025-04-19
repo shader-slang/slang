@@ -12,8 +12,8 @@
 // logic also orchestrates the overall flow and how
 // and when things get checked.
 
+#include "slang-ast-forward-declarations.h"
 #include "slang-ast-iterator.h"
-#include "slang-ast-reflect.h"
 #include "slang-ast-synthesis.h"
 #include "slang-lookup.h"
 #include "slang-parser.h"
@@ -3590,7 +3590,7 @@ bool SemanticsVisitor::doesAccessorMatchRequirement(
     //
     auto satisfyingMemberClass = satisfyingMemberDeclRef.getDecl()->getClass();
     auto requiredMemberClass = requiredMemberDeclRef.getDecl()->getClass();
-    if (!satisfyingMemberClass.isSubClassOfImpl(requiredMemberClass))
+    if (!satisfyingMemberClass.isSubClassOf(requiredMemberClass))
         return false;
 
     // We do not check the parameters or return types of accessors
@@ -11261,7 +11261,7 @@ void _foreachDirectOrExtensionMemberOfType(
     //
     for (auto memberDeclRef : getMembers(semantics->getASTBuilder(), containerDeclRef))
     {
-        if (memberDeclRef.getDecl()->getClass().isSubClassOfImpl(syntaxClass))
+        if (memberDeclRef.getDecl()->getClass().isSubClassOf(syntaxClass))
         {
             callback(memberDeclRef, (void*)userData);
         }
@@ -11294,7 +11294,7 @@ void _foreachDirectOrExtensionMemberOfType(
 
             for (auto memberDeclRef : getMembers(semantics->getASTBuilder(), extDeclRef))
             {
-                if (memberDeclRef.getDecl()->getClass().isSubClassOfImpl(syntaxClass))
+                if (memberDeclRef.getDecl()->getClass().isSubClassOf(syntaxClass))
                 {
                     callback(memberDeclRef, (void*)userData);
                 }
