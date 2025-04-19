@@ -428,27 +428,10 @@ IRInst* tryRemoveTrivialPhi(ConstructSSAContext* context, PhiInfo* phiInfo)
     // to the phi itself.
 
     IRInst* same = nullptr;
-    IRInst* undefinedVal = nullptr;
-    bool multipleUndefined = false;
     for (auto u : phiInfo->operands)
     {
         auto usedVal = u.get();
         SLANG_ASSERT(usedVal);
-
-        if (usedVal->getOp() == kIROp_undefined)
-        {
-            // Since undefined values are undefined, we can
-            // ignore them in favor of a defined value in
-            // the phi. We still need to keep it around
-            // though, in case we don't find any defined
-            // values and have to use it instead.
-            if (undefinedVal != usedVal && undefinedVal != nullptr)
-            {
-                multipleUndefined = true;
-            }
-            undefinedVal = usedVal;
-            continue;
-        }
 
         if (usedVal == same || usedVal == phi)
         {
@@ -456,7 +439,6 @@ IRInst* tryRemoveTrivialPhi(ConstructSSAContext* context, PhiInfo* phiInfo)
             // to the same value we've seen already.
             continue;
         }
-
         if (same != nullptr)
         {
             // We've found at least two distinct values
@@ -474,36 +456,19 @@ IRInst* tryRemoveTrivialPhi(ConstructSSAContext* context, PhiInfo* phiInfo)
         }
     }
 
-
     if (!same)
     {
-        if (undefinedVal)
-        {
-            // Didn't find any defined values, so we'll have to make
-            // do with the undefined ones.
-            if (multipleUndefined)
-            {
-                // Multiple undefined values, so just keep the phi.
-                return phi;
-            }
-
-            // Single undefined, so proceed with it.
-            same = undefinedVal;
-        }
-        else
-        {
-            // There were no operands other than the phi itself.
-            // This implies that the value at the use sites should
-            // actually be undefined.
-            //
-            // For now we will simply return in this case, without
-            // removing the phi node.
-            //
-            // TODO: Construct a value for `same` that represents an
-            // undefined value with the same type as `phi`.
-            //
-            return phi;
-        }
+        // There were no operands other than the phi itself.
+        // This implies that the value at the use sites should
+        // actually be undefined.
+        //
+        // For now we will simply return in this case, without
+        // removing the phi node.
+        //
+        // TODO: Construct a value for `same` that represents an
+        // undefined value with the same type as `phi`.
+        //
+        return phi;
     }
 
     // Removing this phi as trivial may make other phi nodes
