@@ -1034,7 +1034,7 @@ struct PeepholeContext : InstPassBase
                         break;
                     }
                 }
-                if (argValue)
+                if (argValue && argValue != inst)
                 {
                     if (inst->hasUses())
                     {
