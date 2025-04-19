@@ -663,8 +663,7 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 auto structDecl = m_astBuilder->create<StructDecl>();
                 auto conformanceDecl = m_astBuilder->create<InheritanceDecl>();
                 conformanceDecl->base.type = m_astBuilder->getDiffInterfaceType();
-                conformanceDecl->parentDecl = structDecl;
-                structDecl->members.add(conformanceDecl);
+                structDecl->addMember(conformanceDecl);
                 structDecl->parentDecl = parent;
 
                 synthesizedDecl = structDecl;
@@ -678,10 +677,9 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 typeDef->type.type = DeclRefType::create(m_astBuilder, synthDeclRef);
                 structDecl->members.add(typeDef);
 
-                synthesizedDecl->parentDecl = parent;
                 synthesizedDecl->nameAndLoc.name = item.declRef.getName();
                 synthesizedDecl->loc = parent->loc;
-                parent->members.add(synthesizedDecl);
+                parent->addMember(synthesizedDecl);
                 parent->invalidateMemberDictionary();
 
                 // Mark the newly synthesized decl as `ToBeSynthesized` so future checking can
@@ -697,7 +695,6 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
                 //
                 auto typeDef = m_astBuilder->create<TypeAliasDecl>();
                 typeDef->nameAndLoc.name = item.declRef.getName();
-                typeDef->parentDecl = parent;
 
                 // Compute the decl's type as if it is referred to from itself. This is important
                 // because subType may have substitutions from the context it is used in, while this
@@ -708,7 +705,7 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
 
                 synthesizedDecl = parent;
 
-                parent->members.add(typeDef);
+                parent->addMember(typeDef);
                 parent->invalidateMemberDictionary();
 
                 markSelfDifferentialMembersOfType(parent, subType);

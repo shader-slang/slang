@@ -71,9 +71,7 @@ public:
         ASTEmitScope scope = getCurrentScope();
         auto scopeDecl = m_builder->create<ScopeDecl>();
         auto newScope = m_builder->create<Scope>();
-        scopeDecl->parentDecl = scope.m_parent;
-        if (scope.m_parent)
-            scope.m_parent->members.add(scopeDecl);
+        ContainerDecl::setParent(scope.m_parent, scopeDecl);
         newScope->parent = scope.m_scope;
         newScope->containerDecl = scopeDecl;
         scope.m_scope = newScope;

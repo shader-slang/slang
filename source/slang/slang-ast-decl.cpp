@@ -105,6 +105,20 @@ void ContainerDecl::buildMemberDictionary()
     SLANG_ASSERT(isMemberDictionaryValid());
 }
 
+Index ContainerDecl::getDeclIndex(Decl* decl)
+{
+    if (Index* ptr = mapDeclMemberToIndex.tryGetValue(decl))
+    {
+        return *ptr;
+    }
+    Index res = members.findFirstIndex([&](Decl* d) { return d == decl; });
+    if (res >= Index(0))
+    {
+        mapDeclMemberToIndex[decl] = res;
+    }
+    return res;
+}
+
 bool isLocalVar(const Decl* decl)
 {
     const auto varDecl = as<VarDecl>(decl);
