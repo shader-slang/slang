@@ -433,10 +433,11 @@ IRInst* tryRemoveTrivialPhi(ConstructSSAContext* context, PhiInfo* phiInfo)
         auto usedVal = u.get();
         SLANG_ASSERT(usedVal);
 
-        if (usedVal == same || usedVal == phi)
+        if (usedVal == same || usedVal == phi || usedVal->getOp() == kIROp_undefined)
         {
             // Either this is a self-reference, or it refers
-            // to the same value we've seen already.
+            // to the same value we've seen already, or it is
+            // an undefined value that can be ignored.
             continue;
         }
         if (same != nullptr)
