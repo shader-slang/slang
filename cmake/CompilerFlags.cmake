@@ -152,8 +152,8 @@ function(set_default_compile_options target)
 
     add_supported_cxx_flags(${target} PRIVATE ${warning_flags})
 
-    if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-        # valid linker options only for GNU/Clang
+    if(NOT WIN32)
+        # these options are for ELF specific and not for Windows
         add_supported_cxx_linker_flags(
             ${target}
             PRIVATE
