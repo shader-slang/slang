@@ -142,7 +142,7 @@ Currently, the following target names are supported in a `case` statement: `cpp`
 
 ## Inline SPIRV Assembly
 
-When targeting SPIRV, Slang allows you to directly write an SPIRV assembly block and use it as a part of an expression. For example:
+When targeting SPIRV, Slang allows you to directly write a SPIRV assembly block and use it as part of an expression. For example:
 ```cpp
 int test()
 {
@@ -164,7 +164,7 @@ where `<opcode>` defines a value named `identifier` of `<type>`, or simply:
 ```
 When `<opcode>` does not define a return value.
 
-When used as part of an expression, the Slang type of the `spirv_asm` construct is defined by the last instruction, which must be in the form of
+When used as part of an expression, the Slang type of the `spirv_asm` construct is defined by the last instruction, which must be in the form of:
 ```
 result: <type> = ...
 ```

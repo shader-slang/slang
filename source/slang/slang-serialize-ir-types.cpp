@@ -37,17 +37,6 @@ casts it.
         {0, 0}  // Int64,
 };
 
-// Check all compressible chunk ids, start with upper case 'S'
-SLANG_COMPILE_TIME_ASSERT(SLANG_FOUR_CC_GET_FIRST_CHAR(IRSerialBinary::kInstFourCc) == 'S');
-SLANG_COMPILE_TIME_ASSERT(SLANG_FOUR_CC_GET_FIRST_CHAR(IRSerialBinary::kChildRunFourCc) == 'S');
-SLANG_COMPILE_TIME_ASSERT(
-    SLANG_FOUR_CC_GET_FIRST_CHAR(IRSerialBinary::kExternalOperandsFourCc) == 'S');
-
-// Compressed version starts with 's'
-SLANG_COMPILE_TIME_ASSERT(
-    SLANG_FOUR_CC_GET_FIRST_CHAR(SLANG_MAKE_COMPRESSED_FOUR_CC(IRSerialBinary::kInstFourCc)) ==
-    's');
-
 struct PrefixString;
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialData !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

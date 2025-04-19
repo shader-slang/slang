@@ -23,6 +23,18 @@ IRType* getVectorElementType(IRType* type)
         return vectorType->getElementType();
     if (auto coopVecType = as<IRCoopVectorType>(type))
         return coopVecType->getElementType();
+    if (auto coopMatType = as<IRCoopMatrixType>(type))
+        return coopMatType->getElementType();
+    return type;
+}
+
+IRType* getVectorOrCoopMatrixElementType(IRType* type)
+{
+    auto vectorElementType = getVectorElementType(type);
+    if (vectorElementType != type)
+        return vectorElementType;
+    if (auto coopMatrixType = as<IRCoopMatrixType>(type))
+        return coopMatrixType->getElementType();
     return type;
 }
 

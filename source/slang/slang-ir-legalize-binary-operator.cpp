@@ -1,61 +1,38 @@
 #include "slang-ir-legalize-binary-operator.h"
 
+#include "compiler-core/slang-diagnostic-sink.h"
 #include "slang-ir-insts.h"
 
 namespace Slang
 {
 
-void legalizeBinaryOp(IRInst* inst)
+static bool isVectorOrMatrix(IRType* type)
 {
-    // For shifts, ensure that the shift amount is unsigned, as required by
-    // https://www.w3.org/TR/WGSL/#bit-expr.
-    if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
+    switch (type->getOp())
     {
-        IRInst* shiftAmount = inst->getOperand(1);
-        IRType* shiftAmountType = shiftAmount->getDataType();
-        if (auto shiftAmountVectorType = as<IRVectorType>(shiftAmountType))
-        {
-            IRType* shiftAmountElementType = shiftAmountVectorType->getElementType();
-            IntInfo opIntInfo = getIntTypeInfo(shiftAmountElementType);
-            if (opIntInfo.isSigned)
-            {
-                IRBuilder builder(inst);
-                builder.setInsertBefore(inst);
-                opIntInfo.isSigned = false;
-                shiftAmountElementType = builder.getType(getIntTypeOpFromInfo(opIntInfo));
-                shiftAmountVectorType = builder.getVectorType(
-                    shiftAmountElementType,
-                    shiftAmountVectorType->getElementCount());
-                IRInst* newShiftAmount = builder.emitCast(shiftAmountVectorType, shiftAmount);
-                builder.replaceOperand(inst->getOperands() + 1, newShiftAmount);
-            }
-        }
-        else if (isIntegralType(shiftAmountType))
-        {
-            IntInfo opIntInfo = getIntTypeInfo(shiftAmountType);
-            if (opIntInfo.isSigned)
-            {
-                IRBuilder builder(inst);
-                builder.setInsertBefore(inst);
-                opIntInfo.isSigned = false;
-                shiftAmountType = builder.getType(getIntTypeOpFromInfo(opIntInfo));
-                IRInst* newShiftAmount = builder.emitCast(shiftAmountType, shiftAmount);
-                builder.replaceOperand(inst->getOperands() + 1, newShiftAmount);
-            }
-        }
+    case kIROp_VectorType:
+    case kIROp_MatrixType:
+        return true;
+    default:
+        return false;
     }
+};
 
-    auto isVectorOrMatrix = [](IRType* type)
-    {
-        switch (type->getOp())
-        {
-        case kIROp_VectorType:
-        case kIROp_MatrixType:
-            return true;
-        default:
-            return false;
-        }
-    };
+static bool isDivisionByMatrix(IRInst* inst)
+{
+    return (inst->getOp() == kIROp_Div) && (as<IRMatrixType>(inst->getOperand(1)->getDataType()));
+}
+
+static bool isMatrixDividedByScalar(IRInst* inst)
+{
+    return (inst->getOp() == kIROp_Div) && (as<IRMatrixType>(inst->getOperand(0)->getDataType())) &&
+           (as<IRBasicType>(inst->getOperand(1)->getDataType()));
+}
+
+// If one operand is a composite type (vector or matrix), and the other one is a scalar
+// type, then the scalar is converted to a composite type.
+static void legalizeScalarOperandsToMatchComposite(IRInst* inst)
+{
     if (isVectorOrMatrix(inst->getOperand(0)->getDataType()) &&
         as<IRBasicType>(inst->getOperand(1)->getDataType()))
     {
@@ -91,8 +68,89 @@ void legalizeBinaryOp(IRInst* inst)
         auto newLhs = builder.emitMakeCompositeFromScalar(compositeType, scalarValue);
         builder.replaceOperand(inst->getOperands(), newLhs);
     }
-    else if (
-        isIntegralType(inst->getOperand(0)->getDataType()) &&
+}
+
+// Replaces a division by scalar operation by a multiplication.
+// This is done for WGSL where matrix divided by scalar operations are not supported.
+static void replaceMatrixDividedByScalarWithMul(IRInst* inst)
+{
+    SLANG_ASSERT(isMatrixDividedByScalar(inst));
+
+    IRBuilder builder(inst);
+    builder.setInsertBefore(inst);
+
+    auto scalarType = inst->getOperand(1)->getDataType();
+    auto newRhs =
+        builder.emitDiv(scalarType, builder.getFloatValue(scalarType, 1.0), inst->getOperand(1));
+    auto newOp = builder.emitMul(inst->getDataType(), inst->getOperand(0), newRhs);
+
+    inst->replaceUsesWith(newOp);
+    inst->transferDecorationsTo(newOp);
+}
+
+void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target)
+{
+    IRBuilder builder(inst);
+    builder.setInsertBefore(inst);
+
+    // Division by matrix is not supported on Metal and WGSL.
+    if (isDivisionByMatrix(inst))
+    {
+        sink->diagnose(inst, Diagnostics::divisionByMatrixNotSupported);
+        return;
+    }
+
+    // For shifts, ensure that the shift amount is unsigned, as required by
+    // https://www.w3.org/TR/WGSL/#bit-expr.
+    if (inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh)
+    {
+        IRInst* shiftAmount = inst->getOperand(1);
+        IRType* shiftAmountType = shiftAmount->getDataType();
+        if (auto shiftAmountVectorType = as<IRVectorType>(shiftAmountType))
+        {
+            IRType* shiftAmountElementType = shiftAmountVectorType->getElementType();
+            IntInfo opIntInfo = getIntTypeInfo(shiftAmountElementType);
+            if (opIntInfo.isSigned)
+            {
+                opIntInfo.isSigned = false;
+                shiftAmountElementType = builder.getType(getIntTypeOpFromInfo(opIntInfo));
+                shiftAmountVectorType = builder.getVectorType(
+                    shiftAmountElementType,
+                    shiftAmountVectorType->getElementCount());
+                IRInst* newShiftAmount = builder.emitCast(shiftAmountVectorType, shiftAmount);
+                builder.replaceOperand(inst->getOperands() + 1, newShiftAmount);
+            }
+        }
+        else if (isIntegralType(shiftAmountType))
+        {
+            IntInfo opIntInfo = getIntTypeInfo(shiftAmountType);
+            if (opIntInfo.isSigned)
+            {
+                opIntInfo.isSigned = false;
+                shiftAmountType = builder.getType(getIntTypeOpFromInfo(opIntInfo));
+                IRInst* newShiftAmount = builder.emitCast(shiftAmountType, shiftAmount);
+                builder.replaceOperand(inst->getOperands() + 1, newShiftAmount);
+            }
+        }
+    }
+
+    // For matrix divided by scalar operations, do not convert scalar divisor to dividend's matrix
+    // type. Division by matrix is not supported on Metal and WGSL.
+    if (!isMatrixDividedByScalar(inst))
+    {
+        legalizeScalarOperandsToMatchComposite(inst);
+    }
+    else if (isWGPUTarget(target))
+    {
+        // WGSL does not support matrix division by scalar, convert it to multiplication.
+        replaceMatrixDividedByScalarWithMul(inst);
+    }
+    else
+    {
+        // Matrix divided by scalar is natively supported on Metal - leave it as is.
+    }
+
+    if (isIntegralType(inst->getOperand(0)->getDataType()) &&
         isIntegralType(inst->getOperand(1)->getDataType()))
     {
         // Unless the operator is a shift, and if the integer operands differ in signedness,
@@ -108,8 +166,6 @@ void legalizeBinaryOp(IRInst* inst)
         {
             int signedOpIndex = (int)opIntInfo[1].isSigned;
             opIntInfo[signedOpIndex].isSigned = false;
-            IRBuilder builder(inst);
-            builder.setInsertBefore(inst);
             auto newOp = builder.emitCast(
                 builder.getType(getIntTypeOpFromInfo(opIntInfo[signedOpIndex])),
                 inst->getOperand(signedOpIndex));

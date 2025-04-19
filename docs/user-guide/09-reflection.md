@@ -1169,7 +1169,6 @@ Semantics are only relevant for shader parameters that became part of the varyin
 A semantic is decomposed into both a name and an index (e.g., `TEXCOORD5` has a name of `"TEXCOORD"` and an index of `5`).
 This information can be reflected with `getSemanticName()` and `getSemanticIndex()`:
 
-```c++
 
 ```c++
 void printVarLayout(slang::VariableLayoutReflection* varLayout)

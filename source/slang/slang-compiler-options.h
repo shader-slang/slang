@@ -274,7 +274,7 @@ struct CompilerOptionSet
                 result->getCount() != 0 && (*result)[0].kind == CompilerOptionValueKind::Int);
             return (*result)[0].intValue;
         }
-        return getDefault(name).intValue != 0;
+        return getDefault(name).intValue;
     }
     String getStringOption(CompilerOptionName name)
     {

@@ -2165,9 +2165,6 @@ SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
     // Set up options
     SerialContainerUtil::WriteOptions options;
 
-    options.compressionType = linkage->m_optionSet.getEnumOption<SerialCompressionType>(
-        CompilerOptionName::IrCompression);
-
     // If debug information is enabled, enable writing out source locs
     if (_shouldWriteSourceLocs(linkage))
     {

@@ -53,7 +53,7 @@ public:
         const uint32_t* contents,
         int contentsSize,
         String& outString) SLANG_OVERRIDE;
-    int link(
+    virtual SLANG_NO_THROW int SLANG_MCALL link(
         const uint32_t** modules,
         const uint32_t* moduleSizes,
         const uint32_t moduleCount,
