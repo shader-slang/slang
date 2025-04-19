@@ -1810,6 +1810,18 @@ TokenList Lexer::lexAllMarkupTokens()
     }
 }
 
+TokenList Lexer::lexAllTokens()
+{
+    TokenList tokenList;
+    for (;;)
+    {
+        Token token = lexToken();
+        tokenList.add(token);
+        if (token.type == TokenType::EndOfFile)
+            return tokenList;
+    }
+}
+
 /* static */ UnownedStringSlice Lexer::sourceLocationLexer(const UnownedStringSlice& in)
 {
     Lexer lexer;

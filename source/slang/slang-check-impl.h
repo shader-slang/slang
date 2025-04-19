@@ -3037,6 +3037,8 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
 private:
     void validateCaseStmts(SwitchStmt* stmt, DiagnosticSink* sink);
+
+    void generateUniqueIDForStmt(BreakableStmt* stmt);
 };
 
 struct SemanticsDeclVisitorBase : public SemanticsVisitor

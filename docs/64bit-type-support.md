@@ -147,7 +147,7 @@ D3D12    | FXC/DXBC         |      No        |          No        |   2
 2) uint64_t support requires https://docs.microsoft.com/en-us/windows/win32/direct3dhlsl/hlsl-shader-model-6-0-features-for-direct3d-12, so DXBC is not a target.
 
 The intrinsics available on `uint64_t` type are `abs`, `min`, `max`, `clamp` and `countbits`.
-The intrinsics available on `uint64_t` type are `abs`, `min`, `max` and `clamp`.
+The intrinsics available on `int64_t` type are `abs`, `min`, `max`, `clamp` and `countbits`.
 
 GLSL
 ====

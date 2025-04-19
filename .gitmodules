@@ -41,3 +41,6 @@
 [submodule "external/WindowsToolchain"]
 	path = external/WindowsToolchain
 	url = https://github.com/MarkSchofield/WindowsToolchain/
+[submodule "external/lua"]
+	path = external/lua
+	url = https://github.com/lua/lua.git

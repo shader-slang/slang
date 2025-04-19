@@ -1823,6 +1823,11 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL double I32_asdouble(int32_t low, int32_t hi)
     return u.d;
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_countbits(int32_t v)
+{
+    return __popc(uint32_t(v));
+}
+
 // ----------------------------- U32 -----------------------------------------
 
 // Unary
@@ -1880,6 +1885,11 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_min(int64_t a, int64_t b)
 SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_max(int64_t a, int64_t b)
 {
     return a > b ? a : b;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I64_countbits(int64_t v)
+{
+    return __popcll(uint64_t(v));
 }
 
 // ----------------------------- U64 -----------------------------------------

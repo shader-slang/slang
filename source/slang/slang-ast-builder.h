@@ -670,6 +670,8 @@ public:
 
     Index getId() { return m_id; }
 
+    BreakableStmt::UniqueID generateUniqueIDForStmt() { return create<UniqueStmtIDNode>(); }
+
     /// Ctor
     ASTBuilder(SharedASTBuilder* sharedASTBuilder, const String& name);
 
