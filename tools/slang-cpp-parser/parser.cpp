@@ -16,44 +16,8 @@ SLANG_COMPILE_TIME_ASSERT(int(Node::Kind::CountOf) <= 8 * sizeof(uint32_t));
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Parser !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 Parser::Parser(NodeTree* nodeTree, DiagnosticSink* sink)
-    : m_sink(sink), m_nodeTree(nodeTree), m_nodeTypeEnabled(0)
+    : m_sink(sink), m_nodeTree(nodeTree)
 {
-    // Enable types by default
-    const Node::Kind defaultEnabled[] = {
-        Node::Kind::ClassType,
-        Node::Kind::StructType,
-        Node::Kind::Namespace,
-        Node::Kind::AnonymousNamespace,
-        Node::Kind::Field,
-
-        // These are disabled by default because AST uses macro magic to build up the types
-        // Node::Type::TypeDef,
-        // Node::Type::Enum,
-        // Node::Type::EnumClass,
-
-        Node::Kind::Callable,
-    };
-    setKindsEnabled(defaultEnabled, SLANG_COUNT_OF(defaultEnabled));
-}
-
-void Parser::setKindEnabled(Node::Kind kind, bool isEnabled)
-{
-    if (isEnabled)
-    {
-        m_nodeTypeEnabled |= (NodeTypeBitType(1) << int(kind));
-    }
-    else
-    {
-        m_nodeTypeEnabled &= ~(NodeTypeBitType(1) << int(kind));
-    }
-}
-
-void Parser::setKindsEnabled(const Node::Kind* kinds, Index kindsCount, bool isEnabled)
-{
-    for (Index i = 0; i < kindsCount; ++i)
-    {
-        setKindEnabled(kinds[i], isEnabled);
-    }
 }
 
 bool Parser::_isMarker(const UnownedStringSlice& name)
@@ -410,6 +374,33 @@ SlangResult Parser::_parseEnum()
         TokenType tokenType = m_reader.peekTokenType();
         if (tokenType == TokenType::RBrace)
         {
+            break;
+        }
+
+        // TODO:
+        // The SlangImageFormat enum #includes "slang-image-format-defs.h" to define its cases.
+        // Since this parser has no preprocessor, it can't unfold those enum cases. For now skip
+        // the # directives in the enum body, resulting in an empty parsed enum. Maybe fix it by
+        // unfolding the enum manually where it is #included, resulting in some code duplication.
+        if (tokenType == TokenType::Pound)
+        {
+            while (m_reader.peekTokenType() == TokenType::Pound)
+            {
+                Token token = m_reader.peekToken();
+                if (token.flags & TokenFlag::AtStartOfLine)
+                {
+                    m_reader.advanceToken();
+                    for (;;)
+                    {
+                        auto t = m_reader.peekToken();
+                        if (t.type == TokenType::EndOfFile || (t.flags & TokenFlag::AtStartOfLine))
+                        {
+                            break;
+                        }
+                        m_reader.advanceToken();
+                    }
+                }
+            }
             break;
         }
 
@@ -1013,6 +1004,13 @@ SlangResult Parser::_maybeParseType(
         // TODO(JS):
         // Doesn't handle all the modifiers just (*SomeName)
 
+        // Skip the class name in case of a pointer to member function (Class::*Member)
+        if (m_reader.peekTokenType() == TokenType::Identifier)
+        {
+            m_reader.advanceToken();
+            expect(TokenType::Scope);
+        }
+
         SLANG_RETURN_ON_FAIL(expect(TokenType::OpMul));
         outNameCursor = m_reader.getCursor();
         SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier));
@@ -1111,32 +1109,58 @@ SlangResult Parser::_parseSpecialMacro()
     Token name;
     SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier, &name));
 
-    List<Token> params;
-
-    if (m_reader.peekTokenType() == TokenType::LParent)
-    {
-        // Mark the start
-        auto startCursor = m_reader.getCursor();
-
-        // Consume the params
-        SLANG_RETURN_ON_FAIL(_consumeBalancedParens());
-
-        auto endCursor = m_reader.getCursor();
-        m_reader.setCursor(startCursor);
-
-        while (!m_reader.isAtCursor(endCursor))
-        {
-            params.add(m_reader.advanceToken());
-        }
-    }
-
-    // Can do special handling here
     const UnownedStringSlice suffix = name.getContent().tail(m_options->m_markPrefix.getLength());
 
     if (suffix == "COM_INTERFACE")
     {
-        // TODO(JS): It's a com interface. Extact the GUID
+        return _parseGuid();
     }
+
+    if (m_reader.peekTokenType() == TokenType::LParent)
+    {
+        SLANG_RETURN_ON_FAIL(_consumeBalancedParens());
+    }
+
+    return SLANG_OK;
+}
+
+SlangResult Parser::_parseGuid()
+{
+    Guid guid{};
+    Token guidToken;
+    Int value;
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::LParent));
+
+    SLANG_RETURN_ON_FAIL(expect(TokenType::IntegerLiteral, &guidToken));
+    StringUtil::parseInt(guidToken.getContent(), value);
+    guid.data1 = value;
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
+    SLANG_RETURN_ON_FAIL(expect(TokenType::IntegerLiteral, &guidToken));
+    StringUtil::parseInt(guidToken.getContent(), value);
+    guid.data2 = value;
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
+    SLANG_RETURN_ON_FAIL(expect(TokenType::IntegerLiteral, &guidToken));
+    StringUtil::parseInt(guidToken.getContent(), value);
+    guid.data3 = value;
+    SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
+    SLANG_RETURN_ON_FAIL(expect(TokenType::LBrace));
+    for (Index i = 0; i < 8; ++i)
+    {
+        SLANG_RETURN_ON_FAIL(expect(TokenType::IntegerLiteral, &guidToken));
+        StringUtil::parseInt(guidToken.getContent(), value);
+        guid.data4[i] = value;
+        if (i < 7)
+        {
+            SLANG_RETURN_ON_FAIL(expect(TokenType::Comma));
+        }
+    }
+    SLANG_RETURN_ON_FAIL(expect(TokenType::RBrace));
+    SLANG_RETURN_ON_FAIL(expect(TokenType::RParent));
+
+    ClassLikeNode* node = as<ClassLikeNode>(m_currentScope);
+
+    node->m_guid = guid;
 
     return SLANG_OK;
 }
@@ -1471,6 +1495,9 @@ SlangResult Parser::_parseTypeDef()
     // Consume the typedef
     SLANG_RETURN_ON_FAIL(expect(TokenType::Identifier));
 
+    _maybeConsume(IdentifierStyle::Struct);
+    _maybeConsume(IdentifierStyle::Enum);
+
     Token nameToken;
     // Parse the type
     List<Token> toks;
@@ -1484,6 +1511,17 @@ SlangResult Parser::_parseTypeDef()
 
     if (Node::lookupNameInScope(m_currentScope, nameToken.getContent()))
     {
+        // TODO:
+        // In slang.h these types are defined twice as different sizes and then conditionally
+        // enabled based on a define. Since this parser has no preprocessor, it can't handle this.
+        // Maybe fix it by moving all of the platform-detection stuff out to a separate file as
+        // suggested here: https://github.com/shader-slang/slang/pull/954#discussion_r278687475
+        if (nameToken.getContent() == "SlangInt" || nameToken.getContent() == "SlangUInt" ||
+            nameToken.getContent() == "SlangSSizeT" || nameToken.getContent() == "SlangSizeT")
+        {
+            return SLANG_OK;
+        }
+
         m_sink->diagnose(
             nameToken.loc,
             CPPDiagnostics::identifierAlreadyDefined,
@@ -2129,15 +2167,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                     }
                 case IdentifierStyle::TypeDef:
                     {
-                        if (isTypeEnabled(Node::Kind::TypeDef))
-                        {
-                            SLANG_RETURN_ON_FAIL(_parseTypeDef());
-                        }
-                        else
-                        {
-                            m_reader.advanceToken();
-                            SLANG_RETURN_ON_FAIL(_consumeToSync());
-                        }
+                        SLANG_RETURN_ON_FAIL(_parseTypeDef());
                         break;
                     }
                 default:
@@ -2149,14 +2179,7 @@ SlangResult Parser::parse(SourceOrigin* sourceOrigin, const Options* options)
                             Node::Kind kind = _toNodeKind(style);
                             SLANG_ASSERT(kind != Node::Kind::Invalid);
 
-                            if (isTypeEnabled(kind))
-                            {
-                                SLANG_RETURN_ON_FAIL(_maybeParseNode(kind));
-                            }
-                            else
-                            {
-                                SLANG_RETURN_ON_FAIL(_maybeConsumeScope());
-                            }
+                            SLANG_RETURN_ON_FAIL(_maybeParseNode(kind));
                         }
                         else
                         {

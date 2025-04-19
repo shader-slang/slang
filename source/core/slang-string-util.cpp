@@ -690,16 +690,18 @@ String StringUtil::replaceAll(
     }
 
     int radix = 10;
+    auto isDigit = CharUtil::isDigit;
     auto getDigit = CharUtil::getDecimalDigitValue;
     if (cur + 1 < end && *cur == '0' && (*(cur + 1) == 'x' || *(cur + 1) == 'X'))
     {
         radix = 16;
+        isDigit = CharUtil::isHexDigit;
         getDigit = CharUtil::getHexDigitValue;
         cur += 2;
     }
 
     // We need at least one digit
-    if (cur >= end || !CharUtil::isDigit(*cur))
+    if (cur >= end || !isDigit(*cur))
     {
         return SLANG_FAIL;
     }
