@@ -139,22 +139,22 @@ SLANG_FORCE_INLINE bool operator!=(const Slang::Guid& a, const Slang::Guid& b)
             return SLANG_E_NO_INTERFACE;                       \
         }
 
-    #define SLANG_IUNKNOWN_ADD_REF                   \
-        SLANG_NO_THROW uint32_t SLANG_MCALL addRef() \
-        {                                            \
-            return ++m_refCount;                     \
+    #define SLANG_IUNKNOWN_ADD_REF                                  \
+        SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE \
+        {                                                           \
+            return ++m_refCount;                                    \
         }
 
-    #define SLANG_IUNKNOWN_RELEASE                    \
-        SLANG_NO_THROW uint32_t SLANG_MCALL release() \
-        {                                             \
-            --m_refCount;                             \
-            if (m_refCount == 0)                      \
-            {                                         \
-                delete this;                          \
-                return 0;                             \
-            }                                         \
-            return m_refCount;                        \
+    #define SLANG_IUNKNOWN_RELEASE                                   \
+        SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE \
+        {                                                            \
+            --m_refCount;                                            \
+            if (m_refCount == 0)                                     \
+            {                                                        \
+                delete this;                                         \
+                return 0;                                            \
+            }                                                        \
+            return m_refCount;                                       \
         }
 
     #define SLANG_IUNKNOWN_ALL         \
