@@ -364,6 +364,20 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
         getSpecializedBuiltinType(makeArrayView(args), "ArrayExpressionType"));
 }
 
+ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* elementCount, Expr* specConstSizeExpr)
+{
+    auto arrayType = getArrayType(elementType, elementCount);
+    if (auto elementCountConstantInt = as<ConstantIntVal>(elementCount))
+    {
+        if (elementCountConstantInt->getValue() == kSpecializationConstantArrayMagicLength)
+        {
+            arrayType->setSpecializationConstantSize(specConstSizeExpr);
+        }
+    }
+
+    return arrayType;
+}
+
 ConstantBufferType* ASTBuilder::getConstantBufferType(
     Type* elementType,
     Type* layoutType,

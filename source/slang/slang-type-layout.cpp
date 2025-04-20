@@ -2332,7 +2332,8 @@ static LayoutSize GetElementCount(IntVal* val)
 
     if (auto constantVal = as<ConstantIntVal>(val))
     {
-        if (constantVal->getValue() == kUnsizedArrayMagicLength)
+        if (constantVal->getValue() == kUnsizedArrayMagicLength ||
+            constantVal->getValue() == kSpecializationConstantArrayMagicLength)
             return LayoutSize::infinite();
         return LayoutSize(LayoutSize::RawValue(constantVal->getValue()));
     }

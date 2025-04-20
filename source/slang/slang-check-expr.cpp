@@ -1745,6 +1745,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     IntVal* argVals[kMaxArgs];
     IntegerLiteralValue constArgVals[kMaxArgs];
     bool allConst = true;
+    bool hasSpecializationConstant = false;
     for (Index a = 0; a < argCount; ++a)
     {
         auto argExpr = getArg(invokeExpr, a);
@@ -1756,12 +1757,27 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
         if (auto constArgVal = as<ConstantIntVal>(argVal))
         {
+            if (constArgVal->getValue() == kSpecializationConstantArrayMagicLength)
+            {
+                hasSpecializationConstant = true;
+            }
             constArgVals[a] = constArgVal->getValue();
         }
         else
         {
             allConst = false;
         }
+    }
+
+    if (allConst && hasSpecializationConstant)
+    {
+        // If the expression contains a specialization constant, we are not able to constant fold
+        // it, but we will still allow it to be used as array size. To handle this, we just return
+        // a magic value to indicate that the whole expression will result into a specialization constant
+        // operation.
+        IntVal* result = m_astBuilder->getIntVal(invokeExpr.getExpr()->type.type,
+                kSpecializationConstantArrayMagicLength);
+        return result;
     }
 
     if (!allConst)
@@ -1974,7 +1990,15 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
     // if they're marked `const`.
     if (decl->hasModifier<SpecializationConstantAttribute>() ||
         decl->hasModifier<VkConstantIdAttribute>())
+    {
+        if (kind == ConstantFoldingKind::SpecializationConstant)
+        {
+            return m_astBuilder->getIntVal(
+                    m_astBuilder->getIntType(),
+                    kSpecializationConstantArrayMagicLength);
+        }
         return nullptr;
+    }
 
     if (decl->hasModifier<ExternModifier>())
     {
@@ -2383,7 +2407,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                 subscriptExpr->indexExprs[0],
                 IntegerConstantExpressionCoercionType::AnyInteger,
                 nullptr,
-                ConstantFoldingKind::LinkTime);
+                ConstantFoldingKind::SpecializationConstant);
 
             // Validate that array size is greater than zero
             if (auto constElementCount = as<ConstantIntVal>(elementCount))
@@ -2395,7 +2419,17 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                         Diagnostics::invalidArraySize);
                     return CreateErrorExpr(subscriptExpr);
                 }
+
+                // If the specialization constant is a magic number, we need to create a new elementCount
+                // to represent this.
+                if (constElementCount->getValue() == kSpecializationConstantArrayMagicLength)
+                {
+                    elementCount = m_astBuilder->getIntVal(
+                         m_astBuilder->getIntType(),
+                         kSpecializationConstantArrayMagicLength);
+                }
             }
+
         }
         else if (subscriptExpr->indexExprs.getCount() != 0)
         {
@@ -2403,7 +2437,8 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         }
 
         auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->getType()), nullptr);
-        auto arrayType = getArrayType(m_astBuilder, elementType, elementCount);
+        auto arrayType = getArrayType(m_astBuilder, elementType, elementCount,
+               subscriptExpr->indexExprs.getCount() == 1 ? subscriptExpr->indexExprs[0] : nullptr);
 
         subscriptExpr->type = QualType(m_astBuilder->getTypeType(arrayType));
         return subscriptExpr;
