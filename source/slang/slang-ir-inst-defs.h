@@ -1038,6 +1038,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(MethodDecoration, method, 0, 0)
     INST(PackOffsetDecoration, packoffset, 2, 0)
     INST(SpecializationConstantDecoration, SpecializationConstantDecoration, 1, 0)
+        /// Decorate a new specialization constant that results from doing an operation
+    INST(SpecializationConstantOpDecoration, SpecializationConstantOpDecoration, 1, 0)
+
 
         // Reflection metadata for a shader parameter that provides the original type name.
     INST(UserTypeNameDecoration, UserTypeName, 1, 0)

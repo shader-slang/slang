@@ -314,6 +314,8 @@ ArrayExpressionType* getArrayType(ASTBuilder* astBuilder, Type* elementType, Int
 
 ArrayExpressionType* getArrayType(ASTBuilder* astBuilder, Type* elementType);
 
+ArrayExpressionType* getArrayType(ASTBuilder* astBuilder, Type* elementType, IntVal* elementCount, Expr* specConstExpr);
+
 NamedExpressionType* getNamedType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> const& declRef);
 
 FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef);
@@ -364,6 +366,7 @@ enum class UserDefinedAttributeTargets
 };
 
 const int kUnsizedArrayMagicLength = 0x7FFFFFFF;
+const int kSpecializationConstantArrayMagicLength = 0x7FFFFFFE;
 
 /// Get the module dclaration that a declaration is associated with, if any.
 ModuleDecl* getModuleDecl(Decl* decl);
