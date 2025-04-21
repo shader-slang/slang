@@ -28,6 +28,7 @@
 #include "options.h"
 #include "parse-diagnostic-util.h"
 #include "slangc-tool.h"
+#include "slangi-tool.h"
 #include "test-context.h"
 #include "test-reporter.h"
 
@@ -860,7 +861,7 @@ Result spawnAndWaitSharedLibrary(
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, &stdError);
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, &stdOut);
 
-        if (exeName == "slangc")
+        if (exeName == "slangc" || exeName == "slangi")
         {
             stdWriters.setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, &stdError);
         }
@@ -902,7 +903,7 @@ Result spawnAndWaitProxy(
     // Get the name of the thing to execute
     String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executableLocation.m_pathOrName);
 
-    if (exeName == "slangc")
+    if (exeName == "slangc" || exeName == "slangi")
     {
         // If the test is slangc there is a command line version we can just directly use
         // return spawnAndWaitExe(context, testPath, inCmdLine, outRes);
@@ -1065,6 +1066,7 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
     case SLANG_CUDA_SOURCE:
     case SLANG_METAL:
     case SLANG_WGSL:
+    case SLANG_HOST_VM:
         {
             return 0;
         }
@@ -1302,6 +1304,10 @@ static SlangResult _extractTestRequirements(const CommandLine& cmdLine, TestRequ
     else if (exeName == "slangc")
     {
         return _extractSlangCTestRequirements(cmdLine, ioInfo);
+    }
+    else if (exeName == "slangi")
+    {
+        return SLANG_OK;
     }
     else if (exeName == "slang-reflection-test")
     {
@@ -1560,6 +1566,12 @@ String findExpectedPath(const TestInput& input, const char* postFix)
         specializedBuf.getBuffer());
 
     return "";
+}
+
+static SlangResult _initSlangInterpreter(TestContext* context, CommandLine& ioCmdLine)
+{
+    ioCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slangi"));
+    return SLANG_OK;
 }
 
 static SlangResult _initSlangCompiler(TestContext* context, CommandLine& ioCmdLine)
@@ -2371,6 +2383,67 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
     }
 
     return _validateOutput(context, input, actualOutput, false);
+}
+
+TestResult runInterpreterTest(TestContext* context, TestInput& input)
+{
+    // need to execute the stand-alone Slang compiler on the file, and compare its output to what we
+    // expect
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+
+    List<String> args;
+
+    for (Index i = 0; i < input.testOptions->args.getCount(); i++)
+    {
+        auto& arg = input.testOptions->args[i];
+        if (arg == "-disasm")
+            cmdLine.addArg(arg);
+        else if (arg == "-entry")
+        {
+            cmdLine.addArg(arg);
+            i++;
+            if (i < input.testOptions->args.getCount())
+            {
+                cmdLine.addArg(input.testOptions->args[i]);
+            }
+        }
+        else
+        {
+            args.add(arg);
+        }
+    }
+
+    cmdLine.addArg(input.filePath);
+
+    for (auto arg : args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    if (SLANG_FAILED(_initSlangInterpreter(context, cmdLine)))
+    {
+        return TestResult::Ignored;
+    }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    String actualOutput = getOutput(exeRes);
+
+    return _validateOutput(
+        context,
+        input,
+        actualOutput,
+        false,
+        "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
+        [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }
 
 TestResult runCompile(TestContext* context, TestInput& input)
@@ -3952,6 +4025,7 @@ static const TestCommandInfo s_testCommandInfos[] = {
     {"SIMPLE", &runSimpleTest, 0},
     {"SIMPLE_EX", &runSimpleTest, 0},
     {"SIMPLE_LINE", &runSimpleLineTest, 0},
+    {"INTERPRET", &runInterpreterTest, 0},
     {"REFLECTION", &runReflectionTest, 0},
     {"CPU_REFLECTION", &runReflectionTest, 0},
     {"COMMAND_LINE_SIMPLE", &runSimpleCompareCommandLineTest, 0},
@@ -4849,6 +4923,11 @@ SlangResult innerMain(int argc, char** argv)
     {
         // We can set the slangc command line tool, to just use the function defined here
         context.setInnerMainFunc("slangc", &SlangCTool::innerMain);
+    }
+
+    {
+        // We can set the slangc command line tool, to just use the function defined here
+        context.setInnerMainFunc("slangi", &SlangITool::innerMain);
     }
 
     SLANG_RETURN_ON_FAIL(
