@@ -16369,6 +16369,91 @@ bool IsHelperLane()
 }
 
 //
+// Wave Rotate intrinsics.
+// These are Slang specific intrinsics to rotate values within a subgroup.
+//
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_rotate)
+[require(glsl_metal_spirv, subgroup_rotate)]
+T WaveRotate(T value, uint delta)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupRotate";
+    case metal:
+            __intrinsic_asm "simd_shuffle_rotate_down";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_KHR_subgroup_rotate";
+            OpCapability GroupNonUniformRotateKHR;
+            result:$$T = OpGroupNonUniformRotateKHR Subgroup $value $delta;
+        };
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_rotate)
+[require(glsl_metal_spirv, subgroup_rotate)]
+vector<T, N> WaveRotate(vector<T, N> value, uint delta)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupRotate";
+    case metal:
+        __intrinsic_asm "simd_shuffle_rotate_down";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_KHR_subgroup_rotate";
+            OpCapability GroupNonUniformRotateKHR;
+            result:$$vector<T,N> = OpGroupNonUniformRotateKHR Subgroup $value $delta;
+        };
+    }
+}
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_rotate)
+[require(glsl_spirv, subgroup_rotate)]
+T WaveClusteredRotate(T value, uint delta, constexpr uint clusterSize)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredRotate";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_KHR_subgroup_rotate";
+            OpCapability GroupNonUniformRotateKHR;
+            result:$$T = OpGroupNonUniformRotateKHR Subgroup $value $delta $clusterSize;
+        };
+    }
+}
+
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_rotate)
+[require(glsl_spirv, subgroup_rotate)]
+vector<T, N> WaveClusteredRotate(vector<T, N> value, uint delta, constexpr uint clusterSize)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredRotate";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_KHR_subgroup_rotate";
+            OpCapability GroupNonUniformRotateKHR;
+            result:$$vector<T,N> = OpGroupNonUniformRotateKHR Subgroup $value $delta $clusterSize;
+        };
+    }
+}
+
+//
 // Quad Control intrinsics
 //
 // For SPIRV and GLSL targets, the behavior is taken from Vulkan's `VK_KHR_shader_quad_control` spec.

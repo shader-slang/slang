@@ -8176,6 +8176,37 @@ public vector<T,N> subgroupQuadSwapDiagonal(vector<T,N> value)
     return QuadReadAcrossDiagonal(value);
 }
 
+// GL_KHR_shader_subgroup_rotate
+
+__generic<T : __BuiltinType>
+[require(glsl_metal_spirv, subgroup_rotate)]
+T subgroupRotate(T value, uint delta)
+{
+    return WaveRotate(value, delta);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[require(glsl_metal_spirv, subgroup_rotate)]
+vector<T, N> WaveRotate(vector<T, N> value, uint delta)
+{
+    return WaveRotate(value, delta);
+}
+
+__generic<T : __BuiltinType>
+[require(glsl_spirv, subgroup_rotate)]
+T subgroupClusteredRotate(T value, uint delta, constexpr uint clusterSize)
+{
+    return WaveClusteredRotate(value, delta, clusterSize);
+
+}
+
+__generic<T : __BuiltinType, let N : int>
+[require(glsl_spirv, subgroup_rotate)]
+vector<T, N> subgroupClusteredRotate(vector<T, N> value, uint delta, constexpr uint clusterSize)
+{
+    return WaveClusteredRotate(value, delta, clusterSize);
+}
+
 //// GLSL atomic
 
 // The following type internally is a Shader Storage Buffer 
