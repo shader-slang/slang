@@ -27,7 +27,6 @@
 #include "slang-lookup.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
-#include "slang-module-library.h"
 #include "slang-options.h"
 #include "slang-parameter-binding.h"
 #include "slang-parser.h"
@@ -860,29 +859,6 @@ Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSe
         linkageDebugInfoLevel =
             Math::Max(linkageDebugInfoLevel, target->getOptionSet().getDebugInfoLevel());
     linkage->m_optionSet.set(CompilerOptionName::DebugInformation, linkageDebugInfoLevel);
-
-    // Add any referenced modules to the linkage
-    for (auto& option : linkage->m_optionSet.options)
-    {
-        if (option.key != CompilerOptionName::ReferenceModule)
-            continue;
-        for (auto& path : option.value)
-        {
-            DiagnosticSink sink;
-            ComPtr<IArtifact> artifact;
-            SlangResult result = createArtifactFromReferencedModule(
-                path.stringValue,
-                SourceLoc{},
-                &sink,
-                artifact.writeRef());
-            if (SLANG_FAILED(result))
-            {
-                sink.diagnose(SourceLoc{}, Diagnostics::unableToReadFile, path.stringValue);
-                return result;
-            }
-            linkage->m_libModules.add(artifact);
-        }
-    }
 
     *outSession = asExternal(linkage.detach());
     return SLANG_OK;
@@ -6717,159 +6693,15 @@ void EndToEndCompileRequest::setDefaultModuleName(const char* defaultModuleName)
     frontEndReq->m_defaultModuleName = namePool->getName(defaultModuleName);
 }
 
-SlangResult _addLibraryReference(
-    EndToEndCompileRequest* req,
-    ModuleLibrary* moduleLibrary,
-    bool includeEntryPoint)
-{
-    FrontEndCompileRequest* frontEndRequest = req->getFrontEndReq();
-
-    if (includeEntryPoint)
-    {
-        frontEndRequest->m_extraEntryPoints.addRange(
-            moduleLibrary->m_entryPoints.getBuffer(),
-            moduleLibrary->m_entryPoints.getCount());
-    }
-
-    for (auto m : moduleLibrary->m_modules)
-    {
-        RefPtr<TranslationUnitRequest> tu = new TranslationUnitRequest(frontEndRequest, m);
-        frontEndRequest->translationUnits.add(tu);
-        // For modules loaded for EndToEndCompileRequest,
-        // we don't need the automatically discovered entrypoints.
-        if (!includeEntryPoint)
-            m->getEntryPoints().clear();
-    }
-    return SLANG_OK;
-}
-
-SlangResult _addLibraryReference(
-    EndToEndCompileRequest* req,
-    String path,
-    IArtifact* artifact,
-    bool includeEntryPoint)
-{
-    auto desc = artifact->getDesc();
-
-    // TODO(JS):
-    // This isn't perhaps the best way to handle this scenario, as IArtifact can
-    // support lazy evaluation, with suitable hander.
-    // For now we just read in and strip out the bits we want.
-    if (isDerivedFrom(desc.kind, ArtifactKind::Container) &&
-        isDerivedFrom(desc.payload, ArtifactPayload::CompileResults))
-    {
-        // We want to read as a file system
-        ComPtr<IArtifact> container;
-
-        SLANG_RETURN_ON_FAIL(ArtifactContainerUtil::readContainer(artifact, container));
-
-        // Find the payload... It should be linkable
-        if (!ArtifactDescUtil::isLinkable(container->getDesc()))
-        {
-            return SLANG_FAIL;
-        }
-
-        ComPtr<IModuleLibrary> libraryIntf;
-        SLANG_RETURN_ON_FAIL(
-            loadModuleLibrary(ArtifactKeep::Yes, container, path, req, libraryIntf));
-
-        auto library = as<ModuleLibrary>(libraryIntf);
-
-        // Look for source maps
-        for (auto associated : container->getAssociated())
-        {
-            auto assocDesc = associated->getDesc();
-
-            // If we find an obfuscated source map load it and associate
-            if (isDerivedFrom(assocDesc.kind, ArtifactKind::Json) &&
-                isDerivedFrom(assocDesc.payload, ArtifactPayload::SourceMap) &&
-                isDerivedFrom(assocDesc.style, ArtifactStyle::Obfuscated))
-            {
-                ComPtr<ICastable> castable;
-                SLANG_RETURN_ON_FAIL(associated->getOrCreateRepresentation(
-                    SourceMap::getTypeGuid(),
-                    ArtifactKeep::Yes,
-                    castable.writeRef()));
-                auto sourceMap = asBoxValue<SourceMap>(castable);
-                SLANG_ASSERT(sourceMap);
-
-                // TODO(JS):
-                // There is perhaps (?) a risk here that we might copy the obfuscated map
-                // into some output container. Currently that only happens for source maps
-                // that are from translation units.
-                //
-                // On the other hand using "import" is a way that such source maps *would* be
-                // copied into the output, and that is something that could be a vector
-                // for leaking.
-                //
-                // That isn't a risk from -r though because, it doesn't create a translation
-                // unit(s).
-                for (auto module : library->m_modules)
-                {
-                    module->getIRModule()->setObfuscatedSourceMap(sourceMap);
-                }
-
-                // Look up the source file
-                auto sourceManager = req->getSink()->getSourceManager();
-
-                auto name = Path::getFileNameWithoutExt(associated->getName());
-
-                if (name.getLength())
-                {
-                    auto sourceFile = sourceManager->findSourceFileByPathRecursively(name);
-                    sourceFile->setSourceMap(sourceMap, SourceMapKind::Obfuscated);
-                }
-            }
-        }
-
-        SLANG_RETURN_ON_FAIL(_addLibraryReference(req, library, includeEntryPoint));
-        return SLANG_OK;
-    }
-
-    if (desc.kind == ArtifactKind::Library && desc.payload == ArtifactPayload::SlangIR)
-    {
-        ComPtr<IModuleLibrary> libraryIntf;
-
-        SLANG_RETURN_ON_FAIL(
-            loadModuleLibrary(ArtifactKeep::Yes, artifact, path, req, libraryIntf));
-
-        auto library = as<ModuleLibrary>(libraryIntf);
-        if (!library)
-        {
-            return SLANG_FAIL;
-        }
-
-        SLANG_RETURN_ON_FAIL(_addLibraryReference(req, library, includeEntryPoint));
-        return SLANG_OK;
-    }
-
-    // TODO(JS):
-    // Do we want to check the path exists?
-
-    // Add to the m_libModules
-    auto linkage = req->getLinkage();
-    linkage->m_libModules.add(ComPtr<IArtifact>(artifact));
-
-    return SLANG_OK;
-}
-
 SlangResult EndToEndCompileRequest::addLibraryReference(
     const char* basePath,
     const void* libData,
     size_t libDataSize)
 {
-    // We need to deserialize and add the modules
-    ComPtr<IModuleLibrary> library;
-
-    SLANG_RETURN_ON_FAIL(
-        loadModuleLibrary((const Byte*)libData, libDataSize, basePath, this, library));
-
-    // Create an artifact without any name (as one is not provided)
-    auto artifact =
-        Artifact::create(ArtifactDesc::make(ArtifactKind::Library, ArtifactPayload::SlangIR));
-    artifact->addRepresentation(library);
-
-    return _addLibraryReference(this, basePath, artifact, true);
+    SLANG_UNUSED(basePath);
+    SLANG_UNUSED(libData);
+    SLANG_UNUSED(libDataSize);
+    return SLANG_FAIL;
 }
 
 void EndToEndCompileRequest::addTranslationUnitPreprocessorDefine(

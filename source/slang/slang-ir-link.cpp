@@ -12,7 +12,6 @@
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 #include "slang-mangle.h"
-#include "slang-module-library.h"
 
 namespace Slang
 {
