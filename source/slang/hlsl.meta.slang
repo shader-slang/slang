@@ -16382,6 +16382,7 @@ bool IsHelperLane()
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
+__spirv_version(1.3)
 [ForceInline]
 [require(glsl_hlsl_metal_spirv, quad_control)]
 bool QuadAny(bool expr)
@@ -16406,6 +16407,7 @@ bool QuadAny(bool expr)
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
+__spirv_version(1.3)
 [ForceInline]
 [require(glsl_hlsl_metal_spirv, quad_control)]
 bool QuadAll(bool expr)
