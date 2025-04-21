@@ -33,6 +33,22 @@ bool testVRotate()
     return (__rotate(gvec(T(threadIndex)), DELTA) == gvec(T(rotatedValue)))[0];
 }
 
+bool test1RotateBool()
+{
+    bool currentValue = (threadIndex % 2 == 0) ? true : true;
+    bool rotatedValueBool = (threadIndex % 2 == 0) ? false : false;
+    return __rotate(true, 1) == true;
+}
+
+__generic<let N : int>
+bool testVRotate()
+{
+    typealias gvec = vector<bool, N>;
+    bool currentValue = (threadIndex % 2 == 0) ? false : true;
+    bool rotatedValueBool = (threadIndex % 2 == 0) ? true : false;
+    return (__rotate(gvec(currentValue), DELTA) == gvec(rotatedValueBool))[0];
+}
+
 bool testRotate()
 {
     return true
@@ -76,6 +92,7 @@ bool testRotate()
         && testVRotate<int64_t, 2>()
         && testVRotate<int64_t, 3>()
         && testVRotate<int64_t, 4>()
+        && test1RotateBool()
         ;
 }
 
