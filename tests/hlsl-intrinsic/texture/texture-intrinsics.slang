@@ -360,10 +360,10 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     outputBuffer[idx] = val;
 }
 
-// DX11: 327
-// DX11: 327
-// DX11: 327
-// DX11: 327
+// DX11: 354
+// DX11: 354
+// DX11: 354
+// DX11: 354
 // DX12: 354
 // DX12: 354
 // DX12: 354
