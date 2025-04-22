@@ -277,6 +277,14 @@ Versions
 > HLSL shader model 6.8 and related capabilities of other targets.
 > Includes related GLSL/SPIRV extensions.
 
+`sm_6_9_version`
+> HLSL shader model 6.9 and related capabilities of other targets.
+> Does not include related GLSL/SPIRV extensions.
+
+`sm_6_9`
+> HLSL shader model 6.9 and related capabilities of other targets.
+> Includes related GLSL/SPIRV extensions.
+
 `GLSL_130`
 > GLSL 130 and related capabilities of other targets.
 
@@ -1286,6 +1294,9 @@ Other
 
 `DX_6_8`
 > Use `sm_6_8` instead
+
+`DX_6_9`
+> Use `sm_6_9` instead
 
 `GLSL_410_SPIRV_1_0`
 > User should not use this capability
