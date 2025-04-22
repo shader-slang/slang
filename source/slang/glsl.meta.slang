@@ -8180,21 +8180,21 @@ public vector<T,N> subgroupQuadSwapDiagonal(vector<T,N> value)
 
 __generic<T : __BuiltinType>
 [require(glsl_metal_spirv, subgroup_rotate)]
-T subgroupRotate(T value, uint delta)
+public T subgroupRotate(T value, uint delta)
 {
     return WaveRotate(value, delta);
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 [require(glsl_metal_spirv, subgroup_rotate)]
-vector<T, N> WaveRotate(vector<T, N> value, uint delta)
+public vector<T, N> subgroupRotate(vector<T, N> value, uint delta)
 {
     return WaveRotate(value, delta);
 }
 
 __generic<T : __BuiltinType>
 [require(glsl_spirv, subgroup_rotate)]
-T subgroupClusteredRotate(T value, uint delta, constexpr uint clusterSize)
+public T subgroupClusteredRotate(T value, uint delta, constexpr uint clusterSize)
 {
     return WaveClusteredRotate(value, delta, clusterSize);
 
@@ -8202,7 +8202,7 @@ T subgroupClusteredRotate(T value, uint delta, constexpr uint clusterSize)
 
 __generic<T : __BuiltinType, let N : int>
 [require(glsl_spirv, subgroup_rotate)]
-vector<T, N> subgroupClusteredRotate(vector<T, N> value, uint delta, constexpr uint clusterSize)
+public vector<T, N> subgroupClusteredRotate(vector<T, N> value, uint delta, constexpr uint clusterSize)
 {
     return WaveClusteredRotate(value, delta, clusterSize);
 }
