@@ -236,6 +236,20 @@ void GroupMemoryBarrierWithWaveSync();
 
 Synchronizes all lanes to the same GroupMemoryBarrierWithWaveSync in program flow. Orders group shared memory accesses such that accesses after the barrier can be seen by writes before.  
 
+Wave Rotate Intrinsics
+======================
+
+These intrinsics are specific to Slang and were added to support the subgroup rotate functionalities provided by SPIRV (through the `GroupNonUniformRotateKHR` capability), GLSL (through the `GL_KHR_shader_subgroup_rotate
+` extension), and Metal.
+
+```
+// Supported on SPIRV, GLSL, and Metal targets.
+T WaveRotate(T value, uint delta);
+
+// Supported on SPIRV and GLSL targets.
+T WaveClusteredRotate(T value, uint delta, constexpr uint clusterSize);
+```
+
 Wave Mask Intrinsics
 ====================
 
