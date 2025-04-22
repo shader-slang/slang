@@ -1100,7 +1100,7 @@ alias bufferreference_int64 = bufferreference + GL_EXT_shader_explicit_arithmeti
 /// Note that cpp and cuda are supported via a fallback non-cooperative implementation
 /// No HLSL shader model bound yet
 /// [Compound]
-alias cooperative_vector = _sm_6_8 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV;
+alias cooperative_vector = _sm_6_9 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV;
 /// Capabilities needed to train cooperative vectors
 /// [Compound]
 alias cooperative_vector_training = spvCooperativeVectorTrainingNV;
