@@ -1,55 +1,56 @@
 // slang-ast-stmt.h
-
 #pragma once
 
 #include "slang-ast-base.h"
+#include "slang-ast-stmt.h.fiddle"
 
+FIDDLE()
 namespace Slang
 {
 
 // Syntax class definitions for statements.
 
+FIDDLE(abstract)
 class ScopeStmt : public Stmt
 {
-    SLANG_ABSTRACT_AST_CLASS(ScopeStmt)
-
+    FIDDLE(...)
     ScopeDecl* scopeDecl = nullptr;
 };
 
 // A sequence of statements, treated as a single statement
+FIDDLE()
 class SeqStmt : public Stmt
 {
-    SLANG_AST_CLASS(SeqStmt)
-
-    List<Stmt*> stmts;
+    FIDDLE(...)
+    FIDDLE() List<Stmt*> stmts;
 };
 
 // A statement with a label.
+FIDDLE()
 class LabelStmt : public Stmt
 {
-    SLANG_AST_CLASS(LabelStmt)
-
-    Token label;
-    Stmt* innerStmt;
+    FIDDLE(...)
+    FIDDLE() Token label;
+    FIDDLE() Stmt* innerStmt;
 };
 
 // The simplest kind of scope statement: just a `{...}` block
+FIDDLE()
 class BlockStmt : public ScopeStmt
 {
-    SLANG_AST_CLASS(BlockStmt)
-
+    FIDDLE(...)
     /// TODO(JS): Having ranges of sourcelocs might be a good addition to AST nodes in general.
     SourceLoc closingSourceLoc; ///< The source location of the closing brace
 
-    Stmt* body = nullptr;
+    FIDDLE() Stmt* body = nullptr;
 };
 
 // A statement that we aren't going to parse or check, because
 // we want to let a downstream compiler handle any issues
+FIDDLE()
 class UnparsedStmt : public Stmt
 {
-    SLANG_AST_CLASS(UnparsedStmt)
-
+    FIDDLE(...)
     // The tokens that were contained between `{` and `}`
     List<Token> tokens;
     Scope* currentScope = nullptr;
@@ -58,41 +59,45 @@ class UnparsedStmt : public Stmt
     bool isInVariadicGenerics = false;
 };
 
+FIDDLE()
 class EmptyStmt : public Stmt
 {
-    SLANG_AST_CLASS(EmptyStmt)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class DiscardStmt : public Stmt
 {
-    SLANG_AST_CLASS(DiscardStmt)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class DeclStmt : public Stmt
 {
-    SLANG_AST_CLASS(DeclStmt)
-
-    DeclBase* decl = nullptr;
+    FIDDLE(...)
+    FIDDLE() DeclBase* decl = nullptr;
 };
 
+FIDDLE()
 class IfStmt : public Stmt
 {
-    SLANG_AST_CLASS(IfStmt)
-
-    Expr* predicate = nullptr;
-    Stmt* positiveStatement = nullptr;
-    Stmt* negativeStatement = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* predicate = nullptr;
+    FIDDLE() Stmt* positiveStatement = nullptr;
+    FIDDLE() Stmt* negativeStatement = nullptr;
 };
 
+FIDDLE()
 class UniqueStmtIDNode : public Decl
 {
-    SLANG_AST_CLASS(UniqueStmtIDNode)
+    FIDDLE(...)
 };
 
 // A statement that can be escaped with a `break`
+FIDDLE(abstract)
 class BreakableStmt : public ScopeStmt
 {
-    SLANG_ABSTRACT_AST_CLASS(BreakableStmt)
+    FIDDLE(...)
 
     /// A unique ID for this statement.
     ///
@@ -106,20 +111,21 @@ class BreakableStmt : public ScopeStmt
     static constexpr UniqueID kInvalidUniqueID = nullptr;
 };
 
+FIDDLE()
 class SwitchStmt : public BreakableStmt
 {
-    SLANG_AST_CLASS(SwitchStmt)
-
-    Expr* condition = nullptr;
-    Stmt* body = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* condition = nullptr;
+    FIDDLE() Stmt* body = nullptr;
 };
 
 // A statement that is expected to appear lexically nested inside
 // some other construct, and thus needs to keep track of the
 // outer statement that it is associated with...
+FIDDLE(abstract)
 class ChildStmt : public Stmt
 {
-    SLANG_ABSTRACT_AST_CLASS(ChildStmt)
+    FIDDLE(...)
 
     /// The unique ID of the enclosing statement this
     /// child statement refers to.
@@ -127,33 +133,35 @@ class ChildStmt : public Stmt
     BreakableStmt::UniqueID targetOuterStmtID = BreakableStmt::kInvalidUniqueID;
 };
 
+FIDDLE()
 class TargetCaseStmt : public ChildStmt
 {
-    SLANG_AST_CLASS(TargetCaseStmt)
-    int32_t capability;
-    Token capabilityToken;
-    Stmt* body = nullptr;
+    FIDDLE(...)
+    FIDDLE() int32_t capability;
+    FIDDLE() Token capabilityToken;
+    FIDDLE() Stmt* body = nullptr;
 };
 
+FIDDLE()
 class TargetSwitchStmt : public BreakableStmt
 {
-    SLANG_AST_CLASS(TargetSwitchStmt)
-
-    List<TargetCaseStmt*> targetCases;
+    FIDDLE(...)
+    FIDDLE() List<TargetCaseStmt*> targetCases;
 };
 
+FIDDLE()
 class StageSwitchStmt : public TargetSwitchStmt
 {
-    SLANG_AST_CLASS(StageSwitchStmt)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class IntrinsicAsmStmt : public Stmt
 {
-    SLANG_AST_CLASS(IntrinsicAsmStmt)
+    FIDDLE(...)
+    FIDDLE() String asmText;
 
-    String asmText;
-
-    List<Expr*> args;
+    FIDDLE() List<Expr*> args;
 };
 
 // a `case` or `default` statement inside a `switch`
@@ -161,129 +169,136 @@ class IntrinsicAsmStmt : public Stmt
 // Note(tfoley): A correct AST for a C-like language would treat
 // these as a labelled statement, and so they would contain a
 // sub-statement. I'm leaving that out for now for simplicity.
+FIDDLE(abstract)
 class CaseStmtBase : public ChildStmt
 {
-    SLANG_ABSTRACT_AST_CLASS(CaseStmtBase)
+    FIDDLE(...)
 };
 
 // a `case` statement inside a `switch`
+FIDDLE()
 class CaseStmt : public CaseStmtBase
 {
-    SLANG_AST_CLASS(CaseStmt)
+    FIDDLE(...)
+    FIDDLE() Expr* expr = nullptr;
 
-    Expr* expr = nullptr;
-
-    Val* exprVal = nullptr;
+    FIDDLE() Val* exprVal = nullptr;
 };
 
 // a `default` statement inside a `switch`
+FIDDLE()
 class DefaultStmt : public CaseStmtBase
 {
-    SLANG_AST_CLASS(DefaultStmt)
+    FIDDLE(...)
 };
 
 // a `default` statement inside a `switch`
+FIDDLE()
 class GpuForeachStmt : public ScopeStmt
 {
-    SLANG_AST_CLASS(GpuForeachStmt)
-
-    Expr* device = nullptr;
-    Expr* gridDims = nullptr;
-    VarDecl* dispatchThreadID = nullptr;
-    Expr* kernelCall = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* device = nullptr;
+    FIDDLE() Expr* gridDims = nullptr;
+    FIDDLE() VarDecl* dispatchThreadID = nullptr;
+    FIDDLE() Expr* kernelCall = nullptr;
 };
 
 // A statement that represents a loop, and can thus be escaped with a `continue`
+FIDDLE(abstract)
 class LoopStmt : public BreakableStmt
 {
-    SLANG_ABSTRACT_AST_CLASS(LoopStmt)
+    FIDDLE(...)
 };
 
 // A `for` statement
+FIDDLE()
 class ForStmt : public LoopStmt
 {
-    SLANG_AST_CLASS(ForStmt)
-
-    Stmt* initialStatement = nullptr;
-    Expr* sideEffectExpression = nullptr;
-    Expr* predicateExpression = nullptr;
-    Stmt* statement = nullptr;
+    FIDDLE(...)
+    FIDDLE() Stmt* initialStatement = nullptr;
+    FIDDLE() Expr* sideEffectExpression = nullptr;
+    FIDDLE() Expr* predicateExpression = nullptr;
+    FIDDLE() Stmt* statement = nullptr;
 };
 
 // A `for` statement in a language that doesn't restrict the scope
 // of the loop variable to the body.
+FIDDLE()
 class UnscopedForStmt : public ForStmt
 {
-    SLANG_AST_CLASS(UnscopedForStmt);
+    FIDDLE(...)
 };
 
+FIDDLE()
 class WhileStmt : public LoopStmt
 {
-    SLANG_AST_CLASS(WhileStmt)
-
-    Expr* predicate = nullptr;
-    Stmt* statement = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* predicate = nullptr;
+    FIDDLE() Stmt* statement = nullptr;
 };
 
+FIDDLE()
 class DoWhileStmt : public LoopStmt
 {
-    SLANG_AST_CLASS(DoWhileStmt)
-
-    Stmt* statement = nullptr;
-    Expr* predicate = nullptr;
+    FIDDLE(...)
+    FIDDLE() Stmt* statement = nullptr;
+    FIDDLE() Expr* predicate = nullptr;
 };
 
 // A compile-time, range-based `for` loop, which will not appear in the output code
+FIDDLE()
 class CompileTimeForStmt : public ScopeStmt
 {
-    SLANG_AST_CLASS(CompileTimeForStmt)
-
-    VarDecl* varDecl = nullptr;
-    Expr* rangeBeginExpr = nullptr;
-    Expr* rangeEndExpr = nullptr;
-    Stmt* body = nullptr;
-    IntVal* rangeBeginVal = nullptr;
-    IntVal* rangeEndVal = nullptr;
+    FIDDLE(...)
+    FIDDLE() VarDecl* varDecl = nullptr;
+    FIDDLE() Expr* rangeBeginExpr = nullptr;
+    FIDDLE() Expr* rangeEndExpr = nullptr;
+    FIDDLE() Stmt* body = nullptr;
+    FIDDLE() IntVal* rangeBeginVal = nullptr;
+    FIDDLE() IntVal* rangeEndVal = nullptr;
 };
 
 // The case of child statements that do control flow relative
 // to their parent statement.
+FIDDLE(abstract)
 class JumpStmt : public ChildStmt
 {
-    SLANG_ABSTRACT_AST_CLASS(JumpStmt)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class BreakStmt : public JumpStmt
 {
-    SLANG_AST_CLASS(BreakStmt)
-
+    FIDDLE(...)
     Token targetLabel;
 };
 
+FIDDLE()
 class ContinueStmt : public JumpStmt
 {
-    SLANG_AST_CLASS(ContinueStmt)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class ReturnStmt : public Stmt
 {
-    SLANG_AST_CLASS(ReturnStmt)
-
-    Expr* expression = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* expression = nullptr;
 };
 
+FIDDLE()
 class DeferStmt : public Stmt
 {
-    SLANG_AST_CLASS(DeferStmt)
+    FIDDLE(...)
 
-    Stmt* statement = nullptr;
+    FIDDLE() Stmt* statement = nullptr;
 };
 
+FIDDLE()
 class ExpressionStmt : public Stmt
 {
-    SLANG_AST_CLASS(ExpressionStmt)
-
-    Expr* expression = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* expression = nullptr;
 };
 
 } // namespace Slang

@@ -1,19 +1,20 @@
 // slang-ast-type.h
-
 #pragma once
 
 #include "slang-ast-base.h"
+#include "slang-ast-type.h.fiddle"
 
+FIDDLE()
 namespace Slang
 {
 
 // Syntax class definitions for types.
 
 // The type of a reference to an overloaded name
+FIDDLE()
 class OverloadGroupType : public Type
 {
-    SLANG_AST_CLASS(OverloadGroupType)
-
+    FIDDLE(...)
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
@@ -21,20 +22,20 @@ class OverloadGroupType : public Type
 
 // The type of an initializer-list expression (before it has
 // been coerced to some other type)
+FIDDLE()
 class InitializerListType : public Type
 {
-    SLANG_AST_CLASS(InitializerListType)
-
+    FIDDLE(...)
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
 };
 
 // The type of an expression that was erroneous
+FIDDLE()
 class ErrorType : public Type
 {
-    SLANG_AST_CLASS(ErrorType)
-
+    FIDDLE(...)
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
@@ -42,20 +43,20 @@ class ErrorType : public Type
 };
 
 // The bottom/empty type that has no values.
+FIDDLE()
 class BottomType : public Type
 {
-    SLANG_AST_CLASS(BottomType)
-
+    FIDDLE(...)
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 // A type that takes the form of a reference to some declaration
+FIDDLE()
 class DeclRefType : public Type
 {
-    SLANG_AST_CLASS(DeclRefType)
-
+    FIDDLE(...)
     static Type* create(ASTBuilder* astBuilder, DeclRef<Decl> declRef);
 
     DeclRef<Decl> getDeclRef() const { return DeclRef<Decl>(as<DeclRefBase>(getOperand(0))); }
@@ -83,20 +84,20 @@ bool isTypePack(Type* type);
 bool isAbstractTypePack(Type* type);
 
 // Base class for types that can be used in arithmetic expressions
+FIDDLE(abstract)
 class ArithmeticExpressionType : public DeclRefType
 {
-    SLANG_ABSTRACT_AST_CLASS(ArithmeticExpressionType)
-
+    FIDDLE(...)
     BasicExpressionType* getScalarType();
 
     // Overrides should be public so base classes can access
     BasicExpressionType* _getScalarTypeOverride();
 };
 
+FIDDLE()
 class BasicExpressionType : public ArithmeticExpressionType
 {
-    SLANG_AST_CLASS(BasicExpressionType)
-
+    FIDDLE(...)
     BaseType getBaseType() const;
 
     // Overrides should be public so base classes can access
@@ -108,45 +109,52 @@ class BasicExpressionType : public ArithmeticExpressionType
 // Base type for things that are built in to the compiler,
 // and will usually have special behavior or a custom
 // mapping to the IR level.
+FIDDLE(abstract)
 class BuiltinType : public DeclRefType
 {
-    SLANG_ABSTRACT_AST_CLASS(BuiltinType)
+    FIDDLE(...)
 };
 
+FIDDLE(abstract)
 class DataLayoutType : public BuiltinType
 {
-    SLANG_ABSTRACT_AST_CLASS(DataLayoutType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class IBufferDataLayoutType : public BuiltinType
 {
-    SLANG_AST_CLASS(IBufferDataLayoutType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class DefaultDataLayoutType : public DataLayoutType
 {
-    SLANG_AST_CLASS(DefaultDataLayoutType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class Std430DataLayoutType : public DataLayoutType
 {
-    SLANG_AST_CLASS(Std430DataLayoutType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class Std140DataLayoutType : public DataLayoutType
 {
-    SLANG_AST_CLASS(Std140DataLayoutType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class ScalarDataLayoutType : public DataLayoutType
 {
-    SLANG_AST_CLASS(ScalarDataLayoutType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class FeedbackType : public BuiltinType
 {
-    SLANG_AST_CLASS(FeedbackType)
-
+    FIDDLE(...)
     enum class Kind : uint8_t
     {
         MinMip,        /// SAMPLER_FEEDBACK_MIN_MIP
@@ -156,37 +164,43 @@ class FeedbackType : public BuiltinType
     Kind getKind() const;
 };
 
+FIDDLE(abstract)
 class TextureShapeType : public BuiltinType
 {
-    SLANG_ABSTRACT_AST_CLASS(TextureShapeType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class TextureShape1DType : public TextureShapeType
 {
-    SLANG_AST_CLASS(TextureShape1DType)
+    FIDDLE(...)
 };
+FIDDLE()
 class TextureShape2DType : public TextureShapeType
 {
-    SLANG_AST_CLASS(TextureShape2DType)
+    FIDDLE(...)
 };
+FIDDLE()
 class TextureShape3DType : public TextureShapeType
 {
-    SLANG_AST_CLASS(TextureShape3DType)
+    FIDDLE(...)
 };
+FIDDLE()
 class TextureShapeCubeType : public TextureShapeType
 {
-    SLANG_AST_CLASS(TextureShapeCubeType)
+    FIDDLE(...)
 };
+FIDDLE()
 class TextureShapeBufferType : public TextureShapeType
 {
-    SLANG_AST_CLASS(TextureShapeBufferType)
+    FIDDLE(...)
 };
 
 // Resources that contain "elements" that can be fetched
+FIDDLE(abstract)
 class ResourceType : public BuiltinType
 {
-    SLANG_ABSTRACT_AST_CLASS(ResourceType)
-
+    FIDDLE(...)
     bool isMultisample();
     bool isArray();
     bool isShadow();
@@ -199,286 +213,322 @@ class ResourceType : public BuiltinType
     void _toTextOverride(StringBuilder& out);
 };
 
+FIDDLE(abstract)
 class TextureTypeBase : public ResourceType
 {
-    SLANG_ABSTRACT_AST_CLASS(TextureTypeBase)
-
+    FIDDLE(...)
     Val* getSampleCount();
     Val* getFormat();
 };
 
+FIDDLE()
 class TextureType : public TextureTypeBase
 {
-    SLANG_AST_CLASS(TextureType)
+    FIDDLE(...)
 };
 
 // This is a base type for `image*` types, as they exist in GLSL
+FIDDLE()
 class GLSLImageType : public TextureTypeBase
 {
-    SLANG_AST_CLASS(GLSLImageType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class SubpassInputType : public BuiltinType
 {
-    SLANG_AST_CLASS(SubpassInputType)
-
+    FIDDLE(...)
     bool isMultisample();
     Type* getElementType();
 };
 
+FIDDLE()
 class SamplerStateType : public BuiltinType
 {
-    SLANG_AST_CLASS(SamplerStateType)
-
+    FIDDLE(...)
     // Returns flavor of sampler state of this type.
     SamplerStateFlavor getFlavor() const;
 };
 
 // Other cases of generic types known to the compiler
+FIDDLE()
 class BuiltinGenericType : public BuiltinType
 {
-    SLANG_AST_CLASS(BuiltinGenericType)
-
+    FIDDLE(...)
     Type* getElementType() const;
 };
 
 // Types that behave like pointers, in that they can be
 // dereferenced (implicitly) to access members defined
 // in the element type.
+FIDDLE(abstract)
 class PointerLikeType : public BuiltinGenericType
 {
-    SLANG_AST_CLASS(PointerLikeType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class DynamicResourceType : public BuiltinType
 {
-    SLANG_AST_CLASS(DynamicResourceType)
+    FIDDLE(...)
 };
 
 // HLSL buffer-type resources
 
+FIDDLE(abstract)
 class HLSLStructuredBufferTypeBase : public BuiltinGenericType
 {
-    SLANG_AST_CLASS(HLSLStructuredBufferTypeBase)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLStructuredBufferType : public HLSLStructuredBufferTypeBase
 {
-    SLANG_AST_CLASS(HLSLStructuredBufferType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLRWStructuredBufferType : public HLSLStructuredBufferTypeBase
 {
-    SLANG_AST_CLASS(HLSLRWStructuredBufferType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLRasterizerOrderedStructuredBufferType : public HLSLStructuredBufferTypeBase
 {
-    SLANG_AST_CLASS(HLSLRasterizerOrderedStructuredBufferType)
+    FIDDLE(...)
 };
 
 
+FIDDLE()
 class UntypedBufferResourceType : public BuiltinType
 {
-    SLANG_AST_CLASS(UntypedBufferResourceType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLByteAddressBufferType : public UntypedBufferResourceType
 {
-    SLANG_AST_CLASS(HLSLByteAddressBufferType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLRWByteAddressBufferType : public UntypedBufferResourceType
 {
-    SLANG_AST_CLASS(HLSLRWByteAddressBufferType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLRasterizerOrderedByteAddressBufferType : public UntypedBufferResourceType
 {
-    SLANG_AST_CLASS(HLSLRasterizerOrderedByteAddressBufferType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class RaytracingAccelerationStructureType : public UntypedBufferResourceType
 {
-    SLANG_AST_CLASS(RaytracingAccelerationStructureType)
+    FIDDLE(...)
 };
 
 
+FIDDLE()
 class HLSLAppendStructuredBufferType : public HLSLStructuredBufferTypeBase
 {
-    SLANG_AST_CLASS(HLSLAppendStructuredBufferType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLConsumeStructuredBufferType : public HLSLStructuredBufferTypeBase
 {
-    SLANG_AST_CLASS(HLSLConsumeStructuredBufferType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLAtomicUintType : public BuiltinType
 {
-    SLANG_AST_CLASS(GLSLAtomicUintType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLPatchType : public BuiltinType
 {
-    SLANG_AST_CLASS(HLSLPatchType)
-
+    FIDDLE(...)
     Type* getElementType();
     IntVal* getElementCount();
 };
 
+FIDDLE()
 class HLSLInputPatchType : public HLSLPatchType
 {
-    SLANG_AST_CLASS(HLSLInputPatchType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLOutputPatchType : public HLSLPatchType
 {
-    SLANG_AST_CLASS(HLSLOutputPatchType)
+    FIDDLE(...)
 };
 
 
 // HLSL geometry shader output stream types
 
+FIDDLE()
 class HLSLStreamOutputType : public BuiltinGenericType
 {
-    SLANG_AST_CLASS(HLSLStreamOutputType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLPointStreamType : public HLSLStreamOutputType
 {
-    SLANG_AST_CLASS(HLSLPointStreamType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLLineStreamType : public HLSLStreamOutputType
 {
-    SLANG_AST_CLASS(HLSLLineStreamType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLTriangleStreamType : public HLSLStreamOutputType
 {
-    SLANG_AST_CLASS(HLSLTriangleStreamType)
+    FIDDLE(...)
 };
 
 // mesh shader output types
 
+FIDDLE()
 class MeshOutputType : public BuiltinGenericType
 {
-    SLANG_AST_CLASS(MeshOutputType)
-
+    FIDDLE(...)
     Type* getElementType();
 
     IntVal* getMaxElementCount();
 };
 
+FIDDLE()
 class VerticesType : public MeshOutputType
 {
-    SLANG_AST_CLASS(VerticesType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class IndicesType : public MeshOutputType
 {
-    SLANG_AST_CLASS(IndicesType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class PrimitivesType : public MeshOutputType
 {
-    SLANG_AST_CLASS(PrimitivesType)
+    FIDDLE(...)
 };
 
 
 //
+FIDDLE()
 class GLSLInputAttachmentType : public BuiltinType
 {
-    SLANG_AST_CLASS(GLSLInputAttachmentType)
+    FIDDLE(...)
 };
 
 
+FIDDLE()
 class DescriptorHandleType : public PointerLikeType
 {
-    SLANG_AST_CLASS(DescriptorHandleType)
+    FIDDLE(...)
 };
 
 // Base class for types used when desugaring parameter block
 // declarations, includeing HLSL `cbuffer` or GLSL `uniform` blocks.
+FIDDLE(abstract)
 class ParameterGroupType : public PointerLikeType
 {
-    SLANG_AST_CLASS(ParameterGroupType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class UniformParameterGroupType : public ParameterGroupType
 {
-    SLANG_AST_CLASS(UniformParameterGroupType)
+    FIDDLE(...)
     Type* getLayoutType();
 };
 
+FIDDLE()
 class VaryingParameterGroupType : public ParameterGroupType
 {
-    SLANG_AST_CLASS(VaryingParameterGroupType)
+    FIDDLE(...)
 };
 
 
 // type for HLSL `cbuffer` declarations, and `ConstantBuffer<T>`
 // ALso used for GLSL `uniform` blocks.
+FIDDLE()
 class ConstantBufferType : public UniformParameterGroupType
 {
-    SLANG_AST_CLASS(ConstantBufferType)
+    FIDDLE(...)
 };
 
 
 // type for HLSL `tbuffer` declarations, and `TextureBuffer<T>`
+FIDDLE()
 class TextureBufferType : public UniformParameterGroupType
 {
-    SLANG_AST_CLASS(TextureBufferType)
+    FIDDLE(...)
 };
 
 
 // type for GLSL `in` and `out` blocks
+FIDDLE()
 class GLSLInputParameterGroupType : public VaryingParameterGroupType
 {
-    SLANG_AST_CLASS(GLSLInputParameterGroupType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLOutputParameterGroupType : public VaryingParameterGroupType
 {
-    SLANG_AST_CLASS(GLSLOutputParameterGroupType)
+    FIDDLE(...)
 };
 
 
 // type for GLSL `buffer` blocks
+FIDDLE()
 class GLSLShaderStorageBufferType : public PointerLikeType
 {
-    SLANG_AST_CLASS(GLSLShaderStorageBufferType)
+    FIDDLE(...)
 };
 
 
 // type for Slang `ParameterBlock<T>` type
+FIDDLE()
 class ParameterBlockType : public UniformParameterGroupType
 {
-    SLANG_AST_CLASS(ParameterBlockType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class ArrayExpressionType : public DeclRefType
 {
-    SLANG_AST_CLASS(ArrayExpressionType)
-
+    FIDDLE(...)
     bool isUnsized();
     void _toTextOverride(StringBuilder& out);
     Type* getElementType();
     IntVal* getElementCount();
 };
 
+FIDDLE()
 class AtomicType : public DeclRefType
 {
-    SLANG_AST_CLASS(AtomicType)
-
+    FIDDLE(...)
     Type* getElementType();
 };
 
+FIDDLE()
 class CoopVectorExpressionType : public ArithmeticExpressionType
 {
-    SLANG_AST_CLASS(CoopVectorExpressionType)
-
+    FIDDLE(...)
     void _toTextOverride(StringBuilder& out);
     BasicExpressionType* _getScalarTypeOverride();
 
@@ -489,10 +539,10 @@ class CoopVectorExpressionType : public ArithmeticExpressionType
 // The "type" of an expression that resolves to a type.
 // For example, in the expression `float(2)` the sub-expression,
 // `float` would have the type `TypeType(float)`.
+FIDDLE()
 class TypeType : public Type
 {
-    SLANG_AST_CLASS(TypeType)
-
+    FIDDLE(...)
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
@@ -503,38 +553,43 @@ class TypeType : public Type
 };
 
 // A differential pair type, e.g., `__DifferentialPair<T>`
+FIDDLE()
 class DifferentialPairType : public ArithmeticExpressionType
 {
-    SLANG_AST_CLASS(DifferentialPairType)
+    FIDDLE(...)
     Type* getPrimalType();
 };
 
+FIDDLE()
 class DifferentialPtrPairType : public ArithmeticExpressionType
 {
-    SLANG_AST_CLASS(DifferentialPtrPairType)
+    FIDDLE(...)
     Type* getPrimalRefType();
 };
 
+FIDDLE()
 class DifferentiableType : public BuiltinType
 {
-    SLANG_AST_CLASS(DifferentiableType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class DifferentiablePtrType : public BuiltinType
 {
-    SLANG_AST_CLASS(DifferentiablePtrType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class DefaultInitializableType : public BuiltinType
 {
-    SLANG_AST_CLASS(DefaultInitializableType);
+    FIDDLE(...)
 };
 
 // A vector type, e.g., `vector<T,N>`
+FIDDLE()
 class VectorExpressionType : public ArithmeticExpressionType
 {
-    SLANG_AST_CLASS(VectorExpressionType)
-
+    FIDDLE(...)
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
     BasicExpressionType* _getScalarTypeOverride();
@@ -544,10 +599,10 @@ class VectorExpressionType : public ArithmeticExpressionType
 };
 
 // A matrix type, e.g., `matrix<T,R,C,L>`
+FIDDLE()
 class MatrixExpressionType : public ArithmeticExpressionType
 {
-    SLANG_AST_CLASS(MatrixExpressionType)
-
+    FIDDLE(...)
     Type* getElementType();
     IntVal* getRowCount();
     IntVal* getColumnCount();
@@ -563,137 +618,152 @@ private:
     SLANG_UNREFLECTED Type* rowType = nullptr;
 };
 
+FIDDLE()
 class TensorViewType : public BuiltinType
 {
-    SLANG_AST_CLASS(TensorViewType)
-
+    FIDDLE(...)
     Type* getElementType();
 };
 
 // Base class for built in string types
+FIDDLE(abstract)
 class StringTypeBase : public BuiltinType
 {
-    SLANG_AST_CLASS(StringTypeBase)
+    FIDDLE(...)
 };
 
 // The regular built-in `String` type
+FIDDLE()
 class StringType : public StringTypeBase
 {
-    SLANG_AST_CLASS(StringType)
+    FIDDLE(...)
 };
 
 // The string type native to the target
+FIDDLE()
 class NativeStringType : public StringTypeBase
 {
-    SLANG_AST_CLASS(NativeStringType)
+    FIDDLE(...)
 };
 
 // The built-in `__Dynamic` type
+FIDDLE()
 class DynamicType : public BuiltinType
 {
-    SLANG_AST_CLASS(DynamicType)
+    FIDDLE(...)
 };
 
 // Type built-in `__EnumType` type
+FIDDLE()
 class EnumTypeType : public BuiltinType
 {
-    SLANG_AST_CLASS(EnumTypeType)
-
+    FIDDLE(...)
     // TODO: provide accessors for the declaration, the "tag" type, etc.
 };
 
 // Base class for types that map down to
 // simple pointers as part of code generation.
+FIDDLE()
 class PtrTypeBase : public BuiltinType
 {
-    SLANG_AST_CLASS(PtrTypeBase)
-
+    FIDDLE(...)
     // Get the type of the pointed-to value.
     Type* getValueType();
 
     Val* getAddressSpace();
 };
 
+FIDDLE()
 class NoneType : public BuiltinType
 {
-    SLANG_AST_CLASS(NoneType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class NullPtrType : public BuiltinType
 {
-    SLANG_AST_CLASS(NullPtrType)
+    FIDDLE(...)
 };
 
 // A true (user-visible) pointer type, e.g., `T*`
+FIDDLE()
 class PtrType : public PtrTypeBase
 {
-    SLANG_AST_CLASS(PtrType)
-
+    FIDDLE(...)
     void _toTextOverride(StringBuilder& out);
 };
 
 /// A pointer-like type used to represent a parameter "direction"
+FIDDLE()
 class ParamDirectionType : public PtrTypeBase
 {
-    SLANG_AST_CLASS(ParamDirectionType)
+    FIDDLE(...)
 };
 
 // A type that represents the behind-the-scenes
 // logical pointer that is passed for an `out`
 // or `in out` parameter
+FIDDLE(abstract)
 class OutTypeBase : public ParamDirectionType
 {
-    SLANG_AST_CLASS(OutTypeBase)
+    FIDDLE(...)
 };
 
 // The type for an `out` parameter, e.g., `out T`
+FIDDLE()
 class OutType : public OutTypeBase
 {
-    SLANG_AST_CLASS(OutType)
+    FIDDLE(...)
 };
 
 // The type for an `in out` parameter, e.g., `in out T`
+FIDDLE()
 class InOutType : public OutTypeBase
 {
-    SLANG_AST_CLASS(InOutType)
+    FIDDLE(...)
 };
 
+FIDDLE(abstract)
 class RefTypeBase : public ParamDirectionType
 {
-    SLANG_AST_CLASS(RefTypeBase)
+    FIDDLE(...)
 };
 
 // The type for an `ref` parameter, e.g., `ref T`
+FIDDLE()
 class RefType : public RefTypeBase
 {
-    SLANG_AST_CLASS(RefType)
+    FIDDLE(...)
     void _toTextOverride(StringBuilder& out);
 };
 
 // The type for an `constref` parameter, e.g., `constref T`
+FIDDLE()
 class ConstRefType : public RefTypeBase
 {
-    SLANG_AST_CLASS(ConstRefType)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class OptionalType : public BuiltinType
 {
-    SLANG_AST_CLASS(OptionalType)
+    FIDDLE(...)
     Type* getValueType();
 };
 
 // A raw-pointer reference to an managed value.
+FIDDLE()
 class NativeRefType : public BuiltinType
 {
-    SLANG_AST_CLASS(NativeRefType)
+    FIDDLE(...)
     Type* getValueType();
 };
 
 // A type alias of some kind (e.g., via `typedef`)
+FIDDLE()
 class NamedExpressionType : public Type
 {
-    SLANG_AST_CLASS(NamedExpressionType)
-
+    FIDDLE(...)
     DeclRef<TypeDefDecl> getDeclRef() { return as<DeclRefBase>(getOperand(0)); }
 
     // Overrides should be public so base classes can access
@@ -705,10 +775,10 @@ class NamedExpressionType : public Type
 
 // A function type is defined by its parameter types
 // and its result type.
+FIDDLE()
 class FuncType : public Type
 {
-    SLANG_AST_CLASS(FuncType)
-
+    FIDDLE(...)
     // Construct a unary function
     FuncType(Type* paramType, Type* resultType, Type* errorType)
     {
@@ -739,18 +809,19 @@ class FuncType : public Type
 };
 
 // A tuple is a product of its member types
+FIDDLE()
 class TupleType : public DeclRefType
 {
-    SLANG_AST_CLASS(TupleType)
-
+    FIDDLE(...)
     Index getMemberCount() const;
     Type* getMember(Index i) const;
     Type* getTypePack() const;
 };
 
+FIDDLE()
 class EachType : public Type
 {
-    SLANG_AST_CLASS(EachType)
+    FIDDLE(...)
     Type* getElementType() const { return as<Type>(getOperand(0)); }
     DeclRefType* getElementDeclRefType() const { return as<DeclRefType>(getOperand(0)); }
 
@@ -760,9 +831,10 @@ class EachType : public Type
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+FIDDLE()
 class ExpandType : public Type
 {
-    SLANG_AST_CLASS(ExpandType)
+    FIDDLE(...)
     Type* getPatternType() const { return as<Type>(getOperand(0)); }
     Index getCapturedTypePackCount() { return getOperandCount() - 1; }
     Type* getCapturedTypePack(Index i) { return as<Type>(getOperand(i + 1)); }
@@ -778,9 +850,10 @@ class ExpandType : public Type
 };
 
 // A concrete pack of types.
+FIDDLE()
 class ConcreteTypePack : public Type
 {
-    SLANG_AST_CLASS(ConcreteTypePack)
+    FIDDLE(...)
     ConcreteTypePack(ArrayView<Type*> types)
     {
         for (auto t : types)
@@ -794,10 +867,10 @@ class ConcreteTypePack : public Type
 };
 
 // The "type" of an expression that names a generic declaration.
+FIDDLE()
 class GenericDeclRefType : public Type
 {
-    SLANG_AST_CLASS(GenericDeclRefType)
-
+    FIDDLE(...)
     DeclRef<GenericDecl> getDeclRef() const { return as<DeclRefBase>(getOperand(0)); }
 
     // Overrides should be public so base classes can access
@@ -808,10 +881,10 @@ class GenericDeclRefType : public Type
 };
 
 // The "type" of a reference to a module or namespace
+FIDDLE()
 class NamespaceType : public Type
 {
-    SLANG_AST_CLASS(NamespaceType)
-
+    FIDDLE(...)
     DeclRef<NamespaceDeclBase> getDeclRef() const { return as<DeclRefBase>(getOperand(0)); }
 
     NamespaceType(DeclRef<NamespaceDeclBase> inDeclRef) { setOperands(inDeclRef); }
@@ -823,10 +896,10 @@ class NamespaceType : public Type
 
 // The concrete type for a value wrapped in an existential, accessible
 // when the existential is "opened" in some context.
+FIDDLE()
 class ExtractExistentialType : public Type
 {
-    SLANG_AST_CLASS(ExtractExistentialType)
-
+    FIDDLE(...)
     DeclRef<VarDeclBase> getDeclRef() const { return as<DeclRefBase>(getOperand(0)); }
 
     // A reference to the original interface this type is known
@@ -879,10 +952,10 @@ class ExtractExistentialType : public Type
     DeclRef<ThisTypeDecl> getThisTypeDeclRef();
 };
 
+FIDDLE()
 class ExistentialSpecializedType : public Type
 {
-    SLANG_AST_CLASS(ExistentialSpecializedType)
-
+    FIDDLE(...)
     Type* getBaseType() { return as<Type>(getOperand(0)); }
     ExpandedSpecializationArg getArg(Index i)
     {
@@ -910,10 +983,10 @@ class ExistentialSpecializedType : public Type
 };
 
 /// The type of `this` within a polymorphic declaration
+FIDDLE()
 class ThisType : public DeclRefType
 {
-    SLANG_AST_CLASS(ThisType)
-
+    FIDDLE(...)
     ThisType(DeclRefBase* declRef)
         : DeclRefType(declRef)
     {
@@ -925,10 +998,10 @@ class ThisType : public DeclRefType
 /// The type of `A & B` where `A` and `B` are types
 ///
 /// A value `v` is of type `A & B` if it is both of type `A` and of type `B`.
+FIDDLE()
 class AndType : public Type
 {
-    SLANG_AST_CLASS(AndType)
-
+    FIDDLE(...)
     Type* getLeft() { return as<Type>(getOperand(0)); }
     Type* getRight() { return as<Type>(getOperand(1)); }
 
@@ -940,10 +1013,10 @@ class AndType : public Type
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
+FIDDLE()
 class ModifiedType : public Type
 {
-    SLANG_AST_CLASS(ModifiedType)
-
+    FIDDLE(...)
     Type* getBase() { return as<Type>(getOperand(0)); }
 
     Index getModifierCount() { return getOperandCount() - 1; }

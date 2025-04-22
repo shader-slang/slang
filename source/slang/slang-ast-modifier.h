@@ -1,9 +1,10 @@
 // slang-ast-modifier.h
-
 #pragma once
 
 #include "slang-ast-base.h"
+#include "slang-ast-modifier.h.fiddle"
 
+FIDDLE()
 namespace Slang
 {
 
@@ -11,246 +12,299 @@ namespace Slang
 
 // Simple modifiers have no state beyond their identity
 
+FIDDLE()
 class InModifier : public Modifier
 {
-    SLANG_AST_CLASS(InModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class OutModifier : public Modifier
 {
-    SLANG_AST_CLASS(OutModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class ConstModifier : public Modifier
 {
-    SLANG_AST_CLASS(ConstModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class BuiltinModifier : public Modifier
 {
-    SLANG_AST_CLASS(BuiltinModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class InlineModifier : public Modifier
 {
-    SLANG_AST_CLASS(InlineModifier)
+    FIDDLE(...)
 };
+
+FIDDLE(abstract)
 class VisibilityModifier : public Modifier
 {
-    SLANG_AST_CLASS(VisibilityModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class PublicModifier : public VisibilityModifier
 {
-    SLANG_AST_CLASS(PublicModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class PrivateModifier : public VisibilityModifier
 {
-    SLANG_AST_CLASS(PrivateModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class InternalModifier : public VisibilityModifier
 {
-    SLANG_AST_CLASS(InternalModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class RequireModifier : public Modifier
 {
-    SLANG_AST_CLASS(RequireModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class ParamModifier : public Modifier
 {
-    SLANG_AST_CLASS(ParamModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class ExternModifier : public Modifier
 {
-    SLANG_AST_CLASS(ExternModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class HLSLExportModifier : public Modifier
 {
-    SLANG_AST_CLASS(HLSLExportModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class TransparentModifier : public Modifier
 {
-    SLANG_AST_CLASS(TransparentModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class FromCoreModuleModifier : public Modifier
 {
-    SLANG_AST_CLASS(FromCoreModuleModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class PrefixModifier : public Modifier
 {
-    SLANG_AST_CLASS(PrefixModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class PostfixModifier : public Modifier
 {
-    SLANG_AST_CLASS(PostfixModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class ExportedModifier : public Modifier
 {
-    SLANG_AST_CLASS(ExportedModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class ConstExprModifier : public Modifier
 {
-    SLANG_AST_CLASS(ConstExprModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class ExternCppModifier : public Modifier
 {
-    SLANG_AST_CLASS(ExternCppModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class GLSLPrecisionModifier : public Modifier
 {
-    SLANG_AST_CLASS(GLSLPrecisionModifier)
+    FIDDLE(...)
 };
+
+FIDDLE()
 class GLSLModuleModifier : public Modifier
 {
-    SLANG_AST_CLASS(GLSLModuleModifier)
+    FIDDLE(...)
 };
+
 // Marks that the definition of a decl is not yet synthesized.
+FIDDLE()
 class ToBeSynthesizedModifier : public Modifier
 {
-    SLANG_AST_CLASS(ToBeSynthesizedModifier)
+    FIDDLE(...)
 };
 
 // Marks that the definition of a decl is synthesized.
+FIDDLE()
 class SynthesizedModifier : public Modifier
 {
-    SLANG_AST_CLASS(SynthesizedModifier)
+    FIDDLE(...)
 };
 
 // Marks a synthesized variable as local temporary variable.
+FIDDLE()
 class LocalTempVarModifier : public Modifier
 {
-    SLANG_AST_CLASS(LocalTempVarModifier)
+    FIDDLE(...)
 };
 
 // An `extern` variable in an extension is used to introduce additional attributes on an existing
 // field.
+FIDDLE()
 class ExtensionExternVarModifier : public Modifier
 {
-    SLANG_AST_CLASS(ExtensionExternVarModifier)
-    DeclRef<Decl> originalDecl;
+    FIDDLE(...)
+    FIDDLE() DeclRef<Decl> originalDecl;
 };
 
 // An 'ActualGlobal' is a global that is output as a normal global in CPU code.
 // Globals in HLSL/Slang are constant state passed into kernel execution
+FIDDLE()
 class ActualGlobalModifier : public Modifier
 {
-    SLANG_AST_CLASS(ActualGlobalModifier)
+    FIDDLE(...)
 };
 
 /// A modifier that indicates an `InheritanceDecl` should be ignored during name lookup (and related
 /// checks).
+FIDDLE()
 class IgnoreForLookupModifier : public Modifier
 {
-    SLANG_AST_CLASS(IgnoreForLookupModifier)
+    FIDDLE(...)
 };
 
 // A modifier that marks something as an operation that
 // has a one-to-one translation to the IR, and thus
 // has no direct definition in the high-level language.
 //
+FIDDLE()
 class IntrinsicOpModifier : public Modifier
 {
-    SLANG_AST_CLASS(IntrinsicOpModifier)
-
+    FIDDLE(...)
     // Token that names the intrinsic op.
     Token opToken;
 
     // The IR opcode for the intrinsic operation.
     //
-    uint32_t op = 0;
+    FIDDLE() uint32_t op = 0;
 };
 
 // A modifier that marks something as an intrinsic function,
 // for some subset of targets.
+FIDDLE()
 class TargetIntrinsicModifier : public Modifier
 {
-    SLANG_AST_CLASS(TargetIntrinsicModifier)
-
+    FIDDLE(...)
     // Token that names the target that the operation
     // is an intrisic for.
-    Token targetToken;
+    FIDDLE() Token targetToken;
 
     // A custom definition for the operation, one of either an ident or a
     // string (the concatenation of several string literals)
     Token definitionIdent;
-    String definitionString;
+    FIDDLE() String definitionString;
     bool isString;
 
     // A predicate to be used on an identifier to guard this intrinsic
     Token predicateToken;
     NameLoc scrutinee;
-    DeclRef<Decl> scrutineeDeclRef;
+    FIDDLE() DeclRef<Decl> scrutineeDeclRef;
 };
 
 // A modifier that marks a declaration as representing a
 // specialization that should be preferred on a particular
 // target.
+FIDDLE()
 class SpecializedForTargetModifier : public Modifier
 {
-    SLANG_AST_CLASS(SpecializedForTargetModifier)
-
+    FIDDLE(...)
     // Token that names the target that the operation
     // has been specialized for.
-    Token targetToken;
+    FIDDLE() Token targetToken;
 };
 
 // A modifier to tag something as an intrinsic that requires
 // a certain GLSL extension to be enabled when used
+FIDDLE()
 class RequiredGLSLExtensionModifier : public Modifier
 {
-    SLANG_AST_CLASS(RequiredGLSLExtensionModifier)
-
-    Token extensionNameToken;
+    FIDDLE(...)
+    FIDDLE() Token extensionNameToken;
 };
 
 // A modifier to tag something as an intrinsic that requires
 // a certain GLSL version to be enabled when used
+FIDDLE()
 class RequiredGLSLVersionModifier : public Modifier
 {
-    SLANG_AST_CLASS(RequiredGLSLVersionModifier)
-
-    Token versionNumberToken;
+    FIDDLE(...)
+    FIDDLE() Token versionNumberToken;
 };
 
 
 // A modifier to tag something as an intrinsic that requires
 // a certain SPIRV version to be enabled when used. Specified as "major.minor"
+FIDDLE()
 class RequiredSPIRVVersionModifier : public Modifier
 {
-    SLANG_AST_CLASS(RequiredSPIRVVersionModifier)
-
-    SemanticVersion version;
+    FIDDLE(...)
+    FIDDLE() SemanticVersion version;
 };
 
 // A modifier to tag something as an intrinsic that requires
 // a certain WGSL extension to be enabled when used
+FIDDLE()
 class RequiredWGSLExtensionModifier : public Modifier
 {
-    SLANG_AST_CLASS(RequiredWGSLExtensionModifier)
-
-    Token extensionNameToken;
+    FIDDLE(...)
+    FIDDLE() Token extensionNameToken;
 };
 
 // A modifier to tag something as an intrinsic that requires
 // a certain CUDA SM version to be enabled when used. Specified as "major.minor"
+FIDDLE()
 class RequiredCUDASMVersionModifier : public Modifier
 {
-    SLANG_AST_CLASS(RequiredCUDASMVersionModifier)
-
-    SemanticVersion version;
+    FIDDLE(...)
+    FIDDLE() SemanticVersion version;
 };
 
+FIDDLE()
 class InOutModifier : public OutModifier
 {
-    SLANG_AST_CLASS(InOutModifier)
+    FIDDLE(...)
 };
 
 
 // `__ref` modifier for by-reference parameter passing
+FIDDLE()
 class RefModifier : public Modifier
 {
-    SLANG_AST_CLASS(RefModifier)
+    FIDDLE(...)
 };
 
 // `__ref` modifier for by-reference parameter passing
+FIDDLE()
 class ConstRefModifier : public Modifier
 {
-    SLANG_AST_CLASS(ConstRefModifier)
+    FIDDLE(...)
 };
 
 // This is a special sentinel modifier that gets added
@@ -267,132 +321,147 @@ class ConstRefModifier : public Modifier
 //                                 /
 //     b: RegisterModifier("x0")  /
 //
+FIDDLE()
 class SharedModifiers : public Modifier
 {
-    SLANG_AST_CLASS(SharedModifiers)
+    FIDDLE(...)
 };
 
 // AST nodes to represent the begin/end of a `layout` modifier group
+FIDDLE(abstract)
 class GLSLLayoutModifierGroupMarker : public Modifier
 {
-    SLANG_ABSTRACT_AST_CLASS(GLSLLayoutModifierGroupMarker)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLLayoutModifierGroupBegin : public GLSLLayoutModifierGroupMarker
 {
-    SLANG_AST_CLASS(GLSLLayoutModifierGroupBegin)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLLayoutModifierGroupEnd : public GLSLLayoutModifierGroupMarker
 {
-    SLANG_AST_CLASS(GLSLLayoutModifierGroupEnd)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLUnparsedLayoutModifier : public Modifier
 {
-    SLANG_AST_CLASS(GLSLUnparsedLayoutModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLBufferDataLayoutModifier : public Modifier
 {
-    SLANG_AST_CLASS(GLSLBufferDataLayoutModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLStd140Modifier : public GLSLBufferDataLayoutModifier
 {
-    SLANG_AST_CLASS(GLSLStd140Modifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLStd430Modifier : public GLSLBufferDataLayoutModifier
 {
-    SLANG_AST_CLASS(GLSLStd430Modifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLScalarModifier : public GLSLBufferDataLayoutModifier
 {
-    SLANG_AST_CLASS(GLSLScalarModifier)
+    FIDDLE(...)
 };
 
 
 // A catch-all for single-keyword modifiers
+FIDDLE()
 class SimpleModifier : public Modifier
 {
-    SLANG_AST_CLASS(SimpleModifier)
+    FIDDLE(...)
 };
 
 
 // Indicates that this is a variable declaration that corresponds to
 // a parameter block declaration in the source program.
+FIDDLE()
 class ImplicitParameterGroupVariableModifier : public Modifier
 {
-    SLANG_AST_CLASS(ImplicitParameterGroupVariableModifier)
+    FIDDLE(...)
 };
 
 
 // Indicates that this is a type that corresponds to the element
 // type of a parameter block declaration in the source program.
+FIDDLE()
 class ImplicitParameterGroupElementTypeModifier : public Modifier
 {
-    SLANG_AST_CLASS(ImplicitParameterGroupElementTypeModifier)
+    FIDDLE(...)
 };
 
 
 // An HLSL semantic
+FIDDLE(abstract)
 class HLSLSemantic : public Modifier
 {
-    SLANG_ABSTRACT_AST_CLASS(HLSLSemantic)
-
-    Token name;
+    FIDDLE(...)
+    FIDDLE() Token name;
 };
 
 // An HLSL semantic that affects layout
+FIDDLE()
 class HLSLLayoutSemantic : public HLSLSemantic
 {
-    SLANG_AST_CLASS(HLSLLayoutSemantic)
-
-    Token registerName;
-    Token componentMask;
+    FIDDLE(...)
+    FIDDLE() Token registerName;
+    FIDDLE() Token componentMask;
 };
 
 // An HLSL `register` semantic
+FIDDLE()
 class HLSLRegisterSemantic : public HLSLLayoutSemantic
 {
-    SLANG_AST_CLASS(HLSLRegisterSemantic)
-
-    Token spaceName;
+    FIDDLE(...)
+    FIDDLE() Token spaceName;
 };
 
 // TODO(tfoley): `packoffset`
+FIDDLE()
 class HLSLPackOffsetSemantic : public HLSLLayoutSemantic
 {
-    SLANG_AST_CLASS(HLSLPackOffsetSemantic)
-
-    int uniformOffset = 0;
+    FIDDLE(...)
+    FIDDLE() int uniformOffset = 0;
 };
 
 
 // An HLSL semantic that just associated a declaration with a semantic name
+FIDDLE()
 class HLSLSimpleSemantic : public HLSLSemantic
 {
-    SLANG_AST_CLASS(HLSLSimpleSemantic)
+    FIDDLE(...)
 };
 
 // A semantic applied to a field of a ray-payload type, to control access
+FIDDLE()
 class RayPayloadAccessSemantic : public HLSLSemantic
 {
-    SLANG_AST_CLASS(RayPayloadAccessSemantic)
-
-    List<Token> stageNameTokens;
+    FIDDLE(...)
+    FIDDLE() List<Token> stageNameTokens;
 };
 
+FIDDLE()
 class RayPayloadReadSemantic : public RayPayloadAccessSemantic
 {
-    SLANG_AST_CLASS(RayPayloadReadSemantic)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class RayPayloadWriteSemantic : public RayPayloadAccessSemantic
 {
-    SLANG_AST_CLASS(RayPayloadWriteSemantic)
+    FIDDLE(...)
 };
 
 
@@ -400,73 +469,72 @@ class RayPayloadWriteSemantic : public RayPayloadAccessSemantic
 
 // Directives that came in via the preprocessor, but
 // that we need to keep around for later steps
+FIDDLE()
 class GLSLPreprocessorDirective : public Modifier
 {
-    SLANG_AST_CLASS(GLSLPreprocessorDirective)
+    FIDDLE(...)
 };
 
 
 // A GLSL `#version` directive
+FIDDLE()
 class GLSLVersionDirective : public GLSLPreprocessorDirective
 {
-    SLANG_AST_CLASS(GLSLVersionDirective)
-
-
+    FIDDLE(...)
     // Token giving the version number to use
-    Token versionNumberToken;
+    FIDDLE() Token versionNumberToken;
 
     // Optional token giving the sub-profile to be used
-    Token glslProfileToken;
+    FIDDLE() Token glslProfileToken;
 };
 
 // A GLSL `#extension` directive
+FIDDLE()
 class GLSLExtensionDirective : public GLSLPreprocessorDirective
 {
-    SLANG_AST_CLASS(GLSLExtensionDirective)
-
-
+    FIDDLE(...)
     // Token giving the version number to use
-    Token extensionNameToken;
+    FIDDLE() Token extensionNameToken;
 
     // Optional token giving the sub-profile to be used
-    Token dispositionToken;
+    FIDDLE() Token dispositionToken;
 };
 
+FIDDLE()
 class ParameterGroupReflectionName : public Modifier
 {
-    SLANG_AST_CLASS(ParameterGroupReflectionName)
-
-    NameLoc nameAndLoc;
+    FIDDLE(...)
+    FIDDLE() NameLoc nameAndLoc;
 };
 
 // A modifier that indicates a built-in base type (e.g., `float`)
+FIDDLE()
 class BuiltinTypeModifier : public Modifier
 {
-    SLANG_AST_CLASS(BuiltinTypeModifier)
-
-    BaseType tag;
+    FIDDLE(...)
+    FIDDLE() BaseType tag;
 };
 
 // A modifier that indicates a built-in type that isn't a base type (e.g., `vector`)
 //
 // TODO(tfoley): This deserves a better name than "magic"
+FIDDLE()
 class MagicTypeModifier : public Modifier
 {
-    SLANG_AST_CLASS(MagicTypeModifier)
-
-    ASTNodeType magicNodeType = ASTNodeType(-1);
+    FIDDLE(...)
+    FIDDLE() SyntaxClass<NodeBase> magicNodeType;
 
     /// Modifier has a name so call this magicModifier to disambiguate
-    String magicName;
-    uint32_t tag = uint32_t(0);
+    FIDDLE() String magicName;
+    FIDDLE() uint32_t tag = uint32_t(0);
 };
 
 // A modifier that indicates a built-in associated type requirement (e.g., `Differential`)
+FIDDLE()
 class BuiltinRequirementModifier : public Modifier
 {
-    SLANG_AST_CLASS(BuiltinRequirementModifier);
-
-    BuiltinRequirementKind kind;
+    FIDDLE(...)
+    FIDDLE() BuiltinRequirementKind kind;
 };
 
 
@@ -475,47 +543,52 @@ class BuiltinRequirementModifier : public Modifier
 //
 // TODO: This should really subsume `BuiltinTypeModifier` and
 // `MagicTypeModifier` so that we don't have to apply all of them.
+FIDDLE()
 class IntrinsicTypeModifier : public Modifier
 {
-    SLANG_AST_CLASS(IntrinsicTypeModifier)
-
+    FIDDLE(...)
     // The IR opcode to use when constructing a type
-    uint32_t irOp;
+    FIDDLE() uint32_t irOp;
 
     Token opToken;
 
     // Additional literal opreands to provide when creating instances.
     // (e.g., for a texture type this passes in shape/mutability info)
-    List<uint32_t> irOperands;
+    FIDDLE() List<uint32_t> irOperands;
 };
 
 // Modifiers that affect the storage layout for matrices
+FIDDLE(abstract)
 class MatrixLayoutModifier : public Modifier
 {
-    SLANG_AST_CLASS(MatrixLayoutModifier)
+    FIDDLE(...)
 };
 
 
 // Modifiers that specify row- and column-major layout, respectively
+FIDDLE(abstract)
 class RowMajorLayoutModifier : public MatrixLayoutModifier
 {
-    SLANG_AST_CLASS(RowMajorLayoutModifier)
+    FIDDLE(...)
 };
 
+FIDDLE(abstract)
 class ColumnMajorLayoutModifier : public MatrixLayoutModifier
 {
-    SLANG_AST_CLASS(ColumnMajorLayoutModifier)
+    FIDDLE(...)
 };
 
 // The HLSL flavor of those modifiers
+FIDDLE()
 class HLSLRowMajorLayoutModifier : public RowMajorLayoutModifier
 {
-    SLANG_AST_CLASS(HLSLRowMajorLayoutModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLColumnMajorLayoutModifier : public ColumnMajorLayoutModifier
 {
-    SLANG_AST_CLASS(HLSLColumnMajorLayoutModifier)
+    FIDDLE(...)
 };
 
 
@@ -526,676 +599,736 @@ class HLSLColumnMajorLayoutModifier : public ColumnMajorLayoutModifier
 // we actually interpret that as requesting column-major. This makes
 // sense because we interpret matrix conventions backwards from how
 // GLSL specifies them.
+FIDDLE()
 class GLSLRowMajorLayoutModifier : public ColumnMajorLayoutModifier
 {
-    SLANG_AST_CLASS(GLSLRowMajorLayoutModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLColumnMajorLayoutModifier : public RowMajorLayoutModifier
 {
-    SLANG_AST_CLASS(GLSLColumnMajorLayoutModifier)
+    FIDDLE(...)
 };
 
 
 // More HLSL Keyword
 
+FIDDLE(abstract)
 class InterpolationModeModifier : public Modifier
 {
-    SLANG_ABSTRACT_AST_CLASS(InterpolationModeModifier)
+    FIDDLE(...)
 };
 
 // HLSL `nointerpolation` modifier
+FIDDLE()
 class HLSLNoInterpolationModifier : public InterpolationModeModifier
 {
-    SLANG_AST_CLASS(HLSLNoInterpolationModifier)
+    FIDDLE(...)
 };
 
 
 // HLSL `noperspective` modifier
+FIDDLE()
 class HLSLNoPerspectiveModifier : public InterpolationModeModifier
 {
-    SLANG_AST_CLASS(HLSLNoPerspectiveModifier)
+    FIDDLE(...)
 };
 
 
 // HLSL `linear` modifier
+FIDDLE()
 class HLSLLinearModifier : public InterpolationModeModifier
 {
-    SLANG_AST_CLASS(HLSLLinearModifier)
+    FIDDLE(...)
 };
 
 
 // HLSL `sample` modifier
+FIDDLE()
 class HLSLSampleModifier : public InterpolationModeModifier
 {
-    SLANG_AST_CLASS(HLSLSampleModifier)
+    FIDDLE(...)
 };
 
 
 // HLSL `centroid` modifier
+FIDDLE()
 class HLSLCentroidModifier : public InterpolationModeModifier
 {
-    SLANG_AST_CLASS(HLSLCentroidModifier)
+    FIDDLE(...)
 };
 
 /// Slang-defined `pervertex` modifier
+FIDDLE()
 class PerVertexModifier : public InterpolationModeModifier
 {
-    SLANG_AST_CLASS(PerVertexModifier)
+    FIDDLE(...)
 };
 
 
 // HLSL `precise` modifier
+FIDDLE()
 class PreciseModifier : public Modifier
 {
-    SLANG_AST_CLASS(PreciseModifier)
+    FIDDLE(...)
 };
 
 
 // HLSL `shared` modifier (which is used by the effect system,
 // and shouldn't be confused with `groupshared`)
+FIDDLE()
 class HLSLEffectSharedModifier : public Modifier
 {
-    SLANG_AST_CLASS(HLSLEffectSharedModifier)
+    FIDDLE(...)
 };
 
 
 // HLSL `groupshared` modifier
+FIDDLE()
 class HLSLGroupSharedModifier : public Modifier
 {
-    SLANG_AST_CLASS(HLSLGroupSharedModifier)
+    FIDDLE(...)
 };
 
 
 // HLSL `static` modifier (probably doesn't need to be
 // treated as HLSL-specific)
+FIDDLE()
 class HLSLStaticModifier : public Modifier
 {
-    SLANG_AST_CLASS(HLSLStaticModifier)
+    FIDDLE(...)
 };
 
 
 // HLSL `uniform` modifier (distinct meaning from GLSL
 // use of the keyword)
+FIDDLE()
 class HLSLUniformModifier : public Modifier
 {
-    SLANG_AST_CLASS(HLSLUniformModifier)
+    FIDDLE(...)
 };
 
 
 // HLSL `volatile` modifier (ignored)
+FIDDLE()
 class HLSLVolatileModifier : public Modifier
 {
-    SLANG_AST_CLASS(HLSLVolatileModifier)
+    FIDDLE(...)
 };
 
 
+FIDDLE()
 class AttributeTargetModifier : public Modifier
 {
-    SLANG_AST_CLASS(AttributeTargetModifier)
-
+    FIDDLE(...)
     // A class to which the declared attribute type is applicable
-    SyntaxClass<NodeBase> syntaxClass;
+    FIDDLE() SyntaxClass<NodeBase> syntaxClass;
 };
 
 
 // Base class for checked and unchecked `[name(arg0, ...)]` style attribute.
+FIDDLE(abstract)
 class AttributeBase : public Modifier
 {
-    SLANG_AST_CLASS(AttributeBase)
-
-    AttributeDecl* attributeDecl = nullptr;
+    FIDDLE(...)
+    FIDDLE() AttributeDecl* attributeDecl = nullptr;
 
     // The original identifier token representing the last part of the qualified name.
     Token originalIdentifierToken;
 
-    List<Expr*> args;
+    FIDDLE() List<Expr*> args;
 };
 
 // A `[name(...)]` attribute that hasn't undergone any semantic analysis.
 // After analysis, this will be transformed into a more specific case.
+FIDDLE()
 class UncheckedAttribute : public AttributeBase
 {
-    SLANG_AST_CLASS(UncheckedAttribute)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
     Scope* scope = nullptr;
 };
 
 // A GLSL layout qualifier whose value has not yet been resolved or validated.
+FIDDLE()
 class UncheckedGLSLLayoutAttribute : public AttributeBase
 {
-    SLANG_AST_CLASS(UncheckedGLSLLayoutAttribute)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
 };
 
 // GLSL `binding` layout qualifier, does not include `set`.
+FIDDLE()
 class UncheckedGLSLBindingLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {
-    SLANG_AST_CLASS(UncheckedGLSLBindingLayoutAttribute)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
 };
 
 // GLSL `set` layout qualifier, does not include `binding`.
+FIDDLE()
 class UncheckedGLSLSetLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {
-    SLANG_AST_CLASS(UncheckedGLSLSetLayoutAttribute)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
 };
 
 // GLSL `offset` layout qualifier.
+FIDDLE()
 class UncheckedGLSLOffsetLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {
-    SLANG_AST_CLASS(UncheckedGLSLOffsetLayoutAttribute)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
 };
 
+FIDDLE()
 class UncheckedGLSLInputAttachmentIndexLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {
-    SLANG_AST_CLASS(UncheckedGLSLInputAttachmentIndexLayoutAttribute)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
 };
 
+FIDDLE()
 class UncheckedGLSLLocationLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {
-    SLANG_AST_CLASS(UncheckedGLSLLocationLayoutAttribute)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
 };
 
+FIDDLE()
 class UncheckedGLSLIndexLayoutAttribute : public UncheckedGLSLLayoutAttribute
 {
-    SLANG_AST_CLASS(UncheckedGLSLIndexLayoutAttribute)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
 };
 
+FIDDLE()
 class UncheckedGLSLConstantIdAttribute : public UncheckedGLSLLayoutAttribute
 {
-    SLANG_AST_CLASS(UncheckedGLSLConstantIdAttribute)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
 };
 
+FIDDLE()
 class UncheckedGLSLRayPayloadAttribute : public UncheckedGLSLLayoutAttribute
 {
-    SLANG_AST_CLASS(UncheckedGLSLRayPayloadAttribute)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
 };
 
+FIDDLE()
 class UncheckedGLSLRayPayloadInAttribute : public UncheckedGLSLLayoutAttribute
 {
-    SLANG_AST_CLASS(UncheckedGLSLRayPayloadInAttribute)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
 };
 
-
+FIDDLE()
 class UncheckedGLSLHitObjectAttributesAttribute : public UncheckedGLSLLayoutAttribute
 {
-    SLANG_AST_CLASS(UncheckedGLSLHitObjectAttributesAttribute)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
 };
 
+FIDDLE()
 class UncheckedGLSLCallablePayloadAttribute : public UncheckedGLSLLayoutAttribute
 {
-    SLANG_AST_CLASS(UncheckedGLSLCallablePayloadAttribute)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
 };
 
+FIDDLE()
 class UncheckedGLSLCallablePayloadInAttribute : public UncheckedGLSLLayoutAttribute
 {
-    SLANG_AST_CLASS(UncheckedGLSLCallablePayloadInAttribute)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
 };
 
 // A `[name(arg0, ...)]` style attribute that has been validated.
+FIDDLE()
 class Attribute : public AttributeBase
 {
-    SLANG_AST_CLASS(Attribute)
-
-    List<Val*> intArgVals;
+    FIDDLE(...)
+    FIDDLE() List<Val*> intArgVals;
 };
 
+FIDDLE()
 class UserDefinedAttribute : public Attribute
 {
-    SLANG_AST_CLASS(UserDefinedAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class AttributeUsageAttribute : public Attribute
 {
-    SLANG_AST_CLASS(AttributeUsageAttribute)
-
-    SyntaxClass<NodeBase> targetSyntaxClass;
+    FIDDLE(...)
+    FIDDLE() SyntaxClass<NodeBase> targetSyntaxClass;
 };
 
+FIDDLE()
 class NonDynamicUniformAttribute : public Attribute
 {
-    SLANG_AST_CLASS(NonDynamicUniformAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class RequireCapabilityAttribute : public Attribute
 {
-    SLANG_AST_CLASS(RequireCapabilityAttribute)
-    CapabilitySet capabilitySet;
+    FIDDLE(...)
+    FIDDLE() CapabilitySet capabilitySet;
 };
 
 
 // An `[unroll]` or `[unroll(count)]` attribute
+FIDDLE()
 class UnrollAttribute : public Attribute
 {
-    SLANG_AST_CLASS(UnrollAttribute)
+    FIDDLE(...)
 };
 
 // An `[unroll]` or `[unroll(count)]` attribute
+FIDDLE()
 class ForceUnrollAttribute : public Attribute
 {
-    SLANG_AST_CLASS(ForceUnrollAttribute)
-
-    int32_t maxIterations = 0;
+    FIDDLE(...)
+    FIDDLE() int32_t maxIterations = 0;
 };
 
 // An `[maxiters(count)]`
+FIDDLE()
 class MaxItersAttribute : public Attribute
 {
-    SLANG_AST_CLASS(MaxItersAttribute)
-
-    IntVal* value = 0;
+    FIDDLE(...)
+    FIDDLE() IntVal* value = 0;
 };
 
 // An inferred max iteration count on a loop.
+FIDDLE()
 class InferredMaxItersAttribute : public Attribute
 {
-    SLANG_AST_CLASS(InferredMaxItersAttribute)
-    DeclRef<Decl> inductionVar;
-    int32_t value = 0;
+    FIDDLE(...)
+    FIDDLE() DeclRef<Decl> inductionVar;
+    FIDDLE() int32_t value = 0;
 };
 
+FIDDLE()
 class LoopAttribute : public Attribute
 {
-    SLANG_AST_CLASS(LoopAttribute)
+    FIDDLE(...)
 };
 // `[loop]`
+
+FIDDLE()
 class FastOptAttribute : public Attribute
 {
-    SLANG_AST_CLASS(FastOptAttribute)
+    FIDDLE(...)
 };
 // `[fastopt]`
+
+FIDDLE()
 class AllowUAVConditionAttribute : public Attribute
 {
-    SLANG_AST_CLASS(AllowUAVConditionAttribute)
+    FIDDLE(...)
 };
 // `[allow_uav_condition]`
+
+FIDDLE()
 class BranchAttribute : public Attribute
 {
-    SLANG_AST_CLASS(BranchAttribute)
+    FIDDLE(...)
 };
 // `[branch]`
+
+FIDDLE()
 class FlattenAttribute : public Attribute
 {
-    SLANG_AST_CLASS(FlattenAttribute)
+    FIDDLE(...)
 };
 // `[flatten]`
+
+FIDDLE()
 class ForceCaseAttribute : public Attribute
 {
-    SLANG_AST_CLASS(ForceCaseAttribute)
+    FIDDLE(...)
 };
 // `[forcecase]`
+
+FIDDLE()
 class CallAttribute : public Attribute
 {
-    SLANG_AST_CLASS(CallAttribute)
+    FIDDLE(...)
 };
 // `[call]`
 
+FIDDLE()
 class UnscopedEnumAttribute : public Attribute
 {
-    SLANG_AST_CLASS(UnscopedEnumAttribute)
+    FIDDLE(...)
 };
 
 // Marks a enum to have `flags` semantics, where each enum case is a bitfield.
+FIDDLE()
 class FlagsAttribute : public Attribute
 {
-    SLANG_AST_CLASS(FlagsAttribute);
+    FIDDLE(...)
 };
 
 // [[vk_push_constant]] [[push_constant]]
+FIDDLE()
 class PushConstantAttribute : public Attribute
 {
-    SLANG_AST_CLASS(PushConstantAttribute)
+    FIDDLE(...)
 };
 
 // [[vk_specialization_constant]] [[specialization_constant]]
+FIDDLE()
 class SpecializationConstantAttribute : public Attribute
 {
-    SLANG_AST_CLASS(SpecializationConstantAttribute)
+    FIDDLE(...)
 };
 
 // [[vk_constant_id]]
+FIDDLE()
 class VkConstantIdAttribute : public Attribute
 {
-    SLANG_AST_CLASS(VkConstantIdAttribute)
-    int location;
+    FIDDLE(...)
+    FIDDLE() int location;
 };
 
 // [[vk_shader_record]] [[shader_record]]
+FIDDLE()
 class ShaderRecordAttribute : public Attribute
 {
-    SLANG_AST_CLASS(ShaderRecordAttribute)
+    FIDDLE(...)
 };
 
 
 // [[vk_binding]]
+FIDDLE()
 class GLSLBindingAttribute : public Attribute
 {
-    SLANG_AST_CLASS(GLSLBindingAttribute)
-
-    int32_t binding = 0;
-    int32_t set = 0;
+    FIDDLE(...)
+    FIDDLE() int32_t binding = 0;
+    FIDDLE() int32_t set = 0;
 };
 
+FIDDLE()
 class VkAliasedPointerAttribute : public Attribute
 {
-    SLANG_AST_CLASS(VkAliasedPointerAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class VkRestrictPointerAttribute : public Attribute
 {
-    SLANG_AST_CLASS(VkRestrictPointerAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLOffsetLayoutAttribute : public Attribute
 {
-    SLANG_AST_CLASS(GLSLOffsetLayoutAttribute)
-
-    int64_t offset;
+    FIDDLE(...)
+    FIDDLE() int64_t offset;
 };
 
 // Implicitly added offset qualifier when no offset is specified.
+FIDDLE()
 class GLSLImplicitOffsetLayoutAttribute : public AttributeBase
 {
-    SLANG_AST_CLASS(GLSLImplicitOffsetLayoutAttribute)
-
+    FIDDLE(...)
     SLANG_UNREFLECTED
 };
 
+FIDDLE()
 class GLSLSimpleIntegerLayoutAttribute : public Attribute
 {
-    SLANG_AST_CLASS(GLSLSimpleIntegerLayoutAttribute)
-
-    int32_t value = 0;
+    FIDDLE(...)
+    FIDDLE() int32_t value = 0;
 };
 
 /// [[vk_input_attachment_index]]
+FIDDLE()
 class GLSLInputAttachmentIndexLayoutAttribute : public Attribute
 {
-    SLANG_AST_CLASS(GLSLInputAttachmentIndexLayoutAttribute)
-
-    IntegerLiteralValue location;
+    FIDDLE(...)
+    FIDDLE() IntegerLiteralValue location;
 };
 
 // [[vk_location]]
+FIDDLE()
 class GLSLLocationAttribute : public GLSLSimpleIntegerLayoutAttribute
 {
-    SLANG_AST_CLASS(GLSLLocationAttribute)
+    FIDDLE(...)
 };
 
 
 // [[vk_index]]
+FIDDLE()
 class GLSLIndexAttribute : public GLSLSimpleIntegerLayoutAttribute
 {
-    SLANG_AST_CLASS(GLSLIndexAttribute)
+    FIDDLE(...)
 };
 
 // [[vk_offset]]
+FIDDLE()
 class VkStructOffsetAttribute : public GLSLSimpleIntegerLayoutAttribute
 {
-    SLANG_AST_CLASS(VkStructOffsetAttribute)
+    FIDDLE(...)
 };
 
 // [[vk_spirv_instruction]]
+FIDDLE()
 class SPIRVInstructionOpAttribute : public Attribute
 {
-    SLANG_AST_CLASS(SPIRVInstructionOpAttribute)
+    FIDDLE(...)
 };
 
 // [[spv_target_env_1_3]]
+FIDDLE()
 class SPIRVTargetEnv13Attribute : public Attribute
 {
-    SLANG_AST_CLASS(SPIRVTargetEnv13Attribute);
+    FIDDLE(...)
 };
 
 // [[disable_array_flattening]]
+FIDDLE()
 class DisableArrayFlatteningAttribute : public Attribute
 {
-    SLANG_AST_CLASS(DisableArrayFlatteningAttribute);
+    FIDDLE(...)
 };
 
 // A GLSL layout(local_size_x = 64, ... attribute)
+FIDDLE()
 class GLSLLayoutLocalSizeAttribute : public Attribute
 {
-    SLANG_AST_CLASS(GLSLLayoutLocalSizeAttribute)
-
+    FIDDLE(...)
     // The number of threads to use along each axis
     //
     // TODO: These should be accessors that use the
     // ordinary `args` list, rather than side data.
-    IntVal* extents[3];
+    FIDDLE() IntVal* extents[3];
 
-    bool axisIsSpecConstId[3];
+    FIDDLE() bool axisIsSpecConstId[3];
 
     // References to specialization constants, for defining the number of
     // threads with them. If set, the corresponding axis is set to nullptr
     // above.
-    DeclRef<VarDeclBase> specConstExtents[3];
+    FIDDLE() DeclRef<VarDeclBase> specConstExtents[3];
 };
 
+FIDDLE()
 class GLSLLayoutDerivativeGroupQuadAttribute : public Attribute
 {
-    SLANG_AST_CLASS(GLSLLayoutDerivativeGroupQuadAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLLayoutDerivativeGroupLinearAttribute : public Attribute
 {
-    SLANG_AST_CLASS(GLSLLayoutDerivativeGroupLinearAttribute)
+    FIDDLE(...)
 };
 
 // TODO: for attributes that take arguments, the syntax node
 // classes should provide accessors for the values of those arguments.
 
+FIDDLE()
 class MaxTessFactorAttribute : public Attribute
 {
-    SLANG_AST_CLASS(MaxTessFactorAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class OutputControlPointsAttribute : public Attribute
 {
-    SLANG_AST_CLASS(OutputControlPointsAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class OutputTopologyAttribute : public Attribute
 {
-    SLANG_AST_CLASS(OutputTopologyAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class PartitioningAttribute : public Attribute
 {
-    SLANG_AST_CLASS(PartitioningAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class PatchConstantFuncAttribute : public Attribute
 {
-    SLANG_AST_CLASS(PatchConstantFuncAttribute)
-
-    FuncDecl* patchConstantFuncDecl = nullptr;
+    FIDDLE(...)
+    FIDDLE() FuncDecl* patchConstantFuncDecl = nullptr;
 };
+
+FIDDLE()
 class DomainAttribute : public Attribute
 {
-    SLANG_AST_CLASS(DomainAttribute)
+    FIDDLE(...)
 };
 
 
+FIDDLE()
 class EarlyDepthStencilAttribute : public Attribute
 {
-    SLANG_AST_CLASS(EarlyDepthStencilAttribute)
+    FIDDLE(...)
 };
 // `[earlydepthstencil]`
 
 // An HLSL `[numthreads(x,y,z)]` attribute
+FIDDLE()
 class NumThreadsAttribute : public Attribute
 {
-    SLANG_AST_CLASS(NumThreadsAttribute)
-
+    FIDDLE(...)
     // The number of threads to use along each axis
     //
     // TODO: These should be accessors that use the
     // ordinary `args` list, rather than side data.
-    IntVal* extents[3];
+    FIDDLE() IntVal* extents[3];
 
     // References to specialization constants, for defining the number of
     // threads with them. If set, the corresponding axis is set to nullptr
     // above.
-    DeclRef<VarDeclBase> specConstExtents[3];
+    FIDDLE() DeclRef<VarDeclBase> specConstExtents[3];
 };
 
+FIDDLE()
 class WaveSizeAttribute : public Attribute
 {
-    SLANG_AST_CLASS(WaveSizeAttribute)
-
+    FIDDLE(...)
     // "numLanes" must be a compile time constant integer
     // value of an allowed wave size, which is one of the
     // followings: 4, 8, 16, 32, 64 or 128.
     //
-    IntVal* numLanes;
+    FIDDLE() IntVal* numLanes;
 };
 
+FIDDLE()
 class MaxVertexCountAttribute : public Attribute
 {
-    SLANG_AST_CLASS(MaxVertexCountAttribute)
-
+    FIDDLE(...)
     // The number of max vertex count for geometry shader
     //
     // TODO: This should be an accessor that uses the
     // ordinary `args` list, rather than side data.
-    int32_t value;
+    FIDDLE() int32_t value;
 };
 
+FIDDLE()
 class InstanceAttribute : public Attribute
 {
-    SLANG_AST_CLASS(InstanceAttribute)
-
+    FIDDLE(...)
     // The number of instances to run for geometry shader
     //
     // TODO: This should be an accessor that uses the
     // ordinary `args` list, rather than side data.
-    int32_t value;
+    FIDDLE() int32_t value;
 };
 
 // A `[shader("stageName")]`/`[shader("capability")]` attribute which
 // marks an entry point for compiling. This attribute also specifies
 // the 'capabilities' implicitly supported by an entry point
+FIDDLE()
 class EntryPointAttribute : public Attribute
 {
-    SLANG_AST_CLASS(EntryPointAttribute)
-
+    FIDDLE(...)
     // The resolved capailities for our entry point.
-    CapabilitySet capabilitySet;
+    FIDDLE() CapabilitySet capabilitySet;
 };
 
 // A `[__vulkanRayPayload(location)]` attribute, which is used in the
 // core module implementation to indicate that a variable
 // actually represents the input/output interface for a Vulkan
 // ray tracing shader to pass per-ray payload information.
+FIDDLE()
 class VulkanRayPayloadAttribute : public Attribute
 {
-    SLANG_AST_CLASS(VulkanRayPayloadAttribute)
-
-    int location;
+    FIDDLE(...)
+    FIDDLE() int location;
 };
+FIDDLE()
 class VulkanRayPayloadInAttribute : public Attribute
 {
-    SLANG_AST_CLASS(VulkanRayPayloadInAttribute)
-
-    int location;
+    FIDDLE(...)
+    FIDDLE() int location;
 };
 
 // A `[__vulkanCallablePayload(location)]` attribute, which is used in the
 // core module implementation to indicate that a variable
 // actually represents the input/output interface for a Vulkan
 // ray tracing shader to pass payload information to/from a callee.
+FIDDLE()
 class VulkanCallablePayloadAttribute : public Attribute
 {
-    SLANG_AST_CLASS(VulkanCallablePayloadAttribute)
-
-    int location;
+    FIDDLE(...)
+    FIDDLE() int location;
 };
+FIDDLE()
 class VulkanCallablePayloadInAttribute : public Attribute
 {
-    SLANG_AST_CLASS(VulkanCallablePayloadInAttribute)
-
-    int location;
+    FIDDLE(...)
+    FIDDLE() int location;
 };
 
 // A `[__vulkanHitAttributes]` attribute, which is used in the
 // core module implementation to indicate that a variable
 // actually represents the output interface for a Vulkan
 // intersection shader to pass hit attribute information.
+FIDDLE()
 class VulkanHitAttributesAttribute : public Attribute
 {
-    SLANG_AST_CLASS(VulkanHitAttributesAttribute)
+    FIDDLE(...)
 };
 
 // A `[__vulkanHitObjectAttributes(location)]` attribute, which is used in the
 // core module implementation to indicate that a variable
 // actually represents the attributes on a HitObject as part of
 // Shader ExecutionReordering
+FIDDLE()
 class VulkanHitObjectAttributesAttribute : public Attribute
 {
-    SLANG_AST_CLASS(VulkanHitObjectAttributesAttribute)
-
-    int location;
+    FIDDLE(...)
+    FIDDLE() int location;
 };
 
 // A `[mutating]` attribute, which indicates that a member
 // function is allowed to modify things through its `this`
 // argument.
 //
+FIDDLE()
 class MutatingAttribute : public Attribute
 {
-    SLANG_AST_CLASS(MutatingAttribute)
+    FIDDLE(...)
 };
 
 // A `[nonmutating]` attribute, which indicates that a
 // `set` accessor does not need to modify anything through
 // its `this` parameter.
 //
+FIDDLE()
 class NonmutatingAttribute : public Attribute
 {
-    SLANG_AST_CLASS(NonmutatingAttribute)
+    FIDDLE(...)
 };
 
 // A `[constref]` attribute, which indicates that the `this` parameter of
 // a member function should be passed by const reference.
 //
+FIDDLE()
 class ConstRefAttribute : public Attribute
 {
-    SLANG_AST_CLASS(ConstRefAttribute)
+    FIDDLE(...)
 };
 
 // A `[ref]` attribute, which indicates that the `this` parameter of
 // a member function should be passed by reference.
 //
+FIDDLE()
 class RefAttribute : public Attribute
 {
-    SLANG_AST_CLASS(RefAttribute)
+    FIDDLE(...)
 };
 
 // A `[__readNone]` attribute, which indicates that a function
@@ -1203,174 +1336,194 @@ class RefAttribute : public Attribute
 // reading or writing through any pointer arguments, or any other
 // state that could be observed by a caller.
 //
+FIDDLE()
 class ReadNoneAttribute : public Attribute
 {
-    SLANG_AST_CLASS(ReadNoneAttribute)
+    FIDDLE(...)
 };
 
 
 // A `[__GLSLRequireShaderInputParameter]` attribute to annotate
 // functions that require a shader input as parameter
 //
+FIDDLE()
 class GLSLRequireShaderInputParameterAttribute : public Attribute
 {
-    SLANG_AST_CLASS(GLSLRequireShaderInputParameterAttribute)
-
-    uint32_t parameterNumber;
+    FIDDLE(...)
+    FIDDLE() uint32_t parameterNumber;
 };
 
 // HLSL modifiers for geometry shader input topology
+FIDDLE()
 class HLSLGeometryShaderInputPrimitiveTypeModifier : public Modifier
 {
-    SLANG_AST_CLASS(HLSLGeometryShaderInputPrimitiveTypeModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLPointModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier
 {
-    SLANG_AST_CLASS(HLSLPointModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLLineModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier
 {
-    SLANG_AST_CLASS(HLSLLineModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLTriangleModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier
 {
-    SLANG_AST_CLASS(HLSLTriangleModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLLineAdjModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier
 {
-    SLANG_AST_CLASS(HLSLLineAdjModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLTriangleAdjModifier : public HLSLGeometryShaderInputPrimitiveTypeModifier
 {
-    SLANG_AST_CLASS(HLSLTriangleAdjModifier)
+    FIDDLE(...)
 };
 
 // Mesh shader paramters
 
+FIDDLE()
 class HLSLMeshShaderOutputModifier : public Modifier
 {
-    SLANG_AST_CLASS(HLSLMeshShaderOutputModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLVerticesModifier : public HLSLMeshShaderOutputModifier
 {
-    SLANG_AST_CLASS(HLSLVerticesModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLIndicesModifier : public HLSLMeshShaderOutputModifier
 {
-    SLANG_AST_CLASS(HLSLIndicesModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLPrimitivesModifier : public HLSLMeshShaderOutputModifier
 {
-    SLANG_AST_CLASS(HLSLPrimitivesModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class HLSLPayloadModifier : public Modifier
 {
-    SLANG_AST_CLASS(HLSLPayloadModifier)
+    FIDDLE(...)
 };
 
 // A modifier to indicate that a constructor/initializer can be used
 // to perform implicit type conversion, and to specify the cost of
 // the conversion, if applied.
+FIDDLE()
 class ImplicitConversionModifier : public Modifier
 {
-    SLANG_AST_CLASS(ImplicitConversionModifier)
-
+    FIDDLE(...)
     // The conversion cost, used to rank conversions
-    ConversionCost cost = kConversionCost_None;
+    FIDDLE() ConversionCost cost = kConversionCost_None;
 
     // A builtin identifier for identifying conversions that need special treatment.
-    BuiltinConversionKind builtinConversionKind = kBuiltinConversion_Unknown;
+    FIDDLE() BuiltinConversionKind builtinConversionKind = kBuiltinConversion_Unknown;
 };
 
+FIDDLE()
 class FormatAttribute : public Attribute
 {
-    SLANG_AST_CLASS(FormatAttribute)
-
-    ImageFormat format;
+    FIDDLE(...)
+    FIDDLE() ImageFormat format;
 };
 
+FIDDLE()
 class AllowAttribute : public Attribute
 {
-    SLANG_AST_CLASS(AllowAttribute)
-
-    DiagnosticInfo const* diagnostic = nullptr;
+    FIDDLE(...)
+    FIDDLE() DiagnosticInfo const* diagnostic = nullptr;
 };
 
 
 // A `[__extern]` attribute, which indicates that a function/type is defined externally
 //
+FIDDLE()
 class ExternAttribute : public Attribute
 {
-    SLANG_AST_CLASS(ExternAttribute)
+    FIDDLE(...)
 };
 
 
 // An `[__unsafeForceInlineExternal]` attribute indicates that the callee should be inlined
 // into call sites after initial IR generation (that is, as early as possible).
 //
+FIDDLE()
 class UnsafeForceInlineEarlyAttribute : public Attribute
 {
-    SLANG_AST_CLASS(UnsafeForceInlineEarlyAttribute)
+    FIDDLE(...)
 };
 
 // A `[ForceInline]` attribute indicates that the callee should be inlined
 // by the Slang compiler.
 //
+FIDDLE()
 class ForceInlineAttribute : public Attribute
 {
-    SLANG_AST_CLASS(ForceInlineAttribute)
+    FIDDLE(...)
 };
 
 
 /// An attribute that marks a type declaration as either allowing or
 /// disallowing the type to be inherited from in other modules.
+FIDDLE(abstract)
 class InheritanceControlAttribute : public Attribute
 {
-    SLANG_AST_CLASS(InheritanceControlAttribute)
+    FIDDLE(...)
 };
 
 /// An attribute that marks a type declaration as allowing the type to be inherited from in other
 /// modules.
+FIDDLE()
 class OpenAttribute : public InheritanceControlAttribute
 {
-    SLANG_AST_CLASS(OpenAttribute)
+    FIDDLE(...)
 };
 
 /// An attribute that marks a type declaration as disallowing the type to be inherited from in other
 /// modules.
+FIDDLE()
 class SealedAttribute : public InheritanceControlAttribute
 {
-    SLANG_AST_CLASS(SealedAttribute)
+    FIDDLE(...)
 };
 
 /// An attribute that marks a decl as a compiler built-in object.
+FIDDLE()
 class BuiltinAttribute : public Attribute
 {
-    SLANG_AST_CLASS(BuiltinAttribute)
+    FIDDLE(...)
 };
 
 /// An attribute that marks a decl as a compiler built-in object for the autodiff system.
+FIDDLE()
 class AutoDiffBuiltinAttribute : public Attribute
 {
-    SLANG_AST_CLASS(AutoDiffBuiltinAttribute)
+    FIDDLE(...)
 };
 
 /// An attribute that defines the size of `AnyValue` type to represent a polymoprhic value that
 /// conforms to the decorated interface type.
+FIDDLE()
 class AnyValueSizeAttribute : public Attribute
 {
-    SLANG_AST_CLASS(AnyValueSizeAttribute)
-
-    int32_t size;
+    FIDDLE(...)
+    FIDDLE() int32_t size;
 };
 
 /// This is a stop-gap solution to break overload ambiguity in the core module.
@@ -1379,24 +1532,27 @@ class AnyValueSizeAttribute : public Attribute
 /// In the future, we should enhance our type system to take into account the "specialized"-ness
 /// of an overload, such that `T overload1<T:IDerived>()` is more specialized than `T
 /// overload2<T:IBase>()` and preferred during overload resolution.
+FIDDLE()
 class OverloadRankAttribute : public Attribute
 {
-    SLANG_AST_CLASS(OverloadRankAttribute)
-    int32_t rank;
+    FIDDLE(...)
+    FIDDLE() int32_t rank;
 };
 
 /// An attribute that marks an interface for specialization use only. Any operation that triggers
 /// dynamic dispatch through the interface is a compile-time error.
+FIDDLE()
 class SpecializeAttribute : public Attribute
 {
-    SLANG_AST_CLASS(SpecializeAttribute)
+    FIDDLE(...)
 };
 
 /// An attribute that marks a type, function or variable as differentiable.
+FIDDLE()
 class DifferentiableAttribute : public Attribute
 {
-    SLANG_AST_CLASS(DifferentiableAttribute)
-
+    FIDDLE(...)
+    // TODO(tfoley): Why is there this duplication here?
     List<KeyValuePair<Type*, SubtypeWitness*>> m_typeToIDifferentiableWitnessMappings;
 
     void addType(Type* declRef, SubtypeWitness* witness)
@@ -1418,55 +1574,62 @@ private:
     OrderedDictionary<Type*, SubtypeWitness*> m_mapToIDifferentiableWitness;
 };
 
+FIDDLE()
 class DllImportAttribute : public Attribute
 {
-    SLANG_AST_CLASS(DllImportAttribute)
+    FIDDLE(...)
+    FIDDLE() String modulePath;
 
-    String modulePath;
-
-    String functionName;
+    FIDDLE() String functionName;
 };
 
+FIDDLE()
 class DllExportAttribute : public Attribute
 {
-    SLANG_AST_CLASS(DllExportAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class TorchEntryPointAttribute : public Attribute
 {
-    SLANG_AST_CLASS(TorchEntryPointAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class CudaDeviceExportAttribute : public Attribute
 {
-    SLANG_AST_CLASS(CudaDeviceExportAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class CudaKernelAttribute : public Attribute
 {
-    SLANG_AST_CLASS(CudaKernelAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class CudaHostAttribute : public Attribute
 {
-    SLANG_AST_CLASS(CudaHostAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class AutoPyBindCudaAttribute : public Attribute
 {
-    SLANG_AST_CLASS(AutoPyBindCudaAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class PyExportAttribute : public Attribute
 {
-    SLANG_AST_CLASS(PyExportAttribute)
-
-    String name;
+    FIDDLE(...)
+    FIDDLE() String name;
 };
 
+FIDDLE()
 class PreferRecomputeAttribute : public Attribute
 {
-    SLANG_AST_CLASS(PreferRecomputeAttribute)
+    FIDDLE(...)
 
     enum SideEffectBehavior
     {
@@ -1474,87 +1637,94 @@ class PreferRecomputeAttribute : public Attribute
         Allow = 1
     };
 
-    SideEffectBehavior sideEffectBehavior;
+    FIDDLE() SideEffectBehavior sideEffectBehavior;
 };
 
+FIDDLE()
 class PreferCheckpointAttribute : public Attribute
 {
-    SLANG_AST_CLASS(PreferCheckpointAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class DerivativeMemberAttribute : public Attribute
 {
-    SLANG_AST_CLASS(DerivativeMemberAttribute)
-
-    DeclRefExpr* memberDeclRef;
+    FIDDLE(...)
+    FIDDLE() DeclRefExpr* memberDeclRef;
 };
 
 /// An attribute that marks an interface type as a COM interface declaration.
+FIDDLE()
 class ComInterfaceAttribute : public Attribute
 {
-    SLANG_AST_CLASS(ComInterfaceAttribute)
-
-    String guid;
+    FIDDLE(...)
+    FIDDLE() String guid;
 };
 
 /// A `[__requiresNVAPI]` attribute indicates that the declaration being modifed
 /// requires NVAPI operations for its implementation on D3D.
+FIDDLE()
 class RequiresNVAPIAttribute : public Attribute
 {
-    SLANG_AST_CLASS(RequiresNVAPIAttribute)
+    FIDDLE(...)
 };
 
 /// A `[RequirePrelude(target, "string")]` attribute indicates that the declaration being modifed
 /// requires a textual prelude to be injected in the resulting target code.
+FIDDLE()
 class RequirePreludeAttribute : public Attribute
 {
-    SLANG_AST_CLASS(RequirePreludeAttribute)
-
-    CapabilitySet capabilitySet;
-    String prelude;
+    FIDDLE(...)
+    FIDDLE() CapabilitySet capabilitySet;
+    FIDDLE() String prelude;
 };
 
 /// A `[__AlwaysFoldIntoUseSite]` attribute indicates that the calls into the modified
 /// function should always be folded into use sites during source emit.
+FIDDLE()
 class AlwaysFoldIntoUseSiteAttribute : public Attribute
 {
-    SLANG_AST_CLASS(AlwaysFoldIntoUseSiteAttribute)
+    FIDDLE(...)
 };
 
 // A `[TreatAsDifferentiableAttribute]` attribute indicates that a function or an interface
 // should be treated as differentiable in IR validation step.
 //
+FIDDLE()
 class TreatAsDifferentiableAttribute : public DifferentiableAttribute
 {
-    SLANG_AST_CLASS(TreatAsDifferentiableAttribute)
+    FIDDLE(...)
 };
 
 /// The `[ForwardDifferentiable]` attribute indicates that a function can be forward-differentiated.
+FIDDLE()
 class ForwardDifferentiableAttribute : public DifferentiableAttribute
 {
-    SLANG_AST_CLASS(ForwardDifferentiableAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class UserDefinedDerivativeAttribute : public DifferentiableAttribute
 {
-    SLANG_AST_CLASS(UserDefinedDerivativeAttribute)
-
-    Expr* funcExpr;
+    FIDDLE(...)
+    FIDDLE() Expr* funcExpr;
 };
 
 /// The `[ForwardDerivative(function)]` attribute specifies a custom function that should
 /// be used as the derivative for the decorated function.
+FIDDLE()
 class ForwardDerivativeAttribute : public UserDefinedDerivativeAttribute
 {
-    SLANG_AST_CLASS(ForwardDerivativeAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class DerivativeOfAttribute : public DifferentiableAttribute
 {
-    SLANG_AST_CLASS(DerivativeOfAttribute)
+    FIDDLE(...)
+    FIDDLE() Expr* funcExpr;
 
-    Expr* funcExpr;
-
+    FIDDLE()
     Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
 };
 
@@ -1562,75 +1732,83 @@ class DerivativeOfAttribute : public DifferentiableAttribute
 /// derivative implementation for `primalFunction`.
 /// ForwardDerivativeOfAttribute inherits from DifferentiableAttribute because a derivative
 /// function itself is considered differentiable.
+FIDDLE()
 class ForwardDerivativeOfAttribute : public DerivativeOfAttribute
 {
-    SLANG_AST_CLASS(ForwardDerivativeOfAttribute)
+    FIDDLE(...)
 };
 
 /// The `[BackwardDifferentiable]` attribute indicates that a function can be
 /// backward-differentiated.
+FIDDLE()
 class BackwardDifferentiableAttribute : public DifferentiableAttribute
 {
-    SLANG_AST_CLASS(BackwardDifferentiableAttribute)
-    int maxOrder = 0;
+    FIDDLE(...)
+    FIDDLE() int maxOrder = 0;
 };
 
 /// The `[BackwardDerivative(function)]` attribute specifies a custom function that should
 /// be used as the backward-derivative for the decorated function.
+FIDDLE()
 class BackwardDerivativeAttribute : public UserDefinedDerivativeAttribute
 {
-    SLANG_AST_CLASS(BackwardDerivativeAttribute)
+    FIDDLE(...)
 };
 
 /// The `[BackwardDerivativeOf(primalFunction)]` attribute marks the decorated function as custom
 /// backward-derivative implementation for `primalFunction`.
+FIDDLE()
 class BackwardDerivativeOfAttribute : public DerivativeOfAttribute
 {
-    SLANG_AST_CLASS(BackwardDerivativeOfAttribute)
+    FIDDLE(...)
 };
 
 /// The `[PrimalSubstitute(function)]` attribute specifies a custom function that should
 /// be used as the primal function substitute when differentiating code that calls the primal
 /// function.
+FIDDLE()
 class PrimalSubstituteAttribute : public Attribute
 {
-    SLANG_AST_CLASS(PrimalSubstituteAttribute)
-    Expr* funcExpr;
+    FIDDLE(...)
+    FIDDLE() Expr* funcExpr;
 };
 
 /// The `[PrimalSubstituteOf(primalFunction)]` attribute marks the decorated function as
 /// the substitute primal function in a forward or backward derivative function.
+FIDDLE()
 class PrimalSubstituteOfAttribute : public Attribute
 {
-    SLANG_AST_CLASS(PrimalSubstituteOfAttribute)
-
-    Expr* funcExpr;
+    FIDDLE(...)
+    FIDDLE() Expr* funcExpr;
+    FIDDLE()
     Expr* backDeclRef; // DeclRef to this derivative function when initiated from primalFunction.
 };
 
 /// The `[NoDiffThis]` attribute is used to specify that the `this` parameter should not be
 /// included for differentiation.
+FIDDLE()
 class NoDiffThisAttribute : public Attribute
 {
-    SLANG_AST_CLASS(NoDiffThisAttribute)
+    FIDDLE(...)
 };
 
 /// Indicates that the modified declaration is one of the "magic" declarations
 /// that NVAPI uses to communicate extended operations. When NVAPI is being included
 /// via the prelude for downstream compilation, declarations with this modifier
 /// will not be emitted, instead allowing the versions from the prelude to be used.
+FIDDLE()
 class NVAPIMagicModifier : public Modifier
 {
-    SLANG_AST_CLASS(NVAPIMagicModifier)
+    FIDDLE(...)
 };
 
 /// A modifier that attaches to a `ModuleDecl` to indicate the register/space binding
 /// that NVAPI wants to use, as indicated by, e.g., the `NV_SHADER_EXTN_SLOT` and
 /// `NV_SHADER_EXTN_REGISTER_SPACE` preprocessor definitions.
+FIDDLE()
 class NVAPISlotModifier : public Modifier
 {
-    SLANG_AST_CLASS(NVAPISlotModifier)
-
+    FIDDLE(...)
     /// The name of the register that is to be used (e.g., `"u3"`)
     ///
     /// This value will come from the `NV_SHADER_EXTN_SLOT` macro, if set.
@@ -1639,7 +1817,7 @@ class NVAPISlotModifier : public Modifier
     /// an `NVAPISlotModifier` to a module; if no register name is defined,
     /// then the modifier should not be added.
     ///
-    String registerName;
+    FIDDLE() String registerName;
 
     /// The name of the register space to be used (e.g., `space1`)
     ///
@@ -1648,7 +1826,7 @@ class NVAPISlotModifier : public Modifier
     ///
     /// It is valid for a user to specify a register name but not a space name,
     /// and in that case `spaceName` will be set to `"space0"`.
-    String spaceName;
+    FIDDLE() String spaceName;
 };
 
 /// A `[noinline]` attribute represents a request by the application that,
@@ -1657,41 +1835,48 @@ class NVAPISlotModifier : public Modifier
 /// Note that due to various limitations of different targets, it is entirely
 /// possible for such functions to be inlined or specialized to call sites.
 ///
+FIDDLE()
 class NoInlineAttribute : public Attribute
 {
-    SLANG_AST_CLASS(NoInlineAttribute)
+    FIDDLE(...)
 };
 
 /// A `[noRefInline]` attribute represents a request to not force inline a
 /// function specifically due to a refType parameter.
+FIDDLE()
 class NoRefInlineAttribute : public Attribute
 {
-    SLANG_AST_CLASS(NoRefInlineAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class DerivativeGroupQuadAttribute : public Attribute
 {
-    SLANG_AST_CLASS(DerivativeGroupQuadAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class DerivativeGroupLinearAttribute : public Attribute
 {
-    SLANG_AST_CLASS(DerivativeGroupLinearAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class MaximallyReconvergesAttribute : public Attribute
 {
-    SLANG_AST_CLASS(MaximallyReconvergesAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class QuadDerivativesAttribute : public Attribute
 {
-    SLANG_AST_CLASS(QuadDerivativesAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class RequireFullQuadsAttribute : public Attribute
 {
-    SLANG_AST_CLASS(RequireFullQuadsAttribute)
+    FIDDLE(...)
 };
 
 /// A `[payload]` attribute indicates that a `struct` type will be used as
@@ -1699,9 +1884,10 @@ class RequireFullQuadsAttribute : public Attribute
 /// for shaders in the ray tracing pipeline that might be invoked for
 /// such a ray.
 ///
+FIDDLE()
 class PayloadAttribute : public Attribute
 {
-    SLANG_AST_CLASS(PayloadAttribute)
+    FIDDLE(...)
 };
 
 /// A `[raypayload]` attribute indicates that a `struct` type will be used as
@@ -1709,9 +1895,10 @@ class PayloadAttribute : public Attribute
 /// for shaders in the ray tracing pipeline that might be invoked for
 /// such a ray.
 ///
+FIDDLE()
 class RayPayloadAttribute : public Attribute
 {
-    SLANG_AST_CLASS(RayPayloadAttribute)
+    FIDDLE(...)
 };
 
 /// A `[deprecated("message")]` attribute indicates the target is
@@ -1719,32 +1906,34 @@ class RayPayloadAttribute : public Attribute
 /// A compiler warning including the message will be raised if the
 /// deprecated value is used.
 ///
+FIDDLE()
 class DeprecatedAttribute : public Attribute
 {
-    SLANG_AST_CLASS(DeprecatedAttribute)
-
-    String message;
+    FIDDLE(...)
+    FIDDLE() String message;
 };
 
+FIDDLE()
 class NonCopyableTypeAttribute : public Attribute
 {
-    SLANG_AST_CLASS(NonCopyableTypeAttribute)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class NoSideEffectAttribute : public Attribute
 {
-    SLANG_AST_CLASS(NoSideEffectAttribute)
+    FIDDLE(...)
 };
 
 /// A `[KnownBuiltin("name")]` attribute allows the compiler to
 /// identify this declaration during compilation, despite obfuscation or
 /// linkage removing optimizations
 ///
+FIDDLE()
 class KnownBuiltinAttribute : public Attribute
 {
-    SLANG_AST_CLASS(KnownBuiltinAttribute)
-
-    String name;
+    FIDDLE(...)
+    FIDDLE() String name;
 };
 
 /// A modifier that applies to types rather than declarations.
@@ -1762,103 +1951,117 @@ class KnownBuiltinAttribute : public Attribute
 /// and instead want to belong to the type (or rather the type *specifier*
 /// from a parsing standpoint).
 ///
+FIDDLE()
 class TypeModifier : public Modifier
 {
-    SLANG_AST_CLASS(TypeModifier)
+    FIDDLE(...)
 };
 
 /// A kind of syntax element which appears as a modifier in the syntax, but
 /// we represent as a function over type expressions
+FIDDLE()
 class WrappingTypeModifier : public TypeModifier
 {
-    SLANG_AST_CLASS(WrappingTypeModifier)
+    FIDDLE(...)
 };
 
 /// A modifier that applies to a type and implies information about the
 /// underlying format of a resource that uses that type as its element type.
 ///
+FIDDLE()
 class ResourceElementFormatModifier : public TypeModifier
 {
-    SLANG_AST_CLASS(ResourceElementFormatModifier)
+    FIDDLE(...)
 };
 
 /// HLSL `unorm` modifier
+FIDDLE()
 class UNormModifier : public ResourceElementFormatModifier
 {
-    SLANG_AST_CLASS(UNormModifier)
+    FIDDLE(...)
 };
 
 /// HLSL `snorm` modifier
+FIDDLE()
 class SNormModifier : public ResourceElementFormatModifier
 {
-    SLANG_AST_CLASS(SNormModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class NoDiffModifier : public TypeModifier
 {
-    SLANG_AST_CLASS(NoDiffModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GloballyCoherentModifier : public SimpleModifier
 {
-    SLANG_AST_CLASS(GloballyCoherentModifier)
+    FIDDLE(...)
 };
 
 // Some GLSL-specific modifiers
+FIDDLE()
 class GLSLBufferModifier : public WrappingTypeModifier
 {
-    SLANG_AST_CLASS(GLSLBufferModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLWriteOnlyModifier : public SimpleModifier
 {
-    SLANG_AST_CLASS(GLSLWriteOnlyModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLReadOnlyModifier : public SimpleModifier
 {
-    SLANG_AST_CLASS(GLSLReadOnlyModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLVolatileModifier : public SimpleModifier
 {
-    SLANG_AST_CLASS(GLSLVolatileModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLRestrictModifier : public SimpleModifier
 {
-    SLANG_AST_CLASS(GLSLRestrictModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class GLSLPatchModifier : public SimpleModifier
 {
-    SLANG_AST_CLASS(GLSLPatchModifier)
+    FIDDLE(...)
 };
 
 //
+FIDDLE()
 class BitFieldModifier : public Modifier
 {
-    SLANG_AST_CLASS(BitFieldModifier)
-
-    IntegerLiteralValue width;
+    FIDDLE(...)
+    FIDDLE() IntegerLiteralValue width;
 
     // Fields filled during semantic analysis
-    IntegerLiteralValue offset = 0;
-    DeclRef<VarDecl> backingDeclRef;
+    FIDDLE() IntegerLiteralValue offset = 0;
+    FIDDLE() DeclRef<VarDecl> backingDeclRef;
 };
 
+FIDDLE()
 class DynamicUniformModifier : public Modifier
 {
-    SLANG_AST_CLASS(DynamicUniformModifier)
+    FIDDLE(...)
 };
 
+FIDDLE()
 class MemoryQualifierSetModifier : public Modifier
 {
-    SLANG_AST_CLASS(MemoryQualifierSetModifier);
+    FIDDLE(...)
+    FIDDLE() List<Modifier*> memoryModifiers;
 
-    List<Modifier*> memoryModifiers;
-
-    uint32_t memoryQualifiers = 0;
+    FIDDLE() uint32_t memoryQualifiers = 0;
 
 public:
     struct Flags

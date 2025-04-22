@@ -85,7 +85,7 @@ Result TestContext::init(const char* inExePath)
 {
     SlangGlobalSessionDesc desc = {};
     desc.enableGLSL = true;
-    slang::createGlobalSession(&desc, m_session.writeRef());
+    SLANG_RETURN_ON_FAIL(slang::createGlobalSession(&desc, m_session.writeRef()));
     exePath = inExePath;
     SLANG_RETURN_ON_FAIL(TestToolUtil::getExeDirectoryPath(inExePath, exeDirectoryPath));
     SLANG_RETURN_ON_FAIL(TestToolUtil::getDllDirectoryPath(inExePath, dllDirectoryPath));

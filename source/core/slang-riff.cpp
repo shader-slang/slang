@@ -758,6 +758,24 @@ void RiffContainer::_addChunk(Chunk* chunk)
     }
 }
 
+void RiffContainer::setCurrentChunk(Chunk* chunk)
+{
+    SLANG_ASSERT(chunk);
+
+    switch (chunk->m_kind)
+    {
+    case Chunk::Kind::Data:
+        m_listChunk = nullptr;
+        m_dataChunk = static_cast<RiffContainer::DataChunk*>(chunk);
+        break;
+
+    case Chunk::Kind::List:
+        m_dataChunk = nullptr;
+        m_listChunk = static_cast<RiffContainer::ListChunk*>(chunk);
+        break;
+    }
+}
+
 void RiffContainer::startChunk(Chunk::Kind kind, FourCC fourCC)
 {
     SLANG_ASSERT(m_listChunk || m_rootList == nullptr);
@@ -857,7 +875,10 @@ void RiffContainer::setPayload(Data* data, const void* payload, size_t size)
     data->m_ownership = Ownership::Arena;
     data->m_size = size;
 
-    data->m_payload = m_arena.allocateAligned(size, kPayloadMinAlignment);
+    if (size)
+    {
+        data->m_payload = m_arena.allocateAligned(size, kPayloadMinAlignment);
+    }
 
     if (payload)
     {
