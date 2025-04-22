@@ -122,7 +122,7 @@ spv-amd-shader-trinary-minmax.insts.inc
 
 ## Build Slang and run slang-test
 
-There are many ways to build Slang executables. Refer to the [document](https://github.com/shader-slang/slang/blob/master/docs/building.md) for more detail.
+There are many ways to build Slang executables. Refer to the [document](https://github.com/shader-slang/slang/blob/main/docs/building.md) for more detail.
 For a quick reference, you can build with the following commands,
 ```
 cmake.exe --preset vs2019

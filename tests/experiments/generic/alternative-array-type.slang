@@ -2,7 +2,7 @@
 
 /* The docs claim that for arrays we can use the 'alternate' style 
 
-https://github.com/shader-slang/slang/blob/master/docs/language-reference/04-types.md
+https://github.com/shader-slang/slang/blob/main/docs/language-reference/04-types.md
 
 > int[10] a;
 

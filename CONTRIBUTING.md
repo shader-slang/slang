@@ -10,7 +10,7 @@ This document is designed to guide you in contributing to the project. It is int
 * When you submit a pull request, a CLA bot will determine whether you need to sign a CLA. Simply follow the instructions provided.
 * Please read and follow the contributor [Code of Conduct](CODE_OF_CONDUCT.md).
 * Bug reports and feature requests should be submitted via the GitHub issue tracker.
-* Changes should ideally come in as small pull requests on top of master, coming from your own personal fork of the project.
+* Changes should ideally come in as small pull requests on top of main, coming from your own personal fork of the project.
 * Large features that will involve multiple contributors or a long development time should be discussed in issues and broken down into smaller pieces that can be implemented and checked in stages.
 
 ## Table of Contents
@@ -244,11 +244,11 @@ When you push to your forked repository, `git-push` usually prints a URL that al
 
 If you missed a chance to use the URL, you can still create a PR from the GitHub webpage.
 Go to your forked repository and change the branch name to the one you used for `git-push`.
-It will show a message like "This branch is 1 commit ahead of `shader-slang/slang:master`."
+It will show a message like "This branch is 1 commit ahead of `shader-slang/slang:main`."
 You can create a PR by clicking on the message.
 
 ## Pull Request
-Once a PR is created against `shader-slang/slang:master`, the PR will be merged when the following conditions are met:
+Once a PR is created against `shader-slang/slang:main`, the PR will be merged when the following conditions are met:
 1. The PR is reviewed and got approval.
 1. All of the workflows pass.
 
@@ -269,8 +269,8 @@ When your branch is out of sync with top-of-tree, submit a merge commit to keep 
 
 Use these commands to sync your branch:
 ```
-$ git fetch upstream master
-$ git merge upstream/master # resolve any conflicts here
+$ git fetch upstream main
+$ git merge upstream/main # resolve any conflicts here
 $ git submodule update --recursive
 ```
 

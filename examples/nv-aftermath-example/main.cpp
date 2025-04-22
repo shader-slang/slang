@@ -26,7 +26,7 @@ static const ExampleResources resourceBase("nv-aftermath-example");
 // In addition it uses obfuscation and source maps to allow source level
 // debugging via aftermath even with obfuscation.
 //
-// * [obfuscation](https://github.com/shader-slang/slang/blob/master/docs/user-guide/a1-03-obfuscation.md)
+// * [obfuscation](https://github.com/shader-slang/slang/blob/main/docs/user-guide/a1-03-obfuscation.md)
 // * [source map](https://github.com/source-map/source-map-spec)
 
 struct Vertex

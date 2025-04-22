@@ -150,7 +150,7 @@ The `slangc` tool, included in binary distributions of Slang, is a command-line 
 
 ### All Available Options
 
-See [slangc command line reference](https://github.com/shader-slang/slang/blob/master/docs/command-line-slangc-reference.md) for a complete list of compiler options supported by the `slangc` tool.
+See [slangc command line reference](https://github.com/shader-slang/slang/blob/main/docs/command-line-slangc-reference.md) for a complete list of compiler options supported by the `slangc` tool.
 
 
 ### A Simple `slangc` Example
@@ -271,7 +271,7 @@ The main other options are:
 
 * `-O<level>` can be used to control optimization levels when the Slang compiler invokes downstream code generator
 
-See [slangc command line reference](https://github.com/shader-slang/slang/blob/master/docs/command-line-slangc-reference.md) for a complete list of compiler options supported by the `slangc` tool.
+See [slangc command line reference](https://github.com/shader-slang/slang/blob/main/docs/command-line-slangc-reference.md) for a complete list of compiler options supported by the `slangc` tool.
 
 ### Downstream Arguments
 

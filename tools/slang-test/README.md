@@ -112,7 +112,7 @@ slang-test slang-unit-test-tool/<test-name>
 # e.g. run the `byteEncode` test.
 slang-test slang-unit-test-tool/byteEncode
 ```
-These tests are located in the [tools/slang-unit-test](https://github.com/shader-slang/slang/tree/master/tools/slang-unit-test) directory, and defined with macros like `SLANG_UNIT_TEST(byteEncode)`.
+These tests are located in the [tools/slang-unit-test](https://github.com/shader-slang/slang/tree/main/tools/slang-unit-test) directory, and defined with macros like `SLANG_UNIT_TEST(byteEncode)`.
 
 ### gfx-unit-test-tool
 ```bash
@@ -122,4 +122,4 @@ slang-test gfx-unit-test-tool/<test-name>
 # e.g. run the `precompiledTargetModule2Vulkan` test.
 slang-test gfx-unit-test-tool/precompiledTargetModule2Vulkan
 ```
-These tests are located in [tools/gfx-unit-test](https://github.com/shader-slang/slang/tree/master/tools/gfx-unit-test), and likewise defined using macros like `SLANG_UNIT_TEST(precompiledTargetModule2Vulkan)`.
+These tests are located in [tools/gfx-unit-test](https://github.com/shader-slang/slang/tree/main/tools/gfx-unit-test), and likewise defined using macros like `SLANG_UNIT_TEST(precompiledTargetModule2Vulkan)`.

@@ -99,4 +99,4 @@ Note that in the generated GLSL code, all shader parameters are qualified with e
 
 ## The full example
 
-The full Vulkan example that sets up and runs the `hello-world.slang` shader is located in the [/examples/hello-world](https://github.com/shader-slang/slang/tree/master/examples/hello-world) directory of the Slang repository. The example code initializes a Vulkan context and runs the compiled SPIRV code. The example code demonstrates how to use the Slang API to load and compile shaders.
+The full Vulkan example that sets up and runs the `hello-world.slang` shader is located in the [/examples/hello-world](https://github.com/shader-slang/slang/tree/main/examples/hello-world) directory of the Slang repository. The example code initializes a Vulkan context and runs the compiled SPIRV code. The example code demonstrates how to use the Slang API to load and compile shaders.

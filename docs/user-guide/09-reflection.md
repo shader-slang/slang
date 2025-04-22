@@ -14,7 +14,7 @@ Our goals in this chapter are to:
 * Provide an underlying mental model for how Slang's reflection information represents the structure of a program
 
 We will describe the structure of a program that traverses all of the parameters of a shader program and prints information (including binding locations) for them.
-The code shown here is derived from the [reflection-api](https://github.com/shader-slang/slang/tree/master/examples/reflection-api) example that is included in the Slang repository.
+The code shown here is derived from the [reflection-api](https://github.com/shader-slang/slang/tree/main/examples/reflection-api) example that is included in the Slang repository.
 Readers may find it helpful to follow along with that code, to see a more complete picture of what is presented here.
 
 Compiling a Program

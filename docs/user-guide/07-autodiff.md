@@ -555,7 +555,7 @@ Most often, this is because a lot of shader operations may just not have a funct
 texture sampling. In such cases, Slang provides a `[PrimalSubstitute(fn)]` attribute that can be used to provide
 a reference implementation that Slang can differentiate to generate the derivative function.
 
-The following is a small snippet with bilinear texture sampling. For a full example application that uses this concept, see the [texture differentiation sample](https://github.com/shader-slang/slang/tree/master/examples/autodiff-texture) in the Slang repository.
+The following is a small snippet with bilinear texture sampling. For a full example application that uses this concept, see the [texture differentiation sample](https://github.com/shader-slang/slang/tree/main/examples/autodiff-texture) in the Slang repository.
 
 ```csharp
 [PrimalSubstitute(sampleTextureBiliear_reference)]

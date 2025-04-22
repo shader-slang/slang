@@ -2,9 +2,9 @@ name: Check Table of Contents (comment /regenerate-toc to auto-fix)
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
 jobs:
   check-formatting:
     runs-on: ubuntu-latest
