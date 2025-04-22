@@ -79,7 +79,7 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
 
     textureDesc.sampleCount = inputDesc.sampleCount;
     textureDesc.format = format;
-    textureDesc.mipLevelCount = texData.m_mipLevels;
+    textureDesc.mipCount = texData.m_mipLevels;
     if (isArray)
     {
         textureDesc.arrayLength = inputDesc.arrayLength;
@@ -131,9 +131,9 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
         }
     }
 
-    if (textureDesc.mipLevelCount == 0)
+    if (textureDesc.mipCount == 0)
     {
-        textureDesc.mipLevelCount = calcNumMipLevels(textureDesc.type, textureDesc.size);
+        textureDesc.mipCount = calcNumMipLevels(textureDesc.type, textureDesc.size);
     }
 
     // Metal doesn't support mip maps for 1D textures.
@@ -141,7 +141,7 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
         (textureDesc.type == TextureType::Texture1D ||
          textureDesc.type == TextureType::Texture1DArray))
     {
-        textureDesc.mipLevelCount = 1;
+        textureDesc.mipCount = 1;
     }
 
     List<SubresourceData> initSubresources;
@@ -149,7 +149,7 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
     int subResourceCounter = 0;
     for (int a = 0; a < layerCount; ++a)
     {
-        for (int m = 0; m < textureDesc.mipLevelCount; ++m)
+        for (int m = 0; m < textureDesc.mipCount; ++m)
         {
             int subResourceIndex = subResourceCounter++;
             const int mipWidth = calcMipSize(textureDesc.size.width, m);
