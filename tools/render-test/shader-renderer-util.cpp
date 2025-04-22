@@ -73,17 +73,10 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
     const Format format =
         (inputDesc.format == Format::Undefined) ? Format::RGBA8Unorm : inputDesc.format;
 
-    const FormatInfo& formatInfo = getFormatInfo(format);
-
-    bool isArray = inputDesc.arrayLength > 1;
-
     textureDesc.sampleCount = inputDesc.sampleCount;
     textureDesc.format = format;
     textureDesc.mipCount = texData.m_mipLevels;
-    if (isArray)
-    {
-        textureDesc.arrayLength = inputDesc.arrayLength;
-    }
+    textureDesc.arrayLength = inputDesc.arrayLength > 0 ? inputDesc.arrayLength : 1;
     textureDesc.usage = TextureUsage::CopyDestination | TextureUsage::CopySource;
     switch (defaultState)
     {
@@ -103,7 +96,7 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
     {
     case 1:
         {
-            textureDesc.type = isArray ? TextureType::Texture1DArray : TextureType::Texture1D;
+            textureDesc.type = TextureType::Texture1D;
             textureDesc.size.width = inputDesc.size;
             textureDesc.size.height = 1;
             textureDesc.size.depth = 1;
@@ -112,10 +105,7 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
         }
     case 2:
         {
-            textureDesc.type =
-                isArray ? (inputDesc.isCube ? TextureType::TextureCubeArray
-                                            : TextureType::Texture2DArray)
-                        : (inputDesc.isCube ? TextureType::TextureCube : TextureType::Texture2D);
+            textureDesc.type = inputDesc.isCube ? TextureType::TextureCube : TextureType::Texture2D;
             textureDesc.size.width = inputDesc.size;
             textureDesc.size.height = inputDesc.size;
             textureDesc.size.depth = 1;
@@ -136,18 +126,11 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
         textureDesc.mipCount = calcNumMipLevels(textureDesc.type, textureDesc.size);
     }
 
-    // Metal doesn't support mip maps for 1D textures.
-    if (device->getDeviceType() == DeviceType::Metal &&
-        (textureDesc.type == TextureType::Texture1D ||
-         textureDesc.type == TextureType::Texture1DArray))
-    {
-        textureDesc.mipCount = 1;
-    }
-
     List<SubresourceData> initSubresources;
-    int layerCount = textureDesc.getLayerCount();
+    int arrayLayerCount =
+        textureDesc.arrayLength * (textureDesc.type == TextureType::TextureCube ? 6 : 1);
     int subResourceCounter = 0;
-    for (int a = 0; a < layerCount; ++a)
+    for (int a = 0; a < arrayLayerCount; ++a)
     {
         for (int m = 0; m < textureDesc.mipCount; ++m)
         {
@@ -155,13 +138,13 @@ inline int calcNumMipLevels(TextureType type, Extent3D size)
             const int mipWidth = calcMipSize(textureDesc.size.width, m);
             const int mipHeight = calcMipSize(textureDesc.size.height, m);
 
-            size_t rowPitch = mipWidth * formatInfo.blockSizeInBytes;
-            size_t slicePitch = mipHeight * rowPitch;
+            auto strideY = mipWidth * sizeof(uint32_t);
+            auto strideZ = mipHeight * strideY;
 
             SubresourceData subresourceData;
             subresourceData.data = texData.m_slices[subResourceIndex].values;
-            subresourceData.rowPitch = rowPitch;
-            subresourceData.slicePitch = slicePitch;
+            subresourceData.rowPitch = strideY;
+            subresourceData.slicePitch = strideZ;
 
             initSubresources.add(subresourceData);
         }

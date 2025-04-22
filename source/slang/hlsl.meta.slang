@@ -22864,10 +22864,8 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 // TODO: Should this be a byte offset
                 OpCooperativeVectorStoreNV $ptr $byteOffset16ByteAligned $this None;
             };
-#ifdef NOT_SUPPORTED
         case hlsl:
             this.__Store(buffer, byteOffset16ByteAligned);
-#endif
         default:
             for(int i = 0; i < N; ++i)
                 buffer.StoreByteOffset(byteOffset16ByteAligned + __elemToByteOffset<T>(i), this[i]);
@@ -22978,6 +22976,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         return CoopVec<T, N>();
     }
 
+    [ForceInline]
     [__NoSideEffect]
     [require(cooperative_vector)]
     static CoopVec<T, N> load(RWByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)

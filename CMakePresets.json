@@ -14,7 +14,9 @@
       "cacheVariables": {
         "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>",
         "SLANG_ENABLE_IR_BREAK_ALLOC": "$<$<CONFIG:Debug>:TRUE>$<$<NOT:$<CONFIG:Debug>>:FALSE>",
-        "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo;MinSizeRel"
+        "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo;MinSizeRel",
+        "SLANG_RHI_AGILITY_SDK_DIR": "${sourceDir}/external/agility-sdk-preview-2025-04-02",
+        "SLANG_RHI_FETCH_AGILITY_SDK": "FALSE"
       }
     },
     {
@@ -45,7 +47,11 @@
       "name": "vs2019",
       "inherits": "msvc-base",
       "description": "Visual Studio 2019 project",
-      "generator": "Visual Studio 16 2019"
+      "generator": "Visual Studio 16 2019",
+      "cacheVariables": {
+        "SLANG_RHI_AGILITY_SDK_DIR": "${sourceDir}/external/agility-sdk-preview-2025-04-02",
+        "SLANG_RHI_FETCH_AGILITY_SDK": "FALSE"
+      }
     },
     {
       "name": "vs2019-dev",
@@ -53,14 +59,20 @@
       "description": "Visual Studio 2019 project with debug assisting features",
       "generator": "Visual Studio 16 2019",
       "cacheVariables": {
-        "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE"
+        "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE",
+        "SLANG_RHI_AGILITY_SDK_DIR": "${sourceDir}/external/agility-sdk-preview-2025-04-02",
+        "SLANG_RHI_FETCH_AGILITY_SDK": "FALSE"
       }
     },
     {
       "name": "vs2022",
       "inherits": "msvc-base",
       "description": "Visual Studio 2022 project",
-      "generator": "Visual Studio 17 2022"
+      "generator": "Visual Studio 17 2022",
+      "cacheVariables": {
+        "SLANG_RHI_AGILITY_SDK_DIR": "${sourceDir}/external/agility-sdk-preview-2025-04-02",
+        "SLANG_RHI_FETCH_AGILITY_SDK": "FALSE"
+      }
     },
     {
       "name": "vs2022-dev",
@@ -68,7 +80,9 @@
       "description": "Visual Studio 2022 project with debug assisting features",
       "generator": "Visual Studio 17 2022",
       "cacheVariables": {
-        "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE"
+        "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE",
+        "SLANG_RHI_AGILITY_SDK_DIR": "${sourceDir}/external/agility-sdk-preview-2025-04-02",
+        "SLANG_RHI_FETCH_AGILITY_SDK": "FALSE"
       }
     },
     {
