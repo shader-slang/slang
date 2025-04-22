@@ -43,7 +43,7 @@ Result DebugTransientResourceHeap::finish()
 }
 
 Result DebugTransientResourceHeap::createCommandBuffer(ICommandBuffer** outCommandBuffer)
-{ 
+{
     SLANG_GFX_API_FUNC;
     RefPtr<DebugCommandBuffer> outObject = new DebugCommandBuffer();
     outObject->m_transientHeap = this;
