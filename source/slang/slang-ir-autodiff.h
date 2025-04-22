@@ -221,7 +221,32 @@ struct DifferentiableTypeConformanceContext
     IRGlobalValueWithCode* parentFunc = nullptr;
     OrderedDictionary<IRType*, IRInst*> differentiableTypeWitnessDictionary;
 
-    Dictionary<IRInst*, List<IRDifferentiableTypeAnnotation*>> annotationCache;
+    enum class FunctionConformanceKind
+    {
+        Unknown = 0,
+        ForwardDifferentiable = 1,
+    };
+
+    struct WitnessTableCacheKey
+    {
+        IRInst* inst;
+        FunctionConformanceKind conformanceType;
+        bool operator==(const WitnessTableCacheKey& other) const
+        {
+            return inst == other.inst && conformanceType == other.conformanceType;
+        }
+
+        HashCode getHashCode() const
+        {
+            Hasher hasher;
+            hasher.hashValue(inst);
+            hasher.hashValue(static_cast<int>(conformanceType));
+            return hasher.getResult();
+        }
+    };
+
+    // (inst, conformance-type) -> witness-table
+    Dictionary<WitnessTableCacheKey, IRInst*> witnessTableCache;
 
     IRFunc* existentialDAddFunc = nullptr;
 
@@ -235,11 +260,34 @@ struct DifferentiableTypeConformanceContext
                 sharedContext->nullDifferentialWitness);
     }
 
+    FunctionConformanceKind getFunctionConformanceKind(IRInst* conformanceType)
+    {
+        for (auto decor = conformanceType->getFirstDecoration(); decor;
+             decor = decor->getNextDecoration())
+        {
+            switch (decor->getOp())
+            {
+            case kIROp_KnownBuiltinDecoration:
+                if (as<IRKnownBuiltinDecoration>(decor)->getName() ==
+                    toSlice("IForwardDifferentiable"))
+                {
+                    return FunctionConformanceKind::ForwardDifferentiable;
+                }
+            }
+        }
+
+        return FunctionConformanceKind::Unknown;
+    }
+
     void setFunc(IRGlobalValueWithCode* func);
 
-    List<IRDifferentiableTypeAnnotation*> getAnnotations(IRGlobalValueWithCode* inst);
+    template<typename T>
+    List<T*> getAnnotations(IRGlobalValueWithCode* inst);
 
-    List<IRDifferentiableTypeAnnotation*> getAnnotations(IRModuleInst* inst);
+    template<typename T>
+    List<T*> getAnnotations(IRModuleInst* inst);
+
+    IRInst* tryGetWitnessOfKind(IRInst* target, FunctionConformanceKind kind);
 
     void buildGlobalWitnessDictionary();
 

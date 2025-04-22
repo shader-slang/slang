@@ -585,6 +585,27 @@ class DefaultInitializableType : public BuiltinType
     FIDDLE(...)
 };
 
+FIDDLE()
+class FunctionBaseType : public BuiltinType
+{
+    FIDDLE(...)
+    SLANG_AST_CLASS(FunctionBaseType);
+};
+
+FIDDLE()
+class DifferentiableFuncBaseType : public BuiltinType
+{
+    FIDDLE(...)
+    SLANG_AST_CLASS(DifferentiableFuncBaseType);
+};
+
+FIDDLE()
+class ForwardDiffFuncInterfaceType : public BuiltinType
+{
+    FIDDLE(...)
+    SLANG_AST_CLASS(ForwardDiffFuncInterfaceType);
+};
+
 // A vector type, e.g., `vector<T,N>`
 FIDDLE()
 class VectorExpressionType : public ArithmeticExpressionType

@@ -3065,6 +3065,52 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
                 maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
             }
 
+            if (auto fnExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
+            {
+                // Lower witness for ForwardDifferentiable for this function.
+                // First we'll turn it into a func-as-type-expr, then check that
+                // to get the function reference as a type, and then get the witness
+                // from that.
+                //
+                // TODO: Make this more general, by registering the interfaces that we
+                // need to check against as 'Decl' in the parent functions' body &
+                // lowering all of them in CheckTerm()
+                //
+                auto funcAsType = DeclRefType::create(m_astBuilder, fnExpr->declRef);
+
+                // ...
+                auto diffFuncTypeBase = m_astBuilder->create<VarExpr>();
+                diffFuncTypeBase->name = getName("IDifferentiableFuncBase");
+                diffFuncTypeBase->scope = getScope(fnExpr->declRef.getDecl());
+
+                auto checkedDiffFuncBaseType = ExtractTypeFromTypeRepr(CheckTerm(diffFuncTypeBase));
+
+                if (auto diffFuncBaseWitness =
+                        tryGetSubtypeWitness(funcAsType, checkedDiffFuncBaseType))
+                {
+                    auto fwdDiffInterfaceVarExpr = m_astBuilder->create<VarExpr>();
+                    fwdDiffInterfaceVarExpr->name = getName("IForwardDifferentiable");
+                    fwdDiffInterfaceVarExpr->scope = getScope(fnExpr->declRef.getDecl());
+                    auto fwdDiffInterfaceGenericAppExpr = m_astBuilder->create<GenericAppExpr>();
+                    fwdDiffInterfaceGenericAppExpr->functionExpr =
+                        CheckTerm(fwdDiffInterfaceVarExpr);
+
+                    auto sharedTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+                    sharedTypeExpr->type = m_astBuilder->getOrCreate<TypeType>(funcAsType);
+                    fwdDiffInterfaceGenericAppExpr->arguments.add(sharedTypeExpr);
+
+                    auto checkedInterfaceType = ExtractTypeFromTypeRepr(
+                        checkGenericAppWithCheckedArgs(fwdDiffInterfaceGenericAppExpr));
+
+                    if (auto witness = tryGetSubtypeWitness(funcAsType, checkedInterfaceType))
+                    {
+                        m_parentDifferentiableAttr->addWitness(
+                            fnExpr->declRef.declRefBase,
+                            witness);
+                    }
+                }
+            }
+
             if (auto calleeExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
             {
                 if (auto calleeDecl = as<FunctionDeclBase>(calleeExpr->declRef.getDecl()))
@@ -3527,6 +3573,55 @@ Expr* SemanticsExprVisitor::visitBackwardDifferentiateExpr(BackwardDifferentiate
 {
     BackwardDifferentiateExprCheckingActions actions;
     return _checkHigherOrderInvokeExpr(this, expr, &actions);
+}
+
+Expr* SemanticsExprVisitor::visitFuncAsTypeExpr(FuncAsTypeExpr* expr)
+{
+    expr->base = dispatchExpr(expr->base, *this);
+
+    // Expect a func-decl-ref expr
+    auto declRefExpr = as<DeclRefExpr>(expr->base);
+    if (!declRefExpr)
+    {
+        // Diagnose.
+        getSink()->diagnose(expr->base, Diagnostics::expectedFunction);
+    }
+
+    auto funcDeclRef = declRefExpr->declRef.as<CallableDecl>();
+    if (!funcDeclRef)
+    {
+        // Diagnose.
+        getSink()->diagnose(expr->base, Diagnostics::expectedFunction);
+    }
+
+    auto declRefType = DeclRefType::create(m_astBuilder, funcDeclRef);
+
+    // Create a shared type expr.
+    auto typeExpr = m_astBuilder->create<SharedTypeExpr>();
+    auto typetype = m_astBuilder->getOrCreate<TypeType>(declRefType);
+    typeExpr->type = typetype;
+
+    return typeExpr;
+}
+
+Expr* SemanticsExprVisitor::visitFuncTypeOfExpr(FuncTypeOfExpr* expr)
+{
+    expr->base = dispatchExpr(expr->base, *this);
+    auto funcType = as<FuncType>(expr->base->type.type);
+    if (!funcType)
+    {
+        getSink()->diagnose(expr->base, Diagnostics::expectedFunction);
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+    else
+    {
+        // Create a shared type expr.
+        auto typeExpr = m_astBuilder->create<SharedTypeExpr>();
+        auto typetype = m_astBuilder->getOrCreate<TypeType>(funcType);
+        typeExpr->type = typetype;
+        return typeExpr;
+    }
 }
 
 Expr* SemanticsExprVisitor::visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr)
@@ -4695,6 +4790,21 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
                 base = baseExpression;
             }
         }
+        else if (auto funcDecl = as<FuncDecl>(baseDeclRef))
+        {
+            // Make a decl-ref-type out of the FuncDecl.
+            auto funcAsType = DeclRefType::create(m_astBuilder, baseDeclRef);
+            LookupResult lookupResult = lookUpMember(
+                m_astBuilder,
+                this,
+                expr->name,
+                funcAsType,
+                m_outerScope,
+                LookupMask::Default,
+                LookupOptions::NoDeref);
+
+            AddToLookupResult(globalLookupResult, lookupResult);
+        }
     };
 
     auto handleLeafExpr = [&](Expr* e)
@@ -4708,6 +4818,11 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
             auto properType = CoerceToProperType(TypeExp(e));
             if (properType.type)
                 handleLeafCase(DeclRef<Decl>(), properType.type);
+        }
+        else if (as<FuncType>(e->type))
+        {
+            auto declRefExpr = as<DeclRefExpr>(e);
+            handleLeafCase(declRefExpr->declRef, declRefExpr->type);
         }
     };
 
@@ -4978,6 +5093,19 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     else if (as<ErrorType>(baseType))
     {
         return CreateErrorExpr(expr);
+    }
+    else if (as<FuncType>(baseType))
+    {
+        // Treat the function expression as a type.
+        auto funcAsTypeExpr = m_astBuilder->create<FuncAsTypeExpr>();
+        funcAsTypeExpr->base = expr->baseExpression;
+
+        auto checkedTypeExpr = dispatchExpr(funcAsTypeExpr, *this);
+        if (checkedTypeExpr->type && !as<ErrorType>(checkedTypeExpr->type))
+            return _lookupStaticMember(expr, checkedTypeExpr);
+
+        // fallback to general member lookup
+        return checkGeneralMemberLookupExpr(expr, baseType);
     }
     else
     {
@@ -5485,8 +5613,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                 else if (operand.flavor == SPIRVAsmOperand::BuiltinVar)
                 {
                     operand.type = CheckProperType(operand.type);
-                    auto builtinVarKind =
-                        spirvInfo->allEnums.lookup(SPIRVCoreGrammarInfo::QualifiedEnumName{
+                    auto builtinVarKind = spirvInfo->allEnums.lookup(
+                        SPIRVCoreGrammarInfo::QualifiedEnumName{
                             spirvInfo->operandKinds.lookup(UnownedStringSlice("BuiltIn")).value(),
                             operand.token.getContent()});
                     if (!builtinVarKind)

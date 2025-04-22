@@ -711,10 +711,10 @@ public:
         return false;
     }
     /// Get the list of extension declarations that appear to apply to `decl` in this context
-    List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(AggTypeDecl* decl);
+    List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(Decl* decl);
 
     /// Register a candidate extension `extDecl` for `typeDecl` encountered during checking.
-    void registerCandidateExtension(AggTypeDecl* typeDecl, ExtensionDecl* extDecl);
+    void registerCandidateExtension(Decl* typeDecl, ExtensionDecl* extDecl);
 
     void registerAssociatedDecl(Decl* original, DeclAssociationKind assoc, Decl* declaration);
 
@@ -741,17 +741,24 @@ public:
         InheritanceCircularityInfo* next = nullptr;
     };
 
+    struct InheritanceContext
+    {
+        bool useSimpleInheritance = false;
+    };
+
     GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker() { return &m_glslBindingOffsetTracker; }
 
     /// Get the processed inheritance information for `type`, including all its facets
     InheritanceInfo getInheritanceInfo(
         Type* type,
-        InheritanceCircularityInfo* circularityInfo = nullptr);
+        InheritanceCircularityInfo* circularityInfo = nullptr,
+        InheritanceContext context = InheritanceContext());
 
     /// Get the processed inheritance information for `extension`, including all its facets
     InheritanceInfo getInheritanceInfo(
         DeclRef<ExtensionDecl> const& extension,
-        InheritanceCircularityInfo* circularityInfo = nullptr);
+        InheritanceCircularityInfo* circularityInfo = nullptr,
+        InheritanceContext context = InheritanceContext());
 
     /// Prevent an unsupported case of
     /// ```
@@ -795,8 +802,8 @@ public:
     DeclRef<GenericDecl> getDependentGenericParent(DeclRef<Decl> declRef);
 
 private:
-    /// Mapping from type declarations to the known extensiosn that apply to them
-    Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> m_mapTypeDeclToCandidateExtensions;
+    /// Mapping from type declarations to the known extensions that apply to them
+    Dictionary<Decl*, RefPtr<CandidateExtensionList>> m_mapDeclToCandidateExtensions;
 
     /// Is the `m_mapTypeDeclToCandidateExtensions` dictionary valid and up to date?
     bool m_candidateExtensionListsBuilt = false;
@@ -819,12 +826,19 @@ private:
     InheritanceInfo _getInheritanceInfo(
         DeclRef<Decl> declRef,
         Type* selfType,
-        InheritanceCircularityInfo* circularityInfo);
-    InheritanceInfo _calcInheritanceInfo(Type* type, InheritanceCircularityInfo* circularityInfo);
+        InheritanceCircularityInfo* circularityInfo,
+        InheritanceContext context);
+    InheritanceInfo _calcInheritanceInfo(
+        Type* type,
+        InheritanceCircularityInfo* circularityInfo,
+        InheritanceContext context);
     InheritanceInfo _calcInheritanceInfo(
         DeclRef<Decl> declRef,
         Type* selfType,
-        InheritanceCircularityInfo* circularityInfo);
+        InheritanceCircularityInfo* circularityInfo,
+        InheritanceContext context);
+
+    ExtensionDecl* synthesizeExtensionForFunctionBaseType(DeclRefType* funcAsDeclRefType);
 
     void getDependentGenericParentImpl(DeclRef<GenericDecl>& genericParent, DeclRef<Decl> declRef);
 
@@ -964,6 +978,13 @@ public:
     {
         SemanticsContext result(*this);
         result.m_sink = sink;
+        return result;
+    }
+
+    SemanticsContext allowUnknownWitnesses()
+    {
+        SemanticsContext result(*this);
+        result.m_allowUnknownWitnesses = true;
         return result;
     }
 
@@ -1107,6 +1128,8 @@ public:
 
     bool getExcludeTransparentMembersFromLookup() { return m_excludeTransparentMembersFromLookup; }
 
+    bool getAllowUnknownWitnesses() { return m_allowUnknownWitnesses; }
+
     OrderedHashSet<Type*>* getCapturedTypePacks() { return m_capturedTypePacks; }
 
     GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker()
@@ -1124,6 +1147,8 @@ private:
     Decl* m_declToExcludeFromLookup = nullptr;
 
     bool m_excludeTransparentMembersFromLookup = false;
+
+    bool m_allowUnknownWitnesses = false;
 
 protected:
     // TODO: consider making more of this state `private`...
@@ -1343,7 +1368,9 @@ public:
             return nullptr;
         return val->resolve();
     }
+
     Type* resolveType(Type* type) { return (Type*)resolveVal(type); }
+
     DeclRef<Decl> resolveDeclRef(DeclRef<Decl> declRef);
 
     /// Attempt to "resolve" an overloaded `LookupResult` to only include the "best" results
@@ -1946,6 +1973,11 @@ public:
         RefPtr<WitnessTable> witnessTable,
         SynthesisPattern pattern);
 
+    bool trySynthesizeForwardDiffFuncRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<Decl> requirementDeclRef,
+        RefPtr<WitnessTable> witnessTable);
+
     /// Attempt to synthesize an associated `Differential` type for a type that conforms to
     /// `IDifferentiable`.
     ///
@@ -1954,6 +1986,11 @@ public:
     /// differential type, and returns `true`.
     /// Otherwise, returns `false`.
     bool trySynthesizeDifferentialAssociatedTypeRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<AssocTypeDecl> requirementDeclRef,
+        RefPtr<WitnessTable> witnessTable);
+
+    bool trySynthesizeForwardDiffFuncTypeRequirementWitness(
         ConformanceCheckingContext* context,
         DeclRef<AssocTypeDecl> requirementDeclRef,
         RefPtr<WitnessTable> witnessTable);
@@ -2942,6 +2979,9 @@ public:
     Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
     Expr* visitFuncTypeExpr(FuncTypeExpr* expr);
     Expr* visitTupleTypeExpr(TupleTypeExpr* expr);
+
+    Expr* visitFuncAsTypeExpr(FuncAsTypeExpr* expr);
+    Expr* visitFuncTypeOfExpr(FuncTypeOfExpr* expr);
 
     Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
     Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);

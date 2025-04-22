@@ -11,6 +11,8 @@
 namespace Slang
 {
 
+struct SemanticsContext;
+
 bool isAbstractTypePack(Type* type)
 {
     if (as<ExpandType>(type))
@@ -193,6 +195,16 @@ Val* DeclRefType::_substituteImplOverride(
     return DeclRefType::create(astBuilder, substDeclRef);
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltinTypeFunction !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/*Type* BuiltinTypeFunction::calculateType(SemanticsContext* context){
+    SLANG_AST_NODE_VIRTUAL_CALL(BuiltinTypeFunction, calculateType, (context))}
+
+Type* BuiltinTypeFunction::_calculateTypeOverride(SemanticsContext* context)
+{
+    SLANG_UNEXPECTED("BuiltinTypeFunction::_calculateTypeOverride not overridden");
+    return nullptr;
+}*/
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArithmeticExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -231,7 +243,6 @@ Type* TensorViewType::getElementType()
 {
     return as<Type>(_getGenericTypeArg(this, 0));
 }
-
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! VectorExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

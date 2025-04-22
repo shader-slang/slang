@@ -3106,6 +3106,12 @@ IRDifferentialPairType* IRBuilder::getDifferentialPairType(IRType* valueType, IR
         getType(kIROp_DifferentialPairType, sizeof(operands) / sizeof(operands[0]), operands);
 }
 
+/*IRForwardDiffFuncType* IRBuilder::getForwardDiffFuncType(IRType* baseFuncType)
+{
+    return (
+        IRForwardDiffFuncType*)getType(kIROp_ForwardDiffFuncType, 1, (IRInst* const*)&baseFuncType);
+}*/
+
 IRDifferentialPtrPairType* IRBuilder::getDifferentialPtrPairType(
     IRType* valueType,
     IRInst* witnessTable)

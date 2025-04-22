@@ -662,6 +662,18 @@ class BackwardDifferentiateExpr : public DifferentiateExpr
     FIDDLE(...)
 };
 
+class FuncAsTypeExpr : public Expr
+{
+    SLANG_AST_CLASS(FuncAsTypeExpr)
+    Expr* base = nullptr;
+};
+
+class FuncTypeOfExpr : public Expr
+{
+    SLANG_AST_CLASS(FuncTypeOfExpr)
+    Expr* base = nullptr;
+};
+
 /// An expression of the form `__dispatch_kernel(fn, threadGroupSize, dispatchSize)` to
 /// dispatch a compute kernel from host.
 ///

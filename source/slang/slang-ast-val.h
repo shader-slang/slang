@@ -562,6 +562,20 @@ class SubtypeWitness : public Witness
 };
 
 FIDDLE()
+class UnknownSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    UnknownSubtypeWitness(Type* sub, Type* sup) { setOperands(sub, sup); }
+
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
 class TypePackSubtypeWitness : public SubtypeWitness
 {
     FIDDLE(...)
@@ -640,6 +654,17 @@ class TypeCoercionWitness : public Witness
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride();
 };
+
+/*
+class FuncTypeWitness : public Witness
+{
+    SLANG_AST_CLASS(FuncTypeWitness)
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+*/
 
 // A witness that one type is a subtype of another
 // because some in-scope declaration says so

@@ -9,14 +9,19 @@ namespace Slang
 {
 InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     Type* type,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    InheritanceContext context)
 {
     // We cache the computed inheritance information for types,
     // and re-use that information whenever possible.
 
     // DeclRefTypes will have their inheritance info cached in m_mapDeclRefToInheritanceInfo.
     if (auto declRefType = as<DeclRefType>(type))
-        return _getInheritanceInfo(declRefType->getDeclRef(), declRefType, circularityInfo);
+        return _getInheritanceInfo(
+            declRefType->getDeclRef(),
+            declRefType,
+            circularityInfo,
+            context);
 
     // Non ordinary types are cached on m_mapTypeToInheritanceInfo.
     if (auto found = m_mapTypeToInheritanceInfo.tryGetValue(type))
@@ -31,7 +36,7 @@ InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     //
     m_mapTypeToInheritanceInfo[type] = InheritanceInfo();
 
-    auto info = _calcInheritanceInfo(type, circularityInfo);
+    auto info = _calcInheritanceInfo(type, circularityInfo, context);
     m_mapTypeToInheritanceInfo[type] = info;
 
     return info;
@@ -39,7 +44,8 @@ InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
 
 InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     DeclRef<ExtensionDecl> const& extension,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    InheritanceContext context)
 {
     if (_checkForCircularityInExtensionTargetType(extension.getDecl(), circularityInfo))
     {
@@ -55,7 +61,7 @@ InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     // routine with an optional `Type` parameter.
     //
     InheritanceCircularityInfo newCircularityInfo(extension.getDecl(), circularityInfo);
-    return _getInheritanceInfo(extension, nullptr, &newCircularityInfo);
+    return _getInheritanceInfo(extension, nullptr, &newCircularityInfo, context);
 }
 
 bool SharedSemanticsContext::_checkForCircularityInExtensionTargetType(
@@ -77,7 +83,8 @@ bool SharedSemanticsContext::_checkForCircularityInExtensionTargetType(
 InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
     DeclRef<Decl> declRef,
     Type* selfType,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    InheritanceContext context)
 {
     // Just as with `Type`s, we cache and re-use the inheritance
     // information that has been computed for a `DeclRef` whenever
@@ -95,7 +102,7 @@ InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
     //
     m_mapDeclRefToInheritanceInfo[declRef] = InheritanceInfo();
 
-    auto info = _calcInheritanceInfo(declRef, selfType, circularityInfo);
+    auto info = _calcInheritanceInfo(declRef, selfType, circularityInfo, context);
     m_mapDeclRefToInheritanceInfo[declRef] = info;
 
     getSession()->m_typeDictionarySize = Math::Max(
@@ -155,7 +162,8 @@ DeclRef<GenericDecl> SharedSemanticsContext::getDependentGenericParent(DeclRef<D
 InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     DeclRef<Decl> declRef,
     Type* selfType,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    InheritanceContext context)
 {
     // This method is the main engine for computing linearized inheritance
     // lists for types and `extension` declarations.
@@ -300,7 +308,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     // If we know the type has a facet represented by `extensionTargetDeclRef`, we can consider
     // all extensions on this decl to see if they apply to the type.
     //
-    auto considerExtension = [&](DeclRef<AggTypeDecl> extensionTargetDeclRef,
+    auto considerExtension = [&](DeclRef<Decl> extensionTargetDeclRef,
                                  Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitness)
     {
         bool result = false;
@@ -385,9 +393,19 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                         continue;
                 }
 
-                visitor.ensureDecl(
-                    typeConstraintDeclRef,
-                    DeclCheckState::CanUseBaseOfInheritanceDecl);
+                if (context.useSimpleInheritance)
+                {
+                    SLANG_UNEXPECTED("Simple inheritance not supported yet.");
+                    /*visitor.ensureDecl(
+                        typeConstraintDeclRef,
+                        DeclCheckState::CanUseBaseOfSimpleInheritanceDecl);*/
+                }
+                else
+                {
+                    visitor.ensureDecl(
+                        typeConstraintDeclRef,
+                        DeclCheckState::CanUseBaseOfInheritanceDecl);
+                }
 
                 // For generic type constraint decls, always make sure it is about the type being
                 // checked.
@@ -531,6 +549,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     if (auto directAggTypeDeclRef = declRef.as<AggTypeDecl>())
     {
         considerExtension(directAggTypeDeclRef, nullptr);
+    }
+    if (auto directFuncDeclRef = declRef.as<FuncDecl>())
+    {
+        considerExtension(directFuncDeclRef, nullptr);
     }
     if (!declRef.as<ExtensionDecl>())
     {
@@ -1038,7 +1060,8 @@ bool FacetList::containsMatchFor(Facet facet) const
 
 InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     Type* type,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    InheritanceContext context)
 {
     // The majority of the interesting for for computing linearized
     // inheritance information arises for `DeclRef`s, but we still
@@ -1053,14 +1076,19 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         // bottleneck through the logic that gets shared between
         // type and `extension` declarations.
         //
-        return _getInheritanceInfo(declRefType->getDeclRef(), declRefType, circularityInfo);
+        return _getInheritanceInfo(
+            declRefType->getDeclRef(),
+            declRefType,
+            circularityInfo,
+            context);
     }
     else if (auto extractExistentialType = as<ExtractExistentialType>(type))
     {
         return _getInheritanceInfo(
             extractExistentialType->getThisTypeDeclRef(),
             extractExistentialType,
-            circularityInfo);
+            circularityInfo,
+            context);
     }
     else if (auto conjunctionType = as<AndType>(type))
     {
@@ -1171,7 +1199,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto modifiedType = as<ModifiedType>(type))
     {
-        return _calcInheritanceInfo(modifiedType->getBase(), circularityInfo);
+        return _calcInheritanceInfo(modifiedType->getBase(), circularityInfo, context);
     }
     else
     {

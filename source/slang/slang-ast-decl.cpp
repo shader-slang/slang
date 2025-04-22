@@ -133,6 +133,18 @@ ThisTypeDecl* InterfaceDecl::getThisTypeDecl()
     SLANG_UNREACHABLE("InterfaceDecl does not have a ThisType decl.");
 }
 
+ThisTypeDecl* FunctionInterfaceDecl::getThisTypeDecl()
+{
+    for (auto member : members)
+    {
+        if (auto thisTypeDeclCandidate = as<ThisTypeDecl>(member))
+        {
+            return thisTypeDeclCandidate;
+        }
+    }
+    SLANG_UNREACHABLE("FunctionInterfaceDecl does not have a ThisType decl.");
+}
+
 InterfaceDecl* ThisTypeConstraintDecl::getInterfaceDecl()
 {
     return as<InterfaceDecl>(parentDecl->parentDecl);

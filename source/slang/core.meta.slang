@@ -85,6 +85,28 @@ syntax snorm : SNormModifier;
 ///
 syntax __extern_cpp : ExternCppModifier;
 
+/// Function interface o 
+/*interface IDifferentiableFuncBase
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFuncType) )
+    associatedtype __fwd_diff_func_type;
+}
+
+interface IForwardDifferentiable : IDifferentiableFuncBase
+{
+    associatedfunc __fwd_diff_func_type(This) __fwd_diff__;
+}*/
+
+/*interface IDifferentiableFuncBase
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFuncType) )
+    associatedtype __fwd_diff_func_type;
+};*/
+
+__magic_type(FunctionBaseType)
+interface IFunctionBase
+{ };
+
 /// Represents types that can be initialized with a default constructor.
 __magic_type(DefaultInitializableType)
 interface IDefaultInitializable
@@ -653,6 +675,28 @@ interface IDifferentiablePtrType
     associatedtype Differential : IDifferentiablePtrType;
 };
 
+__magic_type(DifferentiableFuncBaseType)
+[KnownBuiltin("IDifferentiableFuncBase")]
+interface IDifferentiableFuncBase
+{
+    // BuiltinRequirementKind::ForwardDiffFuncType
+    // Calculates the effective function type.
+    // 
+    __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFuncType))
+    associatedtype __fwd_diff_func_type;
+};
+
+__magic_type(ForwardDiffFuncInterfaceType)
+[KnownBuiltin("IForwardDifferentiable")]
+interface IForwardDifferentiable<FType : IDifferentiableFuncBase>
+{
+    // BuiltinRequirementKind::ForwardDerivativeFunc
+    // inserts a synthesized-func-decl, which becomes a 
+    // IRForwardDifferentiate()
+    // 
+    __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc)) 
+    static __associatedfunc FType.__fwd_diff_func_type fwd_diff;
+}
 
 /// `DifferentialPair<T>` is a built-in type that carries both the original and derivative value of a term. 
 /// It is defined as follows:

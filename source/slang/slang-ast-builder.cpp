@@ -134,6 +134,11 @@ Type* SharedASTBuilder::getDiffInterfaceType()
     return m_diffInterfaceType;
 }
 
+Type* SharedASTBuilder::getForwardDiffFuncInterfaceType()
+{
+    return nullptr;
+}
+
 Type* SharedASTBuilder::getIBufferDataLayoutType()
 {
     if (!m_IBufferDataLayoutType)
@@ -452,6 +457,13 @@ DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableInterfaceDecl()
     return declRef;
 }
 
+DeclRef<InterfaceDecl> ASTBuilder::getFunctionBaseInterfaceDecl()
+{
+    DeclRef<InterfaceDecl> declRef =
+        DeclRef<InterfaceDecl>(getBuiltinDeclRef("FunctionBaseType", nullptr));
+    return declRef;
+}
+
 DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableRefInterfaceDecl()
 {
     DeclRef<InterfaceDecl> declRef =
@@ -499,6 +511,11 @@ MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
 Type* ASTBuilder::getDifferentiableInterfaceType()
 {
     return DeclRefType::create(this, getDifferentiableInterfaceDecl());
+}
+
+Type* ASTBuilder::getFunctionBaseType()
+{
+    return DeclRefType::create(this, getFunctionBaseInterfaceDecl());
 }
 
 Type* ASTBuilder::getDifferentiableRefInterfaceType()
@@ -657,6 +674,11 @@ TypePackSubtypeWitness* ASTBuilder::getSubtypeWitnessPack(
     ArrayView<SubtypeWitness*> witnesses)
 {
     return getOrCreate<TypePackSubtypeWitness>(subType, superType, witnesses);
+}
+
+UnknownSubtypeWitness* ASTBuilder::getUnknownSubtypeWitness(Type* subType, Type* superType)
+{
+    return getOrCreate<UnknownSubtypeWitness>(subType, superType);
 }
 
 SubtypeWitness* ASTBuilder::getExpandSubtypeWitness(

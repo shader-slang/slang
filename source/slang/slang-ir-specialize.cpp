@@ -3093,8 +3093,9 @@ IRInst* specializeGenericImpl(
     builder->setInsertBefore(genericVal);
 
     List<IRInst*> pendingWorkList;
-    SLANG_DEFER(for (Index ii = pendingWorkList.getCount() - 1; ii >= 0; ii--) if (context)
-                    context->addToWorkList(pendingWorkList[ii]););
+    SLANG_DEFER(
+        for (Index ii = pendingWorkList.getCount() - 1; ii >= 0; ii--) if (context)
+            context->addToWorkList(pendingWorkList[ii]););
 
     // Now we will run through the body of the generic and
     // clone each of its instructions into the global scope,

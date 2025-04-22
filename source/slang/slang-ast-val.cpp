@@ -305,6 +305,56 @@ void TypeEqualityWitness::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("TypeEqualityWitness(") << getSub() << toSlice(")");
 }
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! UnknownSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Val* UnknownSubtypeWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto newSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
+    auto newSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+
+    auto newSubtypeWitness = getCurrentASTBuilder()->getUnknownSubtypeWitness(newSub, newSup);
+
+    if (getCurrentASTBuilder()->m_resolvedVals.containsKey(this))
+    {
+        // Add the new subtype witness to the cache.
+        getCurrentASTBuilder()->m_resolvedVals.add(
+            newSubtypeWitness,
+            getCurrentASTBuilder()->m_resolvedVals[this]);
+        getCurrentASTBuilder()->m_resolvedVals.remove(this);
+    }
+
+    if (getCurrentASTBuilder()->m_valsRequiringResolution.contains(this))
+    {
+        // Add the new subtype witness to the cache.
+        getCurrentASTBuilder()->m_valsRequiringResolution.add(newSubtypeWitness);
+        getCurrentASTBuilder()->m_valsRequiringResolution.remove(this);
+    }
+
+    return newSubtypeWitness;
+}
+
+void UnknownSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("UnknownSubtypeWitness(") << getSub() << toSlice(")");
+}
+
+Val* UnknownSubtypeWitness::_resolveImplOverride()
+{
+    if (getCurrentASTBuilder()->m_resolvedVals.containsKey(this))
+    {
+        // Return the resolved value from the cache.
+        return getCurrentASTBuilder()->m_resolvedVals[this];
+    }
+
+    return this;
+}
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TypePackSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -896,6 +946,37 @@ Val* TypeCoercionWitness::_resolveImplOverride()
     }
     return this;
 }
+
+// FuncTypeWitness
+/*
+void FuncTypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << "FuncTypeWitness(";
+    if (getSub())
+        out << getSub();
+    out << ")";
+}
+
+Val* FuncTypeWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+
+    auto substSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
+    auto substSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
+
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+
+    FuncTypeWitness* substValue =
+        astBuilder->getFuncTypeWitness(substSub, substSup);
+    return substValue;
+}
+*/
 
 // UNormModifierVal
 
@@ -1680,10 +1761,10 @@ Val* FuncCallIntVal::tryFoldImpl(
         // Special cases need their "operator" names quoted.
         SPECIAL_OPERATOR_CASE("!", resultValue = ((constArgs[0]->getValue() != 0) ? 1 : 0);)
         SPECIAL_OPERATOR_CASE("~", resultValue = ~constArgs[0]->getValue();)
-        SPECIAL_OPERATOR_CASE("?:",
-                              resultValue = constArgs[0]->getValue() != 0
-                                                ? constArgs[1]->getValue()
-                                                : constArgs[2]->getValue();)
+        SPECIAL_OPERATOR_CASE(
+            "?:",
+            resultValue = constArgs[0]->getValue() != 0 ? constArgs[1]->getValue()
+                                                        : constArgs[2]->getValue();)
         TERMINATING_CASE(SLANG_UNREACHABLE("constant folding of FuncCallIntVal");)
 
         return astBuilder->getIntVal(resultType, resultValue);

@@ -1169,33 +1169,32 @@ IRInterfaceType* DifferentiableTypeConformanceContext::getConformanceTypeFromWit
     return diffInterfaceType;
 }
 
-List<IRDifferentiableTypeAnnotation*> DifferentiableTypeConformanceContext::getAnnotations(
-    IRGlobalValueWithCode* code)
+template<typename T>
+List<T*> DifferentiableTypeConformanceContext::getAnnotations(IRGlobalValueWithCode* code)
 {
     // Scan function for all IRDifferentiableTypeAnnotation insts.
-    List<IRDifferentiableTypeAnnotation*> annotations;
+    List<T*> annotations;
     for (auto block : code->getBlocks())
     {
         for (auto child : block->getChildren())
         {
-            if (auto annotation = as<IRDifferentiableTypeAnnotation>(child))
+            if (auto annotation = as<T>(child))
             {
                 annotations.add(annotation);
             }
         }
     }
-
     return annotations;
 }
 
-List<IRDifferentiableTypeAnnotation*> DifferentiableTypeConformanceContext::getAnnotations(
-    IRModuleInst* module)
+template<typename T>
+List<T*> DifferentiableTypeConformanceContext::getAnnotations(IRModuleInst* module)
 {
-    // Scan module for all IRDifferentiableTypeAnnotation insts.
-    List<IRDifferentiableTypeAnnotation*> annotations;
+    // Scan module for all T insts.
+    List<T*> annotations;
     for (auto globalInst : module->getGlobalInsts())
     {
-        if (auto annotation = as<IRDifferentiableTypeAnnotation>(globalInst))
+        if (auto annotation = as<T>(globalInst))
         {
             annotations.add(annotation);
         }
@@ -1204,11 +1203,24 @@ List<IRDifferentiableTypeAnnotation*> DifferentiableTypeConformanceContext::getA
     return annotations;
 }
 
+IRInst* DifferentiableTypeConformanceContext::tryGetWitnessOfKind(
+    IRInst* target,
+    FunctionConformanceKind kind)
+{
+    WitnessTableCacheKey key = {target, kind};
+    if (auto resultPtr = witnessTableCache.tryGetValue(key))
+        return *resultPtr;
+    return nullptr;
+}
+
 void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
 {
     parentFunc = func;
 
-    List<IRDifferentiableTypeAnnotation*> annotations = getAnnotations(func);
+    List<IRDifferentiableTypeAnnotation*> diffTypeAnnotations =
+        getAnnotations<IRDifferentiableTypeAnnotation>(func);
+    List<IRWitnessTableAnnotation*> witnessTableAnnotations =
+        getAnnotations<IRWitnessTableAnnotation>(func);
 
     // Go up the parents of func & add the annotations of any IRGeneric or IRModule parent:
     IRInst* parent = func;
@@ -1217,19 +1229,26 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
         if (auto upperFunc = as<IRGlobalValueWithCode>(parent))
         {
             // TODO: Cache this.
-            auto parentAnnotations = getAnnotations(upperFunc);
-            annotations.addRange(parentAnnotations);
+            auto parentAnnotations = getAnnotations<IRDifferentiableTypeAnnotation>(upperFunc);
+            diffTypeAnnotations.addRange(parentAnnotations);
+
+            auto parentWitnessTableAnnotations =
+                getAnnotations<IRWitnessTableAnnotation>(upperFunc);
+            witnessTableAnnotations.addRange(parentWitnessTableAnnotations);
         }
         else if (auto module = as<IRModuleInst>(parent))
         {
             // TODO: Cache this.
-            auto parentAnnotations = getAnnotations(module);
-            annotations.addRange(parentAnnotations);
+            auto parentAnnotations = getAnnotations<IRDifferentiableTypeAnnotation>(module);
+            diffTypeAnnotations.addRange(parentAnnotations);
+
+            auto parentWitnessTableAnnotations = getAnnotations<IRWitnessTableAnnotation>(module);
+            witnessTableAnnotations.addRange(parentWitnessTableAnnotations);
         }
         parent = parent->getParent();
     }
 
-    for (auto item : annotations)
+    for (auto item : diffTypeAnnotations)
     {
         IRInterfaceType* diffInterfaceType = getConformanceTypeFromWitness(item->getWitness());
 
@@ -1272,61 +1291,17 @@ void DifferentiableTypeConformanceContext::setFunc(IRGlobalValueWithCode* func)
             }
 
             addTypeToDictionary((IRType*)item->getBaseType(), item->getWitness());
-#if 0
-            // TODO: Is this really needed?
-            if (!as<IRInterfaceType>(item->getBaseType()) &&
-                !as<IRAssociatedType>(item->getBaseType()))
-            {
-                addTypeToDictionary(
-                    (IRType*)_lookupWitness(
-                        &subBuilder,
-                        item->getWitness(),
-                        sharedContext->differentialAssocTypeStructKey,
-                        subBuilder.getTypeKind()),
-                    item->getWitness());
-            }
-
-            // TODO: Is this really needed?
-            if (auto diffPairType = as<IRDifferentialPairTypeBase>(item->getBaseType()))
-            {
-                // For differential pair types, register the differential type as well.
-                IRBuilder builder(diffPairType);
-                builder.setInsertAfter(diffPairType->getWitness());
-
-                // TODO(sai): lot of this logic is duplicated. need to refactor.
-                if (!as<IRInterfaceType>(diffPairType->getValueType()) &&
-                    !as<IRAssociatedType>(diffPairType->getValueType()))
-                {
-                    auto diffType =
-                        (diffInterfaceType == sharedContext->differentiableInterfaceType)
-                            ? _lookupWitness(
-                                  &builder,
-                                  diffPairType->getWitness(),
-                                  sharedContext->differentialAssocTypeStructKey,
-                                  builder.getTypeKind())
-                            : _lookupWitness(
-                                  &builder,
-                                  diffPairType->getWitness(),
-                                  sharedContext->differentialAssocRefTypeStructKey,
-                                  builder.getTypeKind());
-                    auto diffWitness =
-                        (diffInterfaceType == sharedContext->differentiableInterfaceType)
-                            ? _lookupWitness(
-                                  &builder,
-                                  diffPairType->getWitness(),
-                                  sharedContext->differentialAssocTypeWitnessStructKey,
-                                  sharedContext->differentialAssocTypeWitnessTableType)
-                            : _lookupWitness(
-                                  &builder,
-                                  diffPairType->getWitness(),
-                                  sharedContext->differentialAssocRefTypeWitnessStructKey,
-                                  sharedContext->differentialAssocRefTypeWitnessTableType);
-
-                    addTypeToDictionary((IRType*)diffType, diffWitness);
-                }
-            }
-#endif
         }
+    }
+
+    for (auto item : witnessTableAnnotations)
+    {
+        auto conformanceKind = getFunctionConformanceKind(item->getConformanceType());
+        if (conformanceKind == FunctionConformanceKind::Unknown)
+            continue;
+        witnessTableCache.addIfNotExists(
+            {item->getTarget(), conformanceKind},
+            item->getWitnessTable());
     }
 }
 
@@ -1653,6 +1628,16 @@ void DifferentiableTypeConformanceContext::buildGlobalWitnessDictionary()
         if (auto annotation = as<IRDifferentiableTypeAnnotation>(globalInst))
         {
             addTypeToDictionary((IRType*)annotation->getBaseType(), annotation->getWitness());
+        }
+
+        if (auto annotation = as<IRWitnessTableAnnotation>(globalInst))
+        {
+            auto confKind = getFunctionConformanceKind(annotation->getConformanceType());
+
+            if (confKind != FunctionConformanceKind::Unknown)
+                witnessTableCache.addIfNotExists(
+                    {annotation->getTarget(), confKind},
+                    annotation->getWitnessTable());
         }
     }
 }
@@ -3691,6 +3676,11 @@ struct RemoveTypeAnnotationInstsPass : InstPassBase
         processInstsOfType<IRDifferentiableTypeAnnotation>(
             kIROp_DifferentiableTypeAnnotation,
             [&](IRDifferentiableTypeAnnotation* annotation) { annotation->removeAndDeallocate(); });
+
+        // TODO: Unify this with the above.
+        processInstsOfType<IRWitnessTableAnnotation>(
+            kIROp_WitnessTableAnnotation,
+            [&](IRWitnessTableAnnotation* annotation) { annotation->removeAndDeallocate(); });
     }
 };
 

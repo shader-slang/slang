@@ -54,6 +54,7 @@ SubtypeWitness* SemanticsVisitor::isSubtype(
     IsSubTypeOptions isSubTypeOptions)
 {
     SubtypeWitness* result = nullptr;
+    // TODO: (make sure unknown witnesses don't have problems here: )
     if (getShared()->tryGetSubtypeWitnessFromCache(subType, superType, result))
         return result;
     result = checkAndConstructSubtypeWitness(subType, superType, isSubTypeOptions);

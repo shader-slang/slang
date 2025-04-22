@@ -598,93 +598,115 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
     //
     if (auto callableDeclRef = declRef.as<CallableDecl>())
     {
-        auto parameters = getParameters(context->astBuilder, callableDeclRef);
-        UInt parameterCount = parameters.getCount();
+        // Get parameter type as a list.
+        List<Type*> parameterTypes;
+        List<ParameterDirection> parameterDirections;
+        Type* resultType = nullptr;
 
-        emitRaw(context, "p");
-        emit(context, parameterCount);
-        emitRaw(context, "p");
-
-        for (auto paramDeclRef : parameters)
+        if (!callableDeclRef.getDecl()->funcType.type)
         {
-            // parameter modifier makes big difference in the spirv code generation, for example
-            // "out"/"inout" parameter will be passed by pointer. Therefore, we need to
-            // distinguish them in the mangled name to avoid name collision.
-            ParameterDirection paramDirection = getParameterDirection(paramDeclRef.getDecl());
-            switch (paramDirection)
+            auto parameters = getParameters(context->astBuilder, callableDeclRef);
+            for (auto paramDeclRef : parameters)
             {
-            case kParameterDirection_Ref:
-                emitRaw(context, "r_");
-                break;
-            case kParameterDirection_ConstRef:
-                emitRaw(context, "c_");
-                break;
-            case kParameterDirection_Out:
-                emitRaw(context, "o_");
-                break;
-            case kParameterDirection_InOut:
-                emitRaw(context, "io_");
-                break;
-            case kParameterDirection_In:
-                emitRaw(context, "i_");
-                break;
-            default:
-                StringBuilder errMsg;
-                errMsg << "Unknown parameter direction: " << paramDirection;
-                SLANG_ABORT_COMPILATION(errMsg.toString().begin());
-                break;
+                auto paramType = getType(context->astBuilder, paramDeclRef);
+                parameterTypes.add(paramType);
+                parameterDirections.add(getParameterDirection(paramDeclRef.getDecl()));
             }
-            emitType(context, getType(context->astBuilder, paramDeclRef));
-        }
+            resultType = getResultType(context->astBuilder, callableDeclRef);
 
-        // Don't print result type for an initializer/constructor,
-        // since it is implicit in the qualified name.
-        if (!callableDeclRef.is<ConstructorDecl>())
+            emitRaw(context, "p");
+            emit(context, parameterTypes.getCount());
+            emitRaw(context, "p");
+
+            for (Index i = 0; i < parameterTypes.getCount(); i++)
+            {
+                // parameter modifier makes big difference in the spirv code generation, for example
+                // "out"/"inout" parameter will be passed by pointer. Therefore, we need to
+                // distinguish them in the mangled name to avoid name collision.
+                ParameterDirection paramDirection = parameterDirections[i];
+                switch (paramDirection)
+                {
+                case kParameterDirection_Ref:
+                    emitRaw(context, "r_");
+                    break;
+                case kParameterDirection_ConstRef:
+                    emitRaw(context, "c_");
+                    break;
+                case kParameterDirection_Out:
+                    emitRaw(context, "o_");
+                    break;
+                case kParameterDirection_InOut:
+                    emitRaw(context, "io_");
+                    break;
+                case kParameterDirection_In:
+                    emitRaw(context, "i_");
+                    break;
+                default:
+                    StringBuilder errMsg;
+                    errMsg << "Unknown parameter direction: " << paramDirection;
+                    SLANG_ABORT_COMPILATION(errMsg.toString().begin());
+                    break;
+                }
+                emitType(context, parameterTypes[i]);
+            }
+
+            // Don't print result type for an initializer/constructor,
+            // since it is implicit in the qualified name.
+            if (!callableDeclRef.is<ConstructorDecl>())
+            {
+                emitType(context, resultType);
+            }
+
+            // Include key modifiers in the mangled name so we never deduplicate
+            // things like a nonmutating method and a mutating method.
+            bool isMutating = false;
+            bool isRefThis = false;
+            bool isFwdDiff = false;
+            bool isBwdDiff = false;
+            bool isNoDiffThis = false;
+            for (auto modifier : callableDeclRef.getDecl()->modifiers)
+            {
+                if (as<MutatingAttribute>(modifier))
+                {
+                    isMutating = true;
+                }
+                else if (as<RefAttribute>(modifier))
+                {
+                    isRefThis = true;
+                }
+                else if (as<ForwardDifferentiableAttribute>(modifier))
+                {
+                    isFwdDiff = true;
+                }
+                else if (as<BackwardDifferentiableAttribute>(modifier))
+                {
+                    isBwdDiff = true;
+                }
+                else if (as<NoDiffThisAttribute>(modifier))
+                {
+                    isNoDiffThis = true;
+                }
+            }
+
+            if (isMutating)
+                emitRaw(context, "m");
+            if (isRefThis)
+                emitRaw(context, "r");
+            if (isFwdDiff)
+                emitRaw(context, "f");
+            if (isBwdDiff)
+                emitRaw(context, "b");
+            if (isNoDiffThis)
+                emitRaw(context, "n");
+        }
+        else
         {
-            emitType(context, getResultType(context->astBuilder, callableDeclRef));
+            auto funcType = callableDeclRef.getDecl()->funcType.type;
+            auto resolvedFuncType =
+                as<Type>(funcType->substitute(context->astBuilder, SubstitutionSet(callableDeclRef))
+                             ->resolve());
+            emitType(context, resolvedFuncType);
         }
-
-        // Include key modifiers in the mangled name so we never deduplicate
-        // things like a nonmutating method and a mutating method.
-        bool isMutating = false;
-        bool isRefThis = false;
-        bool isFwdDiff = false;
-        bool isBwdDiff = false;
-        bool isNoDiffThis = false;
-        for (auto modifier : callableDeclRef.getDecl()->modifiers)
-        {
-            if (as<MutatingAttribute>(modifier))
-            {
-                isMutating = true;
-            }
-            else if (as<RefAttribute>(modifier))
-            {
-                isRefThis = true;
-            }
-            else if (as<ForwardDifferentiableAttribute>(modifier))
-            {
-                isFwdDiff = true;
-            }
-            else if (as<BackwardDifferentiableAttribute>(modifier))
-            {
-                isBwdDiff = true;
-            }
-            else if (as<NoDiffThisAttribute>(modifier))
-            {
-                isNoDiffThis = true;
-            }
-        }
-
-        if (isMutating)
-            emitRaw(context, "m");
-        if (isRefThis)
-            emitRaw(context, "r");
-        if (isFwdDiff)
-            emitRaw(context, "f");
-        if (isBwdDiff)
-            emitRaw(context, "b");
-        if (isNoDiffThis)
-            emitRaw(context, "n");
     }
 }
 

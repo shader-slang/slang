@@ -700,9 +700,24 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     }
 
     auto primalCallee = findOrTranscribePrimalInst(builder, origCallee);
+
+    auto fwdDiffWitness = this->differentiableTypeConformanceContext.tryGetWitnessOfKind(
+        primalCallee,
+        DifferentiableTypeConformanceContext::FunctionConformanceKind::ForwardDifferentiable);
+
+    auto fwdDiffWitnessType = as<IRWitnessTableType>(fwdDiffWitness->getDataType());
+    auto fwdDiffWitnessInterface = as<IRInterfaceType>(fwdDiffWitnessType->getConformanceType());
+    IRInterfaceRequirementEntry* fwdDiffMethodEntry =
+        as<IRInterfaceRequirementEntry>(fwdDiffWitnessInterface->getOperand(0));
+
+    auto assocForwardDiffCallee = builder->emitLookupInterfaceMethodInst(
+        cast<IRFuncType>(fwdDiffMethodEntry->getRequirementVal()),
+        fwdDiffWitness,
+        fwdDiffMethodEntry->getRequirementKey());
+
     auto substPrimalCallee = tryFindPrimalSubstitute(builder, primalCallee);
 
-    IRInst* diffCallee = nullptr;
+    IRInst* diffCallee = assocForwardDiffCallee;
     if (substPrimalCallee == primalCallee)
     {
         instMapD.tryGetValue(origCallee, diffCallee);

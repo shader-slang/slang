@@ -705,7 +705,9 @@ bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* tab
         case kIROp_KnownBuiltinDecoration:
             {
                 auto name = as<IRKnownBuiltinDecoration>(decor)->getName();
-                if (name == toSlice("IDifferentiable") || name == toSlice("IDifferentiablePtr"))
+                if (name == toSlice("IDifferentiable") || name == toSlice("IDifferentiablePtr") ||
+                    name == toSlice("IDifferentiableFuncBase") ||
+                    name == toSlice("IForwardDifferentiable"))
                     return context->getShared()->useAutodiff;
                 break;
             }
@@ -2182,6 +2184,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
             if (_isHLSLExported(inst) || shouldCopyGlobalParams && as<IRGlobalParam>(inst) ||
                 sharedContext->useAutodiff &&
                     (as<IRDifferentiableTypeAnnotation>(inst) ||
+                     as<IRWitnessTableAnnotation>(inst) ||
                      inst->findDecorationImpl(kIROp_AutoDiffBuiltinDecoration) != nullptr))
             {
                 auto cloned = cloneValue(context, inst);

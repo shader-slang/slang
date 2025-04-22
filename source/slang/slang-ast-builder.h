@@ -38,6 +38,8 @@ public:
     Type* getNoneType();
     /// Get the `IDifferentiable` type
     Type* getDiffInterfaceType();
+    /// Get the `ForwardDifferentiableFuncType` type
+    Type* getForwardDiffFuncInterfaceType();
 
     Type* getIBufferDataLayoutType();
 
@@ -106,6 +108,7 @@ protected:
     Type* m_nullPtrType = nullptr;
     Type* m_noneType = nullptr;
     Type* m_diffInterfaceType = nullptr;
+    Type* m_forwardDiffFuncInterfaceType = nullptr;
     Type* m_builtinTypes[Index(BaseType::CountOf)];
 
     Dictionary<String, Decl*> m_magicDecls;
@@ -211,6 +214,9 @@ public:
     Dictionary<ValKey, Val*, Hash<ValKey>, ValKeyEqual> m_cachedNodes;
 
     Dictionary<GenericDecl*, List<Val*>> m_cachedGenericDefaultArgs;
+
+    HashSet<Val*> m_valsRequiringResolution;
+    Dictionary<Val*, Val*> m_resolvedVals;
 
     /// Create AST types
     template<typename T>
@@ -555,8 +561,12 @@ public:
     DeclRef<InterfaceDecl> getDifferentiableInterfaceDecl();
     DeclRef<InterfaceDecl> getDifferentiableRefInterfaceDecl();
 
+    DeclRef<InterfaceDecl> getFunctionBaseInterfaceDecl();
+
     Type* getDifferentiableInterfaceType();
     Type* getDifferentiableRefInterfaceType();
+
+    Type* getFunctionBaseType();
 
     bool isDifferentiableInterfaceAvailable();
 
@@ -606,6 +616,8 @@ public:
         Type* subType,
         Type* superType,
         ArrayView<SubtypeWitness*> witnesses);
+
+    UnknownSubtypeWitness* getUnknownSubtypeWitness(Type* subType, Type* superType);
 
     SubtypeWitness* getExpandSubtypeWitness(
         Type* subType,

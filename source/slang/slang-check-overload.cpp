@@ -989,7 +989,17 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         auto sub = getSub(m_astBuilder, constraintDeclRef);
         auto sup = getSup(m_astBuilder, constraintDeclRef);
 
-        auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
+        SubtypeWitness* subTypeWitness = nullptr;
+        if (getAllowUnknownWitnesses())
+        {
+            subTypeWitness = m_astBuilder->getOrCreate<UnknownSubtypeWitness>(sub, sup);
+            m_astBuilder->m_valsRequiringResolution.add(subTypeWitness);
+        }
+        else
+        {
+            subTypeWitness = tryGetSubtypeWitness(sub, sup);
+        }
+
         if (subTypeWitness)
         {
             newArgs.add(subTypeWitness);

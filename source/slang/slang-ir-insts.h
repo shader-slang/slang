@@ -1416,6 +1416,22 @@ struct IRDifferentiableTypeAnnotation : IRInst
     IR_LEAF_ISA(DifferentiableTypeAnnotation)
 };
 
+struct IRWitnessTableAnnotation : IRInst
+{
+    enum
+    {
+        kOp = kIROp_WitnessTableAnnotation
+    };
+    IRInst* getTarget() { return getOperand(0); }
+    IRInst* getWitnessTable() { return getOperand(1); }
+    IRInst* getConformanceType()
+    {
+        return as<IRWitnessTableType>(getWitnessTable()->getDataType())->getConformanceType();
+    }
+
+    IR_LEAF_ISA(WitnessTableAnnotation)
+};
+
 struct IRDispatchKernel : IRInst
 {
     enum

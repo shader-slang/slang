@@ -1554,6 +1554,7 @@ class DifferentiableAttribute : public Attribute
     FIDDLE(...)
     // TODO(tfoley): Why is there this duplication here?
     List<KeyValuePair<Type*, SubtypeWitness*>> m_typeToIDifferentiableWitnessMappings;
+    OrderedDictionary<Val*, ShortList<SubtypeWitness*, 4>> m_witnessMapping;
 
     void addType(Type* declRef, SubtypeWitness* witness)
     {
@@ -1563,6 +1564,22 @@ class DifferentiableAttribute : public Attribute
             m_typeToIDifferentiableWitnessMappings.add(
                 KeyValuePair<Type*, SubtypeWitness*>(declRef, witness));
         }
+    }
+
+    bool hasWitnessForVal(Val* targetVal) const { return m_witnessMapping.containsKey(targetVal); }
+
+    ShortList<SubtypeWitness*, 4> tryGetWitnessList(Val* targetVal) const
+    {
+        if (auto resultPtr = m_witnessMapping.tryGetValue(targetVal))
+            return *resultPtr;
+        return ShortList<SubtypeWitness*, 4>();
+    }
+
+    void addWitness(Val* targetVal, SubtypeWitness* witness)
+    {
+        auto list = tryGetWitnessList(targetVal);
+        list.add(witness);
+        m_witnessMapping[targetVal] = list;
     }
 
     /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
