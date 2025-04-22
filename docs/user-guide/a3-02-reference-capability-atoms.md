@@ -407,6 +407,9 @@ Extensions
 `SPV_NV_shader_subgroup_partitioned`
 > Represents the SPIR-V extension for shader subgroup partitioned.
 
+`SPV_KHR_subgroup_rotate`
+> Represents the SPIR-V extension enables rotating values across invocations within a subgroup.
+
 `SPV_NV_ray_tracing_motion_blur`
 > Represents the SPIR-V extension for ray tracing motion blur.
 
@@ -500,6 +503,9 @@ Extensions
 
 `spvGroupNonUniformPartitionedNV`
 > Represents the SPIR-V capability for group non-uniform partitioned operations.
+
+`spvGroupNonUniformRotateKHR`
+> Represents the SPIR-V capability for group non-uniform rotate operations.
 
 `spvRayTracingMotionBlurNV`
 > Represents the SPIR-V capability for ray tracing motion blur.
@@ -698,6 +704,9 @@ Extensions
 
 `GL_KHR_shader_subgroup_vote`
 > Represents the GL_KHR_shader_subgroup_vote extension.
+
+`GL_KHR_shader_subgroup_rotate`
+> Represents the GL_KHR_shader_subgroup_rotate extension.
 
 `GL_NV_compute_shader_derivatives`
 > Represents the GL_NV_compute_shader_derivatives extension.
@@ -1131,6 +1140,9 @@ Compound Capabilities
 
 `subgroup_partitioned`
 > Capabilities required to use GLSL-style subgroup operations 'subgroup_partitioned'
+
+`subgroup_rotate`
+> Capabilities required to use GLSL-style subgroup rotate operations 'subgroup_rotate'
 
 `atomic_glsl_hlsl_nvapi_cuda_metal_float1`
 > (All implemented targets) Capabilities required to use atomic operations of GLSL tier-1 float atomics
