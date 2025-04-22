@@ -1070,6 +1070,12 @@ class GLSLIndexAttribute : public GLSLSimpleIntegerLayoutAttribute
     FIDDLE(...)
 };
 
+// [[vk_offset]]
+class VkStructOffsetAttribute : public GLSLSimpleIntegerLayoutAttribute
+{
+    SLANG_AST_CLASS(VkStructOffsetAttribute)
+};
+
 // [[vk_spirv_instruction]]
 FIDDLE()
 class SPIRVInstructionOpAttribute : public Attribute

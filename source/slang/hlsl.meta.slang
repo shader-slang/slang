@@ -8028,7 +8028,8 @@ vector<T,N> cospi(vector<T,N> x)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-uint countbits(uint value)
+__generic<T : __BuiltinIntegerType>
+uint countbits(T value)
 {
     __target_switch
     {
@@ -8037,22 +8038,42 @@ uint countbits(uint value)
     case glsl:
         __intrinsic_asm "bitCount";
     case metal:
-        __intrinsic_asm "popcount";
+        if(T is int64_t || T  is uint64_t)
+        {
+            // emulate 64-bit
+            uint2 value_uint2 = bit_cast<uint2>(value);
+            uint2 counted_bits_uint2 = countbits(value_uint2);
+            return counted_bits_uint2.x + counted_bits_uint2.y;
+        }
+        else
+        {
+            __intrinsic_asm "popcount";
+        }
     case cuda:
     case cpp:
         __intrinsic_asm "$P_countbits($0)";
     case spirv:
-        return spirv_asm {OpBitCount $$uint result $value};
+        if(T is int64_t || T  is uint64_t)
+        {
+            // emulate 64-bit
+            uint2 value_uint2 = bit_cast<uint2>(value);
+            uint2 counted_bits_uint2 = countbits(value_uint2);
+            return counted_bits_uint2.x + counted_bits_uint2.y;
+        }
+        else
+        {
+            return spirv_asm {OpBitCount $$uint result $value};
+        }
     case wgsl:
         __intrinsic_asm "countOneBits";
     }
 }
 
-__generic <let N : int>
+__generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-vector<uint, N> countbits(vector<uint, N> value)
+vector<uint, N> countbits(vector<T, N> value)
 {
     __target_switch
     {
@@ -8061,9 +8082,25 @@ vector<uint, N> countbits(vector<uint, N> value)
     case glsl:
         __intrinsic_asm "bitCount";
     case metal:
-        __intrinsic_asm "popcount";
+        if(T is int64_t || T  is uint64_t)
+        {
+            // emulate 64-bit
+            VECTOR_MAP_UNARY(uint, N, countbits, value);
+        }
+        else
+        {
+            __intrinsic_asm "popcount";
+        }
     case spirv:
-        return spirv_asm {OpBitCount $$vector<uint, N> result $value};
+        if(T is int64_t || T  is uint64_t)
+        {
+            // emulate 64-bit
+            VECTOR_MAP_UNARY(uint, N, countbits, value);
+        }
+        else
+        {
+            return spirv_asm {OpBitCount $$vector<uint, N> result $value};
+        }
     case wgsl:
         __intrinsic_asm "countOneBits";
     default:
@@ -16345,6 +16382,7 @@ bool IsHelperLane()
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
+__spirv_version(1.3)
 [ForceInline]
 [require(glsl_hlsl_metal_spirv, quad_control)]
 bool QuadAny(bool expr)
@@ -16369,6 +16407,7 @@ bool QuadAny(bool expr)
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
+__spirv_version(1.3)
 [ForceInline]
 [require(glsl_hlsl_metal_spirv, quad_control)]
 bool QuadAll(bool expr)

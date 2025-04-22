@@ -728,9 +728,9 @@ static bool simplifyBoolPhiParams(IRBlock* block)
 
 static bool removeTrivialPhiParams(IRBlock* block)
 {
-    // We can remove a phi parmeter if:
-    // 1. all arguments to a parameter is the same (not really a phi).
-    // 2. the arguments to the parameter is always the same as arguments to another existing
+    // We can remove a phi parameter if:
+    // 1. all non-self-referential arguments to a parameter are the same (not really a phi).
+    // 2. the arguments to the parameter are always the same as arguments to another existing
     // parameter (duplicate phi).
 
     bool changed = false;
@@ -765,7 +765,10 @@ static bool removeTrivialPhiParams(IRBlock* block)
         termInsts.add(termInst);
         for (UInt i = 0; i < termInst->getArgCount(); i++)
         {
-            if (args[i].areKnownValueSame)
+            // Self-referential parameters can be skipped, as they cannot
+            // introduce a new value. The phi can only have multiple different
+            // values if non-self-referential arguments differ.
+            if (args[i].areKnownValueSame && termInst->getArg(i) != params[i])
             {
                 if (args[i].knownValue == nullptr)
                     args[i].knownValue = termInst->getArg(i);
