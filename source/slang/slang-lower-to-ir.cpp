@@ -2062,7 +2062,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             if (constIntVal && constIntVal->getValue() == kSpecializationConstantArrayMagicLength)
             {
                 auto irInitVal =
-                    getSimpleVal(context, lowerRValueExpr(context, type->specConstExpr));
+                    getSimpleVal(context, lowerRValueExpr(context, type->m_specConstExpr));
                 elementCount =
                     getBuilder()->emitGlobalConstant(irInitVal->getFullType(), irInitVal);
                 getBuilder()->addDecoration(elementCount, kIROp_SpecializationConstantOpDecoration);
