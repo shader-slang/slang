@@ -2099,18 +2099,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     auto globalConstant = as<IRGlobalConstant>(inst);
                     return emitSpecializationConstantOp(globalConstant->getValue());
-                    printf("We can now emit the specialization constant op inst\n");
                 }
+                break;
             }
         default:
             {
                 if (as<IRSPIRVAsmOperand>(inst))
                     return nullptr;
-                String e = "Unhandled global inst in spirv-emit:\n" +
-                           dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
-                SLANG_UNIMPLEMENTED_X(e.begin());
             }
         }
+        String e = "Unhandled global inst in spirv-emit:\n" +
+                   dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+        SLANG_UNIMPLEMENTED_X(e.begin());
     }
 
     SpvImageFormat getSpvImageFormat(IRTextureTypeBase* type)
@@ -2912,7 +2912,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             SLANG_UNREACHABLE("Non specialization constant used in OpSpecConstantOp\n");
         }
-        else if (auto constant = as<IRConstant>(inst))
+        else if (as<IRConstant>(inst))
         {
             // We need to emit the constant as a specialization constant
             return emitLit(inst);
