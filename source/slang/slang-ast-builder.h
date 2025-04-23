@@ -524,7 +524,10 @@ public:
     PtrTypeBase* getPtrType(Type* valueType, AddressSpace addrSpace, char const* ptrTypeName);
 
     ArrayExpressionType* getArrayType(Type* elementType, IntVal* elementCount);
-    ArrayExpressionType* getArrayType(Type* elementType, IntVal* elementCount, Expr* specConstSizeExpr);
+    ArrayExpressionType* getArrayType(
+        Type* elementType,
+        IntVal* elementCount,
+        Expr* specConstSizeExpr);
 
     VectorExpressionType* getVectorType(Type* elementType, IntVal* elementCount);
 

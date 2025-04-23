@@ -518,7 +518,7 @@ class ArrayExpressionType : public DeclRefType
     IntVal* getElementCount();
     void setSpecializationConstantSize(Expr* specConstExpr) { this->specConstExpr = specConstExpr; }
 
-    SLANG_UNREFLECTED Expr*  specConstExpr = nullptr;
+    SLANG_UNREFLECTED Expr* specConstExpr = nullptr;
 };
 
 FIDDLE()

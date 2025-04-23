@@ -531,14 +531,7 @@ SpvInst* emitOpSpecConstantOp(
     const T& opCode,
     const Ts& oprands)
 {
-    return emitInst(
-        parent,
-        inst,
-        SpvOpSpecConstantOp,
-        idResultType,
-        kResultID,
-        opCode,
-        oprands);
+    return emitInst(parent, inst, SpvOpSpecConstantOp, idResultType, kResultID, opCode, oprands);
 }
 
 template<typename T>

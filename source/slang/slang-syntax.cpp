@@ -900,7 +900,11 @@ ArrayExpressionType* getArrayType(ASTBuilder* astBuilder, Type* elementType)
     return astBuilder->getArrayType(elementType, nullptr);
 }
 
-ArrayExpressionType* getArrayType(ASTBuilder* astBuilder, Type* elementType, IntVal* elementCount, Expr* specConstExpr)
+ArrayExpressionType* getArrayType(
+    ASTBuilder* astBuilder,
+    Type* elementType,
+    IntVal* elementCount,
+    Expr* specConstExpr)
 {
     return astBuilder->getArrayType(elementType, elementCount, specConstExpr);
 }
