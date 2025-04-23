@@ -314,7 +314,11 @@ ArrayExpressionType* getArrayType(ASTBuilder* astBuilder, Type* elementType, Int
 
 ArrayExpressionType* getArrayType(ASTBuilder* astBuilder, Type* elementType);
 
-ArrayExpressionType* getArrayType(ASTBuilder* astBuilder, Type* elementType, IntVal* elementCount, Expr* specConstExpr);
+ArrayExpressionType* getArrayType(
+    ASTBuilder* astBuilder,
+    Type* elementType,
+    IntVal* elementCount,
+    Expr* specConstExpr);
 
 NamedExpressionType* getNamedType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> const& declRef);
 

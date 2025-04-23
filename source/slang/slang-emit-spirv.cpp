@@ -2095,7 +2095,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 as<IRDebugInlinedAt>(inst));
         case kIROp_GlobalConstant:
             {
-                if(inst->findDecoration<IRSpecializationConstantOpDecoration>())
+                if (inst->findDecoration<IRSpecializationConstantOpDecoration>())
                 {
                     auto globalConstant = as<IRGlobalConstant>(inst);
                     return emitSpecializationConstantOp(globalConstant->getValue());
@@ -2905,7 +2905,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             auto layout = getVarLayout(param);
             if (layout)
             {
-                if (auto offset = layout->findOffsetAttr(LayoutResourceKind::SpecializationConstant))
+                if (auto offset =
+                        layout->findOffsetAttr(LayoutResourceKind::SpecializationConstant))
                 {
                     return emitSpecializationConstant(param, offset);
                 }
@@ -2929,7 +2930,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
 
         Array<SpvInst*, 3> operands;
-        for(UInt i = 0; i < inst->getOperandCount(); i++)
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
         {
             auto operand = inst->getOperand(i);
             SpvInst* spv = emitSpecializationConstantOp(operand);
@@ -7394,8 +7395,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             SLANG_ASSERT(!"unknown arithmetic opcode");
 
         bool isFloatingPoint = basicType->getBaseType() == BaseType::Float ||
-                                basicType->getBaseType() == BaseType::Double ||
-                                basicType->getBaseType() == BaseType::Half;
+                               basicType->getBaseType() == BaseType::Double ||
+                               basicType->getBaseType() == BaseType::Half;
         if (operandCount == 1)
         {
             return emitInst(parent, instToRegister, opCode, type, kResultID, operands);
