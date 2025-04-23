@@ -152,6 +152,9 @@ Versions
 `hlsl_nvapi`
 > Represents HLSL NVAPI support.
 
+`hlsl_2018`
+> Represet HLSL compatibility support.
+
 `dxil_lib`
 > Represents capabilities required for DXIL Library compilation.
 
@@ -444,6 +447,12 @@ Extensions
 `SPV_KHR_cooperative_matrix`
 > Represents the SPIR-V extension for SPV_KHR_cooperative_matrix.
 
+`SPV_NV_cooperative_matrix2`
+> Represents the SPIR-V extension for SPV_NV_cooperative_matrix2.
+
+`SPV_NV_tensor_addressing`
+> Represents the SPIR-V extension for SPV_NV_tensor_addressing.
+
 `spvAtomicFloat32AddEXT`
 > Represents the SPIR-V capability for atomic float 32 add operations.
 
@@ -560,6 +569,24 @@ Extensions
 
 `spvCooperativeMatrixKHR`
 > Represents the SPIR-V capability for cooperative matrices
+
+`spvCooperativeMatrixReductionsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixConversionsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixPerElementOperationsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixTensorAddressingNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixBlockLoadsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvTensorAddressingNV`
+> Represents the SPIR-V capability for tensor addressing
 
 `spvMaximalReconvergenceKHR`
 > Represents the SPIR-V capability for maximal reconvergence.
@@ -930,6 +957,27 @@ Compound Capabilities
 `cooperative_vector_training`
 > Capabilities needed to train cooperative vectors
 
+`cooperative_matrix`
+> Capabilities needed to use cooperative matrices
+
+`cooperative_matrix_reduction`
+> Capabilities needed to use reduction operations with cooperative matrix
+
+`cooperative_matrix_conversion`
+> Capabilities needed to convert cooperative matrices
+
+`cooperative_matrix_map_element`
+> Capabilities needed to use MapElement operation with cooperative matrix
+
+`cooperative_matrix_tensor_addressing`
+> Capabilities needed to load or store with tensor_addressing extension
+
+`cooperative_matrix_block_load`
+> Capabilities needed to use decodeFunc with cooperative matrix load
+
+`tensor_addressing`
+> Capabilities needed to use tensor addressing
+
 `any_stage`
 > Collection of all shader stages
 
@@ -1237,9 +1285,6 @@ Compound Capabilities
 Other
 ----------------------
 *Capabilities which may be deprecated*
-
-`cooperative_matrix`
-> Capabilities needed to use cooperative matrices
 
 `SPIRV_1_0`
 > Use `spirv_1_0` instead
