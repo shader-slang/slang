@@ -2933,8 +2933,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         for (UInt i = 0; i < inst->getOperandCount(); i++)
         {
             auto operand = inst->getOperand(i);
-            SpvInst* spv = emitSpecializationConstantOp(operand);
-            operands.add(spv);
+            SpvInst* spvInst = emitSpecializationConstantOp(operand);
+            operands.add(spvInst);
         }
 
         auto resultType = inst->getFullType();

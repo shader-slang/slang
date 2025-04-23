@@ -352,6 +352,17 @@ bool ArrayExpressionType::isUnsized()
     return false;
 }
 
+bool ArrayExpressionType::isSpecConstSized()
+{
+    if (auto constSize = as<ConstantIntVal>(getElementCount()))
+    {
+        if (constSize->getValue() == kSpecializationConstantArrayMagicLength)
+            return true;
+    }
+
+    return false;
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! AtomicType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 Type* AtomicType::getElementType()
 {
