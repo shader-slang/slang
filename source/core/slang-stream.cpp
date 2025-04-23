@@ -163,8 +163,7 @@ SlangResult FileStream::_init(
         return SLANG_FAIL;
     }
     if (share == FileShare::None)
-#pragma warning(suppress : 4996)
-        m_handle = _wfopen(fileName.toWString(), wideMode);
+        _wfopen_s(&m_handle, fileName.toWString(), wideMode);
     else
         m_handle = _wfsopen(fileName.toWString(), wideMode, shFlag);
 #else

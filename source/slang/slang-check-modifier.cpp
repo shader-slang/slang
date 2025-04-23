@@ -1266,7 +1266,6 @@ AttributeBase* SemanticsVisitor::checkAttribute(
     //
     // The attribute declaration will have one or more `AttributeTargetModifier`s
     // that each specify a syntax class that the attribute can be applied to.
-    // If any of these match `attrTarget`, then we are good.
     //
     bool validTarget = false;
     for (auto attrTargetMod : attrDecl->getModifiersOfType<AttributeTargetModifier>())
@@ -1277,6 +1276,18 @@ AttributeBase* SemanticsVisitor::checkAttribute(
             break;
         }
     }
+
+    // Some attributes impose constraints on where they can be placed that cannot be captured by the
+    // only checking the syntax class. Perform more checks here.
+    switch (attr->astNodeType)
+    {
+    // Allowed only on struct fields.
+    case ASTNodeType::VkStructOffsetAttribute:
+        auto targetDecl = as<Decl>(attrTarget);
+        validTarget = validTarget && targetDecl && as<StructDecl>(getParentDecl(targetDecl));
+        break;
+    };
+
     if (!validTarget)
     {
         getSink()->diagnose(attr, Diagnostics::attributeNotApplicable, attrName);
@@ -1327,6 +1338,7 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::GLSLLayoutModifierGroupBegin:
     case ASTNodeType::GLSLLayoutModifierGroupEnd:
     case ASTNodeType::GLSLBufferModifier:
+    case ASTNodeType::VkStructOffsetAttribute:
     case ASTNodeType::MemoryQualifierSetModifier:
     case ASTNodeType::GLSLWriteOnlyModifier:
     case ASTNodeType::GLSLReadOnlyModifier:

@@ -159,6 +159,12 @@ static Result _calcSizeAndAlignment(
                 // subsequent offsets
                 SLANG_ASSERT(!seenFinalUnsizedArrayField);
 
+                if (auto offsetDecor =
+                        field->getKey()->findDecoration<IRVkStructOffsetDecoration>())
+                {
+                    offset = offsetDecor->getOffset()->getValue();
+                }
+
                 IRSizeAndAlignment fieldTypeLayout;
                 SLANG_RETURN_ON_FAIL(
                     getSizeAndAlignment(optionSet, rules, field->getFieldType(), &fieldTypeLayout));

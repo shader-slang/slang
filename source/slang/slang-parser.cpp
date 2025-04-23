@@ -1771,46 +1771,46 @@ public:
     void visitDeclRefExpr(DeclRefExpr* expr) { expr->scope = scope; }
     void visitGenericAppExpr(GenericAppExpr* expr)
     {
-        expr->functionExpr->accept(this, nullptr);
+        dispatch(expr->functionExpr);
         for (auto arg : expr->arguments)
-            arg->accept(this, nullptr);
+            dispatch(arg);
     }
     void visitIndexExpr(IndexExpr* expr)
     {
-        expr->baseExpression->accept(this, nullptr);
+        dispatch(expr->baseExpression);
         for (auto arg : expr->indexExprs)
-            arg->accept(this, nullptr);
+            dispatch(arg);
     }
     void visitMemberExpr(MemberExpr* expr)
     {
-        expr->baseExpression->accept(this, nullptr);
+        dispatch(expr->baseExpression);
         expr->scope = scope;
     }
     void visitStaticMemberExpr(StaticMemberExpr* expr)
     {
-        expr->baseExpression->accept(this, nullptr);
+        dispatch(expr->baseExpression);
         expr->scope = scope;
     }
     void visitAppExprBase(AppExprBase* expr)
     {
-        expr->functionExpr->accept(this, nullptr);
+        dispatch(expr->functionExpr);
         for (auto arg : expr->arguments)
-            arg->accept(this, nullptr);
+            dispatch(arg);
     }
     void visitIsTypeExpr(IsTypeExpr* expr)
     {
         if (expr->typeExpr.exp)
-            expr->typeExpr.exp->accept(this, nullptr);
+            dispatch(expr->typeExpr.exp);
     }
     void visitAsTypeExpr(AsTypeExpr* expr)
     {
         if (expr->typeExpr)
-            expr->typeExpr->accept(this, nullptr);
+            dispatch(expr->typeExpr);
     }
     void visitSizeOfLikeExpr(SizeOfLikeExpr* expr)
     {
         if (expr->value)
-            expr->value->accept(this, nullptr);
+            dispatch(expr->value);
     }
     void visitExpr(Expr* /*expr*/) {}
 };
@@ -1910,7 +1910,7 @@ static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& decl
             //
             ReplaceScopeVisitor replaceScopeVisitor;
             replaceScopeVisitor.scope = parser->currentScope;
-            declaratorInfo.typeSpec->accept(&replaceScopeVisitor, nullptr);
+            replaceScopeVisitor.dispatch(declaratorInfo.typeSpec);
 
             decl->returnType = TypeExp(declaratorInfo.typeSpec);
 
@@ -4377,7 +4377,7 @@ static NodeBase* parseTypeAliasDecl(Parser* parser, void* /*userData*/)
 // the class of AST node to construct.
 NodeBase* parseSimpleSyntax(Parser* parser, void* userData)
 {
-    SyntaxClassBase syntaxClass((ReflectClassInfo*)userData);
+    SyntaxClassBase syntaxClass((SyntaxClassInfo*)userData);
     return (NodeBase*)syntaxClass.createInstanceImpl(parser->astBuilder);
 }
 
@@ -4411,7 +4411,7 @@ static NodeBase* parseSyntaxDecl(Parser* parser, void* /*userData*/)
     // to the `parseSimpleSyntax` callback that will just construct
     // an instance of that type to represent the keyword in the AST.
     SyntaxParseCallback parseCallback = &parseSimpleSyntax;
-    void* parseUserData = (void*)syntaxClass.classInfo;
+    void* parseUserData = (void*)syntaxClass.getInfo();
 
     // Next we look for an initializer that will make this keyword
     // an alias for some existing keyword.
@@ -4435,7 +4435,7 @@ static NodeBase* parseSyntaxDecl(Parser* parser, void* /*userData*/)
             // If we don't already have a syntax class specified, then
             // we will crib the one from the existing syntax, to ensure
             // that we are creating a drop-in alias.
-            if (!syntaxClass.classInfo)
+            if (!syntaxClass)
                 syntaxClass = existingSyntax->syntaxClass;
         }
     }
@@ -4445,7 +4445,7 @@ static NodeBase* parseSyntaxDecl(Parser* parser, void* /*userData*/)
     //
     // TODO: down the line this should be expanded so that the user can reference
     // an existing *function* to use to parse the chosen syntax.
-    if (!syntaxClass.classInfo)
+    if (!syntaxClass)
     {
         // TODO: diagnose: either a type or an existing keyword needs to be specified
     }
@@ -4757,7 +4757,7 @@ static NodeBase* parseAttributeSyntaxDecl(Parser* parser, void* /*userData*/)
         auto classNameAndLoc = expectIdentifier(parser);
         syntaxClass = parser->astBuilder->findSyntaxClass(classNameAndLoc.name);
 
-        assert(syntaxClass.classInfo);
+        assert(syntaxClass);
     }
     else
     {
@@ -8098,7 +8098,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     }
 
     if (ret.opcode.flavor == SPIRVAsmOperand::Flavor::NamedValue &&
-        ret.opcode.knownValue == SpvOp(0xffffffff))
+        ret.opcode.knownValue == (SpvWord)(SpvOp(0xffffffff)))
     {
         if (ret.opcode.token.type == TokenType::IntegerLiteral)
         {
@@ -8428,20 +8428,20 @@ static void addBuiltinSyntax(
     SyntaxParseCallback callback,
     void* userData = nullptr)
 {
-    addBuiltinSyntaxImpl(session, scope, name, callback, userData, getClass<T>());
+    addBuiltinSyntaxImpl(session, scope, name, callback, userData, getSyntaxClass<T>());
 }
 
 template<typename T>
 static void addSimpleModifierSyntax(Session* session, Scope* scope, char const* name)
 {
-    auto syntaxClass = getClass<T>();
+    auto syntaxClass = getSyntaxClass<T>();
     addBuiltinSyntaxImpl(
         session,
         scope,
         name,
         &parseSimpleSyntax,
         (void*)syntaxClass.classInfo,
-        getClass<T>());
+        getSyntaxClass<T>());
 }
 
 static IROp parseIROp(Parser* parser, Token& outToken)
@@ -8931,10 +8931,10 @@ static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
         modifier->tag =
             uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
     }
-    auto classInfo = parser->astBuilder->findClassInfo(getName(parser, modifier->magicName));
-    if (classInfo)
+    auto syntaxClass = parser->astBuilder->findSyntaxClass(getName(parser, modifier->magicName));
+    if (syntaxClass)
     {
-        modifier->magicNodeType = ASTNodeType(classInfo->m_classId);
+        modifier->magicNodeType = syntaxClass;
     }
     // TODO: print diagnostic if the magic type name doesn't correspond to an actual ASTNodeType.
     parser->ReadToken(TokenType::RParent);
@@ -9006,7 +9006,7 @@ static NodeBase* parseAttributeTargetModifier(Parser* parser, void* /*userData*/
 static SyntaxParseInfo _makeParseExpr(const char* keywordName, SyntaxParseCallback callback)
 {
     SyntaxParseInfo entry;
-    entry.classInfo = &Expr::kReflectClassInfo;
+    entry.classInfo = getSyntaxClass<Expr>();
     entry.keywordName = keywordName;
     entry.callback = callback;
     return entry;
@@ -9016,18 +9016,18 @@ static SyntaxParseInfo _makeParseDecl(const char* keywordName, SyntaxParseCallba
     SyntaxParseInfo entry;
     entry.keywordName = keywordName;
     entry.callback = callback;
-    entry.classInfo = &Decl::kReflectClassInfo;
+    entry.classInfo = getSyntaxClass<Decl>();
     return entry;
 }
 static SyntaxParseInfo _makeParseModifier(
     const char* keywordName,
-    const ReflectClassInfo& classInfo)
+    SyntaxClass<NodeBase> const& syntaxClass)
 {
     // If we just have class info - use simple parser
     SyntaxParseInfo entry;
     entry.keywordName = keywordName;
     entry.callback = &parseSimpleSyntax;
-    entry.classInfo = &classInfo;
+    entry.classInfo = syntaxClass;
     return entry;
 }
 static SyntaxParseInfo _makeParseModifier(const char* keywordName, SyntaxParseCallback callback)
@@ -9035,7 +9035,7 @@ static SyntaxParseInfo _makeParseModifier(const char* keywordName, SyntaxParseCa
     SyntaxParseInfo entry;
     entry.keywordName = keywordName;
     entry.callback = callback;
-    entry.classInfo = &Modifier::kReflectClassInfo;
+    entry.classInfo = getSyntaxClass<Modifier>();
     return entry;
 }
 
@@ -9082,68 +9082,68 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     // and which can be represented just by creating
     // a new AST node of the corresponding type.
 
-    _makeParseModifier("in", InModifier::kReflectClassInfo),
-    _makeParseModifier("out", OutModifier::kReflectClassInfo),
-    _makeParseModifier("inout", InOutModifier::kReflectClassInfo),
-    _makeParseModifier("__ref", RefModifier::kReflectClassInfo),
-    _makeParseModifier("__constref", ConstRefModifier::kReflectClassInfo),
-    _makeParseModifier("const", ConstModifier::kReflectClassInfo),
-    _makeParseModifier("__builtin", BuiltinModifier::kReflectClassInfo),
-    _makeParseModifier("highp", GLSLPrecisionModifier::kReflectClassInfo),
-    _makeParseModifier("lowp", GLSLPrecisionModifier::kReflectClassInfo),
-    _makeParseModifier("mediump", GLSLPrecisionModifier::kReflectClassInfo),
+    _makeParseModifier("in", getSyntaxClass<InModifier>()),
+    _makeParseModifier("out", getSyntaxClass<OutModifier>()),
+    _makeParseModifier("inout", getSyntaxClass<InOutModifier>()),
+    _makeParseModifier("__ref", getSyntaxClass<RefModifier>()),
+    _makeParseModifier("__constref", getSyntaxClass<ConstRefModifier>()),
+    _makeParseModifier("const", getSyntaxClass<ConstModifier>()),
+    _makeParseModifier("__builtin", getSyntaxClass<BuiltinModifier>()),
+    _makeParseModifier("highp", getSyntaxClass<GLSLPrecisionModifier>()),
+    _makeParseModifier("lowp", getSyntaxClass<GLSLPrecisionModifier>()),
+    _makeParseModifier("mediump", getSyntaxClass<GLSLPrecisionModifier>()),
 
-    _makeParseModifier("__global", ActualGlobalModifier::kReflectClassInfo),
+    _makeParseModifier("__global", getSyntaxClass<ActualGlobalModifier>()),
 
-    _makeParseModifier("inline", InlineModifier::kReflectClassInfo),
-    _makeParseModifier("public", PublicModifier::kReflectClassInfo),
-    _makeParseModifier("private", PrivateModifier::kReflectClassInfo),
-    _makeParseModifier("internal", InternalModifier::kReflectClassInfo),
+    _makeParseModifier("inline", getSyntaxClass<InlineModifier>()),
+    _makeParseModifier("public", getSyntaxClass<PublicModifier>()),
+    _makeParseModifier("private", getSyntaxClass<PrivateModifier>()),
+    _makeParseModifier("internal", getSyntaxClass<InternalModifier>()),
 
-    _makeParseModifier("require", RequireModifier::kReflectClassInfo),
-    _makeParseModifier("param", ParamModifier::kReflectClassInfo),
-    _makeParseModifier("extern", ExternModifier::kReflectClassInfo),
+    _makeParseModifier("require", getSyntaxClass<RequireModifier>()),
+    _makeParseModifier("param", getSyntaxClass<ParamModifier>()),
+    _makeParseModifier("extern", getSyntaxClass<ExternModifier>()),
 
-    _makeParseModifier("row_major", HLSLRowMajorLayoutModifier::kReflectClassInfo),
-    _makeParseModifier("column_major", HLSLColumnMajorLayoutModifier::kReflectClassInfo),
+    _makeParseModifier("row_major", getSyntaxClass<HLSLRowMajorLayoutModifier>()),
+    _makeParseModifier("column_major", getSyntaxClass<HLSLColumnMajorLayoutModifier>()),
 
-    _makeParseModifier("nointerpolation", HLSLNoInterpolationModifier::kReflectClassInfo),
-    _makeParseModifier("noperspective", HLSLNoPerspectiveModifier::kReflectClassInfo),
-    _makeParseModifier("linear", HLSLLinearModifier::kReflectClassInfo),
-    _makeParseModifier("sample", HLSLSampleModifier::kReflectClassInfo),
-    _makeParseModifier("centroid", HLSLCentroidModifier::kReflectClassInfo),
-    _makeParseModifier("precise", PreciseModifier::kReflectClassInfo),
+    _makeParseModifier("nointerpolation", getSyntaxClass<HLSLNoInterpolationModifier>()),
+    _makeParseModifier("noperspective", getSyntaxClass<HLSLNoPerspectiveModifier>()),
+    _makeParseModifier("linear", getSyntaxClass<HLSLLinearModifier>()),
+    _makeParseModifier("sample", getSyntaxClass<HLSLSampleModifier>()),
+    _makeParseModifier("centroid", getSyntaxClass<HLSLCentroidModifier>()),
+    _makeParseModifier("precise", getSyntaxClass<PreciseModifier>()),
     _makeParseModifier("shared", parseSharedModifier),
-    _makeParseModifier("groupshared", HLSLGroupSharedModifier::kReflectClassInfo),
-    _makeParseModifier("static", HLSLStaticModifier::kReflectClassInfo),
-    _makeParseModifier("uniform", HLSLUniformModifier::kReflectClassInfo),
+    _makeParseModifier("groupshared", getSyntaxClass<HLSLGroupSharedModifier>()),
+    _makeParseModifier("static", getSyntaxClass<HLSLStaticModifier>()),
+    _makeParseModifier("uniform", getSyntaxClass<HLSLUniformModifier>()),
     _makeParseModifier("volatile", parseVolatileModifier),
     _makeParseModifier("coherent", parseCoherentModifier),
     _makeParseModifier("restrict", parseRestrictModifier),
     _makeParseModifier("readonly", parseReadonlyModifier),
     _makeParseModifier("writeonly", parseWriteonlyModifier),
-    _makeParseModifier("export", HLSLExportModifier::kReflectClassInfo),
-    _makeParseModifier("dynamic_uniform", DynamicUniformModifier::kReflectClassInfo),
+    _makeParseModifier("export", getSyntaxClass<HLSLExportModifier>()),
+    _makeParseModifier("dynamic_uniform", getSyntaxClass<DynamicUniformModifier>()),
 
     // Modifiers for geometry shader input
-    _makeParseModifier("point", HLSLPointModifier::kReflectClassInfo),
-    _makeParseModifier("line", HLSLLineModifier::kReflectClassInfo),
-    _makeParseModifier("triangle", HLSLTriangleModifier::kReflectClassInfo),
-    _makeParseModifier("lineadj", HLSLLineAdjModifier::kReflectClassInfo),
-    _makeParseModifier("triangleadj", HLSLTriangleAdjModifier::kReflectClassInfo),
+    _makeParseModifier("point", getSyntaxClass<HLSLPointModifier>()),
+    _makeParseModifier("line", getSyntaxClass<HLSLLineModifier>()),
+    _makeParseModifier("triangle", getSyntaxClass<HLSLTriangleModifier>()),
+    _makeParseModifier("lineadj", getSyntaxClass<HLSLLineAdjModifier>()),
+    _makeParseModifier("triangleadj", getSyntaxClass<HLSLTriangleAdjModifier>()),
 
     // Modifiers for mesh shader parameters
-    _makeParseModifier("vertices", HLSLVerticesModifier::kReflectClassInfo),
-    _makeParseModifier("indices", HLSLIndicesModifier::kReflectClassInfo),
-    _makeParseModifier("primitives", HLSLPrimitivesModifier::kReflectClassInfo),
-    _makeParseModifier("payload", HLSLPayloadModifier::kReflectClassInfo),
+    _makeParseModifier("vertices", getSyntaxClass<HLSLVerticesModifier>()),
+    _makeParseModifier("indices", getSyntaxClass<HLSLIndicesModifier>()),
+    _makeParseModifier("primitives", getSyntaxClass<HLSLPrimitivesModifier>()),
+    _makeParseModifier("payload", getSyntaxClass<HLSLPayloadModifier>()),
 
     // Modifiers for unary operator declarations
-    _makeParseModifier("__prefix", PrefixModifier::kReflectClassInfo),
-    _makeParseModifier("__postfix", PostfixModifier::kReflectClassInfo),
+    _makeParseModifier("__prefix", getSyntaxClass<PrefixModifier>()),
+    _makeParseModifier("__postfix", getSyntaxClass<PostfixModifier>()),
 
     // Modifier to apply to `import` that should be re-exported
-    _makeParseModifier("__exported", ExportedModifier::kReflectClassInfo),
+    _makeParseModifier("__exported", getSyntaxClass<ExportedModifier>()),
 
     // Add syntax for more complex modifiers, which allow
     // or expect more tokens after the initial keyword.
@@ -9208,7 +9208,7 @@ ModuleDecl* populateBaseLanguageModule(ASTBuilder* astBuilder, Scope* scope)
             scope,
             info.keywordName,
             info.callback,
-            const_cast<ReflectClassInfo*>(info.classInfo),
+            info.classInfo.getInfo(),
             info.classInfo);
     }
 
