@@ -2360,6 +2360,13 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
                 kIROp_GLSLOffsetDecoration,
                 builder->getIntValue(builder->getIntType(), glslOffsetMod->offset));
         }
+        else if (auto glslStructOffsetMod = as<VkStructOffsetAttribute>(mod))
+        {
+            builder->addDecoration(
+                inst,
+                kIROp_VkStructOffsetDecoration,
+                builder->getIntValue(builder->getIntType(), glslStructOffsetMod->value));
+        }
         else if (auto hlslSemantic = as<HLSLSimpleSemantic>(mod))
         {
             builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
@@ -5836,13 +5843,19 @@ struct DestinationDrivenRValueExprLoweringVisitor
     }
 
     /// Emit code for a `try` invoke.
-    LoweredValInfo visitTryExpr(TryExpr* expr)
+    void visitTryExpr(TryExpr* expr)
     {
         auto invokeExpr = as<InvokeExpr>(expr->base);
         assert(invokeExpr);
         TryClauseEnvironment tryEnv;
         tryEnv.clauseType = expr->tryClauseType;
-        return sharedLoweringContext.visitInvokeExprImpl(invokeExpr, destination, tryEnv);
+        auto rValue = sharedLoweringContext.visitInvokeExprImpl(invokeExpr, destination, tryEnv);
+        if (rValue.flavor != LoweredValInfo::Flavor::None)
+        {
+            // If we weren't able to fuse the destination write during lowering rvalue,
+            // we should insert the assign operation now.
+            assign(context, destination, rValue);
+        }
     }
 };
 

@@ -117,7 +117,7 @@ inline void foreachDirectOrExtensionMemberOfType(
     _foreachDirectOrExtensionMemberOfType(
         semantics,
         declRef,
-        getClass<T>(),
+        getSyntaxClass<T>(),
         &Helper::callback,
         &helper);
 }

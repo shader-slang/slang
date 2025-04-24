@@ -685,6 +685,14 @@ Result DebugDevice::getTextureRowAlignment(size_t* outAlignment)
     return baseObject->getTextureRowAlignment(outAlignment);
 }
 
+Result DebugDevice::getCooperativeVectorProperties(
+    CooperativeVectorProperties* properties,
+    uint32_t* propertyCount)
+{
+    SLANG_GFX_API_FUNC;
+    return baseObject->getCooperativeVectorProperties(properties, propertyCount);
+}
+
 Result DebugDevice::createShaderTable(const IShaderTable::Desc& desc, IShaderTable** outTable)
 {
     SLANG_GFX_API_FUNC;

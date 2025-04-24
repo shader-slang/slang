@@ -24,16 +24,10 @@ typedef uint32_t FourCC;
 #define SLANG_FOUR_CC(c0, c1, c2, c3) \
     ((FourCC(c0) << 0) | (FourCC(c1) << 8) | (FourCC(c2) << 16) | (FourCC(c3) << 24))
 
-#define SLANG_FOUR_CC_GET_FIRST_CHAR(x) char((x) & 0xff)
-#define SLANG_FOUR_CC_REPLACE_FIRST_CHAR(x, c) (((x) & 0xffffff00) | FourCC(c))
-
 #else
 
 #define SLANG_FOUR_CC(c0, c1, c2, c3) \
     ((FourCC(c0) << 24) | (FourCC(c1) << 16) | (FourCC(c2) << 8) | (FourCC(c3) << 0))
-
-#define SLANG_FOUR_CC_GET_FIRST_CHAR(x) char((x) >> 24)
-#define SLANG_FOUR_CC_REPLACE_FIRST_CHAR(x, c) (((x) & 0x00ffffff) | (FourCC(c) << 24))
 
 #endif
 
@@ -450,6 +444,8 @@ public:
 
     /// Ctor
     RiffContainer();
+
+    void setCurrentChunk(Chunk* chunk);
 
 protected:
     void _addChunk(Chunk* chunk);
