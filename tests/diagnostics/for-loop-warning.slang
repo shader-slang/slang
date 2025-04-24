@@ -1,5 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE:
-
+StructuredBuffer<float> buffer0;
+StructuredBuffer<float> buffer1;
+RWStructuredBuffer<float> result;
 
 float doSomething(int x)
 {
@@ -55,6 +57,10 @@ float doSomething(int x)
     for (int i = 0; i < 5; i+=2)
     {
         i--;
+    }
+    for (int i = 1; i < 10; i+1) // warn.
+    {
+        result[i] = buffer0[i] + buffer1[i];
     }
     return 0.0;
 }
