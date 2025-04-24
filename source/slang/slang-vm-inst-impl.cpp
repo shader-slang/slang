@@ -91,7 +91,7 @@ struct BinaryVectorFunc
         T2* src2 = (T2*)inst->getOperand(2).getPtr();
         for (int i = 0; i < elementCount; ++i)
         {
-            ScalarFunc::run<TR, T1, T2>(&dst[i], &src1[i], &src2[i]);
+            ScalarFunc::template run<TR, T1, T2>(&dst[i], &src1[i], &src2[i]);
         }
     }
 };
@@ -110,7 +110,7 @@ struct GeneralBinaryVectorFunc
         memcpy(&arithExtCode, &inst->opcodeExtension, sizeof(arithExtCode));
         for (uint32_t i = 0; i < arithExtCode.vectorSize; ++i)
         {
-            ScalarFunc::run<TR, T1, T2>(&dst[i], &src1[i], &src2[i]);
+            ScalarFunc::template run<TR, T1, T2>(&dst[i], &src1[i], &src2[i]);
         }
     }
 };
@@ -312,7 +312,7 @@ struct UnaryVectorFunc
         T1* src1 = (T1*)inst->getOperand(1).getPtr();
         for (int i = 0; i < elementCount; ++i)
         {
-            ScalarFunc::run<TR, T1>(&dst[i], &src1[i]);
+            ScalarFunc::template run<TR, T1>(&dst[i], &src1[i]);
         }
     }
 };
@@ -330,7 +330,7 @@ struct GeneralUnaryVectorFunc
         memcpy(&arithExtCode, &inst->opcodeExtension, sizeof(arithExtCode));
         for (uint32_t i = 0; i < arithExtCode.vectorSize; ++i)
         {
-            ScalarFunc::run<TR, T1>(&dst[i], &src1[i]);
+            ScalarFunc::template run<TR, T1>(&dst[i], &src1[i]);
         }
     }
 };
