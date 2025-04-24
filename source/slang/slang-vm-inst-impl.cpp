@@ -44,17 +44,23 @@ struct ModScalarFunc
     template<typename TR, typename T1, typename T2>
     static void run(TR* dst, const T1* src1, const T2* src2)
     {
+        ModScalarFunc().runInner<TR, T1, T2>(dst, src1, src2);
+    }
+
+    template<typename TR, typename T1, typename T2>
+    void runInner(TR* dst, const T1* src1, const T2* src2)
+    {
         *dst = *src1 % *src2;
     }
 
     template<>
-    static void run<float>(float* dst, const float* src1, const float* src2)
+    void runInner<float, float, float>(float* dst, const float* src1, const float* src2)
     {
         *dst = fmodf(*src1, *src2);
     }
 
     template<>
-    static void run<double>(double* dst, const double* src1, const double* src2)
+    void runInner<double, double, double>(double* dst, const double* src1, const double* src2)
     {
         *dst = fmod(*src1, *src2);
     }

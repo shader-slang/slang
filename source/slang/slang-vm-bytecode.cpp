@@ -402,7 +402,7 @@ StringBuilder& operator<<(StringBuilder& sb, VMModuleView& module)
             sb << "  ";
             auto loc = ((uint8_t*)inst - f.functionCode);
             auto pos = sb.getLength();
-            sb << String(loc, 16) << ": ";
+            sb << String((uint32_t)loc, 16) << ": ";
             auto addrLength = (int)(sb.getLength() - pos);
             for (int j = 0; j < addrColumnSize - addrLength; j++)
             {
