@@ -16368,6 +16368,155 @@ bool IsHelperLane()
     }
 }
 
+//@hidden:
+
+__generic<T : __BuiltinType>
+[ForceInline]
+[require(glsl)]
+void __requireGLSLShaderSubgroupTypeExtension()
+{
+    // the following is a seperate function call, since else the `__requireTargetExtension` and associated __intrinsic_asm is ignored if the calling function also calls an __intrinsic_asm
+    if (__type_equals<T, half>()
+        || __type_equals<T, float16_t>()
+        ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
+    else if (__type_equals<T, uint8_t>()
+        || __type_equals<T, int8_t>()
+        ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_int8");
+    else if (__type_equals<T, uint16_t>()
+        || __type_equals<T, int16_t>()
+        ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_int16");
+    else if (__type_equals<T, uint64_t>()
+        || __type_equals<T, int64_t>()
+        ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_int64");
+
+    __intrinsic_asm "";
+}
+
+__generic<T : __BuiltinType>
+[ForceInline]
+[require(metal)]
+void __checkMetalShaderSubgroupType()
+{
+    // These builtin types are not supported for Metal's `simd` operations.
+    if (__type_equals<T, uint8_t>()
+        || __type_equals<T, int8_t>()
+        || __type_equals<T, uint64_t>()
+        || __type_equals<T, int64_t>()
+        || __isBool<T>()
+        )
+    {
+        static_assert(false, "Unsupported type for subgroup operations in Metal. Valid types include scalars and vectors of uint/uint32_t, int/int32_t, uint16_t, int16_t, float, and half.");
+    }
+}
+
+__generic<T : __BuiltinType>
+void shader_subgroup_preamble()
+{
+    // checks needed for shader_subgroup functions; __requireTargetExtension does not work
+    // (does not add the ext specified correctly to the compile output; using extended type
+    // will result in error for using the type)
+    __target_switch
+    {
+    case glsl:
+        __requireGLSLShaderSubgroupTypeExtension<T>();
+    case metal:
+        __checkMetalShaderSubgroupType<T>();
+    default:
+        return;
+    }
+}
+
+//@public:
+
+//
+// Wave Rotate intrinsics.
+// These are Slang specific intrinsics to rotate values within a subgroup.
+//
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_rotate)
+[require(glsl_metal_spirv, subgroup_rotate)]
+T WaveRotate(T value, uint delta)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupRotate";
+    case metal:
+        __intrinsic_asm "simd_shuffle_rotate_down";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_KHR_subgroup_rotate";
+            OpCapability GroupNonUniformRotateKHR;
+            result:$$T = OpGroupNonUniformRotateKHR Subgroup $value $delta;
+        };
+    }
+}
+
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_rotate)
+[require(glsl_metal_spirv, subgroup_rotate)]
+vector<T, N> WaveRotate(vector<T, N> value, uint delta)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupRotate";
+    case metal:
+        __intrinsic_asm "simd_shuffle_rotate_down";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_KHR_subgroup_rotate";
+            OpCapability GroupNonUniformRotateKHR;
+            result:$$vector<T,N> = OpGroupNonUniformRotateKHR Subgroup $value $delta;
+        };
+    }
+}
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_rotate)
+[require(glsl_spirv, subgroup_rotate)]
+T WaveClusteredRotate(T value, uint delta, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredRotate";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_KHR_subgroup_rotate";
+            OpCapability GroupNonUniformRotateKHR;
+            result:$$T = OpGroupNonUniformRotateKHR Subgroup $value $delta $clusterSize;
+        };
+    }
+}
+
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_rotate)
+[require(glsl_spirv, subgroup_rotate)]
+vector<T, N> WaveClusteredRotate(vector<T, N> value, uint delta, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredRotate";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_KHR_subgroup_rotate";
+            OpCapability GroupNonUniformRotateKHR;
+            result:$$vector<T,N> = OpGroupNonUniformRotateKHR Subgroup $value $delta $clusterSize;
+        };
+    }
+}
+
 //
 // Quad Control intrinsics
 //
@@ -16382,6 +16531,7 @@ bool IsHelperLane()
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
+__spirv_version(1.3)
 [ForceInline]
 [require(glsl_hlsl_metal_spirv, quad_control)]
 bool QuadAny(bool expr)
@@ -16406,6 +16556,7 @@ bool QuadAny(bool expr)
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
+__spirv_version(1.3)
 [ForceInline]
 [require(glsl_hlsl_metal_spirv, quad_control)]
 bool QuadAll(bool expr)

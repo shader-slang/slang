@@ -3710,6 +3710,13 @@ attribute_syntax [vk_location(location : int)] : GLSLLocationAttribute;
 __attributeTarget(VarDeclBase)
 attribute_syntax [vk_index(index : int)] : GLSLIndexAttribute;
 
+/// Declare offset for a struct field. Applies to all kinds of structs when targeting Vulkan.
+/// Applies only to structs that are directly used as interface blocks (such as push constants and uniforms)
+/// when targeting GLSL, as GLSL does not support the `offset` qualifier on regular structs.
+/// This attribute has no effect on other targets.
+__attributeTarget(VarDeclBase)
+attribute_syntax [vk_offset(index: int)] : VkStructOffsetAttribute;
+
 /// @deprecated
 /// Use `spirv_asm` instead for inline SPIR-V assembly.
 __attributeTarget(FuncDecl)

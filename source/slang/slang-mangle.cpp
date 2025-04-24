@@ -381,7 +381,7 @@ void emitVal(ManglingContext* context, Val* val)
     }
     else if (auto modifier = as<ModifierVal>(val))
     {
-        emitNameImpl(context, UnownedStringSlice(modifier->getClassInfo().m_name));
+        emitNameImpl(context, UnownedStringSlice(modifier->getClass().getName()));
     }
     else
     {
