@@ -148,7 +148,6 @@ SlangResult compileAndInterpret(
     Arguments args;
     args.argc = argc;
     args.argv = argv;
-    auto entryPointLayout = linkedProgram->getLayout(0)->findEntryPointByName(entryPointName);
     void* arguments = nullptr;
     size_t argSize = 0;
     slang::ByteCodeFuncInfo funcInfo;
