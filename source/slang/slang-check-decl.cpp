@@ -1361,15 +1361,6 @@ bool isUnsizedArrayType(Type* type)
     return arrayType->isUnsized();
 }
 
-bool isSpecConstSizedArrayType(Type* type)
-{
-    auto arrayType = as<ArrayExpressionType>(type);
-    if (!arrayType)
-        return false;
-
-    return arrayType->isSpecConstSized();
-}
-
 bool isInterfaceType(Type* type)
 {
     if (auto declRefType = as<DeclRefType>(type))
@@ -1881,19 +1872,6 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 maybeInferArraySizeForVariable(varDecl);
 
                 varDecl->setCheckState(DeclCheckState::DefinitionChecked);
-            }
-        }
-        if (isSpecConstSizedArrayType(varDecl->type))
-        {
-            // Only global variable or shared variables can be specialization constant sized
-            // arrays.
-            if (!(isGlobalDecl(varDecl) && (varDecl->hasModifier<HLSLGroupSharedModifier>() ||
-                                            varDecl->hasModifier<HLSLStaticModifier>())))
-            {
-                getSink()->diagnose(
-                    varDecl,
-                    Diagnostics::arraySizeCannotBeSpecializationConstant,
-                    varDecl);
             }
         }
         //
@@ -2527,6 +2505,17 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 getSink()->diagnose(varDecl, Diagnostics::doYouMeanStaticConst);
             else
                 getSink()->diagnose(varDecl, Diagnostics::doYouMeanUniform);
+        }
+    }
+    else
+    {
+        bool isSpecConstSized = (((int)varTypeTags & (int)TypeTag::SpecializationConstantSized) != 0);
+        if (isSpecConstSized)
+        {
+            getSink()->diagnose(
+                    varDecl,
+                    Diagnostics::arraySizeCannotBeSpecializationConstant,
+                    varDecl);
         }
     }
 

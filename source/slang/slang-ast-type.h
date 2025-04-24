@@ -513,7 +513,6 @@ class ArrayExpressionType : public DeclRefType
 {
     FIDDLE(...)
     bool isUnsized();
-    bool isSpecConstSized();
     void _toTextOverride(StringBuilder& out);
     Type* getElementType();
     IntVal* getElementCount();
