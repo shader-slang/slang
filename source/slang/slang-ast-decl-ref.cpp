@@ -334,29 +334,39 @@ void DeclRefBase::toText(StringBuilder& out)
 
     SubstitutionSet substSet(this);
 
-    List<Decl*> decls;
-    for (auto dd = getDecl(); dd; dd = dd->parentDecl)
+    // Build a list of parent DeclRefs instead of just Decls
+    List<DeclRefBase*> declRefs;
+
+    for (DeclRefBase* dr = this; dr; dr = dr->getParent())
     {
+        auto dd = dr->getDecl();
+
+        // If this declaration is an extension, add it and then stop gathering parents
+        if (as<ExtensionDecl>(dd))
+        {
+            declRefs.add(dr);
+            break; // Stop gathering parent DeclRefs to exclude namespace
+        }
+
         // Skip the module, file & include decls since their names are
         // considered "transparent"
-        //
         if (as<ModuleDecl>(dd) || as<FileDecl>(dd) || as<IncludeDecl>(dd))
             continue;
 
         // Skip base decls in generic containers. We will handle them when we handle the generic
         // decl.
-        //
         if (dd->parentDecl && as<GenericDecl>(dd->parentDecl))
             continue;
 
-        decls.add(dd);
+        declRefs.add(dr);
     }
 
-    decls.reverse();
+    declRefs.reverse();
 
     bool first = true;
-    for (auto decl : decls)
+    for (auto declRef : declRefs)
     {
+        auto decl = declRef->getDecl();
         if (!first)
             out << ".";
         first = false;
@@ -387,8 +397,13 @@ void DeclRefBase::toText(StringBuilder& out)
                     out << ">";
                 }
             }
-
-            // TODO: What do we do about extensions?
+        }
+        else if (auto extDecl = as<ExtensionDecl>(decl))
+        {
+            if (extDecl->targetType)
+            {
+                getTargetType(getCurrentASTBuilder(), getParent())->toText(out);
+            }
         }
     }
 }
