@@ -7,13 +7,13 @@
 
 /* The slangi 'tool' interface, such that slangc like functionality is available directly without
 invoking slangc command line tool, or need for a dll/shared library. */
-struct SlangITool
+namespace SlangITool
 {
-    static SlangResult innerMain(
-        Slang::StdWriters* stdWriters,
-        SlangSession* session,
-        int argc,
-        const char* const* argv);
+SlangResult innerMain(
+    Slang::StdWriters* stdWriters,
+    SlangSession* session,
+    int argc,
+    const char* const* argv);
 };
 
 #endif // SLANGI_TOOL_H_INCLUDED
