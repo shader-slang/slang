@@ -100,6 +100,70 @@ String getDocPath(const DocumentationConfig& config, String path)
     return config.rootDir + Path::getPathWithoutExt(path);
 }
 
+String getRelativePath(String fromPath, String toPath, bool includeExt)
+{
+    // Remove .md extension from paths if present
+    String toPathWithoutExt = toPath;
+
+    if (toPathWithoutExt.endsWith(".md"))
+        toPathWithoutExt = toPathWithoutExt.getUnownedSlice().head(toPathWithoutExt.getLength() - 3);
+    
+    // Get the directory of the source page
+    String fromDir = Path::getParentDirectory(fromPath);
+    
+    // If the source page is in the root directory, just return the target path
+    if (fromDir.getLength() == 0)
+        return toPathWithoutExt;
+    
+    // Count the number of directory levels in the source path
+    List<UnownedStringSlice> fromParts;
+    StringUtil::split(fromDir.getUnownedSlice(), '/', fromParts);
+    
+    // Count the number of directory levels in the target path
+    List<UnownedStringSlice> toParts;
+    StringUtil::split(toPathWithoutExt.getUnownedSlice(), '/', toParts);
+    
+    // Find the common prefix
+    Index commonPrefixLength = 0;
+    Index minLength = Math::Min(fromParts.getCount(), toParts.getCount());
+    while (commonPrefixLength < minLength && fromParts[commonPrefixLength] == toParts[commonPrefixLength])
+    {
+        commonPrefixLength++;
+    }
+    
+    // Build the relative path
+    StringBuilder sb;
+    
+    // Add "../" for each level we need to go up
+    for (Index i = commonPrefixLength; i < fromParts.getCount(); i++)
+    {
+        sb << "../";
+    }
+    
+    // Add the remaining parts of the target path
+    for (Index i = commonPrefixLength; i < toParts.getCount(); i++)
+    {
+        sb << toParts[i];
+        if (i < toParts.getCount() - 1)
+            sb << "/";
+    }
+
+    // Add the .html extension if requested
+    if (includeExt)
+        sb << ".html";
+    
+    return sb.produceString();
+}
+
+String getToctreeEntry(const String& name, const String& fromPath, const String& toPath)
+{
+    StringBuilder sb;
+    // Format: name <path>
+    sb << name;
+    sb << " <" << getRelativePath(fromPath, toPath, false) << ">\n";
+    return sb.produceString();
+}
+
 void DocMarkdownWriter::_appendAsBullets(
     const List<NameAndText>& values,
     bool insertLinkForName,
@@ -109,6 +173,18 @@ void DocMarkdownWriter::_appendAsBullets(
     for (const auto& value : values)
     {
         out << "#### ";
+        if (value.decl)
+        {
+            // Add anchor ID for the decl.
+            if (as<GenericTypeParamDeclBase>(value.decl))
+            {
+                out << " <a id=\"typeparam-" << getText(value.decl->getName()) << "\"></a>";
+            }
+            else
+            {
+                out << " <a id=\"decl-" << getText(value.decl->getName()) << "\"></a>";
+            }
+        }
         const String& name = value.name;
         auto path = findLinkForToken(m_currentPage, name);
         if (name.getLength())
@@ -124,7 +200,7 @@ void DocMarkdownWriter::_appendAsBullets(
                 out.appendChar(wrapChar);
                 if (path.getLength())
                 {
-                    out << "](" << getDocPath(m_config, path) << ")";
+                    out << "](" << getRelativePath(m_currentPage->path, path, true) << ")";
                 }
             }
             else
@@ -144,18 +220,6 @@ void DocMarkdownWriter::_appendAsBullets(
                         out << translateToMarkdownWithLinks(rest);
                     }
                 }
-            }
-        }
-        if (value.decl)
-        {
-            // Add anchor ID for the decl.
-            if (as<GenericTypeParamDeclBase>(value.decl))
-            {
-                out << " {#typeparam-" << getText(value.decl->getName()) << "}";
-            }
-            else
-            {
-                out << " {#decl-" << getText(value.decl->getName()) << "}";
             }
         }
         if (value.text.getLength())
@@ -208,7 +272,7 @@ void DocMarkdownWriter::_appendAsBullets(const List<String>& values, char wrapCh
         }
         if (path.getLength())
         {
-            out << "](" << getDocPath(m_config, path) << ")";
+            out << "](" << getRelativePath(m_currentPage->path, path, true) << ")";
         }
         out << "\n";
     }
@@ -1926,7 +1990,7 @@ void DocMarkdownWriter::writeAggType(
 
         if (assocTypeDecls.getCount())
         {
-            out << toSlice("# Associated types\n\n");
+            out << toSlice("## Associated types\n\n");
 
             for (AssocTypeDecl* assocTypeDecl : assocTypeDecls)
             {
@@ -2151,7 +2215,7 @@ String DocMarkdownWriter::translateToMarkdownWithLinks(String text, bool strictC
                 sb.append("[");
                 sb << escapeMarkdownText(tokenContent.getUnownedSlice());
                 sb.append("](");
-                sb.append(getDocPath(m_config, page->path));
+                sb.append(getRelativePath(m_currentPage->path, page->path, true));
                 if (sectionName.getLength())
                     sb << "#" << sectionName;
                 sb.append(")");
@@ -2239,7 +2303,7 @@ String DocMarkdownWriter::translateToHTMLWithLinks(Decl* decl, String text)
             if (page)
             {
                 sb.append("<a href=\"");
-                sb.append(getDocPath(m_config, page->path));
+                sb.append(getRelativePath(m_currentPage->path, page->path, true));
                 if (sectionName.getLength())
                     sb << "#" << sectionName;
                 sb.append("\"");
@@ -2698,7 +2762,7 @@ void DocMarkdownWriter::generateSectionIndexPage(DocumentPage* page)
     for (auto child : page->children)
     {
         sb << "- [" << escapeMarkdownText(child->shortName) << "]("
-           << getDocPath(m_config, child->path) << ")\n";
+           << getRelativePath(m_currentPage->path, child->path, true) << ")\n";
     }
 }
 
@@ -2872,6 +2936,32 @@ void writeTOCChildren(
     categoryNames.sort();
     auto parentPath = Path::getParentDirectory(page->path);
     parentPath.append("/");
+
+    // Create toctree for index pages
+    if (page->path.endsWith("index.md"))
+    {
+        StringBuilder& tocSB = page->get();
+        tocSB << "\n```{toctree}\n:titlesonly:\n:hidden:\n\n";
+        
+        // Add category landing pages to the toctree
+        for (auto& cat : categoryNames)
+        {
+            // Skip non-categorized pages
+            if (cat.getLength() == 0)
+                continue;
+                
+            String landingPagePath = parentPath + cat + ".md";
+            tocSB << getToctreeEntry(writer->m_categories[cat], parentPath, landingPagePath);
+        }
+        
+        // Add uncategorized pages to the toctree
+        for (auto child : categories[""])
+        {
+            tocSB << getToctreeEntry(child->shortName, parentPath, child->path);
+        }
+        tocSB << "```\n";
+    }
+
     for (auto& cat : categoryNames)
     {
         // Skip non-categorized pages first.
@@ -2901,8 +2991,17 @@ void writeTOCChildren(
         for (auto child : categories[cat])
         {
             landingPage->contentSB << "#### [" << writer->escapeMarkdownText(child->title) << "]("
-                                   << getDocPath(config, child->path) << ")\n\n";
+                                   << getRelativePath(page->path, child->path, true) << ")\n\n";
         }
+
+        // Add the toctree for the category landing page.
+        landingPage->contentSB << "\n```{toctree}\n:titlesonly:\n:hidden:\n\n";
+        for (auto child : categories[cat])
+        {
+            landingPage->contentSB << getToctreeEntry(child->shortName, parentPath, child->path);
+        }
+        landingPage->contentSB << toSlice("```\n");
+
         page->children.add(landingPage);
     }
 
