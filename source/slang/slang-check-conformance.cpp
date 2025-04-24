@@ -329,6 +329,10 @@ TypeTag SemanticsVisitor::getTypeTags(Type* type)
             {
                 sized = true;
             }
+            if (cint->getValue() == kSpecializationConstantArrayMagicLength)
+            {
+                typeTag = (TypeTag)((int)typeTag | (int)TypeTag::SpecializationConstantSized);
+            }
         }
         else if (arrayType->getElementCount())
         {
