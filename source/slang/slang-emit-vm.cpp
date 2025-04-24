@@ -834,7 +834,7 @@ public:
                     &sizeAlignment);
                 auto stride = sizeAlignment.getStride();
                 auto baseOperand = ensureInst(base);
-                if (auto intLit = as<IRIntLit>(index))
+                if (as<IRIntLit>(index))
                 {
                     baseOperand.offset += (uint32_t)(stride * getIntVal(index));
                     mapInstToOperand[inst] = baseOperand;
