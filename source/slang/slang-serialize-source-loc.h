@@ -135,10 +135,8 @@ public:
 
     bool operator==(const ThisType& rhs) const;
 
-    Result writeContainer(SerialCompressionType moduleCompressionType, RiffContainer* container);
-    Result readContainer(
-        SerialCompressionType moduleCompressionType,
-        RiffContainer::ListChunk* listChunk);
+    Result writeContainer(RiffContainer* container);
+    Result readContainer(RiffContainer::ListChunk* listChunk);
 
     List<char> m_stringTable;                   ///< String table for debug use only
     List<LineInfo> m_lineInfos;                 ///< Line information
@@ -149,8 +147,6 @@ public:
 class SerialSourceLocReader : public RefObject
 {
 public:
-    static const SerialExtraType kExtraType = SerialExtraType::SourceLocReader;
-
     Index findViewIndex(SerialSourceLocData::SourceLoc loc);
 
     SourceLoc getSourceLoc(SerialSourceLocData::SourceLoc loc);
@@ -188,8 +184,6 @@ protected:
 class SerialSourceLocWriter : public RefObject
 {
 public:
-    static const SerialExtraType kExtraType = SerialExtraType::SourceLocWriter;
-
     class Source : public RefObject
     {
     public:

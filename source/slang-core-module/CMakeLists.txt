@@ -60,7 +60,7 @@ set(core_module_source_common_args
     LINK_WITH_PRIVATE
     core
     slang-capability-defs
-    slang-reflect-headers
+    slang-fiddle-output
     SPIRV-Headers
     INCLUDE_DIRECTORIES_PRIVATE
     ../slang

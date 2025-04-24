@@ -416,8 +416,8 @@ public:
     virtual void emitMemoryQualifiers(IRInst* /*varInst*/){};
     virtual void emitStructFieldAttributes(
         IRStructType* /* structType */,
-        IRStructField* /* field */
-    ){};
+        IRStructField* /* field */,
+        bool /* allowOffsetLayout */){};
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
     void emitMeshShaderModifiers(IRInst* varInst);
     virtual void emitPackOffsetModifier(

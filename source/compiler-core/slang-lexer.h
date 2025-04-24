@@ -139,6 +139,9 @@ struct Lexer
     /// Lex all tokens (up to the end of the stream) that are relevant to things like markup
     TokenList lexAllMarkupTokens();
 
+    /// Lex all tokens (up to the end of the stream) whether relevant or not.
+    TokenList lexAllTokens();
+
     /// Get the diagnostic sink, taking into account flags. Will return null if suppressing
     /// diagnostics.
     DiagnosticSink* getDiagnosticSink()

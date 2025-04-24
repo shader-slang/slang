@@ -874,6 +874,7 @@ String GetHLSLProfileName(Profile profile)
         CASE(DX_6_6, _6_6);
         CASE(DX_6_7, _6_7);
         CASE(DX_6_8, _6_8);
+        CASE(DX_6_9, _6_9);
 #undef CASE
 
     default:
@@ -2165,9 +2166,6 @@ SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
     // Set up options
     SerialContainerUtil::WriteOptions options;
 
-    options.compressionType = linkage->m_optionSet.getEnumOption<SerialCompressionType>(
-        CompilerOptionName::IrCompression);
-
     // If debug information is enabled, enable writing out source locs
     if (_shouldWriteSourceLocs(linkage))
     {
@@ -2175,17 +2173,7 @@ SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
         options.sourceManager = linkage->getSourceManager();
     }
 
-    {
-        RiffContainer container;
-        {
-            SerialContainerData data;
-            SLANG_RETURN_ON_FAIL(
-                SerialContainerUtil::addEndToEndRequestToData(this, options, data));
-            SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(data, options, &container));
-        }
-        // We now write the RiffContainer to the stream
-        SLANG_RETURN_ON_FAIL(RiffUtil::write(container.getRoot(), true, stream));
-    }
+    SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(this, options, stream));
 
     return SLANG_OK;
 }

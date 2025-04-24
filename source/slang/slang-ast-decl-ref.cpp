@@ -1,8 +1,9 @@
+// slang-ast-decl-ref.cpp
+
 #include "slang-ast-builder.h"
-#include "slang-ast-reflect.h"
+#include "slang-ast-dispatch.h"
+#include "slang-ast-forward-declarations.h"
 #include "slang-check-impl.h"
-#include "slang-generated-ast-macro.h"
-#include "slang-generated-ast.h"
 
 namespace Slang
 {

@@ -277,6 +277,14 @@ Versions
 > HLSL shader model 6.8 and related capabilities of other targets.
 > Includes related GLSL/SPIRV extensions.
 
+`sm_6_9_version`
+> HLSL shader model 6.9 and related capabilities of other targets.
+> Does not include related GLSL/SPIRV extensions.
+
+`sm_6_9`
+> HLSL shader model 6.9 and related capabilities of other targets.
+> Includes related GLSL/SPIRV extensions.
+
 `GLSL_130`
 > GLSL 130 and related capabilities of other targets.
 
@@ -399,6 +407,9 @@ Extensions
 `SPV_NV_shader_subgroup_partitioned`
 > Represents the SPIR-V extension for shader subgroup partitioned.
 
+`SPV_KHR_subgroup_rotate`
+> Represents the SPIR-V extension enables rotating values across invocations within a subgroup.
+
 `SPV_NV_ray_tracing_motion_blur`
 > Represents the SPIR-V extension for ray tracing motion blur.
 
@@ -492,6 +503,9 @@ Extensions
 
 `spvGroupNonUniformPartitionedNV`
 > Represents the SPIR-V capability for group non-uniform partitioned operations.
+
+`spvGroupNonUniformRotateKHR`
+> Represents the SPIR-V capability for group non-uniform rotate operations.
 
 `spvRayTracingMotionBlurNV`
 > Represents the SPIR-V capability for ray tracing motion blur.
@@ -690,6 +704,9 @@ Extensions
 
 `GL_KHR_shader_subgroup_vote`
 > Represents the GL_KHR_shader_subgroup_vote extension.
+
+`GL_KHR_shader_subgroup_rotate`
+> Represents the GL_KHR_shader_subgroup_rotate extension.
 
 `GL_NV_compute_shader_derivatives`
 > Represents the GL_NV_compute_shader_derivatives extension.
@@ -959,7 +976,7 @@ Compound Capabilities
 > Collection of shader stages
 
 `meshshading`
-> Capabilities required to use mesh shading features
+> Ccapabilities required to use mesh shading features
 
 `shadermemorycontrol_compute`
 > (gfx targets) Capabilities required to use memory barriers that only work for raytracing & compute shader stages
@@ -1124,6 +1141,9 @@ Compound Capabilities
 `subgroup_partitioned`
 > Capabilities required to use GLSL-style subgroup operations 'subgroup_partitioned'
 
+`subgroup_rotate`
+> Capabilities required to use GLSL-style subgroup rotate operations 'subgroup_rotate'
+
 `atomic_glsl_hlsl_nvapi_cuda_metal_float1`
 > (All implemented targets) Capabilities required to use atomic operations of GLSL tier-1 float atomics
 
@@ -1210,7 +1230,7 @@ Compound Capabilities
 
 Other
 ----------------------
-*Capabilities that may be deprecated*
+*Capabilities which may be deprecated*
 
 `cooperative_matrix`
 > Capabilities needed to use cooperative matrices
@@ -1274,6 +1294,9 @@ Other
 
 `DX_6_8`
 > Use `sm_6_8` instead
+
+`DX_6_9`
+> Use `sm_6_9` instead
 
 `GLSL_410_SPIRV_1_0`
 > User should not use this capability

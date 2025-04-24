@@ -627,6 +627,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         name = "gl_InstanceIndex";
         targetVarName = IRTargetBuiltinVarName::HlslInstanceID;
         context->requireSPIRVVersion(SemanticVersion(1, 3));
+        context->requireGLSLVersion(ProfileVersion::GLSL_460);
         context->requireGLSLExtension(toSlice("GL_ARB_shader_draw_parameters"));
     }
     else if (semanticName == "sv_isfrontface")
@@ -2040,10 +2041,12 @@ ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType*
                 // Get array sizes once
                 auto fromSize = getIntVal(fromArray->getElementCount());
                 auto toSize = getIntVal(toArray->getElementCount());
-                SLANG_ASSERT(fromSize <= toSize);
 
-                // Extract elements one at a time up to the source array size
-                for (Index i = 0; i < fromSize; i++)
+                // Extract elements one at a time up to the minimum
+                // size, between the source and destination.
+                //
+                auto limit = fromSize < toSize ? fromSize : toSize;
+                for (Index i = 0; i < limit; i++)
                 {
                     auto element = builder->emitElementExtract(
                         fromArray->getElementType(),

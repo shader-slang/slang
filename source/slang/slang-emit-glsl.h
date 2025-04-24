@@ -53,6 +53,10 @@ protected:
         IRPackOffsetDecoration* decoration) SLANG_OVERRIDE;
 
     virtual void emitMemoryQualifiers(IRInst* varInst) SLANG_OVERRIDE;
+    virtual void emitStructFieldAttributes(
+        IRStructType* structType,
+        IRStructField* field,
+        bool allowOffsetLayout) SLANG_OVERRIDE;
     virtual void emitMeshShaderModifiersImpl(IRInst* varInst) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
