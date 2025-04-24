@@ -4590,6 +4590,9 @@ enum class OperandDataType
 struct VMExecOperand
 {
     uint8_t** section; // Pointer to the section start pointer.
+    #if SLANG_PTR_IS_32
+    uint32_t padding;
+    #endif
     uint32_t type : 8; // type of the operand data.
     uint32_t size : 24;
     uint32_t offset;
@@ -4606,6 +4609,9 @@ typedef void (*VMPrintFunc)(const char* message, void* userData);
 struct VMExecInstHeader
 {
     VMExtFunction functionPtr; // Pointer to the function that executes this instruction.
+    #if SLANG_PTR_IS_32
+    uint32_t padding;
+    #endif
     uint32_t opcodeExtension;
     uint32_t operandCount;
     VMExecInstHeader* getNextInst()
