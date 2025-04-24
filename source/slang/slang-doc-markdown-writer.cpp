@@ -2889,18 +2889,18 @@ void writeTOCChildren(
     {
         StringBuilder& tocSB = page->get();
         tocSB << "\n```{toctree}\n:titlesonly:\n:hidden:\n\n";
-        
+
         // Add category landing pages to the toctree
         for (auto& cat : categoryNames)
         {
             // Skip non-categorized pages
             if (cat.getLength() == 0)
                 continue;
-                
+
             String landingPagePath = parentPath + cat + ".md";
             tocSB << getTocTreeEntry(writer->m_categories[cat], parentPath, landingPagePath);
         }
-        
+
         // Add uncategorized pages to the toctree
         for (auto child : categories[""])
         {
