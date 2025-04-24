@@ -809,20 +809,6 @@ VMExtFunction getSwizzleHandler(uint32_t extCode)
     return nullptr;
 }
 
-template<typename To, typename From>
-void castHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
-{
-    SLANG_UNUSED(ctx);
-    To* dst = (To*)inst->getOperand(0).getPtr();
-    From* src = (From*)inst->getOperand(1).getPtr();
-    ArithmeticExtCode arithExtCode;
-    memcpy(&arithExtCode, &extCode, sizeof(arithExtCode));
-    for (int i = 0; i < arithExtCode.vectorSize; ++i)
-    {
-        dst[i] = static_cast<To>(src[i]);
-    }
-}
-
 template<typename To, typename From, int vectorSize>
 void castHandler(IByteCodeRunner* ctx, VMExecInstHeader* inst, void*)
 {
