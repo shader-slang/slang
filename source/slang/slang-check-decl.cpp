@@ -1885,10 +1885,10 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         }
         if (isSpecConstSizedArrayType(varDecl->type))
         {
-            // Only global parameter or shared variables can be specialization constant sized
+            // Only global variable or shared variables can be specialization constant sized
             // arrays.
-            if (!isGlobalShaderParameter(varDecl) &&
-                !varDecl->hasModifier<HLSLGroupSharedModifier>())
+            if (!(isGlobalDecl(varDecl) && (varDecl->hasModifier<HLSLGroupSharedModifier>() ||
+                                            varDecl->hasModifier<HLSLStaticModifier>())))
             {
                 getSink()->diagnose(
                     varDecl,
