@@ -1160,6 +1160,12 @@ struct IRBoolLit : IRConstant
 // if it has one, and assert-fail otherwise.
 IRIntegerValue getIntVal(IRInst* inst);
 
+// Get array size value, returns kSpecializationConstantArrayMagicLength
+// if it's a specialization constant sized array array, returns
+// kUnsizedArrayMagicLength if it's an unsized array. Otherwise just returns
+// the actual size.
+IRIntegerValue getArraySizeVal(IRInst* inst);
+
 struct IRStringLit : IRConstant
 {
 
