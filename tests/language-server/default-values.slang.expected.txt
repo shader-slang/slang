@@ -1,0 +1,9 @@
+--------
+range: 4,4 - 4,7
+content:
+```
+func foo(int i = 0, float j = 1f) -> void
+```
+
+
+{REDACTED}.slang(9)
