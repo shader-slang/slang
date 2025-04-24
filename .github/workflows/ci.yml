@@ -84,11 +84,11 @@ jobs:
         run: |
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
-
-      - uses: actions/checkout@v4
-        with:
-          submodules: "recursive"
-          fetch-depth: "3"
+      - name: Sync and Update Submodules
+        run: |
+          git submodule sync --recursive
+          git submodule update --init --recursive --depth 2
+          git submodule status
       - id: filter
         run: |
           # This step prevents subsequent steps from running if only documentation was changed
