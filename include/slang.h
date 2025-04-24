@@ -422,7 +422,7 @@ convention for interface methods.
     #endif
 #elif defined(__arm__)
     #define SLANG_PROCESSOR_ARM 1
-#elif defined(_M_ARM64) || defined(__aarch64__)
+#elif defined(_M_ARM64) || defined(__aarch64__) || defined(__ARM_ARCH_ISA_A64)
     #define SLANG_PROCESSOR_ARM_64 1
 #elif defined(__EMSCRIPTEN__)
     #define SLANG_PROCESSOR_WASM 1
