@@ -676,7 +676,7 @@ public:
                     List<VMOperand> operands;
                     operands.add(ensureWorkingsetMemory(funcBuilder, inst));
                     operands.add(calleeOperand);
-                    for (auto i = 0; i < callInst->getArgCount(); ++i)
+                    for (UInt i = 0; i < callInst->getArgCount(); ++i)
                     {
                         operands.add(ensureInst(callInst->getArg(i)));
                     }
@@ -693,7 +693,7 @@ public:
                 calleeOperand.setType(OperandDataType::Int32);
                 operands.add(ensureWorkingsetMemory(funcBuilder, inst));
                 operands.add(calleeOperand);
-                for (auto i = 0; i < callInst->getArgCount(); ++i)
+                for (UInt i = 0; i < callInst->getArgCount(); ++i)
                 {
                     operands.add(ensureInst(callInst->getArg(i)));
                 }
@@ -745,7 +745,6 @@ public:
                     elementType,
                     &sizeAlignment);
                 auto stride = sizeAlignment.getStride();
-                auto resultReg = ensureWorkingsetMemory(funcBuilder, inst);
                 auto baseOperand = ensureInst(base);
                 auto indexOperand = ensureInst(index);
                 writeInst(
