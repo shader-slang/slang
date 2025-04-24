@@ -106,40 +106,42 @@ String getRelativePath(String fromPath, String toPath, bool includeExt)
     String toPathWithoutExt = toPath;
 
     if (toPathWithoutExt.endsWith(".md"))
-        toPathWithoutExt = toPathWithoutExt.getUnownedSlice().head(toPathWithoutExt.getLength() - 3);
-    
+        toPathWithoutExt =
+            toPathWithoutExt.getUnownedSlice().head(toPathWithoutExt.getLength() - 3);
+
     // Get the directory of the source page
     String fromDir = Path::getParentDirectory(fromPath);
-    
+
     // If the source page is in the root directory, just return the target path
     if (fromDir.getLength() == 0)
         return toPathWithoutExt;
-    
+
     // Count the number of directory levels in the source path
     List<UnownedStringSlice> fromParts;
     StringUtil::split(fromDir.getUnownedSlice(), '/', fromParts);
-    
+
     // Count the number of directory levels in the target path
     List<UnownedStringSlice> toParts;
     StringUtil::split(toPathWithoutExt.getUnownedSlice(), '/', toParts);
-    
+
     // Find the common prefix
     Index commonPrefixLength = 0;
     Index minLength = Math::Min(fromParts.getCount(), toParts.getCount());
-    while (commonPrefixLength < minLength && fromParts[commonPrefixLength] == toParts[commonPrefixLength])
+    while (commonPrefixLength < minLength &&
+           fromParts[commonPrefixLength] == toParts[commonPrefixLength])
     {
         commonPrefixLength++;
     }
-    
+
     // Build the relative path
     StringBuilder sb;
-    
+
     // Add "../" for each level we need to go up
     for (Index i = commonPrefixLength; i < fromParts.getCount(); i++)
     {
         sb << "../";
     }
-    
+
     // Add the remaining parts of the target path
     for (Index i = commonPrefixLength; i < toParts.getCount(); i++)
     {
@@ -151,7 +153,7 @@ String getRelativePath(String fromPath, String toPath, bool includeExt)
     // Add the .html extension if requested
     if (includeExt)
         sb << ".html";
-    
+
     return sb.produceString();
 }
 
@@ -2942,18 +2944,18 @@ void writeTOCChildren(
     {
         StringBuilder& tocSB = page->get();
         tocSB << "\n```{toctree}\n:titlesonly:\n:hidden:\n\n";
-        
+
         // Add category landing pages to the toctree
         for (auto& cat : categoryNames)
         {
             // Skip non-categorized pages
             if (cat.getLength() == 0)
                 continue;
-                
+
             String landingPagePath = parentPath + cat + ".md";
             tocSB << getToctreeEntry(writer->m_categories[cat], parentPath, landingPagePath);
         }
-        
+
         // Add uncategorized pages to the toctree
         for (auto child : categories[""])
         {
