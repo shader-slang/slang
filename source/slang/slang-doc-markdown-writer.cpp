@@ -100,7 +100,7 @@ String getDocPath(const DocumentationConfig& config, String path)
     return config.rootDir + Path::getPathWithoutExt(path);
 }
 
-String getToctreeEntry(const String& name, const String& fromPath, const String& toPath)
+String getTocTreeEntry(const String& name, const String& fromPath, const String& toPath)
 {
     StringBuilder sb;
     // Format: name <path>
@@ -2898,13 +2898,13 @@ void writeTOCChildren(
                 continue;
                 
             String landingPagePath = parentPath + cat + ".md";
-            tocSB << getToctreeEntry(writer->m_categories[cat], parentPath, landingPagePath);
+            tocSB << getTocTreeEntry(writer->m_categories[cat], parentPath, landingPagePath);
         }
         
         // Add uncategorized pages to the toctree
         for (auto child : categories[""])
         {
-            tocSB << getToctreeEntry(child->shortName, parentPath, child->path);
+            tocSB << getTocTreeEntry(child->shortName, parentPath, child->path);
         }
         tocSB << "```\n";
     }
@@ -2945,7 +2945,7 @@ void writeTOCChildren(
         landingPage->contentSB << "\n```{toctree}\n:titlesonly:\n:hidden:\n\n";
         for (auto child : categories[cat])
         {
-            landingPage->contentSB << getToctreeEntry(child->shortName, parentPath, child->path);
+            landingPage->contentSB << getTocTreeEntry(child->shortName, parentPath, child->path);
         }
         landingPage->contentSB << toSlice("```\n");
 
