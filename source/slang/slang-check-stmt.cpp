@@ -282,31 +282,6 @@ void SemanticsStmtVisitor::visitForStmt(ForStmt* stmt)
     if (stmt->sideEffectExpression)
     {
         stmt->sideEffectExpression = CheckExpr(stmt->sideEffectExpression);
-
-        // Check for common mistake where update expression has no side effect
-        auto sideEffect = stmt->sideEffectExpression;
-        if (auto infixExpr = as<InfixExpr>(sideEffect))
-        {
-            // Check if the operation is a binary operation like "+" and not "+="
-            auto funcExpr = as<DeclRefExpr>(infixExpr->functionExpr);
-            if (funcExpr && funcExpr->declRef.getDecl())
-            {
-                // Check if the operator name doesn't contain "="
-                auto opName = funcExpr->declRef.getName();
-                if (opName && !String(opName->text).contains("="))
-                {
-                    // This is a potential issue - binary operators without "=" in for-loop updates
-                    // usually don't modify variables
-                    StringBuilder builder;
-                    builder << opName->text;
-
-                    getSink()->diagnose(
-                        sideEffect,
-                        Diagnostics::forLoopUpdateExpressionHasNoEffect,
-                        builder.produceString());
-                }
-            }
-        }
     }
     subContext.checkStmt(stmt->statement);
 

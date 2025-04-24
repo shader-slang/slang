@@ -1560,11 +1560,6 @@ DIAGNOSTIC(
     loopRunsForZeroIterations,
     "the loop runs for 0 iterations and will be removed.")
 DIAGNOSTIC(
-    30506,
-    Warning,
-    forLoopUpdateExpressionHasNoEffect,
-    "the for loop update expression '$0' has no effect; this will result in an infinite loop")
-DIAGNOSTIC(
     30510,
     Error,
     loopInDiffFuncRequireUnrollOrMaxIters,

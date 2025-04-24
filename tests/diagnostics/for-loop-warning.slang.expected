@@ -21,9 +21,6 @@ tests/diagnostics/for-loop-warning.slang(45): warning 30505: the loop runs for 0
 tests/diagnostics/for-loop-warning.slang(51): warning 30505: the loop runs for 0 iterations and will be removed.
     for (int i = 1; i > 1; i--) // warn
     ^~~
-tests/diagnostics/for-loop-warning.slang(59): warning 30506: the for loop update expression '+' has no effect; this will result in an infinite loop
-    for (int i = 1; i < 100; i + 2) //warn
-                               ^
 tests/diagnostics/for-loop-warning.slang(23): warning 30504: the for loop is statically determined to terminate within 3 iterations, which is less than what [MaxIters] specifies.
     [MaxIters(6)] // warn
      ^~~~~~~~
