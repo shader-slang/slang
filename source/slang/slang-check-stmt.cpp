@@ -880,7 +880,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     // if the loop body modifies the induction variable.
     //
     auto maxItersAttr = m_astBuilder->create<InferredMaxItersAttribute>();
-    auto litExpr = m_astBuilder->create<LiteralExpr>();
+    auto litExpr = m_astBuilder->create<IntegerLiteralExpr>();
     litExpr->type.type = m_astBuilder->getIntType();
     litExpr->token.setName(getNamePool()->getName(String(iterations)));
     maxItersAttr->args.add(litExpr);
