@@ -516,9 +516,8 @@ class ArrayExpressionType : public DeclRefType
     void _toTextOverride(StringBuilder& out);
     Type* getElementType();
     IntVal* getElementCount();
-    void setSpecializationConstantSize(Expr* specConstExpr) { m_specConstExpr = specConstExpr; }
 
-    SLANG_UNREFLECTED Expr* m_specConstExpr = nullptr;
+    SLANG_UNREFLECTED ConstantIntVal* m_specConstSize = nullptr;
 };
 
 FIDDLE()
