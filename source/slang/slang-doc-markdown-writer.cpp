@@ -2943,9 +2943,10 @@ void writeTOCChildren(
                                << "\n\nThis category contains the following declarations:\n\n";
         for (auto child : categories[cat])
         {
-            landingPage->contentSB << "#### [" << writer->escapeMarkdownText(child->title) << "]("
-                                   << Path::getPathWithoutExt(Path::getRelativePath(page->path, child->path))
-                                   << ".html)\n\n";
+            landingPage->contentSB
+                << "#### [" << writer->escapeMarkdownText(child->title) << "]("
+                << Path::getPathWithoutExt(Path::getRelativePath(page->path, child->path))
+                << ".html)\n\n";
         }
 
         // Add the toctree for the category landing page.
