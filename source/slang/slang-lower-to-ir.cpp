@@ -2061,10 +2061,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
             if (constIntVal && constIntVal->getValue() == kSpecializationConstantArrayMagicLength)
             {
-                auto irInitVal =
-                    getSimpleVal(context, lowerRValueExpr(context, type->m_specConstExpr));
+                IRBuilderInsertLocScope insertScope(getBuilder());
+                auto irType = lowerType(context, constIntVal->m_specConstExpr->type.type);
+                auto undefined = getBuilder()->emitUndefined(irType);
                 elementCount =
-                    getBuilder()->emitGlobalConstant(irInitVal->getFullType(), irInitVal);
+                     getBuilder()->emitGlobalConstant(irType, undefined);
+                getBuilder()->setInsertBefore(elementCount);
+                auto irInitVal =
+                    getSimpleVal(context, lowerRValueExpr(context, constIntVal->m_specConstExpr));
+                elementCount->setOperand(0, irInitVal);
                 getBuilder()->addDecoration(elementCount, kIROp_SpecializationConstantOpDecoration);
             }
             else
@@ -11845,10 +11850,17 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             nvapiSlotModifier->spaceName.getUnownedSlice());
     }
 
-#if 0
+#if 1
+    if (compileRequest->optionSet.shouldDumpIR())
     {
         DiagnosticSinkWriter writer(compileRequest->getSink());
-        dumpIR(module, &writer, "GENERATED");
+
+        dumpIR(
+            module,
+            compileRequest->m_irDumpOptions,
+            "GENERATED",
+            compileRequest->getSourceManager(),
+            &writer);
     }
 #endif
 

@@ -2680,6 +2680,7 @@ bool isMovableInst(IRInst* inst);
 uint32_t& _debugGetIRAllocCounter();
 #endif
 
+void addGlobalValue(IRBuilder* builder, IRInst* value);
 // TODO: Ellie, comment and move somewhere more appropriate?
 
 template<typename I = IRInst, typename F>

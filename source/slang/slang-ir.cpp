@@ -2516,7 +2516,7 @@ static void canonicalizeInstOperands(IRBuilder& builder, IROp op, ArrayView<IRIn
     }
 }
 
-static void addGlobalValue(IRBuilder* builder, IRInst* value)
+void addGlobalValue(IRBuilder* builder, IRInst* value)
 {
     // If the value is already in the parent, keep it as-is.
     // Because when the inst is Hoistable, the parent can have

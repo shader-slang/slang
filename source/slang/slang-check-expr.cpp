@@ -1772,12 +1772,39 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     if (allConst && hasSpecializationConstant)
     {
         // If the expression contains a specialization constant, we are not able to constant fold
-        // it, but we will still allow it to be used as array size. To handle this, we just return
-        // a magic value to indicate that the whole expression will result into a specialization
-        // constant operation.
-        IntVal* result = m_astBuilder->getIntVal(
-            invokeExpr.getExpr()->type.type,
+        // it, but we will still allow it to be used as array size, so we will use this expression
+        // as the array sized, and it will be lowered to a specialization constant value.
+        // However we will have to replace all the argument expression that is already constant folded,
+        // because this expression could be declared in local scope, so after we lowering it to IR,
+        // it will have to be hoisted to the global scope. But we can't hoist all the compile-time constant
+        // variable involved in this expression if it has, so that will bring a problem that this expression
+        // could reference a variable not existed in global scope. Therefore, we just replace those compile-time
+        // constant variable with literal, so there will only be a specialization constant left in the expression,
+        // which can only declared in global scope.
+
+        InvokeExpr* newInvokeExpr = m_astBuilder->create<InvokeExpr>();
+        newInvokeExpr->functionExpr = invokeExpr.getExpr()->functionExpr;
+        for (Index a = 0; a < argCount; ++a)
+        {
+            IntegerLiteralValue constIntVal = constArgVals[a];
+            if (constIntVal != kSpecializationConstantArrayMagicLength)
+            {
+                IntegerLiteralExpr* literalExpr = m_astBuilder->create<IntegerLiteralExpr>();
+                literalExpr->value = constIntVal;
+                literalExpr->type.type = m_astBuilder->getIntType();
+                newInvokeExpr->arguments.add(literalExpr);
+            }
+            else
+            {
+                ConstantIntVal* argVal = as<ConstantIntVal>(argVals[a]);
+                newInvokeExpr->arguments.add(argVal->m_specConstExpr);
+            }
+        }
+        auto specConstExpr = CheckTerm(newInvokeExpr);
+        ConstantIntVal* result = m_astBuilder->getIntVal(
+            newInvokeExpr->type.type,
             kSpecializationConstantArrayMagicLength);
+        result->m_specConstExpr = specConstExpr;
         return result;
     }
 
@@ -2103,7 +2130,15 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         // are defined in a way that can be used as a constant expression:
         if (auto varRef = declRef.as<VarDeclBase>())
         {
-            return tryConstantFoldDeclRef(varRef, kind, circularityInfo);
+            IntVal* val = tryConstantFoldDeclRef(varRef, kind, circularityInfo);
+            if (auto constIntVal = as<ConstantIntVal>(val))
+            {
+                if (constIntVal->getValue() == kSpecializationConstantArrayMagicLength)
+                {
+                    constIntVal->m_specConstExpr = expr.getExpr();
+                }
+            }
+            return val;
         }
         else if (auto enumRef = declRef.as<EnumCaseDecl>())
         {
@@ -2423,12 +2458,12 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 
                 // If the specialization constant is a magic number, we need to create a new
                 // elementCount to represent this.
-                if (constElementCount->getValue() == kSpecializationConstantArrayMagicLength)
-                {
-                    elementCount = m_astBuilder->getIntVal(
-                        m_astBuilder->getIntType(),
-                        kSpecializationConstantArrayMagicLength);
-                }
+                // if (constElementCount->getValue() == kSpecializationConstantArrayMagicLength)
+                // {
+                //     elementCount = m_astBuilder->getIntVal(
+                //         m_astBuilder->getIntType(),
+                //         kSpecializationConstantArrayMagicLength);
+                // }
             }
         }
         else if (subscriptExpr->indexExprs.getCount() != 0)
@@ -2440,8 +2475,8 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         auto arrayType = getArrayType(
             m_astBuilder,
             elementType,
-            elementCount,
-            subscriptExpr->indexExprs.getCount() == 1 ? subscriptExpr->indexExprs[0] : nullptr);
+            elementCount
+            );
 
         subscriptExpr->type = QualType(m_astBuilder->getTypeType(arrayType));
         return subscriptExpr;

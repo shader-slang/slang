@@ -164,6 +164,29 @@ class ConstantIntVal : public IntVal
 
     ConstantIntVal(Type* inType, IntegerLiteralValue inValue) { setOperands(inType, inValue); }
     bool _isLinkTimeValOverride() { return false; }
+
+    SLANG_UNREFLECTED mutable Expr* m_specConstExpr = 0;
+};
+
+// Trivial case of a value that is just a constant integer
+FIDDLE()
+class SpecializationConstantIntVal : public IntVal
+{
+    FIDDLE(...)
+    Expr* getValue()
+    {
+        NodeBase* node = getOperand(1);
+        if (auto expr = as<Expr>(node))
+            return expr;
+        else
+            return nullptr;
+    }
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out) {SLANG_UNUSED(out);}
+
+    SpecializationConstantIntVal(Type* inType, Expr* inValue) { setOperands(inType, inValue); }
+    bool _isLinkTimeValOverride() { return false; }
 };
 
 // The logical "value" of a reference to a generic value parameter
