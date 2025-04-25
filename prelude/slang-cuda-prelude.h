@@ -3374,73 +3374,58 @@ struct TensorView
 // 1D is not supported via PTX. Keeping this placeholder in case it ever gets
 // supported.
 template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(
-    CUtexObject texObj,
-    int x)
-{
-    T result;
-	float dummy;
-    asm("tex.1d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5}];" :
-        "=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy) :
-        "l"(texObj), "r"(x));
-    return result;
-}
-
-template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex2Dfetch_int(
-    CUtexObject texObj,
-    int x,
-	int y)
-{
-    T result;
-	float dummy;
-	asm("tex.2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];" :
-		"=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy) :
-		"l"(texObj), "r"(x), "r"(y));
-    return result;
-}
-
-template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex3Dfetch_int(
-    CUtexObject texObj,
-    int x,
-    int y, 
-    int z)
-{
-    T result;
-	float dummy;
-	asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];" :
-    "=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy) :
-    "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z)); 
-	// Note: The repeated z is a WAR for a bug in PTX. That is a dummy parameter.
-    return result;
-}
-
-template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1DArrayfetch_int(
-    CUtexObject texObj,
-    int x,
-    int layer)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x)
 {
     T result;
     float dummy;
-    asm("tex.a1d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];" :
-        "=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy) :
-        "l"(texObj), "r"(x), "r"(layer));
+    asm("tex.1d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5}];"
+        : "=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy)
+        : "l"(texObj), "r"(x));
     return result;
 }
 
 template<typename T>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex2DArrayfetch_int(
-    CUtexObject texObj,
-    int x,
-    int y,
-    int layer)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex2Dfetch_int(CUtexObject texObj, int x, int y)
 {
     T result;
     float dummy;
-    asm("tex.a2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];" :
-        "=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy) :
-        "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
+    asm("tex.2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
+        : "=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy)
+        : "l"(texObj), "r"(x), "r"(y));
+    return result;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex3Dfetch_int(CUtexObject texObj, int x, int y, int z)
+{
+    T result;
+    float dummy;
+    asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
+        : "=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy)
+        : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
+    // Note: The repeated z is a WAR for a bug in PTX. That is a dummy parameter.
+    return result;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1DArrayfetch_int(CUtexObject texObj, int x, int layer)
+{
+    T result;
+    float dummy;
+    asm("tex.a1d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
+        : "=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy)
+        : "l"(texObj), "r"(x), "r"(layer));
+    return result;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T
+tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
+{
+    T result;
+    float dummy;
+    asm("tex.a2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
+        : "=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy)
+        : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
     return result;
 }
