@@ -96,31 +96,6 @@ static bool canLoopExit(IRLoop* loop)
     return false;
 }
 
-/// Get source location from the loop for diagnostics
-static SourceLoc getLoopSourceLocation(IRLoop* loop)
-{
-    // Try to get source location from the loop itself
-    if (loop->sourceLoc.isValid())
-        return loop->sourceLoc;
-
-    // Try to get from the target block
-    IRBlock* targetBlock = loop->getTargetBlock();
-    if (targetBlock && targetBlock->sourceLoc.isValid())
-        return targetBlock->sourceLoc;
-
-    // Try to get from instructions in the target block
-    if (targetBlock)
-    {
-        for (auto inst : targetBlock->getOrdinaryInsts())
-        {
-            if (inst->sourceLoc.isValid())
-                return inst->sourceLoc;
-        }
-    }
-
-    return SourceLoc();
-}
-
 static void checkForPotentialInfiniteLoopsInInst(
     IRInst* inst,
     DiagnosticSink* sink,
@@ -135,8 +110,7 @@ static void checkForPotentialInfiniteLoopsInInst(
         {
             if (diagnoseWarning)
             {
-                SourceLoc loc = getLoopSourceLocation(loop);
-                sink->diagnose(loc, Diagnostics::potentialInfiniteLoop);
+                sink->diagnose(loop, Diagnostics::potentialInfiniteLoop);
             }
         }
     }
