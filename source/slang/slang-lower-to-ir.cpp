@@ -492,6 +492,8 @@ struct SharedIRGenContext
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
 
+    Dictionary<SpecializationConstantIntVal*, IRInst*> mapSpecConstValToIRInst;
+
     void setGlobalValue(Decl* decl, LoweredValInfo value)
     {
         globalEnv.mapDeclToValue[decl] = value;
@@ -1592,6 +1594,24 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             tryEnv);
     }
 
+    LoweredValInfo visitSpecializationConstantIntVal(SpecializationConstantIntVal* val)
+    {
+        auto specVal = val->getValue();
+
+        // This will be the leaf node, which is a specialization constant variable
+        if (auto declRefBase = as<DeclRefBase>(specVal))
+        {
+            if (auto varDecl = as<VarDeclBase>(declRefBase->getDecl()))
+            {
+                DeclRef<VarDeclBase> varDeclRef(varDecl);
+                return emitDeclRef(context,
+                    declRefBase,
+                    lowerType(context, getType(context->astBuilder, varDeclRef)));
+            }
+        }
+        return LoweredValInfo::simple(lowerVal(context, specVal).val);
+    }
+
     LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
     {
         auto baseVal = lowerVal(context, val->getBase());
@@ -2059,16 +2079,29 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             IRInst* elementCount = nullptr;
             if (auto specConstIntVal = as<SpecializationConstantIntVal>(type->getElementCount()))
             {
-                IRBuilderInsertLocScope insertScope(getBuilder());
-                auto specConstExpr = specConstIntVal->getValue();
-                auto irType = lowerType(context, specConstExpr->type.type);
-                auto undefined = getBuilder()->emitUndefined(irType);
+                auto sharedContext = context->shared;
+                IRInst* irInitVal = nullptr;
+                if (!sharedContext->mapSpecConstValToIRInst.tryGetValue(specConstIntVal, irInitVal))
+                {
+                    IRBuilderInsertLocScope insertScope(getBuilder());
+                    getBuilder()->setInsertInto(getBuilder()->getModule());
+                    auto specConstVal = specConstIntVal->getValue();
+                    if (as<FuncCallIntVal>(specConstVal))
+                    {
+                        irInitVal = getSimpleVal(context, lowerVal(context, specConstVal));
+                    }
+                    else if (auto declRefBase = as<DeclRefBase>(specConstVal))
+                    {
+                        irInitVal = getSimpleVal(context, ensureDecl(context, declRefBase->getDecl()));
+                    }
+                    else
+                    {
+                        SLANG_RELEASE_ASSERT("Unknown specialization constant value type");
+                    }
+                    sharedContext->mapSpecConstValToIRInst.add(specConstIntVal, irInitVal);
+                }
                 elementCount =
-                     getBuilder()->emitGlobalConstant(irType, undefined);
-                getBuilder()->setInsertBefore(elementCount);
-                auto irInitVal =
-                    getSimpleVal(context, lowerRValueExpr(context, specConstExpr));
-                elementCount->setOperand(0, irInitVal);
+                     getBuilder()->emitGlobalConstant(irInitVal->getDataType(), irInitVal);
                 getBuilder()->addDecoration(elementCount, kIROp_SpecializationConstantOpDecoration);
             }
             else

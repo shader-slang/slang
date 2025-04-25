@@ -171,19 +171,15 @@ FIDDLE()
 class SpecializationConstantIntVal : public IntVal
 {
     FIDDLE(...)
-    Expr* getValue()
+    Val* getValue()
     {
-        NodeBase* node = m_operands[1].values.nodeOperand;
-        if (auto expr = as<Expr>(node))
-            return expr;
-        else
-            return nullptr;
+        return getOperand(1);
     }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out) {SLANG_UNUSED(out);}
 
-    SpecializationConstantIntVal(Type* inType, Expr* inValue) { setOperands(inType, inValue); }
+    SpecializationConstantIntVal(Type* inType, Val* inValue) { setOperands(inType, inValue); }
     bool _isLinkTimeValOverride() { return false; }
 };
 

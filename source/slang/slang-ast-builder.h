@@ -386,9 +386,9 @@ public:
         return getOrCreate<ConstantIntVal>(type, value);
     }
 
-    SpecializationConstantIntVal* getSpecConstIntVal(Type* type, Expr* specConstExpr)
+    SpecializationConstantIntVal* getSpecConstIntVal(Type* type, Val* specConstVal)
     {
-        return getOrCreate<SpecializationConstantIntVal>(type, specConstExpr);
+        return getOrCreate<SpecializationConstantIntVal>(type, specConstVal);
     }
 
     TypeCastIntVal* getTypeCastIntVal(Type* type, Val* base)
