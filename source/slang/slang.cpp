@@ -873,6 +873,13 @@ Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSe
 
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
 
+    if (desc.skipSPIRVValidation)
+    {
+        linkage->m_optionSet.set(
+            CompilerOptionName::SkipSPIRVValidation,
+            true);
+    }
+
     {
         std::lock_guard<std::mutex> lock(m_typeCheckingCacheMutex);
         if (m_typeCheckingCache)
