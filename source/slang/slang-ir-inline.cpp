@@ -315,11 +315,16 @@ struct InliningPassBase
     // Sets up the initial debug information structures required *before* inlining a call site.
     //
     // This function performs the following steps:
-    // 1. Checks if the callee function has associated debug location information. If not, returns nullptr.
-    // 2. Finds the last `IRDebugLine` preceding the `call` instruction to determine the source location (line, col, file) of the call site.
+    // 1. Checks if the callee function has associated debug location information. If not, returns
+    // nullptr.
+    // 2. Finds the last `IRDebugLine` preceding the `call` instruction to determine the source
+    // location (line, col, file) of the call site.
     // 3. Emits an `IRDebugInlinedAt` instruction.
-    //    - The `outerInlinedAt` field is initially set to `nullptr`. This field will be populated later during the `updateDebugInlinedAt*` calls after the callee's body has been cloned, establishing the nesting hierarchy.
-    // 4. Inserts the newly created `IRDebugInlinedAt` instruction immediately *before* the `call` instruction.
+    //    - The `outerInlinedAt` field is initially set to `nullptr`. This field will be populated
+    //    later during the `updateDebugInlinedAt*` calls after the callee's body has been cloned,
+    //    establishing the nesting hierarchy.
+    // 4. Inserts the newly created `IRDebugInlinedAt` instruction immediately *before* the `call`
+    // instruction.
     IRInst* emitDebugInfoForInlinedCall(
         IRCall* call,
         IRFunc* callee,
@@ -675,7 +680,12 @@ struct InliningPassBase
             }
         }
 
-        insertDebugScopeForSingleBlock(callee, builder, calleeDebugFunc, debugInlinedAt, clonedInsts);
+        insertDebugScopeForSingleBlock(
+            callee,
+            builder,
+            calleeDebugFunc,
+            debugInlinedAt,
+            clonedInsts);
 
         if (debugInlinedAt && callee->findDecoration<IRDebugLocationDecoration>())
         {
@@ -946,8 +956,8 @@ struct InliningPassBase
     //
     // 3. Update DebugInlinedAt
     // ========================
-    // The next step of figuring out the outerInlined is done in the below updateDebugInlinedAtForMultiBlock.
-    // To obtain the outerInlined, the algorithm is like so:
+    // The next step of figuring out the outerInlined is done in the below
+    // updateDebugInlinedAtForMultiBlock. To obtain the outerInlined, the algorithm is like so:
     //  - We keep pushing into the stack until we find the last scope.
     //  - Once we find the last debug scope in the call chain, we then start updating the
     //  - InlinedAt information. So, for Call i, we need to set outer as i-1.
@@ -998,8 +1008,7 @@ struct InliningPassBase
         {
             if (auto debugScope = as<IRDebugScope>(inst))
             {
-                IRInst* outerInlinedAt =
-                    inlinedAtStack.empty() ? nullptr : inlinedAtStack.top();
+                IRInst* outerInlinedAt = inlinedAtStack.empty() ? nullptr : inlinedAtStack.top();
                 IRDebugInlinedAt* inlinedAt = as<IRDebugInlinedAt>(debugScope->getInlinedAt());
 
                 // Ensure we have a valid inlinedAt instruction associated with the scope.
