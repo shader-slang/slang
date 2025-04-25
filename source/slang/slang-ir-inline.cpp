@@ -340,19 +340,6 @@ struct InliningPassBase
         }
         else
         {
-            // Set insertion point to module's global scope. Insert it right after
-            // the DebugSource instruction.
-            IRInst* insertPoint = m_module->getModuleInst()->getFirstChild();
-            while (insertPoint)
-            {
-                if (as<IRDebugSource>(insertPoint))
-                {
-                    break;
-                }
-                insertPoint = insertPoint->getNextInst();
-            }
-            builder.setInsertAfter(insertPoint);
-
             for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
             {
                 if (auto debugLine = as<IRDebugLine>(inst))
@@ -364,56 +351,14 @@ struct InliningPassBase
 
             if (lastDebugLine)
             {
-                auto parentFunc = getParentFunc(call);
+                auto callerFunc = getParentFunc(call);
 
-                // Find or create debug function for current function
+                // We've emitted the debugfunc IR in lower-to-ir. So we need to have the debugfunc here.
                 debugFuncCallee = findExistingDebugFunc(callee);
-                if (!debugFuncCallee)
-                {
-                    auto nameHint = callee->findDecoration<IRNameHintDecoration>();
-                    IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
-                    if (nameOperand)
-                    {
-                        auto locationDecor = callee->findDecoration<IRDebugLocationDecoration>();
-                        IRInst* debugType = callee->getDataType();
+                SLANG_ASSERT(debugFuncCallee);
 
-                        debugFuncCallee = builder.emitDebugFunction(
-                            nameOperand,
-                            locationDecor->getLine(),
-                            locationDecor->getCol(),
-                            locationDecor->getSource(),
-                            debugType);
-                        
-                        // Add a decoration to link the function to its debug function
-                        builder.addDecoration(callee, kIROp_DebugFunctionDecoration, debugFuncCallee);
-                    }
-                }
-
-                // Find or create debug function for parent function
-                debugFuncCaller = findExistingDebugFunc(parentFunc);
-                if (!debugFuncCaller && parentFunc)
-                {
-                    auto nameHint = parentFunc->findDecoration<IRNameHintDecoration>();
-                    IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
-                    if (nameOperand)
-                    {
-                        IRInst* debugType = parentFunc->getDataType();
-
-                        auto locationDecor = parentFunc->findDecoration<IRDebugLocationDecoration>();
-                        if (!locationDecor)
-                            locationDecor = callee->findDecoration<IRDebugLocationDecoration>();
-
-                        debugFuncCaller = builder.emitDebugFunction(
-                            nameOperand,
-                            locationDecor->getLine(),
-                            locationDecor->getCol(),
-                            locationDecor->getSource(),
-                            debugType);
-                        
-                        // Add a decoration to link the function to its debug function
-                        builder.addDecoration(parentFunc, kIROp_DebugFunctionDecoration, debugFuncCaller);
-                    }
-                }
+                debugFuncCaller = findExistingDebugFunc(callerFunc);
+                SLANG_ASSERT(debugFuncCaller);
 
                 // The debugInlinedAt needs to be cloned for each inlining call because our
                 // algorithm updates the operand. So we need to reset the insert point here.

@@ -7374,19 +7374,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugInlinedFunction(SpvInstParent* parent, IRDebugFunction* debugFunc)
     {
+        SpvInst* debugFuncInfo = nullptr;
+        if (m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
+        {
+            return debugFuncInfo;
+        }
+
         auto scope = findDebugScope(debugFunc);
         if (!scope)
             return nullptr;
 
         auto debugType = emitDebugType(as<IRType>(debugFunc->getDebugType()));
         IRBuilder builder(debugFunc);
-
-        SpvInst* debugFuncInfo = nullptr;
-        // We've already emitted, don't emit again.
-        if (m_mapIRInstToSpvDebugInst.tryGetValue(debugFunc, debugFuncInfo))
-        {
-            return debugFuncInfo;
-        }
 
         debugFuncInfo = emitOpDebugFunction(
             parent,
@@ -7403,7 +7402,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             builder.getIntValue(builder.getUIntType(), 0),
             debugFunc->getLine());
 
-        registerDebugInst(debugFunc, debugFuncInfo);
+        registerInst(debugFunc, debugFuncInfo);
 
         return debugFuncInfo;
     }
@@ -7960,19 +7959,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         }
 
-        if (irDebugFunc)
+        if (m_mapIRInstToSpvDebugInst.tryGetValue(function, debugFunc))
         {
-            if (m_mapIRInstToSpvDebugInst.tryGetValue(irDebugFunc, debugFunc))
-            {
-                return debugFunc;
-            }
-        }
-        else
-        {
-            if (m_mapIRInstToSpvDebugInst.tryGetValue(function, debugFunc))
-            {
-                return debugFunc;
-            }
+            return debugFunc;
         }
 
         debugFunc = emitOpDebugFunction(
@@ -7990,11 +7979,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             builder.getIntValue(builder.getUIntType(), 0),
             debugLoc->getLine());
 
+        registerDebugInst(function, debugFunc);
         if (irDebugFunc)
-            registerDebugInst(irDebugFunc, debugFunc);
-        else
-            registerDebugInst(function, debugFunc);
-
+            registerInst(irDebugFunc, debugFunc);
+        
         emitOpDebugFunctionDefinition(
             firstBlock,
             nullptr,

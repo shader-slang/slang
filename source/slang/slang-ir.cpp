@@ -8427,6 +8427,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_RTTIObject:
     case kIROp_RTTIType:
     case kIROp_Func:
+        //debugfunc
+        //debuginlinedat
     case kIROp_Generic:
     case kIROp_Var:
     case kIROp_Param:
