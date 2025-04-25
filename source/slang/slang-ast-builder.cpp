@@ -348,32 +348,16 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
     if (!elementCount)
         elementCount = getIntVal(getIntType(), kUnsizedArrayMagicLength);
 
-    ConstantIntVal* specConstSize = nullptr;
     if (elementCount->getType() != getIntType())
     {
         // Canonicalize constant elementCount to int.
         if (auto elementCountConstantInt = as<ConstantIntVal>(elementCount))
         {
-            if (elementCountConstantInt->getValue() == kSpecializationConstantArrayMagicLength)
-            {
-                // We currently don't have a way to express specialization constants in the AST, it's treated
-                // just as same as sized array. However, when creating the AST node for the sized array, we will
-                // use element type and array size as the key to create or find AST node. There will be a problem
-                // when creating a specialization constant array type, because the key is not unique, so that will
-                // caused the problem that every specialization constant arrays will have the same type. Therefore,
-                // we has the integer value of the raw pointer to make up the key.
-                // TODO: We really should have a new type inherit from ArrayExpressionType to represent specialization
-                // constant sized array type.
-                Hasher hasher;
-                hasher.hashValue(reinterpret_cast<IntegerLiteralValue>(elementCountConstantInt->m_specConstExpr));
-                elementCount = getIntVal(getIntType(), hasher.getResult());
-                specConstSize = as<ConstantIntVal>(elementCount);
-                specConstSize->m_specConstExpr = elementCountConstantInt->m_specConstExpr;
-            }
-            else
-            {
-                elementCount = getIntVal(getIntType(), elementCountConstantInt->getValue());
-            }
+            elementCount = getIntVal(getIntType(), elementCountConstantInt->getValue());
+        }
+        else if (auto elementCountSpecConstInt = as<SpecializationConstantIntVal>(elementCount))
+        {
+            elementCount = getSpecConstIntVal(getIntType(), elementCountSpecConstInt->getValue());
         }
         else
         {
@@ -381,15 +365,8 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
         }
     }
     Val* args[] = {elementType, elementCount};
-    ArrayExpressionType* type = as<ArrayExpressionType>(
+    return as<ArrayExpressionType>(
         getSpecializedBuiltinType(makeArrayView(args), "ArrayExpressionType"));
-
-    if (specConstSize)
-    {
-        specConstSize->setOperands(getIntType(), kSpecializationConstantArrayMagicLength);
-        type->m_specConstSize = specConstSize;
-    }
-    return type;
 }
 
 ConstantBufferType* ASTBuilder::getConstantBufferType(

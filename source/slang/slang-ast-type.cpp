@@ -327,11 +327,6 @@ Type* ArrayExpressionType::getElementType()
 
 IntVal* ArrayExpressionType::getElementCount()
 {
-    if (m_specConstSize)
-    {
-        return as<IntVal>(m_specConstSize);
-    }
-
     return as<IntVal>(_getGenericTypeArg(this, 1));
 }
 
