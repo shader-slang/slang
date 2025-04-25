@@ -2424,11 +2424,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             {
                 CommandLineArg name;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(name));
-                SerialCompressionType compressionType;
-                SLANG_RETURN_ON_FAIL(SerialParseUtil::parseCompressionType(
-                    name.value.getUnownedSlice(),
-                    compressionType));
-                linkage->m_optionSet.set(optionKind, compressionType);
+                // TODO: warn that this option is deprecated
                 break;
             }
         case OptionKind::EmbedDownstreamIR:

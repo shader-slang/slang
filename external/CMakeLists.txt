@@ -174,6 +174,7 @@ target_include_directories(
 # slang-rhi
 if(SLANG_ENABLE_SLANG_RHI)
     set(SLANG_RHI_BUILD_FROM_SLANG_REPO ON)
+    set(SLANG_RHI_INSTALL OFF)
     set(SLANG_RHI_BINARY_DIR ${CMAKE_BINARY_DIR}/$<CONFIG>/bin)
     set(SLANG_RHI_FETCH_SLANG OFF)
     set(SLANG_RHI_SLANG_INCLUDE_DIR ${slang_SOURCE_DIR}/include)
@@ -181,7 +182,7 @@ if(SLANG_ENABLE_SLANG_RHI)
 
     # Not disabling these break tests (issue #5474)
     set(SLANG_RHI_FETCH_DXC OFF)
-    set(SLANG_RHI_FETCH_AGILITY_SDK OFF)
+    set(SLANG_RHI_ENABLE_AGILITY_SDK OFF)
 
     set(SLANG_RHI_ENABLE_NVAPI ${SLANG_ENABLE_NVAPI})
 

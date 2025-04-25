@@ -429,6 +429,34 @@ DIAGNOSTIC(
     Warning,
     pragmaOnceIgnored,
     "pragma once was ignored - this is typically because is not placed in an include")
+DIAGNOSTIC(15610, Error, pragmaWarningGenericError, "Error in #pragma warning processing: $0")
+DIAGNOSTIC(
+    15611,
+    Warning,
+    pragmaWarningPopEmpty,
+    "Detected #pragma warning(pop) with no corresponding #pragma warning(push)")
+DIAGNOSTIC(
+    15612,
+    Warning,
+    pragmaWarningPushNotPopped,
+    "Detected #pragma warning(push) with no corresponding #pragma warning(pop)")
+DIAGNOSTIC(15613, Warning, pragmaWarningUnknownSpecifier, "Unknown #pragma warning specifier '$0'")
+DIAGNOSTIC(
+    15614,
+    Warning,
+    pragmaWarningSuppressCannotIdentifyNextLine,
+    "Cannot identify the next line to suppress in #pragma warning suppress")
+DIAGNOSTIC(
+    15615,
+    Warning,
+    pragmaWarningCannotInsertHere,
+    "Cannot insert #pragma warning here for id '$0'")
+DIAGNOSTIC(
+    15616,
+    Note,
+    pragmaWarningPointSuppress,
+    "#pragma warning for id '$0' was suppressed here")
+
 
 // 159xx - user-defined error/warning
 DIAGNOSTIC(15900, Error, userDefinedError, "#error: $0")
@@ -761,6 +789,13 @@ DIAGNOSTIC(
     "cannot specialize generic '$0' with the provided arguments.")
 
 DIAGNOSTIC(30076, Error, globalVarCannotHaveOpaqueType, "global variable cannot have opaque type.")
+DIAGNOSTIC(
+    30077,
+    Error,
+    concreteArgumentToOutputInterface,
+    "argument passed to parameter '$0' is of concrete type '$1', but interface-typed output "
+    "parameters require interface-typed arguments. To allow passing a concrete type to this "
+    "function, you can replace '$2 $0' with a generic 'T $0' and a 'where T : $2' constraint.")
 DIAGNOSTIC(-1, Note, doYouMeanStaticConst, "do you intend to define a `static const` instead?")
 DIAGNOSTIC(-1, Note, doYouMeanUniform, "do you intend to define a `uniform` parameter instead?")
 
@@ -2615,6 +2650,11 @@ DIAGNOSTIC(
     resourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal,
     "nesting a 'ConstantBuffer' containing resource types inside a 'ParameterBlock' is not "
     "supported on Metal, please use 'ParameterBlock' instead.")
+DIAGNOSTIC(
+    56102,
+    Error,
+    divisionByMatrixNotSupported,
+    "division by matrix is not supported for Metal and WGSL targets.")
 
 DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
 DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")

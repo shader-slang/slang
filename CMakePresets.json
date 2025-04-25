@@ -13,7 +13,8 @@
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>",
-        "SLANG_ENABLE_IR_BREAK_ALLOC": "$<$<CONFIG:Debug>:TRUE>$<$<NOT:$<CONFIG:Debug>>:FALSE>"
+        "SLANG_ENABLE_IR_BREAK_ALLOC": "$<$<CONFIG:Debug>:TRUE>$<$<NOT:$<CONFIG:Debug>>:FALSE>",
+        "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo;MinSizeRel"
       }
     },
     {

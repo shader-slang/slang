@@ -1869,6 +1869,17 @@ struct IRCoopVectorType : IRType
     IR_LEAF_ISA(CoopVectorType)
 };
 
+struct IRCoopMatrixType : IRType
+{
+    IRType* getElementType() { return (IRType*)getOperand(0); }
+    IRInst* getScope() { return getOperand(1); }
+    IRInst* getRowCount() { return getOperand(2); }
+    IRInst* getColumnCount() { return getOperand(3); }
+    IRInst* getMatrixUse() { return getOperand(4); }
+
+    IR_LEAF_ISA(CoopMatrixType)
+};
+
 bool isDefinition(IRInst* inVal);
 
 // A structure type is represented as a parent instruction,

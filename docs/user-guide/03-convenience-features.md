@@ -13,7 +13,7 @@ Slang supports automatic variable type inference:
 var a = 1; // OK, `a` is an `int`.
 var b = float3(0, 1, 2); // OK, `b` is a `float3`.
 ```
-Automatic type inference require an initialization expression to present. Without an initial value, the compiler is not able to infer the type of the variable. The following code will result in a compiler error:
+Automatic type inference requires an initialization expression to be present. Without an initial value, the compiler is not able to infer the type of the variable. The following code will result in a compiler error:
 ```csharp
 var a; // Error, cannot infer the type of `a`.
 ```
@@ -365,7 +365,7 @@ int test()
 {
     MyType rs;
     rs[0, 0] = 1;
-    rs[1, 0] = rs[0, 0] + 1
+    rs[1, 0] = rs[0, 0] + 1;
     return rs[1, 0]; // returns 2.
 }
 ```
@@ -457,8 +457,8 @@ void test()
 {
     if (let x = getOptInt())
     {
-          // if we are here, `getOptInt` returns a value `int`.
-          // and `x` represents the `int` value.
+        // if we are here, `getOptInt` returns a value `int`.
+        // and `x` represents the `int` value.
     }
 }
 ```
@@ -478,9 +478,9 @@ MyType myVal;
 float4 myPackedVector = packMyTypeToFloat4(myVal);
 ```
 
-The `packMyTypeToFloat4` function is usually implemented by bit casting each field in the source type and assign it into the corresponding field in the target type,
+The `packMyTypeToFloat4` function is usually implemented by bit casting each field in the source type and assigning it into the corresponding field in the target type,
 by calling `intAsFloat`, `floatAsInt` and using bit operations to shift things in the right place.
-Instead of writing `packMyTypeToFloat4` function yourself, you can use Slang's builtin `reinterpret<T>` to do just that for you:
+Instead of writing `packMyTypeToFloat4` function yourself, you can use Slang's built-in `reinterpret<T>` to do just that for you:
 ```
 float4 myPackedVector = reinterpret<float4>(myVal);
 ```

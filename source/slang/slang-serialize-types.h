@@ -11,14 +11,7 @@
 
 namespace Slang
 {
-
-// An enumeration of types that can be set
-enum class SerialExtraType
-{
-    SourceLocReader,
-    SourceLocWriter,
-    CountOf,
-};
+class Module;
 
 // Options for IR/AST/Debug serialization
 
@@ -35,20 +28,9 @@ struct SerialOptionFlag
         ASTModule = 0x04, ///< If set will output AST modules - typically required, but potentially
                           ///< not desired (for example with obsfucation)
         IRModule = 0x08,  ///< If set will output IR modules - typically required
-        ASTFunctionBody = 0x10, ///< If set will serialize AST function bodies.
     };
 };
 typedef SerialOptionFlag::Type SerialOptionFlags;
-
-
-// Compression styles
-
-enum class SerialCompressionType : uint8_t
-{
-    None,
-    VariableByteLite,
-};
-
 
 struct SerialStringData
 {
@@ -93,16 +75,6 @@ struct SerialStringTableUtil
         List<StringSlicePool::Handle>& indexMap);
 };
 
-struct SerialParseUtil
-{
-    /// Given text, finds the compression type
-    static SlangResult parseCompressionType(
-        const UnownedStringSlice& text,
-        SerialCompressionType& outType);
-    /// Given a compression type, return text
-    static UnownedStringSlice getText(SerialCompressionType type);
-};
-
 struct SerialListUtil
 {
     template<typename T>
@@ -143,6 +115,20 @@ struct SerialListUtil
     }
 };
 
+template<typename T>
+struct PropertyKeys
+{
+};
+
+template<>
+struct PropertyKeys<Module>
+{
+    static const FourCC Digest = SLANG_FOUR_CC('S', 'H', 'A', '1');
+    static const FourCC ASTModule = SLANG_FOUR_CC('a', 's', 't', ' ');
+    static const FourCC IRModule = SLANG_FOUR_CC('i', 'r', ' ', ' ');
+    static const FourCC FileDependencies = SLANG_FOUR_CC('f', 'd', 'e', 'p');
+};
+
 // For types/FourCC that work for serializing in general (not just IR).
 struct SerialBinary
 {
@@ -160,30 +146,50 @@ struct SerialBinary
     /// An entry point
     static const FourCC kEntryPointFourCc = SLANG_FOUR_CC('E', 'P', 'n', 't');
 
-    /// Container
-    static const FourCC kContainerHeaderFourCc = SLANG_FOUR_CC('S', 'c', 'h', 'd');
+    static const FourCC kEntryPointListFourCc = SLANG_FOUR_CC('e', 'p', 't', 's');
 
-    // Module header
-    static const FourCC kModuleHeaderFourCc = SLANG_FOUR_CC('S', 'm', 'h', 'd');
+    // Module
+    static const FourCC kModuleFourCC = SLANG_FOUR_CC('s', 'm', 'o', 'd');
 
-    struct ContainerHeader
-    {
-        uint32_t compressionType; ///< Holds the compression type used (if used at all)
-    };
+    // The following are "generic" codes, suitable for
+    // use when serializing content using JSON-like structure.
+    //
+    static const FourCC kObjectFourCC = SLANG_FOUR_CC('o', 'b', 'j', ' ');
+    static const FourCC kPairFourCC = SLANG_FOUR_CC('p', 'a', 'i', 'r');
+    static const FourCC kArrayFourCC = SLANG_FOUR_CC('a', 'r', 'r', 'y');
+    static const FourCC kDictionaryFourCC = SLANG_FOUR_CC('d', 'i', 'c', 't');
+    static const FourCC kNullFourCC = SLANG_FOUR_CC('n', 'u', 'l', 'l');
+    static const FourCC kStringFourCC = SLANG_FOUR_CC('s', 't', 'r', ' ');
+    static const FourCC kTrueFourCC = SLANG_FOUR_CC('t', 'r', 'u', 'e');
+    static const FourCC kFalseFourCC = SLANG_FOUR_CC('f', 'a', 'l', 's');
+    static const FourCC kInt32FourCC = SLANG_FOUR_CC('i', '3', '2', ' ');
+    static const FourCC kUInt32FourCC = SLANG_FOUR_CC('u', '3', '2', ' ');
+    static const FourCC kFloat32FourCC = SLANG_FOUR_CC('f', '3', '2', ' ');
+    static const FourCC kInt64FourCC = SLANG_FOUR_CC('i', '6', '4', ' ');
+    static const FourCC kUInt64FourCC = SLANG_FOUR_CC('u', '6', '4', ' ');
+    static const FourCC kFloat64FourCC = SLANG_FOUR_CC('f', '6', '4', ' ');
+
+    // The following codes are suitable for use when serializing
+    // content that represents a logical file system.
+    //
+    static const FourCC kDirectoryFourCC = SLANG_FOUR_CC('d', 'i', 'r', ' ');
+    static const FourCC kFileFourCC = SLANG_FOUR_CC('f', 'i', 'l', 'e');
+    static const FourCC kNameFourCC = SLANG_FOUR_CC('n', 'a', 'm', 'e');
+    static const FourCC kPathFourCC = SLANG_FOUR_CC('p', 'a', 't', 'h');
+    static const FourCC kDataFourCC = SLANG_FOUR_CC('d', 'a', 't', 'a');
+
+    // TODO(tfoley): Figure out where to put all of these so that
+    // they can be more usefully addressed.
+    //
+    static const FourCC kMangledNameFourCC = SLANG_FOUR_CC('m', 'g', 'n', 'm');
+    static const FourCC kProfileFourCC = SLANG_FOUR_CC('p', 'r', 'o', 'f');
+
 
     struct ArrayHeader
     {
         uint32_t numEntries;
     };
-    struct CompressedArrayHeader
-    {
-        uint32_t numEntries;           ///< The number of entries
-        uint32_t numCompressedEntries; ///< The amount of compressed entries
-    };
 };
-
-// Replace first char with 's'
-#define SLANG_MAKE_COMPRESSED_FOUR_CC(fourCc) SLANG_FOUR_CC_REPLACE_FIRST_CHAR(fourCc, 's')
 
 struct SerialRiffUtil
 {
@@ -223,7 +229,6 @@ struct SerialRiffUtil
     };
 
     static Result writeArrayChunk(
-        SerialCompressionType compressionType,
         FourCC chunkId,
         const void* data,
         size_t numEntries,
@@ -231,14 +236,9 @@ struct SerialRiffUtil
         RiffContainer* container);
 
     template<typename T>
-    static Result writeArrayChunk(
-        SerialCompressionType compressionType,
-        FourCC chunkId,
-        const List<T>& array,
-        RiffContainer* container)
+    static Result writeArrayChunk(FourCC chunkId, const List<T>& array, RiffContainer* container)
     {
         return writeArrayChunk(
-            compressionType,
             chunkId,
             array.begin(),
             size_t(array.getCount()),
@@ -246,47 +246,13 @@ struct SerialRiffUtil
             container);
     }
 
-    template<typename T>
-    static Result writeArrayUncompressedChunk(
-        FourCC chunkId,
-        const List<T>& array,
-        RiffContainer* container)
-    {
-        return writeArrayChunk(
-            SerialCompressionType::None,
-            chunkId,
-            array.begin(),
-            size_t(array.getCount()),
-            sizeof(T),
-            container);
-    }
-
-    static Result readArrayChunk(
-        SerialCompressionType compressionType,
-        RiffContainer::DataChunk* dataChunk,
-        ListResizer& listOut);
+    static Result readArrayChunk(RiffContainer::DataChunk* dataChunk, ListResizer& listOut);
 
     template<typename T>
-    static Result readArrayChunk(
-        SerialCompressionType moduleCompressionType,
-        RiffContainer::DataChunk* dataChunk,
-        List<T>& arrayOut)
-    {
-        SerialCompressionType compressionType = SerialCompressionType::None;
-        if (dataChunk->m_fourCC == SLANG_MAKE_COMPRESSED_FOUR_CC(dataChunk->m_fourCC))
-        {
-            // If it has compression, use the compression type set in the header
-            compressionType = moduleCompressionType;
-        }
-        ListResizerForType<T> resizer(arrayOut);
-        return readArrayChunk(compressionType, dataChunk, resizer);
-    }
-
-    template<typename T>
-    static Result readArrayUncompressedChunk(RiffContainer::DataChunk* chunk, List<T>& arrayOut)
+    static Result readArrayChunk(RiffContainer::DataChunk* dataChunk, List<T>& arrayOut)
     {
         ListResizerForType<T> resizer(arrayOut);
-        return readArrayChunk(SerialCompressionType::None, chunk, resizer);
+        return readArrayChunk(dataChunk, resizer);
     }
 };
 

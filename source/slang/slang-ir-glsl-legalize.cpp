@@ -627,6 +627,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         name = "gl_InstanceIndex";
         targetVarName = IRTargetBuiltinVarName::HlslInstanceID;
         context->requireSPIRVVersion(SemanticVersion(1, 3));
+        context->requireGLSLVersion(ProfileVersion::GLSL_460);
         context->requireGLSLExtension(toSlice("GL_ARB_shader_draw_parameters"));
     }
     else if (semanticName == "sv_isfrontface")
@@ -650,6 +651,13 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         // float in hlsl & glsl
         name = "gl_PointSize";
         requiredType = builder->getBasicType(BaseType::Float);
+    }
+    else if (semanticName == "sv_pointcoord")
+    {
+        name = "gl_PointCoord";
+        requiredType = builder->getVectorType(
+            builder->getBasicType(BaseType::Float),
+            builder->getIntValue(builder->getIntType(), 2));
     }
     else if (semanticName == "sv_drawindex")
     {
@@ -2033,10 +2041,12 @@ ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType*
                 // Get array sizes once
                 auto fromSize = getIntVal(fromArray->getElementCount());
                 auto toSize = getIntVal(toArray->getElementCount());
-                SLANG_ASSERT(fromSize <= toSize);
 
-                // Extract elements one at a time up to the source array size
-                for (Index i = 0; i < fromSize; i++)
+                // Extract elements one at a time up to the minimum
+                // size, between the source and destination.
+                //
+                auto limit = fromSize < toSize ? fromSize : toSize;
+                for (Index i = 0; i < limit; i++)
                 {
                     auto element = builder->emitElementExtract(
                         fromArray->getElementType(),
@@ -3541,6 +3551,15 @@ void legalizeEntryPointParameterForGLSL(
                         if (elem.key == key)
                         {
                             realGlobalVar = elem.val.irValue;
+                            if (!realGlobalVar &&
+                                ScalarizedVal::Flavor::typeAdapter == elem.val.flavor)
+                            {
+                                if (auto typeAdapterVal =
+                                        as<ScalarizedTypeAdapterValImpl>(elem.val.impl))
+                                {
+                                    realGlobalVar = typeAdapterVal->val.irValue;
+                                }
+                            }
                             break;
                         }
                     }

@@ -33,46 +33,34 @@ void SharedASTBuilder::init(Session* session)
     // NOTE! That this adds the names of the abstract classes too(!)
     for (Index i = 0; i < Index(ASTNodeType::CountOf); ++i)
     {
-        const ReflectClassInfo* info = ASTClassInfo::getInfo(ASTNodeType(i));
-        if (info)
-        {
-            m_sliceToTypeMap.add(UnownedStringSlice(info->m_name), info);
-            Name* name = m_namePool->getName(String(info->m_name));
-            m_nameToTypeMap.add(name, info);
-        }
+        auto syntaxClass = SyntaxClass(ASTNodeType(i));
+        if (!syntaxClass)
+            continue;
+        auto nameText = syntaxClass.getName();
+        m_sliceToTypeMap.add(nameText, syntaxClass);
+        Name* nameObj = m_namePool->getName(nameText);
+        m_nameToTypeMap.add(nameObj, syntaxClass);
     }
 }
 
-const ReflectClassInfo* SharedASTBuilder::findClassInfo(const UnownedStringSlice& slice)
+SyntaxClass<> SharedASTBuilder::findSyntaxClass(const UnownedStringSlice& slice)
 {
-    const ReflectClassInfo* typeInfo;
-    return m_sliceToTypeMap.tryGetValue(slice, typeInfo) ? typeInfo : nullptr;
-}
-
-SyntaxClass<NodeBase> SharedASTBuilder::findSyntaxClass(const UnownedStringSlice& slice)
-{
-    const ReflectClassInfo* typeInfo;
+    SyntaxClass typeInfo;
     if (m_sliceToTypeMap.tryGetValue(slice, typeInfo))
     {
-        return SyntaxClass<NodeBase>(typeInfo);
+        return typeInfo;
     }
-    return SyntaxClass<NodeBase>();
-}
-
-const ReflectClassInfo* SharedASTBuilder::findClassInfo(Name* name)
-{
-    const ReflectClassInfo* typeInfo;
-    return m_nameToTypeMap.tryGetValue(name, typeInfo) ? typeInfo : nullptr;
+    return getSyntaxClass<NodeBase>();
 }
 
 SyntaxClass<NodeBase> SharedASTBuilder::findSyntaxClass(Name* name)
 {
-    const ReflectClassInfo* typeInfo;
+    SyntaxClass<NodeBase> typeInfo;
     if (m_nameToTypeMap.tryGetValue(name, typeInfo))
     {
-        return SyntaxClass<NodeBase>(typeInfo);
+        return typeInfo;
     }
-    return SyntaxClass<NodeBase>();
+    return getSyntaxClass<NodeBase>();
 }
 
 Type* SharedASTBuilder::getStringType()
@@ -256,9 +244,8 @@ ASTBuilder::~ASTBuilder()
 {
     for (NodeBase* node : m_dtorNodes)
     {
-        const ReflectClassInfo* info = ASTClassInfo::getInfo(node->astNodeType);
-        SLANG_ASSERT(info->m_destructorFunc);
-        info->m_destructorFunc(node);
+        auto nodeClass = node->getClass();
+        nodeClass.destructInstance(node);
     }
     incrementEpoch();
 }
@@ -275,16 +262,8 @@ void ASTBuilder::incrementEpoch()
 
 NodeBase* ASTBuilder::createByNodeType(ASTNodeType nodeType)
 {
-    const ReflectClassInfo* info = ASTClassInfo::getInfo(nodeType);
-
-    auto createFunc = info->m_createFunc;
-    SLANG_ASSERT(createFunc);
-    if (!createFunc)
-    {
-        return nullptr;
-    }
-
-    return (NodeBase*)createFunc(this);
+    auto syntaxClass = SyntaxClass<NodeBase>(nodeType);
+    return syntaxClass.createInstance(this);
 }
 
 Type* ASTBuilder::getSpecializedBuiltinType(Type* typeParam, char const* magicTypeName)

@@ -661,6 +661,23 @@ SLANG_FORCE_INLINE double I32_asdouble(int32_t low, int32_t hi)
     return u.d;
 }
 
+SLANG_FORCE_INLINE uint32_t I32_countbits(int32_t v)
+{
+#if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
+    return __builtin_popcount(uint32_t(v));
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    return __popcnt(uint32_t(v));
+#else
+    uint32_t c = 0;
+    while (v)
+    {
+        c++;
+        v &= v - 1;
+    }
+    return c;
+#endif
+}
+
 // ----------------------------- U32 -----------------------------------------
 
 SLANG_FORCE_INLINE uint32_t U32_abs(uint32_t f)
@@ -729,9 +746,6 @@ SLANG_FORCE_INLINE uint64_t U64_max(uint64_t a, uint64_t b)
     return a > b ? a : b;
 }
 
-// TODO(JS): We don't define countbits for 64bit in the core module currently.
-// It's not clear from documentation if it should return 32 or 64 bits, if it exists.
-// 32 bits can always hold the result, and will be implicitly promoted.
 SLANG_FORCE_INLINE uint32_t U64_countbits(uint64_t v)
 {
 #if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
@@ -763,6 +777,11 @@ SLANG_FORCE_INLINE int64_t I64_min(int64_t a, int64_t b)
 SLANG_FORCE_INLINE int64_t I64_max(int64_t a, int64_t b)
 {
     return a > b ? a : b;
+}
+
+SLANG_FORCE_INLINE uint32_t I64_countbits(int64_t v)
+{
+    return U64_countbits(uint64_t(v));
 }
 
 // ----------------------------- UPTR -----------------------------------------

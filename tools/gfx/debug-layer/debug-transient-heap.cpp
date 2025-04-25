@@ -14,7 +14,11 @@ namespace debug
 SlangResult DebugTransientResourceHeap::queryInterface(SlangUUID const& uuid, void** outObject)
 {
     if (uuid == GfxGUID::IID_ISlangUnknown || uuid == GfxGUID::IID_ITransientResourceHeap)
+    {
         *outObject = static_cast<ITransientResourceHeap*>(this);
+        addRef();
+        return SLANG_OK;
+    }
     if (uuid == GfxGUID::IID_ITransientResourceHeapD3D12)
     {
         RefPtr<DebugTransientResourceHeapD3D12> result = new DebugTransientResourceHeapD3D12();
@@ -22,10 +26,8 @@ SlangResult DebugTransientResourceHeap::queryInterface(SlangUUID const& uuid, vo
         returnComPtr((ITransientResourceHeapD3D12**)outObject, result);
         return SLANG_OK;
     }
-    else
-    {
-        return baseObject->queryInterface(uuid, outObject);
-    }
+
+    return baseObject->queryInterface(uuid, outObject);
 }
 
 Result DebugTransientResourceHeap::synchronizeAndReset()

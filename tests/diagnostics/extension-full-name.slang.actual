@@ -1,0 +1,32 @@
+result code = -1
+standard error = {
+tests/diagnostics/extension-full-name.slang(179): error 30019: expected an expression of type 'GenericType<half>.State', got 'int'
+    state1 = 0;    // Error: expected expr of type 'GenericType<half>.State', got 'int'
+             ^
+tests/diagnostics/extension-full-name.slang(180): error 30019: expected an expression of type 'GenericType<float>.InnerType.Options', got 'int'
+    options1 = 0;  // Error: expected expr of type 'GenericType<float>.InnerType.Options', got 'int'
+               ^
+tests/diagnostics/extension-full-name.slang(181): error 30019: expected an expression of type 'NonGenericType.Config', got 'int'
+    config1 = 0;   // Error: expected expr of type 'NonGenericType.Config', got 'int'
+              ^
+tests/diagnostics/extension-full-name.slang(182): error 30019: expected an expression of type 'Container.Nested.Settings', got 'int'
+    settings1 = 0; // Error: expected expr of type 'Container.Nested.Settings', got 'int'
+                ^
+tests/diagnostics/extension-full-name.slang(183): error 30019: expected an expression of type 'Container.Nested.DeepNested.Record', got 'int'
+    record1 = 0;   // Error: expected expr of type 'Container.Nested.DeepNested.Record', got 'int'
+              ^
+tests/diagnostics/extension-full-name.slang(191): error 30027: 'getOptions' is not a member of 'GenericType<int>.InnerType'.
+        intInner.getOptions(); // This won't compile as intInner doesn't have getOptions
+                 ^~~~~~~~~~
+tests/diagnostics/extension-full-name.slang(221): error 30019: expected an expression of type 'GenericType<float>.InnerType.Options', got 'GenericType<half>.State'
+            .createState(); // Error: expected expr of type 'GenericType<float>.InnerType.Options',
+                        ^
+tests/diagnostics/extension-full-name.slang(223): error 30019: expected an expression of type 'GenericType<half>.State', got 'NonGenericType.Config'
+    state1 = nonGenType.createConfig(); // Error: expected expr of type 'GenericType<half>.State',
+                                    ^
+tests/diagnostics/extension-full-name.slang(225): error 30019: expected an expression of type 'NonGenericType.Config', got 'Container.Nested.Settings'
+    config1 = nested.createSettings();  // Error: expected expr of type 'NonGenericType.Config', got
+                                   ^
+}
+standard output = {
+}

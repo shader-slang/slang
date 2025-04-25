@@ -3,7 +3,7 @@ layout: user-guide
 permalink: /user-guide/spirv-target-specific
 ---
 
-SPIR-V specific functionalities
+SPIR-V-Specific Functionalities
 ===============================
 
 This chapter provides information for SPIR-V specific functionalities and behaviors.
@@ -11,7 +11,7 @@ This chapter provides information for SPIR-V specific functionalities and behavi
 Experimental support for the older versions of SPIR-V
 -----------------------------------------------------
 
-Slang's SPIRV backend is stable when emitting SPIRV 1.3 and later, however, support for SPIR-V 1.0, 1.1 and 1.2 is still experimental.
+Slang's SPIR-V backend is stable when emitting SPIR-V 1.3 and later, however, support for SPIR-V 1.0, 1.1 and 1.2 is still experimental.
 When targeting the older SPIR-V profiles, Slang may produce SPIR-V that uses the instructions and keywords that were introduced in the later versions of SPIR-V.
 
 
@@ -26,7 +26,7 @@ For SPIR-V targets, explicit bindings may be provided through a single `vk::bind
 Sampler2D explicitBindingSampler;
 ```
 
-For other targets (HLSL or others) where combined texture samplers are _not_ supported intrinsicly, they are emulated by Slang using separate objects for Texture and Sampler.
+For other targets (HLSL or others) where combined texture samplers are _not_ supported intrinsically, they are emulated by Slang using separate objects for Texture and Sampler.
 For explicit binding on such targets, you can specify two different register numbers for each: one for the texture register and another for the sampler register.
 ```
 Sampler2D explicitBindingSampler : register(t4): register(s3);
@@ -38,7 +38,7 @@ System-Value semantics
 
 The system-value semantics are translated to the following SPIR-V code.
 
-| SV semantic name              | SPIR-V code                       |
+| SV semantic name              | SPIR-V Code                       |
 |-------------------------------|-----------------------------------|
 | `SV_Barycentrics`             | `BuiltIn BaryCoordKHR`            |
 | `SV_ClipDistance<N>`          | `BuiltIn ClipDistance`            |
@@ -50,7 +50,7 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_DepthLessEqual`           | `BuiltIn FragDepth`               |
 | `SV_DispatchThreadID`         | `BuiltIn GlobalInvocationId`      |
 | `SV_DomainLocation`           | `BuiltIn TessCoord`               |
-| `SV_DrawIndex`                | `Builtin DrawIndex`               |
+| `SV_DrawIndex`<sup>*</sup>    | `Builtin DrawIndex`               |
 | `SV_GSInstanceID`             | `BuiltIn InvocationId`            |
 | `SV_GroupID`                  | `BuiltIn WorkgroupId`             |
 | `SV_GroupIndex`               | `BuiltIn LocalInvocationIndex`    |
@@ -61,7 +61,8 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_IntersectionAttributes`   | *Not supported*                   |
 | `SV_IsFrontFace`              | `BuiltIn FrontFacing`             |
 | `SV_OutputControlPointID`     | `BuiltIn InvocationId`            |
-| `SV_PointSize<sup>note</sup>` | `BuiltIn PointSize`               |
+| `SV_PointSize`<sup>*</sup>    | `BuiltIn PointSize`               |
+| `SV_PointCoord`<sup>*</sup>   | `BuiltIn PointCoord`              |
 | `SV_Position`                 | `BuiltIn Position/FragCoord`      |
 | `SV_PrimitiveID`              | `BuiltIn PrimitiveId`             |
 | `SV_RenderTargetArrayIndex`   | `BuiltIn Layer`                   |
@@ -76,7 +77,7 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_ViewID`                   | `BuiltIn ViewIndex`               |
 | `SV_ViewportArrayIndex`       | `BuiltIn ViewportIndex`           |
 
-*Note* that `SV_DrawIndex` and `SV_PointSize` are Slang-specific semantics that are not defined in HLSL.
+*Note* that `SV_DrawIndex`, `SV_PointSize` and `SV_PointCoord` are Slang-specific semantics that are not defined in HLSL.
 
 
 Behavior of `discard` after SPIR-V 1.6
@@ -87,9 +88,9 @@ You can use OpDemoteToHelperInvocation by explicitly specifying the capability, 
 
 As an example, the following command-line arguments can control the behavior of `discard` when targeting SPIR-V.
 ```
-slangc.exe test.slang -target spirv -profile spirv_1_5 # emits OpKill 
-slangc.exe test.slang -target spirv -profile spirv_1_6 # emits OpDemoteToHelperInvocation 
-slangc.exe test.slang -target spirv -capability SPV_EXT_demote_to_helper_invocation -profile spirv_1_5 # emits OpDemoteToHelperInvocation 
+slangc.exe test.slang -target spir-v -profile spir-v_1_5 # emits OpKill 
+slangc.exe test.slang -target spir-v -profile spir-v_1_6 # emits OpDemoteToHelperInvocation 
+slangc.exe test.slang -target spir-v -capability SPV_EXT_demote_to_helper_invocation -profile spir-v_1_5 # emits OpDemoteToHelperInvocation 
 ```
 
 
@@ -413,7 +414,7 @@ Pack members using FXCs member packing rules when targeting GLSL or SPIRV.
 Uses the entrypoint name from the source instead of 'main' in the spirv output.
 
 ### -fspv-reflect
-Include reflection decorations in the resulting SPIRV for shader parameters.
+Include reflection decorations in the resulting SPIR-V for shader parameters.
 
 ### -spirv-core-grammar
 A path to a specific spirv.core.grammar.json to use when generating SPIR-V output

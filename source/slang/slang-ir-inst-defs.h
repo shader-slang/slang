@@ -235,6 +235,7 @@ INST(Nop, nop, 0, 0)
 INST(RayQueryType, RayQuery, 1, HOISTABLE)
 INST(HitObjectType, HitObject, 0, HOISTABLE)
 INST(CoopVectorType, CoopVectorType, 2, HOISTABLE)
+INST(CoopMatrixType, CoopMatrixType, 5, HOISTABLE)
 
 // Opaque type that can be dynamically cast to other resource types.
 INST(DynamicResourceType, DynamicResource, 0, HOISTABLE)
@@ -1007,6 +1008,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(GlobalInputDecoration, input, 0, 0)
     INST(GLSLLocationDecoration, glslLocation, 1, 0)
     INST(GLSLOffsetDecoration, glslOffset, 1, 0)
+    INST(VkStructOffsetDecoration, vkStructOffset, 1, 0)
     INST(PayloadDecoration, payload, 0, 0)
     INST(RayPayloadDecoration, raypayload, 0, 0)
 

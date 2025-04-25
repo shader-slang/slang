@@ -12,8 +12,8 @@
 // logic also orchestrates the overall flow and how
 // and when things get checked.
 
+#include "slang-ast-forward-declarations.h"
 #include "slang-ast-iterator.h"
-#include "slang-ast-reflect.h"
 #include "slang-ast-synthesis.h"
 #include "slang-lookup.h"
 #include "slang-parser.h"
@@ -3590,7 +3590,7 @@ bool SemanticsVisitor::doesAccessorMatchRequirement(
     //
     auto satisfyingMemberClass = satisfyingMemberDeclRef.getDecl()->getClass();
     auto requiredMemberClass = requiredMemberDeclRef.getDecl()->getClass();
-    if (!satisfyingMemberClass.isSubClassOfImpl(requiredMemberClass))
+    if (!satisfyingMemberClass.isSubClassOf(requiredMemberClass))
         return false;
 
     // We do not check the parameters or return types of accessors
@@ -7069,7 +7069,8 @@ bool SemanticsVisitor::checkInterfaceConformance(
     // the time we are compiling and handle those, and punt on the larger issue
     // for a bit longer.
     //
-    for (auto candidateExt : getCandidateExtensions(superInterfaceDeclRef, this))
+    auto candidateExtensions = getCandidateExtensions(superInterfaceDeclRef, this);
+    for (const auto& candidateExt : candidateExtensions)
     {
         // We need to apply the extension to the interface type that our
         // concrete type is inheriting from.
@@ -11260,7 +11261,7 @@ void _foreachDirectOrExtensionMemberOfType(
     //
     for (auto memberDeclRef : getMembers(semantics->getASTBuilder(), containerDeclRef))
     {
-        if (memberDeclRef.getDecl()->getClass().isSubClassOfImpl(syntaxClass))
+        if (memberDeclRef.getDecl()->getClass().isSubClassOf(syntaxClass))
         {
             callback(memberDeclRef, (void*)userData);
         }
@@ -11272,7 +11273,8 @@ void _foreachDirectOrExtensionMemberOfType(
     if (auto aggTypeDeclRef = containerDeclRef.as<AggTypeDecl>())
     {
         auto aggType = DeclRefType::create(semantics->getASTBuilder(), aggTypeDeclRef);
-        for (auto extDecl : getCandidateExtensions(aggTypeDeclRef, semantics))
+        auto candidateExtensions = getCandidateExtensions(aggTypeDeclRef, semantics);
+        for (auto extDecl : candidateExtensions)
         {
             // Note that `extDecl` may have been declared for a type
             // base on the declaration that `aggTypeDeclRef` refers
@@ -11292,7 +11294,7 @@ void _foreachDirectOrExtensionMemberOfType(
 
             for (auto memberDeclRef : getMembers(semantics->getASTBuilder(), extDeclRef))
             {
-                if (memberDeclRef.getDecl()->getClass().isSubClassOfImpl(syntaxClass))
+                if (memberDeclRef.getDecl()->getClass().isSubClassOf(syntaxClass))
                 {
                     callback(memberDeclRef, (void*)userData);
                 }
