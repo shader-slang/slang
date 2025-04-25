@@ -1795,12 +1795,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         }
                         break;
                     }
-                case kIROp_DownstreamModuleExportDecoration:
-                case kIROp_DownstreamModuleImportDecoration:
-                    {
-                        m_sharedContext->requireSpirvVersion(0X10400);
-                        break;
-                    }
                 }
             }
         };
