@@ -1782,27 +1782,17 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         // constant variable with literal, so there will only be a specialization constant left in the expression,
         // which can only declared in global scope.
 
-        InvokeExpr* newInvokeExpr = m_astBuilder->create<InvokeExpr>();
-        newInvokeExpr->functionExpr = invokeExpr.getExpr()->functionExpr;
-        for (Index a = 0; a < argCount; ++a)
-        {
-            if (auto argVal = as<SpecializationConstantIntVal>(argVals[a]))
-            {
-                newInvokeExpr->arguments.add(argVal->getValue());
-            }
-            else
-            {
-                IntegerLiteralValue constIntVal = constArgVals[a];
-                IntegerLiteralExpr* literalExpr = m_astBuilder->create<IntegerLiteralExpr>();
-                literalExpr->value = constIntVal;
-                literalExpr->type.type = m_astBuilder->getIntType();
-                newInvokeExpr->arguments.add(literalExpr);
-            }
-        }
-        auto specConstExpr = CheckTerm(newInvokeExpr);
+        auto funcCall = m_astBuilder->getOrCreate<FuncCallIntVal>(
+            invokeExpr.getExpr()->type.type,
+            funcDeclRef,
+            as<Type>(funcDeclRefExpr.getExpr()->type->substitute(
+                m_astBuilder,
+                funcDeclRefExpr.getSubsts())),
+            makeArrayView(argVals, argCount));
+
         SpecializationConstantIntVal* result = m_astBuilder->getSpecConstIntVal(
-            newInvokeExpr->type.type,
-            specConstExpr);
+            invokeExpr.getExpr()->type.type,
+            funcCall);
         return result;
     }
 
@@ -2017,7 +2007,7 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
     if (decl->hasModifier<SpecializationConstantAttribute>() ||
         decl->hasModifier<VkConstantIdAttribute>())
     {
-        return nullptr;
+        return m_astBuilder->getSpecConstIntVal(m_astBuilder->getIntType(), declRef);
     }
 
     if (decl->hasModifier<ExternModifier>())
@@ -2123,16 +2113,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         if (auto varRef = declRef.as<VarDeclBase>())
         {
             auto val = tryConstantFoldDeclRef(varRef, kind, circularityInfo);
-
-            if (val == nullptr)
-            {
-                auto decl = varRef.getDecl();
-                if (decl->hasModifier<SpecializationConstantAttribute>() ||
-                    decl->hasModifier<VkConstantIdAttribute>())
-                {
-                    return m_astBuilder->getSpecConstIntVal(m_astBuilder->getIntType(), expr.getExpr());
-                }
-            }
             return val;
         }
         else if (auto enumRef = declRef.as<EnumCaseDecl>())
