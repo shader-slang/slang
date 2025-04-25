@@ -74,11 +74,12 @@ public:
     void popFrame()
     {
         auto& stackFrame = m_stack.getLast();
-        m_workingSetBuffer.setCount(stackFrame.m_workingSetOffset);
+        auto lastWorkingSetBufferCount =
+            (uint32_t)((uint64_t*)m_currentWorkingSet - m_workingSetBuffer.getBuffer());
+        m_workingSetBuffer.setCount(lastWorkingSetBufferCount);
         m_currentInst = stackFrame.m_currentInst->getNextInst();
         m_currentFuncCode = stackFrame.m_currentFuncCode;
-        m_currentWorkingSet = m_workingSetBuffer.getBuffer() +
-                              (m_stack.getCount() == 0 ? 0 : stackFrame.m_workingSetOffset);
+        m_currentWorkingSet = m_workingSetBuffer.getBuffer() + stackFrame.m_workingSetOffset;
         m_stack.removeLast();
     }
 

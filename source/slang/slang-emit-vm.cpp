@@ -481,6 +481,11 @@ public:
     {
         switch (inst->getOp())
         {
+        case kIROp_undefined:
+            {
+                ensureWorkingsetMemory(funcBuilder, inst);
+            }
+            break;
         case kIROp_Param:
             {
                 auto operand = ensureWorkingsetMemory(funcBuilder, inst);
