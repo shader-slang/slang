@@ -145,7 +145,9 @@ void DocMarkdownWriter::_appendAsBullets(
                 out.appendChar(wrapChar);
                 if (path.getLength())
                 {
-                    out << "](" << Path::getPathWithoutExt(Path::getRelativePath(m_currentPage->path, path)) << ".html)";
+                    out << "]("
+                        << Path::getPathWithoutExt(Path::getRelativePath(m_currentPage->path, path))
+                        << ".html)";
                 }
             }
             else
@@ -217,7 +219,8 @@ void DocMarkdownWriter::_appendAsBullets(const List<String>& values, char wrapCh
         }
         if (path.getLength())
         {
-            out << "](" << Path::getPathWithoutExt(Path::getRelativePath(m_currentPage->path, path)) << ".html)";
+            out << "](" << Path::getPathWithoutExt(Path::getRelativePath(m_currentPage->path, path))
+                << ".html)";
         }
         out << "\n";
     }
@@ -2160,7 +2163,8 @@ String DocMarkdownWriter::translateToMarkdownWithLinks(String text, bool strictC
                 sb.append("[");
                 sb << escapeMarkdownText(tokenContent.getUnownedSlice());
                 sb.append("](");
-                sb.append(Path::getPathWithoutExt(Path::getRelativePath(m_currentPage->path, page->path)));
+                sb.append(Path::getPathWithoutExt(
+                    Path::getRelativePath(m_currentPage->path, page->path)));
                 sb.append(".html");
                 if (sectionName.getLength())
                     sb << "#" << sectionName;
@@ -2249,7 +2253,8 @@ String DocMarkdownWriter::translateToHTMLWithLinks(Decl* decl, String text)
             if (page)
             {
                 sb.append("<a href=\"");
-                sb.append(Path::getPathWithoutExt(Path::getRelativePath(m_currentPage->path, page->path)));
+                sb.append(Path::getPathWithoutExt(
+                    Path::getRelativePath(m_currentPage->path, page->path)));
                 sb.append(".html");
                 if (sectionName.getLength())
                     sb << "#" << sectionName;
@@ -2709,7 +2714,8 @@ void DocMarkdownWriter::generateSectionIndexPage(DocumentPage* page)
     for (auto child : page->children)
     {
         sb << "- [" << escapeMarkdownText(child->shortName) << "]("
-           << Path::getPathWithoutExt(Path::getRelativePath(m_currentPage->path, child->path)) << ".html)\n";
+           << Path::getPathWithoutExt(Path::getRelativePath(m_currentPage->path, child->path))
+           << ".html)\n";
     }
 }
 
@@ -2938,7 +2944,8 @@ void writeTOCChildren(
         for (auto child : categories[cat])
         {
             landingPage->contentSB << "#### [" << writer->escapeMarkdownText(child->title) << "]("
-                                   << Path::getPathWithoutExt(Path::getRelativePath(page->path, child->path)) << ".html)\n\n";
+                                   << Path::getPathWithoutExt(Path::getRelativePath(page->path, child->path))
+                                   << ".html)\n\n";
         }
 
         // Add the toctree for the category landing page.
