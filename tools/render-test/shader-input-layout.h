@@ -55,7 +55,7 @@ struct InputTextureDesc
     int mipMapCount = 0; ///< 0 means the maximum number of mips will be bound
 
     InputTextureSampleCount sampleCount = InputTextureSampleCount::One;
-    Format format = Format::R8G8B8A8_UNORM;
+    Format format = Format::RGBA8Unorm;
 
     InputTextureContent content = InputTextureContent::One;
 };
@@ -72,7 +72,7 @@ struct InputBufferDesc
     InputBufferType type = InputBufferType::StorageBuffer;
     int stride = 0; // stride == 0 indicates an unstructured buffer.
     int elementCount = 1;
-    Format format = Format::Unknown;
+    Format format = Format::Undefined;
     // For RWStructuredBuffer, AppendStructuredBuffer, ConsumeStructuredBuffer
     // the default value of 0xffffffff indicates that a counter buffer should
     // not be assigned
@@ -149,7 +149,7 @@ struct TextureData
         m_slices.clear();
     }
 
-    rhi::Format m_format = rhi::Format::Unknown;
+    rhi::Format m_format = rhi::Format::Undefined;
     uint8_t m_formatSize = 0;
 
     Slang::List<Slice> m_slices;

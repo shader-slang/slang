@@ -3905,6 +3905,10 @@ struct SessionDesc
     /** Number of additional compiler option entries.
      */
     uint32_t compilerOptionEntryCount = 0;
+
+    /** Whether to skip SPIRV validation.
+     */
+    bool skipSPIRVValidation = false;
 };
 
 enum class ContainerType

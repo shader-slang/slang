@@ -93,6 +93,8 @@ struct Options
 
     bool showAdapterInfo = false;
 
+    bool skipSPIRVValidation = false;
+
     Options() { downstreamArgs.addName("slang"); }
 
     static SlangResult parse(
