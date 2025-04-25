@@ -172,7 +172,7 @@ jobs:
           if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 8 \
+              -server-count 4 \
               -category ${{ matrix.test-category }} \
               -api all-cpu \
               -expected-failure-list tests/expected-failure-github.txt \
