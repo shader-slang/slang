@@ -370,7 +370,6 @@ enum class UserDefinedAttributeTargets
 };
 
 const int kUnsizedArrayMagicLength = 0x7FFFFFFF;
-const int kSpecializationConstantArrayMagicLength = 0x7FFFFFFE;
 
 /// Get the module dclaration that a declaration is associated with, if any.
 ModuleDecl* getModuleDecl(Decl* decl);

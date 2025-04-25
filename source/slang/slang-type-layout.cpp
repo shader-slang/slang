@@ -2332,10 +2332,13 @@ static LayoutSize GetElementCount(IntVal* val)
 
     if (auto constantVal = as<ConstantIntVal>(val))
     {
-        if (constantVal->getValue() == kUnsizedArrayMagicLength ||
-            constantVal->getValue() == kSpecializationConstantArrayMagicLength)
+        if (constantVal->getValue() == kUnsizedArrayMagicLength)
             return LayoutSize::infinite();
         return LayoutSize(LayoutSize::RawValue(constantVal->getValue()));
+    }
+    else if (as<SpecializationConstantIntVal>(val))
+    {
+        return LayoutSize::infinite();
     }
     else if (const auto varRefVal = as<GenericParamIntVal>(val))
     {

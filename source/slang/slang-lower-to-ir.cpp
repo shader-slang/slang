@@ -2057,23 +2057,24 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         if (!type->isUnsized())
         {
             IRInst* elementCount = nullptr;
-            auto constIntVal = as<ConstantIntVal>(type->getElementCount());
-
-            if (constIntVal && constIntVal->getValue() == kSpecializationConstantArrayMagicLength)
+            if (auto specConstIntVal = as<SpecializationConstantIntVal>(type->getElementCount()))
             {
                 IRBuilderInsertLocScope insertScope(getBuilder());
-                auto irType = lowerType(context, constIntVal->m_specConstExpr->type.type);
+                auto specConstExpr = specConstIntVal->getValue();
+                auto irType = lowerType(context, specConstExpr->type.type);
                 auto undefined = getBuilder()->emitUndefined(irType);
                 elementCount =
                      getBuilder()->emitGlobalConstant(irType, undefined);
                 getBuilder()->setInsertBefore(elementCount);
                 auto irInitVal =
-                    getSimpleVal(context, lowerRValueExpr(context, constIntVal->m_specConstExpr));
+                    getSimpleVal(context, lowerRValueExpr(context, specConstExpr));
                 elementCount->setOperand(0, irInitVal);
                 getBuilder()->addDecoration(elementCount, kIROp_SpecializationConstantOpDecoration);
             }
             else
+            {
                 elementCount = lowerSimpleVal(context, type->getElementCount());
+            }
 
             return getBuilder()->getArrayType(elementType, elementCount);
         }

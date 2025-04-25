@@ -164,8 +164,6 @@ class ConstantIntVal : public IntVal
 
     ConstantIntVal(Type* inType, IntegerLiteralValue inValue) { setOperands(inType, inValue); }
     bool _isLinkTimeValOverride() { return false; }
-
-    SLANG_UNREFLECTED mutable Expr* m_specConstExpr = 0;
 };
 
 // Trivial case of a value that is just a constant integer
@@ -175,7 +173,7 @@ class SpecializationConstantIntVal : public IntVal
     FIDDLE(...)
     Expr* getValue()
     {
-        NodeBase* node = getOperand(1);
+        NodeBase* node = m_operands[1].values.nodeOperand;
         if (auto expr = as<Expr>(node))
             return expr;
         else
