@@ -873,6 +873,11 @@ Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSe
 
     RefPtr<Linkage> linkage = new Linkage(this, astBuilder, getBuiltinLinkage());
 
+    if (desc.skipSPIRVValidation)
+    {
+        linkage->m_optionSet.set(CompilerOptionName::SkipSPIRVValidation, true);
+    }
+
     {
         std::lock_guard<std::mutex> lock(m_typeCheckingCacheMutex);
         if (m_typeCheckingCache)
@@ -1468,17 +1473,17 @@ void Linkage::addTarget(slang::TargetDesc const& desc)
 }
 
 #if 0
-SLANG_NO_THROW SlangInt SLANG_MCALL Linkage::getTargetCount()
-{
-    return targets.getCount();
-}
+    SLANG_NO_THROW SlangInt SLANG_MCALL Linkage::getTargetCount()
+    {
+        return targets.getCount();
+    }
 
-SLANG_NO_THROW slang::ITarget* SLANG_MCALL Linkage::getTargetByIndex(SlangInt index)
-{
-    if(index < 0) return nullptr;
-    if(index >= targets.getCount()) return nullptr;
-    return asExternal(targets[index]);
-}
+    SLANG_NO_THROW slang::ITarget* SLANG_MCALL Linkage::getTargetByIndex(SlangInt index)
+    {
+        if (index < 0) return nullptr;
+        if (index >= targets.getCount()) return nullptr;
+        return asExternal(targets[index]);
+    }
 #endif
 
 static void outputExceptionDiagnostic(
@@ -3476,10 +3481,10 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
         }
 
 #if 0
-        // Test serialization
-        {
-            ASTSerialTestUtil::testSerialize(translationUnit->getModuleDecl(), getSession()->getRootNamePool(), getLinkage()->getASTBuilder()->getSharedASTBuilder(), getSourceManager());
-        }
+            // Test serialization
+            {
+                ASTSerialTestUtil::testSerialize(translationUnit->getModuleDecl(), getSession()->getRootNamePool(), getLinkage()->getASTBuilder()->getSharedASTBuilder(), getSourceManager());
+            }
 #endif
     }
 }
