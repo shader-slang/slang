@@ -673,6 +673,14 @@ class DispatchKernelExpr : public HigherOrderInvokeExpr
     FIDDLE() Expr* dispatchSize;
 };
 
+FIDDLE()
+class LambdaExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() ScopeDecl* paramScopeDecl;
+    FIDDLE() Stmt* bodyStmt;
+};
+
 /// An express to mark its inner expression as an intended non-differential call.
 FIDDLE()
 class TreatAsDifferentiableExpr : public Expr

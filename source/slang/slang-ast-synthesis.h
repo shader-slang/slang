@@ -115,10 +115,12 @@ public:
 
     Expr* emitPostfixExpr(UnownedStringSlice operatorToken, Expr* base);
 
+    Expr* emitThisExpr();
     Expr* emitVarExpr(Name* name);
     Expr* emitVarExpr(VarDecl* var);
     Expr* emitVarExpr(VarDecl* var, Type* type);
     Expr* emitVarExpr(DeclStmt* varStmt, Type* type);
+    Expr* emitStaticTypeExpr(Type* type);
 
     Expr* emitIntConst(int value);
 
@@ -136,6 +138,7 @@ public:
     }
 
     Expr* emitInvokeExpr(Expr* callee, List<Expr*>&& args);
+    Expr* emitCtorInvokeExpr(Expr* callee, List<Expr*>&& args);
 
     Expr* emitGenericAppExpr(Expr* genericExpr, List<Expr*>&& args);
 

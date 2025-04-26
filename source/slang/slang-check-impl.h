@@ -976,6 +976,7 @@ public:
         result.m_parentFunc = parentFunc;
         result.m_outerStmts = nullptr;
         result.m_parentDifferentiableAttr = parentFunc->findModifier<DifferentiableAttribute>();
+        result.m_lambdaCounter = 0;
         if (parentFunc->ownedScope)
             result.m_outerScope = parentFunc->ownedScope;
         return result;
@@ -986,6 +987,18 @@ public:
         SemanticsContext result(*this);
         result.m_parentExpandExpr = expr;
         result.m_capturedTypePacks = capturedTypes;
+        return result;
+    }
+
+    SemanticsContext withParentLambdaExpr(
+        LambdaExpr* expr,
+        LambdaDecl* decl,
+        Dictionary<Decl*, VarDeclBase*>* mapSrcDeclToCapturedLambdaDecl)
+    {
+        SemanticsContext result(*this);
+        result.m_parentLambdaExpr = expr;
+        result.m_mapSrcDeclToCapturedLambdaDecl = mapSrcDeclToCapturedLambdaDecl;
+        result.m_parentLambdaDecl = decl;
         return result;
     }
 
@@ -1161,6 +1174,17 @@ protected:
     ExpandExpr* m_parentExpandExpr = nullptr;
 
     OrderedHashSet<Type*>* m_capturedTypePacks = nullptr;
+
+    // If we are checking inside a lambda expression, we need
+    // to track the referenced variables that should be captured
+    // by the lambda.
+    LambdaExpr* m_parentLambdaExpr = nullptr;
+    LambdaDecl* m_parentLambdaDecl = nullptr;
+    Dictionary<Decl*, VarDeclBase*>* m_mapSrcDeclToCapturedLambdaDecl = nullptr;
+
+    // The number of lambda expressions we have encountered so far in the current function.
+    // This is used to give generated lambda struct types unique names.
+    Int m_lambdaCounter = 0;
 };
 
 struct OuterScopeContextRAII
@@ -2900,8 +2924,11 @@ public:
 
     Expr* visitEachExpr(EachExpr* expr);
 
+    Expr* visitLambdaExpr(LambdaExpr* expr);
+
     void maybeCheckKnownBuiltinInvocation(Expr* invokeExpr);
 
+    Expr* maybeRegisterLambdaCapture(Expr* exprIn);
     //
     // Some syntax nodes should not occur in the concrete input syntax,
     // and will only appear *after* checking is complete. We need to

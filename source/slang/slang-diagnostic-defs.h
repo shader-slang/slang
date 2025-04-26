@@ -932,7 +932,11 @@ DIAGNOSTIC(
     continueInsideDefer,
     "'continue' must not appear inside a defer statement.")
 DIAGNOSTIC(30110, Error, returnInsideDefer, "'return' must not appear inside a defer statement.")
-
+DIAGNOSTIC(
+    30111,
+    Error,
+    typeMismatchWithPreviousReturn,
+    "return type '$0' does not match previous return.")
 
 // Include
 DIAGNOSTIC(

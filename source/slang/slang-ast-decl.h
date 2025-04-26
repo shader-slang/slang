@@ -413,6 +413,14 @@ class ConstructorDecl : public FunctionDeclBase
     bool containsFlavor(ConstructorFlavor flavor) { return m_flavor & (int)flavor; }
 };
 
+FIDDLE()
+class LambdaDecl : public StructDecl
+{
+    FIDDLE(...)
+
+    FIDDLE() FunctionDeclBase* funcDecl;
+};
+
 // A subscript operation used to index instances of a type
 FIDDLE()
 class SubscriptDecl : public CallableDecl
