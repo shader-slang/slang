@@ -23043,9 +23043,9 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV &data $byteOffset16ByteAligned None
             };
         case hlsl:
-            CoopVec<T, N> ret;
-            ret.__Load(data, __byteToElemOffset<T>(byteOffset16ByteAligned));
-            return ret;
+            CoopVec<T,N> result;
+            result.__Load(data, __byteToElemOffset<T>(byteOffset16ByteAligned));
+            return result;
         default:
             CoopVec<T,N> result;
             for(int i = 0; i < N; ++i)
@@ -23347,20 +23347,13 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [require(hlsl)]
     void __Load(__constref groupshared T buffer[M], uint elemOffset)
     {
+        static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
         __target_switch
         {
         case hlsl:
-#ifdef NOT_SUPPORTED_DXC_PREVIEW
-            if (N == M && elemOffset == 0)
-            {
-                __intrinsic_asm "$0 = $1";
-            }
-            else
-#endif
-            {
-                for(int i = 0; i < N; ++i)
-                    this[i] = buffer[i + elemOffset];
-            }
+            [ForceUnroll]
+            for(int i = 0; i < N; ++i)
+                this[i] = buffer[i + elemOffset];
         }
     }
 

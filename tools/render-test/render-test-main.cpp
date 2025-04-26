@@ -767,16 +767,13 @@ void RenderTestApp::_initializeAccelerationStructure()
     {
         AccelerationStructureBuildInput buildInput = {};
         buildInput.type = AccelerationStructureBuildInputType::Triangles;
-
-        AccelerationStructureBuildInputTriangles& triangles = buildInput.triangles;
-        BufferOffsetPair& vertexBufferWithOffset = triangles.vertexBuffers[0];
-        vertexBufferWithOffset.buffer = vertexBuffer;
-        triangles.vertexBufferCount = 1;
-        triangles.vertexFormat = Format::RGB32Float;
-        triangles.vertexCount = kVertexCount;
-        triangles.vertexStride = sizeof(Vertex);
-        triangles.preTransformBuffer = transformBuffer;
-        triangles.flags = AccelerationStructureGeometryFlags::Opaque;
+        buildInput.triangles.vertexBuffers[0] = vertexBuffer;
+        buildInput.triangles.vertexBufferCount = 1;
+        buildInput.triangles.vertexFormat = Format::RGB32Float;
+        buildInput.triangles.vertexCount = kVertexCount;
+        buildInput.triangles.vertexStride = sizeof(Vertex);
+        buildInput.triangles.preTransformBuffer = transformBuffer;
+        buildInput.triangles.flags = AccelerationStructureGeometryFlags::Opaque;
         AccelerationStructureBuildDesc buildDesc = {};
         buildDesc.inputs = &buildInput;
         buildDesc.inputCount = 1;
@@ -876,11 +873,9 @@ void RenderTestApp::_initializeAccelerationStructure()
 
         AccelerationStructureBuildInput buildInput = {};
         buildInput.type = AccelerationStructureBuildInputType::Instances;
-
-        AccelerationStructureBuildInputInstances& instances = buildInput.instances;
-        instances.instanceBuffer = instanceBuffer;
-        instances.instanceCount = 1;
-        instances.instanceStride = nativeInstanceDescSize;
+        buildInput.instances.instanceBuffer = instanceBuffer;
+        buildInput.instances.instanceCount = 1;
+        buildInput.instances.instanceStride = nativeInstanceDescSize;
         AccelerationStructureBuildDesc buildDesc = {};
         buildDesc.inputs = &buildInput;
         buildDesc.inputCount = 1;
