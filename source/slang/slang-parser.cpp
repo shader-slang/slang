@@ -216,6 +216,7 @@ public:
     ContinueStmt* ParseContinueStatement();
     ReturnStmt* ParseReturnStatement();
     DeferStmt* ParseDeferStatement();
+    ThrowStmt* ParseThrowStatement();
     ExpressionStmt* ParseExpressionStatement();
     Expr* ParseExpression(Precedence level = Precedence::Comma);
 
@@ -5781,6 +5782,10 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
     {
         statement = ParseExpressionStatement();
     }
+    else if (LookAheadToken("throw"))
+    {
+        statement = ParseThrowStatement();
+    }
     else if (LookAheadToken(TokenType::Identifier) || LookAheadToken(TokenType::Scope))
     {
         if (LookAheadToken(TokenType::Identifier) && LookAheadToken(TokenType::Colon, 1))
@@ -6313,6 +6318,15 @@ DeferStmt* Parser::ParseDeferStatement()
     ReadToken("defer");
     deferStatement->statement = ParseStatement();
     return deferStatement;
+}
+
+ThrowStmt* Parser::ParseThrowStatement()
+{
+    ThrowStmt* throwStatement = astBuilder->create<ThrowStmt>();
+    FillPosition(throwStatement);
+    ReadToken("throw");
+    throwStatement->expression = ParseExpression();
+    return throwStatement;
 }
 
 ExpressionStmt* Parser::ParseExpressionStatement()

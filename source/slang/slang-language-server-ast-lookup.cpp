@@ -644,6 +644,8 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitDeferStmt(DeferStmt* stmt) { return dispatchIfNotNull(stmt->statement); }
 
+    bool visitThrowStmt(ThrowStmt* stmt) { return checkExpr(stmt->expression); }
+
     bool visitWhileStmt(WhileStmt* stmt)
     {
         if (checkExpr(stmt->predicate))

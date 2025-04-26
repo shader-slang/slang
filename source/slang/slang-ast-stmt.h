@@ -295,6 +295,13 @@ class DeferStmt : public Stmt
 };
 
 FIDDLE()
+class ThrowStmt : public Stmt
+{
+    FIDDLE(...)
+    FIDDLE() Expr* expression = nullptr;
+};
+
+FIDDLE()
 class ExpressionStmt : public Stmt
 {
     FIDDLE(...)

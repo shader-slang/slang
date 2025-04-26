@@ -6623,6 +6623,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         builder->setInsertInto(mergeBlock);
     }
 
+    void visitThrowStmt(ThrowStmt* stmt)
+    {
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+
+        auto loweredExpr = lowerRValueExpr(context, stmt->expression);
+        builder->emitThrow(getSimpleVal(context, loweredExpr));
+    }
+
     void visitDiscardStmt(DiscardStmt* stmt)
     {
         startBlockIfNeeded(stmt);

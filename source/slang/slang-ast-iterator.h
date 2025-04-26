@@ -438,6 +438,12 @@ struct ASTIterator
             dispatchIfNotNull(stmt->statement);
         }
 
+        void visitThrowStmt(ThrowStmt* stmt)
+        {
+            iterator->maybeDispatchCallback(stmt);
+            iterator->visitExpr(stmt->expression);
+        }
+
         void visitWhileStmt(WhileStmt* stmt)
         {
             iterator->maybeDispatchCallback(stmt);

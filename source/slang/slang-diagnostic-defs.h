@@ -932,6 +932,18 @@ DIAGNOSTIC(
     continueInsideDefer,
     "'continue' must not appear inside a defer statement.")
 DIAGNOSTIC(30110, Error, returnInsideDefer, "'return' must not appear inside a defer statement.")
+DIAGNOSTIC(30111, Error, uncaughtThrowInsideDefer, "'throw' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(30112, Error, uncaughtTryInsideDefer, "'try' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(
+    30113,
+    Error,
+    throwInNonThrowFunc,
+    "the current function or environment is not declared to throw any errors, but contains a 'throw' statement.")
+DIAGNOSTIC(
+    30114,
+    Error,
+    throwTypeIncompatibleWithErrorType,
+    "the type `$0` of `throw` is not compatible with function's error type `$1`.")
 
 
 // Include
