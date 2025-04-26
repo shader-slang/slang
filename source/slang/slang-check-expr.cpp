@@ -1192,7 +1192,7 @@ Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
         auto baseDiffType = tryGetDifferentialType(builder, ptrType->getValueType());
         if (!baseDiffType)
             return nullptr;
-        return builder->getPtrType(baseDiffType, ptrType->getClassInfo().m_name);
+        return builder->getPtrType(baseDiffType, ptrType->getClass().getName());
     }
     else if (auto arrayType = as<ArrayExpressionType>(type))
     {

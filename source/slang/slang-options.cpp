@@ -2424,7 +2424,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             {
                 CommandLineArg name;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(name));
-                // TODO: doagnose deprecated option
+                // TODO: warn that this option is deprecated
                 break;
             }
         case OptionKind::EmbedDownstreamIR:

@@ -2,7 +2,7 @@
 #include "slang-ast-decl.h"
 
 #include "slang-ast-builder.h"
-#include "slang-generated-ast-macro.h"
+#include "slang-ast-dispatch.h"
 #include "slang-syntax.h"
 
 #include <assert.h>
@@ -12,7 +12,7 @@ namespace Slang
 
 const TypeExp& TypeConstraintDecl::getSup() const
 {
-    SLANG_AST_NODE_CONST_VIRTUAL_CALL(TypeConstraintDecl, getSup, ())
+    SLANG_AST_NODE_VIRTUAL_CALL(TypeConstraintDecl, getSup, ())
 }
 
 const TypeExp& TypeConstraintDecl::_getSupOverride() const

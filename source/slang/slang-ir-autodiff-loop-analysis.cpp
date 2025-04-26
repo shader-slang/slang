@@ -707,8 +707,28 @@ StatementSet propagateUpwards(
                 }
                 else
                 {
-                    // Panic
-                    SLANG_UNREACHABLE("Unreachable block in conditional branch");
+                    // It's possible that the predecessor block is the condition block itself (when
+                    // either the true side or the false side is empty).
+                    //
+                    if (predecessor == ifElse->getParent() && ifElse->getFalseBlock() == current)
+                    {
+                        // True branch
+                        newPredicateSet.conjunct(
+                            tryExtractStatements(ifElse, ifElse->getFalseBlock()));
+                    }
+                    else if (
+                        predecessor == ifElse->getParent() && ifElse->getTrueBlock() == current)
+                    {
+                        // False branch
+                        newPredicateSet.conjunct(
+                            tryExtractStatements(ifElse, ifElse->getTrueBlock()));
+                    }
+                    else
+                    {
+
+                        // Panic
+                        SLANG_UNREACHABLE("Unreachable block in conditional branch");
+                    }
                 }
             }
         }

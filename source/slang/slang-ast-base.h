@@ -2,25 +2,26 @@
 
 #pragma once
 
-#include "slang-ast-reflect.h"
+#include "slang-ast-base.h.fiddle"
+#include "slang-ast-forward-declarations.h"
 #include "slang-ast-support-types.h"
 #include "slang-capability.h"
-#include "slang-generated-ast.h"
-#include "slang-serialize-reflection.h"
 
 // This file defines the primary base classes for the hierarchy of
 // AST nodes and related objects. For example, this is where the
 // basic `Decl`, `Stmt`, `Expr`, `type`, etc. definitions come from.
 
+FIDDLE()
 namespace Slang
 {
 
 class ASTBuilder;
 struct SemanticsVisitor;
 
+FIDDLE(abstract)
 class NodeBase
 {
-    SLANG_ABSTRACT_AST_CLASS(NodeBase)
+    FIDDLE(...)
 
     // MUST be called before used. Called automatically via the ASTBuilder.
     // Note that the astBuilder is not stored in the NodeBase derived types by default.
@@ -35,18 +36,12 @@ class NodeBase
 
     void _initDebug(ASTNodeType inAstNodeType, ASTBuilder* inAstBuilder);
 
-    /// Get the class info
-    SLANG_FORCE_INLINE const ReflectClassInfo& getClassInfo() const
-    {
-        return *ASTClassInfo::getInfo(astNodeType);
-    }
-
-    SyntaxClass<NodeBase> getClass() { return SyntaxClass<NodeBase>(&getClassInfo()); }
+    SyntaxClass<NodeBase> getClass() const { return SyntaxClass<NodeBase>(astNodeType); }
 
     /// The type of the node. ASTNodeType(-1) is an invalid node type, and shouldn't appear on any
     /// correctly constructed (through ASTBuilder) NodeBase derived class.
     /// The actual type is set when constructed on the ASTBuilder.
-    ASTNodeType astNodeType = ASTNodeType(-1);
+    FIDDLE() ASTNodeType astNodeType = ASTNodeType(-1);
 
 #ifdef _DEBUG
     SLANG_UNREFLECTED int32_t _debugUID = 0;
@@ -58,37 +53,25 @@ class NodeBase
 template<typename T>
 SLANG_FORCE_INLINE T* dynamicCast(NodeBase* node)
 {
-    return (node &&
-            ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo))
-               ? static_cast<T*>(node)
-               : nullptr;
+    return (node && node->getClass().isSubClassOf<T>()) ? static_cast<T*>(node) : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE const T* dynamicCast(const NodeBase* node)
 {
-    return (node &&
-            ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo))
-               ? static_cast<const T*>(node)
-               : nullptr;
+    return (node && node->getClass().isSubClassOf<T>()) ? static_cast<const T*>(node) : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE T* as(NodeBase* node)
 {
-    return (node &&
-            ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo))
-               ? static_cast<T*>(node)
-               : nullptr;
+    return (node && node->getClass().isSubClassOf<T>()) ? static_cast<T*>(node) : nullptr;
 }
 
 template<typename T>
 SLANG_FORCE_INLINE const T* as(const NodeBase* node)
 {
-    return (node &&
-            ReflectClassInfo::isSubClassOf(uint32_t(node->astNodeType), T::kReflectClassInfo))
-               ? static_cast<const T*>(node)
-               : nullptr;
+    return (node && node->getClass().isSubClassOf<T>()) ? static_cast<const T*>(node) : nullptr;
 }
 
 // Because DeclRefBase is now a `Val`, we prevent casting it directly into other nodes
@@ -114,9 +97,10 @@ DeclRef<T> as(DeclRef<U> declRef)
     return DeclRef<T>(declRef);
 }
 
-struct Scope : public NodeBase
+FIDDLE()
+class Scope : public NodeBase
 {
-    SLANG_AST_CLASS(Scope)
+    FIDDLE(...)
 
     // The container to use for lookup
     //
@@ -135,12 +119,13 @@ struct Scope : public NodeBase
 
 // Base class for all nodes representing actual syntax
 // (thus having a location in the source code)
+FIDDLE(abstract)
 class SyntaxNodeBase : public NodeBase
 {
-    SLANG_ABSTRACT_AST_CLASS(SyntaxNodeBase)
+    FIDDLE(...)
 
     // The primary source location associated with this AST node
-    SourceLoc loc;
+    FIDDLE() SourceLoc loc;
 };
 
 enum class ValNodeOperandKind
@@ -249,7 +234,7 @@ private:
     HashCode hashCode = 0;
 
 public:
-    ASTNodeType type;
+    SyntaxClass<NodeBase> type;
     ShortList<ValNodeOperand, 8> operands;
 
     inline bool operator==(ValNodeDesc const& that) const
@@ -381,9 +366,10 @@ static void addOrAppendToNodeList(List<ValNodeOperand>& list, ArrayView<T> l, Ts
 // a unique location, and any two `Val`s representing
 // the same value should be conceptually equal.
 
+FIDDLE(abstract)
 class Val : public NodeBase
 {
-    SLANG_ABSTRACT_AST_CLASS(Val)
+    FIDDLE(...)
 
     template<typename T>
     struct OperandView
@@ -423,10 +409,6 @@ class Val : public NodeBase
         ConstIterator begin() const { return ConstIterator{val, offset}; }
         ConstIterator end() const { return ConstIterator{val, offset + count}; }
     };
-
-    typedef IValVisitor Visitor;
-
-    void accept(IValVisitor* visitor, void* extra);
 
     // construct a new value by applying a set of parameter
     // substitutions to this one
@@ -485,7 +467,7 @@ class Val : public NodeBase
         for (auto v : operands)
             m_operands.add(ValNodeOperand(v));
     }
-    List<ValNodeOperand> m_operands;
+    FIDDLE() List<ValNodeOperand> m_operands;
 
     // Private use by the core module deserialization only. Since we know the Vals serialized into
     // the core module is already unique, we can just use `this` pointer as the `m_resolvedVal` so
@@ -573,13 +555,10 @@ SLANG_FORCE_INLINE const T* as(const Type* obj);
 // "canonical" type. The representation caches a pointer to
 // a canonical type on every type, so we can easily
 // operate on the raw representation when needed.
+FIDDLE(abstract)
 class Type : public Val
 {
-    SLANG_ABSTRACT_AST_CLASS(Type)
-
-    typedef ITypeVisitor Visitor;
-
-    void accept(ITypeVisitor* visitor, void* extra);
+    FIDDLE(...)
 
     /// Type derived types store the AST builder they were constructed on. The builder calls this
     /// function after constructing.
@@ -624,9 +603,10 @@ class Decl;
 
 // A reference to a declaration, which may include
 // substitutions for generic parameters.
+FIDDLE(abstract)
 class DeclRefBase : public Val
 {
-    SLANG_ABSTRACT_AST_CLASS(DeclRefBase)
+    FIDDLE(...)
 
     Decl* getDecl() const { return getDeclOperand(0); }
 
@@ -693,9 +673,10 @@ SLANG_FORCE_INLINE StringBuilder& operator<<(StringBuilder& io, Decl* decl)
     return io;
 }
 
+FIDDLE(abstract)
 class SyntaxNode : public SyntaxNodeBase
 {
-    SLANG_ABSTRACT_AST_CLASS(SyntaxNode);
+    FIDDLE(...)
 };
 
 //
@@ -703,29 +684,28 @@ class SyntaxNode : public SyntaxNodeBase
 // (that is, we don't use a bitfield, even for simple/common flags).
 // This ensures that we can track source locations for all modifiers.
 //
+FIDDLE(abstract)
 class Modifier : public SyntaxNode
 {
-    SLANG_ABSTRACT_AST_CLASS(Modifier)
-    typedef IModifierVisitor Visitor;
-
-    void accept(IModifierVisitor* visitor, void* extra);
+    FIDDLE(...)
 
     // Next modifier in linked list of modifiers on same piece of syntax
     Modifier* next = nullptr;
 
     // The keyword that was used to introduce t that was used to name this modifier.
-    Name* keywordName = nullptr;
+    FIDDLE() Name* keywordName = nullptr;
 
     Name* getKeywordName() { return keywordName; }
     NameLoc getKeywordNameAndLoc() { return NameLoc(keywordName, loc); }
 };
 
 // A syntax node which can have modifiers applied
+FIDDLE(abstract)
 class ModifiableSyntaxNode : public SyntaxNode
 {
-    SLANG_ABSTRACT_AST_CLASS(ModifiableSyntaxNode)
+    FIDDLE(...)
 
-    Modifiers modifiers;
+    FIDDLE() Modifiers modifiers;
 
     template<typename T>
     FilteredModifierList<T> getModifiersOfType()
@@ -754,28 +734,25 @@ struct ProvenenceNodeWithLoc
 };
 
 // An intermediate type to represent either a single declaration, or a group of declarations
+FIDDLE(abstract)
 class DeclBase : public ModifiableSyntaxNode
 {
-    SLANG_ABSTRACT_AST_CLASS(DeclBase)
-
-    typedef IDeclVisitor Visitor;
-
-    void accept(IDeclVisitor* visitor, void* extra);
+    FIDDLE(...)
 };
 
+FIDDLE(abstract)
 class Decl : public DeclBase
 {
+    FIDDLE(...)
 public:
-    SLANG_ABSTRACT_AST_CLASS(Decl)
-
-    ContainerDecl* parentDecl = nullptr;
+    FIDDLE() ContainerDecl* parentDecl = nullptr;
 
     DeclRefBase* getDefaultDeclRef();
 
-    NameLoc nameAndLoc;
-    CapabilitySet inferredCapabilityRequirements;
+    FIDDLE() NameLoc nameAndLoc;
+    FIDDLE() CapabilitySet inferredCapabilityRequirements;
 
-    RefPtr<MarkupEntry> markup;
+    FIDDLE() RefPtr<MarkupEntry> markup;
 
     Name* getName() const { return nameAndLoc.name; }
     SourceLoc getNameLoc() const { return nameAndLoc.loc; }
@@ -803,26 +780,20 @@ private:
     SLANG_UNREFLECTED DeclRefBase* m_defaultDeclRef = nullptr;
 };
 
+FIDDLE(abstract)
 class Expr : public SyntaxNode
 {
-    SLANG_ABSTRACT_AST_CLASS(Expr)
+    FIDDLE(...)
 
-    typedef IExprVisitor Visitor;
-
-    QualType type;
+    FIDDLE() QualType type;
 
     bool checked = false;
-
-    void accept(IExprVisitor* visitor, void* extra);
 };
 
+FIDDLE(abstract)
 class Stmt : public ModifiableSyntaxNode
 {
-    SLANG_ABSTRACT_AST_CLASS(Stmt)
-
-    typedef IStmtVisitor Visitor;
-
-    void accept(IStmtVisitor* visitor, void* extra);
+    FIDDLE(...)
 };
 
 template<typename T>
