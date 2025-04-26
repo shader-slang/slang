@@ -33,7 +33,6 @@ They should either be ported to use existentials directly (at which point we pot
 * compute/global-type-param-in-entrypoint.slang
 * compute/global-type-param.slang
 * compute/int-generic.slang
-* bugs/gh-6331.slang
 
 ### Static Specialization
 
