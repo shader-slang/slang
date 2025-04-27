@@ -41,6 +41,20 @@ void SemanticsVisitor::checkStmt(Stmt* stmt, SemanticsContext const& context)
     checkModifiers(stmt);
 }
 
+CatchStmt* SemanticsVisitor::findMatchingCatchStmt(Type* errorType)
+{
+    for (auto outerStmtInfo = m_outerStmts; outerStmtInfo; outerStmtInfo = outerStmtInfo->next)
+    {
+        auto outerStmt = outerStmtInfo->stmt;
+        if (auto catchStmt = as<CatchStmt>(outerStmt))
+        {
+            if (catchStmt->errorVar->getType()->equals(errorType))
+                return catchStmt;
+        }
+    }
+    return nullptr;
+}
+
 void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
 {
     // When we encounter a declaration during statement checking,
@@ -606,10 +620,9 @@ void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
         }
     }
 
-    // TODO: Check if this throw is caught in the function itself
-    Stmt* catcher = nullptr;
+    Stmt* catchStmt = findMatchingCatchStmt(stmt->expression->type);
 
-    if (FindOuterStmt<DeferStmt>(catcher))
+    if (FindOuterStmt<DeferStmt>(catchStmt))
     {
         // Allowing 'throw' escape a defer statement gets quite complex, for
         // similar reasons as 'return' - if you have two (or more) defers,
@@ -619,6 +632,16 @@ void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
         // scopes.
         getSink()->diagnose(stmt, Diagnostics::uncaughtThrowInsideDefer);
     }
+}
+
+void SemanticsStmtVisitor::visitCatchStmt(CatchStmt* stmt)
+{
+    ensureDeclBase(stmt->errorVar, DeclCheckState::DefinitionChecked, this);
+    stmt->errorVar->hiddenFromLookup = false;
+
+    WithOuterStmt subContext(this, stmt);
+    subContext.checkStmt(stmt->tryBody);
+    subContext.checkStmt(stmt->handleBody);
 }
 
 void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)

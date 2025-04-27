@@ -463,6 +463,14 @@ struct IRGenEnv
     IRGenEnv* outer = nullptr;
 };
 
+struct CatchHandler
+{
+    IRType* errorType;
+
+    // Block of the handler statement. Takes a value of errorType as parameter.
+    IRBlock* errorHandler;
+};
+
 struct SharedIRGenContext
 {
 
@@ -488,6 +496,8 @@ struct SharedIRGenContext
     // to the appropriate basic block to jump to.
     Dictionary<BreakableStmt::UniqueID, IRBlock*> breakLabels;
     Dictionary<BreakableStmt::UniqueID, IRBlock*> continueLabels;
+
+    List<CatchHandler> catchHandlers;
 
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
@@ -752,6 +762,18 @@ int32_t getIntrinsicOp(Decl* decl, IntrinsicOpModifier* intrinsicOpMod)
     return int32_t(irOp);
 }
 
+static IRBlock* findErrorHandler(SharedIRGenContext* shared, IRType* type)
+{
+    for (Index i = shared->catchHandlers.getCount()-1; i >= 0; --i)
+    {
+        if (shared->catchHandlers[i].errorType == type)
+        {
+            return shared->catchHandlers[i].errorHandler;
+        }
+    }
+    return nullptr;
+}
+
 struct TryClauseEnvironment
 {
     TryClauseType clauseType = TryClauseType::None;
@@ -807,16 +829,29 @@ LoweredValInfo emitCallToVal(
         case TryClauseType::Standard:
             {
                 auto callee = getSimpleVal(context, funcVal);
-                auto succBlock = builder->createBlock();
-                auto failBlock = builder->createBlock();
                 auto funcType = as<IRFuncType>(callee->getDataType());
                 auto throwAttr = funcType->findAttr<IRFuncThrowTypeAttr>();
                 assert(throwAttr);
+
+                auto succBlock = builder->createBlock();
+                bool defaultFailBlock = false;
+                auto failBlock = findErrorHandler(context->shared, throwAttr->getErrorType());
+                if (!failBlock)
+                {
+                    failBlock = builder->createBlock();
+                    defaultFailBlock = true;
+                }
+
                 auto voidType = builder->getVoidType();
                 builder->emitTryCallInst(voidType, succBlock, failBlock, callee, argCount, args);
-                builder->insertBlock(failBlock);
-                auto errParam = builder->emitParam(throwAttr->getErrorType());
-                builder->emitThrow(errParam);
+
+                if (defaultFailBlock)
+                {
+                    // We had to create a default fail block, which just re-throws.
+                    builder->insertBlock(failBlock);
+                    auto errParam = builder->emitParam(throwAttr->getErrorType());
+                    builder->emitThrow(errParam);
+                }
                 builder->insertBlock(succBlock);
                 auto value = builder->emitParam(type);
                 return LoweredValInfo::simple(value);
@@ -6629,7 +6664,61 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         startBlockIfNeeded(stmt);
 
         auto loweredExpr = lowerRValueExpr(context, stmt->expression);
-        builder->emitThrow(getSimpleVal(context, loweredExpr));
+        auto loweredVal = getSimpleVal(context, loweredExpr);
+
+        IRBlock* errorHandler = nullptr;
+        if (loweredVal && loweredVal->getDataType())
+        {
+            findErrorHandler(context->shared, loweredVal->getDataType());
+        }
+
+        if (errorHandler)
+        {
+            auto val = getSimpleVal(context, loweredExpr);
+            builder->emitBranch(errorHandler, 1, &val);
+        }
+        else
+        {
+            builder->emitThrow(getSimpleVal(context, loweredExpr));
+        }
+    }
+
+    void visitCatchStmt(CatchStmt* stmt)
+    {
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+
+        IRBlock* handleBlock = builder->createBlock();
+        IRBlock* mergeBlock = builder->createBlock();
+
+        CatchHandler catchHandler;
+        catchHandler.errorHandler = handleBlock;
+        catchHandler.errorType = lowerType(context, stmt->errorVar->getType());
+        context->shared->catchHandlers.add(catchHandler);
+
+        // Note that the tryBody doesn't actually have to have it's own scope or
+        // block. If there's a `defer` in the tryBody, it can run after the
+        // catch statement.
+        lowerStmt(context, stmt->tryBody);
+        builder->emitBranch(mergeBlock);
+
+        context->shared->catchHandlers.removeLast();
+
+        builder->insertBlock(handleBlock);
+        builder->setInsertInto(handleBlock);
+
+        auto irParam = builder->emitParam(catchHandler.errorType);
+        auto paramVal = LoweredValInfo::simple(irParam);
+        context->setGlobalValue(stmt->errorVar, paramVal);
+
+        IRBlock* prevScopeEndBlock = pushScopeBlock(mergeBlock);
+        lowerStmt(context, stmt->handleBody);
+        popScopeBlock(prevScopeEndBlock, true);
+
+        builder->emitBranch(mergeBlock);
+
+        builder->insertBlock(mergeBlock);
+        builder->setInsertInto(mergeBlock);
     }
 
     void visitDiscardStmt(DiscardStmt* stmt)
@@ -11821,6 +11910,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // uncomment this line while debugging.
 
     //      dumpIR(module);
+    // If we are being asked to dump IR during compilation,
+    // then we can dump the initial IR for the module here.
 
     // First, lower error handling logic into normal control flow.
     // This includes lowering throwing functions into functions that

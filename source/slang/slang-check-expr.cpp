@@ -3839,12 +3839,33 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
         return expr;
 
     auto parentFunc = this->m_parentFunc;
-    // TODO: check if the try clause is caught.
-    // For now we assume all `try`s are not caught (because we don't have catch yet).
-    // The below should be CatchStmt once it exists.
-    Stmt* catcher = nullptr;
+    auto base = as<InvokeExpr>(expr->base);
+    auto callee = as<DeclRefExpr>(base->functionExpr);
+    if (!callee)
+    {
+        getSink()->diagnose(expr, Diagnostics::calleeOfTryCallMustBeFunc);
+        return expr;
+    }
 
-    if (FindOuterStmt<DeferStmt>(catcher))
+    auto funcCallee = as<FuncDecl>(callee->declRef.getDecl());
+    Stmt* catchStmt = nullptr;
+    if (funcCallee)
+    {
+        if (funcCallee->errorType->equals(m_astBuilder->getBottomType()))
+        {
+            getSink()->diagnose(expr, Diagnostics::tryInvokeCalleeShouldThrow, callee->declRef);
+            return expr;
+        }
+        catchStmt = findMatchingCatchStmt(funcCallee->errorType);
+    }
+
+    if (!as<InvokeExpr>(expr->base))
+    {
+        getSink()->diagnose(expr, Diagnostics::tryClauseMustApplyToInvokeExpr);
+        return expr;
+    }
+
+    if (FindOuterStmt<DeferStmt>(catchStmt))
     {
         // 'try' may jump outside a defer statement, which isn't allowed for
         // now.
@@ -3852,11 +3873,7 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
         return expr;
     }
 
-    if (catcher)
-    {
-        return expr;
-    }
-    else
+    if (!catchStmt)
     {
         // Uncaught try.
         if (!parentFunc)
@@ -3869,35 +3886,18 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
             getSink()->diagnose(expr, Diagnostics::uncaughtTryCallInNonThrowFunc);
             return expr;
         }
-        if (!as<InvokeExpr>(expr->base))
+        if (funcCallee && !parentFunc->errorType->equals(funcCallee->errorType))
         {
-            getSink()->diagnose(expr, Diagnostics::tryClauseMustApplyToInvokeExpr);
+            getSink()->diagnose(
+                expr,
+                Diagnostics::errorTypeOfCalleeIncompatibleWithCaller,
+                callee->declRef,
+                funcCallee->errorType,
+                parentFunc->errorType);
             return expr;
         }
-        auto base = as<InvokeExpr>(expr->base);
-        if (auto callee = as<DeclRefExpr>(base->functionExpr))
-        {
-            if (auto funcCallee = as<FuncDecl>(callee->declRef.getDecl()))
-            {
-                if (funcCallee->errorType->equals(m_astBuilder->getBottomType()))
-                {
-                    getSink()->diagnose(expr, Diagnostics::tryInvokeCalleeShouldThrow, callee->declRef);
-                }
-                if (!parentFunc->errorType->equals(funcCallee->errorType))
-                {
-                    getSink()->diagnose(
-                        expr,
-                        Diagnostics::errorTypeOfCalleeIncompatibleWithCaller,
-                        callee->declRef,
-                        funcCallee->errorType,
-                        parentFunc->errorType);
-                }
-                return expr;
-            }
-        }
-        getSink()->diagnose(expr, Diagnostics::calleeOfTryCallMustBeFunc);
-        return expr;
     }
+    return expr;
 }
 
 Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)

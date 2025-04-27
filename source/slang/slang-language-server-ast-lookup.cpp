@@ -646,6 +646,15 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitThrowStmt(ThrowStmt* stmt) { return checkExpr(stmt->expression); }
 
+    bool visitCatchStmt(CatchStmt* stmt)
+    {
+        if (_findAstNodeImpl(*context, stmt->errorVar))
+            return true;
+        if (dispatchIfNotNull(stmt->tryBody))
+            return true;
+        return dispatchIfNotNull(stmt->handleBody);
+    }
+
     bool visitWhileStmt(WhileStmt* stmt)
     {
         if (checkExpr(stmt->predicate))

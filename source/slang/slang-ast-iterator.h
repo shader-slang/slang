@@ -444,6 +444,13 @@ struct ASTIterator
             iterator->visitExpr(stmt->expression);
         }
 
+        void visitCatchStmt(CatchStmt* stmt)
+        {
+            iterator->visitDecl(stmt->errorVar);
+            dispatchIfNotNull(stmt->tryBody);
+            dispatchIfNotNull(stmt->handleBody);
+        }
+
         void visitWhileStmt(WhileStmt* stmt)
         {
             iterator->maybeDispatchCallback(stmt);

@@ -2852,6 +2852,8 @@ public:
     void addVisibilityModifier(Decl* decl, DeclVisibility vis);
 
     void checkRayPayloadStructFields(StructDecl* structDecl);
+
+    CatchStmt* findMatchingCatchStmt(Type* errorType);
 };
 
 
@@ -3037,6 +3039,8 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
     void visitDeferStmt(DeferStmt* stmt);
 
     void visitThrowStmt(ThrowStmt* stmt);
+
+    void visitCatchStmt(CatchStmt* stmt);
 
     void visitWhileStmt(WhileStmt* stmt);
 

@@ -217,6 +217,7 @@ public:
     ReturnStmt* ParseReturnStatement();
     DeferStmt* ParseDeferStatement();
     ThrowStmt* ParseThrowStatement();
+    CatchStmt* ParseCatchStatement(Stmt* parseBody);
     ExpressionStmt* ParseExpressionStatement();
     Expr* ParseExpression(Precedence level = Precedence::Comma);
 
@@ -6005,6 +6006,16 @@ Stmt* Parser::parseBlockStatement()
             AddMember(scopeDecl, (Decl*)typeDefDecl);
             continue;
         }
+        else if (LookAheadToken("catch"))
+        {
+            // Move preceding instructions in block inside the catch statement,
+            // then replace the current contents with the catch statement.
+            auto catchStmt = ParseCatchStatement(body);
+            body = nullptr;
+            if (catchStmt)
+                addStmt(catchStmt);
+            continue;
+        }
 
         auto stmt = ParseStatement();
 
@@ -6327,6 +6338,40 @@ ThrowStmt* Parser::ParseThrowStatement()
     ReadToken("throw");
     throwStatement->expression = ParseExpression();
     return throwStatement;
+}
+
+CatchStmt* Parser::ParseCatchStatement(Stmt* tryBody)
+{
+    ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
+    pushScopeAndSetParent(scopeDecl);
+
+    CatchStmt* catchStatement = astBuilder->create<CatchStmt>();
+    FillPosition(catchStatement);
+    ReadToken("catch");
+    ReadToken(TokenType::LParent);
+
+    LetDecl* errorVar = astBuilder->create<LetDecl>();
+    FillPosition(errorVar);
+    if (_peekModernStyleVarDecl(this))
+    {
+        errorVar->nameAndLoc = NameLoc(ReadToken(TokenType::Identifier));
+        ReadToken(TokenType::Colon);
+        errorVar->type = ParseTypeExp();
+    }
+    else
+    {
+        errorVar->type = ParseTypeExp();
+        errorVar->nameAndLoc = NameLoc(ReadToken(TokenType::Identifier));
+    }
+    catchStatement->errorVar = errorVar;
+    AddMember(scopeDecl, errorVar);
+
+    ReadToken(TokenType::RParent);
+    catchStatement->tryBody = tryBody;
+    catchStatement->handleBody = ParseStatement();
+
+    PopScope();
+    return catchStatement;
 }
 
 ExpressionStmt* Parser::ParseExpressionStatement()
