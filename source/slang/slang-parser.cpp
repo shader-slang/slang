@@ -5946,7 +5946,7 @@ Stmt* Parser::parseBlockStatement()
     pushScopeAndSetParent(scopeDecl);
 
     Stmt* body = nullptr;
-
+    bool catchSegment = false;
 
     if (!tokenReader.isAtEnd())
     {
@@ -6012,9 +6012,14 @@ Stmt* Parser::parseBlockStatement()
             // then replace the current contents with the catch statement.
             auto catchStmt = ParseCatchStatement(body);
             body = nullptr;
+            catchSegment = true;
             if (catchStmt)
                 addStmt(catchStmt);
             continue;
+        }
+        else if (catchSegment)
+        {
+            sink->diagnose(tokenReader.peekLoc(), Diagnostics::catchBeforeEndOfScope);
         }
 
         auto stmt = ParseStatement();

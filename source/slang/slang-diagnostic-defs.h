@@ -526,6 +526,7 @@ DIAGNOSTIC(
     Error,
     unexpectedBodyAfterSemicolon,
     "unexpected function body after signature declaration, is this ';' a typo?")
+DIAGNOSTIC(20103, Error, catchBeforeEndOfScope, "catch statements must be last in scope.")
 DIAGNOSTIC(30102, Error, declNotAllowed, "$0 is not allowed here.")
 
 // 29xxx - Snippet parsing and inline asm
