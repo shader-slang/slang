@@ -2817,7 +2817,7 @@ static void legalizeMeshOutputParam(
                     auto tmp = builder->emitVar(t);
                     assign(builder, ScalarizedVal::address(tmp), d);
 
-                    s->replaceUsesWith(tmp);
+                    s->replaceUsesWith(builder->emitLoad(tmp));
                     s->removeAndDeallocate();
                 }
                 else if (const auto swiz = as<IRSwizzledStore>(s))
