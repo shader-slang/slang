@@ -6010,6 +6010,8 @@ Stmt* Parser::parseBlockStatement()
         {
             // Move preceding instructions in block inside the catch statement,
             // then replace the current contents with the catch statement.
+            PopScope();
+
             auto catchStmt = ParseCatchStatement(body);
             body = nullptr;
             catchSegment = true;
@@ -6029,7 +6031,8 @@ Stmt* Parser::parseBlockStatement()
 
         TryRecover(this);
     }
-    PopScope();
+    if (!catchSegment)
+        PopScope();
 
     // Save the closing braces source loc
     blockStatement->closingSourceLoc = closingBraceToken.loc;
