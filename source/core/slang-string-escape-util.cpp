@@ -1184,4 +1184,19 @@ StringEscapeUtil::Handler* StringEscapeUtil::getHandler(Style style)
     return SLANG_OK;
 }
 
+String StringEscapeUtil::escapeString(UnownedStringSlice input, StringEscapeUtil::Style style)
+{
+    StringBuilder sb;
+    auto handler = StringEscapeUtil::getHandler(style);
+    StringEscapeUtil::appendQuoted(handler, input, sb);
+    return sb.produceString();
+}
+
+String StringEscapeUtil::unescapeString(UnownedStringSlice input, StringEscapeUtil::Style style)
+{
+    StringBuilder sb;
+    auto handler = StringEscapeUtil::getHandler(style);
+    StringEscapeUtil::appendUnquoted(handler, input, sb);
+    return sb.produceString();
+}
 } // namespace Slang

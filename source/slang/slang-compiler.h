@@ -92,6 +92,7 @@ enum class CodeGenTarget : SlangCompileTargetIntegral
     WGSL = SLANG_WGSL,
     WGSLSPIRVAssembly = SLANG_WGSL_SPIRV_ASM,
     WGSLSPIRV = SLANG_WGSL_SPIRV,
+    HostVM = SLANG_HOST_VM,
     CountOf = SLANG_TARGET_COUNT_OF,
 };
 
@@ -1492,7 +1493,7 @@ public:
         {
             return SLANG_E_INVALID_ARG;
         }
-
+        SLANG_AST_BUILDER_RAII(m_astBuilder);
         ComPtr<slang::IEntryPoint> entryPoint(findEntryPointByName(UnownedStringSlice(name)));
         if ((!entryPoint))
             return SLANG_FAIL;
@@ -1511,7 +1512,6 @@ public:
         {
             return SLANG_E_INVALID_ARG;
         }
-
         ComPtr<slang::IEntryPoint> entryPoint(
             findAndCheckEntryPoint(UnownedStringSlice(name), stage, outDiagnostics));
         if ((!entryPoint))
