@@ -1303,10 +1303,16 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                         auto intType = builder.getIntType();
                         auto uintType = builder.getBasicType(BaseType::UInt);
 
-                        auto xComponent = builder.emitElementExtract(uintType, dispatchThreadID, builder.getIntValue(intType, 0));
-                        auto yComponent = builder.emitElementExtract(uintType, dispatchThreadID, builder.getIntValue(intType, 1));
+                        auto xComponent = builder.emitElementExtract(
+                            uintType,
+                            dispatchThreadID,
+                            builder.getIntValue(intType, 0));
+                        auto yComponent = builder.emitElementExtract(
+                            uintType,
+                            dispatchThreadID,
+                            builder.getIntValue(intType, 1));
 
-                        IRInst* components[2] = { xComponent, yComponent };
+                        IRInst* components[2] = {xComponent, yComponent};
                         auto vector2 = builder.emitMakeVector(vectorType, 2, components);
 
                         return LegalizedVaryingVal::makeValue(vector2);
