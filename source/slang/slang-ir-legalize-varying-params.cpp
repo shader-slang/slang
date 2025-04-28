@@ -1276,7 +1276,45 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         case SystemValueSemanticName::GroupIndex:
             return LegalizedVaryingVal::makeValue(groupThreadIndex);
         case SystemValueSemanticName::DispatchThreadID:
-            return LegalizedVaryingVal::makeValue(dispatchThreadID);
+            {
+                // If the parameter type is not uint3, we need to extract components as needed
+                auto paramType = info.type->getOperand(0);
+                IRBuilder builder(m_module);
+                builder.setInsertBefore(m_firstOrdinaryInst);
+
+                // For uint scalar, extract the x component
+                if (auto basicType = as<IRBasicType>(paramType))
+                {
+                    auto intType = builder.getIntType();
+                    auto val = builder.getIntValue(intType, 0);
+                    auto uintType = builder.getBasicType(BaseType::UInt);
+                    auto xComponent = builder.emitElementExtract(uintType, dispatchThreadID, val);
+                    return LegalizedVaryingVal::makeValue(xComponent);
+                }
+                // For uint2, extract the x and y components into a new vector
+                else if (auto vectorType = as<IRVectorType>(paramType))
+                {
+                    auto elementType = vectorType->getElementType();
+                    auto elementCount = getIntVal(vectorType->getElementCount());
+
+                    if (elementCount == 2 && as<IRBasicType>(elementType) &&
+                        as<IRBasicType>(elementType)->getBaseType() == BaseType::UInt)
+                    {
+                        auto intType = builder.getIntType();
+                        auto uintType = builder.getBasicType(BaseType::UInt);
+
+                        auto xComponent = builder.emitElementExtract(uintType, dispatchThreadID, builder.getIntValue(intType, 0));
+                        auto yComponent = builder.emitElementExtract(uintType, dispatchThreadID, builder.getIntValue(intType, 1));
+
+                        IRInst* components[2] = { xComponent, yComponent };
+                        auto vector2 = builder.emitMakeVector(vectorType, 2, components);
+
+                        return LegalizedVaryingVal::makeValue(vector2);
+                    }
+                }
+                // Default to the full uint3 if the parameter type doesn't match our expectations
+                return LegalizedVaryingVal::makeValue(dispatchThreadID);
+            }
         default:
             return diagnoseUnsupportedSystemVal(info);
         }
