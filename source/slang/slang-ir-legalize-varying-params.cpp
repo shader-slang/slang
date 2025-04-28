@@ -1283,7 +1283,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 builder.setInsertBefore(m_firstOrdinaryInst);
 
                 // For uint scalar, extract the x component
-                if (auto basicType = as<IRBasicType>(paramType))
+                if (as<IRBasicType>(paramType))
                 {
                     auto intType = builder.getIntType();
                     auto val = builder.getIntValue(intType, 0);
