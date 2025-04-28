@@ -12155,6 +12155,7 @@ vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 /// }
 /// ```
 [require(cpp_cuda_glsl_hlsl_spirv, printf)]
+[require(slangvm)]
 __intrinsic_op($(kIROp_Printf))
 void printf<each T>(NativeString format, expand each T args);
 
