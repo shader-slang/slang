@@ -61,6 +61,43 @@ static bool findEntryPointLayoutInfo(
     return false;
 }
 
+// Find semantic decoration for the return value of a function
+// Find semantic information for the return value of a function
+static bool findReturnValueSemanticInfo(
+    IRFunc* func,
+    UnownedStringSlice& outSemanticName,
+    int& outSemanticIndex)
+{
+    // Check for semantic on function itself
+    if (auto semanticDecor = findSemanticDecoration(func))
+    {
+        outSemanticName = semanticDecor->getSemanticName();
+        outSemanticIndex = semanticDecor->getSemanticIndex();
+        return true;
+    }
+
+    // Check for semantic in entry point layout
+    IREntryPointLayout* entryLayout = nullptr;
+    IRVarLayout* paramsLayout = nullptr;
+    IRVarLayout* resultLayout = nullptr;
+
+    if (findEntryPointLayoutInfo(func, entryLayout, paramsLayout, resultLayout) && resultLayout)
+    {
+        for (UInt i = 0; i < resultLayout->getOperandCount(); i++)
+        {
+            auto operand = resultLayout->getOperand(i);
+            if (auto semanticAttr = as<IRSystemValueSemanticAttr>(operand))
+            {
+                outSemanticName = semanticAttr->getName();
+                outSemanticIndex = semanticAttr->getIndex();
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 // Setup layout for return struct
 static void setupReturnStructLayout(
     IRFunc* origFunc,
@@ -73,6 +110,42 @@ static void setupReturnStructLayout(
 {
     // Create struct type layout for return struct
     IRStructTypeLayout::Builder returnStructLayoutBuilder(&builder);
+
+    // Add original return value if present
+    if (!as<IRVoidType>(origFunc->getResultType()) && outKeys.getCount())
+    {
+        // The original return value is always the first field
+        if (originalResultLayout)
+        {
+            returnStructLayoutBuilder.addField(outKeys[0], originalResultLayout);
+
+            // Transfer semantic information from original result layout to key if needed
+            bool hasSemanticOnKey = false;
+            for (auto decor : outKeys[0]->getDecorations())
+            {
+                if (as<IRSemanticDecoration>(decor))
+                {
+                    hasSemanticOnKey = true;
+                    break;
+                }
+            }
+
+            if (!hasSemanticOnKey)
+            {
+                for (UInt i = 0; i < originalResultLayout->getOperandCount(); i++)
+                {
+                    auto operand = originalResultLayout->getOperand(i);
+                    if (auto semanticAttr = as<IRSystemValueSemanticAttr>(operand))
+                    {
+                        builder.addSemanticDecoration(
+                            outKeys[0],
+                            semanticAttr->getName(),
+                            semanticAttr->getIndex());
+                    }
+                }
+            }
+        }
+    }
 
     // Add fields to the return struct layout
     for (auto param = origFunc->getFirstParam(); param; param = param->getNextParam())
@@ -91,16 +164,6 @@ static void setupReturnStructLayout(
                     returnStructLayoutBuilder.addField(key, paramLayout);
                 }
             }
-        }
-    }
-
-    // Add original return value if present
-    if (!as<IRVoidType>(origFunc->getResultType()) && outKeys.getCount())
-    {
-        // The original return value is always the first field
-        if (originalResultLayout)
-        {
-            returnStructLayoutBuilder.addField(outKeys[0], originalResultLayout);
         }
     }
 
@@ -271,12 +334,6 @@ static void setupEntryPointLayout(
 
 IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseReturnStruct)
 {
-    {
-        SourceManager s;
-        DiagnosticSinkWriter w(sink);
-        dumpIR(func->getModule(), {}, "MODULE AFTER", &s, &w);
-    }
-
     IRBuilder builder(func->getModule());
     IRCloneEnv cloneEnv;
 
@@ -303,6 +360,15 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
     {
         resultKey = builder.createStructKey();
         builder.addNameHintDecoration(resultKey, UnownedStringSlice("result"));
+
+        // Transfer semantic decoration from function return value to struct key
+        UnownedStringSlice semanticName;
+        int semanticIndex = 0;
+        if (findReturnValueSemanticInfo(func, semanticName, semanticIndex))
+        {
+            builder.addSemanticDecoration(resultKey, semanticName, semanticIndex);
+        }
+
         outKeys.add(resultKey);
     }
 
@@ -612,12 +678,6 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
         }
 
         func->removeAndDeallocate();
-    }
-
-    {
-        SourceManager s;
-        DiagnosticSinkWriter w(sink);
-        dumpIR(newFunc->getModule(), {}, "MODULE AFTER", &s, &w);
     }
 
     return newFunc;
