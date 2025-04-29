@@ -3991,6 +3991,8 @@ attribute_syntax [__ref] : RefAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__readNone] : ReadNoneAttribute;
 
+__attributeTarget(FunctionDeclBase)
+attribute_syntax [__noReturn] : NoReturnAttribute;
 /// Represents the applicable target for an attribute.
 enum _AttributeTargets
 {

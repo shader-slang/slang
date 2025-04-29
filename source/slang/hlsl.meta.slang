@@ -17490,6 +17490,7 @@ bool ReportHitOptix(float tHit, uint hitKind, expand each T attribs)
 /// Ignores the current intersection and continues traversal.
 /// @remarks Used in any-hit shaders to reject potential intersections
 /// @category raytracing
+[__noReturn]
 [require(cuda_glsl_hlsl_spirv, raytracing_anyhit)]
 void IgnoreHit()
 {

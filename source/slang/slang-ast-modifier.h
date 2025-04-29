@@ -1350,6 +1350,11 @@ class ReadNoneAttribute : public Attribute
     FIDDLE(...)
 };
 
+FIDDLE()
+class NoReturnAttribute: public Attribute
+{
+    FIDDLE(...)
+};
 
 // A `[__GLSLRequireShaderInputParameter]` attribute to annotate
 // functions that require a shader input as parameter

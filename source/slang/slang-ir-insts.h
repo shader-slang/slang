@@ -463,6 +463,7 @@ struct IRMemoryQualifierSetDecoration : IRDecoration
 
 IR_SIMPLE_DECORATION(HasExplicitHLSLBindingDecoration)
 IR_SIMPLE_DECORATION(ReadNoneDecoration)
+IR_SIMPLE_DECORATION(NoReturnDecoration)
 IR_SIMPLE_DECORATION(NoSideEffectDecoration)
 IR_SIMPLE_DECORATION(EarlyDepthStencilDecoration)
 IR_SIMPLE_DECORATION(PreciseDecoration)
