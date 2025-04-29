@@ -8,56 +8,320 @@
 
 namespace Slang
 {
+
+// Helper functions for decoration handling
+static IRVarLayout* findVarLayout_(IRInst* inst)
+{
+    for (auto decor : inst->getDecorations())
+    {
+        if (auto layoutDecor = as<IRLayoutDecoration>(decor))
+        {
+            return as<IRVarLayout>(layoutDecor->getLayout());
+        }
+    }
+    return nullptr;
+}
+
+static IRSemanticDecoration* findSemanticDecoration(IRInst* inst)
+{
+    for (auto decor : inst->getDecorations())
+    {
+        if (auto semanticDecor = as<IRSemanticDecoration>(decor))
+        {
+            return semanticDecor;
+        }
+    }
+    return nullptr;
+}
+
+static void transferSemanticDecorations(IRInst* source, IRInst* target, IRBuilder& builder)
+{
+    for (auto decor : source->getDecorations())
+    {
+        if (auto semanticDecor = as<IRSemanticDecoration>(decor))
+        {
+            builder.addSemanticDecoration(
+                target,
+                semanticDecor->getSemanticName(),
+                semanticDecor->getSemanticIndex());
+        }
+    }
+}
+
+// Helper to set up entry point layout
+
+static void setupEntryPointLayout(
+    IRFunc* origFunc,
+    IRFunc* newFunc,
+    IRStructType* returnStruct,
+    List<IRInst*>& fieldKeys,
+    Dictionary<IRParam*, int>& outParamMap,
+    List<IRParam*>& newParams,
+    Dictionary<IRParam*, IRParam*>& origToNewParamMap,
+    IRBuilder& builder)
+{
+    // Find the original entry point layout
+    IREntryPointLayout* originalEntryPointLayout = nullptr;
+    IRVarLayout* originalParamsLayout = nullptr;
+    IRVarLayout* originalResultLayout = nullptr;
+
+    for (auto decor : origFunc->getDecorations())
+    {
+        if (auto layoutDecor = as<IRLayoutDecoration>(decor))
+        {
+            if (auto entryLayout = as<IREntryPointLayout>(layoutDecor->getLayout()))
+            {
+                originalEntryPointLayout = entryLayout;
+                if (entryLayout->getOperandCount() >= 2)
+                {
+                    originalParamsLayout = as<IRVarLayout>(entryLayout->getOperand(0));
+                    originalResultLayout = as<IRVarLayout>(entryLayout->getOperand(1));
+                }
+                break;
+            }
+        }
+    }
+
+    if (!originalEntryPointLayout || !originalParamsLayout)
+        return;
+
+    // Extract original struct type layout for parameters
+    auto origParamsStructLayout = as<IRStructTypeLayout>(originalParamsLayout->getTypeLayout());
+    if (!origParamsStructLayout)
+        return;
+
+    // =======================================================================
+    // Create struct type layout for return struct
+    // =======================================================================
+    IRStructTypeLayout::Builder returnStructLayoutBuilder(&builder);
+
+    // Add fields to the return struct layout
+    for (auto param = origFunc->getFirstParam(); param; param = param->getNextParam())
+    {
+        if (auto outType = as<IROutTypeBase>(param->getDataType()))
+        {
+            // Skip inout params for output layout (they're handled as inputs)
+            if (outType->getOp() == kIROp_InOutType)
+                continue;
+
+            IRVarLayout* paramLayout = findVarLayout(param);
+            if (paramLayout && outParamMap.containsKey(param))
+            {
+                int index = outParamMap[param];
+                returnStructLayoutBuilder.addField(fieldKeys[index], paramLayout);
+            }
+        }
+    }
+
+    // Add original return value if present
+    if (!as<IRVoidType>(origFunc->getResultType()) && fieldKeys.getCount() > 0)
+    {
+        // Assume first field key is for the original return value
+        if (originalResultLayout)
+        {
+            returnStructLayoutBuilder.addField(fieldKeys[0], originalResultLayout);
+        }
+    }
+
+    auto returnStructLayout = returnStructLayoutBuilder.build();
+
+    // =======================================================================
+    // Create var layout for return struct
+    // =======================================================================
+    List<IRInst*> resultLayoutOperands;
+    resultLayoutOperands.add(returnStructLayout);
+
+    // Find and add stage information
+    IRInst* stageAttr = nullptr;
+    if (originalResultLayout)
+    {
+        for (UInt i = 0; i < originalResultLayout->getOperandCount(); i++)
+        {
+            auto operand = originalResultLayout->getOperand(i);
+            if (as<IRStageAttr>(operand))
+            {
+                stageAttr = operand;
+                resultLayoutOperands.add(stageAttr);
+                break;
+            }
+        }
+    }
+
+    // Add system value semantics from out parameters
+    for (auto param = origFunc->getFirstParam(); param; param = param->getNextParam())
+    {
+        if (auto outType = as<IROutTypeBase>(param->getDataType()))
+        {
+            auto semanticDecor = findSemanticDecoration(param);
+            if (semanticDecor)
+            {
+                auto semanticAttr = builder.getSystemValueSemanticAttr(
+                    semanticDecor->getSemanticName(),
+                    semanticDecor->getSemanticIndex());
+                resultLayoutOperands.add(semanticAttr);
+            }
+        }
+    }
+
+    auto resultVarLayout = builder.getVarLayout(resultLayoutOperands);
+
+    // =======================================================================
+    // Create params layout for input parameters
+    // =======================================================================
+    IRStructTypeLayout::Builder paramsLayoutBuilder(&builder);
+
+    // Build key-to-layout mapping from original params layout
+    Dictionary<IRInst*, IRVarLayout*> keyToLayoutMap;
+    for (auto fieldAttr : origParamsStructLayout->getFieldLayoutAttrs())
+    {
+        keyToLayoutMap[fieldAttr->getFieldKey()] = fieldAttr->getLayout();
+    }
+
+    // Map param-to-key from original layout
+    Dictionary<IRParam*, IRInst*> paramToKeyMap;
+
+    // Create a temporary mapping of parameter index to field
+    int paramIndex = 0;
+    for (auto param = origFunc->getFirstParam(); param; param = param->getNextParam())
+    {
+        if (paramIndex < int(origParamsStructLayout->getFieldLayoutAttrs().getCount()))
+        {
+            auto fieldAttr = origParamsStructLayout->getFieldLayoutAttrs()[paramIndex];
+            paramToKeyMap[param] = fieldAttr->getFieldKey();
+        }
+        paramIndex++;
+    }
+
+    // Process original parameters to add fields to new params layout
+    for (auto param = origFunc->getFirstParam(); param; param = param->getNextParam())
+    {
+        // Skip pure out parameters
+        if (auto outType = as<IROutTypeBase>(param->getDataType()))
+        {
+            if (outType->getOp() != kIROp_InOutType)
+                continue;
+        }
+
+        // Get layout for this parameter
+        IRVarLayout* paramLayout = findVarLayout(param);
+        if (!paramLayout)
+            continue;
+
+        // Get the key for this parameter
+        if (!paramToKeyMap.containsKey(param))
+            continue;
+
+        auto key = paramToKeyMap[param];
+
+        // Add field to new params layout
+        paramsLayoutBuilder.addField(key, paramLayout);
+
+        // Add layout decoration to new parameter if there's a mapping
+        if (origToNewParamMap.containsKey(param))
+        {
+            auto newParam = origToNewParamMap[param];
+            builder.addLayoutDecoration(newParam, paramLayout);
+
+            // Ensure semantic decoration is present
+            IRSemanticDecoration* origSemantic = findSemanticDecoration(param);
+            IRSemanticDecoration* newSemantic = findSemanticDecoration(newParam);
+
+            if (origSemantic && !newSemantic)
+            {
+                builder.addSemanticDecoration(
+                    newParam,
+                    origSemantic->getSemanticName(),
+                    origSemantic->getSemanticIndex());
+            }
+        }
+    }
+
+    auto paramsTypeLayout = paramsLayoutBuilder.build();
+
+    // =======================================================================
+    // Create var layout for parameters
+    // =======================================================================
+    List<IRInst*> paramsLayoutOperands;
+    paramsLayoutOperands.add(paramsTypeLayout);
+
+    // Copy additional var layout attributes
+    for (UInt i = 1; i < originalParamsLayout->getOperandCount(); i++)
+    {
+        paramsLayoutOperands.add(originalParamsLayout->getOperand(i));
+    }
+
+    auto paramsVarLayout = builder.getVarLayout(paramsLayoutOperands);
+
+    // =======================================================================
+    // Create entry point layout and apply to function
+    // =======================================================================
+    auto entryPointLayout = builder.getEntryPointLayout(paramsVarLayout, resultVarLayout);
+    builder.addLayoutDecoration(newFunc, entryPointLayout);
+}
+
+
 IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseReturnStruct)
 {
+#ifdef SLANG_DEBUG
     SourceManager s;
     DiagnosticSinkWriter w(sink);
     dumpIR(func->getModule(), {}, "MODULE BEFORE", &s, &w);
+#endif
 
     IRBuilder builder(func->getModule());
     IRCloneEnv cloneEnv;
 
-    // Collect types for the new function
-    List<IRType*> returnTypes;
-    List<IRType*> paramTypes;
+    // Parameter classification
+    struct ParamInfo
+    {
+        IRType* type;       // Parameter type
+        bool isOut;         // Is out parameter
+        bool isInOut;       // Is inout parameter
+        IRParam* origParam; // Original parameter
+        int fieldIndex;     // Index in field list (-1 if not an out parameter)
+    };
+    List<ParamInfo> paramInfos;
 
-    // Keep track of field information for struct
+    // Field information for struct return
     struct FieldInfo
     {
         IRStructKey* key;
         String name;
         IRType* type;
-        IRParam* origParam; // Track the original parameter for this field
+        IRParam* origParam; // nullptr for original return value
     };
     List<FieldInfo> fieldInfos;
 
-    struct VarInfo
-    {
-        IRVar* var;
-        IRParam* origParam;
-        bool isInOut;
-    };
-    List<VarInfo> outVars;
+    // Track struct keys for layout
+    List<IRInst*> fieldKeys;
 
-    // If original function returns non-void, add it to return types
+    // Map from original parameter to field index
+    Dictionary<IRParam*, int> outParamFieldMap;
+
+    // If original function returns non-void, add it to return struct
     if (!as<IRVoidType>(func->getResultType()))
     {
-        returnTypes.add(func->getResultType());
-
         auto resultKey = builder.createStructKey();
         builder.addNameHintDecoration(resultKey, UnownedStringSlice("result"));
         fieldInfos.add({resultKey, "result", func->getResultType(), nullptr});
+        fieldKeys.add(resultKey);
     }
 
     // Process parameters
     for (auto param : func->getParams())
     {
-        if (auto outType = as<IROutTypeBase>(param->getDataType()))
+        ParamInfo info;
+        info.origParam = param;
+        info.fieldIndex = -1;
+
+        if (const auto outType = as<IROutTypeBase>(param->getDataType()))
         {
             auto valueType = outType->getValueType();
-            returnTypes.add(valueType);
+            info.type = valueType;
+            info.isOut = true;
+            info.isInOut = (outType->getOp() == kIROp_InOutType);
 
-            // Get parameter name for field name
+            // Get parameter name for field
             String fieldName = "param";
             if (auto nameHint = param->findDecoration<IRNameHintDecoration>())
                 fieldName = String(nameHint->getName());
@@ -65,36 +329,37 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
             auto fieldKey = builder.createStructKey();
             builder.addNameHintDecoration(fieldKey, UnownedStringSlice(fieldName.getBuffer()));
 
-            // Copy semantic information
-            for (auto decor : param->getDecorations())
-            {
-                if (auto semanticDecor = as<IRSemanticDecoration>(decor))
-                {
-                    // Clone the semantic decoration to the new struct key
-                    builder.addSemanticDecoration(
-                        fieldKey,
-                        semanticDecor->getSemanticName(),
-                        semanticDecor->getSemanticIndex());
-                }
-            }
+            // Transfer semantic decorations to the key
+            transferSemanticDecorations(param, fieldKey, builder);
 
+            // Add to field list
+            info.fieldIndex = fieldInfos.getCount();
             fieldInfos.add({fieldKey, fieldName, valueType, param});
-
-            if (outType->getOp() == kIROp_InOutType)
-            {
-                paramTypes.add(valueType);
-            }
-
-            outVars.add(VarInfo{nullptr, param, outType->getOp() == kIROp_InOutType});
+            fieldKeys.add(fieldKey);
+            outParamFieldMap[param] = fieldKeys.getCount() - 1;
         }
         else
         {
-            paramTypes.add(param->getDataType());
+            info.type = param->getDataType();
+            info.isOut = false;
+            info.isInOut = false;
+        }
+
+        paramInfos.add(info);
+    }
+
+    // Nothing to do if no out parameters
+    bool hasOutParams = false;
+    for (auto& info : paramInfos)
+    {
+        if (info.isOut && !info.isInOut)
+        {
+            hasOutParams = true;
+            break;
         }
     }
 
-    // Nothing to do
-    if (outVars.getCount() == 0)
+    if (!hasOutParams && !alwaysUseReturnStruct)
         return func;
 
     // Create new function
@@ -103,13 +368,13 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
     // Copy all decorations except layout
     for (auto decor : func->getDecorations())
     {
-        if (!as<IRLayoutDecoration>(decor) && !as<IRSemanticDecoration>(decor))
+        if (!as<IRLayoutDecoration>(decor))
         {
             cloneDecoration(&cloneEnv, decor, newFunc, builder.getModule());
         }
     }
 
-    // Create return struct type if we have multiple return values
+    // Create return type
     IRType* resultType;
     IRStructType* returnStruct = nullptr;
 
@@ -132,124 +397,94 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
         for (auto& fieldInfo : fieldInfos)
         {
             builder.createStructField(returnStruct, fieldInfo.key, fieldInfo.type);
-
-            // Skip fields that don't come from parameters
-            if (!fieldInfo.origParam)
-                continue;
-
-            // Transfer semantic decorations from the original parameter to the struct key
-            for (auto decor : fieldInfo.origParam->getDecorations())
-            {
-                if (auto semanticDecor = as<IRSemanticDecoration>(decor))
-                {
-                    // Add semantic decoration to the struct key in the new struct
-                    builder.addSemanticDecoration(
-                        fieldInfo.key,
-                        semanticDecor->getSemanticName(),
-                        semanticDecor->getSemanticIndex());
-                }
-            }
         }
 
         resultType = returnStruct;
     }
-    else if (returnTypes.getCount() == 1)
+    else if (fieldInfos.getCount() == 1)
     {
-        resultType = returnTypes[0];
+        resultType = fieldInfos[0].type;
     }
     else
     {
         resultType = builder.getVoidType();
     }
 
+    // Collect parameter types for new function
+    List<IRType*> newParamTypes;
+    for (auto& info : paramInfos)
+    {
+        if (!info.isOut || info.isInOut)
+        {
+            newParamTypes.add(info.type);
+        }
+    }
 
-    auto funcType = builder.getFuncType(paramTypes, resultType);
+    auto funcType = builder.getFuncType(newParamTypes, resultType);
     newFunc->setFullType(funcType);
 
     auto firstBlock = builder.createBlock();
     newFunc->addBlock(firstBlock);
     builder.setInsertInto(firstBlock);
 
-    // Create parameters and track them
+    // Create parameters for new function
     List<IRParam*> newParams;
+    List<IRVar*> outVars;
+    Dictionary<IRParam*, IRParam*> origToNewParamMap; // Track mapping
 
-    for (auto param : func->getParams())
+    for (auto& info : paramInfos)
     {
-        if (auto outType = as<IROutTypeBase>(param->getDataType()))
+        if (!info.isOut || info.isInOut)
         {
-            if (outType->getOp() == kIROp_InOutType)
+            // Create parameter
+            auto newParam = builder.emitParam(info.type);
+
+            // Copy ALL decorations except layout
+            for (auto decor : info.origParam->getDecorations())
             {
-                auto newParam = builder.emitParam(param->getDataType());
-
-                // For regular parameters, copy ALL decorations including semantics and layout
-                for (auto decor : param->getDecorations())
-                {
-                    cloneDecoration(&cloneEnv, decor, newParam, builder.getModule());
-                }
-
-                newParams.add(newParam);
-            }
-        }
-        else
-        {
-            auto newParam = builder.emitParam(param->getDataType());
-
-            // Clone all decorations except layout and semantic from original parameter
-            for (auto decor : param->getDecorations())
-            {
-                if (!as<IRLayoutDecoration>(decor) && !as<IRSemanticDecoration>(decor))
+                if (!as<IRLayoutDecoration>(decor))
                 {
                     cloneDecoration(&cloneEnv, decor, newParam, builder.getModule());
                 }
             }
 
             newParams.add(newParam);
+            origToNewParamMap[info.origParam] = newParam; // Store mapping
         }
-    }
 
-    // Create vars for out/inout parameters
-    for (auto& varInfo : outVars)
-    {
-        auto outType = as<IROutTypeBase>(varInfo.origParam->getDataType());
-        varInfo.var = builder.emitVar(outType->getValueType());
 
-        if (varInfo.isInOut)
+        if (info.isOut)
         {
-            // Find the corresponding parameter by direct pointer comparison
-            int newParamIndex = 0;
-            for (auto param : func->getParams())
-            {
-                if (!as<IROutTypeBase>(param->getDataType()) ||
-                    as<IROutTypeBase>(param->getDataType())->getOp() != kIROp_InOutType)
-                {
-                    newParamIndex++;
-                    continue;
-                }
+            // Create variable for out parameter
+            auto var = builder.emitVar(info.type);
+            outVars.add(var);
 
-                if (param == varInfo.origParam)
-                {
-                    builder.emitStore(varInfo.var, newParams[newParamIndex]);
-                    break;
-                }
-                newParamIndex++;
+            // Initialize inout variables from parameters
+            if (info.isInOut)
+            {
+                int paramIndex = newParams.getCount() - 1;
+                builder.emitStore(var, newParams[paramIndex]);
             }
+        }
+        else
+        {
+            outVars.add(nullptr);
         }
     }
 
     // Build call to original function
     List<IRInst*> args;
-    int newParamIndex = 0;
-    int outVarIndex = 0;
+    int regularParamIndex = 0;
 
-    for (auto param : func->getParams())
+    for (int i = 0; i < paramInfos.getCount(); i++)
     {
-        if (as<IROutTypeBase>(param->getDataType()))
+        if (paramInfos[i].isOut)
         {
-            args.add(outVars[outVarIndex++].var);
+            args.add(outVars[i]);
         }
         else
         {
-            args.add(newParams[newParamIndex++]);
+            args.add(newParams[regularParamIndex++]);
         }
     }
 
@@ -263,7 +498,7 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
     {
         inlineCall(callResult);
 
-        // Remove keepAlive and entryPoint decorations from old function
+        // Remove decorations from old function
         List<IRDecoration*> decorationsToRemove;
         for (auto decor : func->getDecorations())
         {
@@ -273,7 +508,6 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
             }
         }
 
-        // Remove them after iteration is complete
         for (auto decor : decorationsToRemove)
         {
             decor->removeFromParent();
@@ -295,24 +529,35 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
         }
 
         // Add out parameter values
-        for (auto& varInfo : outVars)
+        for (int i = 0; i < paramInfos.getCount(); i++)
         {
-            fieldValues.add(builder.emitLoad(varInfo.var));
+            if (paramInfos[i].isOut)
+            {
+                fieldValues.add(builder.emitLoad(outVars[i]));
+            }
         }
 
         // Create struct with all field values
         returnValue = builder.emitMakeStruct(returnStruct, fieldValues);
     }
-    else if (returnTypes.getCount() == 1)
+    else if (fieldInfos.getCount() == 1)
     {
         // Single return value
         if (!as<IRVoidType>(func->getResultType()))
         {
             returnValue = callResult;
         }
-        else if (outVars.getCount() == 1)
+        else
         {
-            returnValue = builder.emitLoad(outVars[0].var);
+            // Find the out parameter
+            for (int i = 0; i < paramInfos.getCount(); i++)
+            {
+                if (paramInfos[i].isOut)
+                {
+                    returnValue = builder.emitLoad(outVars[i]);
+                    break;
+                }
+            }
         }
     }
 
@@ -328,199 +573,29 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
             entryPointDecor->getModuleName()->getStringSlice());
     }
 
-    if (returnStruct)
-    {
-        // Find the original entry point layout and extract components
-        IREntryPointLayout* originalEntryPointLayout = nullptr;
-        IRVarLayout* originalParamsLayout = nullptr;
-        IRVarLayout* originalResultLayout = nullptr;
-
-        for (auto decor : func->getDecorations())
-        {
-            if (auto layoutDecor = as<IRLayoutDecoration>(decor))
-            {
-                if (auto entryLayout = as<IREntryPointLayout>(layoutDecor->getLayout()))
-                {
-                    originalEntryPointLayout = entryLayout;
-                    if (entryLayout->getOperandCount() >= 2)
-                    {
-                        originalParamsLayout = as<IRVarLayout>(entryLayout->getOperand(0));
-                        originalResultLayout = as<IRVarLayout>(entryLayout->getOperand(1));
-                    }
-                    break;
-                }
-            }
-        }
-
-        if (originalEntryPointLayout && originalParamsLayout)
-        {
-            // Create struct type layout for return struct
-            IRStructTypeLayout::Builder returnStructLayoutBuilder(&builder);
-
-            // Add fields to the return struct layout
-            for (auto& fieldInfo : fieldInfos)
-            {
-                if (!fieldInfo.origParam)
-                    continue;
-
-                // Find the parameter's original layout
-                IRVarLayout* paramLayout = nullptr;
-                for (auto decor : fieldInfo.origParam->getDecorations())
-                {
-                    if (auto layoutDecor = as<IRLayoutDecoration>(decor))
-                    {
-                        paramLayout = as<IRVarLayout>(layoutDecor->getLayout());
-                        break;
-                    }
-                }
-
-                if (paramLayout)
-                {
-                    returnStructLayoutBuilder.addField(fieldInfo.key, paramLayout);
-                }
-            }
-
-            auto returnStructLayout = returnStructLayoutBuilder.build();
-
-            // Create var layout for return struct with semantics
-            List<IRInst*> resultLayoutOperands;
-            resultLayoutOperands.add(returnStructLayout);
-
-            // Find and add stage information
-            IRInst* stageAttr = nullptr;
-            if (originalResultLayout)
-            {
-                for (UInt i = 0; i < originalResultLayout->getOperandCount(); i++)
-                {
-                    auto operand = originalResultLayout->getOperand(i);
-                    if (as<IRStageAttr>(operand))
-                    {
-                        stageAttr = operand;
-                        resultLayoutOperands.add(stageAttr);
-                        break;
-                    }
-                }
-            }
-
-            // Add system value semantics from the out parameters
-            for (auto& fieldInfo : fieldInfos)
-            {
-                if (!fieldInfo.origParam)
-                    continue;
-
-                for (auto decor : fieldInfo.origParam->getDecorations())
-                {
-                    if (auto semanticDecor = as<IRSemanticDecoration>(decor))
-                    {
-                        auto semanticAttr = builder.getSystemValueSemanticAttr(
-                            semanticDecor->getSemanticName(),
-                            semanticDecor->getSemanticIndex());
-                        resultLayoutOperands.add(semanticAttr);
-                    }
-                }
-            }
-
-            // Create the return value layout
-            auto resultVarLayout = builder.getVarLayout(resultLayoutOperands);
-
-            // Handle input parameters layout preservation
-            // Extract struct type layout for input parameters
-            auto origParamsStructLayout =
-                as<IRStructTypeLayout>(originalParamsLayout->getTypeLayout());
-            if (!origParamsStructLayout)
-                return newFunc;
-
-            // Create new params structure layout
-            IRStructTypeLayout::Builder paramsLayoutBuilder(&builder);
-
-            // Track which parameters are regular inputs vs out parameters
-            int fieldIndex = 0;
-            int newParamIndex = 0;
-
-            // Iterate through original parameters
-            for (auto param : func->getParams())
-            {
-                if (auto outType = as<IROutTypeBase>(param->getDataType()))
-                {
-                    // Skip out parameters, they're now in the return struct
-                    if (outType->getOp() != kIROp_InOutType)
-                    {
-                        fieldIndex++;
-                        continue;
-                    }
-
-                    // InOut parameters need appropriate layout info transferred
-                    // They appear as regular parameters in the new function
-                }
-
-                // Handle regular inputs (including inout parameters that become inputs)
-                if (fieldIndex < origParamsStructLayout->getFieldCount())
-                {
-                    auto fieldLayoutAttr =
-                        origParamsStructLayout->getFieldLayoutAttrs()[fieldIndex];
-                    auto key = fieldLayoutAttr->getFieldKey();
-                    auto layout = fieldLayoutAttr->getLayout();
-
-                    // Add field to new params layout
-                    paramsLayoutBuilder.addField(key, layout);
-
-                    // Also add layout decoration to new parameter
-                    builder.addLayoutDecoration(newParams[newParamIndex], layout);
-
-                    // Add semantic decoration to parameter if present
-                    for (auto decor : param->getDecorations())
-                    {
-                        if (auto semanticDecor = as<IRSemanticDecoration>(decor))
-                        {
-                            builder.addSemanticDecoration(
-                                newParams[newParamIndex],
-                                semanticDecor->getSemanticName(),
-                                semanticDecor->getSemanticIndex());
-                        }
-                    }
-                }
-
-                newParamIndex++;
-                fieldIndex++;
-            }
-
-            auto paramsTypeLayout = paramsLayoutBuilder.build();
-
-            // Create var layout for parameters
-            List<IRInst*> paramsLayoutOperands;
-            paramsLayoutOperands.add(paramsTypeLayout);
-
-            // Copy any additional var layout attributes (beyond type layout)
-            for (UInt i = 1; i < originalParamsLayout->getOperandCount(); i++)
-            {
-                paramsLayoutOperands.add(originalParamsLayout->getOperand(i));
-            }
-
-            auto paramsVarLayout = builder.getVarLayout(paramsLayoutOperands);
-
-            // Create new entry point layout
-            auto entryPointLayout = builder.getEntryPointLayout(paramsVarLayout, resultVarLayout);
-
-            // Add layout decoration to the function
-            builder.addLayoutDecoration(newFunc, entryPointLayout);
-        }
-    }
-
     // Add keepAlive decoration to ensure the new function is preserved
     builder.addKeepAliveDecoration(newFunc);
 
+    // Set up layout information
+    if (returnStruct)
+    {
+        setupEntryPointLayout(
+            func,
+            newFunc,
+            returnStruct,
+            fieldKeys,
+            outParamFieldMap,
+            newParams,
+            origToNewParamMap, // Pass the parameter mapping
+            builder);
+    }
 
     if (useCount == 1)
         func->removeAndDeallocate();
+
+#ifdef SLANG_DEBUG
     dumpIR(newFunc->getModule(), {}, "MODULE AFTER", &s, &w);
-    // fprintf(
-    //     stderr,
-    //     "Original function:\n%s\n",
-    //     dumpIRToString(func, {IRDumpOptions::Mode::Detailed, 0}).getBuffer());
-    // fprintf(
-    //     stderr,
-    //     "Transformed function:\n%s\n",
-    //     dumpIRToString(newFunc, {IRDumpOptions::Mode::Detailed, 0}).getBuffer());
+#endif
 
     return newFunc;
 }

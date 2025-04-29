@@ -192,6 +192,18 @@ public:
 
     Index getCount() const { return m_count; }
     Index getCapacity() const { return m_capacity; }
+    template<typename Predicate>
+    Index countIf(Predicate predicate) const
+    {
+        Index count = 0;
+        for (Index i = 0; i < getCount(); ++i)
+        {
+            if (predicate((*this)[i]))
+                count++;
+        }
+        return count;
+    }
+
 
     const T* getBuffer() const { return m_buffer; }
     T* getBuffer() { return m_buffer; }
