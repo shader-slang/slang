@@ -477,6 +477,20 @@ Type* ASTBuilder::getDefaultInitializableType()
         getDefaultInitializableTypeInterfaceDecl());
 }
 
+DeclRef<InterfaceDecl> ASTBuilder::getErrorResultTypeInterfaceDecl()
+{
+    DeclRef<InterfaceDecl> declRef =
+        DeclRef<InterfaceDecl>(getBuiltinDeclRef("ErrorResultType", nullptr));
+    return declRef;
+}
+
+Type* ASTBuilder::getErrorResultType()
+{
+    return DeclRefType::create(
+        m_sharedASTBuilder->m_astBuilder,
+        getErrorResultTypeInterfaceDecl());
+}
+
 MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
     HLSLMeshShaderOutputModifier* modifier,
     Type* elementType,

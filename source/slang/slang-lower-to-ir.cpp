@@ -1996,8 +1996,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         else
         {
             auto errorType = lowerType(context, type->getErrorType());
+            IRInst* operands[] = {errorType, nullptr};
             auto irThrowFuncTypeAttribute =
-                getBuilder()->getAttr(kIROp_FuncThrowTypeAttr, 1, (IRInst**)&errorType);
+                getBuilder()->getAttr(kIROp_FuncThrowTypeAttr, 2, operands);
             return getBuilder()->getFuncType(
                 paramCount,
                 paramTypes.getBuffer(),
@@ -3455,9 +3456,12 @@ void _lowerFuncDeclBaseTypeInfo(
     if (!getErrorCodeType(context->astBuilder, declRef)
              ->equals(context->astBuilder->getBottomType()))
     {
-        auto errorType = lowerType(context, getErrorCodeType(context->astBuilder, declRef));
-        IRAttr* throwTypeAttr = nullptr;
-        throwTypeAttr = builder->getAttr(kIROp_FuncThrowTypeAttr, 1, (IRInst**)&errorType);
+        auto irErrorType = lowerType(context, getErrorCodeType(context->astBuilder, declRef));
+        SubtypeWitness* errorTypeWitness = declRef.getDecl()->errorTypeWitness;
+        auto irErrorTypeWitness = lowerSimpleVal(context, errorTypeWitness);
+        builder->addKeepAliveDecoration(irErrorTypeWitness);
+        IRInst* operands[] = {irErrorType, irErrorTypeWitness};
+        IRAttr* throwTypeAttr = builder->getAttr(kIROp_FuncThrowTypeAttr, 2, operands);
         outInfo.type = builder->getFuncType(
             paramTypes.getCount(),
             paramTypes.getBuffer(),

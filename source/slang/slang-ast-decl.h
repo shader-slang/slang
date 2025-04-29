@@ -367,6 +367,9 @@ class CallableDecl : public ContainerDecl
     // If this callable throws an error code, `errorType` is the type of the error code.
     FIDDLE() TypeExp errorType;
 
+    // Witness that `errorType` is subtype of `IError`
+    FIDDLE() SubtypeWitness* errorTypeWitness = nullptr;
+
     // Fields related to redeclaration, so that we
     // can support multiple specialized variations
     // of the "same" logical function.

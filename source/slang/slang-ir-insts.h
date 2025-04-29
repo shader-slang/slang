@@ -1788,6 +1788,7 @@ struct IRFuncThrowTypeAttr : IRAttr
     IR_LEAF_ISA(FuncThrowTypeAttr)
 
     IRType* getErrorType() { return (IRType*)getOperand(0); }
+    IRInst* getErrorTypeWitness() { return (IRInst*)getOperand(1); }
 };
 
 struct IRNoDiffAttr : IRAttr
@@ -3772,7 +3773,7 @@ public:
 
     IRExpandType* getExpandTypeOrVal(IRType* type, IRInst* pattern, ArrayView<IRInst*> capture);
 
-    IRResultType* getResultType(IRType* valueType, IRType* errorType);
+    IRResultType* getResultType(IRType* valueType, IRType* errorType, IRInst* errorTypeWitness);
     IROptionalType* getOptionalType(IRType* valueType);
 
     IRBasicBlockType* getBasicBlockType();

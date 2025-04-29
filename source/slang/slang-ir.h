@@ -2049,6 +2049,7 @@ struct IRResultType : IRType
 
     IRType* getValueType() { return (IRType*)getOperand(0); }
     IRType* getErrorType() { return (IRType*)getOperand(1); }
+    IRInst* getErrorTypeWitness() { return (IRInst*)getOperand(2); }
 };
 
 /// Represents an `Optional<T>`.
