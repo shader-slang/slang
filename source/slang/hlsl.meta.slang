@@ -9911,6 +9911,130 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
     }
 }
 
+/// Texture filter width (coarse).
+/// Calculates the sum abs(ddx_coarse(`p`)) + abs(ddy_coarse(`p`)).
+/// @param p The value to sum x and y partial derivative magnitudes for.
+/// @return The sum of abs(ddx_coarse(`p`)) and abs(ddy_coarse(`p`)).
+/// @remarks For SPIR-V, this function maps to `OpFwidthCoarse`.
+/// @category derivative
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+T fwidth_coarse(T p)
+{
+    __requireComputeDerivative();
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "abs(ddx_coarse($0)) + abs(ddy_coarse($0))";
+    case glsl:
+        __intrinsic_asm "fwidthCoarse($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability DerivativeControl;
+            OpFwidthCoarse $$T result $p;
+        };
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+vector<T, N> fwidth_coarse(vector<T, N> x)
+{
+    __requireComputeDerivative();
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "abs(ddx_coarse($0)) + abs(ddy_coarse($0))";
+    case glsl:
+        __intrinsic_asm "fwidthCoarse($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability DerivativeControl;
+            OpFwidthCoarse $$vector<T, N> result $x;
+        };
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
+matrix<T, N, M> fwidth_coarse(matrix<T, N, M> x)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "abs(ddx_coarse($0)) + abs(ddy_coarse($0))";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, fwidth_coarse, x);
+    }
+}
+
+/// Texture filter width (fine).
+/// Calculates the sum abs(ddx_fine(`p`)) + abs(ddy_fine(`p`)).
+/// @param p The value to sum x and y partial derivative magnitudes for.
+/// @return The sum of abs(ddx_fine(`p`)) and abs(ddy_fine(`p`)).
+/// @remarks For SPIR-V, this function maps to `OpFwidthFine`.
+/// @category derivative
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+T fwidth_fine(T p)
+{
+    __requireComputeDerivative();
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "abs(ddx_fine($0)) + abs(ddy_fine($0))";
+    case glsl:
+        __intrinsic_asm "fwidthFine($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability DerivativeControl;
+            OpFwidthFine $$T result $p;
+        };
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+vector<T, N> fwidth_fine(vector<T, N> x)
+{
+    __requireComputeDerivative();
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "abs(ddx_fine($0)) + abs(ddy_fine($0))";
+    case glsl:
+        __intrinsic_asm "fwidthFine($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability DerivativeControl;
+            OpFwidthFine $$vector<T, N> result $x;
+        };
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
+matrix<T, N, M> fwidth_fine(matrix<T, N, M> x)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "abs(ddx_fine($0)) + abs(ddy_fine($0))";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, fwidth_fine, x);
+    }
+}
+
 __intrinsic_op($(kIROp_ResolveVaryingInputRef))
 Ref<T> __ResolveVaryingInputRef<T>(__constref T attribute);
 
