@@ -935,8 +935,15 @@ DIAGNOSTIC(30110, Error, returnInsideDefer, "'return' must not appear inside a d
 DIAGNOSTIC(
     30111,
     Error,
-    typeMismatchWithPreviousReturn,
-    "return type '$0' does not match previous return.")
+    returnTypeMismatchInsideLambda,
+    "returned values must have the same type among all 'return' statements inside a lambda "
+    "expression: returned '$0' here, but '$1' previously.")
+
+DIAGNOSTIC(
+    30112,
+    Error,
+    nonCopyableTypeCapturedInLambda,
+    "cannot capture non-copyable type '$0' in a lambda expression.")
 
 // Include
 DIAGNOSTIC(

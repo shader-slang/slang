@@ -976,7 +976,6 @@ public:
         result.m_parentFunc = parentFunc;
         result.m_outerStmts = nullptr;
         result.m_parentDifferentiableAttr = parentFunc->findModifier<DifferentiableAttribute>();
-        result.m_lambdaCounter = 0;
         if (parentFunc->ownedScope)
             result.m_outerScope = parentFunc->ownedScope;
         return result;
@@ -1181,10 +1180,6 @@ protected:
     LambdaExpr* m_parentLambdaExpr = nullptr;
     LambdaDecl* m_parentLambdaDecl = nullptr;
     Dictionary<Decl*, VarDeclBase*>* m_mapSrcDeclToCapturedLambdaDecl = nullptr;
-
-    // The number of lambda expressions we have encountered so far in the current function.
-    // This is used to give generated lambda struct types unique names.
-    Int m_lambdaCounter = 0;
 };
 
 struct OuterScopeContextRAII

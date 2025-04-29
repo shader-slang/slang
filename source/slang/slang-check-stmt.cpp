@@ -571,7 +571,7 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
         returnType = stmt->expression->type.type;
         if (!stmt->expression->type->equals(m_astBuilder->getErrorType()))
         {
-            if (expectedReturnType)
+            if (!m_parentLambdaExpr && expectedReturnType)
             {
                 stmt->expression =
                     coerce(CoercionSite::Return, expectedReturnType, stmt->expression);
@@ -586,7 +586,11 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
             m_parentLambdaDecl->funcDecl->returnType.type = returnType;
         if (!m_parentLambdaDecl->funcDecl->returnType.type->equals(returnType))
         {
-            getSink()->diagnose(stmt, Diagnostics::typeMismatchWithPreviousReturn, returnType);
+            getSink()->diagnose(
+                stmt,
+                Diagnostics::returnTypeMismatchInsideLambda,
+                returnType,
+                m_parentLambdaDecl->funcDecl->returnType.type);
         }
     }
 

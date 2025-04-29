@@ -3213,9 +3213,16 @@ Expr* SemanticsExprVisitor::maybeRegisterLambdaCapture(Expr* exprIn)
         capturedVarDecl->type.type = exprIn->type.type;
         m_mapSrcDeclToCapturedLambdaDecl->add(srcDecl, capturedVarDecl);
         m_parentLambdaDecl->addMember(capturedVarDecl);
+
+        // Is captured value NonCopyable? If so, it needs to be an error.
+        if (isNonCopyableType(capturedVarDecl->type.type))
+        {
+            getSink()->diagnose(
+                exprIn,
+                Diagnostics::nonCopyableTypeCapturedInLambda,
+                capturedVarDecl->type.type);
+        }
     }
-    ASTSynthesizer synth = ASTSynthesizer(m_astBuilder, getNamePool());
-    synth.pushContainerScope(m_parentLambdaDecl);
 
     // Return a VarExpr referencing the capturedVarDecl.
     auto thisLambdaExpr = m_astBuilder->create<ThisExpr>();
@@ -3227,6 +3234,7 @@ Expr* SemanticsExprVisitor::maybeRegisterLambdaCapture(Expr* exprIn)
     resultMemberExpr->declRef = capturedVarDecl;
     resultMemberExpr->baseExpression = thisLambdaExpr;
     resultMemberExpr->type = exprIn->type;
+    resultMemberExpr->loc = exprIn->loc;
 
     // For captured variables, we need to set the type to be a non-lvalue to prevent
     // lambda expression body from mutating their values.
@@ -4191,10 +4199,10 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     nameBuilder << "_slang_Lambda_";
     if (m_parentFunc)
     {
-        nameBuilder << getMangledName(m_astBuilder, m_parentFunc);
+        nameBuilder << getText(m_parentFunc->getName());
     }
     nameBuilder << "_";
-    nameBuilder << m_lambdaCounter;
+    nameBuilder << m_parentFunc->members.getCount();
     auto name = getName(nameBuilder.getBuffer());
     lambdaStructDecl->nameAndLoc.name = name;
     lambdaStructDecl->nameAndLoc.loc = lambdaExpr->loc;
@@ -4205,9 +4213,15 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     funcDecl->nameAndLoc.name = getName("()");
     lambdaStructDecl->addMember(funcDecl);
     lambdaStructDecl->funcDecl = funcDecl;
+    addModifier(funcDecl, m_astBuilder->create<SynthesizedModifier>());
 
     // As we check the body, we will fill in the result type when we visit `ReturnStmt`.
     dispatchStmt(lambdaExpr->bodyStmt, subContext);
+
+    // If the lambda has no return type, we will set it to `void`.
+    if (!funcDecl->returnType.type)
+        funcDecl->returnType.type = m_astBuilder->getVoidType();
+
     synthesizer.popScope();
     synthesizer.popScope();
 

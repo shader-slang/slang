@@ -62,9 +62,10 @@ static Index _getDeclNameLength(Name* name, Decl* optionalDecl = nullptr)
         return 0;
     }
     // HACK: our __subscript functions currently have a name "operator[]".
+    // and our operator() functions have a name "()".
     // Since this isn't the name that actually appears in user's code,
     // we need to shorten its reported length to 1 for now.
-    if (name->text.startsWith("operator"))
+    if (name->text.startsWith("operator") || name->text.startsWith("()"))
     {
         return 1;
     }
@@ -667,17 +668,27 @@ bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
         {
             if (_isLocInRange(&context, decl->nameAndLoc.loc, _getDeclNameLength(decl->getName())))
             {
+                bool isRealDeclName = true;
                 for (auto modifier : decl->modifiers)
                 {
                     if (as<SynthesizedModifier>(modifier))
-                        return false;
+                    {
+                        isRealDeclName = false;
+                        break;
+                    }
                     if (as<ImplicitParameterGroupElementTypeModifier>(modifier))
-                        return false;
+                    {
+                        isRealDeclName = false;
+                        break;
+                    }
                 }
-                ASTLookupResult result;
-                result.path = context.nodePath;
-                context.results.add(_Move(result));
-                return true;
+                if (isRealDeclName)
+                {
+                    ASTLookupResult result;
+                    result.path = context.nodePath;
+                    context.results.add(_Move(result));
+                    return true;
+                }
             }
         }
         if (auto funcDecl = as<FunctionDeclBase>(node))
