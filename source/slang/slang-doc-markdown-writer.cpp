@@ -2253,8 +2253,9 @@ String DocMarkdownWriter::translateToHTMLWithLinks(Decl* decl, String text)
             if (page)
             {
                 sb.append("<a href=\"");
-                sb.append(Path::getPathWithoutExt(
-                    Path::getRelativePath(Path::getParentDirectory(m_currentPage->path), page->path)));
+                sb.append(Path::getPathWithoutExt(Path::getRelativePath(
+                    Path::getParentDirectory(m_currentPage->path),
+                    page->path)));
                 sb.append(".html");
                 if (sectionName.getLength())
                     sb << "#" << sectionName;
