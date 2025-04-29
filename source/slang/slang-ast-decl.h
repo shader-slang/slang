@@ -394,11 +394,11 @@ class CallableDecl : public ContainerDecl
 
     // The "primary" declaration of the function, which will
     // be used whenever we need to unique things.
-    CallableDecl* primaryDecl = nullptr;
+    FIDDLE() CallableDecl* primaryDecl = nullptr;
 
     // The next declaration of the "same" function (that is,
     // with the same `primaryDecl`).
-    CallableDecl* nextDecl = nullptr;
+    FIDDLE() CallableDecl* nextDecl = nullptr;
 };
 
 // Base class for callable things that may also have a body that is evaluated to produce their
