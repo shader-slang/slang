@@ -10,7 +10,7 @@
 //WGSLSPIRV: %vertexMain = OpFunction
 
 // Vertex Shader which writes to position
-void vertexMain(out float4 position : SV_Position)
+void vertexMain(out float4 position : SV_Position, in uint vertexID : SV_VertexID)
 {
     position = float4(0.6, 0.1, 0.6, 0.33);
 }
@@ -19,7 +19,7 @@ void vertexMain(out float4 position : SV_Position)
 // {
 //     float4 position : SV_Position; 
 // }
-// VertexOut vertexMain()
+// VertexOut vertexMain(in uint vertexID : SV_VertexID)
 // {
 //     VertexOut o;
 //     o.position = float4(1,2,3,4);
