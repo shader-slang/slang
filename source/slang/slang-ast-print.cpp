@@ -301,6 +301,7 @@ void ASTPrinter::addExpr(Expr* expr)
                 // Binary operator
                 if (invokeExpr->arguments.getCount() == 2)
                 {
+                    sb << "(";
                     addExpr(invokeExpr->arguments[0]);
                     if (operatorExpr->functionExpr && as<VarExpr>(operatorExpr->functionExpr) &&
                         as<VarExpr>(operatorExpr->functionExpr)->name)
@@ -312,6 +313,7 @@ void ASTPrinter::addExpr(Expr* expr)
                         sb << " <op> ";
                     }
                     addExpr(invokeExpr->arguments[1]);
+                    sb << ")";
                     return;
                 }
             }
@@ -411,11 +413,11 @@ void ASTPrinter::addExpr(Expr* expr)
 
         sb << "[";
         bool first = true;
-        for (auto indexExpr : indexExpr->indexExprs)
+        for (auto i : indexExpr->indexExprs)
         {
             if (!first)
                 sb << ", ";
-            addExpr(indexExpr);
+            addExpr(i);
             first = false;
         }
         sb << "]";
