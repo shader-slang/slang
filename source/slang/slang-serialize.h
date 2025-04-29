@@ -329,14 +329,14 @@ public:
 
         case SerialBinary::kInt32FourCC:
         case SerialBinary::kInt64FourCC:
-        {
-            auto intValue = decodeInt();
-            if (intValue < 0)
             {
-                SLANG_UNEXPECTED("signed/unsigned mismatch in RIFF");
+                auto intValue = decodeInt();
+                if (intValue < 0)
+                {
+                    SLANG_UNEXPECTED("signed/unsigned mismatch in RIFF");
+                }
+                return UInt64(intValue);
             }
-            return UInt64(intValue);
-        }
 
         default:
             SLANG_UNEXPECTED("invalid format in RIFF");
