@@ -4012,7 +4012,8 @@ private:
 void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointInfo& entryPoint)
 {
     const auto oldFunc = entryPoint.entryPointFunc;
-    entryPoint.entryPointFunc = lowerOutParameters(oldFunc, sink);
+    const bool alwaysUseReturnStruct = true;
+    entryPoint.entryPointFunc = lowerOutParameters(oldFunc, sink, alwaysUseReturnStruct);
 
     if (oldFunc == entryPoint.entryPointFunc)
         return;

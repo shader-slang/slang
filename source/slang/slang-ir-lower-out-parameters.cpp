@@ -8,8 +8,12 @@
 
 namespace Slang
 {
-IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
+IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseReturnStruct)
 {
+    SourceManager s;
+    DiagnosticSinkWriter w(sink);
+    dumpIR(func->getModule(), {}, "MODULE BEFORE", &s, &w);
+
     IRBuilder builder(func->getModule());
     IRCloneEnv cloneEnv;
 
@@ -75,6 +79,10 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
         }
     }
 
+    // Nothing to do
+    if (outVars.getCount() == 0)
+        return func;
+
     // Create new function
     auto newFunc = builder.createFunc();
 
@@ -91,7 +99,7 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
     IRType* resultType;
     IRStructType* returnStruct = nullptr;
 
-    if (fieldInfos.getCount() > 1)
+    if (fieldInfos.getCount() > 1 || alwaysUseReturnStruct)
     {
         returnStruct = builder.createStructType();
 
@@ -221,9 +229,7 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
     // If original function has only one use, inline it
     int useCount = 0;
     for (auto use = func->firstUse; use; use = use->nextUse)
-    {
         useCount++;
-    }
     if (useCount == 1)
     {
         inlineCall(callResult);
@@ -296,14 +302,18 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink*)
     // Add keepAlive decoration to ensure the new function is preserved
     builder.addKeepAliveDecoration(newFunc);
 
-    fprintf(
-        stderr,
-        "Original function:\n%s\n",
-        dumpIRToString(func, {IRDumpOptions::Mode::Detailed, 0}).getBuffer());
-    fprintf(
-        stderr,
-        "Transformed function:\n%s\n",
-        dumpIRToString(newFunc, {IRDumpOptions::Mode::Detailed, 0}).getBuffer());
+
+    if (useCount == 1)
+        func->removeAndDeallocate();
+    dumpIR(newFunc->getModule(), {}, "MODULE AFTER", &s, &w);
+    // fprintf(
+    //     stderr,
+    //     "Original function:\n%s\n",
+    //     dumpIRToString(func, {IRDumpOptions::Mode::Detailed, 0}).getBuffer());
+    // fprintf(
+    //     stderr,
+    //     "Transformed function:\n%s\n",
+    //     dumpIRToString(newFunc, {IRDumpOptions::Mode::Detailed, 0}).getBuffer());
 
     return newFunc;
 }
