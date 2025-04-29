@@ -162,6 +162,116 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
         resultType = builder.getVoidType();
     }
 
+
+    if (returnStruct)
+    {
+        // Find the original entry point layout
+        IREntryPointLayout* originalEntryPointLayout = nullptr;
+        IRVarLayout* originalResultLayout = nullptr;
+        IRVarLayout* originalParamsLayout = nullptr;
+
+        for (auto decor : func->getDecorations())
+        {
+            if (auto layoutDecor = as<IRLayoutDecoration>(decor))
+            {
+                if (auto entryLayout = as<IREntryPointLayout>(layoutDecor->getLayout()))
+                {
+                    originalEntryPointLayout = entryLayout;
+
+                    // The entry point layout should have pointers to result and params layouts
+                    if (entryLayout->getOperandCount() >= 2)
+                    {
+                        originalResultLayout = as<IRVarLayout>(entryLayout->getOperand(0));
+                        originalParamsLayout = as<IRVarLayout>(entryLayout->getOperand(1));
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (originalEntryPointLayout)
+        {
+            // Create a new struct type layout for our return struct
+            IRStructTypeLayout::Builder structTypeLayoutBuilder(&builder);
+
+            // For each field, add its layout information to the struct type layout
+            for (auto& fieldInfo : fieldInfos)
+            {
+                // Skip fields that don't come from parameters
+                if (!fieldInfo.origParam)
+                    continue;
+
+                // Find the layout for this parameter
+                IRVarLayout* paramLayout = nullptr;
+                for (auto decor : fieldInfo.origParam->getDecorations())
+                {
+                    if (auto layoutDecor = as<IRLayoutDecoration>(decor))
+                    {
+                        paramLayout = as<IRVarLayout>(layoutDecor->getLayout());
+                        break;
+                    }
+                }
+
+                if (paramLayout)
+                {
+                    // Add this field to the struct type layout
+                    structTypeLayoutBuilder.addField(fieldInfo.key, paramLayout);
+                }
+            }
+
+            // Build the struct type layout
+            auto structTypeLayout = structTypeLayoutBuilder.build();
+
+            // Create var layout for the return struct
+            List<IRInst*> varLayoutOperands;
+            varLayoutOperands.add(structTypeLayout);
+
+            // Add any system value semantics that might be needed
+            for (auto& fieldInfo : fieldInfos)
+            {
+                if (!fieldInfo.origParam)
+                    continue;
+
+                for (auto decor : fieldInfo.origParam->getDecorations())
+                {
+                    if (auto semanticDecor = as<IRSemanticDecoration>(decor))
+                    {
+                        auto semanticAttr = builder.getSystemValueSemanticAttr(
+                            semanticDecor->getSemanticName(),
+                            semanticDecor->getSemanticIndex());
+                        varLayoutOperands.add(semanticAttr);
+                    }
+                }
+            }
+
+            // Add stage information if present in original layout
+            // IRInst* stageAttr = nullptr;
+            // if (originalResultLayout)
+            // {
+            //     for (auto operand : originalResultLayout->getOperands())
+            //     {
+            //         if (as<IRStageAttr>(operand))
+            //         {
+            //             stageAttr = operand;
+            //             varLayoutOperands.add(stageAttr);
+            //             break;
+            //         }
+            //     }
+            // }
+
+            auto resultVarLayout = builder.getVarLayout(varLayoutOperands);
+
+            // Create a new entry point layout
+            auto newEntryPointLayout = builder.getEntryPointLayout(
+                originalParamsLayout, // Keep the original params layout
+                resultVarLayout       // Use our new result var layout
+            );
+
+            // Apply the layout to the new function
+            builder.addLayoutDecoration(newFunc, newEntryPointLayout);
+        }
+    }
+
     auto funcType = builder.getFuncType(paramTypes, resultType);
     newFunc->setFullType(funcType);
 
@@ -178,15 +288,12 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
         {
             if (outType->getOp() == kIROp_InOutType)
             {
-                auto newParam = builder.emitParam(outType->getValueType());
+                auto newParam = builder.emitParam(param->getDataType());
 
-                // Clone all decorations except layout and semantic from original parameter
+                // For regular parameters, copy ALL decorations including semantics and layout
                 for (auto decor : param->getDecorations())
                 {
-                    if (!as<IRLayoutDecoration>(decor) && !as<IRSemanticDecoration>(decor))
-                    {
-                        cloneDecoration(&cloneEnv, decor, newParam, builder.getModule());
-                    }
+                    cloneDecoration(&cloneEnv, decor, newParam, builder.getModule());
                 }
 
                 newParams.add(newParam);
