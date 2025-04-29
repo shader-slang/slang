@@ -45,6 +45,9 @@ Targets
 `wgsl`
 > Represents the WebGPU shading language code generation target.
 
+`slangvm`
+> Represents the Slang VM bytecode target.
+
 Stages
 ----------------------
 *Capabilities to specify code generation stages (`vertex`, `fragment`...)*
@@ -66,6 +69,9 @@ Stages
 
 `geometry`
 > Geometry shader stage
+
+`dispatch`
+> Dispatch shader stage
 
 `pixel`
 > Pixel shader stage
