@@ -3451,6 +3451,7 @@ struct IRDebugInlinedAt : IRInst
     IRInst* getOuterInlinedAt() { return getOperand(3); }
     IRInst* getDebugFunc() { return getOperand(4); }
     void setOuterInlinedAt(IRInst* outer) { setOperand(3, outer); }
+    void setDebugFunc(IRInst* func) { setOperand(4, func); }
 };
 
 struct IRDebugScope : IRInst
@@ -3482,6 +3483,12 @@ struct IRDebugFunction : IRInst
     IRInst* getCol() { return getOperand(2); }
     IRInst* getFile() { return getOperand(3); }
     IRInst* getDebugType() { return getOperand(4); }
+};
+
+struct IRDebugFuncDecoration : IRInst
+{
+    IR_LEAF_ISA(DebugFunctionDecoration)
+    IRInst* getDebugFunc() { return getOperand(0); }
 };
 
 struct IRDebugLocationDecoration : IRDecoration

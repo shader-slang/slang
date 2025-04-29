@@ -1,6 +1,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv -O0 -g3
 RWStructuredBuffer<int> outputBuffer;
 
+// Test where outer function is inlined before the inner function.
+
 [ForceInline]
 int inlineSingleBasicBlock1(int value1, int value2)
 {
@@ -8,7 +10,7 @@ int inlineSingleBasicBlock1(int value1, int value2)
     return value1 * 2 + value2;
 }
 
-[ForceInline]
+[__unsafeForceInlineEarly]
 int inlineSingleBasicBlock2(int value1, int value2)
 {
     int result1 = inlineSingleBasicBlock1(10, 20);
@@ -35,4 +37,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 // CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugScope %{{[0-9]+}} %{{[0-9]+}}
 // CHECK-COUNT-1: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
 // CHECK-NOT: %{{[0-9]+}} = OpExtInst %void %{{[0-9]+}} DebugNoScope
-

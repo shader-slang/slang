@@ -7964,6 +7964,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugFunction(SpvInst* firstBlock, SpvInst* spvFunc, IRFunc* function)
     {
+        SpvInst* debugFunc = nullptr;
+        if (m_mapIRInstToSpvDebugInst.tryGetValue(function, debugFunc))
+        {
+            return debugFunc;
+        }
+
         auto scope = findDebugScope(function);
         if (!scope)
             return nullptr;
@@ -7982,19 +7988,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // we instead store the IRDebugFunction. This way, we avoid the same
         // function getting emitted again via emitDebugInlinedFunction.
         IRDebugFunction* irDebugFunc = nullptr;
-        SpvInst* debugFunc = nullptr;
         for (auto decor : function->getDecorations())
         {
-            if (decor->getOp() == kIROp_DebugFunctionDecoration)
+            if (auto debugFuncDecor = as<IRDebugFuncDecoration>(decor))
             {
-                irDebugFunc = as<IRDebugFunction>(decor->getOperand(0));
+                irDebugFunc = as<IRDebugFunction>(debugFuncDecor->getDebugFunc());
                 break;
             }
-        }
-
-        if (m_mapIRInstToSpvDebugInst.tryGetValue(function, debugFunc))
-        {
-            return debugFunc;
         }
 
         debugFunc = emitOpDebugFunction(
