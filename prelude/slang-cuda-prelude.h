@@ -3403,7 +3403,10 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex3Dfetch_int(CUtexObject texObj, int x, i
     asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
         : "=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy)
         : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
-    // Note: The repeated z is a WAR for a bug in PTX. That is a dummy parameter.
+	// Note: The repeated z is a dummy used as the fourth operand in ptx.
+	// From the docs: https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#texture-instructions-tex
+	// Operand c is a scalar or singleton tuple for 1d textures; is a two-element vector for 2d textures;
+	// and is a four-element vector for 3d textures.
     return result;
 }
 
