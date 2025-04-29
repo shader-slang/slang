@@ -64,6 +64,20 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
 
             auto fieldKey = builder.createStructKey();
             builder.addNameHintDecoration(fieldKey, UnownedStringSlice(fieldName.getBuffer()));
+
+            // Copy semantic information
+            for (auto decor : param->getDecorations())
+            {
+                if (auto semanticDecor = as<IRSemanticDecoration>(decor))
+                {
+                    // Clone the semantic decoration to the new struct key
+                    builder.addSemanticDecoration(
+                        fieldKey,
+                        semanticDecor->getSemanticName(),
+                        semanticDecor->getSemanticIndex());
+                }
+            }
+
             fieldInfos.add({fieldKey, fieldName, valueType, param});
 
             if (outType->getOp() == kIROp_InOutType)
@@ -118,6 +132,23 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
         for (auto& fieldInfo : fieldInfos)
         {
             builder.createStructField(returnStruct, fieldInfo.key, fieldInfo.type);
+
+            // Skip fields that don't come from parameters
+            if (!fieldInfo.origParam)
+                continue;
+
+            // Transfer semantic decorations from the original parameter to the struct key
+            for (auto decor : fieldInfo.origParam->getDecorations())
+            {
+                if (auto semanticDecor = as<IRSemanticDecoration>(decor))
+                {
+                    // Add semantic decoration to the struct key in the new struct
+                    builder.addSemanticDecoration(
+                        fieldInfo.key,
+                        semanticDecor->getSemanticName(),
+                        semanticDecor->getSemanticIndex());
+                }
+            }
         }
 
         resultType = returnStruct;
