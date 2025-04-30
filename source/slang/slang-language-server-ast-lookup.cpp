@@ -76,7 +76,7 @@ bool _isLocInRange(ASTLookupContext* context, SourceLoc loc, Int length)
 {
     auto humaneLoc = context->sourceManager->getHumaneLoc(loc, SourceLocType::Actual);
     return humaneLoc.line == context->line && context->col >= humaneLoc.column &&
-           context->col <= humaneLoc.column + length &&
+           context->col < humaneLoc.column + length &&
            humaneLoc.pathInfo.foundPath.getUnownedSlice().endsWithCaseInsensitive(
                context->sourceFileName);
 }
@@ -88,7 +88,7 @@ bool _isLocInRange(ASTLookupContext* context, SourceLoc start, SourceLoc end)
     Loc s{startLoc.line, startLoc.column};
     Loc e{endLoc.line, endLoc.column};
     Loc c{context->line, context->col};
-    return s <= c && c <= e &&
+    return s <= c && c < e &&
            startLoc.pathInfo.foundPath.getUnownedSlice().endsWithCaseInsensitive(
                context->sourceFileName);
 }
