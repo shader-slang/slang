@@ -601,14 +601,17 @@ void SemanticsStmtVisitor::visitDeferStmt(DeferStmt* stmt)
 
 void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
 {
+    stmt->expression = CheckTerm(stmt->expression);
+    Stmt* catchStmt = findMatchingCatchStmt(stmt->expression->type);
+
     auto parentFunc = getParentFunc();
-    if (!parentFunc || parentFunc->errorType->equals(m_astBuilder->getBottomType()))
+    if (!catchStmt && (!parentFunc || parentFunc->errorType->equals(m_astBuilder->getBottomType())))
     {
-        getSink()->diagnose(stmt, Diagnostics::throwInNonThrowFunc);
+        getSink()->diagnose(stmt, Diagnostics::uncaughtThrowInNonThrowFunc);
         return;
     }
-    stmt->expression = CheckTerm(stmt->expression);
-    if (!stmt->expression->type->equals(m_astBuilder->getErrorType()))
+
+    if (!catchStmt && !stmt->expression->type->equals(m_astBuilder->getErrorType()))
     {
         if (!parentFunc->errorType->equals(stmt->expression->type))
         {
@@ -619,8 +622,6 @@ void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
                 parentFunc->errorType);
         }
     }
-
-    Stmt* catchStmt = findMatchingCatchStmt(stmt->expression->type);
 
     if (FindOuterStmt<DeferStmt>(catchStmt))
     {

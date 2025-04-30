@@ -938,8 +938,8 @@ DIAGNOSTIC(30112, Error, uncaughtTryInsideDefer, "'try' expressions require a ma
 DIAGNOSTIC(
     30113,
     Error,
-    throwInNonThrowFunc,
-    "the current function or environment is not declared to throw any errors, but contains a 'throw' statement.")
+    uncaughtThrowInNonThrowFunc,
+    "the current function or environment is not declared to throw any errors, but contains an uncaught 'throw' statement.")
 DIAGNOSTIC(
     30114,
     Error,
