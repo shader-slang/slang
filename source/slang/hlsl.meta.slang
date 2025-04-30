@@ -22019,6 +22019,7 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     static const DescriptorKind kind = isCombined != 0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture;
     static const DescriptorAccess descriptorAccess = (DescriptorAccess)access;
 
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
     [ForceInline]
     __init(DescriptorHandle<This> bindless)
     {
