@@ -2232,4 +2232,14 @@ UnownedStringSlice getMangledName(IRInst* inst)
     return UnownedStringSlice();
 }
 
+bool isFirstBlock(IRInst* inst)
+{
+    auto block = as<IRBlock>(inst);
+    if (!block)
+        return false;
+    if (!block->getParent())
+        return false;
+    return block->getParent()->getFirstBlock() == block;
+}
+
 } // namespace Slang
