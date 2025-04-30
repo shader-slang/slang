@@ -3615,6 +3615,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     case CodeGenTarget::MetalLibAssembly:
                     case CodeGenTarget::Metal:
                     case CodeGenTarget::WGSL:
+                    case CodeGenTarget::HostVM:
                         rawOutput.isWholeProgram = true;
                         break;
                     case CodeGenTarget::SPIRV:

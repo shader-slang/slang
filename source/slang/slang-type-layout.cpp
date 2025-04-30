@@ -2254,6 +2254,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CSource:
+    case CodeGenTarget::HostVM:
         {
             // For now lets use some fairly simple CPU binding rules
 
