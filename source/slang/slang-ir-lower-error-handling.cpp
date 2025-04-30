@@ -102,8 +102,9 @@ struct ErrorHandlingLoweringContext
         auto isFail = builder.emitIsResultError(call);
         auto failBlock = tryCall->getFailureBlock();
         auto successBlock = tryCall->getSuccessBlock();
+        auto mergeBlock = tryCall->getMergeBlock();
 
-        builder.emitIf(isFail, failBlock, successBlock);
+        builder.emitIfElse(isFail, failBlock, successBlock, mergeBlock);
 
         // Replace the params in failBlock to `getResultError(call)`.
         builder.setInsertBefore(failBlock->getFirstOrdinaryInst());

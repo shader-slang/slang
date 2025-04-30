@@ -2853,10 +2853,11 @@ struct IRTryCall : IRTerminatorInst
 
     IRBlock* getSuccessBlock() { return cast<IRBlock>(getOperand(0)); }
     IRBlock* getFailureBlock() { return cast<IRBlock>(getOperand(1)); }
-    IRInst* getCallee() { return getOperand(2); }
-    UInt getArgCount() { return getOperandCount() - 3; }
-    IRUse* getArgs() { return getOperands() + 3; }
-    IRInst* getArg(UInt index) { return getOperand(index + 3); }
+    IRBlock* getMergeBlock() { return cast<IRBlock>(getOperand(2)); }
+    IRInst* getCallee() { return getOperand(3); }
+    UInt getArgCount() { return getOperandCount() - 4; }
+    IRUse* getArgs() { return getOperands() + 4; }
+    IRInst* getArg(UInt index) { return getOperand(index + 4); }
 };
 
 struct IRDefer : IRTerminatorInst
@@ -4065,6 +4066,7 @@ public:
         IRType* type,
         IRBlock* successBlock,
         IRBlock* failureBlock,
+        IRBlock* mergeBlock,
         IRInst* func,
         UInt argCount,
         IRInst* const* args);

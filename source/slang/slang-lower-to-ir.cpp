@@ -463,14 +463,6 @@ struct IRGenEnv
     IRGenEnv* outer = nullptr;
 };
 
-struct CatchHandler
-{
-    IRType* errorType;
-
-    // Block of the handler statement. Takes a value of errorType as parameter.
-    IRBlock* errorHandler;
-};
-
 struct SharedIRGenContext
 {
 
@@ -496,8 +488,6 @@ struct SharedIRGenContext
     // to the appropriate basic block to jump to.
     Dictionary<BreakableStmt::UniqueID, IRBlock*> breakLabels;
     Dictionary<BreakableStmt::UniqueID, IRBlock*> continueLabels;
-
-    List<CatchHandler> catchHandlers;
 
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
@@ -563,6 +553,18 @@ struct AstOrIRType
     explicit operator bool() { return astType || irType; }
 };
 
+struct CatchHandler
+{
+    IRType* errorType = nullptr;
+
+    // Block of the handler statement. Takes a value of errorType as parameter.
+    IRBlock* errorHandler = nullptr;
+
+    IRBlock* mergeBlock = nullptr;
+
+    CatchHandler* prev = nullptr;
+};
+
 struct IRGenContext
 {
     ASTBuilder* astBuilder;
@@ -606,6 +608,9 @@ struct IRGenContext
 
     // The current scope end for use with `defer`.
     IRBlock* scopeEndBlock = nullptr;
+
+    // A chain of `catch` handlers for `try` and `throw.
+    CatchHandler* catchHandler = nullptr;
 
     // Callback function to call when after lowering a type.
     std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> lowerTypeCallback =
@@ -762,16 +767,19 @@ int32_t getIntrinsicOp(Decl* decl, IntrinsicOpModifier* intrinsicOpMod)
     return int32_t(irOp);
 }
 
-static IRBlock* findErrorHandler(SharedIRGenContext* shared, IRType* type)
+static CatchHandler findErrorHandler(IRGenContext* context, IRType* type)
 {
-    for (Index i = shared->catchHandlers.getCount()-1; i >= 0; --i)
-    {
-        if (shared->catchHandlers[i].errorType == type)
+    for(
+        auto handler = context->catchHandler;
+        handler != nullptr;
+        handler = context->catchHandler->prev
+    ){
+        if (handler->errorType == type)
         {
-            return shared->catchHandlers[i].errorHandler;
+            return *handler;
         }
     }
-    return nullptr;
+    return CatchHandler();
 }
 
 struct TryClauseEnvironment
@@ -834,22 +842,22 @@ LoweredValInfo emitCallToVal(
                 assert(throwAttr);
 
                 auto succBlock = builder->createBlock();
-                bool defaultFailBlock = false;
-                auto failBlock = findErrorHandler(context->shared, throwAttr->getErrorType());
-                if (!failBlock)
-                {
-                    failBlock = builder->createBlock();
-                    defaultFailBlock = true;
-                }
+                auto failBlock = builder->createBlock();
+                auto handler = findErrorHandler(context, throwAttr->getErrorType());
 
                 auto voidType = builder->getVoidType();
-                builder->emitTryCallInst(voidType, succBlock, failBlock, callee, argCount, args);
+                builder->emitTryCallInst(voidType, succBlock, failBlock, handler.mergeBlock, callee, argCount, args);
 
-                if (defaultFailBlock)
+                builder->insertBlock(failBlock);
+                auto errParam = builder->emitParam(throwAttr->getErrorType());
+                if (handler.errorType)
                 {
-                    // We had to create a default fail block, which just re-throws.
-                    builder->insertBlock(failBlock);
-                    auto errParam = builder->emitParam(throwAttr->getErrorType());
+                    IRInst* args[] = {errParam};
+                    builder->emitBranch(handler.errorHandler, 1, args);
+                }
+                else
+                {
+                    // We have to create a default fail block, which just re-throws.
                     builder->emitThrow(errParam);
                 }
                 builder->insertBlock(succBlock);
@@ -6670,16 +6678,16 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto loweredExpr = lowerRValueExpr(context, stmt->expression);
         auto loweredVal = getSimpleVal(context, loweredExpr);
 
-        IRBlock* errorHandler = nullptr;
+        CatchHandler handler;
         if (loweredVal && loweredVal->getDataType())
         {
-            findErrorHandler(context->shared, loweredVal->getDataType());
+            handler = findErrorHandler(context, loweredVal->getDataType());
         }
 
-        if (errorHandler)
+        if (handler.errorType)
         {
             auto val = getSimpleVal(context, loweredExpr);
-            builder->emitBranch(errorHandler, 1, &val);
+            builder->emitBranch(handler.errorHandler, 1, &val);
         }
         else
         {
@@ -6696,17 +6704,19 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         IRBlock* mergeBlock = builder->createBlock();
 
         CatchHandler catchHandler;
-        catchHandler.errorHandler = handleBlock;
         catchHandler.errorType = lowerType(context, stmt->errorVar->getType());
-        context->shared->catchHandlers.add(catchHandler);
+        catchHandler.errorHandler = handleBlock;
+        catchHandler.mergeBlock = mergeBlock;
+        catchHandler.prev = context->catchHandler;
+        context->catchHandler = &catchHandler;
 
         // Note that the tryBody doesn't actually have to have it's own scope or
         // block. If there's a `defer` in the tryBody, it can run after the
         // catch statement.
         lowerStmt(context, stmt->tryBody);
-        builder->emitBranch(mergeBlock);
+        emitBranchIfNeeded(mergeBlock);
 
-        context->shared->catchHandlers.removeLast();
+        context->catchHandler = catchHandler.prev;
 
         builder->insertBlock(handleBlock);
         builder->setInsertInto(handleBlock);
@@ -6719,7 +6729,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         lowerStmt(context, stmt->handleBody);
         popScopeBlock(prevScopeEndBlock, true);
 
-        builder->emitBranch(mergeBlock);
+        emitBranchIfNeeded(mergeBlock);
 
         builder->insertBlock(mergeBlock);
         builder->setInsertInto(mergeBlock);
@@ -8571,6 +8581,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             subContextStorage.returnDestination = LoweredValInfo();
             subContextStorage.lowerTypeCallback = nullptr;
+
+            subContextStorage.catchHandler = nullptr;
         }
 
         IRBuilder* getBuilder() { return &subBuilderStorage; }

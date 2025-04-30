@@ -3823,16 +3823,17 @@ IRInst* IRBuilder::emitTryCallInst(
     IRType* type,
     IRBlock* successBlock,
     IRBlock* failureBlock,
+    IRBlock* mergeBlock,
     IRInst* func,
     UInt argCount,
     IRInst* const* args)
 {
-    IRInst* fixedArgs[] = {successBlock, failureBlock, func};
+    IRInst* fixedArgs[] = {successBlock, failureBlock, mergeBlock, func};
     auto inst = createInstWithTrailingArgs<IRTryCall>(
         this,
         kIROp_TryCall,
         type,
-        3,
+        4,
         fixedArgs,
         argCount,
         args);
