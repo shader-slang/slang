@@ -115,8 +115,8 @@ public:
 
     Expr* emitThisExpr();
     Expr* emitVarExpr(Name* name);
-    Expr* emitVarExpr(VarDecl* var);
-    Expr* emitVarExpr(VarDecl* var, Type* type);
+    Expr* emitVarExpr(VarDeclBase* var);
+    Expr* emitVarExpr(VarDeclBase* var, Type* type);
     Expr* emitVarExpr(DeclStmt* varStmt, Type* type);
     Expr* emitStaticTypeExpr(Type* type);
 

@@ -18,7 +18,6 @@
 #include "slang-ast-synthesis.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
-#include "slang-mangle.h"
 
 namespace Slang
 {
@@ -4259,7 +4258,7 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     for (auto capturedField : getMembersOfType<VarDecl>(m_astBuilder, lambdaStructDecl))
     {
         auto src = mapCapturedDeclToSrcDecl[capturedField.getDecl()];
-        if (auto srcVarDecl = as<VarDecl>(src))
+        if (auto srcVarDecl = as<VarDeclBase>(src))
         {
             args.add(synthesizer.emitVarExpr(srcVarDecl));
         }
