@@ -852,8 +852,8 @@ LoweredValInfo emitCallToVal(
                 auto errParam = builder->emitParam(throwAttr->getErrorType());
                 if (handler.errorType)
                 {
-                    IRInst* args[] = {errParam};
-                    builder->emitBranch(handler.errorHandler, 1, args);
+                    IRInst* handlerArgs[] = {errParam};
+                    builder->emitBranch(handler.errorHandler, 1, handlerArgs);
                 }
                 else
                 {
