@@ -146,6 +146,11 @@ inline Type* getType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
 /// modifier list and return a ModifiedType if such modifiers exist.
 Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef);
 
+/// Get the parameter type, wrapped with `Out<>`, `InOut<>` or `Ref<>` if the parameter has
+/// an non-trivial direction.
+Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef);
+
+
 inline SubstExpr<Expr> getInitExpr(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
 {
     return declRef.substitute(astBuilder, declRef.getDecl()->initExpr);
