@@ -1135,14 +1135,27 @@ private:
     template<typename T>
     void decodePtr(T*& node, Decoder& decoder, DeclBase*)
     {
-        if (decoder.getTag() == SerialBinary::kInt64FourCC)
+        // This case is a bit of a hack. We need
+        // to identify whether we are looking at
+        // an indirection to a `Decl` (which would
+        // be serialized as an integer `DeclID`),
+        // or something else derived from `DeclBase`.
+        //
+        switch (decoder.getTag())
         {
-            DeclID id = decodeDeclID(decoder);
-            node = static_cast<T*>(getDeclByID(id));
-        }
-        else
-        {
+        default:
             decodeASTNode(node, decoder);
+            break;
+
+        case SerialBinary::kInt32FourCC:
+        case SerialBinary::kInt64FourCC:
+        case SerialBinary::kUInt32FourCC:
+        case SerialBinary::kUInt64FourCC:
+            {
+                DeclID id = decodeDeclID(decoder);
+                node = static_cast<T*>(getDeclByID(id));
+            }
+            break;
         }
     }
 
