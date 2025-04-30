@@ -15,6 +15,7 @@ struct ErrorHandlingLoweringContext
 
     InstWorkList workList;
     InstHashSet workListSet;
+    List<IRFuncType*> oldFuncTypes;
 
     ErrorHandlingLoweringContext(IRModule* inModule)
         : module(inModule), workList(inModule), workListSet(inModule)
@@ -52,6 +53,7 @@ struct ErrorHandlingLoweringContext
         }
         auto newFuncType = builder.getFuncType(paramTypes, resultType);
         funcType->replaceUsesWith(newFuncType);
+        funcType->removeAndDeallocate();
     }
 
     void processTryCall(IRTryCall* tryCall)
@@ -178,6 +180,9 @@ struct ErrorHandlingLoweringContext
         case kIROp_Throw:
             processThrow(cast<IRThrow>(inst));
             break;
+        case kIROp_FuncType:
+            oldFuncTypes.add(cast<IRFuncType>(inst));
+            break;
         default:
             break;
         }
@@ -211,18 +216,6 @@ struct ErrorHandlingLoweringContext
         // Lower all functypes.
         // Function types with an IRThrowTypeAttribute will be translated into a normal function
         // type that returns `Result<T,E>`.
-        List<IRFuncType*> oldFuncTypes;
-        for (auto child : module->getGlobalInsts())
-        {
-            switch (child->getOp())
-            {
-            case kIROp_FuncType:
-                oldFuncTypes.add(cast<IRFuncType>(child));
-                break;
-            default:
-                break;
-            }
-        }
         for (auto funcType : oldFuncTypes)
         {
             processFuncType(funcType);
