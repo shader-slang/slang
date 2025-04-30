@@ -47,7 +47,11 @@ class ContainerDecl : public Decl
 
     bool isMemberDictionaryValid() const { return dictionaryLastCount == members.getCount(); }
 
-    void invalidateMemberDictionary() { dictionaryLastCount = -1; }
+    void invalidateMemberDictionary()
+    {
+        dictionaryLastCount = -1;
+        mapDeclMemberToIndex.clear();
+    }
 
     Dictionary<Name*, Decl*>& getMemberDictionary()
     {
@@ -66,9 +70,21 @@ class ContainerDecl : public Decl
         if (member)
         {
             member->parentDecl = this;
+            auto index = members.getCount();
             members.add(member);
+            mapDeclMemberToIndex[member] = index;
         }
     }
+
+    static void setParent(ContainerDecl* parent, Decl* child)
+    {
+        if (child)
+            child->parentDecl = parent;
+        if (parent)
+            parent->addMember(child);
+    }
+
+    Index getDeclIndex(Decl* d);
 
     SLANG_UNREFLECTED // We don't want to reflect the following fields
 
@@ -83,6 +99,8 @@ class ContainerDecl : public Decl
     // Dictionary for looking up members by name.
     // This is built on demand before performing lookup.
     Dictionary<Name*, Decl*> memberDictionary;
+
+    Dictionary<Decl*, Index> mapDeclMemberToIndex;
 
     // A list of transparent members, to be used in lookup
     // Note: this is only valid if `memberDictionaryIsValid` is true
@@ -376,11 +394,11 @@ class CallableDecl : public ContainerDecl
 
     // The "primary" declaration of the function, which will
     // be used whenever we need to unique things.
-    CallableDecl* primaryDecl = nullptr;
+    FIDDLE() CallableDecl* primaryDecl = nullptr;
 
     // The next declaration of the "same" function (that is,
     // with the same `primaryDecl`).
-    CallableDecl* nextDecl = nullptr;
+    FIDDLE() CallableDecl* nextDecl = nullptr;
 };
 
 // Base class for callable things that may also have a body that is evaluated to produce their

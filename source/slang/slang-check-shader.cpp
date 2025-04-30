@@ -448,6 +448,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     }
 
     bool canHaveVaryingInput = false;
+    bool shouldWarnOnNonUniformParam = true;
     switch (stage)
     {
     case Stage::Vertex:
@@ -461,6 +462,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     case Stage::Hull:
     case Stage::Domain:
         canHaveVaryingInput = true;
+        break;
+    case Stage::Dispatch:
+        shouldWarnOnNonUniformParam = false;
         break;
     default:
         break;
@@ -499,10 +503,13 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         // support varying input/output. We will automatically convert it to a 'uniform' parameter,
         // and diagnose a warning.
         addModifier(param, getCurrentASTBuilder()->create<HLSLUniformModifier>());
-        sink->diagnose(
-            param,
-            Diagnostics::nonUniformEntryPointParameterTreatedAsUniform,
-            param->getName());
+        if (shouldWarnOnNonUniformParam)
+        {
+            sink->diagnose(
+                param,
+                Diagnostics::nonUniformEntryPointParameterTreatedAsUniform,
+                param->getName());
+        }
     }
 
     for (auto target : linkage->targets)

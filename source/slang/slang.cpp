@@ -5099,6 +5099,8 @@ RefPtr<EntryPoint> Module::findAndCheckEntryPoint(
     if (auto existingEntryPoint = findEntryPointByName(name))
         return existingEntryPoint;
 
+    SLANG_AST_BUILDER_RAII(m_astBuilder);
+
     // If the function hasn't been marked as [shader], then it won't be discovered
     // by findEntryPointByName. We need to route this to the `findAndValidateEntryPoint`
     // function. To do that we need to setup a FrontEndCompileRequest and a
