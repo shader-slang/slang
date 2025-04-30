@@ -1144,13 +1144,11 @@ Compound Capabilities
 `subgroup_partitioned`
 > Capabilities required to use GLSL-style subgroup operations 'subgroup_partitioned'
 
-<<<<<<< HEAD
-`subgroup_rotate`
-> Capabilities required to use GLSL-style subgroup rotate operations 'subgroup_rotate'
-=======
 `wave_multi_prefix`
 > Capabilities needed to use HLSL wave multi prefix operations
->>>>>>> 2dc6d4559 (Properly implement WaveMask* variants of WaveMultiPrefix* intrinsics)
+
+`subgroup_rotate`
+> Capabilities required to use GLSL-style subgroup rotate operations 'subgroup_rotate'
 
 `atomic_glsl_hlsl_nvapi_cuda_metal_float1`
 > (All implemented targets) Capabilities required to use atomic operations of GLSL tier-1 float atomics
