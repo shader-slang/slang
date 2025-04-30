@@ -299,6 +299,7 @@ class ThrowStmt : public Stmt
 {
     FIDDLE(...)
     FIDDLE() Expr* expression = nullptr;
+    FIDDLE() SubtypeWitness* errorTypeWitness = nullptr;
 };
 
 FIDDLE()
@@ -306,6 +307,7 @@ class CatchStmt : public Stmt
 {
     FIDDLE(...)
     FIDDLE() LetDecl* errorVar = nullptr;
+    FIDDLE() SubtypeWitness* errorTypeWitness = nullptr;
     FIDDLE() Stmt* tryBody = nullptr;
     FIDDLE() Stmt* handleBody = nullptr;
 };

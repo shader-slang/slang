@@ -220,7 +220,6 @@ struct ResultTypeLoweringContext
         auto base = inst->getResultOperand();
         auto loweredResultTypeInfo = getLoweredResultType(builder, base->getDataType());
         SLANG_ASSERT(loweredResultTypeInfo);
-        SLANG_ASSERT(loweredResultTypeInfo->valueField);
 
         auto resultValue = inst->getResultOperand();
         auto errValue = getResultError(builder, resultValue);
