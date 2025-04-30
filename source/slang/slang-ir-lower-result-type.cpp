@@ -56,9 +56,11 @@ struct ResultTypeLoweringContext
             return nullptr;
 
         RefPtr<LoweredResultTypeInfo> info = new LoweredResultTypeInfo();
+        auto resultType = cast<IRResultType>(type);
         info->resultType = (IRType*)type;
-        info->errorType = cast<IRResultType>(type)->getErrorType();
-        auto witnessTable = as<IRWitnessTable>(cast<IRResultType>(type)->getErrorTypeWitness());
+
+        info->errorType = resultType->getErrorType();
+        auto witnessTable = as<IRWitnessTable>(resultType->getErrorTypeWitness());
         SLANG_ASSERT(witnessTable != nullptr);
 
         auto successValueCreateEntry = as<IRWitnessTableEntry>(witnessTable->getEntries().getFirst());
@@ -73,7 +75,6 @@ struct ResultTypeLoweringContext
         info->successValueTestFunc = successValueTestEntry->getSatisfyingVal();
         SLANG_ASSERT(info->successValueTestFunc != nullptr);
 
-        auto resultType = cast<IRResultType>(type);
         auto valueType = resultType->getValueType();
         if (valueType->getOp() != kIROp_VoidType)
         {
@@ -203,7 +204,7 @@ struct ResultTypeLoweringContext
         SLANG_ASSERT(loweredResultTypeInfo);
         SLANG_ASSERT(loweredResultTypeInfo->valueField);
         auto getElement = builder->emitFieldExtract(
-            loweredResultTypeInfo->errorType,
+            loweredResultTypeInfo->valueType,
             base,
             loweredResultTypeInfo->valueField->getKey());
         inst->replaceUsesWith(getElement);
