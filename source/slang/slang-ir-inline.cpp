@@ -354,7 +354,7 @@ struct InliningPassBase
 
             // This is where the debug info insertion starts. The codeflow is documented via
             // tag: DebugInlineInfo-Step[N] in this file. There are two code paths this flows into,
-            // one for single block funcs, and one for multi-block funcs. 
+            // one for single block funcs, and one for multi-block funcs.
             // DebugInlineInfo-Step[1]: Insert a new DebugInlinedAt for each inlining.
             // The debugInlinedAt needs to be cloned for each inlining call because our
             // algorithm updates the operand. So we need to reset the insert point here.
@@ -593,7 +593,7 @@ struct InliningPassBase
         IRInst* outerScope = nullptr;
         if (calleeDebugFunc && debugInlinedAt)
         {
-            // DebugInlineInfo-Step[3]: Insert a new DebugScope inst setting the current scope 
+            // DebugInlineInfo-Step[3]: Insert a new DebugScope inst setting the current scope
             // to the new DebugInlinedAt generated in step[1].
             outerScope = builder->emitDebugScope(calleeDebugFunc, debugInlinedAt);
         }
@@ -620,8 +620,10 @@ struct InliningPassBase
                 {
                     if (outerScope)
                     {
-                        // DebugInlineInfo-Step[4]: For each cloned debugNoScope inst, replace it with the calleeScope.
-                        auto clonedInst = _cloneInstWithSourceLoc(callSite, env, builder, outerScope);
+                        // DebugInlineInfo-Step[4]: For each cloned debugNoScope inst, replace it
+                        // with the calleeScope.
+                        auto clonedInst =
+                            _cloneInstWithSourceLoc(callSite, env, builder, outerScope);
                         clonedInsts.add(clonedInst);
                     }
                 }
@@ -657,8 +659,9 @@ struct InliningPassBase
             {
                 if (auto inlinedAt = as<IRDebugInlinedAt>(inst))
                 {
-                    // DebugInlineInfo-Step[5]: For each cloned debugInlinedAt inst, if its outer inlined at operand is null, 
-                    // set it to the new DebugInlinedAt inst inserted at step[1].
+                    // DebugInlineInfo-Step[5]: For each cloned debugInlinedAt inst, if its outer
+                    // inlined at operand is null, set it to the new DebugInlinedAt inst inserted at
+                    // step[1].
                     if (inlinedAt->getOuterInlinedAt() == nullptr)
                     {
                         inlinedAt->setOuterInlinedAt(debugInlinedAt);
@@ -686,10 +689,7 @@ struct InliningPassBase
         call->removeAndDeallocate();
     }
 
-    IRInst* restoreDebugInfoIfPresent(
-        IRCall* call,
-        IRBuilder* builder, 
-        IRInst* debugInlinedAt)
+    IRInst* restoreDebugInfoIfPresent(IRCall* call, IRBuilder* builder, IRInst* debugInlinedAt)
     {
         if (!debugInlinedAt)
             return nullptr;
@@ -712,7 +712,9 @@ struct InliningPassBase
             {
                 lastDebugScope = as<IRDebugScope>(inst);
                 builder->setInsertAfter(call);
-                builder->emitDebugScope(lastDebugScope->getOperand(0), lastDebugScope->getOperand(1));
+                builder->emitDebugScope(
+                    lastDebugScope->getOperand(0),
+                    lastDebugScope->getOperand(1));
                 break;
             }
         }
@@ -760,12 +762,24 @@ struct InliningPassBase
         SLANG_ASSERT(firstBlock);
         if (!firstBlock->getNextBlock() && as<IRReturn>(firstBlock->getTerminator()))
         {
-            inlineSingleBlockFuncBody(callSite, env, builder, debugInlinedAt, calleeDebugFunc, lastDebugScope);
+            inlineSingleBlockFuncBody(
+                callSite,
+                env,
+                builder,
+                debugInlinedAt,
+                calleeDebugFunc,
+                lastDebugScope);
             return;
         }
 
         // If the callee has multiple blocks, use the more complex inlining approach
-        inlineMultipleBlockFuncBody(callSite, env, builder, debugInlinedAt, calleeDebugFunc, lastDebugScope);
+        inlineMultipleBlockFuncBody(
+            callSite,
+            env,
+            builder,
+            debugInlinedAt,
+            calleeDebugFunc,
+            lastDebugScope);
     }
 
     // Inline the body of the callee for `callSite`, for a callee that has multiple basic blocks.
@@ -908,16 +922,17 @@ struct InliningPassBase
                 IRInst* lastOrdinaryInst = clonedBlock->getLastOrdinaryInst();
 
                 setInsertBeforeOrdinaryInst(builder, firstOrdinaryInst);
-                // DebugInlineInfo-Step[3]: For each cloned block, insert a new DebugScope inst setting the current scope 
-                // to the new DebugInlinedAt generated in step[1].
+                // DebugInlineInfo-Step[3]: For each cloned block, insert a new DebugScope inst
+                // setting the current scope to the new DebugInlinedAt generated in step[1].
                 builder->emitDebugScope(calleeDebugFunc, debugInlinedAt);
 
                 for (auto inst : clonedBlock->getChildren())
                 {
                     if (auto inlinedAt = as<IRDebugInlinedAt>(inst))
                     {
-                        // DebugInlineInfo-Step[4]: For each cloned debugInlinedAt inst, if its outer inlined at operand is null, 
-                        // set it to the new DebugInlinedAt inst inserted at step[1].
+                        // DebugInlineInfo-Step[4]: For each cloned debugInlinedAt inst, if its
+                        // outer inlined at operand is null, set it to the new DebugInlinedAt inst
+                        // inserted at step[1].
                         if (inlinedAt->getOuterInlinedAt() == nullptr)
                         {
                             inlinedAt->setOuterInlinedAt(debugInlinedAt);
@@ -926,7 +941,8 @@ struct InliningPassBase
 
                     if (as<IRDebugNoScope>(inst))
                     {
-                        // DebugInlineInfo-Step[5]: For each cloned debugNoScope inst, replace it with the calleeScope.
+                        // DebugInlineInfo-Step[5]: For each cloned debugNoScope inst, replace it
+                        // with the calleeScope.
                         setInsertBeforeOrdinaryInst(builder, inst);
                         builder->emitDebugScope(calleeDebugFunc, debugInlinedAt);
                         inst->removeAndDeallocate();
