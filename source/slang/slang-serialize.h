@@ -90,13 +90,38 @@ public:
         encodeData(value ? SerialBinary::kTrueFourCC : SerialBinary::kFalseFourCC, nullptr, 0);
     }
 
-    void encode(Int32 value) { encodeData(SerialBinary::kInt32FourCC, &value, sizeof(value)); }
+    void encodeInt(Int64 value)
+    {
+        if (Int32(value) == value)
+        {
+            auto v = Int32(value);
+            encodeData(SerialBinary::kInt32FourCC, &v, sizeof(v));
+        }
+        else
+        {
+            encodeData(SerialBinary::kInt64FourCC, &value, sizeof(value));
+        }
+    }
 
-    void encode(UInt32 value) { encodeData(SerialBinary::kUInt32FourCC, &value, sizeof(value)); }
 
-    void encode(Int64 value) { encodeData(SerialBinary::kInt64FourCC, &value, sizeof(value)); }
+    void encodeUInt(UInt64 value)
+    {
+        if (UInt32(value) == value)
+        {
+            auto v = UInt32(value);
+            encodeData(SerialBinary::kUInt32FourCC, &v, sizeof(v));
+        }
+        else
+        {
+            encodeData(SerialBinary::kUInt64FourCC, &value, sizeof(value));
+        }
+    }
 
-    void encode(UInt64 value) { encodeData(SerialBinary::kUInt64FourCC, &value, sizeof(value)); }
+    void encode(Int32 value) { encodeInt(value); }
+    void encode(Int64 value) { encodeInt(value); }
+
+    void encode(UInt32 value) { encodeUInt(value); }
+    void encode(UInt64 value) { encodeUInt(value); }
 
     void encode(float value) { encodeData(SerialBinary::kFloat32FourCC, &value, sizeof(value)); }
 
@@ -265,18 +290,83 @@ public:
         return value;
     }
 
-    Int64 decodeInt64() { return _decodeSimpleValue<Int64>(SerialBinary::kInt64FourCC); }
+    Int64 decodeInt()
+    {
+        switch (getTag())
+        {
+        case SerialBinary::kInt64FourCC:
+            return _decodeSimpleValue<Int64>(getTag());
+        case SerialBinary::kInt32FourCC:
+            return _decodeSimpleValue<Int32>(getTag());
 
-    UInt64 decodeUInt64() { return _decodeSimpleValue<UInt64>(SerialBinary::kUInt64FourCC); }
+        case SerialBinary::kUInt32FourCC:
+            return _decodeSimpleValue<UInt32>(getTag());
 
-    Int32 decodeInt32() { return _decodeSimpleValue<Int32>(SerialBinary::kInt32FourCC); }
+        case SerialBinary::kUInt64FourCC:
+            {
+                auto uintValue = _decodeSimpleValue<UInt64>(getTag());
+                if (Int64(uintValue) < 0)
+                {
+                    SLANG_UNEXPECTED("signed/unsigned mismatch in RIFF");
+                }
+                return Int64(uintValue);
+            }
 
-    UInt32 decodeUInt32() { return _decodeSimpleValue<UInt32>(SerialBinary::kUInt32FourCC); }
+        default:
+            SLANG_UNEXPECTED("invalid format in RIFF");
+            UNREACHABLE_RETURN(0);
+        }
+    }
 
-    float decodeFloat32() { return _decodeSimpleValue<float>(SerialBinary::kFloat32FourCC); }
+    UInt64 decodeUInt()
+    {
+        switch (getTag())
+        {
+        case SerialBinary::kUInt64FourCC:
+            return _decodeSimpleValue<UInt64>(getTag());
+        case SerialBinary::kUInt32FourCC:
+            return _decodeSimpleValue<UInt32>(getTag());
 
-    double decodeFloat64() { return _decodeSimpleValue<double>(SerialBinary::kFloat64FourCC); }
+        case SerialBinary::kInt32FourCC:
+        case SerialBinary::kInt64FourCC:
+            {
+                auto intValue = decodeInt();
+                if (intValue < 0)
+                {
+                    SLANG_UNEXPECTED("signed/unsigned mismatch in RIFF");
+                }
+                return UInt64(intValue);
+            }
 
+        default:
+            SLANG_UNEXPECTED("invalid format in RIFF");
+            UNREACHABLE_RETURN(0);
+        }
+    }
+
+    double decodeFloat()
+    {
+        switch (getTag())
+        {
+        case SerialBinary::kFloat32FourCC:
+            return _decodeSimpleValue<float>(getTag());
+        case SerialBinary::kFloat64FourCC:
+            return _decodeSimpleValue<double>(getTag());
+
+        default:
+            SLANG_UNEXPECTED("invalid format in RIFF");
+            UNREACHABLE_RETURN(0);
+        }
+    }
+
+    Int32 decodeInt32() { return Int32(decodeInt()); }
+    Int64 decodeInt64() { return decodeInt(); }
+
+    UInt32 decodeUInt32() { return UInt32(decodeUInt()); }
+    UInt64 decodeUInt64() { return decodeUInt(); }
+
+    float decodeFloat32() { return float(decodeFloat()); }
+    double decodeFloat64() { return decodeFloat(); }
 
     FourCC getTag() { return _chunk ? _chunk->m_fourCC : 0; }
 
