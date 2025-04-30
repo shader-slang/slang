@@ -468,6 +468,8 @@ Stage getStageFromAtom(CapabilityAtom atom)
         return Stage::Miss;
     case CapabilityAtom::_callable:
         return Stage::Callable;
+    case CapabilityAtom::dispatch:
+        return Stage::Dispatch;
     default:
         SLANG_UNEXPECTED("unknown stage atom");
         UNREACHABLE_RETURN(Stage::Unknown);
@@ -1766,6 +1768,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     CodeGenContext* codeGenContext,
     ComPtr<IArtifact>& outArtifact);
 
+SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact);
+
 static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
 {
     switch (target)
@@ -1835,7 +1839,9 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::WGSLSPIRV:
         SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
         return SLANG_OK;
-
+    case CodeGenTarget::HostVM:
+        SLANG_RETURN_ON_FAIL(emitHostVMCode(this, outArtifact));
+        return SLANG_OK;
     default:
         break;
     }
@@ -1887,6 +1893,7 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::WGSLSPIRVAssembly:
+    case CodeGenTarget::HostVM:
         {
             SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));
 

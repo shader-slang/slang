@@ -96,6 +96,19 @@ if(SLANG_ENABLE_SLANGD)
     )
 endif()
 
+#
+# Slang Interpreter
+#
+if(SLANG_ENABLE_SLANGI)
+    slang_add_target(
+        slangi
+        EXECUTABLE
+        LINK_WITH_PRIVATE core compiler-core slang
+        INSTALL
+        EXPORT_SET_NAME SlangTargets
+    )
+endif()
+
 if(SLANG_ENABLE_GFX)
     #
     # `platform` contains all the platform abstractions for a GUI application.

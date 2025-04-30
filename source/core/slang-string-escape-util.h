@@ -113,6 +113,9 @@ struct StringEscapeUtil
         Handler* handler,
         const UnownedStringSlice& slice,
         StringBuilder& out);
+
+    static String escapeString(UnownedStringSlice input, Style style = Style::Slang);
+    static String unescapeString(UnownedStringSlice input, Style style = Style::Slang);
 };
 
 
