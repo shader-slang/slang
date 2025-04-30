@@ -50,6 +50,13 @@ ForStmt* ASTSynthesizer::emitFor(Expr* initVal, Expr* finalVal, VarDecl*& outInd
     return stmt;
 }
 
+Expr* ASTSynthesizer::emitThisExpr()
+{
+    auto varExpr = m_builder->create<ThisExpr>();
+    varExpr->scope = getCurrentScope().m_scope;
+    return varExpr;
+}
+
 Expr* ASTSynthesizer::emitVarExpr(Name* name)
 {
     auto scope = getCurrentScope();
@@ -60,7 +67,7 @@ Expr* ASTSynthesizer::emitVarExpr(Name* name)
     return varExpr;
 }
 
-Expr* ASTSynthesizer::emitVarExpr(VarDecl* varDecl)
+Expr* ASTSynthesizer::emitVarExpr(VarDeclBase* varDecl)
 {
     auto varExpr = m_builder->create<VarExpr>();
     varExpr->declRef = makeDeclRef<Decl>(varDecl);
@@ -68,7 +75,7 @@ Expr* ASTSynthesizer::emitVarExpr(VarDecl* varDecl)
     return varExpr;
 }
 
-Expr* ASTSynthesizer::emitVarExpr(VarDecl* var, Type* type)
+Expr* ASTSynthesizer::emitVarExpr(VarDeclBase* var, Type* type)
 {
     auto expr = m_builder->create<VarExpr>();
     expr->declRef = makeDeclRef<Decl>(var);
@@ -83,6 +90,14 @@ Expr* ASTSynthesizer::emitVarExpr(DeclStmt* varStmt, Type* type)
     expr->declRef = makeDeclRef<Decl>(as<Decl>(varStmt->decl));
     expr->type.type = type;
     expr->type.isLeftValue = true;
+    return expr;
+}
+
+Expr* ASTSynthesizer::emitStaticTypeExpr(Type* type)
+{
+    auto expr = m_builder->create<SharedTypeExpr>();
+    expr->type.type = m_builder->getTypeType(type);
+    expr->checked = true;
     return expr;
 }
 
@@ -121,6 +136,14 @@ Expr* ASTSynthesizer::emitAssignExpr(Expr* left, Expr* right)
 Expr* ASTSynthesizer::emitInvokeExpr(Expr* callee, List<Expr*>&& args)
 {
     auto rs = m_builder->create<InvokeExpr>();
+    rs->functionExpr = callee;
+    rs->arguments = _Move(args);
+    return rs;
+}
+
+Expr* ASTSynthesizer::emitCtorInvokeExpr(Expr* callee, List<Expr*>&& args)
+{
+    auto rs = m_builder->create<ExplicitCtorInvokeExpr>();
     rs->functionExpr = callee;
     rs->arguments = _Move(args);
     return rs;

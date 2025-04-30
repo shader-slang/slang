@@ -1515,6 +1515,9 @@ static TokenType _lexTokenImpl(Lexer* lexer)
         case '=':
             _advance(lexer);
             return TokenType::OpEql;
+        case '>':
+            _advance(lexer);
+            return TokenType::DoubleRightArrow;
         default:
             return TokenType::OpAssign;
         }

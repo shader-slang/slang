@@ -4268,6 +4268,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitLambdaExpr(LambdaExpr*)
+    {
+        SLANG_UNEXPECTED("a valid ast should not contain an LambdaExpr.");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     {
         // Although the surface syntax can have an empty ASM block, the IR asm
