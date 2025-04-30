@@ -15,6 +15,6 @@ IFunc<float, float> createFunc(int c)
 void computeMain()
 {
     let func = createFunc(2);
-    // CHECK: 5.0
+    // CHECK: 8.0
     outputBuffer[0] = func(3.0);
 }
