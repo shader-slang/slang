@@ -15,8 +15,10 @@
 #include "slang-emit-glsl.h"
 #include "slang-emit-hlsl.h"
 #include "slang-emit-metal.h"
+#include "slang-emit-slang.h"
 #include "slang-emit-source-writer.h"
 #include "slang-emit-torch.h"
+#include "slang-emit-vm.h"
 #include "slang-emit-wgsl.h"
 #include "slang-ir-any-value-inference.h"
 #include "slang-ir-autodiff.h"
@@ -116,6 +118,7 @@
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
+#include "slang-vm-bytecode.h"
 
 #include <assert.h>
 
@@ -825,6 +828,7 @@ Result linkAndOptimizeIR(
         switch (target)
         {
         case CodeGenTarget::HostCPPSource:
+        case CodeGenTarget::HostVM:
             break;
         case CodeGenTarget::CUDASource:
             collectOptiXEntryPointUniformParams(irModule);
@@ -859,6 +863,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::HostVM:
         break;
     }
 
@@ -1155,6 +1160,15 @@ Result linkAndOptimizeIR(
     else
         cleanupGenerics(targetProgram, irModule, sink);
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER-LOWER-GENERICS");
+
+    // Don't need to run any further target-dependent passes if we are generating code
+    // for host vm.
+    if (target == CodeGenTarget::HostVM)
+    {
+        performForceInlining(irModule);
+        simplifyIR(targetProgram, irModule, defaultIRSimplificationOptions, sink);
+        return SLANG_OK;
+    }
 
     // After dynamic dispatch logic is resolved into ordinary function calls,
     // we can now run our stage specialization logic.
@@ -2327,6 +2341,49 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     ArtifactUtil::addAssociated(artifact, linkedIR.metadata);
 
     outArtifact.swap(artifact);
+
+    return SLANG_OK;
+}
+
+SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact)
+{
+    LinkedIR linkedIR;
+    LinkingAndOptimizationOptions linkingAndOptimizationOptions;
+    SLANG_RETURN_ON_FAIL(
+        linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
+
+    VMByteCodeBuilder byteCode;
+    SLANG_RETURN_ON_FAIL(emitVMByteCodeForEntryPoints(codeGenContext, linkedIR, byteCode));
+
+    String slangDeclaration;
+    SLANG_RETURN_ON_FAIL(
+        emitSlangDeclarationsForEntryPoints(codeGenContext, linkedIR, slangDeclaration));
+
+    slang::SessionDesc sessionDesc = {};
+    ComPtr<slang::ISession> slangSession;
+    SLANG_RETURN_ON_FAIL(
+        codeGenContext->getSession()->createSession(sessionDesc, slangSession.writeRef()));
+    auto linkage = static_cast<Linkage*>(slangSession.get());
+
+    ComPtr<ISlangBlob> diagnostics;
+    auto module = slangSession->loadModuleFromSource(
+        "kernel",
+        "kernel.slang",
+        StringBlob::create(slangDeclaration),
+        diagnostics.writeRef());
+    if (!module)
+        return SLANG_FAIL;
+    RefPtr<Module> newModule = new Module(linkage);
+    newModule->setModuleDecl(static_cast<Module*>(module)->getModuleDecl());
+    newModule->setIRModule(linkedIR.module);
+    newModule->setName("kernels");
+    SLANG_RETURN_ON_FAIL(newModule->serialize(byteCode.kernelBlob.writeRef()));
+
+    ComPtr<slang::IBlob> byteCodeBlob;
+    SLANG_RETURN_ON_FAIL(byteCode.serialize(byteCodeBlob.writeRef()));
+
+    outArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_HOST_VM);
+    outArtifact->addRepresentationUnknown(byteCodeBlob);
 
     return SLANG_OK;
 }

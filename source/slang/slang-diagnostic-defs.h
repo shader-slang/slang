@@ -933,20 +933,34 @@ DIAGNOSTIC(
     continueInsideDefer,
     "'continue' must not appear inside a defer statement.")
 DIAGNOSTIC(30110, Error, returnInsideDefer, "'return' must not appear inside a defer statement.")
-DIAGNOSTIC(30111, Error, uncaughtThrowInsideDefer, "'throw' expressions require a matching 'catch' inside a defer statement.")
-DIAGNOSTIC(30112, Error, uncaughtTryInsideDefer, "'try' expressions require a matching 'catch' inside a defer statement.")
+
 DIAGNOSTIC(
-    30113,
+    30111,
+    Error,
+    returnTypeMismatchInsideLambda,
+    "returned values must have the same type among all 'return' statements inside a lambda "
+    "expression: returned '$0' here, but '$1' previously.")
+
+DIAGNOSTIC(
+    30112,
+    Error,
+    nonCopyableTypeCapturedInLambda,
+    "cannot capture non-copyable type '$0' in a lambda expression.")
+
+DIAGNOSTIC(30113, Error, uncaughtThrowInsideDefer, "'throw' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(30114, Error, uncaughtTryInsideDefer, "'try' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(
+    30115,
     Error,
     uncaughtThrowInNonThrowFunc,
     "the current function or environment is not declared to throw any errors, but contains an uncaught 'throw' statement.")
 DIAGNOSTIC(
-    30114,
+    30116,
     Error,
     throwTypeIncompatibleWithErrorType,
     "the type `$0` of `throw` is not compatible with function's error type `$1`.")
 DIAGNOSTIC(
-    30115,
+    30117,
     Error,
     errorTypeDoesNotConformToIError,
     "the function's error type `$0` does not conform to interface `IError`.")

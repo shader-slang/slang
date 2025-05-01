@@ -79,7 +79,7 @@ private:
     {
     public:
         // ISlangUnknown
-        virtual SlangResult SLANG_MCALL
+        virtual SLANG_NO_THROW SlangResult SLANG_MCALL
         queryInterface(SlangUUID const& uuid, void** outObject) override
         {
             if (uuid == ISlangUnknown::getTypeGuid() || uuid == ISlangBlob::getTypeGuid())
@@ -91,18 +91,18 @@ private:
             return SLANG_E_NO_INTERFACE;
         }
 
-        virtual uint32_t SLANG_MCALL addRef() override { return 1; }
-        virtual uint32_t SLANG_MCALL release() override { return 1; }
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return 1; }
+        virtual SLANG_NO_THROW uint32_t SLANG_MCALL release() override { return 1; }
 
         BlobImpl(const PointerDecoder<void*>* blobData)
             : m_pBlobData(blobData)
         {
         }
-        virtual const void* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE
+        virtual SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() SLANG_OVERRIDE
         {
             return m_pBlobData->getPointer();
         }
-        virtual size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE
+        virtual SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() SLANG_OVERRIDE
         {
             return m_pBlobData->getDataSize();
         }

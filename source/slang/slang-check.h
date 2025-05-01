@@ -29,4 +29,7 @@ Type* unwrapModifiedType(Type* type);
 OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericConstraints(
     ASTBuilder* builder,
     DeclRef<ContainerDecl> genericDecl);
+OrderedDictionary<Type*, List<Type*>> getCanonicalGenericConstraints2(
+    ASTBuilder* builder,
+    DeclRef<ContainerDecl> genericDecl);
 } // namespace Slang
