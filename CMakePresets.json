@@ -24,8 +24,14 @@
       "binaryDir": "${sourceDir}/build.em",
       "cacheVariables": {
         "SLANG_SLANG_LLVM_FLAVOR": "DISABLE",
-        "SLANG_ENABLE_SPLIT_DEBUG_INFO": "OFF",
+        "SLANG_ENABLE_AFTERMATH": "OFF",
+        "SLANG_ENABLE_CUDA": "OFF",
+        "SLANG_ENABLE_GFX": "OFF",
+        "SLANG_ENABLE_OPTIX": "OFF",
+        "SLANG_ENABLE_REPLAYER": "OFF",
         "SLANG_ENABLE_SLANG_RHI": "OFF",
+        "SLANG_ENABLE_SPLIT_DEBUG_INFO": "OFF",
+        "SLANG_ENABLE_TESTS": "OFF",
         "CMAKE_C_FLAGS_INIT": "-fwasm-exceptions -Os",
         "CMAKE_CXX_FLAGS_INIT": "-fwasm-exceptions -Os",
         "CMAKE_EXE_LINKER_FLAGS": "-sASSERTIONS -sALLOW_MEMORY_GROWTH -fwasm-exceptions --export=__cpp_exception"
