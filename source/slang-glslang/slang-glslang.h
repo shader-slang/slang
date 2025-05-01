@@ -2,8 +2,8 @@
 #ifndef SLANG_GLSLANG_H_INCLUDED
 #define SLANG_GLSLANG_H_INCLUDED
 
-#include <cstring>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <stddef.h>
 
