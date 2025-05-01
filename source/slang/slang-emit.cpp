@@ -1164,6 +1164,9 @@ Result linkAndOptimizeIR(
         cleanupGenerics(targetProgram, irModule, sink);
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER-LOWER-GENERICS");
 
+    if (requiredLoweringPassSet.enumType)
+        lowerEnumType(irModule, sink);
+
     // Don't need to run any further target-dependent passes if we are generating code
     // for host vm.
     if (target == CodeGenTarget::HostVM)
@@ -1193,9 +1196,6 @@ Result linkAndOptimizeIR(
     default:
         lowerCooperativeVectors(irModule, sink);
     }
-
-    if (requiredLoweringPassSet.enumType)
-        lowerEnumType(irModule, sink);
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     performForceInlining(irModule);
