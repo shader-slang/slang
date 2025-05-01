@@ -4151,7 +4151,12 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
          {kIROp_CastFloatToInt, kIROp_CastIntToEnum},
          kIROp_CastToVoid},
         /* From Bool  */
-        {kIROp_IntCast, kIROp_CastIntToFloat, kIROp_Nop, kIROp_CastIntToPtr, kIROp_CastIntToEnum, kIROp_CastToVoid},
+        {kIROp_IntCast,
+         kIROp_CastIntToFloat,
+         kIROp_Nop,
+         kIROp_CastIntToPtr,
+         kIROp_CastIntToEnum,
+         kIROp_CastToVoid},
         /* From Ptr   */
         {kIROp_CastPtrToInt,
          {kIROp_CastPtrToInt, kIROp_CastIntToFloat},
