@@ -124,6 +124,7 @@ jobs:
         if: steps.filter.outputs.should-run == 'true'
         run: |
           if [[ "${{ matrix.platform }}" = "wasm" ]]; then
+              git clone https://github.com/shader-slang/slang-playground.git
               git clone https://github.com/emscripten-core/emsdk.git
               pushd emsdk
                 ./emsdk install latest
@@ -135,8 +136,12 @@ jobs:
               cmake --install build --config Release --component generators --prefix generators
               emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
               cmake --build --preset emscripten --config "$cmake_config" --target slang-wasm
-              [ -f "build.em/$cmake_config/bin/slang-wasm.wasm" ]
-              [ -f "build.em/$cmake_config/bin/slang-wasm.js" ]
+              cd "build.em/$cmake_config/bin"
+              [ -f "slang-wasm.wasm" ]
+              [ -f "slang-wasm.js" ]
+              mkdir test
+              cp ../../../slang-playground/src/slang/rand_float.slang ../../../tests/wasm/smoke-test.js test/
+              node test/smoke-test.js test/rand_float.slang computeMain
           else
             if [[ "${{ matrix.os }}" =~ "windows" && "${{ matrix.config }}" != "release" && "${{ matrix.config }}" != "releaseWithDebugInfo" ]]; then
               # Doing a debug build will try to link against a release built llvm, this
