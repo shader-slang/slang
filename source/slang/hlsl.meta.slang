@@ -3610,7 +3610,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 //@public:
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location)
     {
         __target_switch
@@ -3618,6 +3618,34 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         case cpp:
         case hlsl:
             __intrinsic_asm ".Load";
+		case cuda:
+            if (isArray != 0)
+                {
+     				static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_3D),
+                              "Integer coordinates are supported for texture reads only for 2D and 3D textures and 2D array textures.");
+
+                    if (Shape.flavor == $(SLANG_TEXTURE_2D))
+                    {
+						__intrinsic_asm "tex2DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
+				    }
+                    else
+					{
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
+                else
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "tex2Dfetch_int<$T0>($0, ($1).x, ($1).y)";
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
+					case $(SLANG_TEXTURE_CUBE):
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
         case metal:
             switch (Shape.flavor)
             {
@@ -3824,7 +3852,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
         get
         {
             __target_switch
@@ -3833,6 +3861,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 case hlsl:
                     __intrinsic_asm ".operator[]";
                 case metal:
+                case cuda:
                     return Load(__makeVector(location, 0));
                 case glsl:
                     if (isCombined == 0)
@@ -21937,6 +21966,16 @@ enum DescriptorKind
     AccelerationStructure, /// A ray tracing acceleration structure descriptor.
 }
 
+enum DescriptorAccess
+{
+    Unknown = -1,
+    Read = $(kCoreModule_ResourceAccessReadOnly),
+    Write = $(kCoreModule_ResourceAccessWriteOnly),
+    ReadWrite = $(kCoreModule_ResourceAccessReadWrite),
+    RasterizerOrdered = $(kCoreModule_ResourceAccessRasterizerOrdered),
+    Feedback = $(kCoreModule_ResourceAccessFeedback),
+}
+
 /// Represents an opaque descriptor type, such as textures, samplers, and buffers etc,
 /// whose size may be undefined and can't be directly accessed as ordinary data.
 [sealed]
@@ -21945,6 +21984,7 @@ interface IOpaqueDescriptor
 {
     /// The kind of the descriptor.
     static const DescriptorKind kind;
+    static const DescriptorAccess descriptorAccess;
 }
 
 __magic_type(DynamicResourceType)
@@ -21976,7 +22016,8 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
 
     typealias Handle = DescriptorHandle<This>;
 
-    static const DescriptorKind kind = isCombined!=0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture;
+    static const DescriptorKind kind = isCombined != 0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture;
+    static const DescriptorAccess descriptorAccess = (DescriptorAccess)access;
 
     __implicit_conversion($(kConversionCost_ImplicitDereference))
     [ForceInline]
@@ -21992,28 +22033,30 @@ struct DynamicResourceTypeInfo
     const char* name;
     const char* kind;
     const char* dynamicKind;
+    const char* access;
 };
 
 const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
-    {"StructuredBuffer<T, L>", "Buffer", "General"},
-    {"RWStructuredBuffer<T, L>", "Buffer", "General"},
-    {"AppendStructuredBuffer<T, L>", "Buffer", "General"},
-    {"ConsumeStructuredBuffer<T, L>", "Buffer", "General"},
-    {"RasterizerOrderedStructuredBuffer<T, L>", "Buffer", "General"},
-    {"ByteAddressBuffer", "Buffer", "General"},
-    {"RWByteAddressBuffer", "Buffer", "General"},
-    {"RasterizerOrderedByteAddressBuffer", "Buffer", "General"},
-    {"SamplerState", "Sampler", "Sampler"},
-    {"SamplerComparisonState", "Sampler", "Sampler"},
-    {"ConstantBuffer<T, L>", "Buffer", "General"},
-    {"TextureBuffer<T>", "Buffer", "General"},
-    {"RaytracingAccelerationStructure", "AccelerationStructure", "General"},
+    { "StructuredBuffer<T, L>", "Buffer", "General", "Read" },
+    { "RWStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
+    { "AppendStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
+    { "ConsumeStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
+    { "RasterizerOrderedStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
+    { "ByteAddressBuffer", "Buffer", "General", "Read" },
+    { "RWByteAddressBuffer", "Buffer", "General", "ReadWrite" },
+    { "RasterizerOrderedByteAddressBuffer", "Buffer", "General", "ReadWrite" },
+    { "SamplerState", "Sampler", "Sampler", "Unknown" },
+    { "SamplerComparisonState", "Sampler", "Sampler", "Unknown" },
+    { "ConstantBuffer<T, L>", "Buffer", "General", "Read"},
+    { "TextureBuffer<T>", "Buffer", "General", "Read"},
+    { "RaytracingAccelerationStructure", "AccelerationStructure", "General", "Read"},
 };
 
 for (auto type : kDynamicResourceCastableTypes) {
     auto dynamicKind = type.dynamicKind;
     auto kind = type.kind;
     auto typeName = type.name;
+    auto access = type.access;
     if (strstr(typeName, "<T, L>"))
         sb << "__generic<T, L : IBufferDataLayout>\n";
     else if (strstr(typeName, "<T>"))
@@ -22027,6 +22070,7 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
     __init(__DynamicResource res);
 
     static const DescriptorKind kind = DescriptorKind.$(kind);
+    static const DescriptorAccess descriptorAccess = DescriptorAccess.$(access);
 
     typealias Handle = DescriptorHandle<$(typeName)>;
 

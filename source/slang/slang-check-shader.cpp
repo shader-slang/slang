@@ -727,6 +727,27 @@ Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
     return paramType;
 }
 
+Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
+{
+    auto result = getParamType(astBuilder, paramDeclRef);
+    auto direction = getParameterDirection(paramDeclRef.getDecl());
+    switch (direction)
+    {
+    case kParameterDirection_In:
+        return result;
+    case kParameterDirection_ConstRef:
+        return astBuilder->getConstRefType(result);
+    case kParameterDirection_Out:
+        return astBuilder->getOutType(result);
+    case kParameterDirection_InOut:
+        return astBuilder->getInOutType(result);
+    case kParameterDirection_Ref:
+        return astBuilder->getRefType(result, AddressSpace::Generic);
+    default:
+        return result;
+    }
+}
+
 void Module::_collectShaderParams()
 {
     // We are going to walk the global declarations in the body of the
