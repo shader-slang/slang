@@ -332,7 +332,7 @@ struct HelloWorld : public WindowedAppBase
         // from our program, and that it is set up to hold values for
         // all the parameters of that program. In order to actually
         // set values, we need to be able to look up the location
-        // of specific parameters that we want to set.
+        // of the specific parameters that we want to set.
         //
         // Our example graphics API layer supports this operation
         // with the idea of a *shader cursor* which can be thought
