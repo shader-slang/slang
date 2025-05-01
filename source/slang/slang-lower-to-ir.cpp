@@ -9235,8 +9235,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRType* loweredTagType = lowerType(subContext, decl->tagType);
         IRType* enumType = subBuilder->createEnumType(loweredTagType);
 
-        return LoweredValInfo::simple(
-            finishOuterGenerics(subBuilder, enumType, outerGeneric));
+        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, enumType, outerGeneric));
     }
 
     LoweredValInfo visitThisTypeDecl(ThisTypeDecl* decl)
