@@ -106,6 +106,7 @@ IROp getTypeStyle(IROp op)
     {
     case kIROp_VoidType:
     case kIROp_BoolType:
+    case kIROp_EnumType:
         {
             return op;
         }

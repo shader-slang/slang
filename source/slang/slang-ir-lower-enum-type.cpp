@@ -74,16 +74,19 @@ struct EnumTypeLoweringContext
         auto builder = &builderStorage;
         builder->setInsertBefore(inst);
 
-        auto type = inst->getFullType();
         auto value = inst->getOperand(0);
-
-        IRType* dstType = type;
-        if (auto enumType = getLoweredEnumType(dstType))
-        { // Cast was into enum, so use tag type instead.
-            dstType = enumType->loweredType;
+        if (auto enumType = getLoweredEnumType(value->getFullType()))
+        {
+            value->setFullType(enumType->loweredType);
         }
 
-        auto cast = builder->emitCast(dstType, value);
+        auto type = inst->getFullType();
+        if (auto enumType = getLoweredEnumType(type))
+        { // Cast was into enum, so use tag type instead.
+            type = enumType->loweredType;
+        }
+
+        auto cast = builder->emitCast(type, value);
 
         inst->replaceUsesWith(cast);
         inst->removeAndDeallocate();
