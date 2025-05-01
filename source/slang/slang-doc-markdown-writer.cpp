@@ -2896,7 +2896,8 @@ void writeTOCChildren(
     if (page->path.endsWith("index.md"))
     {
         StringBuilder& tocSB = page->get();
-        tocSB << "\n```{toctree}\n:titlesonly:\n:hidden:\n\n";
+        tocSB << "\n<!-- RTD-TOC-START\n";
+        tocSB << "```{toctree}\n:titlesonly:\n:hidden:\n\n";
 
         // Add category landing pages to the toctree
         for (auto& cat : categoryNames)
@@ -2915,6 +2916,7 @@ void writeTOCChildren(
             tocSB << getTocTreeEntry(child->shortName, parentPath, child->path);
         }
         tocSB << "```\n";
+        tocSB << "RTD-TOC-END -->\n";
     }
 
     for (auto& cat : categoryNames)
@@ -2953,12 +2955,14 @@ void writeTOCChildren(
         }
 
         // Add the toctree for the category landing page.
-        landingPage->contentSB << "\n```{toctree}\n:titlesonly:\n:hidden:\n\n";
+        landingPage->contentSB << "\n<!-- RTD-TOC-START\n";
+        landingPage->contentSB << "```{toctree}\n:titlesonly:\n:hidden:\n\n";
         for (auto child : categories[cat])
         {
             landingPage->contentSB << getTocTreeEntry(child->shortName, parentPath, child->path);
         }
-        landingPage->contentSB << toSlice("```\n");
+        landingPage->contentSB << "```\n";
+        landingPage->contentSB << "RTD-TOC-END -->\n";
 
         page->children.add(landingPage);
     }
