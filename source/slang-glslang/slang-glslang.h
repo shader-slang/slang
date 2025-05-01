@@ -3,6 +3,7 @@
 #define SLANG_GLSLANG_H_INCLUDED
 
 #include <cstring>
+#include <cstdint>
 #include <memory>
 #include <stddef.h>
 
