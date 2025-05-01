@@ -124,7 +124,7 @@ struct EnumTypeLoweringContext
             }
         }
 
-        // Replace all optional types with lowered struct types.
+        // Replace all enum types with their lowered equivalent types.
         for (const auto& [key, value] : loweredEnumTypes)
             key->replaceUsesWith(value->loweredType);
     }
