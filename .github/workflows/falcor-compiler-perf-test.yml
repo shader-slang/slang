@@ -100,5 +100,5 @@ jobs:
         run: |
           $filename = '${{ fromJson(steps.download.outputs.downloaded_files)[0] }}'
           Expand-Archive $filename -DestinationPath .\falcor-perf-test
-          $env:PATH += ";.\build\${{matrix.config}}\bin";
+          $env:PATH = ".\build\${{matrix.config}}\bin;" + $env:PATH
           .\falcor-perf-test\bin\Release\falcor_perftest.exe
