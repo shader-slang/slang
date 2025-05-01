@@ -4270,6 +4270,11 @@ IRInst* IRBuilder::emitVectorReshape(IRType* type, IRInst* value)
                 }
                 return emitMakeVector(targetVectorType, args);
             }
+            else
+            {
+                // Sizes match, no need to reshape.
+                return value;
+            }
         }
         auto reshape = emitIntrinsicInst(
             getVectorType(sourceVectorType->getElementType(), targetVectorType->getElementCount()),
