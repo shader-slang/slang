@@ -557,8 +557,6 @@ struct CatchHandler
 {
     IRType* errorType = nullptr;
 
-    IRInst* errorTypeWitness = nullptr;
-
     // Block of the handler statement. Takes a value of errorType as parameter.
     IRBlock* errorHandler = nullptr;
 
@@ -769,14 +767,14 @@ int32_t getIntrinsicOp(Decl* decl, IntrinsicOpModifier* intrinsicOpMod)
     return int32_t(irOp);
 }
 
-static CatchHandler findErrorHandler(IRGenContext* context, IRInst* typeWitness)
+static CatchHandler findErrorHandler(IRGenContext* context, IRType* type)
 {
     for(
         auto handler = context->catchHandler;
         handler != nullptr;
         handler = context->catchHandler->prev
     ){
-        if (handler->errorTypeWitness == typeWitness)
+        if (handler->errorType == type)
         {
             return *handler;
         }
@@ -787,6 +785,7 @@ static CatchHandler findErrorHandler(IRGenContext* context, IRInst* typeWitness)
 struct TryClauseEnvironment
 {
     TryClauseType clauseType = TryClauseType::None;
+    IRBlock* catchBlock = nullptr;
 };
 
 // Given a `LoweredValInfo` for something callable, along with a
@@ -844,7 +843,7 @@ LoweredValInfo emitCallToVal(
 
                 auto succBlock = builder->createBlock();
                 auto failBlock = builder->createBlock();
-                auto handler = findErrorHandler(context, throwAttr->getErrorTypeWitness());
+                auto handler = findErrorHandler(context, throwAttr->getErrorType());
 
                 auto voidType = builder->getVoidType();
                 builder->emitTryCallInst(voidType, succBlock, failBlock, handler.mergeBlock, callee, argCount, args);
@@ -6678,12 +6677,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         auto loweredExpr = lowerRValueExpr(context, stmt->expression);
         auto loweredVal = getSimpleVal(context, loweredExpr);
-        auto errorTypeWitness = lowerSimpleVal(context, stmt->errorTypeWitness);
 
         CatchHandler handler;
         if (loweredVal && loweredVal->getDataType())
         {
-            handler = findErrorHandler(context, errorTypeWitness);
+            handler = findErrorHandler(context, loweredVal->getDataType());
         }
 
         if (handler.errorType)
@@ -6707,7 +6705,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         CatchHandler catchHandler;
         catchHandler.errorType = lowerType(context, stmt->errorVar->getType());
-        catchHandler.errorTypeWitness = lowerSimpleVal(context, stmt->errorTypeWitness);
         catchHandler.errorHandler = handleBlock;
         catchHandler.mergeBlock = mergeBlock;
         catchHandler.prev = context->catchHandler;

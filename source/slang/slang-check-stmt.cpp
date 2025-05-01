@@ -602,7 +602,6 @@ void SemanticsStmtVisitor::visitDeferStmt(DeferStmt* stmt)
 void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
 {
     stmt->expression = CheckTerm(stmt->expression);
-
     Stmt* catchStmt = findMatchingCatchStmt(stmt->expression->type);
 
     auto parentFunc = getParentFunc();
@@ -622,10 +621,6 @@ void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
                 stmt->expression->type,
                 parentFunc->errorType);
         }
-
-        stmt->errorTypeWitness = tryGetSubtypeWitness(
-            stmt->expression->type,
-            m_astBuilder->getErrorResultType());
     }
 
     if (FindOuterStmt<DeferStmt>(catchStmt))
@@ -644,9 +639,6 @@ void SemanticsStmtVisitor::visitCatchStmt(CatchStmt* stmt)
 {
     ensureDeclBase(stmt->errorVar, DeclCheckState::DefinitionChecked, this);
     stmt->errorVar->hiddenFromLookup = false;
-    stmt->errorTypeWitness = tryGetSubtypeWitness(
-        stmt->errorVar->type.type,
-        m_astBuilder->getErrorResultType());
 
     WithOuterStmt subContext(this, stmt);
     subContext.checkStmt(stmt->tryBody);
