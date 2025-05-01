@@ -875,9 +875,6 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.optionalType)
         lowerOptionalType(irModule, sink);
 
-    if (requiredLoweringPassSet.enumType)
-        lowerEnumType(irModule, sink);
-
     switch (target)
     {
     case CodeGenTarget::CUDASource:
@@ -1196,6 +1193,9 @@ Result linkAndOptimizeIR(
     default:
         lowerCooperativeVectors(irModule, sink);
     }
+
+    if (requiredLoweringPassSet.enumType)
+        lowerEnumType(irModule, sink);
 
     // Inline calls to any functions marked with [__unsafeInlineEarly] or [ForceInline].
     performForceInlining(irModule);
