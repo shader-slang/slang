@@ -9228,18 +9228,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto subContext = nestedContext.getContext();
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
-        // An `enum` declaration will currently lower directly to its "tag"
-        // type, so that any references to the `enum` become referenes to
-        // the tag type instead.
-        //
         // TODO: if we ever support `enum` types with payloads, we would
         // need to make the `enum` lower to some kind of custom "tagged union"
         // type.
 
         IRType* loweredTagType = lowerType(subContext, decl->tagType);
+        IRType* enumType = subBuilder->createEnumType(loweredTagType);
 
         return LoweredValInfo::simple(
-            finishOuterGenerics(subBuilder, loweredTagType, outerGeneric));
+            finishOuterGenerics(subBuilder, enumType, outerGeneric));
     }
 
     LoweredValInfo visitThisTypeDecl(ThisTypeDecl* decl)

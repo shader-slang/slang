@@ -4051,6 +4051,7 @@ enum class TypeCastStyle
     Float,
     Bool,
     Ptr,
+    Enum,
     Void
 };
 static TypeCastStyle _getTypeStyleId(IRType* type)
@@ -4083,6 +4084,8 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
     case kIROp_RefType:
     case kIROp_ConstRefType:
         return TypeCastStyle::Ptr;
+    case kIROp_EnumType:
+        return TypeCastStyle::Enum;
     case kIROp_VoidType:
         return TypeCastStyle::Void;
     default:
@@ -4131,27 +4134,37 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
         }
     };
 
-    static const OpSeq opMap[4][5] = {
-        /*      To:      Int, Float, Bool, Ptr, Void*/
+    static const OpSeq opMap[5][6] = {
+        /*      To:      Int, Float, Bool, Ptr, Enum, Void */
         /* From Int   */ {
             kIROp_IntCast,
             kIROp_CastIntToFloat,
             kIROp_IntCast,
             kIROp_CastIntToPtr,
+            kIROp_CastIntToEnum,
             kIROp_CastToVoid},
         /* From Float */
         {kIROp_CastFloatToInt,
          kIROp_FloatCast,
          {kIROp_Neq},
          {kIROp_CastFloatToInt, kIROp_CastIntToPtr},
+         {kIROp_CastFloatToInt, kIROp_CastIntToEnum},
          kIROp_CastToVoid},
         /* From Bool  */
-        {kIROp_IntCast, kIROp_CastIntToFloat, kIROp_Nop, kIROp_CastIntToPtr, kIROp_CastToVoid},
+        {kIROp_IntCast, kIROp_CastIntToFloat, kIROp_Nop, kIROp_CastIntToPtr, kIROp_CastIntToEnum, kIROp_CastToVoid},
         /* From Ptr   */
         {kIROp_CastPtrToInt,
          {kIROp_CastPtrToInt, kIROp_CastIntToFloat},
          kIROp_CastPtrToBool,
          kIROp_BitCast,
+         {kIROp_CastPtrToInt, kIROp_CastIntToEnum},
+         kIROp_CastToVoid},
+        /* From Enum   */
+        {kIROp_CastEnumToInt,
+         {kIROp_CastEnumToInt, kIROp_CastIntToFloat},
+         {kIROp_CastEnumToInt, kIROp_IntCast},
+         {kIROp_CastEnumToInt, kIROp_CastIntToPtr},
+         kIROp_EnumCast,
          kIROp_CastToVoid},
     };
 
@@ -4805,6 +4818,13 @@ IRClassType* IRBuilder::createClassType()
     IRClassType* classType = createInst<IRClassType>(this, kIROp_ClassType, getTypeKind());
     addGlobalValue(this, classType);
     return classType;
+}
+
+IREnumType* IRBuilder::createEnumType(IRType* tagType)
+{
+    IREnumType* enumType = createInst<IREnumType>(this, kIROp_EnumType, getTypeKind(), tagType);
+    addGlobalValue(this, enumType);
+    return enumType;
 }
 
 IRGLSLShaderStorageBufferType* IRBuilder::createGLSLShaderStorableBufferType()
@@ -8505,6 +8525,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_CastPtrToInt:
     case kIROp_CastIntToPtr:
     case kIROp_PtrCast:
+    case kIROp_CastEnumToInt:
+    case kIROp_CastIntToEnum:
+    case kIROp_EnumCast:
     case kIROp_CastUInt2ToDescriptorHandle:
     case kIROp_CastDescriptorHandleToUInt2:
     case kIROp_CastDescriptorHandleToResource:
@@ -8956,6 +8979,9 @@ bool isMovableInst(IRInst* inst)
     case kIROp_CastPtrToBool:
     case kIROp_CastPtrToInt:
     case kIROp_PtrCast:
+    case kIROp_CastEnumToInt:
+    case kIROp_CastIntToEnum:
+    case kIROp_EnumCast:
     case kIROp_CastDynamicResource:
     case kIROp_BitAnd:
     case kIROp_BitNot:
