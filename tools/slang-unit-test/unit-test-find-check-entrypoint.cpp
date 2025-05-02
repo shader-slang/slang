@@ -133,6 +133,5 @@ SLANG_UNIT_TEST(cudaCodeGenBug)
     ComPtr<slang::IBlob> code;
     auto res = linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnosticBlob.writeRef());
     SLANG_CHECK(res == SLANG_OK);
-    SLANG_CHECK(code != nullptr);
-    SLANG_CHECK(code->getBufferSize() != 0);
+    SLANG_CHECK(code != nullptr && code->getBufferSize() != 0);
 }
