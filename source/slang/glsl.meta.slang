@@ -8898,23 +8898,7 @@ public vector<float, N> dFdyCoarse(vector<float, N> p)
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float fwidthFine(float p)
 {
-    __requireComputeDerivative();
-    __target_switch
-    {
-    case hlsl:
-    {
-        return abs(ddx_fine(p)) + abs(ddy_fine(p));
-    }
-    case glsl: __intrinsic_asm "fwidthFine($0)";
-    case spirv:
-    {
-        return spirv_asm
-        {
-            OpCapability DerivativeControl;
-            OpFwidthFine $$float result $p;
-        };
-    }
-    }
+    return fwidth_fine(p);
 }
 __generic<let N : int>
 [__NoSideEffect]
@@ -8922,23 +8906,7 @@ __generic<let N : int>
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> fwidthFine(vector<float, N> p)
 {
-    __requireComputeDerivative();
-    __target_switch
-    {
-    case hlsl:
-    {
-        return abs(ddx_fine(p)) + abs(ddy_fine(p));
-    }
-    case glsl: __intrinsic_asm "fwidthFine($0)";
-    case spirv:
-    {
-        return spirv_asm
-        {
-            OpCapability DerivativeControl;
-            OpFwidthFine $$vector<float, N> result $p;
-        };
-    }
-    }
+    return fwidth_fine(p);
 }
 
 [__NoSideEffect]
@@ -8946,23 +8914,7 @@ public vector<float, N> fwidthFine(vector<float, N> p)
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float fwidthCoarse(float p)
 {
-    __requireComputeDerivative();
-    __target_switch
-    {
-    case hlsl:
-    {
-        return abs(ddx_coarse(p)) + abs(ddy_coarse(p));
-    }
-    case glsl: __intrinsic_asm "fwidthCoarse($0)";
-    case spirv:
-    {
-        return spirv_asm
-        {
-            OpCapability DerivativeControl;
-            OpFwidthCoarse $$float result $p;
-        };
-    }
-    }
+    return fwidth_coarse(p);
 }
 __generic<let N : int>
 [__NoSideEffect]
@@ -8970,23 +8922,7 @@ __generic<let N : int>
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> fwidthCoarse(vector<float, N> p)
 {
-    __requireComputeDerivative();
-    __target_switch
-    {
-    case hlsl:
-    {
-        return abs(ddx_coarse(p)) + abs(ddy_coarse(p));
-    }
-    case glsl: __intrinsic_asm "fwidthCoarse($0)";
-    case spirv:
-    {
-        return spirv_asm
-        {
-            OpCapability DerivativeControl;
-            OpFwidthCoarse $$vector<float, N> result $p;
-        };
-    }
-    }
+    return fwidth_coarse(p);
 }
 
 [__NoSideEffect]
