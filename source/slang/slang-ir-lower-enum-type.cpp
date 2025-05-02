@@ -75,12 +75,19 @@ struct EnumTypeLoweringContext
         builder->setInsertBefore(inst);
 
         auto value = inst->getOperand(0);
-        if (auto enumType = getLoweredEnumType(value->getFullType()))
+        if (auto enumType = getLoweredEnumType(value->getDataType()))
         {
-            value->setFullType(enumType->loweredType);
+            auto rate = value->getRate();
+            auto type = enumType->loweredType;
+            if (rate)
+            {
+                type = builder->getRateQualifiedType(rate, type);
+            }
+
+            value->setFullType(type);
         }
 
-        auto type = inst->getFullType();
+        auto type = inst->getDataType();
         if (auto enumType = getLoweredEnumType(type))
         { // Cast was into enum, so use tag type instead.
             type = enumType->loweredType;
