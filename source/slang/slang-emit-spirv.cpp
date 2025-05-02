@@ -7427,12 +7427,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugInlinedFunction(SpvInstParent* parent, IRDebugFunction* debugFunc)
     {
-        SpvInst* debugFuncInfo = nullptr;
-        if (m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
-        {
-            return debugFuncInfo;
-        }
-
         auto scope = findDebugScope(debugFunc);
         if (!scope)
             return nullptr;
@@ -7440,9 +7434,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto debugType = emitDebugType(as<IRType>(debugFunc->getDebugType()));
         IRBuilder builder(debugFunc);
 
+        SpvInst* debugFuncInfo = nullptr;
         debugFuncInfo = emitOpDebugFunction(
             parent,
-            nullptr,
+            debugFunc,
             m_voidType,
             getNonSemanticDebugInfoExtInst(),
             debugFunc->getName(),
@@ -7454,8 +7449,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             debugFunc->getName(),
             builder.getIntValue(builder.getUIntType(), 0),
             debugFunc->getLine());
-
-        registerInst(debugFunc, debugFuncInfo);
 
         return debugFuncInfo;
     }
@@ -7984,12 +7977,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugFunction(SpvInst* firstBlock, SpvInst* spvFunc, IRFunc* function)
     {
-        SpvInst* debugFunc = nullptr;
-        if (m_mapIRInstToSpvDebugInst.tryGetValue(function, debugFunc))
-        {
-            return debugFunc;
-        }
-
         auto scope = findDebugScope(function);
         if (!scope)
             return nullptr;
@@ -8017,6 +8004,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         }
 
+        SpvInst* debugFunc = nullptr;
         debugFunc = emitOpDebugFunction(
             getSection(SpvLogicalSectionID::ConstantsAndTypes),
             nullptr,
@@ -8033,10 +8021,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             debugLoc->getLine());
 
         registerDebugInst(function, debugFunc);
-        if (!m_mapIRInstToSpvInst.tryGetValue(irDebugFunc, debugFunc))
-        {
-            registerInst(irDebugFunc, debugFunc);
-        }
+        registerInst(irDebugFunc, debugFunc);
 
         emitOpDebugFunctionDefinition(
             firstBlock,

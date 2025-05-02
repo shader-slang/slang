@@ -385,9 +385,6 @@ IRIntegerValue SharedGenericsLoweringContext::getInterfaceAnyValueSize(
 {
     SLANG_UNUSED(usageLoc);
 
-    if (!type)
-        return kDefaultAnyValueSize;
-
     if (auto decor = type->findDecoration<IRAnyValueSizeDecoration>())
     {
         return decor->getSize();
