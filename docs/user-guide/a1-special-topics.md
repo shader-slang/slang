@@ -13,3 +13,16 @@ In this chapter:
 3. [Obfuscation](a1-03-obfuscation.md)
 4. [Interoperation with target-specific code](a1-04-interop.md)
 5. [Uniformity Analysis](a1-05-uniformity.md)
+
+<!-- RTD-TOC-START
+```{toctree}
+:titlesonly:
+:hidden:
+
+Handling Matrix Layout Differences on Different Platforms <a1-01-matrix-layout>
+Using Slang to Write PyTorch Kernels <a1-02-slangpy>
+Obfuscation <a1-03-obfuscation>
+Interoperation with Target-Specific Code <a1-04-interop>
+Uniformity Analysis <a1-05-uniformity>
+```
+RTD-TOC-END -->
