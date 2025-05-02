@@ -3,12 +3,12 @@ layout: user-guide
 permalink: /user-guide/metal-target-specific
 ---
 
-# Metal-Specific Functionalities
+## Metal-Specific Functionalities
 
 This chapter provides information for Metal-specific functionalities and
 behaviors in Slang.
 
-## Entry Point Parameter Handling
+### Entry Point Parameter Handling
 
 Slang performs several transformations on entry point parameters when targeting Metal:
 
@@ -17,7 +17,7 @@ Slang performs several transformations on entry point parameters when targeting 
 - System value semantics are translated to Metal attributes
 - Parameters without semantics are given automatic attribute indices
 
-## System-Value semantics
+### System-Value semantics
 
 The system-value semantics are translated to the following Metal attributes:
 
@@ -50,7 +50,7 @@ Custom semantics are mapped to user attributes:
 - `[[user(SEMANTIC_NAME)]]` For non-system value semantics
 - `[[user(SEMANTIC_NAME_INDEX)]]` When semantic has an index
 
-## Interpolation Modifiers
+### Interpolation Modifiers
 
 Slang maps interpolation modifiers to Metal's interpolation attributes:
 
@@ -62,7 +62,7 @@ Slang maps interpolation modifiers to Metal's interpolation attributes:
 | `sample`            | `[[sample_perspective]]`    |
 | `centroid`          | `[[center_perspective]]`    |
 
-## Resource Types
+### Resource Types
 
 Resource types are translated with appropriate Metal qualifiers:
 
@@ -107,7 +107,7 @@ Raster-ordered access resources receive the `[[raster_order_group(0)]]`
 attribute, for example `texture2d<float, access::read_write> tex
 [[raster_order_group(0)]]`.
 
-# Array Types
+## Array Types
 
 Array types in Metal are declared using the array template:
 
@@ -115,7 +115,7 @@ Array types in Metal are declared using the array template:
 | ------------------- | -------------------------- |
 | `ElementType[Size]` | `array<ElementType, Size>` |
 
-# Matrix Layout
+## Matrix Layout
 
 Metal exclusively uses column-major matrix layout. Slang automatically handles
 the translation of matrix operations to maintain correct semantics:
@@ -124,7 +124,7 @@ the translation of matrix operations to maintain correct semantics:
 - Matrix types are declared as `matrix<T, Columns, Rows>`, for example
   `float3x4` is represented as `matrix<float, 3, 4>`
 
-# Mesh Shader Support
+## Mesh Shader Support
 
 Mesh shaders can be targeted using the following types and syntax. The same as task/mesh shaders generally in Slang.
 
@@ -140,7 +140,7 @@ void meshMain(
     )
 ```
 
-## Header Inclusions and Namespace
+### Header Inclusions and Namespace
 
 When targeting Metal, Slang automatically includes the following headers, these
 are available to any intrinsic code.
@@ -152,7 +152,7 @@ are available to any intrinsic code.
 using namespace metal;
 ```
 
-## Parameter blocks and Argument Buffers
+### Parameter blocks and Argument Buffers
 
 `ParameterBlock` values are translated into _Argument Buffers_ potentially
 containing nested resources. For example, this Slang code...
@@ -185,7 +185,7 @@ struct MyParameters
 [[kernel]] void main(MyParameters constant* gObj [[buffer(1)]])
 ```
 
-## Struct Parameter Flattening
+### Struct Parameter Flattening
 
 When targeting Metal, top-level nested struct parameters are automatically
 flattened. For example:
@@ -214,7 +214,7 @@ struct InputStruct
 };
 ```
 
-## Return Value Handling
+### Return Value Handling
 
 Non-struct return values from entry points are automatically wrapped in a
 struct with appropriate semantics. For example:
@@ -239,7 +239,7 @@ FragmentOutput main()
 }
 ```
 
-## Value Type Conversion
+### Value Type Conversion
 
 Metal enforces strict type requirements for certain operations. Slang
 automatically performs the following conversions:
@@ -255,11 +255,11 @@ RWTexture2D<float2> tex;
 tex[coord] = float2(1,2);  // Automatically expanded to float4(1,2,0,0)
 ```
 
-## Conservative Rasterization
+### Conservative Rasterization
 
 Since Metal doesn't support conservative rasterization, SV_InnerCoverage is always false.
 
-## Address Space Assignment
+### Address Space Assignment
 
 Metal requires explicit address space qualifiers. Slang automatically assigns appropriate address spaces:
 
@@ -272,7 +272,7 @@ Metal requires explicit address space qualifiers. Slang automatically assigns ap
 | Group Shared          | `threadgroup`       |
 | Parameter Blocks      | `constant`          |
 
-## Explicit Parameter Binding
+### Explicit Parameter Binding
 
 The HLSL `:register()` semantic is respected when emitting Metal code.
 
@@ -282,7 +282,7 @@ Since Metal does not differentiate between a constant buffer, a shader resource 
 
 The `[vk::location(N)]` attributes on stage input/output parameters are respected.
 
-## Specialization Constants
+### Specialization Constants
 
 Specialization constants declared with the `[SpecializationConstant]` or `[vk::constant_id]` attribute will be translated into a `function_constant` when generating Metal source.
 For example:
