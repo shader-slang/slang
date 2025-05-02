@@ -308,7 +308,7 @@ struct InliningPassBase
     // Sets up the initial debug information structures required *before* inlining a call site.
     //
     // This function performs the following steps:
-    // 1. Checks if the callee function has associated debug location information. 
+    // 1. Checks if the callee function has associated debug location information.
     // 2. Finds the last `IRDebugLine` preceding the `call` instruction to determine the source
     //    location (line, col, file) of the call site.
     // 3. Emits an `IRDebugInlinedAt` instruction with outer set to callDebugInlinedAt.
@@ -667,7 +667,10 @@ struct InliningPassBase
         call->removeAndDeallocate();
     }
 
-    std::pair<IRDebugScope*, IRDebugInlinedAt*> emitAndGetCallDebugInfo(IRCall* call, IRFunc* callee, IRBuilder* builder)
+    std::pair<IRDebugScope*, IRDebugInlinedAt*> emitAndGetCallDebugInfo(
+        IRCall* call,
+        IRFunc* callee,
+        IRBuilder* builder)
     {
         if (!callee->findDecoration<IRDebugLocationDecoration>())
         {
@@ -718,27 +721,29 @@ struct InliningPassBase
     /// Inline the body of the callee for `callSite`.
     // Here is the algorithm for inserting debug information for slang inlined functions:
     // !!!!!!   TODO: FIX ME    !!!!!
-    // 1. Check if the call inst belongs to an existing debug scope and find corresponding debugInlinedAt. [callDebugScope, callDebugInlinedAt]
+    // 1. Check if the call inst belongs to an existing debug scope and find corresponding
+    // debugInlinedAt. [callDebugScope, callDebugInlinedAt]
     //    1a. If callDebugScope exists, emit this debug Scope* after* the call inst.
-    // 2. Emit a new DebugInlinedAt inst, with debugFunc of the callee, and outer debugInlinedAt is callDebugInlinedAt. [newDebugInlinedAt]
+    // 2. Emit a new DebugInlinedAt inst, with debugFunc of the callee, and outer debugInlinedAt is
+    // callDebugInlinedAt. [newDebugInlinedAt]
     //    2a. If calleDebugScope does not exist, emit debugNoScope after the call inst.
     // 3. Clone the callee body.
     // 4. For each cloned block, do this:
-    //    4a.Emit a new DebugScope inst setting the current scope to newDebugInlinedAt. [calleeDebugScope]
-    //    4b.Emit a DebugNoScope at the end of each block.
-    //    4c.If callDebugScope exists, do not emit a DebugNoScope for the last block.
-    // 5. For each cloned debugInlinedAt inst, if its outer inlined at operand is null, set it to the new DebugInlinedAt inst inserted at the top of the block.
-    // 6. For each cloned debugNoScope inst, replace it with calleeDebugScope. (This is because all cloned insts are in callee's scope).
-    void inlineFuncBody(
-        CallSiteInfo const& callSite,
-        IRCloneEnv* env,
-        IRBuilder* builder)
+    //    4a.Emit a new DebugScope inst setting the current scope to newDebugInlinedAt.
+    //    [calleeDebugScope] 4b.Emit a DebugNoScope at the end of each block. 4c.If callDebugScope
+    //    exists, do not emit a DebugNoScope for the last block.
+    // 5. For each cloned debugInlinedAt inst, if its outer inlined at operand is null, set it to
+    // the new DebugInlinedAt inst inserted at the top of the block.
+    // 6. For each cloned debugNoScope inst, replace it with calleeDebugScope. (This is because all
+    // cloned insts are in callee's scope).
+    void inlineFuncBody(CallSiteInfo const& callSite, IRCloneEnv* env, IRBuilder* builder)
     {
         auto callee = callSite.callee;
         auto call = callSite.call;
 
         auto [callDebugScope, callDebugInlinedAt] = emitAndGetCallDebugInfo(call, callee, builder);
-        auto [newDebugInlinedAt, calleeDebugFunc] = emitCalleeDebugInlinedAt(call, callee, *builder, callDebugInlinedAt);
+        auto [newDebugInlinedAt, calleeDebugFunc] =
+            emitCalleeDebugInlinedAt(call, callee, *builder, callDebugInlinedAt);
 
         // If the callee consists of a single basic block *and* that block
         // ends with a `return` instruction, then we can apply a simple approach
