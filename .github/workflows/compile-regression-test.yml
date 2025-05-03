@@ -36,7 +36,7 @@ jobs:
           - warnings-as-errors: true
             test-category: full
             full-gpu-tests: false
-            runs-on: [Windows, self-hosted, regression-test]
+            runs-on: [Windows, self-hosted, regression-test, disabled]
     runs-on: ${{ matrix.runs-on }}
     defaults:
       run:

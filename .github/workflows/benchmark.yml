@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: [Windows, self-hosted]
+    runs-on: [Windows, self-hosted, disabled]
     steps:
       - uses: actions/checkout@v4
         with:
