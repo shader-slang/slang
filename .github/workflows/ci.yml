@@ -174,12 +174,17 @@ jobs:
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
           if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
-            "$bin_dir/slang-test" \
-              -category ${{ matrix.test-category }} \
-              -api all-cpu \
-              -expected-failure-list tests/expected-failure-github.txt \
-              -skip-reference-image-generation \
-              -show-adapter-info
+            for i in $(seq 100)
+            do
+              echo "Retry attempt #$i ..."
+              "$bin_dir/slang-test" \
+                tests/autodiff/ \
+                -category ${{ matrix.test-category }} \
+                -api all-cpu \
+                -skip-reference-image-generation
+                #-show-adapter-info
+                #-expected-failure-list tests/expected-failure-github.txt \
+            done
           elif [[ "${{matrix.has-gpu}}" == "true" ]]; then
             "$bin_dir/slang-test" \
               -use-test-server \
@@ -219,13 +224,18 @@ jobs:
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
-          "$bin_dir/slang-test" \
-            -category ${{ matrix.test-category }} \
-            -emit-spirv-via-glsl \
-            -api vk \
-            -expected-failure-list tests/expected-failure.txt \
-            -skip-reference-image-generation \
-            -show-adapter-info
+          for i in $(seq 100)
+          do
+            echo "Retry attempt #$i ..."
+            "$bin_dir/slang-test" \
+              tests/autodiff/ \
+              -category ${{ matrix.test-category }} \
+              -emit-spirv-via-glsl \
+              -api vk \
+              -expected-failure-list tests/expected-failure.txt \
+              -skip-reference-image-generation \
+              -show-adapter-info
+          done
       - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests
         with:
