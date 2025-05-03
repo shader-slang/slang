@@ -829,15 +829,45 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     return value;
 }
 
-static void _lexStringLiteralBody(Lexer* lexer, char quote)
+IntegerLiteralValue getCharLiteralValue(Token const& token)
 {
+    const UnownedStringSlice content = token.getContent();
+    char const* cursor = content.begin();
+
+    // Skip the first '
+    cursor++;
+
+    IntegerLiteralValue codepoint = getUnicodePointFromUTF8([&](){return *cursor++;});
+    return codepoint;
+}
+
+static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
+{
+    int len = 0;
     for (;;)
     {
         int c = _peek(lexer);
         if (c == quote)
         {
+            if (singleChar && len == 0)
+            { // Empty char literal - size must be exactly 1.
+                if (auto sink = lexer->getDiagnosticSink())
+                {
+                    sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::illegalCharacterLiteral);
+                }
+            }
             _advance(lexer);
             return;
+        }
+
+        len++;
+
+        if (singleChar && len == 2)
+        { // Char literal about to have more than 1 char.
+            if (auto sink = lexer->getDiagnosticSink())
+            {
+                sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::illegalCharacterLiteral);
+            }
         }
 
         switch (c)
@@ -1346,12 +1376,12 @@ static TokenType _lexTokenImpl(Lexer* lexer)
 
     case '\"':
         _advance(lexer);
-        _lexStringLiteralBody(lexer, '\"');
+        _lexStringLiteralBody(lexer, '\"', false);
         return TokenType::StringLiteral;
 
     case '\'':
         _advance(lexer);
-        _lexStringLiteralBody(lexer, '\'');
+        _lexStringLiteralBody(lexer, '\'', true);
         return TokenType::CharLiteral;
 
 
