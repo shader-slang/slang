@@ -837,7 +837,7 @@ IntegerLiteralValue getCharLiteralValue(Token const& token)
     // Skip the first '
     cursor++;
 
-    IntegerLiteralValue codepoint = getUnicodePointFromUTF8([&](){return *cursor++;});
+    IntegerLiteralValue codepoint = getUnicodePointFromUTF8([&]() { return *cursor++; });
     return codepoint;
 }
 
