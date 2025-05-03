@@ -381,11 +381,7 @@ static Result _calcSizeAndAlignment(
         {
             auto enumType = cast<IREnumType>(type);
             auto tagType = enumType->getTagType();
-            return _calcSizeAndAlignment(
-                optionSet,
-                rules,
-                tagType,
-                outSizeAndAlignment);
+            return _calcSizeAndAlignment(optionSet, rules, tagType, outSizeAndAlignment);
         }
         break;
     default:
