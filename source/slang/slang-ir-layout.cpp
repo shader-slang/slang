@@ -377,6 +377,17 @@ static Result _calcSizeAndAlignment(
                 attributedType->getBaseType(),
                 outSizeAndAlignment);
         }
+    case kIROp_EnumType:
+        {
+            auto enumType = cast<IREnumType>(type);
+            auto tagType = enumType->getTagType();
+            return _calcSizeAndAlignment(
+                optionSet,
+                rules,
+                tagType,
+                outSizeAndAlignment);
+        }
+        break;
     default:
         break;
     }
