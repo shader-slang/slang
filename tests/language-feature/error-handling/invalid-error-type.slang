@@ -10,4 +10,4 @@ int g() throws MyError
     throw MyError.Fail;
 }
 
-// CHECK: error 30115
+// CHECK: error 30117

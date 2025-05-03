@@ -1,6 +1,12 @@
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
+
+// CHECK: 2
+// CHECK-NEXT: 0
+// CHECK-NEXT: 11
+// CHECK-NEXT: 12
+// CHECK-NEXT: 6
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -29,12 +35,10 @@ extension MyError2 : IError
     bool isSuccessValue() { return this == Success; }
 }
 
-/*
 void throwingFunc() throws MyError1
 {
     throw MyError1.Fail;
 }
-*/
 
 int maybeBadFunc1(int n) throws MyError1
 {

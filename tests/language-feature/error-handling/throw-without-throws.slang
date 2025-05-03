@@ -23,4 +23,4 @@ void f()
 }
 
 // CHECK: error 30093
-// CHECK: error 30113
+// CHECK: error 30115

@@ -28,4 +28,4 @@ int g() throws MyError1
     throw MyError2.Fail;
 }
 
-// CHECK: error 30114
+// CHECK: error 30116

@@ -21,4 +21,4 @@ void f() throws MyError
     }
 }
 
-// CHECK: error 30111
+// CHECK: error 30113
