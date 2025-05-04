@@ -6,6 +6,7 @@
 //
 
 #include "core/slang-char-encode.h"
+#include "core/slang-string-escape-util.h"
 #include "slang-core-diagnostics.h"
 #include "slang-name.h"
 #include "slang-source-loc.h"
@@ -831,11 +832,12 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
 
 IntegerLiteralValue getCharLiteralValue(Token const& token)
 {
-    const UnownedStringSlice content = token.getContent();
-    char const* cursor = content.begin();
+    String unquotedContent = StringEscapeUtil::unquote('\'', token.getContent());
+    StringBuilder unescaped(4);
+    auto escapeHandler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp);
+    escapeHandler->appendUnescaped(unquotedContent.getUnownedSlice(), unescaped);
 
-    // Skip the first '
-    cursor++;
+    char const* cursor = unescaped.getBuffer();
 
     IntegerLiteralValue codepoint = getUnicodePointFromUTF8([&]() { return *cursor++; });
     return codepoint;
