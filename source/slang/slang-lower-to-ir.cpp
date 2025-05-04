@@ -841,27 +841,24 @@ LoweredValInfo emitCallToVal(
                 auto throwAttr = funcType->findAttr<IRFuncThrowTypeAttr>();
                 assert(throwAttr);
 
-                auto succBlock = builder->createBlock();
-                auto failBlock = builder->createBlock();
                 auto handler = findErrorHandler(context, throwAttr->getErrorType());
+                auto succBlock = builder->createBlock();
+                auto failBlock = handler.errorType ? handler.errorHandler : builder->createBlock();
 
                 auto voidType = builder->getVoidType();
                 builder->emitTryCallInst(voidType, succBlock, failBlock, handler.mergeBlock, callee, argCount, args);
 
-                builder->insertBlock(failBlock);
-                auto errParam = builder->emitParam(throwAttr->getErrorType());
-                if (handler.errorType)
-                {
-                    IRInst* handlerArgs[] = {errParam};
-                    builder->emitBranch(handler.errorHandler, 1, handlerArgs);
-                }
-                else
-                {
-                    // We have to create a default fail block, which just re-throws.
-                    builder->emitThrow(errParam);
-                }
                 builder->insertBlock(succBlock);
                 auto value = builder->emitParam(type);
+
+                if (!handler.errorType)
+                {
+                    // We have to create a default fail block, which just re-throws.
+                    builder->insertBlock(failBlock);
+                    auto errParam = builder->emitParam(throwAttr->getErrorType());
+                    builder->emitThrow(errParam);
+                    builder->setInsertInto(succBlock);
+                }
                 return LoweredValInfo::simple(value);
             }
             break;
@@ -6706,8 +6703,25 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto builder = getBuilder();
         startBlockIfNeeded(stmt);
 
-        IRBlock* handleBlock = builder->createBlock();
-        IRBlock* mergeBlock = builder->createBlock();
+        // The mental model here is that the Catch statement lowers similarly to
+        // do
+        // {
+        //     Result<T, E> r = mayThrowFunc();
+        //     if(isResultError(r))
+        //     {
+        //         handleError(r.getErrorValue());
+        //         break;
+        //     }
+        //     let val = r.getSuccessValue();
+        // }
+        // while(false);
+        //
+        // This approach allows for it to generate valid SPIR-V. Just jumping
+        // around with unstructured conditional jumps doesn't work there.
+
+        IRBlock* handleBlock = createBlock();
+        IRBlock* mergeBlock = createBlock();
+        IRBlock* endBlock = createBlock();
 
         CatchHandler catchHandler;
         catchHandler.errorType = lowerType(context, stmt->errorVar->getType());
@@ -6716,10 +6730,17 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         catchHandler.prev = context->catchHandler;
         context->catchHandler = &catchHandler;
 
+        auto loopHead = createBlock();
+        builder->emitLoop(loopHead, mergeBlock, endBlock);
+        insertBlock(loopHead);
+
         // Note that the tryBody doesn't actually have to have it's own scope or
         // block. If there's a `defer` in the tryBody, it can run after the
         // catch statement.
         lowerStmt(context, stmt->tryBody);
+        emitBranchIfNeeded(mergeBlock);
+
+        builder->insertBlock(endBlock);
         emitBranchIfNeeded(mergeBlock);
 
         context->catchHandler = catchHandler.prev;

@@ -2,6 +2,8 @@
 
 #include "slang-ir-lower-error-handling.h"
 
+#include "slang-ir-clone.h"
+#include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
 
@@ -56,6 +58,53 @@ struct ErrorHandlingLoweringContext
         funcType->removeAndDeallocate();
     }
 
+    void cloneHandlerBlock(
+        IRBuilder* builder,
+        IRBlock* handler,
+        IRBlock* merge,
+        IRBlock* clonedHandler,
+        IRInst* resultVal
+    ){
+        auto func = cast<IRFunc>(handler->getParent());
+        SLANG_ASSERT(func);
+        auto dom = module->findOrCreateDominatorTree(func);
+        auto handlerDominatedBlocks = dom->getProperlyDominatedBlocks(handler);
+        List<IRBlock*> handlerBlocks;
+        IRCloneEnv env;
+
+        handlerBlocks.add(handler);
+        builder->addInst(clonedHandler);
+        env.mapOldValToNew[handler] = clonedHandler;
+
+        for (IRBlock* block : handlerDominatedBlocks)
+        {
+            if (!dom->properlyDominates(merge, block) && block != merge)
+            {
+                handlerBlocks.add(block);
+                auto clonedBlock = builder->createBlock();
+                builder->addInst(clonedBlock);
+                env.mapOldValToNew[block] = clonedBlock;
+            }
+        }
+
+        IRBlock* handlerBlock = nullptr;
+        for (auto block : handlerBlocks)
+        {
+            auto clonedBlock = as<IRBlock>(env.mapOldValToNew.getValue(block));
+            if (handlerBlock == nullptr)
+                handlerBlock = clonedBlock;
+            builder->setInsertInto(clonedBlock);
+            for (auto inst : block->getChildren())
+                cloneInst(&env, builder, inst);
+        }
+
+        builder->setInsertBefore(clonedHandler->getFirstOrdinaryInst());
+        auto errVal = builder->emitGetResultError(resultVal);
+        auto errorParam = clonedHandler->getFirstParam();
+        errorParam->replaceUsesWith(errVal);
+        errorParam->removeAndDeallocate();
+    }
+
     void processTryCall(IRTryCall* tryCall)
     {
         // If we see:
@@ -90,6 +139,12 @@ struct ErrorHandlingLoweringContext
         auto errorType = throwAttr->getErrorType();
 
         IRBuilder builder(module);
+
+        auto successBlock = tryCall->getSuccessBlock();
+        auto failBlock = tryCall->getFailureBlock();
+        auto mergeBlock = tryCall->getMergeBlock();
+        auto handlerBlock = builder.createBlock();
+
         builder.setInsertBefore(tryCall);
 
         auto resultType = builder.getResultType(resultValueType, errorType, throwAttr->getErrorTypeWitness());
@@ -101,19 +156,13 @@ struct ErrorHandlingLoweringContext
         auto call = builder.emitCallInst(resultType, tryCall->getCallee(), args);
         tryCall->transferDecorationsTo(call);
 
-        auto isFail = builder.emitIsResultError(call);
-        auto failBlock = tryCall->getFailureBlock();
-        auto successBlock = tryCall->getSuccessBlock();
-        auto mergeBlock = tryCall->getMergeBlock();
+        auto isError = builder.emitIsResultError(call);
 
-        builder.emitIfElse(isFail, failBlock, successBlock, mergeBlock);
+        auto branch = builder.emitIfElse(isError, handlerBlock, successBlock, successBlock);
 
         // Replace the params in failBlock to `getResultError(call)`.
-        builder.setInsertBefore(failBlock->getFirstOrdinaryInst());
-        auto errorParam = failBlock->getFirstParam();
-        auto errVal = builder.emitGetResultError(call);
-        errorParam->replaceUsesWith(errVal);
-        errorParam->removeAndDeallocate();
+        builder.setInsertAfter(branch->getParent());
+        cloneHandlerBlock(&builder, failBlock, mergeBlock, handlerBlock, call);
 
         // Replace the params in successBlock to `getResultValue(call)`.
         builder.setInsertBefore(successBlock->getFirstOrdinaryInst());
