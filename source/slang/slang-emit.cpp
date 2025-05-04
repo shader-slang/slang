@@ -72,6 +72,7 @@
 #include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-coopvec.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
+#include "slang-ir-lower-enum-type.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-glsl-ssbo-types.h"
 #include "slang-ir-lower-l-value-cast.h"
@@ -312,6 +313,7 @@ struct RequiredLoweringPassSet
     bool debugInfo;
     bool resultType;
     bool optionalType;
+    bool enumType;
     bool combinedTextureSamplers;
     bool reinterpret;
     bool generics;
@@ -355,6 +357,9 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_OptionalType:
         result.optionalType = true;
+        break;
+    case kIROp_EnumType:
+        result.enumType = true;
         break;
     case kIROp_TextureType:
         if (!isKhronosTarget(codeGenContext->getTargetReq()))
@@ -1160,6 +1165,9 @@ Result linkAndOptimizeIR(
     else
         cleanupGenerics(targetProgram, irModule, sink);
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER-LOWER-GENERICS");
+
+    if (requiredLoweringPassSet.enumType)
+        lowerEnumType(irModule, sink);
 
     // Don't need to run any further target-dependent passes if we are generating code
     // for host vm.
