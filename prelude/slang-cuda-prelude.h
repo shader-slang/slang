@@ -3395,3 +3395,70 @@ struct TensorView
         *reinterpret_cast<T*>(data + offset) = val;
     }
 };
+
+// Implementations for texture fetch/load functions using tex PTX intrinsics
+// These are used for read-only texture access with integer coordinates
+// See #6781 for details.
+
+// 1D is not supported via PTX. Keeping this placeholder in case it ever gets
+// supported.
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x)
+{
+    T result;
+    float dummy;
+    asm("tex.1d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5}];"
+        : "=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy)
+        : "l"(texObj), "r"(x));
+    return result;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex2Dfetch_int(CUtexObject texObj, int x, int y)
+{
+    T result;
+    float dummy;
+    asm("tex.2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
+        : "=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy)
+        : "l"(texObj), "r"(x), "r"(y));
+    return result;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex3Dfetch_int(CUtexObject texObj, int x, int y, int z)
+{
+    T result;
+    float dummy;
+    asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
+        : "=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy)
+        : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
+    // Note: The repeated z is a dummy used as the fourth operand in ptx.
+    // From the docs:
+    // https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#texture-instructions-tex
+    // Operand c is a scalar or singleton tuple for 1d textures; is a two-element vector for 2d
+    // textures; and is a four-element vector for 3d textures.
+    return result;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1DArrayfetch_int(CUtexObject texObj, int x, int layer)
+{
+    T result;
+    float dummy;
+    asm("tex.a1d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
+        : "=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy)
+        : "l"(texObj), "r"(x), "r"(layer));
+    return result;
+}
+
+template<typename T>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL T
+tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
+{
+    T result;
+    float dummy;
+    asm("tex.a2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
+        : "=f"(result), "=f"(dummy), "=f"(dummy), "=f"(dummy)
+        : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
+    return result;
+}

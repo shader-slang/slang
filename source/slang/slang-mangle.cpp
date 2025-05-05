@@ -381,7 +381,7 @@ void emitVal(ManglingContext* context, Val* val)
     }
     else if (auto modifier = as<ModifierVal>(val))
     {
-        emitNameImpl(context, UnownedStringSlice(modifier->getClassInfo().m_name));
+        emitNameImpl(context, UnownedStringSlice(modifier->getClass().getName()));
     }
     else
     {
@@ -576,14 +576,23 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             }
 
             auto canonicalizedConstraints =
-                getCanonicalGenericConstraints(context->astBuilder, parentGenericDeclRef);
+                getCanonicalGenericConstraints2(context->astBuilder, parentGenericDeclRef);
             for (auto& constraint : canonicalizedConstraints)
             {
-                for (auto type : constraint.value)
+                if (constraint.value.getCount() > 0)
                 {
                     emitRaw(context, "C");
-                    emitQualifiedName(context, makeDeclRef(constraint.key), true);
-                    emitType(context, type);
+                    emitType(context, constraint.key);
+                    int counter = 0;
+                    for (auto type : constraint.value)
+                    {
+                        if (counter > 0)
+                        {
+                            emitRaw(context, "_");
+                        }
+                        ++counter;
+                        emitType(context, type);
+                    }
                 }
             }
         }

@@ -2041,10 +2041,12 @@ ScalarizedVal adaptType(IRBuilder* builder, IRInst* val, IRType* toType, IRType*
                 // Get array sizes once
                 auto fromSize = getIntVal(fromArray->getElementCount());
                 auto toSize = getIntVal(toArray->getElementCount());
-                SLANG_ASSERT(fromSize <= toSize);
 
-                // Extract elements one at a time up to the source array size
-                for (Index i = 0; i < fromSize; i++)
+                // Extract elements one at a time up to the minimum
+                // size, between the source and destination.
+                //
+                auto limit = fromSize < toSize ? fromSize : toSize;
+                for (Index i = 0; i < limit; i++)
                 {
                     auto element = builder->emitElementExtract(
                         fromArray->getElementType(),
@@ -2807,6 +2809,16 @@ static void legalizeMeshOutputParam(
                     }
                     builder->setInsertAfter(c);
                     assign(builder, d, ScalarizedVal::value(builder->emitLoad(tmp)));
+                }
+                else if (const auto load = as<IRLoad>(s))
+                {
+                    // Handles the case where a `this` points to a IRMeshOutputRef.
+                    auto t = as<IRPtrType>(load->getPtr()->getDataType())->getValueType();
+                    auto tmp = builder->emitVar(t);
+                    assign(builder, ScalarizedVal::address(tmp), d);
+
+                    s->replaceUsesWith(builder->emitLoad(tmp));
+                    s->removeAndDeallocate();
                 }
                 else if (const auto swiz = as<IRSwizzledStore>(s))
                 {

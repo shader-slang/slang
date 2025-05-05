@@ -6110,45 +6110,6 @@ public void traceRayMotionNV(
     }
 }
 
-__generic<T : __BuiltinType>
-[ForceInline]
-void typeRequireChecks_shader_subgroup_GLSL() {
-    // the following is a seperate function call, since else the `__requireTargetExtension` and associated __intrinsic_asm is ignored if the calling function also calls an __intrinsic_asm
-    __target_switch
-    {
-    case glsl:
-        if (__type_equals<T, half>()
-            || __type_equals<T, float16_t>()
-            ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        else if (__type_equals<T, uint8_t>()
-            || __type_equals<T, int8_t>()
-            ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_int8");
-        else if (__type_equals<T, uint16_t>()
-            || __type_equals<T, int16_t>()
-            ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_int16");
-        else if (__type_equals<T, uint64_t>()
-            || __type_equals<T, int64_t>()
-            ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_int64");
-
-        __intrinsic_asm "";
-    }
-}
-
-__generic<T : __BuiltinType>
-void shader_subgroup_preamble() {
-    // checks needed for shader_subgroup functions; __requireTargetExtension does not work
-    // (does not add the ext specified correctly to the compile output; using extended type
-    // will result in error for using the type)
-    __target_switch
-    {
-    case glsl:
-        typeRequireChecks_shader_subgroup_GLSL<T>();
-    default:
-        return;
-    }
-
-} 
-
 // GL_KHR_shader_subgroup_basic Built-in Variables
 
 [require(cpp_cuda_glsl_hlsl_spirv_wgsl, subgroup_basic)]
@@ -8176,6 +8137,37 @@ public vector<T,N> subgroupQuadSwapDiagonal(vector<T,N> value)
     return QuadReadAcrossDiagonal(value);
 }
 
+// GL_KHR_shader_subgroup_rotate
+
+__generic<T : __BuiltinType>
+[require(glsl_metal_spirv, subgroup_rotate)]
+public T subgroupRotate(T value, uint delta)
+{
+    return WaveRotate(value, delta);
+}
+
+__generic<T : __BuiltinType, let N : int>
+[require(glsl_metal_spirv, subgroup_rotate)]
+public vector<T, N> subgroupRotate(vector<T, N> value, uint delta)
+{
+    return WaveRotate(value, delta);
+}
+
+__generic<T : __BuiltinType>
+[require(glsl_spirv, subgroup_rotate)]
+public T subgroupClusteredRotate(T value, uint delta, constexpr uint clusterSize)
+{
+    return WaveClusteredRotate(value, delta, clusterSize);
+
+}
+
+__generic<T : __BuiltinType, let N : int>
+[require(glsl_spirv, subgroup_rotate)]
+public vector<T, N> subgroupClusteredRotate(vector<T, N> value, uint delta, constexpr uint clusterSize)
+{
+    return WaveClusteredRotate(value, delta, clusterSize);
+}
+
 //// GLSL atomic
 
 // The following type internally is a Shader Storage Buffer 
@@ -8906,23 +8898,7 @@ public vector<float, N> dFdyCoarse(vector<float, N> p)
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float fwidthFine(float p)
 {
-    __requireComputeDerivative();
-    __target_switch
-    {
-    case hlsl:
-    {
-        return abs(ddx_fine(p)) + abs(ddy_fine(p));
-    }
-    case glsl: __intrinsic_asm "fwidthFine($0)";
-    case spirv:
-    {
-        return spirv_asm
-        {
-            OpCapability DerivativeControl;
-            OpFwidthFine $$float result $p;
-        };
-    }
-    }
+    return fwidth_fine(p);
 }
 __generic<let N : int>
 [__NoSideEffect]
@@ -8930,23 +8906,7 @@ __generic<let N : int>
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> fwidthFine(vector<float, N> p)
 {
-    __requireComputeDerivative();
-    __target_switch
-    {
-    case hlsl:
-    {
-        return abs(ddx_fine(p)) + abs(ddy_fine(p));
-    }
-    case glsl: __intrinsic_asm "fwidthFine($0)";
-    case spirv:
-    {
-        return spirv_asm
-        {
-            OpCapability DerivativeControl;
-            OpFwidthFine $$vector<float, N> result $p;
-        };
-    }
-    }
+    return fwidth_fine(p);
 }
 
 [__NoSideEffect]
@@ -8954,23 +8914,7 @@ public vector<float, N> fwidthFine(vector<float, N> p)
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public float fwidthCoarse(float p)
 {
-    __requireComputeDerivative();
-    __target_switch
-    {
-    case hlsl:
-    {
-        return abs(ddx_coarse(p)) + abs(ddy_coarse(p));
-    }
-    case glsl: __intrinsic_asm "fwidthCoarse($0)";
-    case spirv:
-    {
-        return spirv_asm
-        {
-            OpCapability DerivativeControl;
-            OpFwidthCoarse $$float result $p;
-        };
-    }
-    }
+    return fwidth_coarse(p);
 }
 __generic<let N : int>
 [__NoSideEffect]
@@ -8978,23 +8922,7 @@ __generic<let N : int>
 [require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
 public vector<float, N> fwidthCoarse(vector<float, N> p)
 {
-    __requireComputeDerivative();
-    __target_switch
-    {
-    case hlsl:
-    {
-        return abs(ddx_coarse(p)) + abs(ddy_coarse(p));
-    }
-    case glsl: __intrinsic_asm "fwidthCoarse($0)";
-    case spirv:
-    {
-        return spirv_asm
-        {
-            OpCapability DerivativeControl;
-            OpFwidthCoarse $$vector<float, N> result $p;
-        };
-    }
-    }
+    return fwidth_coarse(p);
 }
 
 [__NoSideEffect]

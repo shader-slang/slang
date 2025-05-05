@@ -199,6 +199,7 @@ static SlangResult _compileProgramImpl(
     sessionDesc.targetCount = 1;
     sessionDesc.targets = &sessionTargetDesc;
 
+    sessionDesc.skipSPIRVValidation = options.skipSPIRVValidation;
     if (options.generateSPIRVDirectly)
     {
         slang::CompilerOptionEntry entry;

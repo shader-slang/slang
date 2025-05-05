@@ -117,7 +117,7 @@ inline void foreachDirectOrExtensionMemberOfType(
     _foreachDirectOrExtensionMemberOfType(
         semantics,
         declRef,
-        getClass<T>(),
+        getSyntaxClass<T>(),
         &Helper::callback,
         &helper);
 }
@@ -145,6 +145,11 @@ inline Type* getType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
 /// same as getType, but take into account the additional type modifiers from the parameter's
 /// modifier list and return a ModifiedType if such modifiers exist.
 Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef);
+
+/// Get the parameter type, wrapped with `Out<>`, `InOut<>` or `Ref<>` if the parameter has
+/// an non-trivial direction.
+Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef);
+
 
 inline SubstExpr<Expr> getInitExpr(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
 {

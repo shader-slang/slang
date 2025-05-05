@@ -468,6 +468,8 @@ Stage getStageFromAtom(CapabilityAtom atom)
         return Stage::Miss;
     case CapabilityAtom::_callable:
         return Stage::Callable;
+    case CapabilityAtom::dispatch:
+        return Stage::Dispatch;
     default:
         SLANG_UNEXPECTED("unknown stage atom");
         UNREACHABLE_RETURN(Stage::Unknown);
@@ -874,6 +876,7 @@ String GetHLSLProfileName(Profile profile)
         CASE(DX_6_6, _6_6);
         CASE(DX_6_7, _6_7);
         CASE(DX_6_8, _6_8);
+        CASE(DX_6_9, _6_9);
 #undef CASE
 
     default:
@@ -1765,6 +1768,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     CodeGenContext* codeGenContext,
     ComPtr<IArtifact>& outArtifact);
 
+SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact);
+
 static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
 {
     switch (target)
@@ -1834,7 +1839,9 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::WGSLSPIRV:
         SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
         return SLANG_OK;
-
+    case CodeGenTarget::HostVM:
+        SLANG_RETURN_ON_FAIL(emitHostVMCode(this, outArtifact));
+        return SLANG_OK;
     default:
         break;
     }
@@ -1886,6 +1893,7 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::WGSLSPIRVAssembly:
+    case CodeGenTarget::HostVM:
         {
             SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));
 
@@ -2172,17 +2180,7 @@ SlangResult EndToEndCompileRequest::writeContainerToStream(Stream* stream)
         options.sourceManager = linkage->getSourceManager();
     }
 
-    {
-        RiffContainer container;
-        {
-            SerialContainerData data;
-            SLANG_RETURN_ON_FAIL(
-                SerialContainerUtil::addEndToEndRequestToData(this, options, data));
-            SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(data, options, &container));
-        }
-        // We now write the RiffContainer to the stream
-        SLANG_RETURN_ON_FAIL(RiffUtil::write(container.getRoot(), true, stream));
-    }
+    SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(this, options, stream));
 
     return SLANG_OK;
 }
