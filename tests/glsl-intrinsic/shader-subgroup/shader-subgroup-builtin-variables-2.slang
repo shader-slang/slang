@@ -15,9 +15,10 @@ buffer MyBlockName2
 } outputBuffer;
 
 layout(local_size_x = 4) in;
+in uint3 dispatchThreadID : SV_DispatchThreadID;
 
 [shader("compute")]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain()
 {
     // There may be some issues with structure padding for global context containing
     // global builtin variables.

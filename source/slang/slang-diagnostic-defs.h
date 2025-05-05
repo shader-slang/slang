@@ -2800,6 +2800,14 @@ DIAGNOSTIC(
     unhandledGLSLSSBOType,
     "Unhandled GLSL Shader Storage Buffer Object contents, unsized arrays as a final parameter "
     "must be the only parameter")
+DIAGNOSTIC(
+    58004,
+    Error,
+    mixingGLSLFlavoredGlobalInOutVarsWithEntryPointParams,
+    "Mixing of GLSL-flavored global in/out variables with "
+    "entry point parameters is only supported when using "
+    "built in system-defined binding semantics on varying entry "
+    "point parameters.")
 
 DIAGNOSTIC(
     58003,

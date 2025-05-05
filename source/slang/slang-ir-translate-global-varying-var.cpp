@@ -65,6 +65,17 @@ struct GlobalVarTranslationContext
             if (!entryPointFunc)
                 continue;
 
+            // It's an error to mix GLSL-flavored global in/out vars and entry point params.
+            // Before we continue, check for this here and throw an error if mixing is
+            // detected.
+
+            if (entryPointFunc->getParamCount() != 0)
+            {
+                context->getSink()->diagnose(
+                    entryPointFunc,
+                    Diagnostics::mixingGLSLFlavoredGlobalInOutVarsWithEntryPointParams);
+            }
+
             auto entryPointDecor = entryPointFunc->findDecoration<IREntryPointDecoration>();
 
             IRVarLayout* resultVarLayout = nullptr;

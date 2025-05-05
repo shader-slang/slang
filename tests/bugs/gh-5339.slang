@@ -8,6 +8,7 @@
 #extension GL_EXT_gpu_shader5 : require
 
 layout (location = 0) in highp vec2 v_texCoord;
+in uint3 dispatchThreadID : SV_DispatchThreadID;
 
 layout (binding = 0) uniform highp sampler2D u_sampler;
 layout (binding = 1) uniform offset { highp ivec2 u_offset; };
@@ -18,7 +19,7 @@ buffer MyBlockName
     vec4 result;
 } outputBuffer;
 
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain()
 {
     //SPV:OpImageGather %
     //SPV-NOT:Const
