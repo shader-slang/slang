@@ -64,7 +64,8 @@ float zap(float x)
 
 // Will be auto-inserted.
 extension __func_as_type(zap) : IDifferentiableFuncBase
-{ };*/
+{ };
+*/
 
 float zap(float x)
 {

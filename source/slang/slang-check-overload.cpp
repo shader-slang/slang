@@ -1909,12 +1909,44 @@ void SemanticsVisitor::AddFuncOverloadCandidate(
         }
     }
 
-    OverloadCandidate candidate;
-    candidate.flavor = OverloadCandidate::Flavor::Func;
-    candidate.item = item;
-    candidate.resultType = getResultType(m_astBuilder, funcDeclRef);
+    if (!funcDeclRef.getDecl()->funcType.type)
+    {
+        // Standard function definition, resolve using parameter declarations.
+        OverloadCandidate candidate;
+        candidate.flavor = OverloadCandidate::Flavor::Func;
+        candidate.item = item;
+        candidate.resultType = getResultType(m_astBuilder, funcDeclRef);
 
-    AddOverloadCandidate(context, candidate, baseCost);
+        AddOverloadCandidate(context, candidate, baseCost);
+    }
+    else
+    {
+        auto resolvedFuncType = as<FuncType>(resolveType(
+            as<Type>(funcDeclRef.getDecl()->funcType.type->substitute(
+                m_astBuilder,
+                SubstitutionSet(funcDeclRef)))));
+
+        if (!resolvedFuncType)
+        {
+            // Diagnose.
+            getSink()->diagnose(
+                funcDeclRef.getLoc(),
+                Diagnostics::expectedFunction,
+                funcDeclRef.getName());
+            return;
+        }
+
+        auto funcExpr = ConstructLookupResultExpr(
+            item,
+            context.baseExpr,
+            item.declRef.getName(),
+            item.declRef.getLoc(),
+            context.originalExpr);
+
+        funcExpr->type = resolvedFuncType;
+
+        AddFuncExprOverloadCandidate(resolvedFuncType, context, funcExpr, baseCost);
+    }
 }
 
 void SemanticsVisitor::AddFuncOverloadCandidate(

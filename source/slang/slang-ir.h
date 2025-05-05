@@ -1197,7 +1197,7 @@ struct IRTerminatorInst : IRInst
 
 // A function parameter is owned by a basic block, and represents
 // either an incoming function parameter (in the entry block), or
-// a value that flows from one SSA block to another (in a non-entry
+// a value that flows from one SSA block to (in a non-entry
 // block).
 //
 // In each case, the basic idea is that a block is a "label with

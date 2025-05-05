@@ -321,20 +321,26 @@ Val* UnknownSubtypeWitness::_substituteImplOverride(
 
     auto newSubtypeWitness = getCurrentASTBuilder()->getUnknownSubtypeWitness(newSub, newSup);
 
-    if (getCurrentASTBuilder()->m_resolvedVals.containsKey(this))
+    if (newSubtypeWitness == this)
+    {
+        // No need to update the cache if we are not changing the witness.
+        return this;
+    }
+
+    if (getCurrentASTBuilder()->m_resolvedVals.containsKey(this) &&
+        !getCurrentASTBuilder()->m_resolvedVals.containsKey(newSubtypeWitness))
     {
         // Add the new subtype witness to the cache.
         getCurrentASTBuilder()->m_resolvedVals.add(
             newSubtypeWitness,
-            getCurrentASTBuilder()->m_resolvedVals[this]);
-        getCurrentASTBuilder()->m_resolvedVals.remove(this);
+            getCurrentASTBuilder()->m_resolvedVals[this]->substitute(astBuilder, subst));
     }
 
-    if (getCurrentASTBuilder()->m_valsRequiringResolution.contains(this))
+    if (getCurrentASTBuilder()->m_valsRequiringResolution.contains(this) &&
+        !getCurrentASTBuilder()->m_valsRequiringResolution.contains(newSubtypeWitness))
     {
         // Add the new subtype witness to the cache.
         getCurrentASTBuilder()->m_valsRequiringResolution.add(newSubtypeWitness);
-        getCurrentASTBuilder()->m_valsRequiringResolution.remove(this);
     }
 
     return newSubtypeWitness;

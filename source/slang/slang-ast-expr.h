@@ -662,16 +662,18 @@ class BackwardDifferentiateExpr : public DifferentiateExpr
     FIDDLE(...)
 };
 
+FIDDLE()
 class FuncAsTypeExpr : public Expr
 {
-    SLANG_AST_CLASS(FuncAsTypeExpr)
-    Expr* base = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* base = nullptr;
 };
 
+FIDDLE()
 class FuncTypeOfExpr : public Expr
 {
-    SLANG_AST_CLASS(FuncTypeOfExpr)
-    Expr* base = nullptr;
+    FIDDLE(...)
+    FIDDLE() Expr* base = nullptr;
 };
 
 /// An expression of the form `__dispatch_kernel(fn, threadGroupSize, dispatchSize)` to
@@ -709,6 +711,13 @@ class TreatAsDifferentiableExpr : public Expr
     };
 
     FIDDLE() Flavor flavor;
+};
+
+FIDDLE()
+class FwdDiffFuncTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
 };
 
 /// A type expression of the form `This`

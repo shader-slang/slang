@@ -2686,6 +2686,9 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 funcDeclBase = as<FunctionDeclBase>(funcDeclRefExpr->declRef.getDecl());
 
             Index paramCount = funcType->getParamCount();
+
+            bool areParamDeclsAvailable =
+                funcDeclBase && funcDeclBase->getMembersOfType<ParamDecl>().getCount() > 0;
             for (Index pp = 0; pp < paramCount; ++pp)
             {
                 auto paramType = funcType->getParamType(pp);
@@ -2694,7 +2697,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 if (pp < expr->arguments.getCount())
                 {
                     argExpr = expr->arguments[pp];
-                    if (funcDeclBase)
+                    if (areParamDeclsAvailable)
                         paramDecl = funcDeclBase->getParameters()[pp];
                 }
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
@@ -3199,10 +3202,10 @@ Type* SemanticsVisitor::_toDifferentialParamType(Type* primalType)
         return m_astBuilder->getInOutType(
             _toDifferentialParamType(primalInOutType->getValueType()));
     }
-    return getDifferentialPairType(primalType);
+    return tryGetDifferentialPairType(primalType);
 }
 
-Type* SemanticsVisitor::getDifferentialPairType(Type* primalType)
+Type* SemanticsVisitor::tryGetDifferentialPairType(Type* primalType)
 {
     if (auto modifiedType = as<ModifiedType>(primalType))
     {
@@ -3217,7 +3220,7 @@ Type* SemanticsVisitor::getDifferentialPairType(Type* primalType)
         for (Index i = 0; i < typePack->getTypeCount(); i++)
         {
             auto t = typePack->getElementType(i);
-            diffTypes.add(getDifferentialPairType(t));
+            diffTypes.add(tryGetDifferentialPairType(t));
         }
         return m_astBuilder->getTypePack(diffTypes.getArrayView());
     }
@@ -3226,7 +3229,7 @@ Type* SemanticsVisitor::getDifferentialPairType(Type* primalType)
         // The differential pair of an abstract type pack P should be `expand DifferentialPair<each
         // P>`.
         auto eachType = m_astBuilder->getEachType(primalType);
-        auto diffPairEachType = getDifferentialPairType(eachType);
+        auto diffPairEachType = tryGetDifferentialPairType(eachType);
         if (auto expandType = as<ExpandType>(primalType))
         {
             List<Type*> capturedTypePacks;
@@ -3262,31 +3265,39 @@ Type* SemanticsVisitor::getDifferentialPairType(Type* primalType)
     return primalType;
 }
 
-Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType)
+Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, Type* thisType)
 {
-    // Resolve JVP type here.
+    // Resolve diff type here.
     // Note that this type checking needs to be in sync with
-    // the auto-generation logic in slang-ir-jvp-diff.cpp
+    // the auto-generation logic in slang-ir-diff-diff.cpp
     List<Type*> paramTypes;
 
-    // The JVP return type is float if primal return type is float
+    // The diff return type is float if primal return type is float
     // void otherwise.
     //
-    auto resultType = getDifferentialPairType(originalType->getResultType());
+    auto resultType = tryGetDifferentialPairType(originalType->getResultType());
 
     // No support for differentiating function that throw errors, for now.
     SLANG_ASSERT(originalType->getErrorType()->equals(m_astBuilder->getBottomType()));
     auto errorType = originalType->getErrorType();
 
+    if (thisType)
+    {
+        // The first parameter is the primal function itself.
+        if (auto diffThisType = _toDifferentialParamType(thisType))
+            paramTypes.add(diffThisType);
+    }
+
     for (Index i = 0; i < originalType->getParamCount(); i++)
     {
-        if (auto jvpParamType = _toDifferentialParamType(originalType->getParamType(i)))
-            paramTypes.add(jvpParamType);
+        if (auto diffParamType = _toDifferentialParamType(originalType->getParamType(i)))
+            paramTypes.add(diffParamType);
     }
-    FuncType* jvpType =
+
+    FuncType* diffType =
         m_astBuilder->getOrCreate<FuncType>(paramTypes.getArrayView(), resultType, errorType);
 
-    return jvpType;
+    return diffType;
 }
 
 Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType)
@@ -3577,7 +3588,12 @@ Expr* SemanticsExprVisitor::visitBackwardDifferentiateExpr(BackwardDifferentiate
 
 Expr* SemanticsExprVisitor::visitFuncAsTypeExpr(FuncAsTypeExpr* expr)
 {
-    expr->base = dispatchExpr(expr->base, *this);
+    SemanticsContext ctx(*this);
+    ctx = ctx.allowStaticReferenceToNonStaticMember();
+    expr->base = dispatchExpr(expr->base, ctx);
+
+    if (auto overloadedExpr = as<OverloadedExpr>(expr->base))
+        expr->base = maybeResolveOverloadedExpr(overloadedExpr, LookupMask::Function, nullptr);
 
     // Expect a func-decl-ref expr
     auto declRefExpr = as<DeclRefExpr>(expr->base);
@@ -4790,10 +4806,10 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
                 base = baseExpression;
             }
         }
-        else if (auto funcDecl = as<FuncDecl>(baseDeclRef))
+        else if (auto callableDecl = as<CallableDecl>(baseDeclRef))
         {
-            // Make a decl-ref-type out of the FuncDecl.
-            auto funcAsType = DeclRefType::create(m_astBuilder, baseDeclRef);
+            // Make a decl-ref-type out of the CallableDecl.
+            auto funcAsType = DeclRefType::create(m_astBuilder, callableDecl);
             LookupResult lookupResult = lookUpMember(
                 m_astBuilder,
                 this,
@@ -4804,6 +4820,7 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
                 LookupOptions::NoDeref);
 
             AddToLookupResult(globalLookupResult, lookupResult);
+            base = baseExpression;
         }
     };
 
@@ -4822,7 +4839,7 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
         else if (as<FuncType>(e->type))
         {
             auto declRefExpr = as<DeclRefExpr>(e);
-            handleLeafCase(declRefExpr->declRef, declRefExpr->type);
+            handleLeafCase(declRefExpr->declRef, nullptr);
         }
     };
 
@@ -4882,6 +4899,21 @@ Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
     expr->baseExpression = maybeOpenExistential(expr->baseExpression);
     // Do a static lookup
     return _lookupStaticMember(expr, expr->baseExpression);
+}
+
+Expr* SemanticsExprVisitor::visitFwdDiffFuncTypeExpr(FwdDiffFuncTypeExpr* expr)
+{
+    // Translate type node.
+    expr->base = CheckProperType(expr->base);
+
+    if (expr->base.type && !as<ErrorType>(expr->base.type))
+    {
+        auto fwdDiffFuncType = m_astBuilder->getOrCreate<FwdDiffFuncType>(expr->base.type);
+        expr->type = m_astBuilder->getOrCreate<TypeType>(fwdDiffFuncType);
+        return expr;
+    }
+
+    SLANG_UNEXPECTED("aaaaah");
 }
 
 Expr* SemanticsVisitor::lookupMemberResultFailure(
@@ -5097,15 +5129,15 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     else if (as<FuncType>(baseType))
     {
         // Treat the function expression as a type.
-        auto funcAsTypeExpr = m_astBuilder->create<FuncAsTypeExpr>();
-        funcAsTypeExpr->base = expr->baseExpression;
+        // auto funcAsTypeExpr = m_astBuilder->create<FuncAsTypeExpr>();
+        // funcAsTypeExpr->base = expr->baseExpression;
 
-        auto checkedTypeExpr = dispatchExpr(funcAsTypeExpr, *this);
-        if (checkedTypeExpr->type && !as<ErrorType>(checkedTypeExpr->type))
-            return _lookupStaticMember(expr, checkedTypeExpr);
+        // auto funcAsType =
+        //     DeclRefType::create(m_astBuilder, as<DeclRefExpr>(expr->baseExpression)->declRef);
+        // auto sharedTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+        // sharedTypeExpr->base.type = funcAsType;
 
-        // fallback to general member lookup
-        return checkGeneralMemberLookupExpr(expr, baseType);
+        return _lookupStaticMember(expr, expr->baseExpression);
     }
     else
     {

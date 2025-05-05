@@ -688,14 +688,15 @@ interface IDifferentiableFuncBase
 
 __magic_type(ForwardDiffFuncInterfaceType)
 [KnownBuiltin("IForwardDifferentiable")]
-interface IForwardDifferentiable<FType : IDifferentiableFuncBase>
+interface IForwardDifferentiable<FType>
 {
     // BuiltinRequirementKind::ForwardDerivativeFunc
     // inserts a synthesized-func-decl, which becomes a 
     // IRForwardDifferentiate()
     // 
     __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc)) 
-    static __associatedfunc FType.__fwd_diff_func_type fwd_diff;
+    //static __associatedfunc FType.__fwd_diff_func_type fwd_diff;
+    static __associatedfunc __fwd_diff_func_type(FType) fwd_diff;
 }
 
 /// `DifferentialPair<T>` is a built-in type that carries both the original and derivative value of a term. 

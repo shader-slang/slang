@@ -66,6 +66,8 @@ INST(Nop, nop, 0, 0)
     INST(DifferentialPtrPairType, DiffRefPair, 1, HOISTABLE)
     INST_RANGE(DifferentialPairTypeBase, DifferentialPairType, DifferentialPtrPairType)
 
+    INST(ForwardDiffFuncType, FwdDiffFuncType, 1, HOISTABLE)
+
     INST(BackwardDiffIntermediateContextType, BwdDiffIntermediateCtxType, 1, HOISTABLE)
 
     INST(TensorViewType, TensorView, 1, HOISTABLE)

@@ -16,6 +16,7 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
     {
     }
 
+    IRFuncType* resolveFuncType(IRBuilder* builder, IRInst* funcType);
 
     // Returns "d<var-name>" to use as a name hint for variables and parameters.
     // If no primal name is available, returns a blank string.

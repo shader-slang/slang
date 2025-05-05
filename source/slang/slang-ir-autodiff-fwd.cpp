@@ -115,6 +115,28 @@ void ForwardDiffTranscriber::generateTrivialFwdDiffFunc(IRFunc* primalFunc, IRFu
     }
 }
 
+IRFuncType* ForwardDiffTranscriber::resolveFuncType(IRBuilder* builder, IRInst* funcTypeInst)
+{
+    if (auto funcType = as<IRFuncType>(funcTypeInst))
+    {
+        // Already a function type, so just return it.
+        return as<IRFuncType>(funcTypeInst);
+    }
+
+    switch (funcTypeInst->getOp())
+    {
+    case kIROp_ForwardDiffFuncType:
+        {
+            if (auto func = as<IRFunc>(funcTypeInst->getOperand(0)))
+            {
+                auto baseFuncType = cast<IRFuncType>(func->getFullType());
+                return differentiateFunctionType(builder, nullptr, baseFuncType);
+            }
+        }
+    }
+    SLANG_UNEXPECTED("Unexpected function type kind for differentiation.");
+}
+
 // Returns "d<var-name>" to use as a name hint for variables and parameters.
 // If no primal name is available, returns a blank string.
 //
@@ -711,14 +733,18 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         as<IRInterfaceRequirementEntry>(fwdDiffWitnessInterface->getOperand(0));
 
     auto assocForwardDiffCallee = builder->emitLookupInterfaceMethodInst(
-        cast<IRFuncType>(fwdDiffMethodEntry->getRequirementVal()),
+        cast<IRFuncType>(resolveFuncType(builder, fwdDiffMethodEntry->getRequirementVal())),
         fwdDiffWitness,
         fwdDiffMethodEntry->getRequirementKey());
 
     auto substPrimalCallee = tryFindPrimalSubstitute(builder, primalCallee);
 
     IRInst* diffCallee = assocForwardDiffCallee;
-    if (substPrimalCallee == primalCallee)
+
+    if (diffCallee)
+    {
+    }
+    else if (substPrimalCallee == primalCallee)
     {
         instMapD.tryGetValue(origCallee, diffCallee);
     }

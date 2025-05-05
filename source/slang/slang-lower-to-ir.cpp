@@ -1821,6 +1821,14 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(diff);
     }
 
+    LoweredValInfo visitFwdDiffFuncType(FwdDiffFuncType* fwdFuncType)
+    {
+        IRType* irType = lowerType(context, fwdFuncType->getBase());
+        IRInst* operand = (IRInst*)irType;
+        return LoweredValInfo::simple(
+            getBuilder()->emitIntrinsicInst(irType, kIROp_ForwardDiffFuncType, 1, &(operand)));
+    }
+
     LoweredValInfo visitBackwardDifferentiateVal(BackwardDifferentiateVal* val)
     {
         auto funcVal = emitDeclRef(context, val->getFunc(), context->irBuilder->getTypeKind());
@@ -3555,6 +3563,12 @@ struct ExprLoweringContext
         if (auto callableDecl = as<CallableDecl>(declRefExpr->declRef.getDecl()))
         {
             // Okay, the declaration is directly callable, so we can continue.
+
+            // unless the return type is unspecified (then the callable is declared using a function
+            // type)
+            //
+            if (!callableDecl->returnType.type)
+                return false;
         }
         else
         {
@@ -4115,6 +4129,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             getBuilder()->emitForwardDifferentiateInst(
                 lowerType(context, expr->type),
                 baseVal.val));
+    }
+
+    LoweredValInfo visitFwdDiffFuncTypeExpr(FwdDiffFuncTypeExpr* expr)
+    {
+        SLANG_UNEXPECTED("FwdDiffFuncTypeExpr should not be present in IR.");
     }
 
     LoweredValInfo visitDetachExpr(DetachExpr* expr)
@@ -8095,6 +8114,23 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
+        // This might be a type constraint on an associated type,
+        // in which case it should lower as the key for that
+        // interface requirement.
+        if (auto funcDecl = as<FuncDecl>(decl->parentDecl))
+        {
+            // TODO: needs more work for generic functions.
+
+            if (const auto interfaceDecl = as<InterfaceDecl>(funcDecl->parentDecl))
+            {
+                // Okay, this seems to be an interface requirement, and
+                // we should lower it as such.
+                return LoweredValInfo::simple(getInterfaceRequirementKey(decl));
+            }
+
+            SLANG_ASSERT("unexpected type constraint inside a function");
+        }
+
         if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
         {
             // This is a constraint on a global generic type parameters,
@@ -8140,6 +8176,41 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return false;
     }
 
+    bool isGenericInterfaceRequirementConstraint(Decl* decl)
+    {
+        bool seenGenerics = false;
+        if (as<GenericTypeConstraintDecl>(decl))
+        {
+            // Keep going up through the parents until we hit an InterfaceDecl &
+            // keep track of whether we see any GenericDecl along the way.
+            //
+            auto parentDecl = decl->parentDecl;
+            while (parentDecl)
+            {
+                if (as<InterfaceDecl>(parentDecl))
+                {
+                    return seenGenerics;
+                }
+                if (as<GenericDecl>(parentDecl))
+                {
+                    seenGenerics = true;
+                }
+                parentDecl = parentDecl->parentDecl;
+            }
+        }
+
+        // If this isn't a constraint decl or it's not inside an interface, it's
+        // not a generic interface requirement constraint.
+        //
+        return false;
+    }
+
+    Decl* getTargetRequirement(Decl* decl)
+    {
+        SLANG_ASSERT(as<CallableDecl>(decl->parentDecl));
+        return decl->parentDecl;
+    }
+
     void lowerWitnessTable(
         IRGenContext* subContext,
         WitnessTable* astWitnessTable,
@@ -8176,8 +8247,74 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             case RequirementWitness::Flavor::val:
                 {
-                    auto satisfyingVal = satisfyingWitness.getVal();
-                    irSatisfyingVal = lowerSimpleVal(subContext, satisfyingVal);
+                    auto satisfyingVal = satisfyingWitness.getVal()->resolve();
+                    if (isGenericInterfaceRequirementConstraint(requiredMemberDecl))
+                    {
+                        // Get the decl that this constraint is referencing.
+                        auto decl = getTargetRequirement(requiredMemberDecl);
+                        auto satisfyingTargetDeclRef =
+                            astWitnessTable->m_requirementDictionary[decl].getValue().getDeclRef();
+                        auto satisfyingTargetIR = getSimpleVal(
+                            subContext,
+                            emitDeclRef(
+                                subContext,
+                                satisfyingTargetDeclRef,
+                                // TODO: we need to know what type to plug in here...
+                                nullptr));
+
+                        IRGenContext genericConstraintContext(
+                            subContext->shared,
+                            subContext->astBuilder);
+
+                        IRGenEnv subEnv;
+                        subEnv.outer = subContext->env;
+                        IRBuilder subIRBuilder(subContext->irBuilder->getModule());
+
+                        IRGenContext genericConstraintEmitContext = *subContext;
+                        genericConstraintEmitContext.irBuilder = &subIRBuilder;
+                        genericConstraintEmitContext.env = &subEnv;
+
+                        IRGeneric* constraintGeneric = emitOuterGenerics(
+                            &genericConstraintEmitContext,
+                            satisfyingTargetDeclRef.getDecl(),
+                            nullptr);
+
+                        irSatisfyingVal =
+                            lowerSimpleVal(&genericConstraintEmitContext, satisfyingVal);
+
+                        auto outerMostConstraintGeneric =
+                            finishOuterGenerics(&subIRBuilder, irSatisfyingVal, constraintGeneric);
+                        irSatisfyingVal = outerMostConstraintGeneric;
+
+                        // Collect all specialization layers first
+                        List<List<IRInst*>> specializationLayers;
+                        while (auto specIR = as<IRSpecialize>(satisfyingTargetIR))
+                        {
+                            List<IRInst*> specializationArgs;
+                            for (auto i = 0; i < specIR->getArgCount(); i++)
+                            {
+                                specializationArgs.add(specIR->getArg(i));
+                            }
+                            specializationLayers.add(specializationArgs);
+                            satisfyingTargetIR = specIR->getBase();
+                        }
+
+                        // Apply the specialization layers in reverse order
+                        for (Index i = specializationLayers.getCount(); i > 0; --i)
+                        {
+                            auto& specializationArgs = specializationLayers[i - 1];
+                            SLANG_ASSERT(!as<IRGeneric>(irSatisfyingVal->getDataType()));
+                            // Copy specialization arguments onto the outer generic
+                            irSatisfyingVal = subIRBuilder.emitSpecializeInst(
+                                irSatisfyingVal->getDataType(),
+                                irSatisfyingVal,
+                                specializationArgs);
+                        }
+                    }
+                    else
+                    {
+                        irSatisfyingVal = lowerSimpleVal(subContext, satisfyingVal);
+                    }
                 }
                 break;
 
@@ -8240,6 +8377,55 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subBuilder->createWitnessTableEntry(irWitnessTable, irRequirementKey, irSatisfyingVal);
         }
     }
+
+    /*RefPtr<WitnessTable> resolveWitnessTable(RefPtr<WitnessTable> table)
+    {
+        ShortList<Decl*> keys;
+        for (auto entry : table->getRequirementDictionary())
+        {
+            keys.add(entry.key);
+        }
+
+        for (auto key : keys)
+        {
+            RequirementWitness witness = table->getRequirementDictionary()[key];
+            switch (witness.getFlavor())
+            {
+            case RequirementWitness::Flavor::declRef:
+                {
+                    table->m_requirementDictionary[key] =
+                        RequirementWitness(witness.getDeclRef().declRefBase->resolve());
+                    break;
+                }
+            case RequirementWitness::Flavor::val:
+                {
+                    auto val = witness.getVal()->resolve();
+                    table->m_requirementDictionary[key] = RequirementWitness(val);
+                    if (auto subtypeWitness = as<DeclaredSubtypeWitness>(val))
+                    {
+                        if (auto inheritanceDecl =
+                                subtypeWitness->getDeclRef().as<InheritanceDecl>())
+                        {
+                            // Special case...
+                            if (isDeclRefTypeOf<CallableDecl>(subtypeWitness->getSub()))
+                            {
+                                // Remove any generic-app-decl-refs.
+                                subtypeWitness->getDeclRef();
+                            }
+                        }
+                    }
+                    break;
+                }
+            case RequirementWitness::Flavor::witnessTable:
+                {
+                    // copy as is
+                    auto astReqWitnessTable = witness.getWitnessTable();
+                    table->m_requirementDictionary[key] =
+                        RequirementWitness(resolveWitnessTable(astReqWitnessTable));
+                }
+            }
+        }
+    }*/
 
     LoweredValInfo visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
@@ -9039,6 +9225,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 operandCount +=
                     associatedTypeDecl->getMembersOfType<TypeConstraintDecl>().getCount();
             }
+
+            if (auto funcDecl = as<FuncDecl>(requirementDecl))
+            {
+                operandCount += funcDecl->getMembersOfType<TypeConstraintDecl>().getCount();
+            }
         }
 
         // Allocate an IRInterfaceType with the `operandCount` operands.
@@ -9154,13 +9345,114 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             requirementKey,
                             diffKey);
                     }
+
+                    for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(
+                             subContext->astBuilder,
+                             createDefaultSpecializedDeclRef(subContext, nullptr, callableDecl)))
+                    {
+                        // Need additional handling if we're inside a generic context.
+                        // SLANG_ASSERT(!as<GenericDecl>(callableDecl->parentDecl));
+
+                        if (!as<GenericDecl>(callableDecl->parentDecl))
+                        {
+                            auto constraintKey =
+                                getInterfaceRequirementKey(constraintDeclRef.getDecl());
+                            auto constraintInterfaceType = lowerType(
+                                subContext,
+                                getSup(subContext->astBuilder, constraintDeclRef));
+                            auto witnessTableType =
+                                getBuilder()->getWitnessTableType(constraintInterfaceType);
+
+                            auto constraintEntry = subBuilder->createInterfaceRequirementEntry(
+                                constraintKey,
+                                witnessTableType);
+                            irInterface->setOperand(entryIndex, constraintEntry);
+                            entryIndex++;
+
+                            context->setValue(
+                                constraintDeclRef.getDecl(),
+                                LoweredValInfo::simple(constraintEntry));
+                        }
+                        else
+                        {
+                            // Emit generics around the constraint entry.
+                            IRGenContext genericConstraintContext(
+                                subContext->shared,
+                                subContext->astBuilder);
+
+                            IRGenEnv subEnv;
+                            subEnv.outer = subContext->env;
+                            IRBuilder subIRBuilder(subContext->irBuilder->getModule());
+
+                            IRGenContext genericConstraintEmitContext = *subContext;
+                            genericConstraintEmitContext.irBuilder = &subIRBuilder;
+                            genericConstraintEmitContext.env = &subEnv;
+
+                            IRGeneric* constraintGeneric = emitOuterGenerics(
+                                &genericConstraintEmitContext,
+                                callableDecl,
+                                nullptr);
+
+                            auto constraintInterfaceType = lowerType(
+                                &genericConstraintEmitContext,
+                                getSup(genericConstraintEmitContext.astBuilder, constraintDeclRef));
+                            auto witnessTableType =
+                                genericConstraintEmitContext.irBuilder->getWitnessTableType(
+                                    constraintInterfaceType);
+
+                            auto outerMostConstraintGeneric = finishOuterGenerics(
+                                &subIRBuilder,
+                                witnessTableType,
+                                constraintGeneric);
+                            auto irRequirement = outerMostConstraintGeneric;
+                            auto irTargetRequirement = entry->getRequirementVal();
+
+                            // Collect any specializations around the parent function requirement
+                            // and replicate them around the constraint entry.
+                            //
+
+                            List<List<IRInst*>> specializationLayers;
+                            while (auto specIR = as<IRSpecialize>(irTargetRequirement))
+                            {
+                                List<IRInst*> specializationArgs;
+                                for (auto i = 0; i < specIR->getArgCount(); i++)
+                                {
+                                    specializationArgs.add(specIR->getArg(i));
+                                }
+                                specializationLayers.add(specializationArgs);
+                                irTargetRequirement = specIR->getBase();
+                            }
+
+                            // Apply the specialization layers in reverse order
+                            for (Index i = specializationLayers.getCount(); i > 0; --i)
+                            {
+                                auto& specializationArgs = specializationLayers[i - 1];
+
+                                // Copy specialization arguments onto the outer generic
+                                irRequirement = subIRBuilder.emitSpecializeInst(
+                                    i > 1 ? as<IRType>(subIRBuilder.getGenericKind())
+                                          : as<IRType>(subIRBuilder.getTypeKind()),
+                                    irRequirement,
+                                    specializationArgs);
+                            }
+
+                            irInterface->setOperand(entryIndex, irRequirement);
+                            entryIndex++;
+
+                            context->setValue(
+                                constraintDeclRef.getDecl(),
+                                LoweredValInfo::simple(irRequirement));
+                        }
+                    }
                 }
+
                 // Add lowered requirement entry to current decl mapping to prevent
                 // the function requirements from being lowered again when we get to
                 // `ensureAllDeclsRec`.
                 context->setValue(requirementDeclRef.getDecl(), LoweredValInfo::simple(entry));
             }
         };
+
         for (auto requirementDecl : decl->members)
         {
             auto requirementKey = getInterfaceRequirementKey(requirementDecl);
@@ -9901,7 +10193,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 markInstsToClone(valuesToClone, parentGeneric->getFirstBlock(), returnType);
                 // For Function Types, we always clone all generic parameters regardless of whether
                 // the generic parameter appears in the function signature or not.
-                if (returnType->getOp() == kIROp_FuncType || returnType->getOp() == kIROp_Generic)
+                if (returnType->getOp() == kIROp_FuncType || returnType->getOp() == kIROp_Generic ||
+                    // TODO: this is a workaround for the fact that we can now have lookup-witness
+                    // return a func-type
+                    as<IRFunc>(val))
                 {
                     for (auto genericParam : parentGeneric->getParams())
                     {
@@ -10483,7 +10778,30 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         // need to create an IR function here
 
-        IRFunc* irFunc = subBuilder->createFunc();
+        IRInst* irFunc = nullptr;
+        if (auto synFuncDecl = as<SynthesizedFuncDecl>(decl))
+        {
+            FuncDeclBaseTypeInfo innerInfo;
+            _lowerFuncDeclBaseTypeInfo(subContext, synFuncDecl->targetFuncDeclRef, innerInfo);
+
+            auto targetDeclRefInfo =
+                emitDeclRef(subContext, synFuncDecl->targetFuncDeclRef, innerInfo.type);
+
+            SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
+            auto _targetIRFunc = getSimpleVal(subContext, targetDeclRefInfo);
+            auto synthOp = subBuilder->emitIntrinsicInst(
+                _targetIRFunc->getFullType(),
+                (IROp)synFuncDecl->irOp,
+                1,
+                &_targetIRFunc);
+
+            irFunc = synthOp;
+        }
+        else
+        {
+            irFunc = subBuilder->createFunc();
+        }
+
         addNameHint(subContext, irFunc, decl);
         addLinkageDecoration(subContext, irFunc, decl);
         maybeAddDebugLocationDecoration(subContext, irFunc);
@@ -11213,7 +11531,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visitFunctionDeclBase(FunctionDeclBase* decl)
     {
         // Handle synthesized functions.
-        if (auto synFuncDecl = as<SynthesizedFuncDecl>(decl))
+        /*if (auto synFuncDecl = as<SynthesizedFuncDecl>(decl))
         {
             FuncDeclBaseTypeInfo info;
             _lowerFuncDeclBaseTypeInfo(context, synFuncDecl->targetFuncDeclRef, info);
@@ -11228,7 +11546,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 1,
                 &_targetIRFunc);
             return LoweredValInfo::simple(synthOp);
-        }
+        }*/
 
         // A function declaration may have multiple, target-specific
         // overloads, and we need to emit an IR version of each of these.
@@ -11379,6 +11697,13 @@ bool canDeclLowerToAGeneric(Decl* decl)
     // a generic that returns a type (a simple type-level function).
     if (as<TypeDefDecl>(decl))
         return true;
+
+    if (as<GenericTypeConstraintDecl>(decl) && as<CallableDecl>(decl->parentDecl))
+    {
+        // A generic type constraint decl nested under a callable decl
+        // will turn into a generic that returns a type (a simple type-level function).
+        return true;
+    }
 
     // A static member variable declaration can be lowered into a generic.
     if (auto varDecl = as<VarDecl>(decl))

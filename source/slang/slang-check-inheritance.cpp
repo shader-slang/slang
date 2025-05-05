@@ -359,13 +359,15 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     auto currentDeclRef = declRef;
     for (; currentDeclRef;)
     {
-        if (auto aggTypeDeclBaseRef = currentDeclRef.as<AggTypeDeclBase>())
+        if (currentDeclRef.as<AggTypeDeclBase>() || currentDeclRef.as<CallableDecl>())
         {
+            auto containerDeclRef = currentDeclRef.as<ContainerDecl>();
+
             // In the case where we have an aggregate type or `extension`
             // declaration, we can use the explicit list of direct bases.
             //
             for (auto typeConstraintDeclRef :
-                 getMembersOfType<TypeConstraintDecl>(_getASTBuilder(), aggTypeDeclBaseRef))
+                 getMembersOfType<TypeConstraintDecl>(_getASTBuilder(), containerDeclRef))
             {
                 // Note: In certain cases something takes the *syntactic* form of an inheritance
                 // clause, but it is not actually something that should be treated as implying
@@ -393,19 +395,9 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                         continue;
                 }
 
-                if (context.useSimpleInheritance)
-                {
-                    SLANG_UNEXPECTED("Simple inheritance not supported yet.");
-                    /*visitor.ensureDecl(
-                        typeConstraintDeclRef,
-                        DeclCheckState::CanUseBaseOfSimpleInheritanceDecl);*/
-                }
-                else
-                {
-                    visitor.ensureDecl(
-                        typeConstraintDeclRef,
-                        DeclCheckState::CanUseBaseOfInheritanceDecl);
-                }
+                visitor.ensureDecl(
+                    typeConstraintDeclRef,
+                    DeclCheckState::CanUseBaseOfInheritanceDecl);
 
                 // For generic type constraint decls, always make sure it is about the type being
                 // checked.
@@ -432,6 +424,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 addDirectBaseType(baseType, satisfyingWitness);
             }
         }
+
         if (currentDeclRef.as<AssocTypeDecl>())
         {
             // If the current type is an associated type, continue inspecting the base/parent of the
@@ -502,6 +495,12 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
 
             if (!sub.type)
                 sub = visitor.TranslateTypeNodeForced(sub);
+
+            // Canonicalize the constraint declRef to make sure we have a full reference to it.
+            constraintDeclRef =
+                createDefaultSubstitutionsIfNeeded(astBuilder, &visitor, constraintDeclRef)
+                    .as<GenericTypeConstraintDecl>();
+
             auto subType = constraintDeclRef.substitute(astBuilder, sub.type);
 
             // We only consider constraints where the type represented

@@ -309,6 +309,33 @@ Type* MatrixExpressionType::getRowType()
     return rowType;
 }
 
+// ----
+void FwdDiffFuncType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("FwdDiffFuncType<") << getBase() << toSlice(">");
+}
+
+Type* FwdDiffFuncType::_createCanonicalTypeOverride()
+{
+    auto canonicalType = getBase()->getCanonicalType();
+    if (canonicalType == this)
+        return this;
+
+    // Otherwise, create a new FwdDiffFuncType.
+    auto astBuilder = getCurrentASTBuilder();
+    auto newType = astBuilder->getOrCreate<FwdDiffFuncType>(canonicalType);
+    return newType;
+}
+
+Val* FwdDiffFuncType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
+    return astBuilder->getOrCreate<FwdDiffFuncType>(substBase)->getCanonicalType();
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TupleType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 Type* TupleType::getMember(Index i) const
 {

@@ -1369,7 +1369,7 @@ public:
         return val->resolve();
     }
 
-    Type* resolveType(Type* type) { return (Type*)resolveVal(type); }
+    Type* resolveType(Type* type);
 
     DeclRef<Decl> resolveDeclRef(DeclRef<Decl> declRef);
 
@@ -1530,10 +1530,10 @@ public:
     // Auto-diff convenience functions for translating primal types to differential types.
     Type* _toDifferentialParamType(Type* primalType);
 
-    Type* getDifferentialPairType(Type* primalType);
+    Type* tryGetDifferentialPairType(Type* primalType);
 
     // Convert a function's original type to it's forward/backward diff'd type.
-    Type* getForwardDiffFuncType(FuncType* originalType);
+    Type* getForwardDiffFuncType(FuncType* originalType, Type* thisType = nullptr);
     Type* getBackwardDiffFuncType(FuncType* originalType);
 
     /// Registers a type as conforming to IDifferentiable, along with a witness
@@ -1791,7 +1791,7 @@ public:
 
     bool doesTypeSatisfyAssociatedTypeConstraintRequirement(
         Type* satisfyingType,
-        DeclRef<AssocTypeDecl> requiredAssociatedTypeDeclRef,
+        DeclRef<ContainerDecl> requiredAssociatedTypeDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
     bool doesTypeSatisfyAssociatedTypeRequirement(
@@ -2982,6 +2982,7 @@ public:
 
     Expr* visitFuncAsTypeExpr(FuncAsTypeExpr* expr);
     Expr* visitFuncTypeOfExpr(FuncTypeOfExpr* expr);
+    Expr* visitFwdDiffFuncTypeExpr(FwdDiffFuncTypeExpr* expr);
 
     Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
     Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);

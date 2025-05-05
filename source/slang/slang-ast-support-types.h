@@ -1677,79 +1677,64 @@ FIDDLE() namespace Slang
         DAddFunc,            ///< The `IDifferentiable.dadd` function requirement
         DMulFunc,            ///< The `IDifferentiable.dmul` function requirement
 
-        InitLogicalFromInt, ///< The `ILogical.__init` mtehod.
-        Equals,             ///< The `ILogical.equals` mtehod.
-        LessThan,           ///< The `ILogical.lessThan` mtehod.
-        LessThanOrEquals,   ///< The `ILogical.lessThanOrEquals` mtehod.
-        Shl,                ///< The `ILogical.shl` mtehod.
-        Shr,                ///< The `ILogical.shr` mtehod.
-        BitAnd,             ///< The `ILogical.bitAnd` mtehod.
-        BitOr,              ///< The `ILogical.bitOr` mtehod.
-        BitXor,             ///< The `ILogical.bitXor` mtehod.
-        BitNot,             ///< The `ILogical.bitNot` mtehod.
-        And,                ///< The `ILogical.and` mtehod.
-        Or,                 ///< The `ILogical.or` mtehod.
-        Not,                ///< The `ILogical.not` mtehod.
+        InitLogicalFromInt,        ///< The `ILogical.__init` method.
+        Equals,                    ///< The `ILogical.equals` method.
+        LessThan,                  ///< The `ILogical.lessThan` method.
+        LessThanOrEquals,          ///< The `ILogical.lessThanOrEquals` method.
+        Shl,                       ///< The `ILogical.shl` method.
+        Shr,                       ///< The `ILogical.shr` method.
+        BitAnd,                    ///< The `ILogical.bitAnd` method.
+        BitOr,                     ///< The `ILogical.bitOr` method.
+        BitXor,                    ///< The `ILogical.bitXor` method.
+        BitNot,                    ///< The `ILogical.bitNot` method.
+        And,                       ///< The `ILogical.and` method.
+        Or,                        ///< The `ILogical.or` method.
+        Not,                       ///< The `ILogical.not` method.
+                                   // Requirement keys for new auto-diff system
+        ForwardDerivativeFuncType, ///< The "__fwd_diff_func_type" built-in associatedtype on
+                                   ///< functions
+        ForwardDerivativeFunc      ///< The "fwd_diff" built-in function on functions
     };
 
-<<<<<<< HEAD
     enum class FunctionDifferentiableLevel
     {
         None,
         Forward,
         Backward
     };
-    == == == = InitLogicalFromInt, ///< The `ILogical.__init` mtehod.
-        Equals,                    ///< The `ILogical.equals` mtehod.
-        LessThan,                  ///< The `ILogical.lessThan` mtehod.
-        LessThanOrEquals,          ///< The `ILogical.lessThanOrEquals` mtehod.
-        Shl,                       ///< The `ILogical.shl` mtehod.
-        Shr,                       ///< The `ILogical.shr` mtehod.
-        BitAnd,                    ///< The `ILogical.bitAnd` mtehod.
-        BitOr,                     ///< The `ILogical.bitOr` mtehod.
-        BitXor,                    ///< The `ILogical.bitXor` mtehod.
-        BitNot,                    ///< The `ILogical.bitNot` mtehod.
-        And,                       ///< The `ILogical.and` mtehod.
-        Or,                        ///< The `ILogical.or` mtehod.
-        Not,                       ///< The `ILogical.not` mtehod.
 
-        // Requirement keys for new auto-diff system
-        ForwardDerivativeFuncType, ///< The "__fwd_diff_func_type" built-in associatedtype on
-                                   ///< functions
-        ForwardDerivativeFunc      ///< The "fwd_diff" built-in function on functions
-};
->>>>>>> 1b6d6ca9f (Initial prototype for functions as types for higher order operators)
+    /// Represents a markup (documentation) associated with a decl.
+    FIDDLE()
+    class MarkupEntry : public RefObject
+    {
+        FIDDLE(...)
+        NodeBase* m_node; ///< The node this documentation is associated with
+        String m_markup;  ///< The raw contents of of markup associated with the decoration
+        MarkupVisibility m_visibility = MarkupVisibility::Public; ///< How visible this decl is
+    };
 
-/// Represents a markup (documentation) associated with a decl.
-FIDDLE()
-class MarkupEntry : public RefObject
-{
-    FIDDLE(...)
-    NodeBase* m_node; ///< The node this documentation is associated with
-    String m_markup;  ///< The raw contents of of markup associated with the decoration
-    MarkupVisibility m_visibility = MarkupVisibility::Public; ///< How visible this decl is
-};
-
-/// Get the inner most expr from an higher order expr chain, e.g. `__fwd_diff(__fwd_diff(f))`'s
-/// inner most expr is `f`.
-Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr, FunctionDifferentiableLevel& outDiffLevel);
-inline Expr* getInnerMostExprFromHigherOrderExpr(Expr* expr)
-{
-    FunctionDifferentiableLevel level;
-    return getInnerMostExprFromHigherOrderExpr(expr, level);
-}
+    /// Get the inner most expr from an higher order expr chain, e.g. `__fwd_diff(__fwd_diff(f))`'s
+    /// inner most expr is `f`.
+    Expr* getInnerMostExprFromHigherOrderExpr(
+        Expr * expr,
+        FunctionDifferentiableLevel & outDiffLevel);
+    inline Expr* getInnerMostExprFromHigherOrderExpr(Expr * expr)
+    {
+        FunctionDifferentiableLevel level;
+        return getInnerMostExprFromHigherOrderExpr(expr, level);
+    }
 
 
-/// Get the operator name from the higher order invoke expr.
-UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr* expr);
+    /// Get the operator name from the higher order invoke expr.
+    UnownedStringSlice getHigherOrderOperatorName(HigherOrderInvokeExpr * expr);
 
-enum class DeclVisibility
-{
-    Private,
-    Internal,
-    Public,
-    Default = Internal,
-};
+    enum class DeclVisibility
+    {
+        Private,
+        Internal,
+        Public,
+        Default = Internal,
+    };
 
 } // namespace Slang
 

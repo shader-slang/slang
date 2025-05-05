@@ -589,21 +589,31 @@ FIDDLE()
 class FunctionBaseType : public BuiltinType
 {
     FIDDLE(...)
-    SLANG_AST_CLASS(FunctionBaseType);
 };
 
 FIDDLE()
 class DifferentiableFuncBaseType : public BuiltinType
 {
     FIDDLE(...)
-    SLANG_AST_CLASS(DifferentiableFuncBaseType);
 };
 
 FIDDLE()
 class ForwardDiffFuncInterfaceType : public BuiltinType
 {
     FIDDLE(...)
-    SLANG_AST_CLASS(ForwardDiffFuncInterfaceType);
+};
+
+// Built-in type to translate the type.
+FIDDLE()
+class FwdDiffFuncType : public Type
+{
+    FIDDLE(...)
+    Type* getBase() { return as<Type>(getOperand(0)); }
+
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 // A vector type, e.g., `vector<T,N>`

@@ -3340,9 +3340,6 @@ struct AutoDiffPass : public InstPassBase
                         switch (inst->getOperand(0)->getOp())
                         {
                         case kIROp_Func:
-                        case kIROp_Specialize:
-                        case kIROp_LookupWitness:
-                        case kIROp_Generic:
                             if (auto innerFunc =
                                     as<IRFunc>(getResolvedInstForDecorations(inst->getOperand(0))))
                             {
@@ -3356,6 +3353,17 @@ struct AutoDiffPass : public InstPassBase
                             }
                             autoDiffWorkList.add(inst);
                             break;
+                        case kIROp_Specialize:
+                            // Skip. We'll need specialization to complete before
+                            // processing the result.
+                            //
+                            break;
+                        case kIROp_LookupWitness:
+                        case kIROp_Generic:
+                            // Should not see this anymore.
+                            SLANG_UNEXPECTED(
+                                "IRDifferentiate(IRGeneric/IRLookupWitnes) is not expected any "
+                                "more");
                         default:
                             autoDiffWorkList.add(inst->getOperand(0));
                             break;

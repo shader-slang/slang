@@ -296,6 +296,11 @@ void emitType(ManglingContext* context, Type* type)
         for (Index i = 0; i < typePack->getTypeCount(); i++)
             emitType(context, typePack->getElementType(i));
     }
+    else if (auto fwdDiffFuncType = as<FwdDiffFuncType>(type))
+    {
+        emitRaw(context, "Tfwddiff");
+        emitType(context, fwdDiffFuncType->getBase());
+    }
     else
     {
         SLANG_UNEXPECTED("unimplemented case in type mangling");

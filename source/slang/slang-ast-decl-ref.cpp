@@ -172,6 +172,17 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
 {
     auto astBuilder = getCurrentASTBuilder();
     Decl* requirementKey = getDecl();
+
+    // We never register the generic itself as the key, but rather use
+    // the inner-most non-generic declaration.
+    //
+    UCount genericLevels = 0;
+    while (auto genericDecl = as<GenericDecl>(requirementKey))
+    {
+        genericLevels++;
+        requirementKey = getInner(genericDecl);
+    }
+
     RequirementWitness requirementWitness =
         tryLookUpRequirementWitness(astBuilder, newWitness, requirementKey);
     switch (requirementWitness.getFlavor())
@@ -179,10 +190,28 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
     default:
         // No usable value was found, so there is nothing we can do.
         break;
+    case RequirementWitness::Flavor::declRef:
+        {
+            auto satisfyingVal =
+                as<DeclRefBase>(requirementWitness.getDeclRef().declRefBase->resolve());
+            if (genericLevels == 0)
+                return satisfyingVal;
+            else
+            {
+                for (; satisfyingVal && genericLevels > 0;
+                     satisfyingVal = satisfyingVal->getParent())
+                {
+                    if (as<GenericDecl>(satisfyingVal->getParent()->getDecl()))
+                        genericLevels--;
+                }
 
+                return satisfyingVal;
+            }
+        }
     case RequirementWitness::Flavor::val:
         {
             auto satisfyingVal = requirementWitness.getVal()->resolve();
+            SLANG_ASSERT(!genericLevels);
             return satisfyingVal;
         }
         break;
@@ -239,10 +268,44 @@ DeclRefBase* GenericAppDeclRef::_substituteImplOverride(
     if (diff == 0)
         return this;
     (*ioDiff)++;
-    return astBuilder->getGenericAppDeclRef(
-        substGenericDeclRef,
-        substArgs.getArrayView(),
-        getDecl());
+
+    if (getDecl()->isChildOf(substGenericDeclRef->getDecl()))
+        return astBuilder->getGenericAppDeclRef(
+            substGenericDeclRef,
+            substArgs.getArrayView(),
+            getDecl());
+    else
+    {
+        // If decl is no longer the child of the new parent, it's most likely due to
+        // the base lookup resolving to a different decl.
+        //
+        if (auto baseLookup = as<LookupDeclRef>(getGenericDeclRef()))
+        {
+            // Otherwise, we need to get the effective inner decl-ref for the generic app.
+            auto resolvedTargetDecl = astBuilder
+                                          ->getLookupDeclRef(
+                                              baseLookup->getLookupSource(),
+                                              baseLookup->getWitness(),
+                                              getDecl())
+                                          .substituteImpl(astBuilder, subst, &diff)
+                                          .declRefBase->resolve();
+
+            if (as<DeclRefBase>(resolvedTargetDecl))
+            {
+                return astBuilder->getGenericAppDeclRef(
+                    substGenericDeclRef,
+                    substArgs.getArrayView(),
+                    as<DeclRefBase>(resolvedTargetDecl)->getDecl());
+            }
+        }
+
+        SLANG_UNEXPECTED(
+            "GenericAppDeclRef::substituteImpl: generic decl ref is not a child of the new parent "
+            "& base is not a lookup");
+    }
+
+    // Default:
+    return astBuilder->getGenericAppDeclRef(substGenericDeclRef, substArgs.getArrayView());
 }
 
 GenericDecl* GenericAppDeclRef::getGenericDecl()
@@ -545,8 +608,6 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
         return declRef;
     if (declRef.as<GenericValueParamDecl>())
         return declRef;
-    if (declRef.as<GenericTypeConstraintDecl>())
-        return declRef;
     ShortList<GenericDecl*> genericParentDecls;
     auto lastSubstNode = SubstitutionSet(declRef).getInnerMostNodeWithSubstInfo();
     auto lastGenApp = as<GenericAppDeclRef>(lastSubstNode);
@@ -557,6 +618,8 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
             break;
         if (lastLookup && lastLookup->getDecl()->isChildOf(dd))
             break;
+        if (as<GenericTypeConstraintDecl>(declRef.getDecl()) && dd == declRef.getDecl()->parentDecl)
+            continue;
         if (auto gen = as<GenericDecl>(dd))
             genericParentDecls.add(gen);
     }

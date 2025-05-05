@@ -206,7 +206,7 @@ Result IRSerialWriter::write(
             {
                 switch (srcInst->getOp())
                 {
-                // Special handling for the ir const derived types
+                // Special handling for the ir const derived
                 case kIROp_BlobLit:
                     {
                         // Blobs are serialized into string table like strings
@@ -359,19 +359,22 @@ Result _writeInstArrayChunk(
     SLANG_RETURN_ON_FAIL(_writeInstArrayChunk(Bin::kInstFourCc, data.m_insts, container));
     SLANG_RETURN_ON_FAIL(
         SerialRiffUtil::writeArrayChunk(Bin::kChildRunFourCc, data.m_childRuns, container));
-    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
-        Bin::kExternalOperandsFourCc,
-        data.m_externalOperands,
-        container));
-    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
-        SerialBinary::kStringTableFourCc,
-        data.m_stringTable,
-        container));
+    SLANG_RETURN_ON_FAIL(
+        SerialRiffUtil::writeArrayChunk(
+            Bin::kExternalOperandsFourCc,
+            data.m_externalOperands,
+            container));
+    SLANG_RETURN_ON_FAIL(
+        SerialRiffUtil::writeArrayChunk(
+            SerialBinary::kStringTableFourCc,
+            data.m_stringTable,
+            container));
 
-    SLANG_RETURN_ON_FAIL(SerialRiffUtil::writeArrayChunk(
-        Bin::kUInt32RawSourceLocFourCc,
-        data.m_rawSourceLocs,
-        container));
+    SLANG_RETURN_ON_FAIL(
+        SerialRiffUtil::writeArrayChunk(
+            Bin::kUInt32RawSourceLocFourCc,
+            data.m_rawSourceLocs,
+            container));
 
     if (data.m_debugSourceLocRuns.getCount())
     {

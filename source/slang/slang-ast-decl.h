@@ -391,7 +391,7 @@ class CallableDecl : public ContainerDecl
     // Optional function expression type, which, if present, will be used to determine
     // the return type and parameter types of the callable.
     //
-    TypeExp funcType;
+    FIDDLE() TypeExp funcType;
 
     // Fields related to redeclaration, so that we
     // can support multiple specialized variations

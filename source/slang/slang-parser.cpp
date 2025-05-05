@@ -1919,6 +1919,66 @@ static Stmt* parseOptBody(Parser* parser)
     return parser->parseBlockStatement();
 }
 
+
+static void parseOptionalGenericConstraints(Parser* parser, ContainerDecl* decl)
+{
+    if (AdvanceIf(parser, TokenType::Colon))
+    {
+        do
+        {
+            GenericTypeConstraintDecl* paramConstraint =
+                parser->astBuilder->create<GenericTypeConstraintDecl>();
+            parser->FillPosition(paramConstraint);
+
+            // substitution needs to be filled during check
+            Type* paramType = nullptr;
+            if (as<GenericTypeParamDeclBase>(decl) || as<FuncDecl>(decl))
+            {
+                paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
+
+                SharedTypeExpr* typeExpr = parser->astBuilder->create<SharedTypeExpr>();
+                typeExpr->loc = decl->loc;
+                typeExpr->base.type = paramType;
+                typeExpr->type = QualType(parser->astBuilder->getTypeType(paramType));
+
+                paramConstraint->sub = TypeExp(typeExpr);
+            }
+            else if (as<AssocTypeDecl>(decl))
+            {
+                auto varExpr = parser->astBuilder->create<VarExpr>();
+                varExpr->scope = parser->currentScope;
+                varExpr->name = decl->getName();
+                paramConstraint->sub.exp = varExpr;
+            }
+
+            paramConstraint->sup = parser->ParseTypeExp();
+            AddMember(decl, paramConstraint);
+        } while (AdvanceIf(parser, TokenType::Comma));
+    }
+}
+
+static void parseOptionalInheritanceClause(Parser* parser, ContainerDecl* decl)
+{
+    if (AdvanceIf(parser, TokenType::Colon))
+    {
+        do
+        {
+            auto base = parser->ParseTypeExp();
+
+            auto inheritanceDecl = parser->astBuilder->create<InheritanceDecl>();
+            inheritanceDecl->loc = base.exp->loc;
+            inheritanceDecl->nameAndLoc.name = getName(parser, "$inheritance");
+            inheritanceDecl->base = base;
+
+            AddMember(decl, inheritanceDecl);
+
+            if (parser->pendingModifiers->hasModifier<ExternModifier>())
+                addModifier(inheritanceDecl, parser->astBuilder->create<ExternModifier>());
+
+        } while (AdvanceIf(parser, TokenType::Comma));
+    }
+}
+
 /// Complete parsing of a function using traditional (C-like) declarator syntax
 static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& declaratorInfo)
 {
@@ -1956,12 +2016,19 @@ static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& decl
             {
                 decl->errorType = parser->ParseTypeExp();
             }
-
-            _parseOptSemantics(parser, decl);
+            //_parseOptSemantics(parser, decl); TODO: Fix this (make sure semantics can also be
+            // parsed)
+            //
+            // parseOptionalInheritanceClause(parser, decl);
 
             auto funcScope = parser->currentScope;
             parser->PopScope();
-            maybeParseGenericConstraints(parser, genericParent);
+
+            // TODO: Need to figure out how to parse interface requirements constraints as
+            // constraints & regular function constraints as inheritance decls.
+            //
+            parseOptionalGenericConstraints(parser, decl);       // Parse ":"
+            maybeParseGenericConstraints(parser, genericParent); // Parse "where"
             parser->PushScope(funcScope);
 
             decl->body = parseOptBody(parser);
@@ -2669,6 +2736,16 @@ static Expr* parseFuncTypeOfExpr(Parser* parser)
     return funcTypeOfExpr;
 }
 
+static Expr* parseFwdDiffFuncTypeExpr(Parser* parser)
+{
+    // Parse an expr of the form `fwd_diff_func_type(fn)`
+    FwdDiffFuncTypeExpr* expr = parser->astBuilder->create<FwdDiffFuncTypeExpr>();
+    parser->ReadToken(TokenType::LParent);
+    expr->base = parser->ParseTypeExp();
+    parser->ReadToken(TokenType::RParent);
+    return expr;
+}
+
 // parseFuncAsTypeExpr
 static NodeBase* parseFuncAsTypeExpr(Parser* parser, void* /* unused */)
 {
@@ -2944,6 +3021,11 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     else if (AdvanceIf(parser, "__func_type_of"))
     {
         typeSpec.expr = parseFuncTypeOfExpr(parser);
+        return typeSpec;
+    }
+    else if (AdvanceIf(parser, "__fwd_diff_func_type"))
+    {
+        typeSpec.expr = parseFwdDiffFuncTypeExpr(parser);
         return typeSpec;
     }
 
@@ -3651,28 +3733,6 @@ static NodeBase* parseGLSLShaderStorageBufferDecl(Parser* parser, String layoutT
     return ParseBufferBlockDecl(parser, "GLSLShaderStorageBuffer", &layoutType);
 }
 
-static void parseOptionalInheritanceClause(Parser* parser, AggTypeDeclBase* decl)
-{
-    if (AdvanceIf(parser, TokenType::Colon))
-    {
-        do
-        {
-            auto base = parser->ParseTypeExp();
-
-            auto inheritanceDecl = parser->astBuilder->create<InheritanceDecl>();
-            inheritanceDecl->loc = base.exp->loc;
-            inheritanceDecl->nameAndLoc.name = getName(parser, "$inheritance");
-            inheritanceDecl->base = base;
-
-            AddMember(decl, inheritanceDecl);
-
-            if (parser->pendingModifiers->hasModifier<ExternModifier>())
-                addModifier(inheritanceDecl, parser->astBuilder->create<ExternModifier>());
-
-        } while (AdvanceIf(parser, TokenType::Comma));
-    }
-}
-
 static NodeBase* parseExtensionDecl(Parser* parser, void* /*userData*/)
 {
     return parseOptGenericDecl(
@@ -3732,43 +3792,6 @@ static NodeBase* parseFunctionExtensionDecl(Parser* parser, void*)
         });
 }
 */
-
-static void parseOptionalGenericConstraints(Parser* parser, ContainerDecl* decl)
-{
-    if (AdvanceIf(parser, TokenType::Colon))
-    {
-        do
-        {
-            GenericTypeConstraintDecl* paramConstraint =
-                parser->astBuilder->create<GenericTypeConstraintDecl>();
-            parser->FillPosition(paramConstraint);
-
-            // substitution needs to be filled during check
-            Type* paramType = nullptr;
-            if (as<GenericTypeParamDeclBase>(decl))
-            {
-                paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
-
-                SharedTypeExpr* paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
-                paramTypeExpr->loc = decl->loc;
-                paramTypeExpr->base.type = paramType;
-                paramTypeExpr->type = QualType(parser->astBuilder->getTypeType(paramType));
-
-                paramConstraint->sub = TypeExp(paramTypeExpr);
-            }
-            else if (as<AssocTypeDecl>(decl))
-            {
-                auto varExpr = parser->astBuilder->create<VarExpr>();
-                varExpr->scope = parser->currentScope;
-                varExpr->name = decl->getName();
-                paramConstraint->sub.exp = varExpr;
-            }
-
-            paramConstraint->sup = parser->ParseTypeExp();
-            AddMember(decl, paramConstraint);
-        } while (AdvanceIf(parser, TokenType::Comma));
-    }
-}
 
 static NodeBase* parseAssocType(Parser* parser, void*)
 {
