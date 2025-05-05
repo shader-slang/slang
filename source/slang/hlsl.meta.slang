@@ -17889,6 +17889,26 @@ float RayCurrentTime()
     }
 }
 
+/// @category raytracing
+[__requiresNVAPI]
+__glsl_extension(GL_NV_cluster_acceleration_structure)
+__glsl_extension(GL_EXT_ray_tracing)
+[NonUniformReturn]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit)]
+int GetClusterID()
+{
+    __target_switch
+    {
+    case hlsl:  __intrinsic_asm "NvRtGetClusterID";
+    case glsl:  __intrinsic_asm "(gl_ClusterIDNV)";
+    case cuda: __intrinsic_asm "optixGetClusterId";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$int = OpLoad builtin(ClusterIDNV:int);
+        };
+    }
+}
 // Note: The provisional DXR spec included these unadorned
 // `ObjectToWorld()` and `WorldToObject()` functions, so
 // we will forward them to the new names as a convience
@@ -18683,6 +18703,31 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    /// Gets the cluster ID of the candidate hit.
+    /// @return Cluster ID for the candidate hit
+    /// @remarks HLSL/GLSL/SPIRV
+    [__requiresNVAPI]
+    __glsl_extension(GL_NV_cluster_acceleration_structure)
+    __glsl_extension(GL_EXT_ray_query)
+    [__NoSideEffect]
+    [require(glsl_hlsl_spirv, rayquery)]
+    int CandidateClusterID()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtGetCandidateClusterID";
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionClusterIdNV($0, false)";
+        case spirv:
+            uint iCandidateOrCommitted = 0;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_cluster_acceleration_structure";
+                OpCapability RayTracingClusterAccelerationStructureNV;
+                result:$$int = OpRayQueryGetIntersectionClusterIdNV &this $iCandidateOrCommitted;
+            };
+        }
+    }
+
     /// Gets the custom index of the instance containing the committed hit.
     /// @return User-provided instance identifier
     /// @remarks GLSL/SPIRV only
@@ -18699,6 +18744,31 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             return spirv_asm
             {
                 result:$$int = OpRayQueryGetIntersectionInstanceCustomIndexKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+
+    /// Gets the cluster ID of the committed hit.
+    /// @return Cluster ID for the committed hit
+    /// @remarks HLSL/GLSL/SPIRV
+    [__requiresNVAPI]
+    __glsl_extension(GL_NV_cluster_acceleration_structure)
+    __glsl_extension(GL_EXT_ray_query)
+    [__NoSideEffect]
+    [require(glsl_hlsl_spirv, rayquery)]
+    int CommittedClusterID()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtGetCommittedClusterID";
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionClusterIdNV($0, true)";
+        case spirv:
+            uint iCandidateOrCommitted = 1;
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_cluster_acceleration_structure";
+                OpCapability RayTracingClusterAccelerationStructureNV;
+                result:$$int = OpRayQueryGetIntersectionClusterIdNV &this $iCandidateOrCommitted;
             };
         }
     }
@@ -20350,6 +20420,29 @@ struct HitObject
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetHitKindNV &this;
+            };
+        }
+    }
+
+    /// Returns the cluster ID of the current hit. Valid if the hit object represents a hit.
+    [__requiresNVAPI]
+    __glsl_extension(GL_NV_cluster_acceleration_structure)
+    __glsl_extension(GL_EXT_ray_tracing)
+    [ForceInline]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    int GetClusterID()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetClusterID";
+        case glsl: __intrinsic_asm "hitObjectGetClusterIdNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetClusterId";
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_cluster_acceleration_structure";
+                OpCapability RayTracingClusterAccelerationStructureNV;
+                result:$$int = OpHitObjectGetClusterIdNV &this;
             };
         }
     }
