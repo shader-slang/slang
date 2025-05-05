@@ -106,6 +106,7 @@ IROp getTypeStyle(IROp op)
     {
     case kIROp_VoidType:
     case kIROp_BoolType:
+    case kIROp_EnumType:
         {
             return op;
         }
@@ -220,6 +221,7 @@ bool isValueType(IRInst* dataType)
     case kIROp_FuncType:
     case kIROp_RaytracingAccelerationStructureType:
     case kIROp_GLSLAtomicUintType:
+    case kIROp_EnumType:
         return true;
     default:
         // Read-only resource handles are considered as Value type.
@@ -271,6 +273,12 @@ bool isSimpleDataType(IRType* type)
     case kIROp_AnyValueType:
     case kIROp_PtrType:
         return true;
+    case kIROp_EnumType:
+        {
+            auto enumType = as<IREnumType>(type);
+            auto tagType = enumType->getTagType();
+            return isSimpleDataType(tagType);
+        }
     case kIROp_ArrayType:
     case kIROp_UnsizedArrayType:
         return isSimpleDataType((IRType*)type->getOperand(0));
