@@ -68,7 +68,7 @@ jobs:
             platform: x86_64
             test-category: full
             full-gpu-tests: true
-            runs-on: [Windows, self-hosted]
+            runs-on: { group: gcp, labels: [Windows, self-hosted] }
             has-gpu: true
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
