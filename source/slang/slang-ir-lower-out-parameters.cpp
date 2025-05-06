@@ -679,6 +679,11 @@ IRFunc* lowerOutParameters(
     [[maybe_unused]] DiagnosticSink* sink,
     bool alwaysUseReturnStruct)
 {
+    {
+        SourceManager s;
+        DiagnosticSinkWriter w(sink);
+        dumpIR(func->getModule(), {}, "MODULE BEFORE", &s, &w);
+    }
     IRBuilder builder(func->getModule());
     IRCloneEnv cloneEnv;
 
@@ -754,6 +759,11 @@ IRFunc* lowerOutParameters(
     // Handle cleanup of original function
     handleOriginalFunction(func, callResult);
 
+    {
+        SourceManager s;
+        DiagnosticSinkWriter w(sink);
+        dumpIR(newFunc->getModule(), {}, "MODULE AFTER", &s, &w);
+    }
     return newFunc;
 }
 
