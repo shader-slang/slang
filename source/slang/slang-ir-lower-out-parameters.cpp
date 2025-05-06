@@ -103,7 +103,6 @@ static void setupReturnStructLayout(
     IRFunc* origFunc,
     IRBuilder& builder,
     IRVarLayout* originalResultLayout,
-    IRStructType* returnStruct,
     List<IRStructKey*>& outKeys,
     Dictionary<IRParam*, IRStructKey*>& paramToKeyMap,
     IRVarLayout*& outResultVarLayout)
@@ -190,7 +189,7 @@ static void setupReturnStructLayout(
     // Add system value semantics from out parameters
     for (auto param = origFunc->getFirstParam(); param; param = param->getNextParam())
     {
-        if (auto outType = as<IROutTypeBase>(param->getDataType()))
+        if (const auto outType = as<IROutTypeBase>(param->getDataType()))
         {
             if (auto semanticDecor = findSemanticDecoration(param))
             {
@@ -290,7 +289,6 @@ static IRVarLayout* setupParamsLayout(
 static void setupEntryPointLayout(
     IRFunc* origFunc,
     IRFunc* newFunc,
-    IRStructType* returnStruct,
     List<IRStructKey*>& outKeys,
     Dictionary<IRParam*, IRStructKey*>& paramToKeyMap,
     Dictionary<IRParam*, IRParam*>& origToNewParamMap,
@@ -314,7 +312,6 @@ static void setupEntryPointLayout(
         origFunc,
         builder,
         originalResultLayout,
-        returnStruct,
         outKeys,
         paramToKeyMap,
         resultVarLayout);
@@ -332,49 +329,27 @@ static void setupEntryPointLayout(
     builder.addLayoutDecoration(newFunc, entryPointLayout);
 }
 
-IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseReturnStruct)
+// Structure to hold parameter information
+struct ParamInfo
 {
-    IRBuilder builder(func->getModule());
-    IRCloneEnv cloneEnv;
+    IRParam* origParam;       // Original parameter
+    IRType* valueType;        // Parameter value type (without out/inout wrapper)
+    bool isOut;               // Is an out parameter
+    bool isInOut;             // Is an inout parameter
+    IRParam* newParam;        // New param (nullptr for pure out params)
+    IRVar* outVar;            // Out variable (nullptr for non-out params)
+    IRStructKey* outFieldKey; // Field key (for out params)
+};
 
-    struct ParamInfo
-    {
-        IRParam* origParam;       // Original parameter
-        IRType* valueType;        // Parameter value type (without out/inout wrapper)
-        bool isOut;               // Is an out parameter
-        bool isInOut;             // Is an inout parameter
-        IRParam* newParam;        // New param (nullptr for pure out params)
-        IRVar* outVar;            // Out variable (nullptr for non-out params)
-        IRStructKey* outFieldKey; // Field key (for out params)
-    };
-
-    // List of parameter infos and output field keys
+// Analyze parameters and collect information
+List<ParamInfo> collectParameterInfo(
+    IRFunc* func,
+    IRBuilder& builder,
+    List<IRStructKey*>& outKeys,
+    Dictionary<IRParam*, IRStructKey*>& paramToKeyMap)
+{
     List<ParamInfo> paramInfos;
-    List<IRStructKey*> outKeys;
-    Dictionary<IRParam*, IRStructKey*> paramToKeyMap;
-    Dictionary<IRParam*, IRParam*> origToNewParamMap;
 
-    // If original function returns non-void, add it to return fields
-    IRStructKey* resultKey = nullptr;
-    if (!as<IRVoidType>(func->getResultType()))
-    {
-        resultKey = builder.createStructKey();
-        builder.addNameHintDecoration(resultKey, UnownedStringSlice("result"));
-
-        // Transfer semantic decoration from function return value to struct key
-        UnownedStringSlice semanticName;
-        int semanticIndex = 0;
-        if (findReturnValueSemanticInfo(func, semanticName, semanticIndex))
-        {
-            builder.addSemanticDecoration(resultKey, semanticName, semanticIndex);
-        }
-
-        outKeys.add(resultKey);
-    }
-
-    bool hasOutParams = false;
-
-    // Process all parameters
     for (auto param = func->getFirstParam(); param; param = param->getNextParam())
     {
         ParamInfo info;
@@ -414,33 +389,58 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
             info.isInOut = false;
         }
 
-        if (info.isOut && !info.isInOut)
-        {
-            hasOutParams = true;
-        }
-
         paramInfos.add(info);
     }
 
-    if (!hasOutParams && !alwaysUseReturnStruct)
-        return func;
+    return paramInfos;
+}
 
-    // Create new function
-    auto newFunc = builder.createFunc();
+// Create a result key for non-void return types
+IRStructKey* createResultKey(IRFunc* func, IRBuilder& builder, List<IRStructKey*>& outKeys)
+{
+    if (as<IRVoidType>(func->getResultType()))
+        return nullptr;
 
-    // Copy all decorations except layout
-    for (auto decor : func->getDecorations())
+    IRStructKey* resultKey = builder.createStructKey();
+    builder.addNameHintDecoration(resultKey, UnownedStringSlice("result"));
+
+    // Transfer semantic decoration from function return value to struct key
+    UnownedStringSlice semanticName;
+    int semanticIndex = 0;
+    if (findReturnValueSemanticInfo(func, semanticName, semanticIndex))
     {
-        if (!as<IRLayoutDecoration>(decor))
-        {
-            cloneDecoration(&cloneEnv, decor, newFunc, builder.getModule());
-        }
+        builder.addSemanticDecoration(resultKey, semanticName, semanticIndex);
     }
 
-    // Create return type
-    IRType* resultType = nullptr;
-    IRStructType* returnStruct = nullptr;
+    outKeys.add(resultKey);
+    return resultKey;
+}
 
+// Determine if we need to transform the function
+bool needsTransformation(const List<ParamInfo>& paramInfos, bool alwaysUseReturnStruct)
+{
+    if (alwaysUseReturnStruct)
+        return true;
+
+    for (auto& info : paramInfos)
+    {
+        if (info.isOut && !info.isInOut)
+            return true;
+    }
+
+    return false;
+}
+
+// Create the return type for the new function
+IRType* createReturnType(
+    IRFunc* func,
+    IRBuilder& builder,
+    IRStructKey* resultKey,
+    const List<IRStructKey*>& outKeys,
+    const List<ParamInfo>& paramInfos,
+    bool alwaysUseReturnStruct,
+    IRStructType*& returnStruct)
+{
     // Determine if we need a struct return type
     bool needsStructReturn = alwaysUseReturnStruct ||
                              (resultKey != nullptr && outKeys.getCount()) || outKeys.getCount() > 1;
@@ -474,54 +474,31 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
             }
         }
 
-        resultType = returnStruct;
+        return returnStruct;
     }
     else if (outKeys.getCount())
     {
         // Find the first out parameter's type
-        bool found = false;
         for (auto& info : paramInfos)
         {
             if (info.isOut)
             {
-                resultType = info.valueType;
-                found = true;
-                break;
+                return info.valueType;
             }
         }
-
-        if (!found)
-        {
-            // Fallback if we somehow don't have an out param
-            resultType = func->getResultType();
-        }
     }
 
-    else
-    {
-        resultType = builder.getVoidType();
-    }
+    // Default case
+    return builder.getVoidType();
+}
 
-    // Collect parameter types for new function
-    List<IRType*> newParamTypes;
-    for (auto& info : paramInfos)
-    {
-        if (!info.isOut || info.isInOut)
-        {
-            newParamTypes.add(info.valueType);
-        }
-    }
-
-    // Set function type
-    auto funcType = builder.getFuncType(newParamTypes, resultType);
-    newFunc->setFullType(funcType);
-
-    // Create function body
-    auto firstBlock = builder.createBlock();
-    newFunc->addBlock(firstBlock);
-    builder.setInsertInto(firstBlock);
-
-    // Create parameters and variables
+// Create parameters for the new function
+void createNewParameters(
+    IRBuilder& builder,
+    List<ParamInfo>& paramInfos,
+    IRCloneEnv& cloneEnv,
+    Dictionary<IRParam*, IRParam*>& origToNewParamMap)
+{
     for (auto& info : paramInfos)
     {
         if (!info.isOut || info.isInOut)
@@ -555,8 +532,14 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
             }
         }
     }
+}
 
-    // Build call to original function
+// Build the call to the original function
+IRCall* buildOriginalFunctionCall(
+    IRFunc* func,
+    IRBuilder& builder,
+    const List<ParamInfo>& paramInfos)
+{
     List<IRInst*> args;
     for (auto& info : paramInfos)
     {
@@ -571,11 +554,18 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
     }
 
     // Call the original function
-    IRCall* callResult = builder.emitCallInst(func->getResultType(), func, args);
+    return builder.emitCallInst(func->getResultType(), func, args);
+}
 
-    // Construct return value
-    IRInst* returnValue = nullptr;
-
+// Construct the return value for the new function
+IRInst* constructReturnValue(
+    IRBuilder& builder,
+    IRCall* callResult,
+    IRStructKey* resultKey,
+    IRStructType* returnStruct,
+    const List<IRStructKey*>& outKeys,
+    const List<ParamInfo>& paramInfos)
+{
     if (returnStruct)
     {
         // Collect field values in order
@@ -597,14 +587,14 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
         }
 
         // Create struct with all field values
-        returnValue = builder.emitMakeStruct(returnStruct, fieldValues);
+        return builder.emitMakeStruct(returnStruct, fieldValues);
     }
     else if (outKeys.getCount())
     {
         // Single return value
         if (resultKey)
         {
-            returnValue = callResult;
+            return callResult;
         }
         else
         {
@@ -613,14 +603,30 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
             {
                 if (info.isOut && info.outVar)
                 {
-                    returnValue = builder.emitLoad(info.outVar);
-                    break;
+                    return builder.emitLoad(info.outVar);
                 }
             }
         }
     }
 
-    builder.emitReturn(returnValue);
+    return nullptr;
+}
+
+// Transfer decorations from original to new function
+void transferFunctionDecorations(
+    IRFunc* func,
+    IRFunc* newFunc,
+    IRBuilder& builder,
+    IRCloneEnv& cloneEnv)
+{
+    // Copy all decorations except layout
+    for (auto decor : func->getDecorations())
+    {
+        if (!as<IRLayoutDecoration>(decor))
+        {
+            cloneDecoration(&cloneEnv, decor, newFunc, builder.getModule());
+        }
+    }
 
     // Transfer entry point decoration if present
     if (auto entryPointDecor = func->findDecoration<IREntryPointDecoration>())
@@ -634,22 +640,12 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
 
     // Add keepAlive decoration to ensure the new function is preserved
     builder.addKeepAliveDecoration(newFunc);
+}
 
-    // Set up layout information
-    if (returnStruct)
-    {
-        setupEntryPointLayout(
-            func,
-            newFunc,
-            returnStruct,
-            outKeys,
-            paramToKeyMap,
-            origToNewParamMap,
-            builder);
-    }
-
-    // If original function has only one use, inline it
-    // Delete original function if it's been inlined
+// Handle cleanup of original function if needed
+void handleOriginalFunction(IRFunc* func, IRCall* callResult)
+{
+    // Count uses of original function
     int useCount = 0;
     for (auto use = func->firstUse; use; use = use->nextUse)
         useCount++;
@@ -675,8 +671,91 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
 
         func->removeAndDeallocate();
     }
+}
+
+// Main function that orchestrates the transformation
+IRFunc* lowerOutParameters(
+    IRFunc* func,
+    [[maybe_unused]] DiagnosticSink* sink,
+    bool alwaysUseReturnStruct)
+{
+    IRBuilder builder(func->getModule());
+    IRCloneEnv cloneEnv;
+
+    // Data structures for tracking parameter information
+    List<IRStructKey*> outKeys;
+    Dictionary<IRParam*, IRStructKey*> paramToKeyMap;
+    Dictionary<IRParam*, IRParam*> origToNewParamMap;
+
+    // Create result key for non-void return types
+    IRStructKey* resultKey = createResultKey(func, builder, outKeys);
+
+    // Collect parameter information
+    List<ParamInfo> paramInfos = collectParameterInfo(func, builder, outKeys, paramToKeyMap);
+
+    // Check if transformation is needed
+    if (!needsTransformation(paramInfos, alwaysUseReturnStruct))
+        return func;
+
+    // Create new function
+    auto newFunc = builder.createFunc();
+
+    // Transfer decorations to new function
+    transferFunctionDecorations(func, newFunc, builder, cloneEnv);
+
+    // Create return type
+    IRStructType* returnStruct = nullptr;
+    IRType* resultType = createReturnType(
+        func,
+        builder,
+        resultKey,
+        outKeys,
+        paramInfos,
+        alwaysUseReturnStruct,
+        returnStruct);
+
+    // Collect parameter types for new function
+    List<IRType*> newParamTypes;
+    for (auto& info : paramInfos)
+    {
+        if (!info.isOut || info.isInOut)
+        {
+            newParamTypes.add(info.valueType);
+        }
+    }
+
+    // Set function type
+    auto funcType = builder.getFuncType(newParamTypes, resultType);
+    newFunc->setFullType(funcType);
+
+    // Create function body
+    auto firstBlock = builder.createBlock();
+    newFunc->addBlock(firstBlock);
+    builder.setInsertInto(firstBlock);
+
+    // Create parameters and variables
+    createNewParameters(builder, paramInfos, cloneEnv, origToNewParamMap);
+
+    // Build call to original function
+    IRCall* callResult = buildOriginalFunctionCall(func, builder, paramInfos);
+
+    // Construct return value
+    IRInst* returnValue =
+        constructReturnValue(builder, callResult, resultKey, returnStruct, outKeys, paramInfos);
+
+    builder.emitReturn(returnValue);
+
+    // Set up layout information
+    if (returnStruct)
+    {
+        setupEntryPointLayout(func, newFunc, outKeys, paramToKeyMap, origToNewParamMap, builder);
+    }
+
+    // Handle cleanup of original function
+    handleOriginalFunction(func, callResult);
 
     return newFunc;
 }
+
 
 } // namespace Slang
