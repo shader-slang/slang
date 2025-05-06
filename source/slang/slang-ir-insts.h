@@ -4299,6 +4299,9 @@ public:
     // Create an initially empty `class` type.
     IRClassType* createClassType();
 
+    // Create an an `enum` type with the given tag type.
+    IREnumType* createEnumType(IRType* tagType);
+
     // Create an initially empty `GLSLShaderStorageBufferType` type.
     IRGLSLShaderStorageBufferType* createGLSLShaderStorableBufferType();
     IRGLSLShaderStorageBufferType* createGLSLShaderStorableBufferType(
