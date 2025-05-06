@@ -274,7 +274,7 @@ IRInst* extractMultiByteValueAtOffset(
             src,
             firstHalfSize,
             offset);
-        switch(firstHalfSize)
+        switch (firstHalfSize)
         {
         case 1:
             firstHalf =
