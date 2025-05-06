@@ -1788,44 +1788,34 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL double F64_fma(double a, double b, double c)
     return ::fma(a, b, c);
 }
 
-// ----------------------------- I32 -----------------------------------------
+// ----------------------------- U8 -----------------------------------------
 
-// Unary
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int32_t I32_abs(int32_t f)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U8_countbits(uint8_t v)
 {
-    return (f < 0) ? -f : f;
-}
-
-// Binary
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int32_t I32_min(int32_t a, int32_t b)
-{
-    return a < b ? a : b;
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int32_t I32_max(int32_t a, int32_t b)
-{
-    return a > b ? a : b;
-}
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float I32_asfloat(int32_t x)
-{
-    Union32 u;
-    u.i = x;
-    return u.f;
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_asuint(int32_t x)
-{
-    return uint32_t(x);
-}
-SLANG_FORCE_INLINE SLANG_CUDA_CALL double I32_asdouble(int32_t low, int32_t hi)
-{
-    Union64 u;
-    u.u = (uint64_t(hi) << 32) | uint32_t(low);
-    return u.d;
-}
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_countbits(int32_t v)
-{
+    // No native 8bit popc yet, just cast and use 32bit variant
     return __popc(uint32_t(v));
+}
+
+// ----------------------------- I8 -----------------------------------------
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I8_countbits(int8_t v)
+{
+    return U8_countbits(uint8_t(v));
+}
+
+// ----------------------------- U16 -----------------------------------------
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U16_countbits(uint16_t v)
+{
+    // No native 16bit popc yet, just cast and use 32bit variant
+    return __popc(uint32_t(v));
+}
+
+// ----------------------------- I16 -----------------------------------------
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I16_countbits(int16_t v)
+{
+    return U16_countbits(uint16_t(v));
 }
 
 // ----------------------------- U32 -----------------------------------------
@@ -1870,26 +1860,44 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_countbits(uint32_t v)
     return __popc(v);
 }
 
+// ----------------------------- I32 -----------------------------------------
 
-// ----------------------------- I64 -----------------------------------------
-
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_abs(int64_t f)
+// Unary
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int32_t I32_abs(int32_t f)
 {
     return (f < 0) ? -f : f;
 }
 
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_min(int64_t a, int64_t b)
+// Binary
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int32_t I32_min(int32_t a, int32_t b)
 {
     return a < b ? a : b;
 }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_max(int64_t a, int64_t b)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int32_t I32_max(int32_t a, int32_t b)
 {
     return a > b ? a : b;
 }
 
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I64_countbits(int64_t v)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL float I32_asfloat(int32_t x)
 {
-    return __popcll(uint64_t(v));
+    Union32 u;
+    u.i = x;
+    return u.f;
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_asuint(int32_t x)
+{
+    return uint32_t(x);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL double I32_asdouble(int32_t low, int32_t hi)
+{
+    Union64 u;
+    u.u = (uint64_t(hi) << 32) | uint32_t(low);
+    return u.d;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_countbits(int32_t v)
+{
+    return U32_countbits(uint32_t(v));
 }
 
 // ----------------------------- U64 -----------------------------------------
@@ -1912,6 +1920,27 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_countbits(uint64_t v)
 {
     // https://docs.nvidia.com/cuda/cuda-math-api/group__CUDA__MATH__INTRINSIC__INT.html#group__CUDA__MATH__INTRINSIC__INT_1g43c9c7d2b9ebf202ff1ef5769989be46
     return __popcll(v);
+}
+
+// ----------------------------- I64 -----------------------------------------
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_abs(int64_t f)
+{
+    return (f < 0) ? -f : f;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_min(int64_t a, int64_t b)
+{
+    return a < b ? a : b;
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_max(int64_t a, int64_t b)
+{
+    return a > b ? a : b;
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I64_countbits(int64_t v)
+{
+    return U64_countbits(uint64_t(v));
 }
 
 // ----------------------------- IPTR -----------------------------------------
