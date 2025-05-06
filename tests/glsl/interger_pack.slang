@@ -71,7 +71,7 @@ void computeMain()
     outputBuffer.i = pack32(i);
     // BUF-NEXT: 341256F2
 
-    i8vec4 j = {0x02, 0x56, 0x12, 0x80};
+    i8vec4 j = {0x82, 0x56, 0x12, 0x80};
     outputBuffer.j = pack32(j);
-    // BUF-NEXT: 80125602
+    // BUF-NEXT: 80125682
 }

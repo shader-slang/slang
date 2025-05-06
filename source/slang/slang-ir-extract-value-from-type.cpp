@@ -274,6 +274,23 @@ IRInst* extractMultiByteValueAtOffset(
             src,
             firstHalfSize,
             offset);
+        switch(firstHalfSize)
+        {
+        case 1:
+            firstHalf =
+                builder.emitBitAnd(uintType, firstHalf, builder.getIntValue(uintType, 0xFF));
+            break;
+        case 2:
+            firstHalf =
+                builder.emitBitAnd(uintType, firstHalf, builder.getIntValue(uintType, 0xFFFF));
+            break;
+        case 3:
+            firstHalf =
+                builder.emitBitAnd(uintType, firstHalf, builder.getIntValue(uintType, 0xFFFFFF));
+            break;
+        default:
+            break;
+        }
         auto restSize = size - firstHalfSize;
         auto secondHalf = extractMultiByteValueAtOffset(
             builder,
@@ -284,7 +301,7 @@ IRInst* extractMultiByteValueAtOffset(
             restSize,
             offset + firstHalfSize);
         uint32_t shift = firstHalfSize * 8;
-        resultValue = builder.emitAdd(
+        resultValue = builder.emitBitOr(
             builder.getUIntType(),
             firstHalf,
             builder.emitShl(
