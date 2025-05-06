@@ -600,9 +600,9 @@ struct InliningPassBase
         return clonedInst;
     }
 
-    // Inline the body of the callee for `callSite`, for a callee that has only
-    // a single basic block.
-    //
+    /// Inline the body of the callee for `callSite`, for a callee that has only
+    /// a single basic block.
+    ///
     void inlineSingleBlockFuncBody(
         CallSiteInfo const& callSite,
         IRCloneEnv* env,
@@ -636,10 +636,7 @@ struct InliningPassBase
             switch (inst->getOp())
             {
             default:
-                // In the common case we just clone the instruction as-is
-                {
-                    _cloneInstWithSourceLoc(callSite, env, builder, inst);
-                }
+                _cloneInstWithSourceLoc(callSite, env, builder, inst);
                 break;
 
             case kIROp_Param:
@@ -658,10 +655,13 @@ struct InliningPassBase
                 break;
 
             case kIROp_DebugInlinedAt:
-                IRDebugInlinedAt* inlinedAt = as<IRDebugInlinedAt>(inst);
-                if (newDebugInlinedAt && (inlinedAt->getOuterInlinedAt() == nullptr))
-                    inlinedAt->setOuterInlinedAt(newDebugInlinedAt);
-                break;
+                {
+                    auto clonedInst = _cloneInstWithSourceLoc(callSite, env, builder, inst);
+                    IRDebugInlinedAt* inlinedAt = as<IRDebugInlinedAt>(clonedInst);
+                    if (newDebugInlinedAt && (inlinedAt->getOuterInlinedAt() == nullptr))
+                        inlinedAt->setOuterInlinedAt(newDebugInlinedAt);
+                    break;
+                }
             }
         }
         // We are going to remove the original `call` now that the callee
