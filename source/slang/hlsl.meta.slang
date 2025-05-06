@@ -25512,29 +25512,117 @@ int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
 
 // Work-graphs
 
-//@public:
-/// read-only input to Broadcasting launch node.
-__generic<T>
-//TODO: DispatchNodeInputRecord should be available only for broadcasting node shader.
-//[require(broadcasting_node)]
-[require(spirv)]
-struct DispatchNodeInputRecord
+///@public
+/// Set of zero or more records for each thread.
+///
+__generic<RecordType, let nodeID : int>
+struct ThreadNodeOutputRecords
 {
-    /// Provide an access to a record object that only holds a single record.
-    NodePayloadPtr<T> Get()
+    NodePayloadArrayPtr<RecordType, nodeID> alloc;
+
+    [ForceInline]
+    [require(hlsl_spirv)] // [require(hlsl_spirv, thread)]
+    __init(int recordCount, int nodeIndex = 0) // , constexpr String nodeStr)
     {
-        int index = 0;
         __target_switch
         {
+        case hlsl: return;
+        case spirv:
+            alloc = spirv_asm
+            {
+                //TODO: `String` doesn't seem to work inside of spirv_asm.
+                //%nodeStr = OpConstantStringAMDX $nodeStr;
+                //OpDecorateId $$__SPIRVNodePayloadArray<BaseType, nodeID> PayloadNodeNameAMDX %nodeStr;
+                result = OpAllocateNodePayloadsAMDX $$NodePayloadArrayPtr<RecordType, nodeID> Workgroup $recordCount $nodeIndex;
+            };
+        }
+    }
+
+    [ForceInline]
+    [require(hlsl_spirv)] // [require(hlsl_spirv, thread)]
+    void OutputComplete()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".OutputComplete";
+        case spirv: spirv_asm { OpEnqueueNodePayloadsAMDX $alloc; };
+        }
+    }
+
+    __subscript(uint index) -> NodePayloadPtr<RecordType>
+    {
+        [ForceInline]
+        get { return Get(index); }
+    }
+
+    [ForceInline]
+    [require(hlsl_spirv)] // [require(hlsl_spirv, thread)]
+    NodePayloadPtr<RecordType> Get(int index = 0)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Get";
         case spirv:
             return spirv_asm
             {
-                %in_payload_t = OpTypeNodePayloadArrayAMDX $$T;
-                %in_payload_ptr_t = OpTypePointer NodePayloadAMDX %in_payload_t;
-                %var = OpVariable %in_payload_ptr_t NodePayloadAMDX;
-                result : $$NodePayloadPtr<T> = OpAccessChain %var $index;
+                result : $$NodePayloadPtr<RecordType> = OpAccessChain $alloc $index
             };
         }
+    }
+};
+
+//@public:
+/// Read-only input to Broadcasting launch node.
+///
+__generic<RecordType, let nodeID : int>
+struct DispatchNodeInputRecord
+{
+    NodePayloadArrayPtr<RecordType, nodeID> payload;
+
+    [ForceInline]
+    [require(hlsl_spirv)] // [require(hlsl_spirv, broadcasting)]
+    __init()
+    {
+        __target_switch
+        {
+        case hlsl: return;
+        case spirv:
+            //TODO: It may be simpler if we add a new __intrinsic_op for OpVariable with NodePayloadAMDX.
+            payload = spirv_asm
+            {
+                // The variable name, "%payload", is required here,
+                // because it needs to be send to OpEntryPoint as an interface.
+                %payload = OpVariable $$NodePayloadArrayPtr<RecordType, nodeID> NodePayloadAMDX;
+                result : $$NodePayloadArrayPtr<RecordType, nodeID> = OpCopyObject %payload;
+            };
+        }
+    }
+
+    /// Provide an access to a record object that only holds a single record.
+    [ForceInline]
+    [require(hlsl_spirv)] // [require(hlsl_spirv, broadcasting)]
+    NodePayloadPtr<RecordType> Get()
+    {
+        int index = 0;
+
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".Get";
+        case spirv:
+            return spirv_asm
+            {
+                result : $$NodePayloadPtr<RecordType> = OpAccessChain $payload $index;
+            };
+        }
+    }
+
+    [ForceInline]
+    uint Count()
+    {
+        return spirv_asm
+        {
+            result: $$uint = OpNodePayloadArrayLengthAMDX $payload;
+        };
     }
 };
 
