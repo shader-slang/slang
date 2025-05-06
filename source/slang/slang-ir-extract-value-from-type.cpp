@@ -190,7 +190,8 @@ IRInst* extractByteAtOffset(
     {
         uintType = builder.getUInt64Type();
     }
-    auto resultValue = builder.emitBitCast(uintType, leaf.leafValue);
+    auto resultValue = builder.emitCast(uintType, leaf.leafValue);
+    resultValue = builder.emitBitCast(uintType, resultValue);
     if (leaf.offsetInValue != 0)
     {
         uint32_t shift = leaf.offsetInValue * 8;
@@ -231,7 +232,8 @@ IRInst* extractMultiByteValueAtOffset(
     {
         // The request value is fully contained in the found leaf element.
         // We can proceed to extract the requested bits from the element.
-        resultValue = builder.emitBitCast(uintType, leaf.leafValue);
+        resultValue = builder.emitCast(uintType, leaf.leafValue);
+        resultValue = builder.emitBitCast(uintType, resultValue);
         uint32_t shift = leaf.offsetInValue * 8;
         if (shift > 0)
             resultValue =
