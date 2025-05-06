@@ -268,6 +268,11 @@ static SlangResult replayExample(UnitTestContext* context, List<entryHashInfo>& 
 {
     List<String> fileNames;
     findRecordFileName(&fileNames);
+    if (fileNames.getCount() == 0)
+    {
+        getTestReporter()->message(TestMessageType::TestFailure, "No record files found\n");
+        return SLANG_FAIL;
+    }
 
     List<String> optArgs;
     String recordFileName = Path::combine("slang-record", fileNames[0]);
@@ -406,7 +411,7 @@ static SlangResult runTest(UnitTestContext* context, const char* testName)
     }
 
 error:
-    res = cleanupRecordFiles();
+    cleanupRecordFiles();
     return res;
 }
 

@@ -635,8 +635,49 @@ export T getDescriptorFromHandle<T>(DescriptorHandle<T> handle) where T : IOpaqu
 }
 ```
 
+Note that the `getDescriptorFromHandle` is not supposed to be called from the user code directly,
+it will be automatically called by the compiler to dereference a `DescriptorHandle<T>` to get `T`.
+Think about providing `getDescriptorFromHandle` as a way to override `operator->` for `DescriptorHandle<T>`. 
+
+The `IOpaqueDescriptor` interface is defined as:
+
+```slang
+interface IOpaqueDescriptor
+{
+    /// The kind of the descriptor.
+    static const DescriptorKind kind;
+    static const DescriptorAccess descriptorAccess;
+}
+```
+
 The user can call `defaultGetDescriptorFromHandle` function from their implementation of
 `getDescriptorFromHandle` to dispatch to the default behavior.
+
+The `kind` and `descriptorAccess` constants allows user code to fetch from different locations
+depending on the type and access of the resource being requested. The `DescriptorKind` and
+`DescriptorAccess` enums are defined as:
+
+```slang
+enum DescriptorKind
+{
+    Unknown, /// Unknown descriptor kind.
+    Texture, /// A texture descriptor.
+    CombinedTextureSampler, /// A combined texture and sampler state descriptor.
+    Buffer, /// A buffer descriptor.
+    Sampler, /// A sampler state descriptor.
+    AccelerationStructure, /// A ray tracing acceleration structure descriptor.
+}
+
+enum DescriptorAccess
+{
+    Unknown = -1,
+    Read = 0,
+    Write = 1,
+    ReadWrite = 2,
+    RasterizerOrdered = 3,
+    Feedback = 4,
+}
+```
 
 By default, the value of a `DescriptorHandle<T>` object is assumed to be dynamically uniform across all
 execution threads. If this is not the case, the user is required to mark the `DescriptorHandle` as `nonuniform`
