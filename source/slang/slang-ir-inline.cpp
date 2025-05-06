@@ -625,11 +625,9 @@ struct InliningPassBase
         // them into the same basic block as the `call`.
         //
         builder->setInsertBefore(call);
-
-        IRInst* outerScope = nullptr;
         if (calleeDebugFunc && newDebugInlinedAt)
         {
-            outerScope = builder->emitDebugScope(calleeDebugFunc, newDebugInlinedAt);
+            builder->emitDebugScope(calleeDebugFunc, newDebugInlinedAt);
         }
 
         // Along the way, we will detect any `return` instruction,

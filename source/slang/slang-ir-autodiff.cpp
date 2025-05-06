@@ -965,7 +965,8 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
         if (as<IRThisType>(primalType) || as<IRAssociatedType>(primalType))
         {
             List<IRInterfaceType*> constraintTypes;
-            constraintTypes.add(this->commonDiffPairInterface);
+            auto diffPairInterfaceType = cast<IRInterfaceType>(getOrCreateCommonDiffPairInterface(builder));
+            constraintTypes.add(diffPairInterfaceType);
             return builder->getAssociatedType(constraintTypes.getArrayView());
         }
 
