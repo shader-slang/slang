@@ -184,6 +184,8 @@ IntegerLiteralValue getIntegerLiteralValue(
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
     UnownedStringSlice* outSuffix = 0);
+
+IntegerLiteralValue getCharLiteralValue(Token const& token);
 } // namespace Slang
 
 #endif
