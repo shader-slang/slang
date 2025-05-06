@@ -15,7 +15,13 @@ RWTexture2D<float> rwt2D;
 //TEST_INPUT: RWTexture3D(format=R32Float, size=4, content = one, mipMaps = 1):name rwt3D
 RWTexture3D<float> rwt3D;
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
+// Add float2 and float4 RWTexture2D tests
+//TEST_INPUT: RWTexture2D(format=RG32Float, size=4, content = one, mipMaps = 1):name rwt2D_float2
+RWTexture2D<float2> rwt2D_float2;
+//TEST_INPUT: RWTexture2D(format=RGBA32Float, size=4, content = one, mipMaps = 1):name rwt2D_float4
+RWTexture2D<float4> rwt2D_float4;
+
+//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(4, 1, 1)]
@@ -25,6 +31,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     
     float val = 0.0f;
  
+    // Original float texture operations
     val += rwt1D[idx];
     val += rwt2D[uint2(idx, idx)];
     val += rwt3D[uint3(idx, idx, idx)];
@@ -36,6 +43,25 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     val += rwt1D[idx];
     val += rwt2D[uint2(idx, idx)];
     val += rwt3D[uint3(idx, idx, idx)];
- 
+    
+    // Original output
     outputBuffer[idx] = val;
+    
+    // float2 texture operations
+    float2 val2 = rwt2D_float2[uint2(idx, idx)];
+    rwt2D_float2[uint2(idx, idx)] = float2(idx + 0.5, idx + 0.25);
+    val2 = rwt2D_float2[uint2(idx, idx)];
+    
+    // Store float2 results (x and y components)
+    outputBuffer[idx + 4] = val2.x;  // should be idx + 0.5
+    outputBuffer[idx + 8] = val2.y;  // should be idx + 0.25
+    
+    // float4 texture operations
+    float4 val4 = rwt2D_float4[uint2(idx, idx)];
+    rwt2D_float4[uint2(idx, idx)] = float4(idx + 0.1, idx + 0.2, idx + 0.3, idx + 0.4);
+    val4 = rwt2D_float4[uint2(idx, idx)];
+    
+    // Store float4 results (x and w components)
+    outputBuffer[idx + 4] = val2.x;  // should be idx + 0.5
+    outputBuffer[idx + 8] = val2.y;  // should be idx + 0.25
 }
