@@ -28,7 +28,7 @@ extern "C"
 
 extern "C"
 {
-    __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\";
+    __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\";
 }
 #endif
 
@@ -188,6 +188,9 @@ SlangResult innerMain(
 
 } // namespace SlangCTool
 
+// SlangITool
+#include "../slang-test/slangi-tool-impl.h"
+
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!! TestServer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
 SlangResult TestServer::init(int argc, const char* const* argv)
@@ -307,6 +310,10 @@ TestServer::InnerMainFunc TestServer::getToolFunction(const String& name, Diagno
     if (name == "slangc")
     {
         return &SlangCTool::innerMain;
+    }
+    else if (name == "slangi")
+    {
+        return &SlangITool::innerMain;
     }
 
     StringBuilder sharedLibToolBuilder;

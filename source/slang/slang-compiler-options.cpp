@@ -155,6 +155,7 @@ void CompilerOptionSet::writeCommandLineArgs(Session* globalSession, StringBuild
         case CompilerOptionName::DisableDynamicDispatch:
         case CompilerOptionName::DisableSpecialization:
         case CompilerOptionName::DumpIntermediates:
+        case CompilerOptionName::SkipSPIRVValidation:
             if (option.value.getCount() && option.value[0].intValue != 0)
                 sb << " " << name;
             break;

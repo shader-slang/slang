@@ -354,7 +354,22 @@ function(slang_add_target dir type)
                     COMMAND
                         ${CMAKE_OBJCOPY} --only-keep-debug
                         $<TARGET_FILE:${target}> $<TARGET_FILE:${target}>.dwarf
-                    COMMAND chmod 644 $<TARGET_FILE:${target}>.dwarf
+                    WORKING_DIRECTORY ${output_dir}
+                    VERBATIM
+                )
+                # We may be building for Android on a Windows host, where chmod isn't available or needed.
+                if(NOT CMAKE_HOST_WIN32)
+                    add_custom_command(
+                        TARGET ${target}
+                        POST_BUILD
+                        COMMAND chmod 644 $<TARGET_FILE:${target}>.dwarf
+                        WORKING_DIRECTORY ${output_dir}
+                        VERBATIM
+                    )
+                endif()
+                add_custom_command(
+                    TARGET ${target}
+                    POST_BUILD
                     COMMAND
                         ${CMAKE_STRIP} --strip-debug $<TARGET_FILE:${target}>
                     COMMAND

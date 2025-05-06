@@ -179,6 +179,7 @@ public:
             _sink.diagnose(SourceLoc(), fiddle::Diagnostics::internalError);
             return nullptr;
         }
+        return nullptr;
     }
 
     RefPtr<Expr> parseCppExpr()

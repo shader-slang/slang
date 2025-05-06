@@ -2767,6 +2767,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             param->getDataType(),
             storageClass);
         maybeEmitPointerDecoration(varInst, param);
+        maybeEmitWriteOnlyImageDecoration(varInst, param);
         if (layout)
             emitVarLayout(param, varInst, layout);
         emitDecorations(param, getID(varInst));
@@ -5684,6 +5685,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     void maybeEmitPointerDecoration(SpvInst* varInst, IRInst* inst)
     {
         maybeEmitPointerDecoration(varInst, inst->getDataType(), as<IRVar>(inst), inst->getOp());
+    }
+
+    void maybeEmitWriteOnlyImageDecoration(SpvInst* varInst, IRInst* inst)
+    {
+        auto ptrType = as<IRPtrTypeBase>(inst->getDataType());
+        if (!ptrType)
+            return;
+        auto textureType = as<IRTextureType>(ptrType->getValueType());
+        if (!textureType)
+            return;
+
+        if (textureType->getAccess() == SLANG_RESOURCE_ACCESS_WRITE)
+        {
+            emitOpDecorate(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                getID(varInst),
+                SpvDecorationNonReadable);
+        }
     }
 
     SpvInst* emitParam(SpvInstParent* parent, IRInst* inst)

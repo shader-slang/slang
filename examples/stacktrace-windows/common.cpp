@@ -163,7 +163,7 @@ int exceptionFilter(FILE* logFile, _EXCEPTION_POINTERS* exception)
     FILE* file = logFile ? logFile : stdout;
     fprintf(
         file,
-        "error: Exception 0x%x occurred. Stack trace:\n",
+        "error: Exception 0x%lx occurred. Stack trace:\n",
         exception->ExceptionRecord->ExceptionCode);
 
     HANDLE process = GetCurrentProcess();

@@ -71,9 +71,7 @@ public:
         ASTEmitScope scope = getCurrentScope();
         auto scopeDecl = m_builder->create<ScopeDecl>();
         auto newScope = m_builder->create<Scope>();
-        scopeDecl->parentDecl = scope.m_parent;
-        if (scope.m_parent)
-            scope.m_parent->members.add(scopeDecl);
+        ContainerDecl::setParent(scope.m_parent, scopeDecl);
         newScope->parent = scope.m_scope;
         newScope->containerDecl = scopeDecl;
         scope.m_scope = newScope;
@@ -115,10 +113,12 @@ public:
 
     Expr* emitPostfixExpr(UnownedStringSlice operatorToken, Expr* base);
 
+    Expr* emitThisExpr();
     Expr* emitVarExpr(Name* name);
-    Expr* emitVarExpr(VarDecl* var);
-    Expr* emitVarExpr(VarDecl* var, Type* type);
+    Expr* emitVarExpr(VarDeclBase* var);
+    Expr* emitVarExpr(VarDeclBase* var, Type* type);
     Expr* emitVarExpr(DeclStmt* varStmt, Type* type);
+    Expr* emitStaticTypeExpr(Type* type);
 
     Expr* emitIntConst(int value);
 
@@ -136,6 +136,7 @@ public:
     }
 
     Expr* emitInvokeExpr(Expr* callee, List<Expr*>&& args);
+    Expr* emitCtorInvokeExpr(Expr* callee, List<Expr*>&& args);
 
     Expr* emitGenericAppExpr(Expr* genericExpr, List<Expr*>&& args);
 

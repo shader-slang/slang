@@ -155,6 +155,13 @@ struct AnyValueMarshallingContext
         case kIROp_PtrType:
             context->marshalBasicType(builder, dataType, concreteTypedVar);
             break;
+        case kIROp_EnumType:
+            {
+                auto enumType = static_cast<IREnumType*>(dataType);
+                auto tagType = enumType->getTagType();
+                context->marshalBasicType(builder, tagType, concreteTypedVar);
+                break;
+            }
         case kIROp_VectorType:
             {
                 auto vectorType = static_cast<IRVectorType*>(dataType);
@@ -868,6 +875,12 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
     case kIROp_UInt8Type:
     case kIROp_Int8Type:
         return offset + 1;
+    case kIROp_EnumType:
+        {
+            auto enumType = static_cast<IREnumType*>(type);
+            auto tagType = enumType->getTagType();
+            return _getAnyValueSizeRaw(tagType, offset);
+        }
     case kIROp_VectorType:
         {
             auto vectorType = static_cast<IRVectorType*>(type);

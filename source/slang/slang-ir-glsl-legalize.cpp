@@ -2810,6 +2810,16 @@ static void legalizeMeshOutputParam(
                     builder->setInsertAfter(c);
                     assign(builder, d, ScalarizedVal::value(builder->emitLoad(tmp)));
                 }
+                else if (const auto load = as<IRLoad>(s))
+                {
+                    // Handles the case where a `this` points to a IRMeshOutputRef.
+                    auto t = as<IRPtrType>(load->getPtr()->getDataType())->getValueType();
+                    auto tmp = builder->emitVar(t);
+                    assign(builder, ScalarizedVal::address(tmp), d);
+
+                    s->replaceUsesWith(builder->emitLoad(tmp));
+                    s->removeAndDeallocate();
+                }
                 else if (const auto swiz = as<IRSwizzledStore>(s))
                 {
                     SLANG_UNEXPECTED("Swizzled store to a non-address ScalarizedVal");
