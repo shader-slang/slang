@@ -372,6 +372,8 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
         outKeys.add(resultKey);
     }
 
+    bool hasOutParams = false;
+
     // Process all parameters
     for (auto param = func->getFirstParam(); param; param = param->getNextParam())
     {
@@ -412,18 +414,12 @@ IRFunc* lowerOutParameters(IRFunc* func, DiagnosticSink* sink, bool alwaysUseRet
             info.isInOut = false;
         }
 
-        paramInfos.add(info);
-    }
-
-    // Check if we have any out parameters to process
-    bool hasOutParams = false;
-    for (auto& info : paramInfos)
-    {
         if (info.isOut && !info.isInOut)
         {
             hasOutParams = true;
-            break;
         }
+
+        paramInfos.add(info);
     }
 
     if (!hasOutParams && !alwaysUseReturnStruct)
