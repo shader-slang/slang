@@ -321,10 +321,7 @@ struct InliningPassBase
     // 4. Emits an `IRDebugInlinedAt` instruction with outer set to callDebugInlinedAt.
     // 5. Inserts the newly created `IRDebugInlinedAt` instruction immediately *before* the `call`
     // instruction.
-    DebugInlineInfo emitCalleeDebugInlinedAt(
-        IRCall* call,
-        IRFunc* callee,
-        IRBuilder& builder)
+    DebugInlineInfo emitCalleeDebugInlinedAt(IRCall* call, IRFunc* callee, IRBuilder& builder)
     {
         IRDebugLine* lastDebugLine = nullptr;
         IRInst* newDebugInlinedAt = nullptr;
@@ -338,12 +335,12 @@ struct InliningPassBase
         else
         {
             // Check if the call inst is part of an existing scope. If yes, then we restore
-            // that scope after the inlining of callee. This case can occur when we have out of order
-            // inlining. See forceinline-basic-block-inline-order.slang test for that use case.
-            // If we are travesing back the call inst and if we find a DebugNoScope, it means that
-            // there's another function that was inlined. We don't want that scope. If the call inst
-            // truly belongs to another DebugScope, then we should hit a DebugScope inst *before* we
-            // see a DebugNoScope
+            // that scope after the inlining of callee. This case can occur when we have out of
+            // order inlining. See forceinline-basic-block-inline-order.slang test for that use
+            // case. If we are travesing back the call inst and if we find a DebugNoScope, it means
+            // that there's another function that was inlined. We don't want that scope. If the call
+            // inst truly belongs to another DebugScope, then we should hit a DebugScope inst
+            // *before* we see a DebugNoScope
             IRDebugScope* callDebugScope{};
             for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
             {
@@ -640,10 +637,10 @@ struct InliningPassBase
             {
             default:
                 // In the common case we just clone the instruction as-is
-            {
-                _cloneInstWithSourceLoc(callSite, env, builder, inst);
-            }
-            break;
+                {
+                    _cloneInstWithSourceLoc(callSite, env, builder, inst);
+                }
+                break;
 
             case kIROp_Param:
                 // Parameters of the first block are the parameters of
