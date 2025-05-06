@@ -8021,7 +8021,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             debugLoc->getLine());
 
         registerDebugInst(function, debugFunc);
-        registerInst(irDebugFunc, debugFunc);
+        if (!m_mapIRInstToSpvInst.tryGetValue(irDebugFunc, debugFunc))
+        {
+            registerInst(irDebugFunc, debugFunc);
+        }
 
         emitOpDebugFunctionDefinition(
             firstBlock,
