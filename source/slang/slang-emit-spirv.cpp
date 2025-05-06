@@ -6526,12 +6526,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             kResultID,
             inst->getOperand(0),
             SpvLiteralInteger::from32(0));
-        auto elementType = as<IRPtrType>(inst->getOperand(0)->getDataType())->getValueType();
-        IRIntegerValue stride = 0;
-        if (auto sizeDecor = elementType->findDecoration<IRSizeAndAlignmentDecoration>())
-        {
-            stride = align(sizeDecor->getSize(), (int)sizeDecor->getAlignment());
-        }
+
+        // The buffer is a global parameter, so it's a pointer
+        auto bufPtrType = cast<IRPtrTypeBase>(inst->getOperand(0)->getDataType());
+        // It's lowered to a struct type..
+        auto bufType = cast<IRStructType>(bufPtrType->getValueType());
+        // containing an unsized array, specifically one with an explicit
+        // stride, which is not expressible in spirv_asm blocks
+        auto arrayType = cast<IRArrayTypeBase>(bufType->getFields().getFirst()->getFieldType());
+
+        // The element type should have a `SizeAndAlignment` decoration created during lowering.
+        auto sizeDecor =
+            arrayType->getElementType()->findDecoration<IRSizeAndAlignmentDecoration>();
+        SLANG_ASSERT(sizeDecor);
+        const auto stride = align(sizeDecor->getSize(), (int)sizeDecor->getAlignment());
+
         auto strideOperand = emitIntConstant(stride, builder.getUIntType());
         auto result =
             emitOpCompositeConstruct(parent, inst, inst->getDataType(), arrayLength, strideOperand);
