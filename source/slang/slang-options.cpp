@@ -2424,7 +2424,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             {
                 CommandLineArg name;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(name));
-                // TODO: doagnose deprecated option
+                // TODO: warn that this option is deprecated
                 break;
             }
         case OptionKind::EmbedDownstreamIR:
@@ -3615,6 +3615,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     case CodeGenTarget::MetalLibAssembly:
                     case CodeGenTarget::Metal:
                     case CodeGenTarget::WGSL:
+                    case CodeGenTarget::HostVM:
                         rawOutput.isWholeProgram = true;
                         break;
                     case CodeGenTarget::SPIRV:

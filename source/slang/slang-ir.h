@@ -2059,6 +2059,14 @@ struct IROptionalType : IRType
     IRType* getValueType() { return (IRType*)getOperand(0); }
 };
 
+/// Represents an enum type
+struct IREnumType : IRType
+{
+    IR_LEAF_ISA(EnumType)
+
+    IRType* getTagType() { return (IRType*)getOperand(0); }
+};
+
 struct IRTypeType : IRType
 {
     IR_LEAF_ISA(TypeType);

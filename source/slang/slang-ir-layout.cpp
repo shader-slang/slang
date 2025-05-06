@@ -159,6 +159,12 @@ static Result _calcSizeAndAlignment(
                 // subsequent offsets
                 SLANG_ASSERT(!seenFinalUnsizedArrayField);
 
+                if (auto offsetDecor =
+                        field->getKey()->findDecoration<IRVkStructOffsetDecoration>())
+                {
+                    offset = offsetDecor->getOffset()->getValue();
+                }
+
                 IRSizeAndAlignment fieldTypeLayout;
                 SLANG_RETURN_ON_FAIL(
                     getSizeAndAlignment(optionSet, rules, field->getFieldType(), &fieldTypeLayout));
@@ -371,6 +377,13 @@ static Result _calcSizeAndAlignment(
                 attributedType->getBaseType(),
                 outSizeAndAlignment);
         }
+    case kIROp_EnumType:
+        {
+            auto enumType = cast<IREnumType>(type);
+            auto tagType = enumType->getTagType();
+            return _calcSizeAndAlignment(optionSet, rules, tagType, outSizeAndAlignment);
+        }
+        break;
     default:
         break;
     }

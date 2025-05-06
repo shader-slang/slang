@@ -5,7 +5,7 @@
 
 // Test atomics on a RWTexture2D<float>.
 
-//TEST_INPUT: set t = RWTexture2D(format=R32_FLOAT, size=4, content = zero, mipMaps = 1)
+//TEST_INPUT: set t = RWTexture2D(format=R32Float, size=4, content = zero, mipMaps = 1)
 [format("r32f")]
 globallycoherent RWTexture2D<float> t;
 

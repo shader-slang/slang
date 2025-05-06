@@ -234,6 +234,26 @@ void GLSLSourceEmitter::emitMemoryQualifiers(IRInst* varDecl)
     _emitMemoryQualifierDecorations(varDecl);
 }
 
+
+void GLSLSourceEmitter::emitStructFieldAttributes(
+    IRStructType* structType,
+    IRStructField* field,
+    bool allowOffsetLayout)
+{
+    SLANG_UNUSED(structType);
+    auto structKey = field->getKey();
+
+    if (allowOffsetLayout)
+    {
+        if (auto offsetDecoration = structKey->findDecoration<IRVkStructOffsetDecoration>())
+        {
+            m_writer->emit("layout(offset = ");
+            m_writer->emit(offsetDecoration->getOffset()->getValue());
+            m_writer->emit(") ");
+        }
+    }
+}
+
 void GLSLSourceEmitter::_emitGLSLStructuredBuffer(
     IRGlobalParam* varDecl,
     IRHLSLStructuredBufferTypeBase* structuredBufferType)
@@ -1817,8 +1837,9 @@ bool GLSLSourceEmitter::tryEmitGlobalParamImpl(IRGlobalParam* varDecl, IRType* v
 
 void GLSLSourceEmitter::emitImageFormatModifierImpl(IRInst* varDecl, IRType* varType)
 {
-    // As a special case, if we are emitting a GLSL declaration
-    // for an HLSL `RWTexture*` then we need to emit a `format` layout qualifier.
+    // Special cases when emitting a GLSL declaration for HLSL/Slang `RWTexture* and `WTexture*`:
+    // - Emit a `format` layout qualifier.
+    // - Emit `writeonly` memory qualifier for `WTexture*`.
 
     if (auto resourceType = as<IRTextureType>(unwrapArray(varType)))
     {
@@ -1834,6 +1855,11 @@ void GLSLSourceEmitter::emitImageFormatModifierImpl(IRInst* varDecl, IRType* var
 
         default:
             break;
+        }
+
+        if (resourceType->getAccess() == SLANG_RESOURCE_ACCESS_WRITE)
+        {
+            m_writer->emit("writeonly\n");
         }
     }
 }

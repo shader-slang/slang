@@ -3610,7 +3610,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
 //@public:
     [__readNone]
     [ForceInline]
-    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
     T Load(vector<int, Shape.dimensions+isArray+1> location)
     {
         __target_switch
@@ -3618,6 +3618,34 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
         case cpp:
         case hlsl:
             __intrinsic_asm ".Load";
+		case cuda:
+            if (isArray != 0)
+                {
+     				static_assert(Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_3D),
+                              "Integer coordinates are supported for texture reads only for 2D and 3D textures and 2D array textures.");
+
+                    if (Shape.flavor == $(SLANG_TEXTURE_2D))
+                    {
+						__intrinsic_asm "tex2DArrayfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
+				    }
+                    else
+					{
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
+                else
+                {
+                    switch(Shape.flavor)
+                    {
+                    case $(SLANG_TEXTURE_2D):
+                        __intrinsic_asm "tex2Dfetch_int<$T0>($0, ($1).x, ($1).y)";
+                    case $(SLANG_TEXTURE_3D):
+                        __intrinsic_asm "tex3Dfetch_int<$T0>($0, ($1).x, ($1).y, ($1).z)";
+					case $(SLANG_TEXTURE_CUBE):
+                    default:
+                        __intrinsic_asm "<invalid intrinsic>";
+                    }
+                }
         case metal:
             switch (Shape.flavor)
             {
@@ -3824,7 +3852,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
     {
         [__readNone]
         [ForceInline]
-        [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
+        [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1_samplerless)]
         get
         {
             __target_switch
@@ -3833,6 +3861,7 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
                 case hlsl:
                     __intrinsic_asm ".operator[]";
                 case metal:
+                case cuda:
                     return Load(__makeVector(location, 0));
                 case glsl:
                     if (isCombined == 0)
@@ -8018,6 +8047,16 @@ vector<T,N> cospi(vector<T,N> x)
     }
 }
 
+// emulate 64-bit countbits when not natively supported.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+internal uint __emulatedCountbits64(uint64_t value)
+{
+    uint2 value_uint2 = bit_cast<uint2>(value);
+    uint2 counted_bits_uint2 = countbits(value_uint2);
+    return counted_bits_uint2.x + counted_bits_uint2.y;
+}
 
 /// Population count.
 /// Counts the number of set bits in the binary representation of a value.
@@ -8028,32 +8067,84 @@ vector<T,N> cospi(vector<T,N> x)
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-uint countbits(uint value)
+__generic<T : __BuiltinIntegerType>
+uint countbits(T value)
 {
+    // Emulate 8-bit support
+    // 8-bit support is not currently supported anywhere natively
+    if (T is int8_t || T  is uint8_t)
+    {
+        return countbits(__intCast<uint32_t>(value));
+    }
+
     __target_switch
     {
     case hlsl:
+        // 64-bit support dependent on SM6.0 and dxil
+        // 16-bit support dependent on SM6.2 and dxil
         __intrinsic_asm "countbits";
     case glsl:
+        // 64-bit support dependent on GL_ARB_gpu_shader_int64
+        // 16-bit support dependent on GL_EXT_shader_16bit_storage
         __intrinsic_asm "bitCount";
     case metal:
-        __intrinsic_asm "popcount";
+        if (T is int64_t || T  is uint64_t)
+        {
+            return __emulatedCountbits64(__intCast<uint64_t>(value));
+        }
+        else if (T is int16_t || T  is uint16_t)
+        {
+            // emulate 16-bit
+            return countbits(__intCast<uint32_t>(value));
+        }
+        else
+        {
+            __intrinsic_asm "popcount";
+        }
     case cuda:
     case cpp:
         __intrinsic_asm "$P_countbits($0)";
     case spirv:
-        return spirv_asm {OpBitCount $$uint result $value};
+        if(T is int64_t || T  is uint64_t)
+        {
+            return __emulatedCountbits64(__intCast<uint64_t>(value));
+        }
+        else if (T is int16_t || T  is uint16_t)
+        {
+            // emulate 16-bit
+            return countbits(__intCast<uint32_t>(value));
+        }
+        else
+        {
+            // OpBitCount only supports 32-bit
+            return spirv_asm {OpBitCount $$uint result $value};
+        }
     case wgsl:
-        __intrinsic_asm "countOneBits";
+            // wgsl only supports 32-bit integers
+            if (T is int32_t)
+            {
+                // wgsl countOneBits returns the same type as the
+                // one it was given. Cast signed ints to unsigned
+                // so we can provide the correct return value.
+                return countbits(__intCast<uint32_t>(value));
+            }
+            __intrinsic_asm "countOneBits";
     }
 }
 
-__generic <let N : int>
+__generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-vector<uint, N> countbits(vector<uint, N> value)
+vector<uint, N> countbits(vector<T, N> value)
 {
+    // Emulate 8-bit support
+    // 8-bit support is not currently supported anywhere natively
+    if (T is int8_t || T  is uint8_t)
+    {
+        VECTOR_MAP_UNARY(uint, N, countbits, value);
+    }
+
     __target_switch
     {
     case hlsl:
@@ -8061,11 +8152,37 @@ vector<uint, N> countbits(vector<uint, N> value)
     case glsl:
         __intrinsic_asm "bitCount";
     case metal:
-        __intrinsic_asm "popcount";
+        if(T is int64_t || T  is uint64_t || T is int16_t || T  is uint16_t)
+        {
+            // Emulate 64-bit and 16-bit
+            VECTOR_MAP_UNARY(uint, N, countbits, value);
+        }
+        else
+        {
+            __intrinsic_asm "popcount";
+        }
     case spirv:
-        return spirv_asm {OpBitCount $$vector<uint, N> result $value};
+        if(T is int64_t || T  is uint64_t || T is int16_t || T  is uint16_t)
+        {
+            // Emulate 64-bit and 16-bit
+            VECTOR_MAP_UNARY(uint, N, countbits, value);
+        }
+        else
+        {
+            return spirv_asm {OpBitCount $$vector<uint, N> result $value};
+        }
     case wgsl:
-        __intrinsic_asm "countOneBits";
+        // wgsl only supports 32-bit integers
+        if (T is int32_t)
+        {
+            vector<uint32_t, N> ret;
+            for (int i = 0; i < N; i++)
+            {
+                ret[i] = countbits(__intCast<uint32_t>(value[i]));
+            }
+            return ret;
+        }
+            __intrinsic_asm "countOneBits";
     default:
         VECTOR_MAP_UNARY(uint, N, countbits, value);
     }
@@ -9871,6 +9988,130 @@ matrix<T, N, M> fwidth(matrix<T, N, M> x)
         __intrinsic_asm "fwidth($0)";
     default:
         MATRIX_MAP_UNARY(T, N, M, fwidth, x);
+    }
+}
+
+/// Texture filter width (coarse).
+/// Calculates the sum abs(ddx_coarse(`p`)) + abs(ddy_coarse(`p`)).
+/// @param p The value to sum x and y partial derivative magnitudes for.
+/// @return The sum of abs(ddx_coarse(`p`)) and abs(ddy_coarse(`p`)).
+/// @remarks For SPIR-V, this function maps to `OpFwidthCoarse`.
+/// @category derivative
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+T fwidth_coarse(T p)
+{
+    __requireComputeDerivative();
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "abs(ddx_coarse($0)) + abs(ddy_coarse($0))";
+    case glsl:
+        __intrinsic_asm "fwidthCoarse($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability DerivativeControl;
+            OpFwidthCoarse $$T result $p;
+        };
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+vector<T, N> fwidth_coarse(vector<T, N> x)
+{
+    __requireComputeDerivative();
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "abs(ddx_coarse($0)) + abs(ddy_coarse($0))";
+    case glsl:
+        __intrinsic_asm "fwidthCoarse($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability DerivativeControl;
+            OpFwidthCoarse $$vector<T, N> result $x;
+        };
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
+matrix<T, N, M> fwidth_coarse(matrix<T, N, M> x)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "abs(ddx_coarse($0)) + abs(ddy_coarse($0))";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, fwidth_coarse, x);
+    }
+}
+
+/// Texture filter width (fine).
+/// Calculates the sum abs(ddx_fine(`p`)) + abs(ddy_fine(`p`)).
+/// @param p The value to sum x and y partial derivative magnitudes for.
+/// @return The sum of abs(ddx_fine(`p`)) and abs(ddy_fine(`p`)).
+/// @remarks For SPIR-V, this function maps to `OpFwidthFine`.
+/// @category derivative
+__generic<T : __BuiltinFloatingPointType>
+[__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+T fwidth_fine(T p)
+{
+    __requireComputeDerivative();
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "abs(ddx_fine($0)) + abs(ddy_fine($0))";
+    case glsl:
+        __intrinsic_asm "fwidthFine($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability DerivativeControl;
+            OpFwidthFine $$T result $p;
+        };
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int>
+[__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing_derivativecontrol)]
+vector<T, N> fwidth_fine(vector<T, N> x)
+{
+    __requireComputeDerivative();
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "abs(ddx_fine($0)) + abs(ddy_fine($0))";
+    case glsl:
+        __intrinsic_asm "fwidthFine($0)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability DerivativeControl;
+            OpFwidthFine $$vector<T, N> result $x;
+        };
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(glsl_hlsl_spirv, fragmentprocessing)]
+matrix<T, N, M> fwidth_fine(matrix<T, N, M> x)
+{
+    __target_switch
+    {
+    case hlsl:
+        __intrinsic_asm "abs(ddx_fine($0)) + abs(ddy_fine($0))";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, fwidth_fine, x);
     }
 }
 
@@ -12118,6 +12359,7 @@ vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 /// }
 /// ```
 [require(cpp_cuda_glsl_hlsl_spirv, printf)]
+[require(slangvm)]
 __intrinsic_op($(kIROp_Printf))
 void printf<each T>(NativeString format, expand each T args);
 
@@ -16331,6 +16573,155 @@ bool IsHelperLane()
     }
 }
 
+//@hidden:
+
+__generic<T : __BuiltinType>
+[ForceInline]
+[require(glsl)]
+void __requireGLSLShaderSubgroupTypeExtension()
+{
+    // the following is a seperate function call, since else the `__requireTargetExtension` and associated __intrinsic_asm is ignored if the calling function also calls an __intrinsic_asm
+    if (__type_equals<T, half>()
+        || __type_equals<T, float16_t>()
+        ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
+    else if (__type_equals<T, uint8_t>()
+        || __type_equals<T, int8_t>()
+        ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_int8");
+    else if (__type_equals<T, uint16_t>()
+        || __type_equals<T, int16_t>()
+        ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_int16");
+    else if (__type_equals<T, uint64_t>()
+        || __type_equals<T, int64_t>()
+        ) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_int64");
+
+    __intrinsic_asm "";
+}
+
+__generic<T : __BuiltinType>
+[ForceInline]
+[require(metal)]
+void __checkMetalShaderSubgroupType()
+{
+    // These builtin types are not supported for Metal's `simd` operations.
+    if (__type_equals<T, uint8_t>()
+        || __type_equals<T, int8_t>()
+        || __type_equals<T, uint64_t>()
+        || __type_equals<T, int64_t>()
+        || __isBool<T>()
+        )
+    {
+        static_assert(false, "Unsupported type for subgroup operations in Metal. Valid types include scalars and vectors of uint/uint32_t, int/int32_t, uint16_t, int16_t, float, and half.");
+    }
+}
+
+__generic<T : __BuiltinType>
+void shader_subgroup_preamble()
+{
+    // checks needed for shader_subgroup functions; __requireTargetExtension does not work
+    // (does not add the ext specified correctly to the compile output; using extended type
+    // will result in error for using the type)
+    __target_switch
+    {
+    case glsl:
+        __requireGLSLShaderSubgroupTypeExtension<T>();
+    case metal:
+        __checkMetalShaderSubgroupType<T>();
+    default:
+        return;
+    }
+}
+
+//@public:
+
+//
+// Wave Rotate intrinsics.
+// These are Slang specific intrinsics to rotate values within a subgroup.
+//
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_rotate)
+[require(glsl_metal_spirv, subgroup_rotate)]
+T WaveRotate(T value, uint delta)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupRotate";
+    case metal:
+        __intrinsic_asm "simd_shuffle_rotate_down";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_KHR_subgroup_rotate";
+            OpCapability GroupNonUniformRotateKHR;
+            result:$$T = OpGroupNonUniformRotateKHR Subgroup $value $delta;
+        };
+    }
+}
+
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_rotate)
+[require(glsl_metal_spirv, subgroup_rotate)]
+vector<T, N> WaveRotate(vector<T, N> value, uint delta)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupRotate";
+    case metal:
+        __intrinsic_asm "simd_shuffle_rotate_down";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_KHR_subgroup_rotate";
+            OpCapability GroupNonUniformRotateKHR;
+            result:$$vector<T,N> = OpGroupNonUniformRotateKHR Subgroup $value $delta;
+        };
+    }
+}
+
+__generic<T : __BuiltinType>
+__glsl_extension(GL_KHR_shader_subgroup_rotate)
+[require(glsl_spirv, subgroup_rotate)]
+T WaveClusteredRotate(T value, uint delta, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredRotate";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_KHR_subgroup_rotate";
+            OpCapability GroupNonUniformRotateKHR;
+            result:$$T = OpGroupNonUniformRotateKHR Subgroup $value $delta $clusterSize;
+        };
+    }
+}
+
+__generic<T : __BuiltinType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_rotate)
+[require(glsl_spirv, subgroup_rotate)]
+vector<T, N> WaveClusteredRotate(vector<T, N> value, uint delta, constexpr uint clusterSize)
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupClusteredRotate";
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_KHR_subgroup_rotate";
+            OpCapability GroupNonUniformRotateKHR;
+            result:$$vector<T,N> = OpGroupNonUniformRotateKHR Subgroup $value $delta $clusterSize;
+        };
+    }
+}
+
 //
 // Quad Control intrinsics
 //
@@ -16345,6 +16736,7 @@ bool IsHelperLane()
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
+__spirv_version(1.3)
 [ForceInline]
 [require(glsl_hlsl_metal_spirv, quad_control)]
 bool QuadAny(bool expr)
@@ -16369,6 +16761,7 @@ bool QuadAny(bool expr)
 __glsl_extension(GL_KHR_shader_subgroup_vote)
 __glsl_extension(GL_EXT_maximal_reconvergence)
 __glsl_extension(GL_EXT_shader_quad_control)
+__spirv_version(1.3)
 [ForceInline]
 [require(glsl_hlsl_metal_spirv, quad_control)]
 bool QuadAll(bool expr)
@@ -21748,6 +22141,16 @@ enum DescriptorKind
     AccelerationStructure, /// A ray tracing acceleration structure descriptor.
 }
 
+enum DescriptorAccess
+{
+    Unknown = -1,
+    Read = $(kCoreModule_ResourceAccessReadOnly),
+    Write = $(kCoreModule_ResourceAccessWriteOnly),
+    ReadWrite = $(kCoreModule_ResourceAccessReadWrite),
+    RasterizerOrdered = $(kCoreModule_ResourceAccessRasterizerOrdered),
+    Feedback = $(kCoreModule_ResourceAccessFeedback),
+}
+
 /// Represents an opaque descriptor type, such as textures, samplers, and buffers etc,
 /// whose size may be undefined and can't be directly accessed as ordinary data.
 [sealed]
@@ -21756,6 +22159,7 @@ interface IOpaqueDescriptor
 {
     /// The kind of the descriptor.
     static const DescriptorKind kind;
+    static const DescriptorAccess descriptorAccess;
 }
 
 __magic_type(DynamicResourceType)
@@ -21787,7 +22191,8 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
 
     typealias Handle = DescriptorHandle<This>;
 
-    static const DescriptorKind kind = isCombined!=0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture;
+    static const DescriptorKind kind = isCombined != 0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture;
+    static const DescriptorAccess descriptorAccess = (DescriptorAccess)access;
 
     __implicit_conversion($(kConversionCost_ImplicitDereference))
     [ForceInline]
@@ -21803,28 +22208,30 @@ struct DynamicResourceTypeInfo
     const char* name;
     const char* kind;
     const char* dynamicKind;
+    const char* access;
 };
 
 const DynamicResourceTypeInfo kDynamicResourceCastableTypes[] = {
-    {"StructuredBuffer<T, L>", "Buffer", "General"},
-    {"RWStructuredBuffer<T, L>", "Buffer", "General"},
-    {"AppendStructuredBuffer<T, L>", "Buffer", "General"},
-    {"ConsumeStructuredBuffer<T, L>", "Buffer", "General"},
-    {"RasterizerOrderedStructuredBuffer<T, L>", "Buffer", "General"},
-    {"ByteAddressBuffer", "Buffer", "General"},
-    {"RWByteAddressBuffer", "Buffer", "General"},
-    {"RasterizerOrderedByteAddressBuffer", "Buffer", "General"},
-    {"SamplerState", "Sampler", "Sampler"},
-    {"SamplerComparisonState", "Sampler", "Sampler"},
-    {"ConstantBuffer<T, L>", "Buffer", "General"},
-    {"TextureBuffer<T>", "Buffer", "General"},
-    {"RaytracingAccelerationStructure", "AccelerationStructure", "General"},
+    { "StructuredBuffer<T, L>", "Buffer", "General", "Read" },
+    { "RWStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
+    { "AppendStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
+    { "ConsumeStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
+    { "RasterizerOrderedStructuredBuffer<T, L>", "Buffer", "General", "ReadWrite" },
+    { "ByteAddressBuffer", "Buffer", "General", "Read" },
+    { "RWByteAddressBuffer", "Buffer", "General", "ReadWrite" },
+    { "RasterizerOrderedByteAddressBuffer", "Buffer", "General", "ReadWrite" },
+    { "SamplerState", "Sampler", "Sampler", "Unknown" },
+    { "SamplerComparisonState", "Sampler", "Sampler", "Unknown" },
+    { "ConstantBuffer<T, L>", "Buffer", "General", "Read"},
+    { "TextureBuffer<T>", "Buffer", "General", "Read"},
+    { "RaytracingAccelerationStructure", "AccelerationStructure", "General", "Read"},
 };
 
 for (auto type : kDynamicResourceCastableTypes) {
     auto dynamicKind = type.dynamicKind;
     auto kind = type.kind;
     auto typeName = type.name;
+    auto access = type.access;
     if (strstr(typeName, "<T, L>"))
         sb << "__generic<T, L : IBufferDataLayout>\n";
     else if (strstr(typeName, "<T>"))
@@ -21838,6 +22245,7 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
     __init(__DynamicResource res);
 
     static const DescriptorKind kind = DescriptorKind.$(kind);
+    static const DescriptorAccess descriptorAccess = DescriptorAccess.$(access);
 
     typealias Handle = DescriptorHandle<$(typeName)>;
 

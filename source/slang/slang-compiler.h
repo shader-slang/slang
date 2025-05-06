@@ -34,6 +34,7 @@ namespace Slang
 struct PathInfo;
 struct IncludeHandler;
 struct SharedSemanticsContext;
+struct ModuleChunkRef;
 
 class ProgramLayout;
 class PtrType;
@@ -91,6 +92,7 @@ enum class CodeGenTarget : SlangCompileTargetIntegral
     WGSL = SLANG_WGSL,
     WGSLSPIRVAssembly = SLANG_WGSL_SPIRV_ASM,
     WGSLSPIRV = SLANG_WGSL_SPIRV,
+    HostVM = SLANG_HOST_VM,
     CountOf = SLANG_TARGET_COUNT_OF,
 };
 
@@ -1491,7 +1493,7 @@ public:
         {
             return SLANG_E_INVALID_ARG;
         }
-
+        SLANG_AST_BUILDER_RAII(m_astBuilder);
         ComPtr<slang::IEntryPoint> entryPoint(findEntryPointByName(UnownedStringSlice(name)));
         if ((!entryPoint))
             return SLANG_FAIL;
@@ -1510,7 +1512,6 @@ public:
         {
             return SLANG_E_INVALID_ARG;
         }
-
         ComPtr<slang::IEntryPoint> entryPoint(
             findAndCheckEntryPoint(UnownedStringSlice(name), stage, outDiagnostics));
         if ((!entryPoint))
@@ -2086,8 +2087,39 @@ struct ContainerTypeKey
     }
 };
 
-/// A dictionary of currently loaded modules. Used by `findOrImportModule` to
-/// lookup additional loaded modules.
+/// A dictionary of modules to be considered when resolving `import`s,
+/// beyond those that would normally be found through a `Linkage`.
+///
+/// Checking of an `import` declaration will bottleneck through
+/// `Linkage::findOrImportModule`, which would usually just check for
+/// any module that had been previously loaded into the same `Linkage`
+/// (e.g., by a call to `Linkage::loadModule()`).
+///
+/// In the case where compilation is being done through an
+/// explicit `FrontEndCompileRequest` or `EndToEndCompileRequest`,
+/// the modules being compiled by that request do not get added to
+/// the surrounding `Linkage`.
+///
+/// There is a corner case when an explicit compile request has
+/// multiple `TranslationUnitRequest`s, because the user (reasonably)
+/// expects that if they compile `A.slang` and `B.slang` as two
+/// distinct translation units in the same compile request, then
+/// an `import B` inside of `A.slang` should resolve to reference
+/// the code of `B.slang`. But because neither `A` nor `B` gets
+/// added to the `Linkage`, and the `Linkage` is what usually
+/// determines what is or isn't loaded, that intuition will
+/// be wrong, without a bit of help.
+///
+/// The `LoadedModuleDictionary` is thus filled in by a
+/// `FrontEndCompileRequest` to collect the modules it is compiling,
+/// so that they can cross-reference one another (albeit with
+/// a current implementation restriction that modules in the
+/// request can only `import` those earlier in the request...).
+///
+/// The dictionary then gets passed around between nearly all of
+/// the operations that deal with loading modules, to make sure
+/// that they can detect a previously loaded module.
+///
 typedef Dictionary<Name*, Module*> LoadedModuleDictionary;
 
 enum ModuleBlobType
@@ -2095,8 +2127,6 @@ enum ModuleBlobType
     Source,
     IR
 };
-
-struct SerialContainerDataModule;
 
 /// A context for loading and re-using code modules.
 class Linkage : public RefObject, public slang::ISession
@@ -2287,7 +2317,15 @@ public:
     /// Add a new target and return its index.
     UInt addTarget(CodeGenTarget target);
 
-    RefPtr<Module> loadModule(
+    /// "Bottleneck" routine for loading a module.
+    ///
+    /// All attempts to load a module, whether through
+    /// Slang API calls, `import` operations, or other
+    /// means, should bottleneck through `loadModuleImpl`,
+    /// or one of the specialized cases `loadSourceModuleImpl`
+    /// and `loadBinaryModuleImpl`.
+    ///
+    RefPtr<Module> loadModuleImpl(
         Name* name,
         const PathInfo& filePathInfo,
         ISlangBlob* fileContentsBlob,
@@ -2296,17 +2334,49 @@ public:
         const LoadedModuleDictionary* additionalLoadedModules,
         ModuleBlobType blobType);
 
-    RefPtr<Module> loadModuleFromIRBlobImpl(
+    RefPtr<Module> loadSourceModuleImpl(
         Name* name,
         const PathInfo& filePathInfo,
         ISlangBlob* fileContentsBlob,
         SourceLoc const& loc,
         DiagnosticSink* sink,
         const LoadedModuleDictionary* additionalLoadedModules);
-    RefPtr<Module> loadDeserializedModule(
+
+    RefPtr<Module> loadBinaryModuleImpl(
         Name* name,
         const PathInfo& filePathInfo,
-        SerialContainerDataModule& m,
+        ISlangBlob* fileContentsBlob,
+        SourceLoc const& loc,
+        DiagnosticSink* sink);
+
+    /// Either finds a previously-loaded module matching what
+    /// was serialized into `moduleChunk`, or else attempts
+    /// to load the serialized module.
+    ///
+    /// If a previously-loaded module is found that matches the
+    /// name or path information in `moduleChunk`, then that
+    /// previously-loaded module is returned.
+    ///
+    /// Othwerise, attempts to load a module from `moduleChunk`
+    /// and, if successful, returns the freshly loaded module.
+    ///
+    /// Otherwise, return null.
+    ///
+    RefPtr<Module> findOrLoadSerializedModuleForModuleLibrary(
+        ModuleChunkRef moduleChunk,
+        DiagnosticSink* sink);
+
+    RefPtr<Module> loadSerializedModule(
+        Name* moduleName,
+        const PathInfo& moduleFilePathInfo,
+        ModuleChunkRef moduleChunk,
+        SourceLoc const& requestingLoc,
+        DiagnosticSink* sink);
+
+    SlangResult loadSerializedModuleContents(
+        Module* module,
+        const PathInfo& moduleFilePathInfo,
+        ModuleChunkRef moduleChunk,
         DiagnosticSink* sink);
 
     SourceFile* loadSourceFile(String pathFrom, String path);
@@ -2317,22 +2387,14 @@ public:
         Name* name,
         PathInfo const& pathInfo);
 
-    /// Load a module of the given name.
-    Module* loadModule(String const& name);
-
     bool isBinaryModuleUpToDate(String fromPath, RiffContainer* container);
+    bool isBinaryModuleUpToDate(String fromPath, ModuleChunkRef moduleChunk);
 
     RefPtr<Module> findOrImportModule(
         Name* name,
         SourceLoc const& loc,
         DiagnosticSink* sink,
         const LoadedModuleDictionary* loadedModules = nullptr);
-
-    void prepareDeserializedModule(
-        SerialContainerDataModule& moduleEntry,
-        const PathInfo& pathInfo,
-        Module* module,
-        DiagnosticSink* sink);
 
     SourceFile* findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem);
     struct IncludeResult
