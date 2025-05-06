@@ -7935,7 +7935,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 emitDebugType(arrayType->getElementType()),
                 sizedArrayType ? builder.getIntValue(
                                      builder.getUIntType(),
-                                     getIntVal(sizedArrayType->getElementCount()))
+                                     getArraySizeVal(sizedArrayType->getElementCount()))
                                : builder.getIntValue(builder.getUIntType(), 0));
         }
         else if (auto vectorType = as<IRVectorType>(type))
