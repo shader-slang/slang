@@ -585,6 +585,8 @@ void WorkspaceVersion::ensureWorkspaceFlavor(UnownedStringSlice path)
         linkage->addPreprocessorDefine("RTX", "__file_decl");
         linkage->addPreprocessorDefine("PS_RTX", "__file_decl");
         linkage->addPreprocessorDefine("VS_RTX", "__file_decl");
+        linkage->addPreprocessorDefine("MS", "__file_decl");
+        linkage->addPreprocessorDefine("VS_MS_RTX", "__file_decl");
         linkage->addPreprocessorDefine("FRAGMENT_ANNOTATION", "");
         linkage->addPreprocessorDefine("DynamicCombo", "//");
         linkage->addPreprocessorDefine("DynamicComboRule", "//");
