@@ -611,21 +611,15 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             {
                 elementCount = (UInt)constElementCount->getValue();
             }
-            else if (!as<GenericParamIntVal>(as<TypeCastIntVal>(toElementCount)->getBase()))
+            else
             {
-                // We don't know the element count statically,
-                // so what are we supposed to be doing?
-                //
-                if (outToExpr)
-                {
-                    getSink()->diagnose(
-                        fromInitializerListExpr,
-                        Diagnostics::cannotUseInitializerListForArrayOfUnknownSize,
-                        toElementCount);
-                }
-                return false;
-            }
+                auto toMakeArrayFromElementExpr = m_astBuilder->create<MakeArrayFromElementExpr>();
+                toMakeArrayFromElementExpr->loc = fromInitializerListExpr->loc;
+                toMakeArrayFromElementExpr->type = QualType(toType);
 
+                *outToExpr = toMakeArrayFromElementExpr;
+                return true;
+            }
             for (UInt ee = 0; ee < elementCount; ++ee)
             {
                 Expr* coercedArg = nullptr;
