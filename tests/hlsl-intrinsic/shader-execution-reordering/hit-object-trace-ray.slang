@@ -29,6 +29,7 @@ uint calcValue(HitObject hit)
         uint instanceID = hit.GetInstanceID();
         uint geometryIndex = hit.GetGeometryIndex();
         uint primitiveIndex = hit.GetPrimitiveIndex();
+        int clusterID = hit.GetClusterID();
 
         SomeValues objSomeValues = hit.GetAttributes<SomeValues>();
         
@@ -37,6 +38,7 @@ uint calcValue(HitObject hit)
         r += geometryIndex;
         r += primitiveIndex;
         r += objSomeValues.a;
+        r += clusterID;
     }
     
     return r;

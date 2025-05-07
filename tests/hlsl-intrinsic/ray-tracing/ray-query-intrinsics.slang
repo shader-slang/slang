@@ -21,7 +21,11 @@ float GetRayT<let RAY_QUERY_FLAGS: uint>(uint rayInlineFlags)
         switch( rq.CandidateType() )
         {
             case CANDIDATE_NON_OPAQUE_TRIANGLE:
-                rq.CommitNonOpaqueTriangleHit();
+                int candidateClusterId = rayq.CandidateClusterID();
+                if (candidateClusterId >= 0)
+                {
+                    rayq.CommitNonOpaqueTriangleHit();
+                }
                 rq.Abort();
                 return rq.CommittedRayT();
 
@@ -44,6 +48,8 @@ float GetRayT<let RAY_QUERY_FLAGS: uint>(uint rayInlineFlags)
         }
     }
     
+    int committedClusterId = rayQuery.CommittedClusterID();
+    ray.TMin = 0.01f + committedClusterId;
     return 0.0f;
 }
 
