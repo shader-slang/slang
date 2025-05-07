@@ -523,17 +523,6 @@ SpvInst* emitOpSpecConstantComposite(
         constituents);
 }
 
-template<typename T, typename Ts>
-SpvInst* emitOpSpecConstantOp(
-    SpvInstParent* parent,
-    IRInst* inst,
-    const T& idResultType,
-    const T& opCode,
-    const Ts& oprands)
-{
-    return emitInst(parent, inst, SpvOpSpecConstantOp, idResultType, kResultID, opCode, oprands);
-}
-
 template<typename T>
 SpvInst* emitOpSpecConstantTrue(SpvInstParent* parent, IRInst* inst, const T& idResultType)
 {
