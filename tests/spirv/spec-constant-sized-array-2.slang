@@ -12,9 +12,10 @@
 [SpecializationConstant]
 const int constValue0 = 32;
 
-//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
+static float g_buffer[constValue0 / 2 + (constValue0 >> 2)];
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
@@ -27,15 +28,21 @@ void computeMain()
     for (uint i = 0; i < size; i++)
     {
         buffer[i] = i;
+        g_buffer[i] = i * 2;
     }
 
-    float temp = 0.0f;
+    float temp1 = 0.0f;
+    float temp2 = 0.0f;
     for (uint i = 0; i < size; i++)
     {
-        temp += buffer[i] * 2;
+        temp1 += buffer[i] * 2;
+        temp2 += g_buffer[i];
     }
 
     // Result will be (0 + size-1) * size = (0 + 23) * 24 = 552
-    outputBuffer[0] = temp;
+    outputBuffer[0] = temp1;
     // BUF: 552
+
+    outputBuffer[1] = temp2;
+    // BUF-NEXT: 552
 }

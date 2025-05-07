@@ -2096,7 +2096,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     }
                     else
                     {
-                        SLANG_RELEASE_ASSERT("Unknown specialization constant value type");
+                        this->context->getSink()->diagnose(
+                            type->getDeclRef(),
+                            Diagnostics::unimplemented,
+                            "lower unknown specialization constant value type");
                     }
                     sharedContext->mapSpecConstValToIRInst.add(specConstIntVal, irInitVal);
                 }
