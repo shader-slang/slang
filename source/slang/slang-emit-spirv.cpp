@@ -7394,9 +7394,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (opCode == SpvOpUndef)
             SLANG_ASSERT(!"unknown arithmetic opcode");
 
-        bool isFloatingPoint = basicType->getBaseType() == BaseType::Float ||
-                               basicType->getBaseType() == BaseType::Double ||
-                               basicType->getBaseType() == BaseType::Half;
+        bool isFloatingPoint = (getTypeStyle(basicType->getBaseType()) == kIROp_FloatType);
+
         if (operandCount == 1)
         {
             return emitInst(parent, instToRegister, opCode, type, kResultID, operands);
