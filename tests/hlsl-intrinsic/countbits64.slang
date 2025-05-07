@@ -1,8 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -compute -cpu
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -render-feature int64
-// emit-spirv-via-glsl is currently ignored, but even working around this, output does not appear to be captured for GLSL
-// No support for uint64_t in GLSL without an extension like GL_EXT_shader_explicit_arithmetic_types_int64
-//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -vk -compute -render-feature int64 -emit-spirv-via-glsl -profile GLSL_400 -Xslang... -capability GL_EXT_shader_explicit_arithmetic_types_int64.
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -emit-spirv-via-glsl
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -cuda -compute
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -mtl -compute
 // No support for uint64_t on fxc - we need SM6.0 and dxil to use uint64_t with d3d12
