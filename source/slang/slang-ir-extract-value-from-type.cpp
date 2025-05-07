@@ -17,6 +17,50 @@ struct FindLeafValueResult
         0; // The offset in bytes within `leafValue` that contains the requested value.
 };
 
+// bitcast the leaf value to the same size as leaf value's type.
+// For type that has size smaller than 4 bytes, we will need to cast them
+// to 32-bit unsigned int first, and then cast to the target type.
+IRInst* bitCastLeafValue(IRBuilder& builder, FindLeafValueResult& leaf)
+{
+    auto resultValue = leaf.leafValue;
+
+    IRType* intermediateUintType = nullptr;
+    IRType* targetUintType = nullptr;
+    switch (leaf.valueSize)
+    {
+    case 1:
+        intermediateUintType = builder.getUInt8Type();
+        targetUintType = builder.getUIntType();
+        break;
+    case 2:
+        intermediateUintType = builder.getUInt16Type();
+        targetUintType = builder.getUIntType();
+        break;
+    case 4:
+        intermediateUintType = builder.getUIntType();
+        targetUintType = intermediateUintType;
+        break;
+    case 8:
+        intermediateUintType = builder.getUInt64Type();
+        targetUintType = intermediateUintType;
+        break;
+    default:
+        SLANG_UNEXPECTED("Unsupported value size");
+        break;
+    }
+    resultValue = builder.emitBitCast(intermediateUintType, resultValue);
+
+    // In case of 1-byte or 2-byte value, we need to cast it to 32-bit unsigned int first
+    // because we don't allow bitCast from 1-byte or 2-byte type to 32-bit type.
+    if (intermediateUintType != targetUintType)
+    {
+        resultValue = builder.emitCast(targetUintType, resultValue);
+        resultValue = builder.emitBitCast(targetUintType, resultValue);
+    }
+
+    return resultValue;
+}
+
 FindLeafValueResult findLeafValueAtOffset(
     TargetProgram* targetProgram,
     IRBuilder& builder,
@@ -181,16 +225,9 @@ IRInst* extractByteAtOffset(
     uint32_t offset)
 {
     auto leaf = findLeafValueAtOffset(targetProgram, builder, dataType, layout, src, offset);
-    IRType* uintType = nullptr;
-    if (leaf.valueSize <= 4)
-    {
-        uintType = builder.getUIntType();
-    }
-    else
-    {
-        uintType = builder.getUInt64Type();
-    }
-    auto resultValue = builder.emitBitCast(uintType, leaf.leafValue);
+    auto resultValue = bitCastLeafValue(builder, leaf);
+    auto uintType = resultValue->getDataType();
+
     if (leaf.offsetInValue != 0)
     {
         uint32_t shift = leaf.offsetInValue * 8;
@@ -217,21 +254,13 @@ IRInst* extractMultiByteValueAtOffset(
         return extractByteAtOffset(builder, targetProgram, dataType, layout, src, offset);
 
     auto leaf = findLeafValueAtOffset(targetProgram, builder, dataType, layout, src, offset);
-    auto resultValue = leaf.leafValue;
-    IRType* uintType = nullptr;
-    if (leaf.valueSize <= 4)
-    {
-        uintType = builder.getUIntType();
-    }
-    else
-    {
-        uintType = builder.getUInt64Type();
-    }
     if (leaf.valueSize - leaf.offsetInValue >= size)
     {
         // The request value is fully contained in the found leaf element.
         // We can proceed to extract the requested bits from the element.
-        resultValue = builder.emitBitCast(uintType, leaf.leafValue);
+        auto resultValue = bitCastLeafValue(builder, leaf);
+        auto uintType = resultValue->getDataType();
+
         uint32_t shift = leaf.offsetInValue * 8;
         if (shift > 0)
             resultValue =
@@ -274,6 +303,8 @@ IRInst* extractMultiByteValueAtOffset(
             src,
             firstHalfSize,
             offset);
+
+        auto uintType = firstHalf->getDataType();
         switch (firstHalfSize)
         {
         case 1:
@@ -301,7 +332,7 @@ IRInst* extractMultiByteValueAtOffset(
             restSize,
             offset + firstHalfSize);
         uint32_t shift = firstHalfSize * 8;
-        resultValue = builder.emitBitOr(
+        auto resultValue = builder.emitBitOr(
             builder.getUIntType(),
             firstHalf,
             builder.emitShl(
