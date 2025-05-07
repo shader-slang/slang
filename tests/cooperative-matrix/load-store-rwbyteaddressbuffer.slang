@@ -18,9 +18,7 @@ ByteAddressBuffer inputBuffer;
 #endif
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
-//TODO: RWBAB doesn't work.
-//RWByteAddressBuffer outputBuffer;
-RWStructuredBuffer<int32_t> outputBuffer;
+RWByteAddressBuffer outputBuffer;
 
 [numthreads(32, 1, 1)]
 void computeMain()
