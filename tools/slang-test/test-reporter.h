@@ -105,6 +105,9 @@ public:
     /// Returns true if all run tests succeeded
     bool didAllSucceed() const;
 
+    /// Returns a result from the current test
+    TestResult getResult() const;
+
     void outputSummary();
 
     SlangResult init(
