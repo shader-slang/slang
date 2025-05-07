@@ -2509,13 +2509,14 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     }
     else
     {
-        bool isSpecConstSized = (((int)varTypeTags & (int)TypeTag::SpecializationConstantSized) != 0);
+        bool isSpecConstSized =
+            (((int)varTypeTags & (int)TypeTag::SpecializationConstantSized) != 0);
         if (isSpecConstSized)
         {
             getSink()->diagnose(
-                    varDecl,
-                    Diagnostics::arraySizeCannotBeSpecializationConstant,
-                    varDecl);
+                varDecl,
+                Diagnostics::arraySizeCannotBeSpecializationConstant,
+                varDecl);
         }
     }
 

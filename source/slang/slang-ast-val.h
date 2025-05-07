@@ -166,9 +166,9 @@ class ConstantIntVal : public IntVal
     bool _isLinkTimeValOverride() { return false; }
 };
 
-// Represent a constant specialize integer or an expression that result in a constant specialize integer
-// The operand could be a DeclRef if it is a specialization constant, or a FuncCallIntVal if it is an expression
-// that results in a specialization constant.
+// Represent a constant specialize integer or an expression that result in a constant specialize
+// integer The operand could be a DeclRef if it is a specialization constant, or a FuncCallIntVal if
+// it is an expression that results in a specialization constant.
 
 FIDDLE()
 class SpecializationConstantIntVal : public IntVal
@@ -185,7 +185,7 @@ class SpecializationConstantIntVal : public IntVal
     }
 
     // Overrides should be public so base classes can access
-    void _toTextOverride(StringBuilder& out) {SLANG_UNUSED(out);}
+    void _toTextOverride(StringBuilder& out) { SLANG_UNUSED(out); }
 
     SpecializationConstantIntVal(Type* inType, Val* inValue) { setOperands(inType, inValue); }
     bool _isLinkTimeValOverride() { return false; }
