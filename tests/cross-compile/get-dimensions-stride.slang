@@ -14,7 +14,7 @@ RWStructuredBuffer<int> buffer0;
 RWStructuredBuffer<int> buffer1;
 
 //TEST_INPUT:ubuffer(data=[0.0], stride=4):name buffer2
-RWStructuredBuffer<half> buffer2;
+RWStructuredBuffer<float> buffer2;
 
 //TEST_INPUT:ubuffer(data=[-10 17 9 4 2 0], stride=4):name buffer3
 RWStructuredBuffer<float> buffer3;
@@ -42,10 +42,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         // Structured buffer of halfs.
         // Stride must be 2 for SPIRV and WGSL but is not guaranteed to be 2 in D3D(?).
 #if !defined(D3D)
-        // CHECK: 2
+        // CHECK: 4
         buffer2.GetDimensions(count, stride);
 #else
-        stride = 2;
+        stride = 4;
 #endif
     }
     else if (index == 3)
