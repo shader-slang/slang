@@ -1759,7 +1759,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         {
             constArgVals[a] = constArgVal->getValue();
         }
-        else if(as<SpecializationConstantIntVal>(argVal))
+        else if (as<SpecializationConstantIntVal>(argVal))
         {
             hasSpecializationConstant = true;
         }
@@ -1774,13 +1774,14 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         // If the expression contains a specialization constant, we are not able to constant fold
         // it, but we will still allow it to be used as array size, so we will use this expression
         // as the array sized, and it will be lowered to a specialization constant value.
-        // However we will have to replace all the argument expression that is already constant folded,
-        // because this expression could be declared in local scope, so after we lowering it to IR,
-        // it will have to be hoisted to the global scope. But we can't hoist all the compile-time constant
-        // variable involved in this expression if it has, so that will bring a problem that this expression
-        // could reference a variable not existed in global scope. Therefore, we just replace those compile-time
-        // constant variable with literal, so there will only be a specialization constant left in the expression,
-        // which can only declared in global scope.
+        // However we will have to replace all the argument expression that is already constant
+        // folded, because this expression could be declared in local scope, so after we lowering it
+        // to IR, it will have to be hoisted to the global scope. But we can't hoist all the
+        // compile-time constant variable involved in this expression if it has, so that will bring
+        // a problem that this expression could reference a variable not existed in global scope.
+        // Therefore, we just replace those compile-time constant variable with literal, so there
+        // will only be a specialization constant left in the expression, which can only declared in
+        // global scope.
 
         auto funcCall = m_astBuilder->getOrCreate<FuncCallIntVal>(
             invokeExpr.getExpr()->type.type,
@@ -1790,9 +1791,8 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
                 funcDeclRefExpr.getSubsts())),
             makeArrayView(argVals, argCount));
 
-        SpecializationConstantIntVal* result = m_astBuilder->getSpecConstIntVal(
-            invokeExpr.getExpr()->type.type,
-            funcCall);
+        SpecializationConstantIntVal* result =
+            m_astBuilder->getSpecConstIntVal(invokeExpr.getExpr()->type.type, funcCall);
         return result;
     }
 

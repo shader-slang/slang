@@ -2080,20 +2080,25 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 auto sharedContext = context->shared;
                 IRInst* irInitVal = nullptr;
 
-                // Note the mapping of specialization constant value to IRInst is very important because
-                // when an array has size of specialize constant, the only way to check the type match on spirv
-                // is to check the if the type inst for two arrays are the same inst. So if two arrays have the same
-                // specialization constant size, we should avoid lowering two global constant variables.
-                if (!sharedContext->mapSpecConstValToIRInst.tryGetValue(specConstIntVal, elementCount))
+                // Note the mapping of specialization constant value to IRInst is very important
+                // because when an array has size of specialize constant, the only way to check the
+                // type match on spirv is to check the if the type inst for two arrays are the same
+                // inst. So if two arrays have the same specialization constant size, we should
+                // avoid lowering two global constant variables.
+                if (!sharedContext->mapSpecConstValToIRInst.tryGetValue(
+                        specConstIntVal,
+                        elementCount))
                 {
                     IRBuilderInsertLocScope insertScope(getBuilder());
                     getBuilder()->setInsertInto(getBuilder()->getModule());
                     irInitVal = lowerSimpleVal(context, specConstIntVal);
                     elementCount =
-                         getBuilder()->emitGlobalConstant(irInitVal->getDataType(), irInitVal);
+                        getBuilder()->emitGlobalConstant(irInitVal->getDataType(), irInitVal);
 
                     sharedContext->mapSpecConstValToIRInst.add(specConstIntVal, elementCount);
-                    getBuilder()->addDecoration(elementCount, kIROp_SpecializationConstantOpDecoration);
+                    getBuilder()->addDecoration(
+                        elementCount,
+                        kIROp_SpecializationConstantOpDecoration);
                 }
             }
             else
