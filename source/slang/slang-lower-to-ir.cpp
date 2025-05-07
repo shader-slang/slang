@@ -1596,20 +1596,19 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitSpecializationConstantIntVal(SpecializationConstantIntVal* val)
     {
-        auto specVal = val->getValue();
+        auto specConstVal = val->getValue();
+        SLANG_RELEASE_ASSERT(specConstVal);
 
-        // This will be the leaf node, which is a specialization constant variable
-        if (auto declRefBase = as<DeclRefBase>(specVal))
+        if (as<FuncCallIntVal>(specConstVal))
         {
-            if (auto varDecl = as<VarDeclBase>(declRefBase->getDecl()))
-            {
-                DeclRef<VarDeclBase> varDeclRef(varDecl);
-                return emitDeclRef(context,
-                    declRefBase,
-                    lowerType(context, getType(context->astBuilder, varDeclRef)));
-            }
+            return lowerVal(context, specConstVal);
         }
-        return LoweredValInfo::simple(lowerVal(context, specVal).val);
+        else if (auto declRefBase = as<DeclRefBase>(specConstVal))
+        {
+            return lowerDecl(context, declRefBase->getDecl());
+        }
+        SLANG_UNREACHABLE("Specialization constant value is not a declRef or function call");
+        return LoweredValInfo::simple(nullptr);
     }
 
     LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
@@ -2081,31 +2080,22 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             {
                 auto sharedContext = context->shared;
                 IRInst* irInitVal = nullptr;
-                if (!sharedContext->mapSpecConstValToIRInst.tryGetValue(specConstIntVal, irInitVal))
+
+                // Note the mapping of specialization constant value to IRInst is very important because
+                // when an array has size of specialize constant, the only way to check the type match on spirv
+                // is to check the if the type inst for two arrays are the same inst. So if two arrays have the same
+                // specialization constant size, we should avoid lowering two global constant variables.
+                if (!sharedContext->mapSpecConstValToIRInst.tryGetValue(specConstIntVal, elementCount))
                 {
                     IRBuilderInsertLocScope insertScope(getBuilder());
                     getBuilder()->setInsertInto(getBuilder()->getModule());
-                    auto specConstVal = specConstIntVal->getValue();
-                    if (as<FuncCallIntVal>(specConstVal))
-                    {
-                        irInitVal = getSimpleVal(context, lowerVal(context, specConstVal));
-                    }
-                    else if (auto declRefBase = as<DeclRefBase>(specConstVal))
-                    {
-                        irInitVal = getSimpleVal(context, ensureDecl(context, declRefBase->getDecl()));
-                    }
-                    else
-                    {
-                        this->context->getSink()->diagnose(
-                            type->getDeclRef(),
-                            Diagnostics::unimplemented,
-                            "lower unknown specialization constant value type");
-                    }
-                    sharedContext->mapSpecConstValToIRInst.add(specConstIntVal, irInitVal);
+                    irInitVal = lowerSimpleVal(context, specConstIntVal);
+                    elementCount =
+                         getBuilder()->emitGlobalConstant(irInitVal->getDataType(), irInitVal);
+
+                    sharedContext->mapSpecConstValToIRInst.add(specConstIntVal, elementCount);
+                    getBuilder()->addDecoration(elementCount, kIROp_SpecializationConstantOpDecoration);
                 }
-                elementCount =
-                     getBuilder()->emitGlobalConstant(irInitVal->getDataType(), irInitVal);
-                getBuilder()->addDecoration(elementCount, kIROp_SpecializationConstantOpDecoration);
             }
             else
             {
@@ -11887,17 +11877,11 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             nvapiSlotModifier->spaceName.getUnownedSlice());
     }
 
-#if 1
+#if 0
     if (compileRequest->optionSet.shouldDumpIR())
     {
         DiagnosticSinkWriter writer(compileRequest->getSink());
-
-        dumpIR(
-            module,
-            compileRequest->m_irDumpOptions,
-            "GENERATED",
-            compileRequest->getSourceManager(),
-            &writer);
+        dumpIR(module, &writer, "GENERATED");
     }
 #endif
 

@@ -2098,7 +2098,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (inst->findDecoration<IRSpecializationConstantOpDecoration>())
                 {
                     auto globalConstant = as<IRGlobalConstant>(inst);
-                    return emitSpecializationConstantOp(globalConstant->getValue());
+                    auto spvInst = emitSpecializationConstantOp(globalConstant->getValue());
+                    if (!m_mapIRInstToSpvInst.tryGetValue(globalConstant->getValue(), spvInst))
+                    {
+                        registerInst(globalConstant->getValue(), spvInst);
+                    }
+                    return spvInst;
                 }
                 break;
             }
