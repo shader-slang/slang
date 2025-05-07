@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda
 //CHECK: __global__ void __closesthit__closestHitShaderA
+//CHECK: optixGetClusterId
 struct RayPayload
 {
     float4 color;

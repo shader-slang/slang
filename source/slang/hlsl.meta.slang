@@ -18718,14 +18718,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         case hlsl: __intrinsic_asm "NvRtGetCandidateClusterID";
         case glsl: __intrinsic_asm "rayQueryGetIntersectionClusterIdNV($0, false)";
         case spirv:
-            return -1;
-            /*uint iCandidateOrCommitted = 0;
+            uint iCandidateOrCommitted = 0;
             return spirv_asm
             {
                 OpExtension "SPV_NV_cluster_acceleration_structure";
                 OpCapability RayTracingClusterAccelerationStructureNV;
-                result:$$int = OpRayQueryGetIntersectionClusterIdNV &this $iCandidateOrCommitted;
-            };*/
+                result:$$int = OpRayQueryGetClusterIdNV &this $iCandidateOrCommitted;
+            };
         }
     }
 
@@ -18744,7 +18743,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             uint iCandidateOrCommitted = 1;
             return spirv_asm
             {
-                result:$$int = OpRayQueryGetIntersectionInstanceCustomIndexKHR &this $iCandidateOrCommitted;
+                result:$$int = OpRayQueryGetClusterIdNV &this $iCandidateOrCommitted;
             };
         }
     }
@@ -18764,14 +18763,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         case hlsl: __intrinsic_asm "NvRtGetCommittedClusterID";
         case glsl: __intrinsic_asm "rayQueryGetIntersectionClusterIdNV($0, true)";
         case spirv:
-            return -1;
-            /*uint iCandidateOrCommitted = 1; // 1 for committed
+            uint iCandidateOrCommitted = 1; // 1 for committed
             return spirv_asm
             {
                 OpExtension "SPV_NV_cluster_acceleration_structure";
                 OpCapability RayTracingClusterAccelerationStructureNV;
-                result:$$int = OpRayQueryGetIntersectionClusterIdNV &this $iCandidateOrCommitted;
-            };*/
+                result:$$int = OpRayQueryGetClusterIdNV &this $iCandidateOrCommitted;
+            };
         }
     }
 
