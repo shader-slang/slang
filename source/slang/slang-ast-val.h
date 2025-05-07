@@ -176,7 +176,12 @@ class SpecializationConstantIntVal : public IntVal
     FIDDLE(...)
     Val* getValue()
     {
-        return getOperand(1);
+        Val* val = getOperand(1);
+        if (!as<FuncCallIntVal>(val) && !as<DeclRefBase>(val))
+        {
+            return nullptr;
+        }
+        return val;
     }
 
     // Overrides should be public so base classes can access
