@@ -32,7 +32,7 @@ jobs:
           - { os: macos, compiler: gcc }
           - { os: macos, compiler: cl }
         include:
-          - { os: linux, runs-on: ubuntu-20.04 }
+          - { os: linux, runs-on: ubuntu-latest }
           - { os: macos, runs-on: macos-latest }
           - { os: windows, runs-on: windows-latest }
           # Warnings are treated as errors by default.
@@ -58,7 +58,7 @@ jobs:
             platform: aarch64
             test-category: smoke
             full-gpu-tests: false
-            runs-on: ubuntu-22.04-arm
+            runs-on: ubuntu-24.04-arm
             has-gpu: false
             build-llvm: false
           # Self-hosted full gpu build
@@ -105,6 +105,12 @@ jobs:
             echo "Only documentation files changed, skipping remaining steps"
             echo "should-run=false" >> $GITHUB_OUTPUT
           fi
+      - name: Install dependencies
+        run: |
+          if [[ "${{ matrix.os }}" = "linux" ]]; then
+              sudo apt-get update
+              sudo apt-get install -y libx11-dev
+          fi
       - name: Setup
         if: steps.filter.outputs.should-run == 'true'
         uses: ./.github/actions/common-setup
@@ -129,8 +135,12 @@ jobs:
               cmake --install build --config Release --component generators --prefix generators
               emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
               cmake --build --preset emscripten --config "$cmake_config" --target slang-wasm
-              [ -f "build.em/$cmake_config/bin/slang-wasm.wasm" ]
-              [ -f "build.em/$cmake_config/bin/slang-wasm.js" ]
+              mkdir "build.em/$cmake_config/bin/smoke"
+              cp tests/wasm/smoke/* "build.em/$cmake_config/bin/smoke/"
+              cd "build.em/$cmake_config/bin"
+              [ -f "slang-wasm.wasm" ]
+              [ -f "slang-wasm.js" ]
+              node smoke/smoke-test.js smoke/rand_float.slang computeMain
           else
             if [[ "${{ matrix.os }}" =~ "windows" && "${{ matrix.config }}" != "release" && "${{ matrix.config }}" != "releaseWithDebugInfo" ]]; then
               # Doing a debug build will try to link against a release built llvm, this

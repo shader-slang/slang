@@ -23,6 +23,18 @@ IRType* getVectorElementType(IRType* type)
         return vectorType->getElementType();
     if (auto coopVecType = as<IRCoopVectorType>(type))
         return coopVecType->getElementType();
+    if (auto coopMatType = as<IRCoopMatrixType>(type))
+        return coopMatType->getElementType();
+    return type;
+}
+
+IRType* getVectorOrCoopMatrixElementType(IRType* type)
+{
+    auto vectorElementType = getVectorElementType(type);
+    if (vectorElementType != type)
+        return vectorElementType;
+    if (auto coopMatrixType = as<IRCoopMatrixType>(type))
+        return coopMatrixType->getElementType();
     return type;
 }
 
@@ -94,6 +106,7 @@ IROp getTypeStyle(IROp op)
     {
     case kIROp_VoidType:
     case kIROp_BoolType:
+    case kIROp_EnumType:
         {
             return op;
         }
@@ -208,6 +221,7 @@ bool isValueType(IRInst* dataType)
     case kIROp_FuncType:
     case kIROp_RaytracingAccelerationStructureType:
     case kIROp_GLSLAtomicUintType:
+    case kIROp_EnumType:
         return true;
     default:
         // Read-only resource handles are considered as Value type.
@@ -259,6 +273,12 @@ bool isSimpleDataType(IRType* type)
     case kIROp_AnyValueType:
     case kIROp_PtrType:
         return true;
+    case kIROp_EnumType:
+        {
+            auto enumType = as<IREnumType>(type);
+            auto tagType = enumType->getTagType();
+            return isSimpleDataType(tagType);
+        }
     case kIROp_ArrayType:
     case kIROp_UnsizedArrayType:
         return isSimpleDataType((IRType*)type->getOperand(0));
@@ -2218,6 +2238,16 @@ UnownedStringSlice getMangledName(IRInst* inst)
             return linkageDecor->getMangledName();
     }
     return UnownedStringSlice();
+}
+
+bool isFirstBlock(IRInst* inst)
+{
+    auto block = as<IRBlock>(inst);
+    if (!block)
+        return false;
+    if (!block->getParent())
+        return false;
+    return block->getParent()->getFirstBlock() == block;
 }
 
 } // namespace Slang

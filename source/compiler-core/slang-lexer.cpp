@@ -6,6 +6,7 @@
 //
 
 #include "core/slang-char-encode.h"
+#include "core/slang-string-escape-util.h"
 #include "slang-core-diagnostics.h"
 #include "slang-name.h"
 #include "slang-source-loc.h"
@@ -374,9 +375,14 @@ static void _lexIdentifier(Lexer* lexer)
     }
 }
 
-static SourceLoc _getSourceLoc(Lexer* lexer)
+static SourceLoc _getSourceLoc(const Lexer& lexer, const char* it)
 {
-    return lexer->m_startLoc + (lexer->m_cursor - lexer->m_begin);
+    return lexer.m_startLoc + (it - lexer.m_begin);
+}
+
+static SourceLoc _getSourceLoc(const Lexer* lexer)
+{
+    return _getSourceLoc(*lexer, lexer->m_cursor);
 }
 
 static void _lexDigits(Lexer* lexer, int base)
@@ -824,15 +830,46 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     return value;
 }
 
-static void _lexStringLiteralBody(Lexer* lexer, char quote)
+IntegerLiteralValue getCharLiteralValue(Token const& token)
 {
+    String unquotedContent = StringEscapeUtil::unquote('\'', token.getContent());
+    StringBuilder unescaped(4);
+    auto escapeHandler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp);
+    escapeHandler->appendUnescaped(unquotedContent.getUnownedSlice(), unescaped);
+
+    char const* cursor = unescaped.getBuffer();
+
+    IntegerLiteralValue codepoint = getUnicodePointFromUTF8([&]() { return *cursor++; });
+    return codepoint;
+}
+
+static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
+{
+    int len = 0;
     for (;;)
     {
         int c = _peek(lexer);
         if (c == quote)
         {
+            if (singleChar && len == 0)
+            { // Empty char literal - size must be exactly 1.
+                if (auto sink = lexer->getDiagnosticSink())
+                {
+                    sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::illegalCharacterLiteral);
+                }
+            }
             _advance(lexer);
             return;
+        }
+
+        len++;
+
+        if (singleChar && len == 2)
+        { // Char literal about to have more than 1 char.
+            if (auto sink = lexer->getDiagnosticSink())
+            {
+                sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::illegalCharacterLiteral);
+            }
         }
 
         switch (c)
@@ -1341,12 +1378,12 @@ static TokenType _lexTokenImpl(Lexer* lexer)
 
     case '\"':
         _advance(lexer);
-        _lexStringLiteralBody(lexer, '\"');
+        _lexStringLiteralBody(lexer, '\"', false);
         return TokenType::StringLiteral;
 
     case '\'':
         _advance(lexer);
-        _lexStringLiteralBody(lexer, '\'');
+        _lexStringLiteralBody(lexer, '\'', true);
         return TokenType::CharLiteral;
 
 
@@ -1510,6 +1547,9 @@ static TokenType _lexTokenImpl(Lexer* lexer)
         case '=':
             _advance(lexer);
             return TokenType::OpEql;
+        case '>':
+            _advance(lexer);
+            return TokenType::DoubleRightArrow;
         default:
             return TokenType::OpAssign;
         }
@@ -1810,6 +1850,18 @@ TokenList Lexer::lexAllMarkupTokens()
     }
 }
 
+TokenList Lexer::lexAllTokens()
+{
+    TokenList tokenList;
+    for (;;)
+    {
+        Token token = lexToken();
+        tokenList.add(token);
+        if (token.type == TokenType::EndOfFile)
+            return tokenList;
+    }
+}
+
 /* static */ UnownedStringSlice Lexer::sourceLocationLexer(const UnownedStringSlice& in)
 {
     Lexer lexer;
@@ -1843,6 +1895,34 @@ TokenList Lexer::lexAllMarkupTokens()
     SLANG_ASSERT(Index(offset + tok.charsCount) <= in.getLength());
 
     return UnownedStringSlice(in.begin() + offset, in.begin() + offset + tok.charsCount);
+}
+
+SourceLoc Lexer::findNextLineEnd(SourceLoc from, UInt& lineCount) const
+{
+    const char* it = m_begin + (from.getRaw() - m_startLoc.getRaw());
+    if (it >= m_begin && it < m_end)
+    {
+        while (it != m_end)
+        {
+            const char c = *it;
+            if (c == '\n' || c == '\r')
+            {
+                const char next = ((it + 1) == m_end) ? char(kEOF) : *(it + 1);
+                if ((next ^ c) == ('\n' ^ '\r'))
+                {
+                    ++it;
+                }
+                --lineCount;
+                if (lineCount == 0)
+                {
+                    SourceLoc res = _getSourceLoc(*this, it);
+                    return res;
+                }
+            }
+            ++it;
+        }
+    }
+    return {};
 }
 
 } // namespace Slang

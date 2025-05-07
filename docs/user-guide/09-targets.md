@@ -100,7 +100,7 @@ More importantly, though, using a root constant can avoid application code havin
 
 ## Direct3D 11
 
-Direct3D 11 (D3D11) is a older graphics API, but remains popular because it is much simpler to learn and use than some more recent APIs.
+Direct3D 11 (D3D11) is an older graphics API, but remains popular because it is much simpler to learn and use than some more recent APIs.
 In this section we will give an overview of the relevant features of D3D11 when used as a target platform for Slang.
 Subsequent sections about other APIs may describe them by comparison to D3D11.
 
@@ -135,7 +135,7 @@ Each stage has its own slots of the following types:
 
 - **Unordered access views** (UAVs) include textures, buffers, and other opaque resource types used for write or read-write operations in GPU code. UAVs use `u` registers.
 
-- **Samplers** are used to pass opaque texture-sampling stage, and use `s` registers.
+- **Samplers** are used to pass opaque texture-sampling state, and use `s` registers.
 
 In addition, the D3D11 pipeline provides _vertex buffer_ slots and a single _index buffer_ slot to be used as the source vertex and index data that defines primitives.
 User-defined varying vertex shader inputs are bound to _vertex attribute_ slots (referred to as "input elements" in D3D11) which define how data from vertex buffers should be fetched to provide values for vertex attributes.

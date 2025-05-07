@@ -27,13 +27,13 @@ jobs:
           - {
               os: linux,
               platform: x86_64,
-              runs-on: ubuntu-22.04,
+              runs-on: ubuntu-latest,
               compiler: gcc,
             }
           - {
               os: linux,
               platform: aarch64,
-              runs-on: ubuntu-22.04-arm,
+              runs-on: ubuntu-24.04-arm,
               compiler: gcc,
             }
           - { os: windows, runs-on: windows-latest, compiler: cl }
@@ -56,6 +56,12 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "0"
+      - name: Install dependencies
+        run: |
+          if [[ "${{ matrix.os }}" = "linux" ]]; then
+              sudo apt-get update
+              sudo apt-get install -y libx11-dev
+          fi
       - name: Setup
         uses: ./.github/actions/common-setup
         with:

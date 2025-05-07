@@ -7,11 +7,11 @@ permalink: /user-guide/autodiff
 
 To support differentiable graphics systems such as Gaussian splatters, neural radiance fields, differentiable path tracers, and more,
 Slang provides first class support for differentiable programming. 
-An overiew: 
+An overview: 
 - Slang supports the `fwd_diff` and `bwd_diff` operators that can generate the forward and backward-mode derivative propagation functions for any valid Slang function annotated with the `[Differentiable]` attribute. 
 - The `DifferentialPair<T>` built-in generic type is used to pass derivatives associated with each function input. 
 - The `IDifferentiable`, and the experimental `IDifferentiablePtrType`, interfaces denote differentiable value and pointer types respectively, and allow finer control over how types behave under differentiation.
-- Futher, Slang allows for user-defined derivative functions through the `[ForwardDerivative(custom_fn)]` and `[BackwardDerivative(custom_fn)]`
+- Further, Slang allows for user-defined derivative functions through the `[ForwardDerivative(custom_fn)]` and `[BackwardDerivative(custom_fn)]`
 - All Slang features, such as control-flow, generics, interfaces, extensions, and more are compatible with automatic differentiation, though the bottom of this chapter documents some sharp edges & known issues.
 
 ## Auto-diff operations `fwd_diff` and `bwd_diff`
@@ -59,7 +59,7 @@ There are two basic ways to compute this product:
 The products described above allow the _propagation_ of derivatives forward and backward through the function $f$
 
 The forward-mode derivative (Jacobian-vector product) can convert a derivative of the inputs to a derivative of the outputs. 
-For example, lets say inputs $$\mathbf{x}$$ depend on some scalar $$\theta$$, and $$\frac{\partial \mathbf{x}}{\partial \theta}$$ is a vector of partial derivatives describing that dependency.
+For example, let's say inputs $$\mathbf{x}$$ depend on some scalar $$\theta$$, and $$\frac{\partial \mathbf{x}}{\partial \theta}$$ is a vector of partial derivatives describing that dependency.
 
 Invoking forward-mode auto-diff with $$\mathbf{v} = \frac{\partial \mathbf{x}}{\partial \theta}$$ converts this into a derivative of the outputs w.r.t the same scalar $$\theta$$.
 This can be verified by expanding the Jacobian and applying the [chain rule](https://en.wikipedia.org/wiki/Chain_rule) of derivatives:
@@ -68,7 +68,7 @@ $$\langle D\mathbf{f}(\mathbf{x}), \frac{\partial \mathbf{x}}{\partial \theta} \
 
 #### Propagating derivatives with reverse-mode auto-diff
 The reverse-mode derivative (vector-Jacobian product) can convert a derivative w.r.t outputs into a derivative w.r.t inputs.
-For example, lets say we have some scalar $$\mathcal{L}$$ that depends on the outputs $$\mathbf{f}$$, and $$\frac{\partial \mathcal{L}}{\partial \mathbf{f}}$$ is a vector of partial derivatives describing that dependency.
+For example, let's say we have some scalar $$\mathcal{L}$$ that depends on the outputs $$\mathbf{f}$$, and $$\frac{\partial \mathcal{L}}{\partial \mathbf{f}}$$ is a vector of partial derivatives describing that dependency.
 
 Invoking forward-mode auto-diff with $$\mathbf{v} = \frac{\partial \mathcal{L}}{\partial \mathbf{f}}$$ converts this into a derivative of the same scalar $$\mathcal{L}$$ w.r.t the inputs $$\mathbf{x}$$.
 To provide more intuition for this, we can expand the Jacobian in a same way we did above:
@@ -679,8 +679,6 @@ float f(float x)
     t.member = x * x; // Error: assigning value with derivative into a non-differentiable location.
     return t.member;
 }
-...
-let result = fwd_diff(f)(diffPair(3.0, 1.0)).d; // result == 0.0
 ```
 In this case, we are assigning the value `x*x`, which carries a derivative, into a non-differentiable location `MyType.member`, thus throwing away any derivative info. When `f` returns `t.member`, there will be no derivative associated with it, so the function will not propagate the derivative through. This code is most likely not intending to discard the derivative through the assignment. To help avoid this kind of unintentional behavior, Slang will treat any assignments of a value with derivative info into a non-differentiable location as a compile-time error. To eliminate this error, the user should either make `t.member` differentiable, or to force the assignment by clarifying the intention to discard any derivatives using the built-in `detach` method.
 The following code will compile, and the derivatives will be discarded:

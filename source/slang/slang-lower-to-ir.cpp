@@ -486,8 +486,8 @@ struct SharedIRGenContext
     // Map from an AST-level statement that can be
     // used as the target of a `break` or `continue`
     // to the appropriate basic block to jump to.
-    Dictionary<Stmt*, IRBlock*> breakLabels;
-    Dictionary<Stmt*, IRBlock*> continueLabels;
+    Dictionary<BreakableStmt::UniqueID, IRBlock*> breakLabels;
+    Dictionary<BreakableStmt::UniqueID, IRBlock*> continueLabels;
 
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
@@ -2359,6 +2359,13 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
                 inst,
                 kIROp_GLSLOffsetDecoration,
                 builder->getIntValue(builder->getIntType(), glslOffsetMod->offset));
+        }
+        else if (auto glslStructOffsetMod = as<VkStructOffsetAttribute>(mod))
+        {
+            builder->addDecoration(
+                inst,
+                kIROp_VkStructOffsetDecoration,
+                builder->getIntValue(builder->getIntType(), glslStructOffsetMod->value));
         }
         else if (auto hlslSemantic = as<HLSLSimpleSemantic>(mod))
         {
@@ -4261,6 +4268,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitLambdaExpr(LambdaExpr*)
+    {
+        SLANG_UNEXPECTED("a valid ast should not contain an LambdaExpr.");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     {
         // Although the surface syntax can have an empty ASM block, the IR asm
@@ -5836,13 +5849,19 @@ struct DestinationDrivenRValueExprLoweringVisitor
     }
 
     /// Emit code for a `try` invoke.
-    LoweredValInfo visitTryExpr(TryExpr* expr)
+    void visitTryExpr(TryExpr* expr)
     {
         auto invokeExpr = as<InvokeExpr>(expr->base);
         assert(invokeExpr);
         TryClauseEnvironment tryEnv;
         tryEnv.clauseType = expr->tryClauseType;
-        return sharedLoweringContext.visitInvokeExprImpl(invokeExpr, destination, tryEnv);
+        auto rValue = sharedLoweringContext.visitInvokeExprImpl(invokeExpr, destination, tryEnv);
+        if (rValue.flavor != LoweredValInfo::Flavor::None)
+        {
+            // If we weren't able to fuse the destination write during lowering rvalue,
+            // we should insert the assign operation now.
+            assign(context, destination, rValue);
+        }
     }
 };
 
@@ -6181,8 +6200,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
-        context->shared->breakLabels.add(stmt, breakLabel);
-        context->shared->continueLabels.add(stmt, continueLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
+        context->shared->continueLabels.add(stmt->uniqueID, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -6288,8 +6307,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
-        context->shared->breakLabels.add(stmt, breakLabel);
-        context->shared->continueLabels.add(stmt, continueLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
+        context->shared->continueLabels.add(stmt->uniqueID, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -6347,8 +6366,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` and `continue` labels so
         // that we can find them for nested statements.
-        context->shared->breakLabels.add(stmt, breakLabel);
-        context->shared->continueLabels.add(stmt, continueLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
+        context->shared->continueLabels.add(stmt->uniqueID, continueLabel);
 
         // Emit the branch that will start out loop,
         // and then insert the block for the head.
@@ -6622,14 +6641,14 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Semantic checking is responsible for finding
         // the statement taht this `break` breaks out of
-        auto parentStmt = stmt->parentStmt;
-        SLANG_ASSERT(parentStmt);
+        auto targetStmtID = stmt->targetOuterStmtID;
+        SLANG_ASSERT(targetStmtID != BreakableStmt::kInvalidUniqueID);
 
         // We just need to look up the basic block that
         // corresponds to the break label for that statement,
         // and then emit an instruction to jump to it.
         IRBlock* targetBlock = nullptr;
-        context->shared->breakLabels.tryGetValue(parentStmt, targetBlock);
+        context->shared->breakLabels.tryGetValue(targetStmtID, targetBlock);
         SLANG_ASSERT(targetBlock);
         getBuilder()->emitBreak(targetBlock);
     }
@@ -6640,15 +6659,15 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Semantic checking is responsible for finding
         // the loop that this `continue` statement continues
-        auto parentStmt = stmt->parentStmt;
-        SLANG_ASSERT(parentStmt);
+        auto targetStmtID = stmt->targetOuterStmtID;
+        SLANG_ASSERT(targetStmtID != BreakableStmt::kInvalidUniqueID);
 
 
         // We just need to look up the basic block that
         // corresponds to the continue label for that statement,
         // and then emit an instruction to jump to it.
         IRBlock* targetBlock = nullptr;
-        context->shared->continueLabels.tryGetValue(parentStmt, targetBlock);
+        context->shared->continueLabels.tryGetValue(targetStmtID, targetBlock);
         SLANG_ASSERT(targetBlock);
         getBuilder()->emitContinue(targetBlock);
     }
@@ -6864,7 +6883,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` label so
         // that we can find it for nested statements.
-        context->shared->breakLabels.add(stmt, breakLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
 
         builder->setInsertInto(initialBlock->getParent());
 
@@ -6935,7 +6954,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // (and that control flow will fall through to otherwise).
         // This is the block that subsequent code will go into.
         insertBlock(breakLabel);
-        context->shared->breakLabels.remove(stmt);
+        context->shared->breakLabels.remove(stmt->uniqueID);
     }
 
     void visitTargetSwitchStmt(TargetSwitchStmt* stmt)
@@ -6947,7 +6966,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         startBlockIfNeeded(stmt);
         auto initialBlock = builder->getBlock();
         auto breakLabel = builder->createBlock();
-        context->shared->breakLabels.add(stmt, breakLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
         builder->setInsertInto(initialBlock->getParent());
         List<IRInst*> args;
         args.add(breakLabel);
@@ -6966,7 +6985,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             args.add(builder->getIntValue(builder->getIntType(), targetCase->capability));
             args.add(caseBlock);
         }
-        context->shared->breakLabels.remove(stmt);
+        context->shared->breakLabels.remove(stmt->uniqueID);
         builder->setInsertInto(initialBlock);
 
         auto parentFunc = initialBlock->getParent();
@@ -7066,7 +7085,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Register the `break` label so
         // that we can find it for nested statements.
-        context->shared->breakLabels.add(stmt, breakLabel);
+        context->shared->breakLabels.add(stmt->uniqueID, breakLabel);
 
         builder->setInsertInto(initialBlock->getParent());
 
@@ -7119,7 +7138,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // (and that control flow will fall through to otherwise).
         // This is the block that subsequent code will go into.
         insertBlock(breakLabel);
-        context->shared->breakLabels.remove(stmt);
+        context->shared->breakLabels.remove(stmt->uniqueID);
 
         // If there is the branch attribute output the IR decoration
         if (stmt->hasModifier<BranchAttribute>())
@@ -9209,18 +9228,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto subContext = nestedContext.getContext();
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
-        // An `enum` declaration will currently lower directly to its "tag"
-        // type, so that any references to the `enum` become referenes to
-        // the tag type instead.
-        //
         // TODO: if we ever support `enum` types with payloads, we would
         // need to make the `enum` lower to some kind of custom "tagged union"
         // type.
 
         IRType* loweredTagType = lowerType(subContext, decl->tagType);
+        IRType* enumType = subBuilder->createEnumType(loweredTagType);
+        addLinkageDecoration(context, enumType, decl);
 
-        return LoweredValInfo::simple(
-            finishOuterGenerics(subBuilder, loweredTagType, outerGeneric));
+        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, enumType, outerGeneric));
     }
 
     LoweredValInfo visitThisTypeDecl(ThisTypeDecl* decl)

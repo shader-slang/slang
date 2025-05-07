@@ -78,6 +78,9 @@ bool isComInterfaceType(IRType* type);
 // If `type` is a vector, returns its element type. Otherwise, return `type`.
 IRType* getVectorElementType(IRType* type);
 
+// If `type` is a vector or a coop matrix, returns its element type. Otherwise, return `type`.
+IRType* getVectorOrCoopMatrixElementType(IRType* type);
+
 // If `type` is a matrix, returns its element type. Otherwise, return `type`.
 IRType* getMatrixElementType(IRType* type);
 
@@ -384,6 +387,7 @@ void legalizeDefUse(IRGlobalValueWithCode* func);
 
 UnownedStringSlice getMangledName(IRInst* inst);
 
+bool isFirstBlock(IRInst* inst);
 } // namespace Slang
 
 #endif

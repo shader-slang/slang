@@ -1,4 +1,5 @@
 // slang-check-overload.cpp
+
 #include "slang-ast-base.h"
 #include "slang-ast-print.h"
 #include "slang-check-impl.h"
@@ -711,7 +712,35 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         }
         else
         {
-            arg.argExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr);
+            Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr);
+
+            // Check if concrete-to-interface coercion caused loss of l-valueness.
+            if (coercedExpr && !coercedExpr->type.isLeftValue && paramType.isLeftValue &&
+                !isInterfaceType(arg.type) && isInterfaceType(paramType.type))
+            {
+                if (context.mode != OverloadResolveContext::Mode::JustTrying)
+                {
+                    String name;
+                    if (candidate.flavor == OverloadCandidate::Flavor::Func)
+                    {
+                        auto decl = getParameters(
+                            m_astBuilder,
+                            candidate.item.declRef.as<CallableDecl>())[paramIndex];
+                        name = getText(decl.getName());
+                    }
+                    else
+                        name.append(paramIndex, 10);
+
+                    getSink()->diagnose(
+                        context.loc,
+                        Diagnostics::concreteArgumentToOutputInterface,
+                        name,
+                        arg.type,
+                        paramType.type);
+                }
+                return {nullptr, nullptr};
+            }
+            arg.argExpr = coercedExpr;
         }
         return arg;
     };

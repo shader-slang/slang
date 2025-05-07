@@ -1270,13 +1270,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         switch (info.systemValueSemanticName)
         {
         case SystemValueSemanticName::GroupID:
-            return LegalizedVaryingVal::makeValue(blockIdxGlobalParam);
+            return createLegalizedVal(info, blockIdxGlobalParam);
         case SystemValueSemanticName::GroupThreadID:
-            return LegalizedVaryingVal::makeValue(threadIdxGlobalParam);
+            return createLegalizedVal(info, threadIdxGlobalParam);
         case SystemValueSemanticName::GroupIndex:
-            return LegalizedVaryingVal::makeValue(groupThreadIndex);
+            return createLegalizedVal(info, groupThreadIndex);
         case SystemValueSemanticName::DispatchThreadID:
-            return LegalizedVaryingVal::makeValue(dispatchThreadID);
+            return createLegalizedVal(info, dispatchThreadID);
         default:
             return diagnoseUnsupportedSystemVal(info);
         }
@@ -1330,6 +1330,62 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         default:
             return diagnoseUnsupportedUserVal(info);
         }
+    }
+
+    LegalizedVaryingVal createLegalizedVal(VaryingParamInfo const& info, IRInst* id)
+    {
+        // If the parameter type is not uint3, we need to extract components as needed
+        auto paramType = info.type->getOperand(0);
+        IRBuilder builder(m_module);
+        builder.setInsertBefore(m_firstOrdinaryInst);
+
+        if (as<IRBasicType>(paramType))
+        {
+            auto uintType = builder.getBasicType(BaseType::UInt);
+            UInt swizzleIndex = 0;
+            auto xComponent = builder.emitSwizzle(uintType, id, 1, &swizzleIndex);
+
+            if (auto basicType = as<IRBasicType>(paramType))
+            {
+                if (basicType->getBaseType() != BaseType::UInt)
+                {
+                    xComponent = builder.emitBitCast(basicType, xComponent);
+                }
+            }
+            return LegalizedVaryingVal::makeValue(xComponent);
+        }
+        // For vector types, use a swizzle to extract the needed components
+        else if (auto vectorType = as<IRVectorType>(paramType))
+        {
+            auto elementCount = getIntVal(vectorType->getElementCount());
+
+            if (elementCount > 0 && elementCount <= 3)
+            {
+                // Setup indices for the swizzle (0 for x, 1 for y, 2 for z)
+                UInt swizzleIndices[3] = {0, 1, 2};
+                auto uintType = builder.getBasicType(BaseType::UInt);
+
+                // Use a swizzle to extract all needed components at once
+                auto extractedVector = builder.emitSwizzle(
+                    builder.getVectorType(uintType, elementCount),
+                    id,
+                    elementCount,
+                    swizzleIndices);
+
+                // Cast if the element type is not uint
+                auto elementType = vectorType->getElementType();
+                if (auto basicElementType = as<IRBasicType>(elementType))
+                {
+                    if (basicElementType->getBaseType() != BaseType::UInt)
+                    {
+                        extractedVector = builder.emitBitCast(vectorType, extractedVector);
+                    }
+                }
+                return LegalizedVaryingVal::makeValue(extractedVector);
+            }
+        }
+        // Default to the full uint3 if the parameter type doesn't match our expectations
+        return LegalizedVaryingVal::makeValue(id);
     }
 };
 
@@ -1763,7 +1819,7 @@ private:
     void removeSemanticLayoutsFromLegalizedStructs()
     {
         // Metal and WGSL does not allow duplicate attributes to appear in the same shader.
-        // If we emit our own struct with `[[color(0)]`, all existing uses of `[[color(0)]]`
+        // If we emit our own struct with `[[color(0)]]`, all existing uses of `[[color(0)]]`
         // must be removed.
         for (auto field : semanticInfoToRemove)
         {
@@ -3154,6 +3210,14 @@ protected:
                 result.permittedTypes.add(builder.getBasicType(BaseType::Float));
                 break;
             }
+        case SystemValueSemanticName::PointCoord:
+            {
+                result.systemValueName = toSlice("point_coord");
+                result.permittedTypes.add(builder.getVectorType(
+                    builder.getBasicType(BaseType::Float),
+                    builder.getIntValue(builder.getIntType(), 2)));
+                break;
+            }
         case SystemValueSemanticName::PrimitiveID:
             {
                 result.systemValueName = toSlice("primitive_id");
@@ -3804,6 +3868,7 @@ protected:
 
         case SystemValueSemanticName::OutputControlPointID:
         case SystemValueSemanticName::PointSize:
+        case SystemValueSemanticName::PointCoord:
             {
                 result.isUnsupported = true;
             }

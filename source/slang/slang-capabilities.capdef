@@ -115,6 +115,10 @@ def spirv : target;
 /// [Target]
 def wgsl : target + textualTarget;
 
+/// Represents the Slang VM bytecode target.
+/// [Target]
+def slangvm : target;
+
 // Capabilities that stand for target SPIR-V versions for the GLSL backend.
 // These are not compilation targets. We will convert `_spirv_*` to `glsl_spirv_*` during compilation.
 
@@ -209,10 +213,16 @@ def _sm_6_5 : _sm_6_4;
 def _sm_6_6 : _sm_6_5;
 def _sm_6_7 : _sm_6_6;
 def _sm_6_8 : _sm_6_7;
+def _sm_6_9 : _sm_6_8;
 
 /// Represents HLSL NVAPI support.
 /// [Version]
 def hlsl_nvapi : hlsl;
+
+
+/// Represet HLSL compatibility support.
+/// [Version]
+def hlsl_2018 : _sm_5_1;
 
 /// Represents capabilities required for DXIL Library compilation.
 /// [Version]
@@ -427,6 +437,10 @@ def domain : stage;
 /// [Stage]
 def geometry : stage;
 
+/// Dispatch shader stage
+/// [Stage]
+def dispatch : stage;
+
 def _raygen : stage;
 alias _raygeneration = _raygen;
 def _intersection : stage;
@@ -512,6 +526,10 @@ def SPV_KHR_shader_clock : _spirv_1_0;
 /// [EXT]
 def SPV_NV_shader_subgroup_partitioned : _spirv_1_0;
 
+/// Represents the SPIR-V extension enables rotating values across invocations within a subgroup.
+/// [EXT]
+def SPV_KHR_subgroup_rotate : _spirv_1_3;
+
 /// Represents the SPIR-V extension for ray tracing motion blur.
 /// [EXT]
 def SPV_NV_ray_tracing_motion_blur : _spirv_1_0;
@@ -544,6 +562,10 @@ def SPV_EXT_replicated_composites : _spirv_1_0;
 /// Represents the SPIR-V extension for SPV_NV_cooperative_vector.
 /// [EXT]
 def SPV_NV_cooperative_vector : _spirv_1_6 + SPV_EXT_replicated_composites;
+
+/// Represents the SPIR-V extension for SPV_KHR_cooperative_matrix.
+/// [EXT]
+def SPV_KHR_cooperative_matrix : _spirv_1_6 + SPV_EXT_physical_storage_buffer;
 
 // SPIRV Capabilities.
 
@@ -635,6 +657,10 @@ def spvGroupNonUniformVote : _spirv_1_3;
 /// [EXT]
 def spvGroupNonUniformPartitionedNV : _spirv_1_3 + SPV_NV_shader_subgroup_partitioned;
 
+/// Represents the SPIR-V capability for group non-uniform rotate operations.
+/// [EXT]
+def spvGroupNonUniformRotateKHR : _spirv_1_3;
+
 /// Represents the SPIR-V capability for ray tracing motion blur.
 /// [EXT]
 def spvRayTracingMotionBlurNV : SPV_NV_ray_tracing_motion_blur;
@@ -694,6 +720,10 @@ def spvCooperativeVectorNV : SPV_NV_cooperative_vector;
 /// Represents the SPIR-V capability for cooperative vector training
 /// [EXT]
 def spvCooperativeVectorTrainingNV : SPV_NV_cooperative_vector;
+
+/// Represents the SPIR-V capability for cooperative matrices
+/// [EXT]
+def spvCooperativeMatrixKHR : SPV_KHR_cooperative_matrix;
 
 /// Represents the SPIR-V capability for maximal reconvergence.
 /// [EXT]
@@ -768,6 +798,7 @@ def _GL_KHR_shader_subgroup_quad : _GLSL_140;
 def _GL_KHR_shader_subgroup_shuffle : _GLSL_140;
 def _GL_KHR_shader_subgroup_shuffle_relative : _GLSL_140;
 def _GL_KHR_shader_subgroup_vote : _GLSL_140;
+def _GL_KHR_shader_subgroup_rotate : _GLSL_140;
 
 def _GL_NV_compute_shader_derivatives : _GLSL_450;
 def _GL_NV_fragment_shader_barycentric : _GL_EXT_fragment_shader_barycentric;
@@ -973,6 +1004,10 @@ alias GL_KHR_shader_subgroup_shuffle_relative = _GL_KHR_shader_subgroup_shuffle_
 /// [EXT]
 alias GL_KHR_shader_subgroup_vote = _GL_KHR_shader_subgroup_vote | spvGroupNonUniformVote;
 
+/// Represents the GL_KHR_shader_subgroup_rotate extension.
+/// [EXT]
+alias GL_KHR_shader_subgroup_rotate = _GL_KHR_shader_subgroup_rotate | spvGroupNonUniformRotateKHR;
+
 /// Represents the GL_NV_compute_shader_derivatives extension.
 /// [EXT]
 alias GL_NV_compute_shader_derivatives = _GL_NV_compute_shader_derivatives | SPV_KHR_compute_shader_derivatives | _sm_6_6;
@@ -1074,6 +1109,9 @@ alias cooperative_vector = _sm_6_8 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV
 /// Capabilities needed to train cooperative vectors
 /// [Compound]
 alias cooperative_vector_training = spvCooperativeVectorTrainingNV;
+
+/// Capabilities needed to use cooperative matrices
+alias cooperative_matrix = spvCooperativeMatrixKHR;
 
 // Non-internal shader stages
 //
@@ -1538,6 +1576,24 @@ alias sm_6_8 = sm_6_8_version
              | sm_6_7
              ;
 
+/// HLSL shader model 6.9 and related capabilities of other targets.
+/// Does not include related GLSL/SPIRV extensions.
+/// [Version]
+alias sm_6_9_version = _sm_6_9
+             | _GLSL_460
+             | spirv_1_5
+             | _cuda_sm_9_0
+             | metal
+             | cpp
+             ;
+
+/// HLSL shader model 6.9 and related capabilities of other targets.
+/// Includes related GLSL/SPIRV extensions.
+/// [Version]
+alias sm_6_9 = sm_6_9_version
+             | sm_6_8
+             ;
+
 // Profiles
 /// Use `sm_4_0` instead
 /// [Other]
@@ -1590,6 +1646,10 @@ alias DX_6_7 = sm_6_7;
 /// Use `sm_6_8` instead
 /// [Other]
 alias DX_6_8 = sm_6_8;
+
+/// Use `sm_6_9` instead
+/// [Other]
+alias DX_6_9 = sm_6_9;
 
 // GLSL profile capabilities
 //
@@ -2035,6 +2095,13 @@ alias subgroup_quad = GL_KHR_shader_subgroup_quad
 /// [Compound]
 alias subgroup_partitioned = GL_NV_shader_subgroup_partitioned + subgroup_ballot_activemask | _sm_6_5 | _cuda_sm_7_0;
 
+
+/// Capabilities required to use GLSL-style subgroup rotate operations 'subgroup_rotate'
+/// [Compound]
+alias subgroup_rotate = GL_KHR_shader_subgroup_rotate 
+                       | metal
+                       ;
+
 /// (All implemented targets) Capabilities required to use atomic operations of GLSL tier-1 float atomics
 /// [Compound]
 alias atomic_glsl_hlsl_nvapi_cuda_metal_float1 = atomic_glsl_float1 | hlsl_nvapi + _sm_4_0 | _cuda_sm_2_0 | metal;
@@ -2151,10 +2218,10 @@ alias ser_motion_raygen = raygen + ser_motion;
 
 /// User should not use this capability
 /// [Other]
-alias all = _sm_6_8 + hlsl_nvapi
-          | glsl_spirv_1_5 + sm_6_8
+alias all = _sm_6_9 + hlsl_nvapi
+          | glsl_spirv_1_5 + sm_6_9
              + ser + shaderclock + texturefootprint + fragmentshaderinterlock + _GL_NV_shader_subgroup_partitioned
              + _GL_NV_ray_tracing_motion_blur + _GL_NV_shader_texture_footprint
-          | spirv_1_5 + sm_6_8
+          | spirv_1_5 + sm_6_9
              + ser + shaderclock + texturefootprint + fragmentshaderinterlock + spvGroupNonUniformPartitionedNV
              + spvRayTracingMotionBlurNV + spvRayTracingMotionBlurNV;

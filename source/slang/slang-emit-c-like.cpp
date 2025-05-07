@@ -4413,7 +4413,7 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(
             }
         }
         emitSemanticsPrefix(fieldKey);
-        emitStructFieldAttributes(structType, ff);
+        emitStructFieldAttributes(structType, ff, allowOffsetLayout);
         emitMemoryQualifiers(fieldKey);
         emitType(fieldType, getName(fieldKey));
         emitSemantics(fieldKey, allowOffsetLayout);

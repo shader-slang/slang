@@ -38,9 +38,9 @@ struct ASTIterator
         {
             if (!expr)
                 return;
-            expr->accept(this, nullptr);
+            this->dispatch(expr);
         }
-        bool visitExpr(Expr*) { return false; }
+        void visitExpr(Expr*) {}
         void visitBoolLiteralExpr(BoolLiteralExpr* expr) { iterator->maybeDispatchCallback(expr); }
         void visitNullPtrLiteralExpr(NullPtrLiteralExpr* expr)
         {
@@ -313,6 +313,8 @@ struct ASTIterator
                     dispatchIfNotNull(o.expr);
             }
         }
+
+        void visitDetachExpr(DetachExpr* expr) { iterator->maybeDispatchCallback(expr); }
     };
 
     struct ASTIteratorStmtVisitor : public StmtVisitor<ASTIteratorStmtVisitor>
@@ -327,7 +329,7 @@ struct ASTIterator
         {
             if (!stmt)
                 return;
-            stmt->accept(this, nullptr);
+            this->dispatch(stmt);
         }
 
         void visitDeclStmt(DeclStmt* stmt)
@@ -566,6 +568,8 @@ void iterateASTWithLanguageServerFilter(
 {
     auto filter = [&](DeclBase* decl)
     {
+        if (as<ConstructorDecl>(decl) && decl->findModifier<SynthesizedModifier>())
+            return false;
         return as<NamespaceDeclBase>(decl) ||
                sourceManager->getHumaneLoc(decl->loc, SourceLocType::Actual)
                    .pathInfo.foundPath.getUnownedSlice()

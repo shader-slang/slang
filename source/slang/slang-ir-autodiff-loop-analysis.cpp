@@ -252,11 +252,8 @@ void StatementSet::disjunct(StatementSet other)
     // Remove any insts that don't have a corresponding statement in the other set,
     // since this effectively means "any".
     //
-    for (auto& statement : statements)
-    {
-        if (!other.statements.containsKey(statement.first))
-            statements.remove(statement.first);
-    }
+    statements.removeIf([&](auto const& statement)
+                        { return !other.statements.containsKey(statement.first); });
 }
 
 void StatementSet::conjunct(StatementSet other)
@@ -710,8 +707,28 @@ StatementSet propagateUpwards(
                 }
                 else
                 {
-                    // Panic
-                    SLANG_UNREACHABLE("Unreachable block in conditional branch");
+                    // It's possible that the predecessor block is the condition block itself (when
+                    // either the true side or the false side is empty).
+                    //
+                    if (predecessor == ifElse->getParent() && ifElse->getFalseBlock() == current)
+                    {
+                        // True branch
+                        newPredicateSet.conjunct(
+                            tryExtractStatements(ifElse, ifElse->getFalseBlock()));
+                    }
+                    else if (
+                        predecessor == ifElse->getParent() && ifElse->getTrueBlock() == current)
+                    {
+                        // False branch
+                        newPredicateSet.conjunct(
+                            tryExtractStatements(ifElse, ifElse->getTrueBlock()));
+                    }
+                    else
+                    {
+
+                        // Panic
+                        SLANG_UNREACHABLE("Unreachable block in conditional branch");
+                    }
                 }
             }
         }

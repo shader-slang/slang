@@ -405,8 +405,13 @@ SlangResult RendererBase::queryInterface(SlangUUID const& uuid, void** outObject
         return SLANG_OK;
     }
 
-    *outObject = getInterface(uuid);
-    return SLANG_OK;
+    if (IDevice* device_ptr = getInterface(uuid))
+    {
+        *outObject = device_ptr;
+        addRef();
+        return SLANG_OK;
+    }
+    return SLANG_E_NO_INTERFACE;
 }
 
 IDevice* gfx::RendererBase::getInterface(const Guid& guid)
@@ -767,6 +772,14 @@ Result RendererBase::getTextureAllocationInfo(
 Result RendererBase::getTextureRowAlignment(Size* outAlignment)
 {
     *outAlignment = 0;
+    return SLANG_E_NOT_AVAILABLE;
+}
+
+Result RendererBase::getCooperativeVectorProperties(
+    CooperativeVectorProperties* properties,
+    uint32_t* propertyCount)
+{
+    *propertyCount = 0;
     return SLANG_E_NOT_AVAILABLE;
 }
 

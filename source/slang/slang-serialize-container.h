@@ -12,80 +12,11 @@ namespace Slang
 
 class EndToEndCompileRequest;
 
-/* The binary representation actually held in riff/file format*/
-struct SerialContainerBinary
-{
-    struct Target
-    {
-        uint32_t target;
-        uint32_t flags;
-        uint32_t profile;
-        uint32_t floatingPointMode;
-    };
-
-    struct EntryPoint
-    {
-        uint32_t name;
-        uint32_t profile;
-        uint32_t mangledName;
-    };
-};
-
-struct SerialContainerDataModule
-{
-    RefPtr<IRModule> irModule;       ///< The IR for the module
-    RefPtr<ASTBuilder> astBuilder;   ///< The astBuilder that owns the astRootNode
-    NodeBase* astRootNode = nullptr; ///< The module decl
-    List<String> dependentFiles;
-    SHA1::Digest digest;
-};
-
-/* Struct that holds all the data that can be held in a 'container' */
-struct SerialContainerData
-{
-    struct Target
-    {
-        CodeGenTarget codeGenTarget = CodeGenTarget::Unknown;
-        SlangTargetFlags flags = kDefaultTargetFlags;
-        Profile profile;
-        FloatingPointMode floatingPointMode = FloatingPointMode::Default;
-    };
-
-    struct TargetComponent
-    {
-        // IR module for a specific compilation target
-        Target target;
-        RefPtr<IRModule> irModule;
-    };
-
-    typedef SerialContainerDataModule Module;
-
-    struct EntryPoint
-    {
-        Name* name = nullptr;
-        Profile profile;
-        String mangledName;
-    };
-
-    void clear()
-    {
-        entryPoints.clear();
-        modules.clear();
-        targetComponents.clear();
-    }
-
-    List<Module> modules;
-    List<TargetComponent> targetComponents;
-    List<EntryPoint> entryPoints;
-};
 
 struct SerialContainerUtil
 {
     struct WriteOptions
     {
-        SerialCompressionType compressionType =
-            SerialCompressionType::VariableByteLite; ///< If compression is used what type to use
-                                                     ///< (only some parts can be compressed)
         SerialOptionFlags optionFlags =
             SerialOptionFlag::ASTModule |
             SerialOptionFlag::IRModule; ///< Flags controlling what is written
@@ -107,37 +38,6 @@ struct SerialContainerUtil
         String modulePath;
     };
 
-    /// Add module to outData
-    static SlangResult addModuleToData(
-        Module* module,
-        const WriteOptions& options,
-        SerialContainerData& outData);
-
-    /// Get the serializable contents of the request as data
-    static SlangResult addEndToEndRequestToData(
-        EndToEndCompileRequest* request,
-        const WriteOptions& options,
-        SerialContainerData& outData);
-
-    /// Convert front end request into something serializable
-    static SlangResult addFrontEndRequestToData(
-        FrontEndCompileRequest* request,
-        const WriteOptions& options,
-        SerialContainerData& outData);
-
-    /// Write the data into the container
-    static SlangResult write(
-        const SerialContainerData& data,
-        const WriteOptions& options,
-        RiffContainer* container);
-
-    /// Read the container into outData
-    static SlangResult read(
-        RiffContainer* container,
-        const ReadOptions& options,
-        const LoadedModuleDictionary* additionalLoadedModules,
-        SerialContainerData& outData);
-
     /// Verify IR serialization
     static SlangResult verifyIRSerialize(
         IRModule* module,
@@ -155,6 +55,192 @@ struct SerialContainerUtil
         Stream* stream);
     static SlangResult write(Module* module, const WriteOptions& options, Stream* stream);
 };
+
+
+struct ChunkRef
+{
+public:
+    ChunkRef(RiffContainer::Chunk* chunk)
+        : _chunk(chunk)
+    {
+    }
+
+    RiffContainer::Chunk* ptr() const { return _chunk; }
+
+protected:
+    RiffContainer::Chunk* _chunk = nullptr;
+};
+
+struct DataChunkRef : ChunkRef
+{
+public:
+    DataChunkRef(RiffContainer::DataChunk* chunk)
+        : ChunkRef(chunk)
+    {
+    }
+
+    RiffContainer::DataChunk* ptr() const { return static_cast<RiffContainer::DataChunk*>(_chunk); }
+
+    operator RiffContainer::DataChunk*() const { return ptr(); }
+};
+
+
+template<typename T>
+struct ChunkRefList
+{
+public:
+    struct Iterator
+    {
+    public:
+        Iterator(RiffContainer::Chunk* chunk)
+            : _chunk(chunk)
+        {
+        }
+
+        bool operator!=(Iterator const& other) const { return _chunk != other._chunk; }
+
+        void operator++() { _chunk = _chunk->m_next; }
+
+        T operator*()
+        {
+            ChunkRef ref(_chunk);
+            return *(T*)&ref;
+        }
+
+    private:
+        RiffContainer::Chunk* _chunk = nullptr;
+    };
+
+    Iterator begin() const { return _list ? _list->getFirstContainedChunk() : nullptr; }
+    Iterator end() const { return Iterator(nullptr); }
+
+    Count getCount()
+    {
+        Count count = 0;
+        for (auto i : *this)
+            count++;
+        return count;
+    }
+
+    T getFirst() { return *begin(); }
+
+    ChunkRefList() {}
+
+    ChunkRefList(RiffContainer::ListChunk* list)
+        : _list(list)
+    {
+    }
+
+    operator RiffContainer::ListChunk*() const { return _list; }
+
+private:
+    RiffContainer::ListChunk* _list = nullptr;
+};
+
+struct ListChunkRef : ChunkRef
+{
+public:
+    ListChunkRef(RiffContainer::Chunk* chunk)
+        : ChunkRef(chunk)
+    {
+    }
+
+    RiffContainer::ListChunk* ptr() const { return static_cast<RiffContainer::ListChunk*>(_chunk); }
+
+    operator RiffContainer::ListChunk*() const { return ptr(); }
+};
+
+
+struct StringChunkRef : DataChunkRef
+{
+public:
+    String getValue();
+};
+
+struct IRModuleChunkRef : ListChunkRef
+{
+public:
+    explicit IRModuleChunkRef(RiffContainer::ListChunk* chunk)
+        : ListChunkRef(chunk)
+    {
+    }
+};
+
+struct ASTModuleChunkRef : ListChunkRef
+{
+public:
+    explicit ASTModuleChunkRef(RiffContainer::ListChunk* chunk)
+        : ListChunkRef(chunk)
+    {
+    }
+};
+
+struct ModuleChunkRef : ListChunkRef
+{
+public:
+    static ModuleChunkRef find(RiffContainer* container);
+
+    String getName();
+
+    IRModuleChunkRef findIR();
+    ASTModuleChunkRef findAST();
+
+    SHA1::Digest getDigest();
+
+    ChunkRefList<StringChunkRef> getFileDependencies();
+
+protected:
+    ModuleChunkRef(RiffContainer::Chunk* chunk)
+        : ListChunkRef(chunk)
+    {
+    }
+};
+
+struct EntryPointChunkRef : ListChunkRef
+{
+public:
+    String getMangledName() const;
+    String getName() const;
+    Profile getProfile() const;
+
+protected:
+    EntryPointChunkRef(RiffContainer::Chunk* chunk)
+        : ListChunkRef(chunk)
+    {
+    }
+};
+
+struct ContainerChunkRef : ListChunkRef
+{
+public:
+    static ContainerChunkRef find(RiffContainer* container);
+
+    ChunkRefList<ModuleChunkRef> getModules();
+
+    ChunkRefList<EntryPointChunkRef> getEntryPoints();
+
+protected:
+    ContainerChunkRef(RiffContainer::Chunk* chunk)
+        : ListChunkRef(chunk)
+    {
+    }
+};
+
+/// Attempt to find a debug-info chunk relative to
+/// the given `startingChunk`.
+///
+RiffContainer::ListChunk* findDebugChunk(RiffContainer::Chunk* startingChunk);
+
+SlangResult readSourceLocationsFromDebugChunk(
+    RiffContainer::ListChunk* debugChunk,
+    SourceManager* sourceManager,
+    RefPtr<SerialSourceLocReader>& outReader);
+
+SlangResult decodeModuleIR(
+    RefPtr<IRModule>& outIRModule,
+    RiffContainer::Chunk* chunk,
+    Session* session,
+    SerialSourceLocReader* sourceLocReader);
 
 } // namespace Slang
 

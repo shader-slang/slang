@@ -1877,6 +1877,7 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
         disableIRValidationAtInsert();
         auto simplifyOptions = IRSimplificationOptions::getDefault(nullptr);
         simplifyOptions.removeRedundancy = true;
+        simplifyOptions.hoistLoopInvariantInsts = true;
         simplifyFunc(autoDiffSharedContext->targetProgram, func, simplifyOptions);
         enableIRValidationAtInsert();
     }
@@ -2156,6 +2157,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_GetNativePtr:
     case kIROp_CastIntToFloat:
     case kIROp_CastFloatToInt:
+    case kIROp_CastIntToEnum:
+    case kIROp_CastEnumToInt:
+    case kIROp_EnumCast:
     case kIROp_DetachDerivative:
     case kIROp_GetSequentialID:
     case kIROp_GetStringHash:
