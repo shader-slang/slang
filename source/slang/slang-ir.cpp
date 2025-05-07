@@ -3415,11 +3415,18 @@ IRInst* IRBuilder::emitDebugInlinedAt(
     IRInst* line,
     IRInst* col,
     IRInst* file,
-    IRInst* outerInlinedAt,
-    IRInst* debugFunc)
+    IRInst* debugFunc,
+    IRInst* outerInlinedAt)
 {
-    IRInst* args[] = {line, col, file, outerInlinedAt, debugFunc};
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedAt, 5, args);
+    List<IRInst*> args;
+    args.add(line);
+    args.add(col);
+    args.add(file);
+    args.add(debugFunc);
+    // This is optional.
+    if (outerInlinedAt)
+        args.add(outerInlinedAt);
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedAt, (UInt)args.getCount(), args.getBuffer());
 }
 
 IRInst* IRBuilder::emitDebugFunction(

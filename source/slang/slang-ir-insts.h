@@ -3448,10 +3448,11 @@ struct IRDebugInlinedAt : IRInst
     IRInst* getLine() { return getOperand(0); }
     IRInst* getCol() { return getOperand(1); }
     IRInst* getFile() { return getOperand(2); }
-    IRInst* getOuterInlinedAt() { return getOperand(3); }
-    IRInst* getDebugFunc() { return getOperand(4); }
-    void setOuterInlinedAt(IRInst* outer) { setOperand(3, outer); }
-    void setDebugFunc(IRInst* func) { setOperand(4, func); }
+    IRInst* getDebugFunc() { return getOperand(3); }
+    IRInst* getOuterInlinedAt() { return getOperand(4); }
+    void setDebugFunc(IRInst* func) { setOperand(3, func); }
+    void setOuterInlinedAt(IRInst* outer) { setOperand(4, outer); }
+    bool isOuterInlinedPresent() { return operandCount == 5; }
 };
 
 struct IRDebugScope : IRInst
@@ -3996,8 +3997,8 @@ public:
         IRInst* line,
         IRInst* col,
         IRInst* file,
-        IRInst* outerInlinedAt,
-        IRInst* debugFunc);
+        IRInst* debugFunc,
+        IRInst* outerInlinedAt);
     IRInst* emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt);
     IRInst* emitDebugScope(IRInst* scope, IRInst* inlinedAt);
     IRInst* emitDebugNoScope();

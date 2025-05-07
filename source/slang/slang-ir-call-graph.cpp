@@ -83,9 +83,6 @@ void buildEntryPointReferenceGraph(
         for (UInt i = 0; i < inst->getOperandCount(); i++)
         {
             auto operand = inst->getOperand(i);
-            if (!operand)
-                continue;
-
             switch (operand->getOp())
             {
             case kIROp_GlobalParam:

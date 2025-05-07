@@ -399,8 +399,8 @@ struct InliningPassBase
                 lastDebugLine->getLineStart(),
                 lastDebugLine->getColStart(),
                 lastDebugLine->getSource(),
-                callDebugInlinedAt,
-                callerDebugFunc);
+                callerDebugFunc,
+                callDebugInlinedAt);
 
             if (newDebugInlinedAt && calleeDebugFunc)
             {
@@ -627,6 +627,7 @@ struct InliningPassBase
         // and remember the (clone of the) returned value.
         //
         IRInst* returnVal = nullptr;
+        List<IRDebugInlinedAt*> debugInlinedInsts;
         for (auto inst : firstBlock->getChildren())
         {
             switch (inst->getOp())
@@ -658,13 +659,27 @@ struct InliningPassBase
                 }
 
             case kIROp_DebugInlinedAt:
-                {
-                    auto clonedInst = _cloneInstWithSourceLoc(callSite, env, builder, inst);
-                    IRDebugInlinedAt* inlinedAt = as<IRDebugInlinedAt>(clonedInst);
-                    if (newDebugInlinedAt && (inlinedAt->getOuterInlinedAt() == nullptr))
-                        inlinedAt->setOuterInlinedAt(newDebugInlinedAt);
-                    break;
-                }
+                auto clonedInst = _cloneInstWithSourceLoc(callSite, env, builder, inst);
+                debugInlinedInsts.add(as<IRDebugInlinedAt>(clonedInst));
+                break;
+            }
+        }
+        // For any debugInlinedAt without an outerinlinedAt, emit a new debugInlinedAt with the outer
+        // set, and delete the older debugInlinedAt
+        for (Index i = 0; i < debugInlinedInsts.getCount(); ++i)
+        {
+            auto inst = debugInlinedInsts[i];
+            if (newDebugInlinedAt && !inst->isOuterInlinedPresent())
+            {
+                builder->setInsertAfter(inst);
+                auto newInlinedAt = builder->emitDebugInlinedAt(
+                    inst->getLine(),
+                    inst->getCol(),
+                    inst->getFile(),
+                    inst->getDebugFunc(),
+                    newDebugInlinedAt);
+                inst->replaceUsesWith(newInlinedAt);
+                inst->removeAndDeallocate();
             }
         }
         // We are going to remove the original `call` now that the callee
@@ -859,21 +874,14 @@ struct InliningPassBase
                         _setSourceLoc(returnBranch, inst, callSite);
                     }
                     break;
-
-                case kIROp_DebugInlinedAt:
-                    {
-                        auto clonedInst = _cloneInstWithSourceLoc(callSite, env, builder, inst);
-                        IRDebugInlinedAt* inlinedAt = as<IRDebugInlinedAt>(clonedInst);
-                        if (newDebugInlinedAt && (inlinedAt->getOuterInlinedAt() == nullptr))
-                            inlinedAt->setOuterInlinedAt(newDebugInlinedAt);
-                        break;
-                    }
                 }
             }
             isFirstBlock = false;
         }
-
         // For each existing debugNoScope inst, replace it with new debug scope we emit.
+        // For any debugInlinedAt without an outerinlinedAt, emit a new debugInlinedAt with the outer
+        // set, and delete the older debugInlinedAt
+        List<IRDebugInlinedAt*> debugInlinedInsts;
         if (newDebugInlinedAt && callee->findDecoration<IRDebugLocationDecoration>())
         {
             for (auto calleeBlock : callee->getBlocks())
@@ -885,14 +893,32 @@ struct InliningPassBase
                 {
                     if (as<IRDebugNoScope>(inst))
                     {
-                        setInsertBeforeOrdinaryInst(builder, inst);
+                        builder->setInsertAfter(inst);
                         builder->emitDebugScope(calleeDebugFunc, newDebugInlinedAt);
                         inst->removeAndDeallocate();
                     }
                 }
+                for (auto inst : clonedBlock->getChildren())
+                {
+                    if (auto inlinedAt = as<IRDebugInlinedAt>(inst))
+                    {
+                        debugInlinedInsts.add(inlinedAt);
+                        if (!inlinedAt->isOuterInlinedPresent())
+                        {
+                            builder->setInsertAfter(inst);
+                            auto newInlinedAt = builder->emitDebugInlinedAt(
+                                inlinedAt->getLine(),
+                                inlinedAt->getCol(),
+                                inlinedAt->getFile(),
+                                inlinedAt->getDebugFunc(),
+                                newDebugInlinedAt);
+                            inlinedAt->replaceUsesWith(newInlinedAt);
+                            inlinedAt->removeAndDeallocate();
+                        }
+                    }
+                }
             }
         }
-
         // If there was a `returnVal` instruction that established
         // the return value of the inlined function, then that value
         // should be used to replace any uses of the original call.

@@ -7474,7 +7474,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         // If it's not chained to another IRDebugInlinedAt, we don't use this.
         SpvInst* inlined = nullptr;
-        if (as<IRDebugInlinedAt>(debugInlinedAt->getOuterInlinedAt()))
+        if (as<IRDebugInlinedAt>(debugInlinedAt)->isOuterInlinedPresent())
         {
             inlined = ensureInst(debugInlinedAt->getOuterInlinedAt());
         }
