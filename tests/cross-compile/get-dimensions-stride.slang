@@ -13,7 +13,7 @@ RWStructuredBuffer<int> buffer0;
 //TEST_INPUT:ubuffer(data=[23 2], stride=4):name buffer1
 RWStructuredBuffer<int> buffer1;
 
-//TEST_INPUT:ubuffer(data=[-10 17 9 4 2], stride=2):name buffer2
+//TEST_INPUT:ubuffer(data=[0.0], stride=4):name buffer2
 RWStructuredBuffer<half> buffer2;
 
 //TEST_INPUT:ubuffer(data=[-10 17 9 4 2 0], stride=4):name buffer3
