@@ -7493,9 +7493,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvInstParent* parent,
         IRDebugInlinedVariable* debugInlinedVar)
     {
-        if (!debugInlinedVar)
-            return nullptr;
-
         // Get the operands from the IRDebugInlinedVariable instruction
         IRInst* variable = debugInlinedVar->getVariable();
         IRInst* inlinedAt = debugInlinedVar->getInlinedAt();
@@ -7989,20 +7986,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto debugType = emitDebugType(function->getDataType());
         IRBuilder builder(function);
 
-        // Look for a DebugFunctionDecoration on the function. If it has,
-        // then it means that we have emitted a IRDebugFunction for this func.
-        // So, instead of storing the func in the m_mapIRInstToSpvDebugInst,
-        // we instead store the IRDebugFunction. This way, we avoid the same
-        // function getting emitted again via emitDebugInlinedFunction.
         IRDebugFunction* irDebugFunc = nullptr;
-        for (auto decor : function->getDecorations())
+        if (auto debugFuncDecor = function->findDecoration<IRDebugFuncDecoration>())
         {
-            if (auto debugFuncDecor = as<IRDebugFuncDecoration>(decor))
-            {
-                irDebugFunc = as<IRDebugFunction>(debugFuncDecor->getDebugFunc());
-                break;
-            }
+            irDebugFunc = as<IRDebugFunction>(debugFuncDecor->getDebugFunc());
         }
+
+        if (irDebugFunc == nullptr)
+            return nullptr;
 
         SpvInst* debugFunc = nullptr;
         debugFunc = emitOpDebugFunction(
