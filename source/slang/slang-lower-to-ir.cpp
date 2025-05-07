@@ -6738,15 +6738,14 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // block. If there's a `defer` in the tryBody, it can run after the
         // catch statement.
         lowerStmt(context, stmt->tryBody);
-        emitBranchIfNeeded(mergeBlock);
+        emitBranchIfNeeded(endBlock);
 
-        builder->insertBlock(endBlock);
+        insertBlock(endBlock);
         emitBranchIfNeeded(mergeBlock);
 
         context->catchHandler = catchHandler.prev;
 
-        builder->insertBlock(handleBlock);
-        builder->setInsertInto(handleBlock);
+        insertBlock(handleBlock);
 
         auto irParam = builder->emitParam(catchHandler.errorType);
         auto paramVal = LoweredValInfo::simple(irParam);
@@ -6757,9 +6756,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         popScopeBlock(prevScopeEndBlock, true);
 
         emitBranchIfNeeded(mergeBlock);
-
-        builder->insertBlock(mergeBlock);
-        builder->setInsertInto(mergeBlock);
+        insertBlock(mergeBlock);
     }
 
     void visitDiscardStmt(DiscardStmt* stmt)
