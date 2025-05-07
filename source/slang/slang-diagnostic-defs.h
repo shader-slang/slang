@@ -1371,7 +1371,7 @@ DIAGNOSTIC(
     31221,
     Error,
     arraySizeCannotBeSpecializationConstant,
-    "'$0' cannot has specialization constant size. Only global or group shared array "
+    "'$0' cannot has specialization constant size. Only static global, group shared or local array "
     "can have specialization constant size.")
 // Enums
 

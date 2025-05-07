@@ -2112,8 +2112,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         // are defined in a way that can be used as a constant expression:
         if (auto varRef = declRef.as<VarDeclBase>())
         {
-            auto val = tryConstantFoldDeclRef(varRef, kind, circularityInfo);
-            return val;
+            return tryConstantFoldDeclRef(varRef, kind, circularityInfo);
         }
         else if (auto enumRef = declRef.as<EnumCaseDecl>())
         {

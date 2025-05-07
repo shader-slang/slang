@@ -348,7 +348,6 @@ bool ArrayExpressionType::isUnsized()
         if (constSize->getValue() == kUnsizedArrayMagicLength)
             return true;
     }
-
     return false;
 }
 

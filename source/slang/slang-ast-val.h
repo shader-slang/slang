@@ -166,7 +166,10 @@ class ConstantIntVal : public IntVal
     bool _isLinkTimeValOverride() { return false; }
 };
 
-// Trivial case of a value that is just a constant integer
+// Represent a constant specialize integer or an expression that result in a constant specialize integer
+// The operand could be a DeclRef if it is a specialization constant, or a FuncCallIntVal if it is an expression
+// that results in a specialization constant.
+
 FIDDLE()
 class SpecializationConstantIntVal : public IntVal
 {
