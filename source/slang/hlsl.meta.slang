@@ -22479,8 +22479,9 @@ struct CoopMat
 
     [ForceInline]
     [require(cooperative_matrix_conversion)]
-    __generic<U : __BuiltinArithmeticType>
-    __init(CoopMat<U, S, M, N, R> other)
+    __init<
+        U : __BuiltinArithmeticType
+    >(CoopMat<U, S, M, N, R> other)
     {
         this.copyFrom(other);
     }
@@ -22524,8 +22525,9 @@ struct CoopMat
     [ForceInline]
     [mutating]
     [require(cooperative_matrix_conversion)]
-    __generic<U : __BuiltinArithmeticType>
-    void copyFrom(CoopMat<U, S, M, N, R> other)
+    void copyFrom<
+        U : __BuiltinArithmeticType
+    >(CoopMat<U, S, M, N, R> other)
     {
         if (__isFloat<T>() && __isInt<U>())
             this = __int_to_float_cast<T>(other);
@@ -22618,8 +22620,9 @@ struct CoopMat
     }
 
     [require(cooperative_matrix_reduction)]
-    __generic<let RN : int>
-    CoopMat<T, S, M, RN, CoopMatMatrixUse.MatrixAccumulator> ReduceRow(functype(T, T) -> T combineOp)
+    CoopMat<T, S, M, RN, CoopMatMatrixUse.MatrixAccumulator> ReduceRow<
+        let RN : int
+    >(functype(T, T) -> T combineOp)
     {
         return spirv_asm
         {
@@ -22630,8 +22633,9 @@ struct CoopMat
     }
 
     [require(cooperative_matrix_reduction)]
-    __generic<let RM : int>
-    CoopMat<T, S, RM, N, CoopMatMatrixUse.MatrixAccumulator> ReduceColumn(functype(T, T) -> T combineOp)
+    CoopMat<T, S, RM, N, CoopMatMatrixUse.MatrixAccumulator> ReduceColumn<
+        let RM : int
+    >(functype(T, T) -> T combineOp)
     {
         return spirv_asm
         {
@@ -22642,8 +22646,10 @@ struct CoopMat
     }
 
     [require(cooperative_matrix_reduction)]
-    __generic<let RM : int, let RN : int>
-    CoopMat<T, S, RM, RN, CoopMatMatrixUse.MatrixAccumulator> ReduceRowAndColumn(functype(T, T) -> T combineOp)
+    CoopMat<T, S, RM, RN, CoopMatMatrixUse.MatrixAccumulator> ReduceRowAndColumn<
+        let RM : int,
+        let RN : int
+    >(functype(T, T) -> T combineOp)
     {
         return spirv_asm
         {
@@ -22718,15 +22724,17 @@ ${{{{
     //
 
     [require(cooperative_matrix)]
-    __generic<let matrixLayout : CoopMatMatrixLayout>
-    void Store(RWStructuredBuffer<T> buffer, uint element, uint stride)
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout
+    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
     {
         __Store(buffer, element, stride, matrixLayout);
     }
 
     [require(cooperative_matrix)]
-    __generic<let matrixLayout : CoopMatMatrixLayout>
-    void Store(RWByteAddressBuffer buffer, uint element, uint stride)
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout
+    >(RWByteAddressBuffer buffer, uint element, uint stride)
     {
         __Store(__getEquivalentStructuredBuffer<T>(buffer), element, stride, matrixLayout);
     }
@@ -22745,8 +22753,9 @@ ${{{{
     }
 
     [require(cooperative_matrix)]
-    __generic<let matrixLayout : CoopMatMatrixLayout>
-    void Store(T* buffer, uint element, uint stride)
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout
+    >(T* buffer, uint element, uint stride)
     {
         let alignment = 16U;
         return spirv_asm
@@ -22758,8 +22767,10 @@ ${{{{
 
     [ForceInline]
     [require(cooperative_matrix)]
-    __generic<let matrixLayout : CoopMatMatrixLayout, let V : int>
-    void Store(__ref groupshared T[V] data, uint element, uint stride)
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout,
+        let V : int
+    >(__ref groupshared T[V] data, uint element, uint stride)
     {
         let alignment = 16U;
         spirv_asm
@@ -22772,8 +22783,11 @@ ${{{{
 
     [ForceInline]
     [require(cooperative_matrix)]
-    __generic<let matrixLayout : CoopMatMatrixLayout, U, let V : int>
-    void Store(__ref groupshared U[V] data, uint element, uint stride)
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+        let V : int
+    >(__ref groupshared U[V] data, uint element, uint stride)
     {
         let alignment = 16U;
         spirv_asm
@@ -22786,8 +22800,12 @@ ${{{{
 
     [ForceInline]
     [require(cooperative_matrix)]
-    __generic<let matrixLayout : CoopMatMatrixLayout, U, let V : int, let L : int>
-    void Store(__ref groupshared vector<U, L>[V] data, uint element, uint stride)
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+        let V : int,
+        let L : int
+    >(__ref groupshared vector<U, L>[V] data, uint element, uint stride)
     {
         let alignment = 16U;
         spirv_asm
@@ -22805,24 +22823,27 @@ ${{{{
 
     [__NoSideEffect]
     [require(cooperative_matrix)]
-    __generic<let matrixLayout : CoopMatMatrixLayout>
-    static This Load(ByteAddressBuffer buffer, uint element, uint stride)
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout
+    >(ByteAddressBuffer buffer, uint element, uint stride)
     {
         return Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
     }
 
     [__NoSideEffect]
     [require(cooperative_matrix)]
-    __generic<let matrixLayout : CoopMatMatrixLayout>
-    static This Load(RWByteAddressBuffer buffer, uint element, uint stride)
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout
+    >(RWByteAddressBuffer buffer, uint element, uint stride)
     {
         return Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
     }
 
     [__NoSideEffect]
     [require(cooperative_matrix)]
-    __generic<let matrixLayout : CoopMatMatrixLayout>
-    static This Load(StructuredBuffer<T> buffer, uint element, uint stride)
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout
+    >(StructuredBuffer<T> buffer, uint element, uint stride)
     {
         let zero = 0;
         let alignment = 16U;
@@ -22836,8 +22857,9 @@ ${{{{
 
     [__NoSideEffect]
     [require(cooperative_matrix)]
-    __generic<let matrixLayout : CoopMatMatrixLayout>
-    static This Load(RWStructuredBuffer<T> buffer, uint element, uint stride)
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout
+    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
     {
         let zero = 0;
         let alignment = 16U;
@@ -22852,8 +22874,9 @@ ${{{{
     [ForceInline]
     [__NoSideEffect]
     [require(cooperative_matrix)]
-    __generic<let matrixLayout : CoopMatMatrixLayout>
-    static This Load(T* buffer, uint element, uint stride)
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout
+    >(T* buffer, uint element, uint stride)
     {
         let alignment = 16;
         return spirv_asm
@@ -22865,8 +22888,10 @@ ${{{{
 
     [ForceInline]
     [require(cooperative_matrix)]
-    __generic<let matrixLayout : CoopMatMatrixLayout, let V : int>
-    static This Load(__constref groupshared T[V] data, uint element, uint stride)
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout,
+        let V : int
+    >(__constref groupshared T[V] data, uint element, uint stride)
     {
         let alignment = 16U;
         return spirv_asm
@@ -22879,8 +22904,11 @@ ${{{{
 
     [ForceInline]
     [require(cooperative_matrix)]
-    __generic<let matrixLayout : CoopMatMatrixLayout, U, let V : int>
-    static This Load(__constref groupshared U[V] data, uint element, uint stride)
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+        let V : int
+    >(__constref groupshared U[V] data, uint element, uint stride)
     {
         let alignment = 16U;
         return spirv_asm
@@ -22893,8 +22921,12 @@ ${{{{
 
     [ForceInline]
     [require(cooperative_matrix)]
-    __generic<let matrixLayout : CoopMatMatrixLayout, U, let V : int, let L : int>
-    static This Load(__constref groupshared vector<U, L>[V] data, uint element, uint stride)
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+        let V : int,
+        let L : int
+    >(__constref groupshared vector<U, L>[V] data, uint element, uint stride)
     {
         let alignment = 16U;
         return spirv_asm
@@ -22992,15 +23024,14 @@ ${{{{
 
 [ForceInline]
 [require(cooperative_matrix)]
-__generic<
+CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
     let matrixLayout : CoopMatMatrixLayout
->
-CoopMat<T, S, M, N, R> coopMatLoad(
+>(
     ByteAddressBuffer buffer,
     uint element,
     uint stride)
@@ -23010,15 +23041,14 @@ CoopMat<T, S, M, N, R> coopMatLoad(
 
 [ForceInline]
 [require(cooperative_matrix)]
-__generic<
+CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
     let matrixLayout : CoopMatMatrixLayout
->
-CoopMat<T, S, M, N, R> coopMatLoad(
+>(
     RWByteAddressBuffer buffer,
     uint element,
     uint stride)
@@ -23028,15 +23058,14 @@ CoopMat<T, S, M, N, R> coopMatLoad(
 
 [ForceInline]
 [require(cooperative_matrix)]
-__generic<
+CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
     let matrixLayout : CoopMatMatrixLayout
->
-CoopMat<T, S, M, N, R> coopMatLoad(
+>(
     StructuredBuffer<T> buffer,
     uint element,
     uint stride)
@@ -23046,15 +23075,14 @@ CoopMat<T, S, M, N, R> coopMatLoad(
 
 [ForceInline]
 [require(cooperative_matrix)]
-__generic<
+CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
     let matrixLayout : CoopMatMatrixLayout
->
-CoopMat<T, S, M, N, R> coopMatLoad(
+>(
     RWStructuredBuffer<T> buffer,
     uint element,
     uint stride)
@@ -23064,15 +23092,14 @@ CoopMat<T, S, M, N, R> coopMatLoad(
 
 [ForceInline]
 [require(cooperative_matrix)]
-__generic<
+CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
     let matrixLayout : CoopMatMatrixLayout
->
-CoopMat<T, S, M, N, R> coopMatLoad(
+>(
     T* buffer,
     uint element,
     uint stride)
@@ -23082,7 +23109,7 @@ CoopMat<T, S, M, N, R> coopMatLoad(
 
 [ForceInline]
 [require(cooperative_matrix)]
-__generic<
+CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
     let M : int,
@@ -23090,8 +23117,7 @@ __generic<
     let R : CoopMatMatrixUse,
     let matrixLayout : CoopMatMatrixLayout,
     let U : int
->
-CoopMat<T, S, M, N, R> coopMatLoad(
+>(
     __constref groupshared T[U] data,
     uint element,
     uint stride)
@@ -23105,66 +23131,61 @@ CoopMat<T, S, M, N, R> coopMatLoad(
 //
 
 [require(cooperative_matrix_conversion)]
-__generic<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
-    let S : MemoryScope,
-    let M : int,
-    let N : int,
-    let R : CoopMatMatrixUse
->
 __intrinsic_op($(kIROp_IntCast))
-CoopMat<T,S,M,N,R> __int_cast(CoopMat<U,S,M,N,R> val);
-
-[require(cooperative_matrix_conversion)]
-__generic<
+CoopMat<T,S,M,N,R> __int_cast<
     T : __BuiltinArithmeticType,
     U : __BuiltinArithmeticType,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse
->
+>(CoopMat<U,S,M,N,R> val);
+
+[require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_FloatCast))
-CoopMat<T,S,M,N,R> __real_cast(CoopMat<U,S,M,N,R> val);
-
-[require(cooperative_matrix_conversion)]
-__generic<
+CoopMat<T,S,M,N,R> __real_cast<
     T : __BuiltinArithmeticType,
     U : __BuiltinArithmeticType,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse
->
+>(CoopMat<U,S,M,N,R> val);
+
+[require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastIntToFloat))
-CoopMat<T,S,M,N,R> __int_to_float_cast(CoopMat<U,S,M,N,R> val);
-
-[require(cooperative_matrix_conversion)]
-__generic<
+CoopMat<T,S,M,N,R> __int_to_float_cast<
     T : __BuiltinArithmeticType,
     U : __BuiltinArithmeticType,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse
->
+>(CoopMat<U,S,M,N,R> val);
+
+[require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastFloatToInt))
-CoopMat<T,S,M,N,R> __float_to_int_cast(CoopMat<U,S,M,N,R> val);
+CoopMat<T,S,M,N,R> __float_to_int_cast<
+    T : __BuiltinArithmeticType,
+    U : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse
+>(CoopMat<U,S,M,N,R> val);
 
 //
 // Cooperative Matrix multiplication with scalar
 //
 
 [require(cooperative_matrix)]
-__generic<
+CoopMat<T, S, M, N, R> operator *<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse
->
-CoopMat<T, S, M, N, R> operator *(CoopMat<T, S, M, N, R> lhs, const T rhs)
+>(CoopMat<T, S, M, N, R> lhs, const T rhs)
 {
     return spirv_asm
     {
@@ -23173,14 +23194,13 @@ CoopMat<T, S, M, N, R> operator *(CoopMat<T, S, M, N, R> lhs, const T rhs)
 }
 
 [require(cooperative_matrix)]
-__generic<
+CoopMat<T, S, M, N, R> operator *<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse
->
-CoopMat<T, S, M, N, R> operator *(const T lhs, CoopMat<T, S, M, N, R> rhs)
+>(const T lhs, CoopMat<T, S, M, N, R> rhs)
 {
     return rhs * lhs;
 }
@@ -23190,7 +23210,7 @@ CoopMat<T, S, M, N, R> operator *(const T lhs, CoopMat<T, S, M, N, R> rhs)
 //
 
 [require(cooperative_matrix)]
-__generic<
+CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     T : __BuiltinArithmeticType,
     let saturatingAccumulation : bool,
     U : __BuiltinArithmeticType,
@@ -23200,8 +23220,7 @@ __generic<
     let M : int,
     let K : int,
     let N : int
->
-CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd(
+>(
     CoopMat<U, S, M, K, CoopMatMatrixUse.MatrixA> matA,
     CoopMat<V, S, K, N, CoopMatMatrixUse.MatrixB> matB,
     CoopMat<W, S, M, N, CoopMatMatrixUse.MatrixAccumulator> matC)
@@ -23241,14 +23260,13 @@ ${{{{
     {
 }}}}
 
-__generic<
+extension<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse
->
-extension Tuple<CoopMat<T, S, M, N, R>
+> Tuple<CoopMat<T, S, M, N, R>
 ${{{{
         for (int j = 0; j < i; ++j)
         {
