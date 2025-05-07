@@ -6,6 +6,7 @@
 //
 
 #include "core/slang-char-encode.h"
+#include "core/slang-string-escape-util.h"
 #include "slang-core-diagnostics.h"
 #include "slang-name.h"
 #include "slang-source-loc.h"
@@ -829,15 +830,46 @@ FloatingPointLiteralValue getFloatingPointLiteralValue(
     return value;
 }
 
-static void _lexStringLiteralBody(Lexer* lexer, char quote)
+IntegerLiteralValue getCharLiteralValue(Token const& token)
 {
+    String unquotedContent = StringEscapeUtil::unquote('\'', token.getContent());
+    StringBuilder unescaped(4);
+    auto escapeHandler = StringEscapeUtil::getHandler(StringEscapeUtil::Style::Cpp);
+    escapeHandler->appendUnescaped(unquotedContent.getUnownedSlice(), unescaped);
+
+    char const* cursor = unescaped.getBuffer();
+
+    IntegerLiteralValue codepoint = getUnicodePointFromUTF8([&]() { return *cursor++; });
+    return codepoint;
+}
+
+static void _lexStringLiteralBody(Lexer* lexer, char quote, bool singleChar)
+{
+    int len = 0;
     for (;;)
     {
         int c = _peek(lexer);
         if (c == quote)
         {
+            if (singleChar && len == 0)
+            { // Empty char literal - size must be exactly 1.
+                if (auto sink = lexer->getDiagnosticSink())
+                {
+                    sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::illegalCharacterLiteral);
+                }
+            }
             _advance(lexer);
             return;
+        }
+
+        len++;
+
+        if (singleChar && len == 2)
+        { // Char literal about to have more than 1 char.
+            if (auto sink = lexer->getDiagnosticSink())
+            {
+                sink->diagnose(_getSourceLoc(lexer), LexerDiagnostics::illegalCharacterLiteral);
+            }
         }
 
         switch (c)
@@ -1346,12 +1378,12 @@ static TokenType _lexTokenImpl(Lexer* lexer)
 
     case '\"':
         _advance(lexer);
-        _lexStringLiteralBody(lexer, '\"');
+        _lexStringLiteralBody(lexer, '\"', false);
         return TokenType::StringLiteral;
 
     case '\'':
         _advance(lexer);
-        _lexStringLiteralBody(lexer, '\'');
+        _lexStringLiteralBody(lexer, '\'', true);
         return TokenType::CharLiteral;
 
 
@@ -1515,6 +1547,9 @@ static TokenType _lexTokenImpl(Lexer* lexer)
         case '=':
             _advance(lexer);
             return TokenType::OpEql;
+        case '>':
+            _advance(lexer);
+            return TokenType::DoubleRightArrow;
         default:
             return TokenType::OpAssign;
         }

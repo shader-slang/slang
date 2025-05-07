@@ -826,6 +826,9 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
             if (targetProfile.getVersion() < ProfileVersion::DX_6_0)
                 return false;
+            auto targetCaps = getTargetReq()->getTargetCaps();
+            if (targetCaps.implies(CapabilityAtom::hlsl_2018))
+                return false;
 
             if (as<IRBasicType>(inst->getDataType()))
                 return false;
@@ -850,6 +853,9 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             // operands are non-scalar.
             auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
             if (targetProfile.getVersion() < ProfileVersion::DX_6_0)
+                return false;
+            auto targetCaps = getTargetReq()->getTargetCaps();
+            if (targetCaps.implies(CapabilityAtom::hlsl_2018))
                 return false;
 
             if (as<IRBasicType>(inst->getDataType()))

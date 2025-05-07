@@ -568,6 +568,8 @@ void iterateASTWithLanguageServerFilter(
 {
     auto filter = [&](DeclBase* decl)
     {
+        if (as<ConstructorDecl>(decl) && decl->findModifier<SynthesizedModifier>())
+            return false;
         return as<NamespaceDeclBase>(decl) ||
                sourceManager->getHumaneLoc(decl->loc, SourceLocType::Actual)
                    .pathInfo.foundPath.getUnownedSlice()

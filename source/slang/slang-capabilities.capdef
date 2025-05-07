@@ -219,6 +219,11 @@ def _sm_6_9 : _sm_6_8;
 /// [Version]
 def hlsl_nvapi : hlsl;
 
+
+/// Represet HLSL compatibility support.
+/// [Version]
+def hlsl_2018 : _sm_5_1;
+
 /// Represents capabilities required for DXIL Library compilation.
 /// [Version]
 alias dxil_lib = _sm_6_3;

@@ -4268,6 +4268,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitLambdaExpr(LambdaExpr*)
+    {
+        SLANG_UNEXPECTED("a valid ast should not contain an LambdaExpr.");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
     {
         // Although the surface syntax can have an empty ASM block, the IR asm
@@ -9222,18 +9228,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         auto subContext = nestedContext.getContext();
         auto outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
-        // An `enum` declaration will currently lower directly to its "tag"
-        // type, so that any references to the `enum` become referenes to
-        // the tag type instead.
-        //
         // TODO: if we ever support `enum` types with payloads, we would
         // need to make the `enum` lower to some kind of custom "tagged union"
         // type.
 
         IRType* loweredTagType = lowerType(subContext, decl->tagType);
+        IRType* enumType = subBuilder->createEnumType(loweredTagType);
+        addLinkageDecoration(context, enumType, decl);
 
-        return LoweredValInfo::simple(
-            finishOuterGenerics(subBuilder, loweredTagType, outerGeneric));
+        return LoweredValInfo::simple(finishOuterGenerics(subBuilder, enumType, outerGeneric));
     }
 
     LoweredValInfo visitThisTypeDecl(ThisTypeDecl* decl)
