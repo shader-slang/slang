@@ -1608,7 +1608,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             return lowerDecl(context, declRefBase->getDecl());
         }
         SLANG_UNREACHABLE("Specialization constant value is not a declRef or function call");
-        return LoweredValInfo::simple(nullptr);
     }
 
     LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
