@@ -16,6 +16,13 @@
 #define SLANG_PRELUDE_STD
 #endif
 
+// Is intptr_t not equal to equal-width sized integer type?
+#if defined(__APPLE__)
+#define SLANG_INTPTR_TYPE_IS_DISTINCT 1
+#else
+#define SLANG_INTPTR_TYPE_IS_DISTINCT 0
+#endif
+
 #include <assert.h>
 #include <stdint.h>
 #include <stdlib.h>
