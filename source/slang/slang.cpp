@@ -4174,7 +4174,13 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
     // will go ahead and load the module from the serialized form.
     //
     PathInfo filePathInfo;
-    return loadSerializedModule(moduleName, modulePathInfo, moduleChunk, libraryChunk, SourceLoc(), sink);
+    return loadSerializedModule(
+        moduleName,
+        modulePathInfo,
+        moduleChunk,
+        libraryChunk,
+        SourceLoc(),
+        sink);
 }
 
 RefPtr<Module> Linkage::loadSerializedModule(
@@ -4210,8 +4216,12 @@ RefPtr<Module> Linkage::loadSerializedModule(
     mapNameToLoadedModules.add(moduleName, module);
     try
     {
-        if (SLANG_FAILED(
-                loadSerializedModuleContents(module, moduleFilePathInfo, moduleChunk, containerChunk, sink)))
+        if (SLANG_FAILED(loadSerializedModuleContents(
+                module,
+                moduleFilePathInfo,
+                moduleChunk,
+                containerChunk,
+                sink)))
         {
             mapPathToLoadedModule.remove(mostUniqueIdentity);
             mapNameToLoadedModules.remove(moduleName);
@@ -4272,8 +4282,13 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     // If everything seems reasonable, then we will go ahead and load
     // the module more completely from that serialized representation.
     //
-    RefPtr<Module> module =
-        loadSerializedModule(moduleName, moduleFilePathInfo, moduleChunk, rootChunk, requestingLoc, sink);
+    RefPtr<Module> module = loadSerializedModule(
+        moduleName,
+        moduleFilePathInfo,
+        moduleChunk,
+        rootChunk,
+        requestingLoc,
+        sink);
 
     return module;
 }

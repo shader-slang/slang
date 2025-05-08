@@ -105,8 +105,7 @@ struct DebugChunk : RIFF::ListChunk
 {
 public:
     /// Search for a debug information chunk.
-    static DebugChunk const* find(
-        RIFF::ListChunk const* baseChunk);
+    static DebugChunk const* find(RIFF::ListChunk const* baseChunk);
 
     /// Search for a debug information chunk.
     ///
