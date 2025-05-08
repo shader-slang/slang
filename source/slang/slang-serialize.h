@@ -438,7 +438,7 @@ public:
             SLANG_UNEXPECTED("invalid format in RIFF");
         }
 
-        _cursor = listChunk->getFirstChild();
+        _cursor = found->getFirstChild();
     }
 
     bool hasElements() { return _cursor != nullptr; }
