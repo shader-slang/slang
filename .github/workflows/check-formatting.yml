@@ -2,9 +2,9 @@ name: Check Formatting (comment /format to auto-fix)
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
 jobs:
   check-formatting:
     runs-on: ubuntu-latest

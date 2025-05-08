@@ -2,7 +2,7 @@ name: MDL Benchmark
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths-ignore:
       - "docs/**"
       - "LICENSES/**"
@@ -10,7 +10,7 @@ on:
       - "CONTRIBUTING.md"
       - "README.md"
   pull_request:
-    branches: [master]
+    branches: [main]
     paths-ignore:
       - "docs/**"
       - "LICENSES/**"

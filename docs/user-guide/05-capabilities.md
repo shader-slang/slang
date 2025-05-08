@@ -25,7 +25,7 @@ a `discard` statement, it shall be a type-check error.
 ## Capability Atoms and Capability Requirements
 
 Slang models code generation targets, shader stages, API extensions and hardware features as distinct capability atoms. For example, `GLSL_460` is a capability atom that stands for the GLSL 460 code generation target,
-`compute` is an atom that represents the compute shader stage, `_sm_6_7` is an atom representing the shader model 6.7 feature set in D3D, `SPV_KHR_ray_tracing` is an atom representing the `SPV_KHR_ray_tracing` SPIR-V extension, and `spvShaderClockKHR` is an atom for the `ShaderClockKHR` SPIRV capability. For a complete list of capabilities supported by the Slang compiler, check the [capability definition file](https://github.com/shader-slang/slang/blob/master/source/slang/slang-capabilities.capdef).
+`compute` is an atom that represents the compute shader stage, `_sm_6_7` is an atom representing the shader model 6.7 feature set in D3D, `SPV_KHR_ray_tracing` is an atom representing the `SPV_KHR_ray_tracing` SPIR-V extension, and `spvShaderClockKHR` is an atom for the `ShaderClockKHR` SPIRV capability. For a complete list of capabilities supported by the Slang compiler, check the [capability definition file](https://github.com/shader-slang/slang/blob/main/source/slang/slang-capabilities.capdef).
 
 A capability **requirement** can be a single capability atom, a conjunction of capability atoms, or a disjunction of conjunction of capability atoms. A function can declare its
 capability requirement with the following syntax:
