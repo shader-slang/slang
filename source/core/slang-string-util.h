@@ -135,6 +135,11 @@ struct StringUtil
     /// Create a string from the format string applying args (like sprintf)
     static String makeStringWithFormat(const char* format, ...);
 
+    /// Create a string from the format string and arguments in a buffer.
+    static String makeStringWithFormatFromArgArray(
+        const char* format,
+        ArrayView<const void*> ptrToArgs);
+
     /// Given a string held in a blob, returns as a String
     /// Returns an empty string if blob is nullptr
     static String getString(ISlangBlob* blob);

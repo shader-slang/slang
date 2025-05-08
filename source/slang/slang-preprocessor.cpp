@@ -200,6 +200,8 @@ struct InputStream
 
     MacroInvocation* getFirstBusyMacroInvocation() { return m_firstBusyMacroInvocation; }
 
+    virtual SourceLoc findNextLineEndImpl(SourceLoc from, UInt& lineCount) const = 0;
+
 protected:
     /// The preprocessor that this input stream is being used by
     Preprocessor* m_preprocessor = nullptr;
@@ -234,6 +236,14 @@ struct PretokenizedInputStream : InputStream
     virtual Token readToken() SLANG_OVERRIDE { return m_tokenReader.advanceToken(); }
 
     virtual Token peekToken() SLANG_OVERRIDE { return m_tokenReader.peekToken(); }
+
+    virtual SourceLoc findNextLineEndImpl(SourceLoc from, UInt& lineCount) const SLANG_OVERRIDE
+    {
+        // Not implemented
+        SLANG_UNUSED(from)
+        SLANG_UNUSED(lineCount)
+        return {};
+    }
 
 protected:
     /// Initialize an input stream, and assocaite with a specific `preprocessor`
@@ -467,6 +477,22 @@ struct InputStreamStack
         }
     }
 
+    SourceLoc findNextLineEnd(SourceLoc from, UInt lineCount = 1) const
+    {
+        auto top = m_top;
+        SourceLoc res = from;
+        res = top->findNextLineEndImpl(res, lineCount);
+        if (lineCount > 0)
+        {
+            // We did not consume all the lines, but arrived at the end of the current Stream
+            // For now, return none.
+            // We could pop the inputStream stack and continue looking,
+            // but it is an unlikely edge case.
+            res = {};
+        }
+        return res;
+    }
+
 private:
     /// The top of the stack of input streams
     InputStream* m_top = nullptr;
@@ -508,6 +534,11 @@ struct LexerInputStream : InputStream
     }
 
     Token peekToken() SLANG_OVERRIDE { return m_lookaheadToken; }
+
+    virtual SourceLoc findNextLineEndImpl(SourceLoc from, UInt& lineCount) const SLANG_OVERRIDE
+    {
+        return m_lexer.findNextLineEnd(from, lineCount);
+    }
 
 private:
     /// Read a token from the lexer, bypassing lookahead
@@ -701,6 +732,14 @@ struct MacroInvocation : InputStream
 
     MacroDefinition* getMacroDefinition() { return m_macro; }
 
+    virtual SourceLoc findNextLineEndImpl(SourceLoc from, UInt& lineCount) const SLANG_OVERRIDE
+    {
+        // There are no actual lines inside of a macro invocation
+        SLANG_UNUSED(from)
+        SLANG_UNUSED(lineCount)
+        return {};
+    }
+
 private:
     // Macro invocations are created as part of applying macro expansion
     // to a stream, so the `ExpansionInputStream` type takes responsibility
@@ -838,6 +877,19 @@ struct ExpansionInputStream : InputStream
         m_isInExpansion = true;
     }
 
+    virtual SourceLoc findNextLineEndImpl(SourceLoc from, UInt& lineCount) const SLANG_OVERRIDE
+    {
+        // Should not be here / not implemented
+        SLANG_UNUSED(from)
+        SLANG_UNUSED(lineCount)
+        return {};
+    }
+
+    SourceLoc findNextLineEnd(SourceLoc from, UInt lineCount = 1) const
+    {
+        return m_inputStreams.findNextLineEnd(from, lineCount);
+    }
+
 private:
     /// The base stream that macro expansion is being applied to
     InputStream* m_base = nullptr;
@@ -950,6 +1002,261 @@ private:
     ExpansionInputStream* m_expansionStream;
 };
 
+enum class PragmaWarningSpecifier
+{
+    Default,
+    Disable,
+    Error,
+    Once,
+    Suppress,
+};
+
+struct WarningTimeline
+{
+    struct Entry
+    {
+        PragmaWarningSpecifier specifier = {};
+        SourceLoc::RawValue location = {}; // Absolute location
+        // Used for the once specifier
+        // -1 points to this, but not consumed
+        // -2 points to this, but was consumed
+        // >= 0 points to a previous once entry (sharing the payload)
+        // Used for the suppress specifier to store the original SourceLoc needed to emit a warning
+        union
+        {
+            int payload = 0;
+            SourceLoc::RawValue debugLocation; // Store the raw value for trivial copy
+        };
+
+        bool operator<(Entry const& other) const { return location < other.location; }
+    };
+    // Sorted by location
+    List<Entry> entries = {};
+
+    const Entry* findEntry(SourceLoc::RawValue location) const
+    {
+        const Entry* res = nullptr;
+        if (entries.getCount() && location >= entries.getFirst().location)
+        {
+            auto nextEntryIndex = ::std::upper_bound(
+                entries.begin(),
+                entries.end(),
+                location,
+                [](SourceLoc::RawValue const& lhs, Entry const& rhs)
+                { return lhs < rhs.location; });
+            res = nextEntryIndex - 1;
+        }
+        return res;
+    }
+
+    PragmaWarningSpecifier consumeSpecifier(SourceLoc::RawValue location)
+    {
+        PragmaWarningSpecifier res = PragmaWarningSpecifier::Default;
+        Entry* entry = const_cast<Entry*>(findEntry(location));
+        if (entry)
+        {
+            PragmaWarningSpecifier& spec = entry->specifier;
+            res = spec;
+            if (res == PragmaWarningSpecifier::Once)
+            {
+                int* payload = &entry->payload;
+                if (*payload >= 0)
+                {
+                    payload = &entries[*payload].payload;
+                }
+                if (*payload == -1)
+                {
+                    res = PragmaWarningSpecifier::Default;
+                    --(*payload);
+                }
+                else if (*payload < -1)
+                {
+                    res = PragmaWarningSpecifier::Disable;
+                }
+            }
+        }
+        return res;
+    }
+
+    const Entry* getLatestEntry() const
+    {
+        const Entry* res = nullptr;
+        if (entries.getCount())
+        {
+            res = &entries.getLast();
+        }
+        return res;
+    }
+
+    PragmaWarningSpecifier getLatestSpecifier() const
+    {
+        PragmaWarningSpecifier res = PragmaWarningSpecifier::Default;
+        if (entries.getCount())
+        {
+            res = entries.getLast().specifier;
+        }
+        return res;
+    }
+
+    void addEntry(
+        SourceLoc::RawValue location,
+        PragmaWarningSpecifier specifier,
+        const Entry* poppingFrom,
+        DiagnosticSink* sink,
+        int id,
+        SourceLoc debugLoc)
+    {
+        SourceLoc::RawValue maxKnownLocation =
+            entries.getCount() ? entries.getLast().location : SourceLoc::RawValue(0);
+        // Add on top
+        if (location > maxKnownLocation)
+        {
+            // Add a new entry only if necessary
+            if (getLatestSpecifier() != specifier || specifier == PragmaWarningSpecifier::Once)
+            {
+                Entry e;
+                e.specifier = specifier;
+                e.location = location;
+                if (specifier == PragmaWarningSpecifier::Once)
+                {
+                    if (poppingFrom)
+                    {
+                        SLANG_ASSERT(poppingFrom->specifier == PragmaWarningSpecifier::Once);
+                        if (poppingFrom->payload >= 0)
+                        {
+                            e.payload = poppingFrom->payload;
+                        }
+                        else
+                        {
+                            e.payload = static_cast<int>(poppingFrom - entries.begin());
+                        }
+                    }
+                    else
+                    {
+                        e.payload = -1;
+                    }
+                }
+                else
+                {
+                    e.debugLocation = debugLoc.getRaw();
+                }
+                entries.add(e);
+            }
+        }
+        else
+        {
+            if (sink)
+            {
+                sink->diagnose(debugLoc, Diagnostics::pragmaWarningCannotInsertHere, id);
+                const Entry* prevEntry = findEntry(location);
+                if (prevEntry && prevEntry->specifier == PragmaWarningSpecifier::Suppress)
+                {
+                    sink->diagnose(
+                        SourceLoc::fromRaw(prevEntry->debugLocation),
+                        Diagnostics::pragmaWarningPointSuppress,
+                        id);
+                }
+            }
+        }
+    }
+
+    void addEntryForPragmaPop(
+        SourceLoc::RawValue location,
+        SourceLoc::RawValue pushedLocation,
+        DiagnosticSink* sink,
+        int id,
+        SourceLoc debugLoc)
+    {
+        const Entry* poppingFrom = findEntry(pushedLocation);
+        addEntry(
+            location,
+            poppingFrom ? poppingFrom->specifier : PragmaWarningSpecifier::Default,
+            poppingFrom,
+            sink,
+            id,
+            debugLoc);
+    }
+};
+
+struct WarningStateTracker : SourceWarningStateTrackerBase
+{
+    SourceManager* sourceManager = nullptr;
+    Dictionary<int, WarningTimeline> mapDiagnosticIdToTimeline = {};
+    List<SourceLoc> stack = {};
+
+    WarningStateTracker(SourceManager* sourceManager = nullptr)
+        : sourceManager(sourceManager)
+    {
+    }
+
+    SourceLoc::RawValue getAbsoluteLocation(SourceLoc loc) const
+    {
+        return sourceManager ? sourceManager->getAbsoluteLocation(loc) : loc.getRaw();
+    }
+
+    virtual Severity consumeWarningSeverity(SourceLoc location, int id, Severity severity) override
+    {
+        Severity res = severity;
+        WarningTimeline* timeline = mapDiagnosticIdToTimeline.tryGetValue(id);
+        if (!timeline)
+            return res;
+        SourceLoc::RawValue absoluteLoc = getAbsoluteLocation(location);
+        PragmaWarningSpecifier spec = timeline->consumeSpecifier(absoluteLoc);
+        if (spec == PragmaWarningSpecifier::Disable || spec == PragmaWarningSpecifier::Suppress)
+        {
+            res = Severity::Disable;
+        }
+        else if (spec == PragmaWarningSpecifier::Error)
+        {
+            res = Severity::Error;
+        }
+        return res;
+    }
+
+    void addEntry(
+        SourceLoc location,
+        SourceLoc nextLineEnd,
+        int id,
+        PragmaWarningSpecifier specifier,
+        DiagnosticSink* sink = nullptr)
+    {
+        WarningTimeline& timeline = mapDiagnosticIdToTimeline[id];
+        auto absLoc = getAbsoluteLocation(location);
+        PragmaWarningSpecifier prev = timeline.getLatestSpecifier();
+        auto lastEntry = timeline.getLatestEntry();
+        timeline.addEntry(absLoc, specifier, nullptr, sink, id, location);
+        if (specifier == PragmaWarningSpecifier::Suppress)
+        {
+            auto nextAbsLoc = getAbsoluteLocation(nextLineEnd);
+            timeline.addEntry(nextAbsLoc, prev, lastEntry, sink, id, nextLineEnd);
+        }
+    }
+
+    void addPragmaPush(SourceLoc location) { stack.add(location); }
+
+    void addPragmaPop(SourceLoc location, DiagnosticSink* sink = nullptr)
+    {
+        if (stack.getCount())
+        {
+            const SourceLoc pushed = stack.getLast();
+            stack.removeLast();
+            if (mapDiagnosticIdToTimeline.getCount())
+            {
+                const SourceLoc::RawValue absLoc = getAbsoluteLocation(location);
+                const SourceLoc::RawValue absPushed = getAbsoluteLocation(pushed);
+                for (auto& [id, timeline] : mapDiagnosticIdToTimeline)
+                {
+                    timeline.addEntryForPragmaPop(absLoc, absPushed, sink, id, location);
+                }
+            }
+        }
+        else if (sink)
+        {
+            sink->diagnose(location, Diagnostics::pragmaWarningPopEmpty);
+        }
+    }
+};
+
 /// State of the preprocessor
 struct Preprocessor
 {
@@ -981,6 +1288,8 @@ struct Preprocessor
     /// stop them from being included again.
     HashSet<String> pragmaOnceUniqueIdentities;
 
+    WarningStateTracker* warningStateTracker = nullptr;
+
     /// Name pool to use when creating `Name`s from strings
     NamePool* namePool = nullptr;
 
@@ -1002,8 +1311,10 @@ struct Preprocessor
     NamePool* getNamePool() { return namePool; }
     SourceManager* getSourceManager() { return sourceManager; }
 
+    SourceLoc::RawValue absoluteSourceLocCounter = 0;
+
     /// Push a new input file onto the input stack of the preprocessor
-    void pushInputFile(InputFile* inputFile);
+    void pushInputFile(InputFile* inputFile, SourceLoc location);
 
     /// Pop the inner-most input file from the stack of input files
     void popInputFile();
@@ -2409,6 +2720,15 @@ static void SkipToEndOfLine(PreprocessorDirectiveContext* context)
     }
 }
 
+static SourceLoc FindNextEndOfLine(
+    PreprocessorDirectiveContext* context,
+    SourceLoc from,
+    UInt lineCount = 1)
+{
+    auto inputStream = getInputStream(context);
+    return inputStream->findNextLineEnd(from, lineCount);
+}
+
 static bool ExpectRaw(
     PreprocessorDirectiveContext* context,
     TokenType tokenType,
@@ -3157,8 +3477,20 @@ static SlangResult readFile(
     return SLANG_OK;
 }
 
-void Preprocessor::pushInputFile(InputFile* inputFile)
+void Preprocessor::pushInputFile(InputFile* inputFile, SourceLoc loc)
 {
+    if (m_currentInputFile)
+    {
+        SourceView* sourceView = m_currentInputFile->getLexer()->m_sourceView;
+        SourceLoc::RawValue offset = SourceRange(sourceView->getLastSegment().begin, loc).getSize();
+        absoluteSourceLocCounter += offset;
+    }
+
+    {
+        SourceView* sourceView = inputFile->getLexer()->m_sourceView;
+        sourceView->setAbsoluteLocationBase(absoluteSourceLocCounter);
+    }
+
     inputFile->m_parent = m_currentInputFile;
     m_currentInputFile = inputFile;
 }
@@ -3281,7 +3613,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 
     InputFile* inputFile = new InputFile(context->m_preprocessor, sourceView);
 
-    context->m_preprocessor->pushInputFile(inputFile);
+    context->m_preprocessor->pushInputFile(inputFile, directiveLoc);
 }
 
 static void _parseMacroOps(
@@ -3819,6 +4151,145 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaOnceDirective)
     context->m_preprocessor->pragmaOnceUniqueIdentities.add(issuedFromPathInfo.uniqueIdentity);
 }
 
+SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
+{
+    auto directiveLoc = GetDirectiveLoc(context);
+    SLANG_UNUSED(subDirectiveToken)
+    SLANG_UNUSED(directiveLoc);
+    Expect(context, TokenType::LParent, Diagnostics::syntaxError);
+    Token tk = PeekToken(context);
+    auto finish = [&]() -> void { SkipToEndOfLine(context); };
+    if (tk.type == TokenType::Identifier)
+    {
+        // #pragma warning (push)
+        if (tk.getContent() == "push")
+        {
+            AdvanceToken(context);
+            context->m_preprocessor->warningStateTracker->addPragmaPush(tk.loc);
+        }
+        // #pragma warning (pop)
+        else if (tk.getContent() == "pop")
+        {
+            AdvanceToken(context);
+            context->m_preprocessor->warningStateTracker->addPragmaPop(tk.loc, GetSink(context));
+        }
+        else
+        {
+            // #pragma warning (spec : id-list [; ...]), examples:
+            // (disable : 123) : disables 123
+            // (disable : 1 2 ; error 4 5 6) disables 1, then disables 2, then errors 4, ...
+            // (disable : 1 ; default : 1) disables 1, then defaults 1
+            // Parse a list of 'specifier : id-list', separated by ';'
+            while (true)
+            {
+                // Read the specifier
+                // We need the raw token location because if the token is a #definition,
+                // PeekToken().loc would be where the definition is, not the invocation
+                // PeekRawToken().loc is where the invocation of the macro is located:
+                // Example:
+                // #define SPEC suppress // (a)
+                // #pragma warning (SPEC : 12) (b)
+                // Here the raw token is 'SPEC' located at its invocation on line (b)
+                // and the token is 'suppress' located at the macro definition on line (a)
+                // The #pragma warning should take effect from line (b), not line (a),
+                // So we need the raw token location.
+                SourceLoc specifierLocation = PeekRawToken(context).loc;
+                Token id;
+                Expect(context, TokenType::Identifier, Diagnostics::syntaxError, &id);
+                PragmaWarningSpecifier specifier;
+                SourceLoc nextLineEnd = {}; // Needed for suppress
+                if (id.getContent() == "default")
+                {
+                    specifier = PragmaWarningSpecifier::Default;
+                }
+                else if (id.getContent() == "disable")
+                {
+                    specifier = PragmaWarningSpecifier::Disable;
+                }
+                else if (id.getContent() == "error")
+                {
+                    specifier = PragmaWarningSpecifier::Error;
+                }
+                else if (id.getContent() == "once")
+                {
+                    specifier = PragmaWarningSpecifier::Once;
+                }
+                else if (id.getContent() == "suppress")
+                {
+                    specifier = PragmaWarningSpecifier::Suppress;
+                    // We need to start from subDirectiveToken.loc because the next tokens
+                    // might be macro invocations, and located before this #pragma warning line.
+                    nextLineEnd = FindNextEndOfLine(context, specifierLocation, 2);
+                    if (!nextLineEnd.isValid())
+                    {
+                        GetSink(context)->diagnose(
+                            specifierLocation,
+                            Diagnostics::pragmaWarningSuppressCannotIdentifyNextLine);
+                        return finish();
+                    }
+                }
+                else
+                {
+                    GetSink(context)->diagnose(
+                        specifierLocation,
+                        Diagnostics::pragmaWarningUnknownSpecifier,
+                        id.getContent());
+                    return finish();
+                }
+                Expect(context, TokenType::Colon, Diagnostics::syntaxError);
+                // Read the id list
+                while (true)
+                {
+                    // Same logic as for the specifierLocation
+                    SourceLoc idLocation = PeekRawToken(context).loc;
+                    Token warningNumberToken = PeekToken(context);
+                    if (warningNumberToken.type == TokenType::IntegerLiteral)
+                    {
+                        AdvanceToken(context);
+                        int warningNumber = stringToInt(warningNumberToken.getContent());
+                        context->m_preprocessor->warningStateTracker->addEntry(
+                            idLocation,
+                            nextLineEnd,
+                            warningNumber,
+                            specifier,
+                            GetSink(context));
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+                SourceLoc endLoc = PeekRawToken(context).loc;
+                Token end = PeekToken(context);
+                if (end.type == TokenType::Semicolon)
+                {
+                    // We need to parse the next 'spec : id-list'
+                    AdvanceToken(context);
+                    continue;
+                }
+                else if (end.type == TokenType::RParent)
+                {
+                    break;
+                }
+                else
+                {
+                    GetSink(context)->diagnose(
+                        endLoc,
+                        Diagnostics::unexpectedToken,
+                        end.getContent());
+                    return finish();
+                }
+            }
+        }
+    }
+    else
+    {
+        GetSink(context)->diagnose(tk, Diagnostics::syntaxError);
+        return finish();
+    }
+    Expect(context, TokenType::RParent, Diagnostics::syntaxError);
+}
+
 // Information about a specific `#pragma` directive
 struct PragmaDirective
 {
@@ -3832,6 +4303,8 @@ struct PragmaDirective
 // A simple array of all the  `#pragma` directives we know how to handle.
 static const PragmaDirective kPragmaDirectives[] = {
     {"once", &handlePragmaOnceDirective},
+
+    {"warning", &handlePragmaWarningDirective},
 
     {NULL, NULL},
 };
@@ -4071,6 +4544,13 @@ void Preprocessor::popInputFile()
             conditional->ifToken.getContent());
     }
 
+    {
+        SourceView* sourceView = inputFile->getLexer()->m_sourceView;
+        auto lastSegment = sourceView->getLastSegment();
+        absoluteSourceLocCounter +=
+            SourceRange(lastSegment.begin, sourceView->getRange().end).getSize();
+    }
+
     // We will update the current file to the parent of whatever
     // the `inputFile` was (usually the file that `#include`d it).
     //
@@ -4085,6 +4565,13 @@ void Preprocessor::popInputFile()
     if (!parentFile)
     {
         endOfFileToken = eofToken;
+    }
+    else
+    {
+        SourceView* sourceView = parentFile->getLexer()->m_sourceView;
+        sourceView->addAbsoluteSegment(
+            parentFile->getExpansionStream()->peekLoc(),
+            absoluteSourceLocCounter);
     }
 
     delete inputFile;
@@ -4230,6 +4717,20 @@ static TokenList ReadAllTokens(Preprocessor* preprocessor)
     }
 }
 
+static void finalCheckPragmaWarnings(Preprocessor* preprocessor)
+{
+    auto tracker = preprocessor->warningStateTracker;
+    if (tracker)
+    {
+        auto sink = GetSink(preprocessor);
+        for (const auto& pushed : tracker->stack)
+        {
+            sink->diagnose(pushed, Diagnostics::pragmaWarningPushNotPopped);
+        }
+        tracker->stack.clearAndDeallocate();
+    }
+}
+
 } // namespace preprocessor
 
 /// Try to look up a macro with the given `macroName` and produce its value as a string
@@ -4300,6 +4801,11 @@ TokenList preprocessSource(
     {
         desc.contentAssistInfo = &linkage->contentAssistInfo.preprocessorInfo;
     }
+
+    preprocessor::WarningStateTracker* wst =
+        new preprocessor::WarningStateTracker(desc.sourceManager);
+    desc.sink->setSourceWarningStateTracker(wst);
+
     return preprocessSource(file, desc, outDetectedLanguage);
 }
 
@@ -4320,6 +4826,9 @@ TokenList preprocessSource(
     preprocessor.endOfFileToken.type = TokenType::EndOfFile;
     preprocessor.endOfFileToken.flags = TokenFlag::AtStartOfLine;
     preprocessor.contentAssistInfo = desc.contentAssistInfo;
+
+    preprocessor.warningStateTracker =
+        dynamicCast<preprocessor::WarningStateTracker>(desc.sink->getSourceWarningStateTracker());
 
     // Add builtin macros
     {
@@ -4366,7 +4875,7 @@ TokenList preprocessSource(
 
         // create an initial input stream based on the provided buffer
         InputFile* primaryInputFile = new InputFile(&preprocessor, sourceView);
-        preprocessor.pushInputFile(primaryInputFile);
+        preprocessor.pushInputFile(primaryInputFile, sourceView->getRange().begin);
     }
 
     TokenList tokens = ReadAllTokens(&preprocessor);
@@ -4375,6 +4884,8 @@ TokenList preprocessSource(
     {
         handler->handleEndOfTranslationUnit(&preprocessor);
     }
+
+    finalCheckPragmaWarnings(&preprocessor);
 
     // debugging: build the pre-processed source back together
 #if 0

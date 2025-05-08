@@ -115,6 +115,10 @@ def spirv : target;
 /// [Target]
 def wgsl : target + textualTarget;
 
+/// Represents the Slang VM bytecode target.
+/// [Target]
+def slangvm : target;
+
 // Capabilities that stand for target SPIR-V versions for the GLSL backend.
 // These are not compilation targets. We will convert `_spirv_*` to `glsl_spirv_*` during compilation.
 
@@ -214,6 +218,11 @@ def _sm_6_9 : _sm_6_8;
 /// Represents HLSL NVAPI support.
 /// [Version]
 def hlsl_nvapi : hlsl;
+
+
+/// Represet HLSL compatibility support.
+/// [Version]
+def hlsl_2018 : _sm_5_1;
 
 /// Represents capabilities required for DXIL Library compilation.
 /// [Version]
@@ -427,6 +436,10 @@ def domain : stage;
 /// Geometry shader stage
 /// [Stage]
 def geometry : stage;
+
+/// Dispatch shader stage
+/// [Stage]
+def dispatch : stage;
 
 def _raygen : stage;
 alias _raygeneration = _raygen;

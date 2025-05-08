@@ -160,6 +160,11 @@ void TestReporter::addResult(TestResult result)
     m_numCurrentResults++;
 }
 
+TestResult TestReporter::getResult() const
+{
+    return m_currentInfo.testResult;
+}
+
 void TestReporter::addExecutionTime(double time)
 {
     std::lock_guard<std::recursive_mutex> lock(m_mutex);

@@ -7149,6 +7149,36 @@ static bool tryParseExpression(Parser* parser, Expr*& outExpr, TokenType tokenTy
     return false;
 }
 
+static Expr* parseLambdaExpr(Parser* parser)
+{
+    auto lambdaExpr = parser->astBuilder->create<LambdaExpr>();
+    parser->ReadToken(TokenType::LParent);
+    lambdaExpr->paramScopeDecl = parser->astBuilder->create<ScopeDecl>();
+    parser->pushScopeAndSetParent(lambdaExpr->paramScopeDecl);
+    while (!AdvanceIfMatch(parser, MatchedTokenType::Parentheses))
+    {
+        AddMember(lambdaExpr->paramScopeDecl, parser->ParseParameter());
+        if (AdvanceIf(parser, TokenType::RParent))
+            break;
+        parser->ReadToken(TokenType::Comma);
+    }
+    parser->FillPosition(lambdaExpr);
+    parser->ReadToken(TokenType::DoubleRightArrow);
+    if (parser->LookAheadToken(TokenType::LBrace))
+    {
+        lambdaExpr->bodyStmt = parser->parseBlockStatement();
+    }
+    else
+    {
+        auto returnStmt = parser->astBuilder->create<ReturnStmt>();
+        parser->FillPosition(returnStmt);
+        returnStmt->expression = parser->ParseArgExpr();
+        lambdaExpr->bodyStmt = returnStmt;
+    }
+    parser->PopScope();
+    return lambdaExpr;
+}
+
 static Expr* parseAtomicExpr(Parser* parser)
 {
     switch (peekTokenType(parser))
@@ -7161,12 +7191,22 @@ static Expr* parseAtomicExpr(Parser* parser)
     // Either:
     // - parenthesized expression `(exp)`
     // - cast `(type) exp`
+    // - lambda expressions (paramList)=>x
     //
     // Proper disambiguation requires mixing up parsing
     // and semantic checking (which we should do eventually)
     // but for now we will follow some heuristics.
     case TokenType::LParent:
         {
+            // Disambiguate between a lambda expression and other cases.
+            auto tokenReader = parser->tokenReader;
+            SkipBalancedToken(&tokenReader);
+            auto nextTokenAfterParent = tokenReader.peekTokenType();
+            if (nextTokenAfterParent == TokenType::DoubleRightArrow)
+            {
+                return parseLambdaExpr(parser);
+            }
+
             Token openParen = parser->ReadToken(TokenType::LParent);
 
             // Only handles cases of `(type)`, where type is a single identifier,
@@ -7544,6 +7584,21 @@ static Expr* parseAtomicExpr(Parser* parser)
 
             return constExpr;
         }
+
+    case TokenType::CharLiteral:
+        {
+            IntegerLiteralExpr* constExpr = parser->astBuilder->create<IntegerLiteralExpr>();
+            parser->FillPosition(constExpr);
+
+            auto token = parser->tokenReader.advanceToken();
+            constExpr->token = token;
+
+            IntegerLiteralValue value = getCharLiteralValue(token);
+            constExpr->value = value;
+            constExpr->suffixType = BaseType::UInt;
+            return constExpr;
+        }
+
     case TokenType::CompletionRequest:
         {
             VarExpr* varExpr = parser->astBuilder->create<VarExpr>();

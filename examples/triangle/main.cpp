@@ -83,14 +83,14 @@ struct HelloWorld : public WindowedAppBase
     }
 
     // The main task an application cares about is compiling shader code
-    // from souce (if needed) and loading it through the chosen graphics API.
+    // from source (if needed) and loading it through the chosen graphics API.
     //
     // In addition, an application may want to receive reflection information
     // about the program, which is what a `slang::ProgramLayout` provides.
     //
     gfx::Result loadShaderProgram(gfx::IDevice* device, gfx::IShaderProgram** outProgram)
     {
-        // We need to obatin a compilation session (`slang::ISession`) that will provide
+        // We need to obtain a compilation session (`slang::ISession`) that will provide
         // a scope to all the compilation and loading of code we do.
         //
         // Our example application uses the `gfx` graphics API abstraction layer, which already
@@ -125,7 +125,7 @@ struct HelloWorld : public WindowedAppBase
         // Note: If you are using this `loadModule` approach to load your shader code it is
         // important to tag your entry point functions with the `[shader("...")]` attribute
         // (e.g., `[shader("vertex")] void vertexMain(...)`). Without that information there
-        // is no umambiguous way for the compiler to know which functions represent entry
+        // is no unambiguous way for the compiler to know which functions represent entry
         // points when it parses your code via `loadModule()`.
         //
         ComPtr<slang::IEntryPoint> vertexEntryPoint;
@@ -205,7 +205,7 @@ struct HelloWorld : public WindowedAppBase
     // we have just defined.
     //
 
-    // We will define global variables for the various platform and
+    // We will define global variables for the various platforms and
     // graphics API objects that our application needs:
     //
     // As a reminder, *none* of these are Slang API objects. All
@@ -225,7 +225,7 @@ struct HelloWorld : public WindowedAppBase
         //
         SLANG_RETURN_ON_FAIL(initializeBase("hello-world", 1024, 768));
 
-        // We will create objects needed to configur the "input assembler"
+        // We will create objects needed to configure the "input assembler"
         // (IA) stage of the D3D pipeline.
         //
         // First, we create an input layout:
@@ -330,9 +330,9 @@ struct HelloWorld : public WindowedAppBase
 
         // We know that `rootObject` is a root shader object created
         // from our program, and that it is set up to hold values for
-        // all the parameter of that program. In order to actually
+        // all the parameters of that program. In order to actually
         // set values, we need to be able to look up the location
-        // of speciic parameter that we want to set.
+        // of the specific parameters that we want to set.
         //
         // Our example graphics API layer supports this operation
         // with the idea of a *shader cursor* which can be thought
@@ -343,7 +343,7 @@ struct HelloWorld : public WindowedAppBase
         //
         // We construct an initial shader cursor that points at the
         // entire shader program. You can think of this as akin to
-        // a diretory path of `/` for the root directory in a file
+        // a directory path of `/` for the root directory in a file
         // system.
         //
         ShaderCursor rootCursor(rootObject);
@@ -365,7 +365,7 @@ struct HelloWorld : public WindowedAppBase
             deviceInfo.identityProjectionMatrix,
             sizeof(float) * 16);
         //
-        // Some readers might be concerned about the performance o
+        // Some readers might be concerned about the performance of
         // the above operations because of the use of strings. For
         // those readers, here are two things to note:
         //

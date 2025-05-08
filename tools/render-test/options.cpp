@@ -158,6 +158,10 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             outOptions.useDXIL = true;
         }
+        else if (argValue == "-skip-spirv-validation")
+        {
+            outOptions.skipSPIRVValidation = true;
+        }
         else if (argValue == "-emit-spirv-directly")
         {
             outOptions.generateSPIRVDirectly = true;

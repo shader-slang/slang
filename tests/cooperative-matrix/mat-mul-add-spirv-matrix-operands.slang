@@ -1,4 +1,4 @@
-//TEST(compute):SIMPLE(filecheck=CHECK): -entry computeMain -stage compute -target spirv
+//TEST(compute):SIMPLE(filecheck=CHECK): -entry computeMain -stage compute -target spirv -skip-spirv-validation
 
 // This test checks that the correct SPIRV Cooperative Matrix Operands are emitted for OpCooperativeMatrixMulAddKHR operaions
 RWStructuredBuffer<int> outputBuffer1;

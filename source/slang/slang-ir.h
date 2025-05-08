@@ -7,9 +7,6 @@
 // similar in spirit to LLVM (but much simpler).
 //
 
-#if defined(__cpp_lib_bit_cast)
-#include <bit>
-#endif
 #include "../compiler-core/slang-source-loc.h"
 #include "../compiler-core/slang-source-map.h"
 #include "../core/slang-basic.h"
@@ -17,6 +14,7 @@
 #include "slang-container-pool.h"
 #include "slang-type-system-shared.h"
 
+#include <bit>
 #include <functional>
 
 namespace Slang
@@ -105,11 +103,7 @@ enum IRMemoryOrder
 
 inline int32_t operator&(const IROpMask m, const IROp o)
 {
-#if defined(__cpp_lib_bit_cast)
     return std::bit_cast<int32_t>(m) & std::bit_cast<int32_t>(o);
-#else
-    return (int32_t)m & (int32_t)o;
-#endif
 }
 
 inline int32_t operator&(const IROp o, const IROpMask m)
@@ -2057,6 +2051,14 @@ struct IROptionalType : IRType
     IR_LEAF_ISA(OptionalType)
 
     IRType* getValueType() { return (IRType*)getOperand(0); }
+};
+
+/// Represents an enum type
+struct IREnumType : IRType
+{
+    IR_LEAF_ISA(EnumType)
+
+    IRType* getTagType() { return (IRType*)getOperand(0); }
 };
 
 struct IRTypeType : IRType

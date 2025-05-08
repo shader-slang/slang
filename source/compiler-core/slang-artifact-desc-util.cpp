@@ -325,6 +325,9 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         return Desc::make(Kind::Assembly, Payload::WGSL_SPIRV, Style::Kernel, 0);
     case SLANG_WGSL_SPIRV:
         return Desc::make(Kind::ObjectCode, Payload::WGSL_SPIRV, Style::Kernel, 0);
+
+    case SLANG_HOST_VM:
+        return Desc::make(Kind::ObjectCode, Payload::UniversalCPU, Style::Host, 0);
     default:
         break;
     }
