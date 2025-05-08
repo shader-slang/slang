@@ -1745,7 +1745,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     IntVal* argVals[kMaxArgs];
     IntegerLiteralValue constArgVals[kMaxArgs];
     bool allConst = true;
-    bool hasSpecializationConstant = false;
     for (Index a = 0; a < argCount; ++a)
     {
         auto argExpr = getArg(invokeExpr, a);
@@ -1759,41 +1758,10 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         {
             constArgVals[a] = constArgVal->getValue();
         }
-        else if (as<SpecializationConstantIntVal>(argVal))
-        {
-            hasSpecializationConstant = true;
-        }
         else
         {
             allConst = false;
         }
-    }
-
-    if (allConst && hasSpecializationConstant)
-    {
-        // If the expression contains a specialization constant, we are not able to constant fold
-        // it, but we will still allow it to be used as array size, so we will use this expression
-        // as the array sized, and it will be lowered to a specialization constant value.
-        // However we will have to replace all the argument expression that is already constant
-        // folded, because this expression could be declared in local scope, so after we lowering it
-        // to IR, it will have to be hoisted to the global scope. But we can't hoist all the
-        // compile-time constant variable involved in this expression if it has, so that will bring
-        // a problem that this expression could reference a variable not existed in global scope.
-        // Therefore, we just replace those compile-time constant variable with literal, so there
-        // will only be a specialization constant left in the expression, which can only declared in
-        // global scope.
-
-        auto funcCall = m_astBuilder->getOrCreate<FuncCallIntVal>(
-            invokeExpr.getExpr()->type.type,
-            funcDeclRef,
-            as<Type>(funcDeclRefExpr.getExpr()->type->substitute(
-                m_astBuilder,
-                funcDeclRefExpr.getSubsts())),
-            makeArrayView(argVals, argCount));
-
-        SpecializationConstantIntVal* result =
-            m_astBuilder->getSpecConstIntVal(invokeExpr.getExpr()->type.type, funcCall);
-        return result;
     }
 
     if (!allConst)
@@ -2004,10 +1972,13 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
 
     // The values of specialization constants aren't known at compile time even
     // if they're marked `const`.
-    if (decl->hasModifier<SpecializationConstantAttribute>() ||
-        decl->hasModifier<VkConstantIdAttribute>())
+    if ((decl->hasModifier<SpecializationConstantAttribute>() ||
+        decl->hasModifier<VkConstantIdAttribute>()) &&
+        kind == ConstantFoldingKind::SpecializationConstant)
     {
-        return m_astBuilder->getSpecConstIntVal(m_astBuilder->getIntType(), declRef);
+        return m_astBuilder->getOrCreate<GenericParamIntVal>(
+            declRef.substitute(m_astBuilder, declRef.getDecl()->getType()),
+            declRef);
     }
 
     if (decl->hasModifier<ExternModifier>())
@@ -2430,17 +2401,17 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                     return CreateErrorExpr(subscriptExpr);
                 }
             }
-            if (auto specConstElementCount = as<SpecializationConstantIntVal>(elementCount))
-            {
-                // We need to check if the specialization constant has valid specConst expression
-                if (!specConstElementCount->getValue())
-                {
-                    getSink()->diagnose(
-                        subscriptExpr->indexExprs[0],
-                        Diagnostics::invalidArraySize);
-                    return CreateErrorExpr(subscriptExpr);
-                }
-            }
+            // if (auto specConstElementCount = as<FuncCallIntVal>(elementCount))
+            // {
+            //     // We need to check if the specialization constant has valid specConst expression
+            //     if (!specConstElementCount->getValue())
+            //     {
+            //         getSink()->diagnose(
+            //             subscriptExpr->indexExprs[0],
+            //             Diagnostics::invalidArraySize);
+            //         return CreateErrorExpr(subscriptExpr);
+            //     }
+            // }
         }
         else if (subscriptExpr->indexExprs.getCount() != 0)
         {
