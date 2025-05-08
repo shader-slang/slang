@@ -659,9 +659,12 @@ struct InliningPassBase
                 }
 
             case kIROp_DebugInlinedAt:
-                auto clonedInst = _cloneInstWithSourceLoc(callSite, env, builder, inst);
-                debugInlinedInsts.add(as<IRDebugInlinedAt>(clonedInst));
-                break;
+                {
+                    auto clonedInst = _cloneInstWithSourceLoc(callSite, env, builder, inst);
+                    if (!as<IRDebugInlinedAt>(clonedInst)->isOuterInlinedPresent())
+                        debugInlinedInsts.add(as<IRDebugInlinedAt>(clonedInst));
+                    break;
+                }
             }
         }
         // For any debugInlinedAt without an outerinlinedAt, emit a new debugInlinedAt with the
@@ -881,7 +884,6 @@ struct InliningPassBase
         // For each existing debugNoScope inst, replace it with new debug scope we emit.
         // For any debugInlinedAt without an outerinlinedAt, emit a new debugInlinedAt with the
         // outer set, and delete the older debugInlinedAt
-        List<IRDebugInlinedAt*> debugInlinedInsts;
         if (newDebugInlinedAt && callee->findDecoration<IRDebugLocationDecoration>())
         {
             for (auto calleeBlock : callee->getBlocks())
@@ -902,7 +904,6 @@ struct InliningPassBase
                 {
                     if (auto inlinedAt = as<IRDebugInlinedAt>(inst))
                     {
-                        debugInlinedInsts.add(inlinedAt);
                         if (!inlinedAt->isOuterInlinedPresent())
                         {
                             builder->setInsertAfter(inst);

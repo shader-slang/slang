@@ -609,7 +609,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         for (auto parent = inst; parent; parent = parent->getParent())
         {
-            if (!as<IRFunc>(parent) && !as<IRModuleInst>(parent) && !as<IRDebugFunction>(parent))
+            if (!as<IRFunc>(parent) && !as<IRModuleInst>(parent))
                 continue;
 
             SpvInst* spvInst = nullptr;
@@ -1953,8 +1953,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_PrimitivesType:
             return nullptr;
         case kIROp_DebugFunction:
-            return emitDebugInlinedFunction(
+            return emitDebugFunction(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                nullptr,
+                nullptr,
                 as<IRDebugFunction>(inst));
         case kIROp_DebugInlinedAt:
             return emitDebugInlinedAt(
@@ -3034,7 +3036,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     }
                 }
                 // DebugInfo.
-                funcDebugScope = emitDebugFunction(spvBlock, spvFunc, irFunc);
+                IRDebugFunction* irDebugFunc = nullptr;
+                if (auto debugFuncDecor = irFunc->findDecoration<IRDebugFuncDecoration>())
+                {
+                    irDebugFunc = as<IRDebugFunction>(debugFuncDecor->getDebugFunc());
+                }
+                funcDebugScope = emitDebugFunction(getSection(SpvLogicalSectionID::ConstantsAndTypes), spvBlock, spvFunc, irDebugFunc);
             }
             if (funcDebugScope)
             {
@@ -4092,8 +4099,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             break;
         case kIROp_DebugFunction:
-            return emitDebugInlinedFunction(
+            return emitDebugFunction(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                nullptr,
+                nullptr,
                 as<IRDebugFunction>(inst));
         case kIROp_DebugInlinedAt:
             return emitDebugInlinedAt(
@@ -7425,7 +7434,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
 
-    SpvInst* emitDebugInlinedFunction(SpvInstParent* parent, IRDebugFunction* debugFunc)
+    SpvInst* emitDebugFunction(SpvInstParent* parent, SpvInst* firstBlock, SpvInst* spvFunc, IRDebugFunction* debugFunc)
     {
         auto scope = findDebugScope(debugFunc);
         if (!scope)
@@ -7450,6 +7459,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             builder.getIntValue(builder.getUIntType(), 0),
             debugFunc->getLine());
 
+        if (firstBlock && spvFunc)
+        {
+            emitOpDebugFunctionDefinition(
+                firstBlock,
+                nullptr,
+                m_voidType,
+                getNonSemanticDebugInfoExtInst(),
+                debugFuncInfo,
+                spvFunc);
+        }
         return debugFuncInfo;
     }
 
@@ -7970,62 +7989,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto result = emitDebugForwardRefsImpl(type);
         m_mapForwardRefsToDebugType[type] = result;
         return result;
-    }
-
-    SpvInst* emitDebugFunction(SpvInst* firstBlock, SpvInst* spvFunc, IRFunc* function)
-    {
-        auto scope = findDebugScope(function);
-        if (!scope)
-            return nullptr;
-        auto name = getName(function);
-        if (!name)
-            return nullptr;
-        auto debugLoc = function->findDecoration<IRDebugLocationDecoration>();
-        if (!debugLoc)
-            return nullptr;
-        auto debugType = emitDebugType(function->getDataType());
-        IRBuilder builder(function);
-
-        IRDebugFunction* irDebugFunc = nullptr;
-        if (auto debugFuncDecor = function->findDecoration<IRDebugFuncDecoration>())
-        {
-            irDebugFunc = as<IRDebugFunction>(debugFuncDecor->getDebugFunc());
-        }
-
-        if (irDebugFunc == nullptr)
-            return nullptr;
-
-        SpvInst* debugFunc = nullptr;
-        debugFunc = emitOpDebugFunction(
-            getSection(SpvLogicalSectionID::ConstantsAndTypes),
-            nullptr,
-            m_voidType,
-            getNonSemanticDebugInfoExtInst(),
-            name,
-            debugType,
-            debugLoc->getSource(),
-            debugLoc->getLine(),
-            debugLoc->getCol(),
-            scope,
-            name,
-            builder.getIntValue(builder.getUIntType(), 0),
-            debugLoc->getLine());
-
-        registerDebugInst(function, debugFunc);
-        if (!m_mapIRInstToSpvInst.tryGetValue(irDebugFunc, debugFunc))
-        {
-            registerInst(irDebugFunc, debugFunc);
-        }
-
-        emitOpDebugFunctionDefinition(
-            firstBlock,
-            nullptr,
-            m_voidType,
-            getNonSemanticDebugInfoExtInst(),
-            debugFunc,
-            spvFunc);
-
-        return debugFunc;
     }
 
     SpvInst* emitSPIRVAsm(SpvInstParent* parent, IRSPIRVAsm* inst)

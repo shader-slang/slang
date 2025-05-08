@@ -3449,9 +3449,13 @@ struct IRDebugInlinedAt : IRInst
     IRInst* getCol() { return getOperand(1); }
     IRInst* getFile() { return getOperand(2); }
     IRInst* getDebugFunc() { return getOperand(3); }
-    IRInst* getOuterInlinedAt() { return getOperand(4); }
+    IRInst* getOuterInlinedAt()
+    {
+        if (operandCount == 5)
+            return getOperand(4);
+        return nullptr;
+    }
     void setDebugFunc(IRInst* func) { setOperand(3, func); }
-    void setOuterInlinedAt(IRInst* outer) { setOperand(4, outer); }
     bool isOuterInlinedPresent() { return operandCount == 5; }
 };
 
