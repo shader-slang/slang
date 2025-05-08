@@ -2166,6 +2166,7 @@ String DocMarkdownWriter::translateToMarkdownWithLinks(String text, bool strictC
                 sb.append(Path::getPathWithoutExt(Path::getRelativePath(
                     Path::getParentDirectory(m_currentPage->path),
                     page->path)));
+                sb.append(".html");
                 if (sectionName.getLength())
                     sb << "#" << sectionName;
                 sb.append(")");
