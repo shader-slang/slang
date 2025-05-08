@@ -687,34 +687,31 @@ SlangResult Session::_readBuiltinModule(
     StringBuilder moduleFilename;
     moduleFilename << moduleName << ".slang-module";
 
-    RiffContainer riffContainer;
+    // Load it
+    ComPtr<ISlangBlob> fileContents;
+    SLANG_RETURN_ON_FAIL(fileSystem->loadFile(moduleFilename.getBuffer(), fileContents.writeRef()));
+
+    RIFF::RootChunk const* rootChunk = RIFF::RootChunk::getFromBlob(fileContents);
+    if (!rootChunk)
     {
-        // Load it
-        ComPtr<ISlangBlob> blob;
-        SLANG_RETURN_ON_FAIL(fileSystem->loadFile(moduleFilename.getBuffer(), blob.writeRef()));
-
-        // Set up a stream
-        MemoryStreamBase stream(FileAccess::Read, blob->getBufferPointer(), blob->getBufferSize());
-
-        // Load the riff container
-        SLANG_RETURN_ON_FAIL(RiffUtil::read(&stream, riffContainer));
+        return SLANG_FAIL;
     }
 
     Linkage* linkage = getBuiltinLinkage();
     SourceManager* sourceManager = getBuiltinSourceManager();
     NamePool* sessionNamePool = &namePool;
 
-    auto moduleChunk = ModuleChunkRef::find(&riffContainer);
+    auto moduleChunk = ModuleChunk::find(rootChunk);
     if (!moduleChunk)
         return SLANG_FAIL;
 
-    SHA1::Digest moduleDigest = moduleChunk.getDigest();
+    SHA1::Digest moduleDigest = moduleChunk->getDigest();
 
-    auto irChunk = moduleChunk.findIR();
+    auto irChunk = moduleChunk->findIR();
     if (!irChunk)
         return SLANG_FAIL;
 
-    auto astChunk = moduleChunk.findAST();
+    auto astChunk = moduleChunk->findAST();
     if (!astChunk)
         return SLANG_FAIL;
 
@@ -724,7 +721,7 @@ SlangResult Session::_readBuiltinModule(
     // in the IR and AST deserialization (if we find anything).
     //
     RefPtr<SerialSourceLocReader> sourceLocReader;
-    if (auto debugChunk = findDebugChunk(moduleChunk.ptr()))
+    if (auto debugChunk = DebugChunk::find(moduleChunk))
     {
         SLANG_RETURN_ON_FAIL(
             readSourceLocationsFromDebugChunk(debugChunk, sourceManager, sourceLocReader));
@@ -4134,7 +4131,7 @@ void Linkage::loadParsedModule(
 }
 
 RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
-    ModuleChunkRef moduleChunk,
+    ModuleChunk const* moduleChunk,
     DiagnosticSink* sink)
 {
     RefPtr<Module> resultModule;
@@ -4147,7 +4144,7 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
     // The first step is to simply decode the module name, and
     // see if we have a already loaded a matching module.
 
-    auto moduleName = getNamePool()->getName(moduleChunk.getName());
+    auto moduleName = getNamePool()->getName(moduleChunk->getName());
     if (mapNameToLoadedModules.tryGetValue(moduleName, resultModule))
         return resultModule;
 
@@ -4163,12 +4160,12 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
     // already. It isn't something that can be fixed in just one
     // place at this point.
 
-    auto fileDependenciesChunk = moduleChunk.getFileDependencies();
-    auto firstFileDependencyChunk = fileDependenciesChunk.getFirst();
+    auto fileDependenciesList = moduleChunk->getFileDependencies();
+    auto firstFileDependencyChunk = fileDependenciesList.getFirst();
     if (!firstFileDependencyChunk)
         return nullptr;
 
-    auto modulePathInfo = PathInfo::makePath(firstFileDependencyChunk.getValue());
+    auto modulePathInfo = PathInfo::makePath(firstFileDependencyChunk->getValue());
     if (mapPathToLoadedModule.tryGetValue(modulePathInfo.getMostUniqueIdentity(), resultModule))
         return resultModule;
 
@@ -4182,7 +4179,7 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
 RefPtr<Module> Linkage::loadSerializedModule(
     Name* moduleName,
     const PathInfo& moduleFilePathInfo,
-    ModuleChunkRef moduleChunk,
+    ModuleChunk const* moduleChunk,
     SourceLoc const& requestingLoc,
     DiagnosticSink* sink)
 {
@@ -4240,24 +4237,17 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     auto astBuilder = getASTBuilder();
     SLANG_AST_BUILDER_RAII(astBuilder);
 
-    // We start by reading the content of the file into
+    // We start by reading the content of the file as
     // an in-memory RIFF container.
     //
-    // TODO(tfoley): this is an unnecessary copy step, since
-    // we can simply use the contents of the blob directly
-    // and navigate it in-memory.
-    //
-    RiffContainer riffContainer;
+    auto rootChunk = RIFF::RootChunk::getFromBlob(moduleFileContents);
+    if (!rootChunk)
     {
-        MemoryStreamBase readStream(
-            FileAccess::Read,
-            moduleFileContents->getBufferPointer(),
-            moduleFileContents->getBufferSize());
-        SLANG_RETURN_NULL_ON_FAIL(RiffUtil::read(&readStream, riffContainer));
+        return nullptr;
     }
 
-    auto moduleChunkRef = ModuleChunkRef::find(&riffContainer);
-    if (!moduleChunkRef)
+    auto moduleChunk = ModuleChunk::find(rootChunk);
+    if (!moduleChunk)
     {
         return nullptr;
     }
@@ -4271,7 +4261,7 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     SLANG_ASSERT(mostUniqueIdentity.getLength() > 0);
     if (m_optionSet.getBoolOption(CompilerOptionName::UseUpToDateBinaryModule))
     {
-        if (!isBinaryModuleUpToDate(moduleFilePathInfo.foundPath, moduleChunkRef))
+        if (!isBinaryModuleUpToDate(moduleFilePathInfo.foundPath, moduleChunk))
         {
             return nullptr;
         }
@@ -4281,7 +4271,7 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     // the module more completely from that serialized representation.
     //
     RefPtr<Module> module =
-        loadSerializedModule(moduleName, moduleFilePathInfo, moduleChunkRef, requestingLoc, sink);
+        loadSerializedModule(moduleName, moduleFilePathInfo, moduleChunk, requestingLoc, sink);
 
     return module;
 }
@@ -4744,18 +4734,13 @@ SourceFile* Linkage::loadSourceFile(String pathFrom, String path)
 }
 
 // Check if a serialized module is up-to-date with current compiler options and source files.
-bool Linkage::isBinaryModuleUpToDate(String fromPath, RiffContainer* riffContainer)
+bool Linkage::isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* baseChunk)
 {
-    auto moduleChunk = ModuleChunkRef::find(riffContainer);
+    auto moduleChunk = ModuleChunk::find(baseChunk);
     if (!moduleChunk)
         return false;
 
-    return isBinaryModuleUpToDate(fromPath, moduleChunk);
-}
-
-bool Linkage::isBinaryModuleUpToDate(String fromPath, ModuleChunkRef moduleChunk)
-{
-    SHA1::Digest existingDigest = moduleChunk.getDigest();
+    SHA1::Digest existingDigest = moduleChunk->getDigest();
 
     DigestBuilder<SHA1> digestBuilder;
     auto version = String(getBuildTagString());
@@ -4765,10 +4750,10 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, ModuleChunkRef moduleChunk
     // Find the canonical path of the directory containing the module source file.
     String moduleSrcPath = "";
 
-    auto dependencyChunks = moduleChunk.getFileDependencies();
+    auto dependencyChunks = moduleChunk->getFileDependencies();
     if (auto firstDependencyChunk = dependencyChunks.getFirst())
     {
-        moduleSrcPath = firstDependencyChunk.getValue();
+        moduleSrcPath = firstDependencyChunk->getValue();
 
         IncludeSystem includeSystem(
             &getSearchDirectories(),
@@ -4784,7 +4769,7 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, ModuleChunkRef moduleChunk
 
     for (auto dependencyChunk : dependencyChunks)
     {
-        auto file = dependencyChunk.getValue();
+        auto file = dependencyChunk->getValue();
         auto sourceFile = loadSourceFile(fromPath, file);
         if (!sourceFile)
         {
@@ -4803,14 +4788,10 @@ bool Linkage::isBinaryModuleUpToDate(String fromPath, ModuleChunkRef moduleChunk
 SLANG_NO_THROW bool SLANG_MCALL
 Linkage::isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob)
 {
-    RiffContainer container;
-    MemoryStreamBase readStream(
-        FileAccess::Read,
-        binaryModuleBlob->getBufferPointer(),
-        binaryModuleBlob->getBufferSize());
-    if (SLANG_FAILED(RiffUtil::read(&readStream, container)))
+    auto rootChunk = RIFF::RootChunk::getFromBlob(binaryModuleBlob);
+    if (!rootChunk)
         return false;
-    return isBinaryModuleUpToDate(modulePath, &container);
+    return isBinaryModuleUpToDate(modulePath, rootChunk);
 }
 
 SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem)
@@ -6534,7 +6515,7 @@ void Linkage::setFileSystem(ISlangFileSystem* inFileSystem)
 SlangResult Linkage::loadSerializedModuleContents(
     Module* module,
     const PathInfo& moduleFilePathInfo,
-    ModuleChunkRef moduleChunk,
+    ModuleChunk const* moduleChunk,
     DiagnosticSink* sink)
 {
     // At this point we've dealt with basically all of
@@ -6544,17 +6525,17 @@ SlangResult Linkage::loadSerializedModuleContents(
 
     auto sourceManager = getSourceManager();
     RefPtr<SerialSourceLocReader> sourceLocReader;
-    if (auto debugChunk = findDebugChunk(moduleChunk.ptr()))
+    if (auto debugChunk = DebugChunk::find(moduleChunk))
     {
         SLANG_RETURN_ON_FAIL(
             readSourceLocationsFromDebugChunk(debugChunk, sourceManager, sourceLocReader));
     }
 
-    auto astChunk = moduleChunk.findAST();
+    auto astChunk = moduleChunk->findAST();
     if (!astChunk)
         return SLANG_FAIL;
 
-    auto irChunk = moduleChunk.findIR();
+    auto irChunk = moduleChunk->findIR();
     if (!irChunk)
         return SLANG_FAIL;
 
@@ -6620,9 +6601,9 @@ SlangResult Linkage::loadSerializedModuleContents(
     module->clearFileDependency();
     String moduleSourcePath = moduleFilePathInfo.foundPath;
     bool isFirst = true;
-    for (auto depenencyFileChunk : moduleChunk.getFileDependencies())
+    for (auto depenencyFileChunk : moduleChunk->getFileDependencies())
     {
-        auto encodedDependencyFilePath = depenencyFileChunk.getValue();
+        auto encodedDependencyFilePath = depenencyFileChunk->getValue();
 
         auto sourceFile = loadSourceFile(moduleFilePathInfo.foundPath, encodedDependencyFilePath);
         if (isFirst)
@@ -6646,7 +6627,7 @@ SlangResult Linkage::loadSerializedModuleContents(
         }
     }
     module->setPathInfo(moduleFilePathInfo);
-    module->setDigest(moduleChunk.getDigest());
+    module->setDigest(moduleChunk->getDigest());
     module->_collectShaderParams();
     module->_discoverEntryPoints(sink, targets);
 

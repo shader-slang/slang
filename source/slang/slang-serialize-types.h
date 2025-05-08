@@ -123,66 +123,66 @@ struct PropertyKeys
 template<>
 struct PropertyKeys<Module>
 {
-    static const FourCC Digest = SLANG_FOUR_CC('S', 'H', 'A', '1');
-    static const FourCC ASTModule = SLANG_FOUR_CC('a', 's', 't', ' ');
-    static const FourCC IRModule = SLANG_FOUR_CC('i', 'r', ' ', ' ');
-    static const FourCC FileDependencies = SLANG_FOUR_CC('f', 'd', 'e', 'p');
+    static const FourCC::RawValue Digest = SLANG_FOUR_CC('S', 'H', 'A', '1');
+    static const FourCC::RawValue ASTModule = SLANG_FOUR_CC('a', 's', 't', ' ');
+    static const FourCC::RawValue IRModule = SLANG_FOUR_CC('i', 'r', ' ', ' ');
+    static const FourCC::RawValue FileDependencies = SLANG_FOUR_CC('f', 'd', 'e', 'p');
 };
 
 // For types/FourCC that work for serializing in general (not just IR).
 struct SerialBinary
 {
-    static const FourCC kRiffFourCc = RiffFourCC::kRiff;
+    static const FourCC::RawValue kRiffFourCc = RIFF::RootChunk::kTag;
 
     /// Container
-    static const FourCC kContainerFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'c');
+    static const FourCC::RawValue kContainerFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'c');
 
     /// A string table
-    static const FourCC kStringTableFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
+    static const FourCC::RawValue kStringTableFourCc = SLANG_FOUR_CC('S', 'L', 's', 't');
 
     /// TranslationUnitList
-    static const FourCC kModuleListFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'l');
+    static const FourCC::RawValue kModuleListFourCc = SLANG_FOUR_CC('S', 'L', 'm', 'l');
 
     /// An entry point
-    static const FourCC kEntryPointFourCc = SLANG_FOUR_CC('E', 'P', 'n', 't');
+    static const FourCC::RawValue kEntryPointFourCc = SLANG_FOUR_CC('E', 'P', 'n', 't');
 
-    static const FourCC kEntryPointListFourCc = SLANG_FOUR_CC('e', 'p', 't', 's');
+    static const FourCC::RawValue kEntryPointListFourCc = SLANG_FOUR_CC('e', 'p', 't', 's');
 
     // Module
-    static const FourCC kModuleFourCC = SLANG_FOUR_CC('s', 'm', 'o', 'd');
+    static const FourCC::RawValue kModuleFourCC = SLANG_FOUR_CC('s', 'm', 'o', 'd');
 
     // The following are "generic" codes, suitable for
     // use when serializing content using JSON-like structure.
     //
-    static const FourCC kObjectFourCC = SLANG_FOUR_CC('o', 'b', 'j', ' ');
-    static const FourCC kPairFourCC = SLANG_FOUR_CC('p', 'a', 'i', 'r');
-    static const FourCC kArrayFourCC = SLANG_FOUR_CC('a', 'r', 'r', 'y');
-    static const FourCC kDictionaryFourCC = SLANG_FOUR_CC('d', 'i', 'c', 't');
-    static const FourCC kNullFourCC = SLANG_FOUR_CC('n', 'u', 'l', 'l');
-    static const FourCC kStringFourCC = SLANG_FOUR_CC('s', 't', 'r', ' ');
-    static const FourCC kTrueFourCC = SLANG_FOUR_CC('t', 'r', 'u', 'e');
-    static const FourCC kFalseFourCC = SLANG_FOUR_CC('f', 'a', 'l', 's');
-    static const FourCC kInt32FourCC = SLANG_FOUR_CC('i', '3', '2', ' ');
-    static const FourCC kUInt32FourCC = SLANG_FOUR_CC('u', '3', '2', ' ');
-    static const FourCC kFloat32FourCC = SLANG_FOUR_CC('f', '3', '2', ' ');
-    static const FourCC kInt64FourCC = SLANG_FOUR_CC('i', '6', '4', ' ');
-    static const FourCC kUInt64FourCC = SLANG_FOUR_CC('u', '6', '4', ' ');
-    static const FourCC kFloat64FourCC = SLANG_FOUR_CC('f', '6', '4', ' ');
+    static const FourCC::RawValue kObjectFourCC = SLANG_FOUR_CC('o', 'b', 'j', ' ');
+    static const FourCC::RawValue kPairFourCC = SLANG_FOUR_CC('p', 'a', 'i', 'r');
+    static const FourCC::RawValue kArrayFourCC = SLANG_FOUR_CC('a', 'r', 'r', 'y');
+    static const FourCC::RawValue kDictionaryFourCC = SLANG_FOUR_CC('d', 'i', 'c', 't');
+    static const FourCC::RawValue kNullFourCC = SLANG_FOUR_CC('n', 'u', 'l', 'l');
+    static const FourCC::RawValue kStringFourCC = SLANG_FOUR_CC('s', 't', 'r', ' ');
+    static const FourCC::RawValue kTrueFourCC = SLANG_FOUR_CC('t', 'r', 'u', 'e');
+    static const FourCC::RawValue kFalseFourCC = SLANG_FOUR_CC('f', 'a', 'l', 's');
+    static const FourCC::RawValue kInt32FourCC = SLANG_FOUR_CC('i', '3', '2', ' ');
+    static const FourCC::RawValue kUInt32FourCC = SLANG_FOUR_CC('u', '3', '2', ' ');
+    static const FourCC::RawValue kFloat32FourCC = SLANG_FOUR_CC('f', '3', '2', ' ');
+    static const FourCC::RawValue kInt64FourCC = SLANG_FOUR_CC('i', '6', '4', ' ');
+    static const FourCC::RawValue kUInt64FourCC = SLANG_FOUR_CC('u', '6', '4', ' ');
+    static const FourCC::RawValue kFloat64FourCC = SLANG_FOUR_CC('f', '6', '4', ' ');
 
     // The following codes are suitable for use when serializing
     // content that represents a logical file system.
     //
-    static const FourCC kDirectoryFourCC = SLANG_FOUR_CC('d', 'i', 'r', ' ');
-    static const FourCC kFileFourCC = SLANG_FOUR_CC('f', 'i', 'l', 'e');
-    static const FourCC kNameFourCC = SLANG_FOUR_CC('n', 'a', 'm', 'e');
-    static const FourCC kPathFourCC = SLANG_FOUR_CC('p', 'a', 't', 'h');
-    static const FourCC kDataFourCC = SLANG_FOUR_CC('d', 'a', 't', 'a');
+    static const FourCC::RawValue kDirectoryFourCC = SLANG_FOUR_CC('d', 'i', 'r', ' ');
+    static const FourCC::RawValue kFileFourCC = SLANG_FOUR_CC('f', 'i', 'l', 'e');
+    static const FourCC::RawValue kNameFourCC = SLANG_FOUR_CC('n', 'a', 'm', 'e');
+    static const FourCC::RawValue kPathFourCC = SLANG_FOUR_CC('p', 'a', 't', 'h');
+    static const FourCC::RawValue kDataFourCC = SLANG_FOUR_CC('d', 'a', 't', 'a');
 
     // TODO(tfoley): Figure out where to put all of these so that
     // they can be more usefully addressed.
     //
-    static const FourCC kMangledNameFourCC = SLANG_FOUR_CC('m', 'g', 'n', 'm');
-    static const FourCC kProfileFourCC = SLANG_FOUR_CC('p', 'r', 'o', 'f');
+    static const FourCC::RawValue kMangledNameFourCC = SLANG_FOUR_CC('m', 'g', 'n', 'm');
+    static const FourCC::RawValue kProfileFourCC = SLANG_FOUR_CC('p', 'r', 'o', 'f');
 
 
     struct ArrayHeader
@@ -233,23 +233,23 @@ struct SerialRiffUtil
         const void* data,
         size_t numEntries,
         size_t typeSize,
-        RiffContainer* container);
+        RIFF::BuildCursor& cursor);
 
     template<typename T>
-    static Result writeArrayChunk(FourCC chunkId, const List<T>& array, RiffContainer* container)
+    static Result writeArrayChunk(FourCC chunkId, const List<T>& array, RIFF::BuildCursor& cursor)
     {
         return writeArrayChunk(
             chunkId,
             array.begin(),
             size_t(array.getCount()),
             sizeof(T),
-            container);
+            cursor);
     }
 
-    static Result readArrayChunk(RiffContainer::DataChunk* dataChunk, ListResizer& listOut);
+    static Result readArrayChunk(RIFF::DataChunk const* dataChunk, ListResizer& listOut);
 
     template<typename T>
-    static Result readArrayChunk(RiffContainer::DataChunk* dataChunk, List<T>& arrayOut)
+    static Result readArrayChunk(RIFF::DataChunk const* dataChunk, List<T>& arrayOut)
     {
         ListResizerForType<T> resizer(arrayOut);
         return readArrayChunk(dataChunk, resizer);

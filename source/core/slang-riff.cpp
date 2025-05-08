@@ -1,1024 +1,885 @@
+// slang-riff.cpp
 #include "slang-riff.h"
 
+#include "slang-blob.h"
 #include "slang-com-helper.h"
-#include "slang-hex-dump-util.h"
 
 namespace Slang
 {
-
-/* static */ int64_t RiffUtil::calcChunkTotalSize(const RiffHeader& chunk)
+namespace RIFF
 {
-    size_t size = chunk.size + sizeof(RiffHeader);
-    return getPadSize(size);
+
+Size _roundUpToChunkAlignment(Size size)
+{
+    auto alignmentMask = Size(Chunk::kChunkAlignment) - 1;
+    return (size + alignmentMask) & ~alignmentMask;
 }
 
-/* static */ SlangResult RiffUtil::skip(
-    const RiffHeader& chunk,
-    Stream* stream,
-    int64_t* remainingBytesInOut)
-{
-    int64_t chunkSize = calcChunkTotalSize(chunk);
-    if (remainingBytesInOut)
-    {
-        *remainingBytesInOut -= chunkSize;
-    }
+//
+// RIFF::Chunk
+//
 
-    // Skip the payload (we don't need to skip the Chunk because that was already read
-    SLANG_RETURN_ON_FAIL(stream->seek(SeekOrigin::Current, chunkSize - sizeof(RiffHeader)));
-    return SLANG_OK;
+//
+// RIFF::DataChunk
+//
+
+void DataChunk::writePayloadInto(void* outData, Size size) const
+{
+    SLANG_ASSERT(size <= getPayloadSize());
+    ::memcpy(outData, getPayload(), size);
 }
 
-/* static */ SlangResult RiffUtil::readChunk(Stream* stream, RiffHeader& outChunk)
+//
+// RIFF::BoundsCheckedChunkPtr
+//
+
+void BoundsCheckedChunkPtr::_set(Chunk const* chunk, Size sizeLimit)
 {
-    size_t readBytes;
-    SLANG_RETURN_ON_FAIL(stream->read(&outChunk, sizeof(RiffHeader), readBytes));
-    // TODO(JS): Could handle endianness issues here...
-    return (readBytes == sizeof(RiffHeader)) ? SLANG_OK : SLANG_FAIL;
-}
+    // We start by clearing out the state of this
+    // pointer, so that we can early-out if any
+    // validation checks fail, and be sure we
+    // have a null pointer.
+    //
+    _ptr = nullptr;
+    _sizeLimit = 0;
 
-/* static */ SlangResult RiffUtil::writeData(
-    const RiffHeader* header,
-    size_t headerSize,
-    const void* payload,
-    size_t payloadSize,
-    Stream* out)
-{
-    SLANG_ASSERT(uint64_t(payloadSize) <= uint64_t(0xfffffffff));
-    SLANG_ASSERT(headerSize >= sizeof(RiffHeader));
-
-    // TODO(JS): Could handle endianness here
-
-    RiffHeader chunk;
-    chunk.type = header->type;
-    chunk.size = uint32_t(headerSize - sizeof(RiffHeader) + payloadSize);
-
-    // The chunk
-    SLANG_RETURN_ON_FAIL(out->write(&chunk, sizeof(RiffHeader)));
-
-    // Remainder of header
-    if (headerSize > sizeof(RiffHeader))
+    // If there's nothing to point to, then the pointer
+    // should be null anyway.
+    //
+    if (!chunk || !sizeLimit)
     {
-        // The rest of the header
-        SLANG_RETURN_ON_FAIL(out->write(header + 1, headerSize - sizeof(RiffHeader)));
+        return;
     }
 
-    // Write the payload
-    SLANG_RETURN_ON_FAIL(out->write(payload, payloadSize));
+    // Because this type can be used to traverse RIFF
+    // chunks that were loaded into memory from in-theory
+    // untrusted sources, we try to provide some validation
+    // checks to make sure that access to the chunk will
+    // be safe (or as safe as we can easily ensure).
 
-    // The riff spec requires all chunks are 4 byte aligned (even if size is not)
-    size_t padSize = getPadSize(payloadSize);
-    if (padSize - payloadSize)
+    // If the available size isn't even enough for the
+    // header of a RIFF chunk, then something is wrong.
+    //
+    if(sizeLimit < sizeof(Chunk::Header))
     {
-        uint8_t end[kRiffPadSize] = {0};
-        SLANG_RETURN_ON_FAIL(out->write(end, padSize - payloadSize));
+        SLANG_UNEXPECTED("invalid RIFF");
+        return;
     }
 
-    return SLANG_OK;
-}
+    // Once we've checked that there is enough space
+    // for a valid RIFF header, we can read the
+    // size that the `chunk` reports itself as having.
+    //
+    auto reportedSize = chunk->getTotalSize();
 
-/* static */ SlangResult RiffUtil::readPayload(
-    Stream* stream,
-    size_t size,
-    void* outData,
-    size_t& outReadSize)
-{
-    outReadSize = 0;
-
-    SLANG_RETURN_ON_FAIL(stream->readExactly(outData, size));
-
-    const size_t alignedSize = getPadSize(size);
-    // Skip to the alignment
-    if (alignedSize > size)
+    // If the reported size is too small, then something
+    // is wrong.
+    //
+    if (reportedSize < sizeof(Chunk::Header))
     {
-        SLANG_RETURN_ON_FAIL(stream->seek(SeekOrigin::Current, alignedSize - size));
-    }
-    outReadSize = alignedSize;
-    return SLANG_OK;
-}
-
-/* static */ SlangResult RiffUtil::readData(
-    Stream* stream,
-    RiffHeader* outHeader,
-    size_t headerSize,
-    List<uint8_t>& data)
-{
-    RiffHeader chunk;
-    SLANG_RETURN_ON_FAIL(readChunk(stream, chunk));
-    if (chunk.size < headerSize)
-    {
-        return SLANG_FAIL;
+        SLANG_UNEXPECTED("invalid RIFF");
+        return;
     }
 
-    *outHeader = chunk;
-
-    // Read the header
-    if (headerSize > sizeof(RiffHeader))
+    // If the reported size is bigger than the size limit,
+    // then it must be invalid (it is reporting itself as
+    // bigger than the region of memory that is supposed
+    // to contain it).
+    //
+    if (reportedSize > sizeLimit)
     {
-        SLANG_RETURN_ON_FAIL(stream->readExactly(outHeader + 1, headerSize - sizeof(RiffHeader)));
+        SLANG_UNEXPECTED("invalid RIFF");
+        return;
     }
 
-    const size_t payloadSize = chunk.size - (headerSize - sizeof(RiffHeader));
-    size_t readSize;
-    data.setCount(payloadSize);
-    return readPayload(stream, payloadSize, data.getBuffer(), readSize);
-}
-
-/* static */ SlangResult RiffUtil::readHeader(Stream* stream, RiffListHeader& outHeader)
-{
-    // Need to read the chunk header
-    SLANG_RETURN_ON_FAIL(readChunk(stream, outHeader.chunk));
-    outHeader.subType = 0;
-
-    if (isListType(outHeader.chunk.type))
+    // If the chunk claims to be a list chunk, then it
+    // must be big enough to hold the larger header
+    // that list chunks use.
+    //
+    if (auto listChunk = as<ListChunk>(chunk))
     {
-        // Read the sub type
-        SLANG_RETURN_ON_FAIL(
-            stream->readExactly(&outHeader.subType, sizeof(RiffListHeader) - sizeof(RiffHeader)));
-    }
-
-    return SLANG_OK;
-}
-
-namespace
-{ // anonymous
-
-struct DumpVisitor : public RiffContainer::Visitor
-{
-    typedef RiffContainer::Chunk Chunk;
-    typedef RiffContainer::ListChunk ListChunk;
-    typedef RiffContainer::DataChunk DataChunk;
-
-
-    // Visitor
-    virtual SlangResult enterList(ListChunk* list) SLANG_OVERRIDE
-    {
-        _dumpIndent();
-        // If it's the root it's 'riff'
-        _dumpRiffType(list == m_rootChunk ? RiffFourCC::kRiff : RiffFourCC::kList);
-        m_writer.put(" ");
-        _dumpRiffType(list->getSubType());
-        m_writer.put("\n");
-        m_indent++;
-        return SLANG_OK;
-    }
-    virtual SlangResult handleData(DataChunk* data) SLANG_OVERRIDE
-    {
-        _dumpIndent();
-        // Write out the name
-        _dumpRiffType(data->m_fourCC);
-        m_writer.put(" ");
-
-        const RiffHashCode hash = data->calcHash();
-
-        // We don't know in general what the contents is or means... but we can display a hash
-        HexDumpUtil::dump(uint32_t(hash), m_writer.getWriter());
-        m_writer.put(" ");
-
-        m_writer.put("\n");
-        return SLANG_OK;
-    }
-    virtual SlangResult leaveList(ListChunk* list) SLANG_OVERRIDE
-    {
-        SLANG_UNUSED(list);
-        m_indent--;
-        return SLANG_OK;
-    }
-
-    DumpVisitor(WriterHelper writer, Chunk* rootChunk)
-        : m_writer(writer), m_indent(0), m_rootChunk(rootChunk)
-    {
-    }
-
-    void _dumpIndent()
-    {
-        for (int i = 0; i < m_indent; ++i)
+        if (reportedSize < sizeof(ListChunk::Header))
         {
-            m_writer.put("  ");
-        }
-    }
-    void _dumpRiffType(FourCC fourCC)
-    {
-        char c[5];
-        for (int i = 0; i < 4; ++i)
-        {
-            c[i] = char(fourCC);
-            fourCC >>= 8;
-        }
-        c[4] = 0;
-        m_writer.put(c);
-    }
-
-    Chunk* m_rootChunk;
-
-    int m_indent;
-    WriterHelper m_writer;
-};
-
-} // namespace
-
-/* static */ void RiffUtil::dump(RiffContainer::Chunk* chunk, WriterHelper writer)
-{
-    DumpVisitor visitor(writer, chunk);
-    chunk->visit(&visitor);
-}
-
-/* static */ SlangResult RiffUtil::write(
-    RiffContainer::ListChunk* list,
-    bool isRoot,
-    Stream* stream)
-{
-    RiffListHeader listHeader;
-
-    listHeader.chunk.type = isRoot ? RiffFourCC::kRiff : RiffFourCC::kList;
-    listHeader.chunk.size = uint32_t(list->m_payloadSize);
-    listHeader.subType = list->getSubType();
-
-    // Write the header
-    SLANG_RETURN_ON_FAIL(stream->write(&listHeader, sizeof(listHeader)));
-
-    // Write the contained chunks
-    Chunk* chunk = list->m_containedChunks;
-    while (chunk)
-    {
-        switch (chunk->m_kind)
-        {
-        case Chunk::Kind::List:
-            {
-                auto listChunk = static_cast<ListChunk*>(chunk);
-                // It's a container
-                SLANG_RETURN_ON_FAIL(write(listChunk, false, stream));
-                break;
-            }
-        case Chunk::Kind::Data:
-            {
-                auto dataChunk = static_cast<DataChunk*>(chunk);
-
-                // Must be a regular chunk with data
-                RiffHeader chunkHeader;
-                chunkHeader.type = dataChunk->m_fourCC;
-                chunkHeader.size = uint32_t(dataChunk->m_payloadSize);
-
-                SLANG_RETURN_ON_FAIL(stream->write(&chunkHeader, sizeof(chunkHeader)));
-
-                RiffContainer::Data* data = dataChunk->m_dataList;
-                while (data)
-                {
-                    SLANG_RETURN_ON_FAIL(stream->write(data->getPayload(), data->getSize()));
-
-                    // Next but of data
-                    data = data->m_next;
-                }
-
-                // Need to write for alignment
-                const size_t remainingSize =
-                    getPadSize(dataChunk->m_payloadSize) - dataChunk->m_payloadSize;
-
-                if (remainingSize)
-                {
-                    static const uint8_t trailing[kRiffPadSize] = {0};
-                    SLANG_RETURN_ON_FAIL(stream->write(trailing, remainingSize));
-                }
-            }
-        default:
-            break;
-        }
-
-        // Next
-        chunk = chunk->m_next;
-    }
-
-    return SLANG_OK;
-}
-
-/* static */ SlangResult RiffUtil::write(RiffContainer* container, Stream* stream)
-{
-    return write(container->getRoot(), true, stream);
-}
-
-/* static */ SlangResult RiffUtil::read(Stream* stream, RiffContainer& outContainer)
-{
-    typedef RiffContainer::ScopeChunk ScopeChunk;
-    outContainer.reset();
-
-    size_t remaining;
-    {
-        RiffListHeader header;
-
-        SLANG_RETURN_ON_FAIL(readHeader(stream, header));
-        if (!isListType(header.chunk.type))
-        {
-            return SLANG_FAIL;
-        }
-
-        remaining = getPadSize(header.chunk.size) - (sizeof(RiffListHeader) - sizeof(RiffHeader));
-        outContainer.startChunk(Chunk::Kind::List, header.subType);
-    }
-
-    List<size_t> remainingStack;
-    while (true)
-    {
-        // It must be the end
-        if (remaining == 0)
-        {
-            // If it's a container then we pop container
-            outContainer.endChunk();
-            if (remainingStack.getCount() <= 0)
-            {
-                break;
-            }
-
-            remaining = remainingStack.getLast();
-            remainingStack.removeLast();
-        }
-        else
-        {
-            RiffListHeader header;
-            SLANG_RETURN_ON_FAIL(readHeader(stream, header));
-
-            // The amount of data can't be larger than what remains
-            if (header.chunk.size > remaining)
-            {
-                return SLANG_FAIL;
-            }
-
-            if (header.chunk.type == RiffFourCC::kList)
-            {
-                if (header.chunk.size & kRiffPadMask)
-                {
-                    SLANG_ASSERT(!"A list chunk can only have divisible by 2 size");
-                    return SLANG_FAIL;
-                }
-
-                // Work out the pad size
-                const size_t padSize = getPadSize(header.chunk.size);
-
-                // Subtract the size of this chunk from remaining of the current chunk
-                remaining -= sizeof(RiffHeader) + padSize;
-                // Push it, for when we hit the end
-                remainingStack.add(remaining);
-
-                // Work out how much remains in this container
-                remaining = padSize - (sizeof(RiffListHeader) - sizeof(RiffHeader));
-
-                // Start a container
-                outContainer.startChunk(Chunk::Kind::List, header.subType);
-            }
-            else
-            {
-                ScopeChunk scopeChunk(&outContainer, Chunk::Kind::Data, header.chunk.type);
-                RiffContainer::Data* data = outContainer.addData();
-
-                outContainer.setPayload(data, nullptr, header.chunk.size);
-
-                size_t readSize;
-                SLANG_RETURN_ON_FAIL(
-                    readPayload(stream, header.chunk.size, data->getPayload(), readSize));
-
-                // All read sizes must end up aligned
-                SLANG_ASSERT((readSize & kRiffPadMask) == 0);
-
-                // Correct remaining
-                remaining -= sizeof(RiffHeader) + readSize;
-            }
-        }
-    }
-
-    return outContainer.isFullyConstructed() ? SLANG_OK : SLANG_FAIL;
-}
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer::Chunk !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-SlangResult RiffContainer::Chunk::visit(Visitor* visitor)
-{
-    switch (m_kind)
-    {
-    case Kind::Data:
-        {
-            return visitor->handleData(static_cast<DataChunk*>(this));
-        }
-    case Kind::List:
-        {
-            auto list = static_cast<ListChunk*>(this);
-            SLANG_RETURN_ON_FAIL(visitor->enterList(list));
-
-            Chunk* chunk = list->m_containedChunks;
-            while (chunk)
-            {
-                SLANG_RETURN_ON_FAIL(chunk->visit(visitor));
-
-                chunk = chunk->m_next;
-            }
-
-            SLANG_RETURN_ON_FAIL(visitor->leaveList(list));
-            return SLANG_OK;
-        }
-    default:
-        return SLANG_FAIL;
-    }
-}
-
-SlangResult RiffContainer::Chunk::visitPreOrder(VisitorCallback callback, void* data)
-{
-    switch (m_kind)
-    {
-    case Kind::Data:
-        {
-            return callback(this, data);
-        }
-    case Kind::List:
-        {
-            auto list = static_cast<ListChunk*>(this);
-            // Do this containing node first
-            SLANG_RETURN_ON_FAIL(callback(this, data));
-
-            // Do the contents next
-            Chunk* chunk = list->m_containedChunks;
-            while (chunk)
-            {
-                SLANG_RETURN_ON_FAIL(chunk->visitPreOrder(callback, data));
-                chunk = chunk->m_next;
-            }
-            return SLANG_OK;
-        }
-    default:
-        return SLANG_FAIL;
-    }
-}
-
-SlangResult RiffContainer::Chunk::visitPostOrder(VisitorCallback callback, void* data)
-{
-    switch (m_kind)
-    {
-    case Kind::Data:
-        {
-            return callback(this, data);
-        }
-    case Kind::List:
-        {
-            auto list = static_cast<ListChunk*>(this);
-
-            // Do the contents first
-            Chunk* chunk = list->m_containedChunks;
-            while (chunk)
-            {
-                SLANG_RETURN_ON_FAIL(chunk->visitPostOrder(callback, data));
-                chunk = chunk->m_next;
-            }
-            // Then the list node (so a post order)
-            SLANG_RETURN_ON_FAIL(callback(this, data));
-            return SLANG_OK;
-        }
-    default:
-        return SLANG_FAIL;
-    }
-}
-
-size_t RiffContainer::Chunk::calcPayloadSize()
-{
-    switch (m_kind)
-    {
-    case Kind::Data:
-        return static_cast<DataChunk*>(this)->calcPayloadSize();
-    case Kind::List:
-        return static_cast<ListChunk*>(this)->calcPayloadSize();
-    default:
-        return 0;
-    }
-}
-
-RiffContainer::Data* RiffContainer::Chunk::getSingleData() const
-{
-    return (m_kind == Kind::Data) ? static_cast<const DataChunk*>(this)->getSingleData() : nullptr;
-}
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer::ListChunk !!!!!!!!!!!!!!!!!!!!!!
-
-size_t RiffContainer::ListChunk::calcPayloadSize()
-{
-    // Have to include the part of the header not taken up by the RiffHeader
-    size_t size = sizeof(RiffListHeader) - sizeof(RiffHeader);
-    Chunk* chunk = m_containedChunks;
-    while (chunk)
-    {
-        size_t chunkSize = chunk->m_payloadSize + sizeof(RiffHeader);
-        // Align the contained chunk size
-        size += RiffUtil::getPadSize(chunkSize);
-
-        chunk = chunk->m_next;
-    }
-    return size;
-}
-
-RiffContainer::Chunk* RiffContainer::ListChunk::findContained(FourCC fourCC) const
-{
-    Chunk* chunk = m_containedChunks;
-    while (chunk)
-    {
-        if (chunk->m_fourCC == fourCC)
-        {
-            return chunk;
-        }
-        chunk = chunk->m_next;
-    }
-    return nullptr;
-}
-
-void RiffContainer::ListChunk::findContained(FourCC type, List<ListChunk*>& out)
-{
-    Chunk* chunk = m_containedChunks;
-    while (chunk)
-    {
-        if (chunk->m_fourCC == type && chunk->m_kind == Chunk::Kind::List)
-        {
-            out.add(static_cast<ListChunk*>(chunk));
-        }
-        chunk = chunk->m_next;
-    }
-}
-
-void RiffContainer::ListChunk::findContained(FourCC type, List<DataChunk*>& out)
-{
-    Chunk* chunk = m_containedChunks;
-    while (chunk)
-    {
-        if (chunk->m_fourCC == type && chunk->m_kind == Chunk::Kind::Data)
-        {
-            out.add(static_cast<DataChunk*>(chunk));
-        }
-        chunk = chunk->m_next;
-    }
-}
-
-RiffContainer::ListChunk* RiffContainer::ListChunk::findContainedList(FourCC type)
-{
-    Chunk* chunk = m_containedChunks;
-    while (chunk)
-    {
-        if (chunk->m_fourCC == type && chunk->m_kind == Chunk::Kind::List)
-        {
-            return static_cast<ListChunk*>(chunk);
-        }
-        chunk = chunk->m_next;
-    }
-    return nullptr;
-}
-
-RiffContainer::Data* RiffContainer::ListChunk::findContainedData(FourCC type) const
-{
-    Chunk* found = findContained(type);
-    if (found && found->m_kind == Kind::Data)
-    {
-        DataChunk* dataChunk = static_cast<DataChunk*>(found);
-        // Assumes that there is a single data chunk
-
-        Data* data = dataChunk->m_dataList;
-        if (data && data->m_next == nullptr)
-        {
-            return data;
-        }
-    }
-    return nullptr;
-}
-
-void* RiffContainer::ListChunk::findContainedData(FourCC type, size_t minSize) const
-{
-    Data* data = findContainedData(type);
-    return (data && data->m_size >= minSize) ? data->getPayload() : nullptr;
-}
-
-static RiffContainer::ListChunk* _findListRec(RiffContainer::ListChunk* list, FourCC subType)
-{
-    RiffContainer::Chunk* chunk = list->m_containedChunks;
-    while (chunk)
-    {
-        if (auto childList = as<RiffContainer::ListChunk>(chunk))
-        {
-            // Test if the child is the subtype, if so we are done
-            if (childList->getSubType() == subType)
-            {
-                return childList;
-            }
-            auto found = _findListRec(childList, subType);
-            if (found)
-            {
-                return found;
-            }
-        }
-        chunk = chunk->m_next;
-    }
-    return nullptr;
-}
-
-/* static */ RiffContainer::ListChunk* RiffContainer::ListChunk::findListRec(FourCC subType)
-{
-    return (getSubType() == subType) ? this : _findListRec(this, subType);
-}
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer::DataChunk !!!!!!!!!!!!!!!!!!!!!!
-
-RiffContainer::Data* RiffContainer::DataChunk::getSingleData() const
-{
-    Data* data = m_dataList;
-    return (data && data->m_next == nullptr) ? data : nullptr;
-}
-
-RiffReadHelper RiffContainer::DataChunk::asReadHelper() const
-{
-    Data* data = getSingleData();
-    if (data)
-    {
-        return RiffReadHelper((const uint8_t*)data->getPayload(), data->getSize());
-    }
-    return RiffReadHelper(nullptr, 0);
-}
-
-RiffHashCode RiffContainer::DataChunk::calcHash() const
-{
-    RiffHashCode hash = 0;
-
-    Data* data = m_dataList;
-    while (data)
-    {
-        // This is a little contrived (in that we don't use the function getHashCode), but the
-        // reason to be careful is we want the same result however many Data blocks there are.
-        const char* buffer = (const char*)data->getPayload();
-        const size_t size = data->getSize();
-
-        for (size_t i = 0; i < size; ++i)
-        {
-            hash = RiffHashCode(buffer[i]) + (hash << 6) + (hash << 16) - hash;
-        }
-
-        data = data->m_next;
-    }
-
-    return hash;
-}
-
-size_t RiffContainer::DataChunk::calcPayloadSize() const
-{
-    size_t size = 0;
-    Data* data = m_dataList;
-    while (data)
-    {
-        size += data->getSize();
-        data = data->m_next;
-    }
-    return size;
-}
-
-void RiffContainer::DataChunk::getPayload(void* inDst) const
-{
-    uint8_t* dst = (uint8_t*)inDst;
-
-    Data* data = m_dataList;
-    while (data)
-    {
-        const size_t size = data->getSize();
-        ::memcpy(dst, data->getPayload(), size);
-
-        dst += size;
-        data = data->m_next;
-    }
-}
-
-bool RiffContainer::DataChunk::isEqual(const void* inData, size_t count) const
-{
-    const uint8_t* src = (const uint8_t*)inData;
-
-    Data* data = m_dataList;
-    while (data)
-    {
-        const size_t size = data->getSize();
-        // Can't have more content than remaining
-        // Contents must match
-        if (size > count || ::memcmp(src, data->getPayload(), size) != 0)
-        {
-            return false;
-        }
-
-        src += size;
-        count -= size;
-
-        // Next data block
-        data = data->m_next;
-    }
-
-    // If match must be at the end
-    return count == 0;
-}
-
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! RiffContainer !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-RiffContainer::RiffContainer()
-    : m_arena(4096)
-{
-    m_rootList = nullptr;
-    m_listChunk = nullptr;
-    m_dataChunk = nullptr;
-}
-
-void RiffContainer::reset()
-{
-    m_arena.reset();
-
-    m_rootList = nullptr;
-    m_listChunk = nullptr;
-    m_dataChunk = nullptr;
-}
-
-RiffContainer::ListChunk* RiffContainer::_newListChunk(FourCC subType)
-{
-    SLANG_ASSERT(!RiffUtil::isListType(subType));
-
-    ListChunk* chunk = (ListChunk*)m_arena.allocate(sizeof(ListChunk));
-    chunk->init(subType);
-    return chunk;
-}
-
-RiffContainer::DataChunk* RiffContainer::_newDataChunk(FourCC type)
-{
-    SLANG_ASSERT(!RiffUtil::isListType(type));
-
-    DataChunk* chunk = (DataChunk*)m_arena.allocate(sizeof(DataChunk));
-    chunk->init(type);
-    return chunk;
-}
-
-void RiffContainer::_addChunk(Chunk* chunk)
-{
-    if (m_listChunk)
-    {
-        chunk->m_parent = m_listChunk;
-        Chunk*& next = m_listChunk->m_endChunk ? m_listChunk->m_endChunk->m_next
-                                               : m_listChunk->m_containedChunks;
-        SLANG_ASSERT(next == nullptr);
-        next = chunk;
-        m_listChunk->m_endChunk = chunk;
-    }
-}
-
-void RiffContainer::setCurrentChunk(Chunk* chunk)
-{
-    SLANG_ASSERT(chunk);
-
-    switch (chunk->m_kind)
-    {
-    case Chunk::Kind::Data:
-        m_listChunk = nullptr;
-        m_dataChunk = static_cast<RiffContainer::DataChunk*>(chunk);
-        break;
-
-    case Chunk::Kind::List:
-        m_dataChunk = nullptr;
-        m_listChunk = static_cast<RiffContainer::ListChunk*>(chunk);
-        break;
-    }
-}
-
-void RiffContainer::startChunk(Chunk::Kind kind, FourCC fourCC)
-{
-    SLANG_ASSERT(m_listChunk || m_rootList == nullptr);
-
-    switch (kind)
-    {
-    case Chunk::Kind::Data:
-        {
-            // We can only start a data chunk if we are in a container, and we can't already be in
-            // data chunk
-            SLANG_ASSERT(m_listChunk && m_dataChunk == nullptr);
-
-            DataChunk* chunk = _newDataChunk(fourCC);
-            _addChunk(chunk);
-            m_dataChunk = chunk;
-            break;
-        }
-    case Chunk::Kind::List:
-        {
-            // We can't be in a data chunk
-            SLANG_ASSERT(m_dataChunk == nullptr);
-
-            ListChunk* list = _newListChunk(fourCC);
-
-            // If this is the first, make it the root
-            if (!m_rootList)
-            {
-                m_rootList = list;
-            }
-
-            _addChunk(list);
-
-            m_listChunk = list;
-            break;
-        }
-    }
-}
-
-void RiffContainer::endChunk()
-{
-    size_t chunkPayloadSize;
-
-    // The chunk we are popping
-    // Only keep track of this in debug builds
-    [[maybe_unused]] Chunk* chunk = nullptr;
-
-    ListChunk* parent;
-    if (m_dataChunk)
-    {
-        chunk = m_dataChunk;
-
-        parent = m_dataChunk->m_parent;
-        chunkPayloadSize = m_dataChunk->m_payloadSize;
-
-        m_dataChunk = nullptr;
-    }
-    else
-    {
-        chunk = m_listChunk;
-
-        SLANG_ASSERT(m_listChunk && m_dataChunk == nullptr);
-        parent = m_listChunk->m_parent;
-        chunkPayloadSize = m_listChunk->m_payloadSize;
-    }
-
-    m_listChunk = parent;
-
-    if (parent)
-    {
-        // Fix the size taking into account padding bytes requirement
-        chunkPayloadSize = RiffUtil::getPadSize(chunkPayloadSize);
-        // Update the parents size
-        parent->m_payloadSize += sizeof(RiffHeader) + chunkPayloadSize;
-    }
-
-    // Check it's size seems ok
-    SLANG_ASSERT(isChunkOk(chunk));
-}
-
-void RiffContainer::addDataChunk(FourCC dataFourCC, const void* data, size_t dataSizeInBytes)
-{
-    startChunk(Chunk::Kind::Data, dataFourCC);
-    write(data, dataSizeInBytes);
-    endChunk();
-}
-
-void RiffContainer::setPayload(Data* data, const void* payload, size_t size)
-{
-    // We must be in a data chunk
-    SLANG_ASSERT(m_dataChunk);
-    // The data shouldn't be set up
-    SLANG_ASSERT(data->m_ownership == Ownership::Uninitialized);
-
-    // Add current chunks data
-    m_dataChunk->m_payloadSize += size;
-
-    data->m_ownership = Ownership::Arena;
-    data->m_size = size;
-
-    if (size)
-    {
-        data->m_payload = m_arena.allocateAligned(size, kPayloadMinAlignment);
-    }
-
-    if (payload)
-    {
-        ::memcpy(data->m_payload, payload, size);
-    }
-}
-
-void RiffContainer::moveOwned(Data* data, void* payload, size_t size)
-{
-    // We must be in a data chunk
-    SLANG_ASSERT(m_dataChunk);
-    // The data shouldn't be set up
-    SLANG_ASSERT(data->m_ownership == Ownership::Uninitialized);
-
-    // Add current chunks data
-    m_dataChunk->m_payloadSize += size;
-
-    data->m_ownership = Ownership::Owned;
-    data->m_size = size;
-
-    // The area will manage this block
-    m_arena.addExternalBlock(payload, size);
-    data->m_payload = payload;
-}
-
-void RiffContainer::setUnowned(Data* data, void* payload, size_t size)
-{
-    // We must be in a data chunk
-    SLANG_ASSERT(m_dataChunk);
-    // The data shouldn't be set up
-    SLANG_ASSERT(data->m_ownership == Ownership::Uninitialized);
-    // Add current chunks data
-    m_dataChunk->m_payloadSize += size;
-
-    data->m_ownership = Ownership::NotOwned;
-    data->m_size = size;
-    data->m_payload = payload;
-}
-
-RiffContainer::Data* RiffContainer::addData()
-{
-    // We must be in a chunk
-    SLANG_ASSERT(m_dataChunk);
-
-    Data* data = (Data*)m_arena.allocate(sizeof(Data));
-    data->init();
-
-    Data*& next = m_dataChunk->m_endData ? m_dataChunk->m_endData->m_next : m_dataChunk->m_dataList;
-    SLANG_ASSERT(next == nullptr);
-
-    // Add to linked list
-    next = data;
-    // Make this the new end
-    m_dataChunk->m_endData = data;
-    return data;
-}
-
-RiffContainer::Data* RiffContainer::makeSingleData(DataChunk* dataChunk)
-{
-    // There is no data
-    if (dataChunk->m_dataList == nullptr)
-    {
-        return nullptr;
-    }
-
-    if (dataChunk->m_dataList->m_next == nullptr)
-    {
-        return dataChunk->m_dataList;
-    }
-
-    {
-        Data* data = dataChunk->m_dataList;
-
-        // Okay lets combine all into one block
-        const size_t payloadSize = dataChunk->calcPayloadSize();
-
-        void* dst = m_arena.allocateAligned(payloadSize, kPayloadMinAlignment);
-        dataChunk->getPayload(dst);
-
-        // Remove other datas
-        data->m_next = nullptr;
-        // Make this the end
-        dataChunk->m_endData = data;
-
-        // Point to the block with all of the data
-        data->m_ownership = Ownership::Arena;
-        data->m_payload = dst;
-        data->m_size = payloadSize;
-
-        return data;
-    }
-}
-
-void RiffContainer::write(const void* inData, size_t size)
-{
-    // We must be in a chunk
-    SLANG_ASSERT(m_dataChunk);
-    // Get the last data chunk
-    Data* endData = m_dataChunk->m_endData;
-    if (endData)
-    {
-        uint8_t* end = ((uint8_t*)endData->m_payload) + endData->m_size;
-        // See if can just add to end of current data
-        if (end == m_arena.getCursor() && m_arena.allocateCurrentUnaligned(size))
-        {
-            ::memcpy(end, inData, size);
-            endData->m_size += size;
-
-            // Add current chunks data
-            m_dataChunk->m_payloadSize += size;
+            SLANG_UNEXPECTED("invalid RIFF");
             return;
         }
     }
 
-    auto data = addData();
-    setPayload(data, inData, size);
+    // At this point we've performed some basic validation
+    // telling us that the chunk header appears plausible.
+    // This does not mean that we've fully validated the
+    // hierarchy of child chunks under it (in the case of
+    // a list chunk), but that validation can be performed
+    // on-demand while descending the hierarchy.
+
+    _ptr = chunk;
+    _sizeLimit = sizeLimit;
 }
 
-static SlangResult _isChunkOk(RiffContainer::Chunk* chunk, void* data)
+void BoundsCheckedChunkPtr::_set(Chunk const* chunk)
 {
-    SLANG_UNUSED(data);
-    return chunk->calcPayloadSize() == chunk->m_payloadSize ? SLANG_OK : SLANG_FAIL;
+    // In the case where we are being set to point to a
+    // single chunk, we have to assume that whatever
+    // code derived the `chunk` pointer has validated
+    // that it is safe to access its header.
+    //
+    // We will simply set up a pointer that can reference
+    // the `chunk` itself, as well as any of its children
+    // (if it has any), but that cannot be used to access
+    // further sibling chunks under the same parent.
+    //
+    _set(chunk, chunk->getTotalSize());
 }
 
-/* static */ bool RiffContainer::isChunkOk(Chunk* chunk)
+BoundsCheckedChunkPtr BoundsCheckedChunkPtr::getNextSibling() const
 {
-    return SLANG_SUCCEEDED(chunk->visitPostOrder(&_isChunkOk, nullptr));
+    SLANG_ASSERT(_ptr != nullptr);
+    if (!_ptr) return nullptr;
+
+    // The RIFF chunk reports its own size, and when navigating
+    // the children of a list chunk, each child chunk starts
+    // at the next (aligned) offset after the previous one.
+    //
+    auto chunkSize = _ptr->getTotalSize();
+
+    // As a simple validation check, we check for a chunk that
+    // reports its size as something bigger than the available
+    // size; that would represent an invalid input.
+    //
+    if (chunkSize > _sizeLimit)
+    {
+        SLANG_UNEXPECTED("invalid RIFF chunk size");
+        UNREACHABLE_RETURN(nullptr);
+    }
+
+    // The next chunk (if there is one) would start at the
+    // next offset after this chunk, rounded up to the minimum
+    // alignment for a chunk. Thus, we round up the reported
+    // size of this chunk to compute the offset to the next
+    // chunk.
+    //
+    auto offsetToNextChunk = _roundUpToChunkAlignment(chunkSize);
+
+    // If stepping forward by the given number of bytes would
+    // cause us to exceed our size limit, then we have reached
+    // the end of the list of sibling chunks, and should
+    // return a null pointer.
+    //
+    if (offsetToNextChunk >= _sizeLimit)
+        return nullptr;
+
+    auto nextChunk = (RIFF::Chunk const*)(offsetToNextChunk + (Byte const*)_ptr);
+    auto nextSizeLimit = _sizeLimit - offsetToNextChunk;
+
+    return BoundsCheckedChunkPtr(nextChunk, nextSizeLimit);
 }
 
-static SlangResult _calcAndSetSize(RiffContainer::Chunk* chunk, void* data)
+
+//
+// RIFF::ListChunk
+//
+
+BoundsCheckedChunkPtr ListChunk::getFirstChild() const
 {
-    SLANG_UNUSED(data);
-    chunk->m_payloadSize = chunk->calcPayloadSize();
+    // Because this type could be used to navigate
+    // an untrusted RIFF that has been loaded into memory,
+    // we make some efforts to validate that things
+    // seem okay as we navigate it.
+
+    // The first child of a list chunk (if it has any)
+    // comes right after the list header.
+    //
+    Size firstChildOffset = sizeof(ListChunk::Header);
+
+    // The size that the parent chunk reports should
+    // be appropriate to store the header.
+    //
+    // Note that in order to compute the reported size
+    // we are *accessing* the header, so if there really
+    // are too few bytes available, it is up to whatever
+    // code computed this `ListChunk*` to have done
+    // their own validation checks.
+    //
+    Size reportedParentSize = getTotalSize();
+    if(reportedParentSize < firstChildOffset)
+    {
+        SLANG_UNEXPECTED("invalid RIFF");
+        UNREACHABLE_RETURN(nullptr);
+    }
+
+    // The total size that the childen of this chunk can
+    // consume is all of the reported size of the parent,
+    // after the `ListChunk::Header`.
+    //
+    Size availableSizeForChildren = reportedParentSize - firstChildOffset;
+
+    // The available size can be zero, in the case where
+    // the parent chunk has no children.
+    //
+    if (availableSizeForChildren == 0)
+        return nullptr;
+
+    // If the parent chunk has a non-zero size, then it should
+    // have at least one child, and the available size had better
+    // be big enough to at least hold the *header* of that first
+    // child.
+    //
+    if (availableSizeForChildren < sizeof(Chunk::Header))
+    {
+        SLANG_UNEXPECTED("invalid RIFF");
+        UNREACHABLE_RETURN(nullptr);
+    }
+
+    // At this point we've convinced ourselves that there is
+    // conceivably enough space for at least one child chunk,
+    // so we will form a `BoundsCheckedChunkPtr` to it, which
+    // will trigger further validity checks on that child chunk.
+    //
+    auto firstChild = (Chunk const*)(firstChildOffset + (Byte const*)this);
+    return BoundsCheckedChunkPtr(firstChild, availableSizeForChildren);
+}
+
+DataChunk const* ListChunk::findDataChunk(Chunk::Type type) const
+{
+    for (auto chunk : getChildren())
+    {
+        auto dataChunk = as<DataChunk>(chunk);
+        if (!dataChunk)
+            continue;
+
+        if (dataChunk->getType() != type)
+            continue;
+
+        return dataChunk;
+    }
+    return nullptr;
+}
+
+ListChunk const* ListChunk::findListChunk(Chunk::Type type) const
+{
+    for (auto chunk : getChildren())
+    {
+        auto listChunk = as<ListChunk>(chunk);
+        if (!listChunk)
+            continue;
+
+        if (listChunk->getType() != type)
+            continue;
+
+        return listChunk;
+    }
+    return nullptr;
+}
+
+ListChunk const* ListChunk::findListChunkRec(Chunk::Type type) const
+{
+    // Note: The search being performed here could
+    // be implemented without any need for recursion
+    // (or a stack), by taking advantage of the way
+    // that RIFF chunks are laid out. If we have some
+    // chunk C, then the next aligned offset in memory
+    // after C is either at the end of the hierarchy,
+    // or it is the next sibling of one of C's ancestors
+    // (where C is being counted as its own ancestor).
+    //
+    // However, it's not really clear if there's enough
+    // of a benefit to justify that more subtle implementation.
+
+    if (getType() == type)
+        return this;
+
+    for (auto chunk : getChildren())
+    {
+        auto listChunk = as<ListChunk>(chunk);
+        if (!listChunk)
+            continue;
+
+        auto found = listChunk->findListChunkRec(type);
+        if (!found)
+            continue;
+
+        return found;
+    }
+    return nullptr;
+}
+
+
+
+//
+// RIFF::RootChunk
+//
+
+RootChunk const* RootChunk::getFromBlob(
+    void const* data,
+    size_t dataSize)
+{
+    // Our goal is to determine whether the given
+    // blob superficially looks like a RIFF.
+
+    // The data pointer should be non-null if there
+    // was any data passed in.
+    //
+    SLANG_ASSERT(data || !dataSize);
+
+    // If there's no data, then it's obvious not usable.
+    //
+    if(!data) return nullptr;
+
+    // If there isn't even enough data to store the header
+    // for a root, chunk, then the blob is too small.
+    //
+    if(dataSize < sizeof(RootChunk::Header)) return nullptr;
+
+    // We cast the data pointer to a root chunk here, so that
+    // we can access the fields in the header, but we are not
+    // yet convinced it is actually a valid RIFF, so we may
+    // still return `nullptr`.
+    //
+    auto rootChunk = reinterpret_cast<RootChunk const*>(data);
+
+    // The root chunk of a valid RIFF should have the `"RIFF"`
+    // tag. This acts as a kind of "magic number" to mark the
+    // start of a RIFF.
+    //
+    if (rootChunk->getTag() != RootChunk::kTag) return nullptr;
+
+    // By reading the size field from the root chunk, we can
+    // determine how big of a file the root chunk claims that
+    // we have.
+    //
+    auto reportedSize = rootChunk->getTotalSize();
+
+    // If the size implied by the RIFF header is larger than the
+    // blob, then we do not have a properly structured RIFF,
+    // and we would be at risk of reading past the end of the
+    // buffer if we attempted to use it.
+    //
+    if (reportedSize > dataSize) return nullptr;
+
+    // Note: It is possible that the `reportedSize` is strictly
+    // *less than* the `dataSize` that was passed in, and there
+    // is a policy choice to be made about how to handle that case.
+    //
+    // We err on the side of leniency here, because the client who
+    // is calling this function might intentionally be storing
+    // additional data in the same blob, after the RIFF, and could
+    // use the RIFF's ability to report its own size as a way to
+    // locate that data.
+
+    // Note: At this point we could recursively walk the hierarchy
+    // of the RIFF and validate that all the contained chunks appear
+    // valid in terms of the sizes they report, but doing so would
+    // take an amount of time that scales with the size of the RIFF,
+    // and our goal here is to be efficient.
+    //
+    // Access to the data through the `RIFF::Chunk` API will do its
+    // best to validate the information in chunks as they are
+    // accessed. The code is attempting to be able to catch
+    // corrupted or accidentally malformed input, but is not aspiring
+    // to anything like proper security.
+
+    return rootChunk;
+}
+
+RootChunk const* RootChunk::getFromBlob(
+    ISlangBlob* blob)
+{
+    SLANG_ASSERT(blob);
+    return getFromBlob(blob->getBufferPointer(), blob->getBufferSize());
+}
+
+//
+// RIFF::ChunkBuilder
+//
+
+Size ChunkBuilder::_updateCachedTotalSize() const
+{
+    Size totalSize = 0;
+    if (auto dataChunk = as<DataChunkBuilder>(this))
+    {
+        // Every chunk starts with a header.
+        //
+        totalSize += sizeof(DataChunk::Header);
+
+        // After the header comes the payload of
+        // the chunk, which for a data chunk
+        // will be the concatenation of all its
+        // shards.
+        //
+        for (auto shard : dataChunk->getShards())
+        {
+            totalSize += shard->getPayloadSize();
+        }
+    }
+    else if (auto listChunk = as<ListChunkBuilder>(this))
+    {
+        // A list chunk starts with a header, just
+        // like a data chunk, although its header
+        // is larger.
+        //
+        totalSize += sizeof(ListChunk::Header);
+
+        // After the header come the child chunks, in order.
+        //
+        for (auto child : listChunk->getChildren())
+        {
+            // We recursively poke the child chunks to
+            // update their cached total size, so that
+            // we can be sure we are getting correct
+            // information.
+            //
+            auto childSize = child->_updateCachedTotalSize();
+
+            // We cannot simply add the size of the child
+            // chunk directly to `totalSize`, because a
+            // RIFF guarantees that every chunk must start
+            // on a suitably aligned boundary. Thus, we
+            // first round `totalSize` up to the necessary
+            // alignment, and then add the child's size.
+            //
+            totalSize = _roundUpToChunkAlignment(totalSize);
+            totalSize += childSize;
+        }
+    }
+    else
+    {
+        SLANG_UNREACHABLE("RIFF chunk must be data or list");
+    }
+
+    _cachedTotalSize = totalSize;
+    return totalSize;
+}
+
+Result ChunkBuilder::_writeTo(Stream* stream) const
+{
+    // The size information that gets written into
+    // the chunk header will be based on the cached
+    // size information for this chunk.
+    //
+    // If nobody has called `_updateCachedTotalSize()`
+    // at all, then that is a problem.
+    //
+    SLANG_ASSERT(_getCachedTotalSize() >= sizeof(Chunk::Header));
+
+    // The size that gets written into the chunk header
+    // is the total size of the chunk, ecluding the chunk
+    // header. Note that this size will *include* the
+    // additional field of the list chunk header.
+    //
+    Size totalSizeExcludingChunkHeader = _getCachedTotalSize() - sizeof(Chunk::Header);
+
+    // Because the size field in the header is only 32 bits,
+    // we want to double-check that it can actually represent
+    // the size of the data to be written into it.
+    //
+    UInt32 sizeToWriteInHeader = UInt32(totalSizeExcludingChunkHeader);
+    SLANG_ASSERT(Size(sizeToWriteInHeader) == totalSizeExcludingChunkHeader);
+
+    if (auto dataChunk = as<DataChunkBuilder>(this))
+    {
+        // We start by writing the header.
+        //
+        DataChunk::Header header;
+        header.size = sizeToWriteInHeader;
+
+        // The tag of a data chunk is its type `FourCC`.
+        //
+        header.tag = dataChunk->getType();
+
+        // Once we've filled in the header fields, we
+        // can write it to the output stream.
+        //
+        SLANG_RETURN_ON_FAIL(stream->write(&header, sizeof(header)));
+
+        // Now we can simply write the payload bytes,
+        // which are the concatenation of the payloads
+        // of all the shards.
+        //
+        for (auto shard : dataChunk->getShards())
+        {
+            auto payload = shard->getPayload();
+            auto payloadSize = shard->getPayloadSize();
+            SLANG_RETURN_ON_FAIL(stream->write(payload, payloadSize));
+        }
+    }
+    else if (auto listChunk = as<ListChunkBuilder>(this))
+    {
+        // We start by writing the header.
+        //
+        ListChunk::Header header;
+        header.chunkHeader.size = sizeToWriteInHeader;
+
+        // The tag of a list chunk is either `"RIFF"`
+        // (for a root chunk) or `"LIST"` (for any
+        // other list chunk).
+        //
+        header.chunkHeader.tag = listChunk->getKind() == Chunk::Kind::Root
+            ? RootChunk::kTag
+            : ListChunk::kTag;
+
+        // The type of a list chunk is stored in the
+        // additional header field after the base
+        // chunk header.
+        //
+        header.type = listChunk->getType();
+
+        // Once we've filled in the header fields, we
+        // can write it to the output stream.
+        //
+        SLANG_RETURN_ON_FAIL(stream->write(&header, sizeof(header)));
+
+        // Now we recursively write each of the child chunks,
+        // keeping track of the total size so far, so that
+        // we can insert padding as needing to bring things
+        // up to alignment.
+        //
+        Size totalSize = sizeof(header);
+        for (auto child : listChunk->getChildren())
+        {
+            // We note the total size written so far,
+            // as well as the size after rounding up
+            // to the required alignment.
+            //
+            auto unalignedSize = totalSize;
+            auto alignedSize = _roundUpToChunkAlignment(unalignedSize);
+            SLANG_ASSERT(alignedSize >= unalignedSize);
+
+            // If the aligned size is greater than the
+            // unaligned size, then we may need to write
+            // some padding bytes into the output stream.
+            //
+            auto paddingSize = alignedSize - unalignedSize;
+
+            // The amount of padding to be inserted must
+            // always be less than the minimum chunk alignment.
+            //
+            SLANG_ASSERT(paddingSize < Chunk::kChunkAlignment);
+
+            // We'll write padding bytes to get things up
+            // to the necessary alignment.
+            //
+            auto remainingPaddingToWrite = paddingSize;
+            while (remainingPaddingToWrite--)
+            {
+                static const Byte kPadding[1] = { 0 };
+                stream->write(kPadding, 1);
+            }
+
+            // Now we are at a suitably aligned offset.
+            //
+            totalSize = alignedSize;
+
+            // With the alignment concern dealt with,
+            // we can simply recursively write the
+            // child chunk and update the total size.
+            //
+            SLANG_RETURN_ON_FAIL(child->_writeTo(stream));
+            totalSize += child->_getCachedTotalSize();
+        }
+
+        // As a validation check, we expect the total number
+        // of bytes we've written here to match the total
+        // size that was cached on this chunk (and that was
+        // written into the chunk header).
+        //
+        SLANG_ASSERT(totalSize == _getCachedTotalSize());
+    }
+    else
+    {
+        SLANG_UNREACHABLE("RIFF chunk must be data or list");
+    }
     return SLANG_OK;
 }
 
-/* static */ void RiffContainer::calcAndSetSize(Chunk* chunk)
+MemoryArena& ChunkBuilder::_getMemoryArena() const
 {
-    chunk->visitPostOrder(&_calcAndSetSize, nullptr);
+    return getRIFFBuilder()->_getMemoryArena();
 }
 
+//
+// RIFF::ListChunkBuilder
+//
+
+DataChunkBuilder* ListChunkBuilder::addDataChunk(Chunk::Type type)
+{
+    auto chunk = new(_getMemoryArena()) DataChunkBuilder(type, this);
+    _children.add(chunk);
+    return chunk;
+}
+
+ListChunkBuilder* ListChunkBuilder::addListChunk(Chunk::Type type)
+{
+    auto chunk = new(_getMemoryArena()) ListChunkBuilder(type, this);
+    _children.add(chunk);
+    return chunk;
+}
+
+//
+// RIFF::DataChunkBuilder
+//
+
+void DataChunkBuilder::addData(void const* data, Size size)
+{
+    // Adding no data should be a no-op.
+    //
+    if(size == 0)
+        return;
+
+    // The most interesting implementation detail here
+    // is that we will try to detect cases where we
+    // can re-use an existing `Shard` by adding the data
+    // to the end of that shard's allocation.
+    //
+    // This is only possible because of the way that
+    // we are using a single `MemoryArena` to allocate
+    // everything, which makes it possible that the
+    // next address the arena would return for an allocation
+    // of `size` bytes is the same as the ending address
+    // of the payload for the last shard of this chunk.
+    //
+    auto& arena = _getMemoryArena();
+
+    // We start by checking if this chunk already has
+    // a last shard that we could consider appending to.
+    //
+    auto lastShard = _shards.getLast();
+    if (lastShard)
+    {
+        // If there is a last shard, then we can compute
+        // the end address of its payload, and see if
+        // it is the same as the cursor of the arena
+        // we are allocating from.
+        //
+        auto payload = lastShard->getPayload();
+        auto payloadSize = lastShard->getPayloadSize();
+        auto payloadEnd = (Byte*)payload + payloadSize;
+        if (payloadEnd == arena.getCursor())
+        {
+            // Now that we've confirmed that the shard's
+            // payload ends at an address the arena could
+            // conceivably allocate from, we need to ask
+            // the arena to allocate `size` bytes from
+            // the current block it is using, and see if
+            // doing so succeeds.
+            //
+            if (arena.allocateCurrentUnaligned(size))
+            {
+                // At this point, we've confirmed that we
+                // are in our special case, and the relevant
+                // bytes have been allocated from the arena.
+                //
+                // Now we can simply write the new data at
+                // what used to be the end address for the
+                // shard's payload, and adjust its state
+                // to account for the new allocation.
+                //
+                ::memcpy(payloadEnd, data, size);
+                lastShard->setPayload(payload, payloadSize + size);
+                return;
+            }
+        }
+    }
+
+    // If we didn't land in our special case, we
+    // will simply allocate a new shard to hold
+    // the data.
+    //
+    // Note that the order of allocation here is
+    // intentional, and supports the optimized special
+    // case that we checked for above. We make the
+    // allocation for the payload *last*, so that
+    // it is possible that the arena's next allocation
+    // could come right after the payload allocation
+    // in memory.
+    //
+    // If we allocated the payload first and the
+    // `Shard` second, then there would already be
+    // another allocation after the payload, and
+    // the optimized case would never trigger.
+    //
+    auto shard = _addShard();
+    auto payload = arena.allocateUnaligned(size);
+    ::memcpy(payload, data, size);
+    shard->setPayload(
+        payload,
+        size);
+}
+
+void DataChunkBuilder::addUnownedData(void const* data, size_t size)
+{
+    // Unowned data will always have to be added as its own shard.
+    //
+    auto shard = _addShard();
+    shard->setPayload(
+        data,
+        size);
+}
+
+DataChunkBuilder::Shard* DataChunkBuilder::_addShard()
+{
+    auto shard = new(_getMemoryArena()) Shard();
+    _shards.add(shard);
+    return shard;
+}
+
+//
+// RIFF::Builder
+//
+
+Builder::Builder()
+    : _arena(4096)
+{
+}
+
+Result Builder::writeTo(Stream* stream)
+{
+    // If there's no root chunk, then this isn't
+    // a well-formed RIFF.
+    //
+    if (!_rootChunk)
+        return SLANG_FAIL;
+
+    // The `ChunkBuilder::_writeTo()` method requires size
+    // information for each of the chunks in the hierarchy.
+    // Rather than try to keep size information up-to-date
+    // during the building process, we simply compute it
+    // all at once, right before writing the output.
+    //
+    _rootChunk->_updateCachedTotalSize();
+    _rootChunk->_writeTo(stream);
+    return SLANG_OK;
+}
+
+Result Builder::writeToBlob(ISlangBlob** outBlob)
+{
+    OwnedMemoryStream stream(FileAccess::Write);
+    SLANG_RETURN_ON_FAIL(writeTo(&stream));
+
+    List<uint8_t> data;
+    stream.swapContents(data);
+
+    *outBlob = ListBlob::moveCreate(data).detach();
+    return SLANG_OK;
+}
+
+ListChunkBuilder* Builder::addRootChunk(Chunk::Type type)
+{
+    // There must not already be a root chunk set.
+    SLANG_ASSERT(getRootChunk() == nullptr);
+
+    auto chunk = new(_getMemoryArena()) ListChunkBuilder(type, this);
+    _rootChunk = chunk;
+    return chunk;
+}
+
+
+
+//
+// RIFF::BuildCursor
+//
+
+BuildCursor::BuildCursor()
+{
+}
+
+BuildCursor::BuildCursor(Builder& builder)
+    : _riffBuilder(&builder)
+{
+}
+
+BuildCursor::BuildCursor(ChunkBuilder* chunk)
+{
+    setCurrentChunk(chunk);
+}
+
+void BuildCursor::setCurrentChunk(ChunkBuilder* chunk)
+{
+    _currentChunk = chunk;
+    _riffBuilder = chunk ? chunk->getRIFFBuilder() : nullptr;
+}
+
+DataChunkBuilder* BuildCursor::addDataChunk(Chunk::Type type)
+{
+    // The current chunk must be a list chunk, so that
+    // we can add children to it.
+    //
+    auto parentChunk = as<ListChunkBuilder>(getCurrentChunk());
+    SLANG_ASSERT(parentChunk);
+
+    return parentChunk->addDataChunk(type);
+}
+
+void BuildCursor::addDataChunk(Chunk::Type type, void const* data, size_t size)
+{
+    beginDataChunk(type);
+    addData(data, size);
+    endChunk();
+}
+
+ListChunkBuilder* BuildCursor::addListChunk(Chunk::Type type)
+{
+    // If there is no current chunk being written into,
+    // then an attempt to add a new chunk should set
+    // the root chunk of the entire RIFF.
+    //
+    auto currentChunk = getCurrentChunk();
+    if (!currentChunk)
+    {
+        SLANG_ASSERT(getRIFFBuilder());
+        return _riffBuilder->addRootChunk(type);
+    }
+
+    // Otherwise, the current chunk must be a list
+    // chunk, and we add a new child to it.
+    //
+    auto parentChunk = as<ListChunkBuilder>(currentChunk);
+    SLANG_ASSERT(parentChunk);
+
+    return parentChunk->addListChunk(type);
+}
+
+void BuildCursor::beginDataChunk(Chunk::Type type)
+{
+    auto chunk = addDataChunk(type);
+    setCurrentChunk(chunk);
+}
+
+void BuildCursor::beginListChunk(Chunk::Type type)
+{
+    auto chunk = addListChunk(type);
+    setCurrentChunk(chunk);
+}
+
+void BuildCursor::endChunk()
+{
+    SLANG_ASSERT(getCurrentChunk() != nullptr);
+
+    auto chunk = getCurrentChunk();
+    setCurrentChunk(chunk->getParent());
+}
+
+void BuildCursor::addData(void const* data, Size size)
+{
+    // The current chunk must be a data chunk, so that
+    // we can add data to it.
+    //
+    auto dataChunk = as<DataChunkBuilder>(getCurrentChunk());
+    SLANG_ASSERT(dataChunk);
+
+    dataChunk->addData(data, size);
+}
+
+void BuildCursor::addUnownedData(void const* data, Size size)
+{
+    // The current chunk must be a data chunk, so that
+    // we can add data to it.
+    //
+    auto dataChunk = as<DataChunkBuilder>(getCurrentChunk());
+    SLANG_ASSERT(dataChunk);
+
+    dataChunk->addUnownedData(data, size);
+}
+
+}
 
 } // namespace Slang

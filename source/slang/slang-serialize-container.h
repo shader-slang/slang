@@ -56,189 +56,64 @@ struct SerialContainerUtil
     static SlangResult write(Module* module, const WriteOptions& options, Stream* stream);
 };
 
-
-struct ChunkRef
+struct StringChunk : RIFF::DataChunk
 {
 public:
-    ChunkRef(RiffContainer::Chunk* chunk)
-        : _chunk(chunk)
-    {
-    }
-
-    RiffContainer::Chunk* ptr() const { return _chunk; }
-
-protected:
-    RiffContainer::Chunk* _chunk = nullptr;
+    String getValue() const;
 };
 
-struct DataChunkRef : ChunkRef
+struct IRModuleChunk;
+
+struct ASTModuleChunk : RIFF::ListChunk
+{};
+
+struct ModuleChunk : RIFF::ListChunk
 {
 public:
-    DataChunkRef(RiffContainer::DataChunk* chunk)
-        : ChunkRef(chunk)
-    {
-    }
+    static ModuleChunk const* find(RIFF::ListChunk const* baseChunk);
 
-    RiffContainer::DataChunk* ptr() const { return static_cast<RiffContainer::DataChunk*>(_chunk); }
+    String getName() const;
 
-    operator RiffContainer::DataChunk*() const { return ptr(); }
+    IRModuleChunk const* findIR() const;
+    ASTModuleChunk const* findAST() const;
+
+    SHA1::Digest getDigest() const;
+
+    RIFF::ChunkList<StringChunk> getFileDependencies() const;
 };
 
-
-template<typename T>
-struct ChunkRefList
-{
-public:
-    struct Iterator
-    {
-    public:
-        Iterator(RiffContainer::Chunk* chunk)
-            : _chunk(chunk)
-        {
-        }
-
-        bool operator!=(Iterator const& other) const { return _chunk != other._chunk; }
-
-        void operator++() { _chunk = _chunk->m_next; }
-
-        T operator*()
-        {
-            ChunkRef ref(_chunk);
-            return *(T*)&ref;
-        }
-
-    private:
-        RiffContainer::Chunk* _chunk = nullptr;
-    };
-
-    Iterator begin() const { return _list ? _list->getFirstContainedChunk() : nullptr; }
-    Iterator end() const { return Iterator(nullptr); }
-
-    Count getCount()
-    {
-        Count count = 0;
-        for (auto i : *this)
-            count++;
-        return count;
-    }
-
-    T getFirst() { return *begin(); }
-
-    ChunkRefList() {}
-
-    ChunkRefList(RiffContainer::ListChunk* list)
-        : _list(list)
-    {
-    }
-
-    operator RiffContainer::ListChunk*() const { return _list; }
-
-private:
-    RiffContainer::ListChunk* _list = nullptr;
-};
-
-struct ListChunkRef : ChunkRef
-{
-public:
-    ListChunkRef(RiffContainer::Chunk* chunk)
-        : ChunkRef(chunk)
-    {
-    }
-
-    RiffContainer::ListChunk* ptr() const { return static_cast<RiffContainer::ListChunk*>(_chunk); }
-
-    operator RiffContainer::ListChunk*() const { return ptr(); }
-};
-
-
-struct StringChunkRef : DataChunkRef
-{
-public:
-    String getValue();
-};
-
-struct IRModuleChunkRef : ListChunkRef
-{
-public:
-    explicit IRModuleChunkRef(RiffContainer::ListChunk* chunk)
-        : ListChunkRef(chunk)
-    {
-    }
-};
-
-struct ASTModuleChunkRef : ListChunkRef
-{
-public:
-    explicit ASTModuleChunkRef(RiffContainer::ListChunk* chunk)
-        : ListChunkRef(chunk)
-    {
-    }
-};
-
-struct ModuleChunkRef : ListChunkRef
-{
-public:
-    static ModuleChunkRef find(RiffContainer* container);
-
-    String getName();
-
-    IRModuleChunkRef findIR();
-    ASTModuleChunkRef findAST();
-
-    SHA1::Digest getDigest();
-
-    ChunkRefList<StringChunkRef> getFileDependencies();
-
-protected:
-    ModuleChunkRef(RiffContainer::Chunk* chunk)
-        : ListChunkRef(chunk)
-    {
-    }
-};
-
-struct EntryPointChunkRef : ListChunkRef
+struct EntryPointChunk : RIFF::ListChunk
 {
 public:
     String getMangledName() const;
     String getName() const;
     Profile getProfile() const;
-
-protected:
-    EntryPointChunkRef(RiffContainer::Chunk* chunk)
-        : ListChunkRef(chunk)
-    {
-    }
 };
 
-struct ContainerChunkRef : ListChunkRef
+struct ContainerChunk : RIFF::ListChunk
 {
 public:
-    static ContainerChunkRef find(RiffContainer* container);
+    static ContainerChunk const* find(RIFF::ListChunk const* baseChunk);
 
-    ChunkRefList<ModuleChunkRef> getModules();
+    RIFF::ChunkList<ModuleChunk> getModules() const;
 
-    ChunkRefList<EntryPointChunkRef> getEntryPoints();
-
-protected:
-    ContainerChunkRef(RiffContainer::Chunk* chunk)
-        : ListChunkRef(chunk)
-    {
-    }
+    RIFF::ChunkList<EntryPointChunk> getEntryPoints() const;
 };
 
-/// Attempt to find a debug-info chunk relative to
-/// the given `startingChunk`.
-///
-RiffContainer::ListChunk* findDebugChunk(RiffContainer::Chunk* startingChunk);
+struct DebugChunk : RIFF::ListChunk
+{
+public:
+    static DebugChunk const* find(RIFF::ListChunk const* baseChunk);
+};
 
 SlangResult readSourceLocationsFromDebugChunk(
-    RiffContainer::ListChunk* debugChunk,
+    DebugChunk const* debugChunk,
     SourceManager* sourceManager,
     RefPtr<SerialSourceLocReader>& outReader);
 
 SlangResult decodeModuleIR(
     RefPtr<IRModule>& outIRModule,
-    RiffContainer::Chunk* chunk,
+    IRModuleChunk const* chunk,
     Session* session,
     SerialSourceLocReader* sourceLocReader);
 

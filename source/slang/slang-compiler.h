@@ -34,7 +34,7 @@ namespace Slang
 struct PathInfo;
 struct IncludeHandler;
 struct SharedSemanticsContext;
-struct ModuleChunkRef;
+struct ModuleChunk;
 
 class ProgramLayout;
 class PtrType;
@@ -2363,20 +2363,20 @@ public:
     /// Otherwise, return null.
     ///
     RefPtr<Module> findOrLoadSerializedModuleForModuleLibrary(
-        ModuleChunkRef moduleChunk,
+        ModuleChunk const* moduleChunk,
         DiagnosticSink* sink);
 
     RefPtr<Module> loadSerializedModule(
         Name* moduleName,
         const PathInfo& moduleFilePathInfo,
-        ModuleChunkRef moduleChunk,
+        ModuleChunk const* moduleChunk,
         SourceLoc const& requestingLoc,
         DiagnosticSink* sink);
 
     SlangResult loadSerializedModuleContents(
         Module* module,
         const PathInfo& moduleFilePathInfo,
-        ModuleChunkRef moduleChunk,
+        ModuleChunk const* moduleChunk,
         DiagnosticSink* sink);
 
     SourceFile* loadSourceFile(String pathFrom, String path);
@@ -2387,8 +2387,7 @@ public:
         Name* name,
         PathInfo const& pathInfo);
 
-    bool isBinaryModuleUpToDate(String fromPath, RiffContainer* container);
-    bool isBinaryModuleUpToDate(String fromPath, ModuleChunkRef moduleChunk);
+    bool isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* baseChunk);
 
     RefPtr<Module> findOrImportModule(
         Name* name,

@@ -13,6 +13,8 @@
 
 namespace Slang
 {
+struct IRModuleChunk : RIFF::ListChunk
+{};
 
 struct IRSerialWriter
 {
@@ -26,7 +28,7 @@ struct IRSerialWriter
         IRSerialData* serialData);
 
     /// Write to a container
-    static Result writeContainer(const IRSerialData& data, RiffContainer* container);
+    static Result writeTo(const IRSerialData& data, RIFF::BuildCursor& cursor);
 
     /// Get an instruction index from an instruction
     Ser::InstIndex getInstIndex(IRInst* inst) const
@@ -93,7 +95,7 @@ struct IRSerialReader
     typedef IRSerialData Ser;
 
     /// Read a stream to fill in dataOut IRSerialData
-    static Result readContainer(RiffContainer::ListChunk* module, IRSerialData* outData);
+    static Result readFrom(IRModuleChunk const* irModuleChunk, IRSerialData* outData);
 
     /// Read a module from serial data
     Result read(

@@ -30,52 +30,53 @@ struct ValNodeDesc;
 struct Encoder
 {
 public:
-    Encoder(Stream* stream)
-        : _stream(stream)
-    {
-    }
+    Encoder()
+    {}
 
-    ~Encoder() { RiffUtil::write(&_riff, _stream); }
+    Encoder(RIFF::Builder& riff)
+        : _cursor(riff)
+    {}
+
+    Encoder(RIFF::ListChunkBuilder* chunk)
+        : _cursor(chunk)
+    {}
 
     void beginArray(FourCC typeCode)
     {
-        _riff.startChunk(RiffContainer::Chunk::Kind::List, typeCode);
+        _cursor.beginListChunk(typeCode);
     }
 
     void beginArray() { beginArray(SerialBinary::kArrayFourCC); }
 
     void endArray()
     {
-        _riff.endChunk();
-        // TODO: maybe end key...
+        _cursor.endChunk();
     }
 
     void beginObject(FourCC typeCode)
     {
-        _riff.startChunk(RiffContainer::Chunk::Kind::List, typeCode);
+        _cursor.beginListChunk(typeCode);
     }
 
     void beginObject() { beginObject(SerialBinary::kObjectFourCC); }
 
-    void endObject() { _riff.endChunk(); }
-
-    void beginKeyValuePair()
-    {
-        _riff.startChunk(RiffContainer::Chunk::Kind::List, SerialBinary::kPairFourCC);
-    }
-
-    void endKeyValuePair() { _riff.endChunk(); }
+    void endObject() { _cursor.endChunk(); }
 
     void beginKeyValuePair(FourCC keyCode)
     {
-        _riff.startChunk(RiffContainer::Chunk::Kind::List, keyCode);
+        _cursor.beginListChunk(keyCode);
     }
+
+    void beginKeyValuePair()
+    {
+        beginKeyValuePair(SerialBinary::kPairFourCC);
+    }
+
+    void endKeyValuePair() { _cursor.endChunk(); }
 
     void encodeData(FourCC typeCode, void const* data, size_t size)
     {
-        _riff.startChunk(RiffContainer::Chunk::Kind::Data, typeCode);
-        _riff.write(data, size);
-        _riff.endChunk();
+        _cursor.addDataChunk(typeCode, data, size);
     }
 
     void encodeData(void const* data, size_t size)
@@ -200,24 +201,24 @@ public:
     };
 
 private:
-    Stream* _stream = nullptr;
-
-    // Implementation details below...
-    RiffContainer _riff;
+    RIFF::BuildCursor _cursor;
 
 public:
-    RiffContainer* getRIFF() { return &_riff; }
+    operator RIFF::BuildCursor& ()
+    {
+        return _cursor;
+    }
 
-    RiffContainer::Chunk* getRIFFChunk() { return _riff.getCurrentChunk(); }
+    RIFF::ChunkBuilder* getRIFFChunk() { return _cursor.getCurrentChunk(); }
 
-    void setRIFFChunk(RiffContainer::Chunk* chunk) { _riff.setCurrentChunk(chunk); }
+    void setRIFFChunk(RIFF::ChunkBuilder* chunk) { _cursor.setCurrentChunk(chunk); }
 };
 
 struct Decoder
 {
 public:
-    Decoder(RiffContainer::Chunk* chunk)
-        : _chunk(chunk)
+    Decoder(RIFF::Chunk const* chunk)
+        : _cursor(chunk)
     {
     }
 
@@ -226,10 +227,10 @@ public:
         switch (getTag())
         {
         case SerialBinary::kTrueFourCC:
-            _chunk = _chunk->m_next;
+            _advanceCursor();
             return true;
         case SerialBinary::kFalseFourCC:
-            _chunk = _chunk->m_next;
+            _advanceCursor();
             return false;
 
         default:
@@ -246,20 +247,20 @@ public:
             UNREACHABLE_RETURN("");
         }
 
-        auto dataChunk = as<RiffContainer::DataChunk>(_chunk);
+        auto dataChunk = as<RIFF::DataChunk>(_cursor);
         if (!dataChunk)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
             UNREACHABLE_RETURN("");
         }
 
-        auto size = dataChunk->calcPayloadSize();
+        auto size = dataChunk->getPayloadSize();
 
         String value;
         value.appendRepeatedChar(' ', size);
-        dataChunk->getPayload((char*)value.getBuffer());
+        dataChunk->writePayloadInto((char*)value.getBuffer(), size);
 
-        _chunk = _chunk->m_next;
+        _advanceCursor();
         return value;
     }
 
@@ -267,13 +268,14 @@ public:
     {
         if (getTag() == typeTag)
         {
-            auto dataChunk = as<RiffContainer::DataChunk>(_chunk);
+            auto dataChunk = as<RIFF::DataChunk>(_cursor);
             if (dataChunk)
             {
-                if (dataChunk->calcPayloadSize() >= dataSize)
+                auto payloadSize = dataChunk->getPayloadSize();
+                if (payloadSize >= dataSize)
                 {
-                    dataChunk->getPayload(outData);
-                    _chunk = _chunk->m_next;
+                    dataChunk->writePayloadInto(outData, dataSize);
+                    _advanceCursor();
                     return;
                 }
             }
@@ -368,7 +370,7 @@ public:
     float decodeFloat32() { return float(decodeFloat()); }
     double decodeFloat64() { return decodeFloat(); }
 
-    FourCC getTag() { return _chunk ? _chunk->m_fourCC : 0; }
+    FourCC getTag() { return _cursor ? _cursor->getType() : 0; }
 
     Int32 _decodeImpl(Int32*) { return decodeInt32(); }
     UInt32 _decodeImpl(UInt32*) { return decodeUInt32(); }
@@ -393,74 +395,74 @@ public:
 
     void beginArray(FourCC typeCode = SerialBinary::kArrayFourCC)
     {
-        auto listChunk = as<RiffContainer::ListChunk>(_chunk);
+        auto listChunk = as<RIFF::ListChunk>(_cursor);
         if (!listChunk)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
         }
 
-        if (listChunk->m_fourCC != typeCode)
+        if (listChunk->getType() != typeCode)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
         }
 
-        _chunk = listChunk->getFirstContainedChunk();
+        _cursor = listChunk->getFirstChild();
     }
 
     void beginObject(FourCC typeCode = SerialBinary::kObjectFourCC)
     {
-        auto listChunk = as<RiffContainer::ListChunk>(_chunk);
+        auto listChunk = as<RIFF::ListChunk>(_cursor);
         if (!listChunk)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
         }
 
-        if (listChunk->m_fourCC != typeCode)
+        if (listChunk->getType() != typeCode)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
         }
 
-        _chunk = listChunk->getFirstContainedChunk();
+        _cursor = listChunk->getFirstChild();
     }
 
     void beginKeyValuePair(FourCC typeCode = SerialBinary::kPairFourCC)
     {
-        auto listChunk = as<RiffContainer::ListChunk>(_chunk);
+        auto listChunk = as<RIFF::ListChunk>(_cursor);
         if (!listChunk)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
         }
 
-        if (listChunk->m_fourCC != typeCode)
+        if (listChunk->getType() != typeCode)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
         }
 
-        _chunk = listChunk->getFirstContainedChunk();
+        _cursor = listChunk->getFirstChild();
     }
 
     void beginProperty(FourCC propertyCode)
     {
-        auto listChunk = as<RiffContainer::ListChunk>(_chunk);
+        auto listChunk = as<RIFF::ListChunk>(_cursor);
         if (!listChunk)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
         }
 
-        auto found = listChunk->findContainedList(propertyCode);
+        auto found = listChunk->findListChunk(propertyCode);
         if (!found)
         {
             SLANG_UNEXPECTED("invalid format in RIFF");
         }
 
-        _chunk = found->getFirstContainedChunk();
+        _cursor = listChunk->getFirstChild();
     }
 
-    bool hasElements() { return _chunk != nullptr; }
+    bool hasElements() { return _cursor != nullptr; }
 
     bool isNull()
     {
-        if (_chunk == nullptr)
+        if (_cursor == nullptr)
             return true;
         if (getTag() == SerialBinary::kNullFourCC)
             return true;
@@ -472,12 +474,14 @@ public:
         if (!isNull())
             return false;
 
-        if (_chunk != nullptr)
+        if (_cursor != nullptr)
         {
-            _chunk = _chunk->m_next;
+            _advanceCursor();
         }
         return true;
     }
+
+    using Cursor = RIFF::BoundsCheckedChunkPtr;
 
     struct WithArray
     {
@@ -485,21 +489,21 @@ public:
         WithArray(Decoder& decoder)
             : _decoder(decoder)
         {
-            _saved = decoder._chunk;
+            _saved = decoder._cursor;
             decoder.beginArray();
         }
 
         WithArray(Decoder& decoder, FourCC typeCode)
             : _decoder(decoder)
         {
-            _saved = decoder._chunk;
+            _saved = decoder._cursor;
             decoder.beginArray(typeCode);
         }
 
-        ~WithArray() { _decoder._chunk = _saved->m_next; }
+        ~WithArray() { _decoder._cursor = _saved.getNextSibling(); }
 
     private:
-        RiffContainer::Chunk* _saved;
+        Cursor _saved;
         Decoder& _decoder;
     };
 
@@ -509,21 +513,21 @@ public:
         WithObject(Decoder& decoder)
             : _decoder(decoder)
         {
-            _saved = decoder._chunk;
+            _saved = decoder._cursor;
             decoder.beginObject();
         }
 
         WithObject(Decoder& decoder, FourCC typeCode)
             : _decoder(decoder)
         {
-            _saved = decoder._chunk;
+            _saved = decoder._cursor;
             decoder.beginObject(typeCode);
         }
 
-        ~WithObject() { _decoder._chunk = _saved->m_next; }
+        ~WithObject() { _decoder._cursor = _saved.getNextSibling(); }
 
     private:
-        RiffContainer::Chunk* _saved;
+        Cursor _saved;
         Decoder& _decoder;
     };
 
@@ -533,21 +537,21 @@ public:
         WithKeyValuePair(Decoder& decoder)
             : _decoder(decoder)
         {
-            _saved = decoder._chunk;
+            _saved = decoder._cursor;
             decoder.beginKeyValuePair();
         }
 
         WithKeyValuePair(Decoder& decoder, FourCC typeCode)
             : _decoder(decoder)
         {
-            _saved = decoder._chunk;
+            _saved = decoder._cursor;
             _decoder.beginKeyValuePair(typeCode);
         }
 
-        ~WithKeyValuePair() { _decoder._chunk = _saved->m_next; }
+        ~WithKeyValuePair() { _decoder._cursor = _saved.getNextSibling(); }
 
     private:
-        RiffContainer::Chunk* _saved;
+        Cursor _saved;
         Decoder& _decoder;
     };
 
@@ -557,23 +561,32 @@ public:
         WithProperty(Decoder& decoder, FourCC typeCode)
             : _decoder(decoder)
         {
-            _saved = decoder._chunk;
+            _saved = decoder._cursor;
             _decoder.beginProperty(typeCode);
         }
 
-        ~WithProperty() { _decoder._chunk = _saved->m_next; }
+        ~WithProperty() { _decoder._cursor = _saved.getNextSibling(); }
 
     private:
-        RiffContainer::Chunk* _saved;
+        Cursor _saved;
         Decoder& _decoder;
     };
 
+    Cursor getCursor() const { return _cursor; }
+    void setCursor(Cursor const& cursor) { _cursor = cursor; }
 
-    RiffContainer::Chunk* getCursor() { return _chunk; }
-    void setCursor(RiffContainer::Chunk* chunk) { _chunk = chunk; }
+    RIFF::Chunk const* getCurrentChunk() const
+    {
+        return getCursor();
+    }
 
 private:
-    RiffContainer::Chunk* _chunk = nullptr;
+    void _advanceCursor()
+    {
+        _cursor = _cursor.getNextSibling();
+    }
+
+    Cursor _cursor;
 };
 
 

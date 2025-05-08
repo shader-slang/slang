@@ -39,8 +39,8 @@ void* ModuleLibrary::castAs(const Guid& guid)
 }
 
 SlangResult loadModuleLibrary(
-    const Byte* inBytes,
-    size_t bytesCount,
+    const Byte* inData,
+    size_t dataSize,
     String path,
     EndToEndCompileRequest* req,
     ComPtr<IModuleLibrary>& outLibrary)
@@ -51,18 +51,23 @@ SlangResult loadModuleLibrary(
     ComPtr<IModuleLibrary> scopeLibrary(library);
 
     // Load up the module
-    MemoryStreamBase memoryStream(FileAccess::Read, inBytes, bytesCount);
-
-    RiffContainer riffContainer;
-    SLANG_RETURN_ON_FAIL(RiffUtil::read(&memoryStream, riffContainer));
+    auto rootChunk = RIFF::RootChunk::getFromBlob(inData, dataSize);
+    if (!rootChunk)
+    {
+        return SLANG_FAIL;
+    }
 
     auto linkage = req->getLinkage();
     auto sink = req->getSink();
     auto namePool = req->getNamePool();
 
-    auto container = ContainerChunkRef::find(&riffContainer);
+    auto container = ContainerChunk::find(rootChunk);
+    if (!container)
+    {
+        return SLANG_FAIL;
+    }
 
-    for (auto moduleChunk : container.getModules())
+    for (auto moduleChunk : container->getModules())
     {
         auto loadedModule = linkage->findOrLoadSerializedModuleForModuleLibrary(moduleChunk, sink);
         if (!loadedModule)
@@ -71,12 +76,12 @@ SlangResult loadModuleLibrary(
         library->m_modules.add(loadedModule);
     }
 
-    for (auto entryPointChunk : container.getEntryPoints())
+    for (auto entryPointChunk : container->getEntryPoints())
     {
         FrontEndCompileRequest::ExtraEntryPointInfo entryPointInfo;
-        entryPointInfo.mangledName = entryPointChunk.getMangledName();
-        entryPointInfo.name = namePool->getName(entryPointChunk.getName());
-        entryPointInfo.profile = entryPointChunk.getProfile();
+        entryPointInfo.mangledName = entryPointChunk->getMangledName();
+        entryPointInfo.name = namePool->getName(entryPointChunk->getName());
+        entryPointInfo.profile = entryPointChunk->getProfile();
 
         library->m_entryPoints.add(entryPointInfo);
     }

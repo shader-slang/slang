@@ -14,7 +14,7 @@
 namespace Slang
 {
 
-/* static */ const RiffSemanticVersion ReproUtil::g_semanticVersion = RiffSemanticVersion::make(
+/* static */ const SemanticVersion ReproUtil::g_semanticVersion = SemanticVersion(
     ReproUtil::kMajorVersion,
     ReproUtil::kMinorVersion,
     ReproUtil::kPatchVersion);
@@ -1173,17 +1173,20 @@ struct LoadContext
     Offset32Ptr<RequestState> requestState;
     SLANG_RETURN_ON_FAIL(store(request, container, requestState));
 
+    RIFF::Builder riff;
+    RIFF::BuildCursor cursor(riff);
+
+    SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, kSlangStateFileFourCC);
+    SLANG_SCOPED_RIFF_BUILDER_DATA_CHUNK(cursor, kSlangStateDataFourCC);
+
     Header header;
-    header.m_chunk.type = kSlangStateFourCC;
     header.m_semanticVersion = g_semanticVersion;
     header.m_typeHash = _getTypeHash();
 
-    return RiffUtil::writeData(
-        &header.m_chunk,
-        sizeof(header),
-        container.getData(),
-        container.getDataCount(),
-        stream);
+    cursor.addData(header);
+    cursor.addUnownedData(container.getData(), container.getDataCount());
+
+    return riff.writeTo(stream);
 }
 
 /* static */ SlangResult ReproUtil::saveState(
@@ -1210,29 +1213,63 @@ struct LoadContext
 /* static */ SlangResult ReproUtil::loadState(
     Stream* stream,
     DiagnosticSink* sink,
-    List<uint8_t>& buffer)
+    List<uint8_t>& outBuffer)
 {
-    Header header;
-
+    List<Byte> streamData;
     {
-        Result res = RiffUtil::readData(stream, &header.m_chunk, sizeof(header), buffer);
-        if (SLANG_FAILED(res))
+        auto result = StreamUtil::readAll(stream, streamData);
+        if (SLANG_FAILED(result))
         {
             sink->diagnose(SourceLoc(), Diagnostics::unableToReadRiff);
-            return res;
+            return result;
         }
     }
-    if (header.m_chunk.type != kSlangStateFourCC)
+
+    return loadState(streamData.getBuffer(), streamData.getCount(), sink, outBuffer);
+}
+
+/* static */ SlangResult ReproUtil::loadState(
+    const uint8_t* data,
+    size_t dataSize,
+    DiagnosticSink* sink,
+    List<uint8_t>& outBuffer)
+{
+    auto rootChunk = RIFF::RootChunk::getFromBlob(data, dataSize);
+    if(!rootChunk)
+    {
+        sink->diagnose(SourceLoc(), Diagnostics::unableToReadRiff);
+        return SLANG_FAIL;
+    }
+    if (rootChunk->getType() != kSlangStateFileFourCC)
     {
         sink->diagnose(SourceLoc(), Diagnostics::expectingSlangRiffContainer);
         return SLANG_FAIL;
     }
 
-    if (!RiffSemanticVersion::areCompatible(g_semanticVersion, header.m_semanticVersion))
+    auto dataChunk = rootChunk->findDataChunk(kSlangStateDataFourCC);
+    if (!dataChunk)
+    {
+        sink->diagnose(SourceLoc(), Diagnostics::expectingSlangRiffContainer);
+        return SLANG_FAIL;
+    }
+
+    MemoryReader reader(dataChunk->getPayload(), dataChunk->getPayloadSize());
+
+    Header header;
+    {
+        auto result = reader.read(header);
+        if (SLANG_FAILED(result))
+        {
+            sink->diagnose(SourceLoc(), Diagnostics::expectingSlangRiffContainer);
+            return result;
+        }
+    }
+
+    if (!g_semanticVersion.isBackwardsCompatibleWith(header.m_semanticVersion))
     {
         StringBuilder headerBuf, currentBuf;
-        header.m_semanticVersion.asSemanticVersion().append(headerBuf);
-        g_semanticVersion.asSemanticVersion().append(currentBuf);
+        header.m_semanticVersion.append(headerBuf);
+        g_semanticVersion.append(currentBuf);
 
         sink->diagnose(
             SourceLoc(),
@@ -1248,17 +1285,19 @@ struct LoadContext
         return SLANG_FAIL;
     }
 
-    return SLANG_OK;
-}
+    auto remainingSize = reader.getRemainingSize();
+    outBuffer.setCount(remainingSize);
 
-/* static */ SlangResult ReproUtil::loadState(
-    const uint8_t* data,
-    size_t size,
-    DiagnosticSink* sink,
-    List<uint8_t>& outBuffer)
-{
-    MemoryStreamBase stream(FileAccess::Read, data, size);
-    return loadState(&stream, sink, outBuffer);
+    {
+        auto result = reader.read(&outBuffer[0], remainingSize);
+        if (SLANG_FAILED(result))
+        {
+            sink->diagnose(SourceLoc(), Diagnostics::expectingSlangRiffContainer);
+            return result;
+        }
+    }
+
+    return SLANG_OK;
 }
 
 /* static */ ReproUtil::RequestState* ReproUtil::getRequest(const List<uint8_t>& buffer)
