@@ -664,8 +664,8 @@ struct InliningPassBase
                 break;
             }
         }
-        // For any debugInlinedAt without an outerinlinedAt, emit a new debugInlinedAt with the outer
-        // set, and delete the older debugInlinedAt
+        // For any debugInlinedAt without an outerinlinedAt, emit a new debugInlinedAt with the
+        // outer set, and delete the older debugInlinedAt
         for (Index i = 0; i < debugInlinedInsts.getCount(); ++i)
         {
             auto inst = debugInlinedInsts[i];
@@ -879,8 +879,8 @@ struct InliningPassBase
             isFirstBlock = false;
         }
         // For each existing debugNoScope inst, replace it with new debug scope we emit.
-        // For any debugInlinedAt without an outerinlinedAt, emit a new debugInlinedAt with the outer
-        // set, and delete the older debugInlinedAt
+        // For any debugInlinedAt without an outerinlinedAt, emit a new debugInlinedAt with the
+        // outer set, and delete the older debugInlinedAt
         List<IRDebugInlinedAt*> debugInlinedInsts;
         if (newDebugInlinedAt && callee->findDecoration<IRDebugLocationDecoration>())
         {
