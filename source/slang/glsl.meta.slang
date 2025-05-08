@@ -17,9 +17,9 @@
 // Section 4.1. 'asic Types'
 //
 
-public typealias f16vec2 = half2;
-public typealias f16vec3 = half3;
-public typealias f16vec4 = half4;
+public typealias f16vec2 = vector<half, 2>;
+public typealias f16vec3 = vector<half, 3>;
+public typealias f16vec4 = vector<half, 4>;
 
 public typealias vec2 = vector<float, 2>;
 public typealias vec3 = vector<float, 3>;
@@ -101,6 +101,18 @@ public typealias f16mat2x2 = matrix<half, 2, 2>;
 public typealias f16mat2x3 = matrix<half, 2, 3>;
 public typealias f16mat2x4 = matrix<half, 2, 4>;
 
+public typealias f16mat3x2 = matrix<half, 3, 2>;
+public typealias f16mat3x3 = matrix<half, 3, 3>;
+public typealias f16mat3x4 = matrix<half, 3, 4>;
+
+public typealias f16mat4x2 = matrix<half, 4, 2>;
+public typealias f16mat4x3 = matrix<half, 4, 3>;
+public typealias f16mat4x4 = matrix<half, 4, 4>;
+
+// Convenience aliases for square matrices
+public typealias f16mat2 = f16mat2x2;
+public typealias f16mat3 = f16mat3x3;
+public typealias f16mat4 = f16mat4x4;
 
 public out float4 gl_Position : SV_Position;
 public out float gl_PointSize : SV_PointSize;
