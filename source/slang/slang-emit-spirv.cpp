@@ -3041,7 +3041,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     irDebugFunc = as<IRDebugFunction>(debugFuncDecor->getDebugFunc());
                 }
-                funcDebugScope = emitDebugFunction(getSection(SpvLogicalSectionID::ConstantsAndTypes), spvBlock, spvFunc, irDebugFunc);
+                funcDebugScope = emitDebugFunction(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    spvBlock,
+                    spvFunc,
+                    irDebugFunc);
             }
             if (funcDebugScope)
             {
@@ -7434,7 +7438,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
 
-    SpvInst* emitDebugFunction(SpvInstParent* parent, SpvInst* firstBlock, SpvInst* spvFunc, IRDebugFunction* debugFunc)
+    SpvInst* emitDebugFunction(
+        SpvInstParent* parent,
+        SpvInst* firstBlock,
+        SpvInst* spvFunc,
+        IRDebugFunction* debugFunc)
     {
         auto scope = findDebugScope(debugFunc);
         if (!scope)
