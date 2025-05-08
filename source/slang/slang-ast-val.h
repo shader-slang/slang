@@ -166,6 +166,17 @@ class ConstantIntVal : public IntVal
     bool _isLinkTimeValOverride() { return false; }
 };
 
+FIDDLE()
+class SpecializationConstantIntVal : public IntVal
+{
+    FIDDLE(...)
+    Val* getValue() { return getOperand(1); }
+    // Overrides should be public so base classes can access
+    void _toTextOverride(StringBuilder& out) { SLANG_UNUSED(out); }
+    SpecializationConstantIntVal(Type* inType, Val* inValue) { setOperands(inType, inValue); }
+    bool _isLinkTimeValOverride() { return false; }
+};
+
 // The logical "value" of a reference to a generic value parameter
 FIDDLE()
 class GenericParamIntVal : public IntVal

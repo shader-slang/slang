@@ -2352,7 +2352,7 @@ static LayoutSize GetElementCount(IntVal* val)
     {
         return 0;
     }
-    else if (as<FuncCallIntVal>(val))
+    else if (as<SpecializationConstantIntVal>(val))
     {
         return 0;
     }
