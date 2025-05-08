@@ -104,7 +104,19 @@ public:
 struct DebugChunk : RIFF::ListChunk
 {
 public:
-    static DebugChunk const* find(RIFF::ListChunk const* baseChunk);
+    /// Search for a debug information chunk.
+    static DebugChunk const* find(
+        RIFF::ListChunk const* baseChunk);
+
+    /// Search for a debug information chunk.
+    ///
+    /// The search will initially look in `baseChunk`, but
+    /// if that fails, it will fall back to the `containerChunk`
+    /// if that is non-null.
+    ///
+    static DebugChunk const* find(
+        RIFF::ListChunk const* baseChunk,
+        RIFF::ListChunk const* containerChunk);
 };
 
 SlangResult readSourceLocationsFromDebugChunk(

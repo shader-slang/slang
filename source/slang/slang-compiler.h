@@ -2364,12 +2364,14 @@ public:
     ///
     RefPtr<Module> findOrLoadSerializedModuleForModuleLibrary(
         ModuleChunk const* moduleChunk,
+        RIFF::ListChunk const* libraryChunk,
         DiagnosticSink* sink);
 
     RefPtr<Module> loadSerializedModule(
         Name* moduleName,
         const PathInfo& moduleFilePathInfo,
         ModuleChunk const* moduleChunk,
+        RIFF::ListChunk const* containerChunk, //< The outer container, if there is one.
         SourceLoc const& requestingLoc,
         DiagnosticSink* sink);
 
@@ -2377,6 +2379,7 @@ public:
         Module* module,
         const PathInfo& moduleFilePathInfo,
         ModuleChunk const* moduleChunk,
+        RIFF::ListChunk const* containerChunk, //< The outer container, if there is one.
         DiagnosticSink* sink);
 
     SourceFile* loadSourceFile(String pathFrom, String path);

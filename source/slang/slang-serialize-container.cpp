@@ -551,6 +551,17 @@ DebugChunk const* DebugChunk::find(RIFF::ListChunk const* baseChunk)
     return static_cast<DebugChunk const*>(found);
 }
 
+DebugChunk const* DebugChunk::find(
+    RIFF::ListChunk const* baseChunk,
+    RIFF::ListChunk const* containerChunk)
+{
+    if (auto found = find(baseChunk))
+        return found;
+    if (containerChunk)
+        return find(containerChunk);
+    return nullptr;
+}
+
 SlangResult readSourceLocationsFromDebugChunk(
     DebugChunk const* debugChunk,
     SourceManager* sourceManager,

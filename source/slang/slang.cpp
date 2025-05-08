@@ -4132,6 +4132,7 @@ void Linkage::loadParsedModule(
 
 RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
     ModuleChunk const* moduleChunk,
+    RIFF::ListChunk const* libraryChunk,
     DiagnosticSink* sink)
 {
     RefPtr<Module> resultModule;
@@ -4173,13 +4174,14 @@ RefPtr<Module> Linkage::findOrLoadSerializedModuleForModuleLibrary(
     // will go ahead and load the module from the serialized form.
     //
     PathInfo filePathInfo;
-    return loadSerializedModule(moduleName, modulePathInfo, moduleChunk, SourceLoc(), sink);
+    return loadSerializedModule(moduleName, modulePathInfo, moduleChunk, libraryChunk, SourceLoc(), sink);
 }
 
 RefPtr<Module> Linkage::loadSerializedModule(
     Name* moduleName,
     const PathInfo& moduleFilePathInfo,
     ModuleChunk const* moduleChunk,
+    RIFF::ListChunk const* containerChunk,
     SourceLoc const& requestingLoc,
     DiagnosticSink* sink)
 {
@@ -4209,7 +4211,7 @@ RefPtr<Module> Linkage::loadSerializedModule(
     try
     {
         if (SLANG_FAILED(
-                loadSerializedModuleContents(module, moduleFilePathInfo, moduleChunk, sink)))
+                loadSerializedModuleContents(module, moduleFilePathInfo, moduleChunk, containerChunk, sink)))
         {
             mapPathToLoadedModule.remove(mostUniqueIdentity);
             mapNameToLoadedModules.remove(moduleName);
@@ -4271,7 +4273,7 @@ RefPtr<Module> Linkage::loadBinaryModuleImpl(
     // the module more completely from that serialized representation.
     //
     RefPtr<Module> module =
-        loadSerializedModule(moduleName, moduleFilePathInfo, moduleChunk, requestingLoc, sink);
+        loadSerializedModule(moduleName, moduleFilePathInfo, moduleChunk, rootChunk, requestingLoc, sink);
 
     return module;
 }
@@ -6516,6 +6518,7 @@ SlangResult Linkage::loadSerializedModuleContents(
     Module* module,
     const PathInfo& moduleFilePathInfo,
     ModuleChunk const* moduleChunk,
+    RIFF::ListChunk const* containerChunk,
     DiagnosticSink* sink)
 {
     // At this point we've dealt with basically all of
@@ -6523,9 +6526,39 @@ SlangResult Linkage::loadSerializedModuleContents(
     // to the real work of decoding the information
     // in the `moduleChunk`.
 
+    //
+    // TODO(tfoley): The fact that a separate `containerChunk` is getting
+    // passed in here is entirely byproduct of the support for "module libraries"
+    // that can (in principle) contain multiple serialized modules. When
+    // things are serialized in the "container" representation used for
+    // a module library, there is a single `DebugChunk` as a child of
+    // the container, with all of the `ModuleChunk`s sharing that debug info.
+    //
+    // In contrast, the more typical kind of serialized module that the compiler
+    // produces serializes a single `ModuleChunk`, and the `DebugChunk` is
+    // one of its direct children. Thus there are currently two different
+    // locations where debug information might be found.
+    //
+    // Prior to the change where we navigate the serialized RIFF hierarchy
+    // in memory without copying it, this issue was addressed by having
+    // the subroutine that looked for a `DebugChunk` start at the `ModuleChunk`
+    // and work its way up through the hierarchy using parent pointers that
+    // were created as part of RIFF loading. When navigating the RIFF in-place
+    // we don't have such parent pointers.
+    //
+    // As a short-term solution, we should deprecate and remove the support
+    // for "module libraries" so that the code doesn't have to handle two
+    // different layouts.
+    //
+    // In the longer term, we should be making some conscious design decisions
+    // around how we want to organize the top-level structure of our serialized
+    // intermediate/output formats, since there's quite a mix of different
+    // approaches currently in use.
+    //
+
     auto sourceManager = getSourceManager();
     RefPtr<SerialSourceLocReader> sourceLocReader;
-    if (auto debugChunk = DebugChunk::find(moduleChunk))
+    if (auto debugChunk = DebugChunk::find(moduleChunk, containerChunk))
     {
         SLANG_RETURN_ON_FAIL(
             readSourceLocationsFromDebugChunk(debugChunk, sourceManager, sourceLocReader));
@@ -7140,8 +7173,8 @@ SlangResult _addLibraryReference(
                     SourceMap::getTypeGuid(),
                     ArtifactKeep::Yes,
                     castable.writeRef()));
-                auto sourceMap = asBoxValue<SourceMap>(castable);
-                SLANG_ASSERT(sourceMap);
+                auto sourceMapBox = asBoxValue<SourceMap>(castable);
+                SLANG_ASSERT(sourceMapBox);
 
                 // TODO(JS):
                 // There is perhaps (?) a risk here that we might copy the obfuscated map
@@ -7156,7 +7189,7 @@ SlangResult _addLibraryReference(
                 // unit(s).
                 for (auto module : library->m_modules)
                 {
-                    module->getIRModule()->setObfuscatedSourceMap(sourceMap);
+                    module->getIRModule()->setObfuscatedSourceMap(sourceMapBox);
                 }
 
                 // Look up the source file
@@ -7166,8 +7199,26 @@ SlangResult _addLibraryReference(
 
                 if (name.getLength())
                 {
+                    // Note(tfoley): There is a subtle requirement here, that any
+                    // source file `name` that might be searched for here *must*
+                    // have been added to the `sourceManager` already, as a
+                    // byproduct of debug source location information getting
+                    // deserialized as part of the call to `loadModuleLibrary()` above.
+                    //
+                    // The implicit dependency is frustrating, and could potentially
+                    // break if somehow the debug info chunk was stripped from a binary,
+                    // while the source map was left in (which should be valid, even if
+                    // it is unlikely to be what a user wants).
+                    //
+                    // Ideally the source map would either be made an integral part of
+                    // the debug source location chunk, so they are loaded together,
+                    // or the `SourceManager` would be adapted so that it can store
+                    // registered source maps independent of whether or not the
+                    // corresponding source file(s) have been loaded.
+
                     auto sourceFile = sourceManager->findSourceFileByPathRecursively(name);
-                    sourceFile->setSourceMap(sourceMap, SourceMapKind::Obfuscated);
+                    SLANG_ASSERT(sourceFile);
+                    sourceFile->setSourceMap(sourceMapBox, SourceMapKind::Obfuscated);
                 }
             }
         }
