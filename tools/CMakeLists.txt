@@ -183,7 +183,7 @@ if(SLANG_ENABLE_GFX)
                 ${slang_SOURCE_DIR}/external/imgui
         else()
             INCLUDE_DIRECTORIES_PUBLIC
-            ${SLANG_OVERRIDE_IMGUI_PATH}
+                ${SLANG_OVERRIDE_IMGUI_PATH}
         endif()
         if (not ${SLANG_OVERRIDE_TINYOBJLOADER_PATH})
             INCLUDE_DIRECTORIES_PUBLIC
