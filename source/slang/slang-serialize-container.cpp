@@ -30,9 +30,7 @@ private:
 
 public:
     ModuleEncodingContext(SerialContainerUtil::WriteOptions const& options, Stream* stream)
-        : _options(options)
-        , _stream(stream)
-        , _containerStringPool(StringSlicePool::Style::Default)
+        : _options(options), _stream(stream), _containerStringPool(StringSlicePool::Style::Default)
     {
         if (options.optionFlags & SerialOptionFlag::SourceLocation)
         {
@@ -677,9 +675,8 @@ SlangResult decodeModuleIR(
     {
         auto streamContents = memoryStream.getContents();
 
-        auto rootChunk = RIFF::RootChunk::getFromBlob(
-            streamContents.getBuffer(),
-            streamContents.getCount());
+        auto rootChunk =
+            RIFF::RootChunk::getFromBlob(streamContents.getBuffer(), streamContents.getCount());
         if (!rootChunk)
         {
             return SLANG_FAIL;

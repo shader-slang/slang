@@ -238,12 +238,7 @@ struct SerialRiffUtil
     template<typename T>
     static Result writeArrayChunk(FourCC chunkId, const List<T>& array, RIFF::BuildCursor& cursor)
     {
-        return writeArrayChunk(
-            chunkId,
-            array.begin(),
-            size_t(array.getCount()),
-            sizeof(T),
-            cursor);
+        return writeArrayChunk(chunkId, array.begin(), size_t(array.getCount()), sizeof(T), cursor);
     }
 
     static Result readArrayChunk(RIFF::DataChunk const* dataChunk, ListResizer& listOut);

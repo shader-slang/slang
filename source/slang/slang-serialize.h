@@ -30,47 +30,33 @@ struct ValNodeDesc;
 struct Encoder
 {
 public:
-    Encoder()
-    {}
+    Encoder() {}
 
     Encoder(RIFF::Builder& riff)
         : _cursor(riff)
-    {}
+    {
+    }
 
     Encoder(RIFF::ListChunkBuilder* chunk)
         : _cursor(chunk)
-    {}
-
-    void beginArray(FourCC typeCode)
     {
-        _cursor.beginListChunk(typeCode);
     }
+
+    void beginArray(FourCC typeCode) { _cursor.beginListChunk(typeCode); }
 
     void beginArray() { beginArray(SerialBinary::kArrayFourCC); }
 
-    void endArray()
-    {
-        _cursor.endChunk();
-    }
+    void endArray() { _cursor.endChunk(); }
 
-    void beginObject(FourCC typeCode)
-    {
-        _cursor.beginListChunk(typeCode);
-    }
+    void beginObject(FourCC typeCode) { _cursor.beginListChunk(typeCode); }
 
     void beginObject() { beginObject(SerialBinary::kObjectFourCC); }
 
     void endObject() { _cursor.endChunk(); }
 
-    void beginKeyValuePair(FourCC keyCode)
-    {
-        _cursor.beginListChunk(keyCode);
-    }
+    void beginKeyValuePair(FourCC keyCode) { _cursor.beginListChunk(keyCode); }
 
-    void beginKeyValuePair()
-    {
-        beginKeyValuePair(SerialBinary::kPairFourCC);
-    }
+    void beginKeyValuePair() { beginKeyValuePair(SerialBinary::kPairFourCC); }
 
     void endKeyValuePair() { _cursor.endChunk(); }
 
@@ -204,10 +190,7 @@ private:
     RIFF::BuildCursor _cursor;
 
 public:
-    operator RIFF::BuildCursor& ()
-    {
-        return _cursor;
-    }
+    operator RIFF::BuildCursor&() { return _cursor; }
 
     RIFF::ChunkBuilder* getRIFFChunk() { return _cursor.getCurrentChunk(); }
 
@@ -575,16 +558,10 @@ public:
     Cursor getCursor() const { return _cursor; }
     void setCursor(Cursor const& cursor) { _cursor = cursor; }
 
-    RIFF::Chunk const* getCurrentChunk() const
-    {
-        return getCursor();
-    }
+    RIFF::Chunk const* getCurrentChunk() const { return getCursor(); }
 
 private:
-    void _advanceCursor()
-    {
-        _cursor = _cursor.getNextSibling();
-    }
+    void _advanceCursor() { _cursor = _cursor.getNextSibling(); }
 
     Cursor _cursor;
 };

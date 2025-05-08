@@ -14,7 +14,8 @@
 namespace Slang
 {
 struct IRModuleChunk : RIFF::ListChunk
-{};
+{
+};
 
 struct IRSerialWriter
 {

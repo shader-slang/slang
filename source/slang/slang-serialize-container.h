@@ -65,7 +65,8 @@ public:
 struct IRModuleChunk;
 
 struct ASTModuleChunk : RIFF::ListChunk
-{};
+{
+};
 
 struct ModuleChunk : RIFF::ListChunk
 {

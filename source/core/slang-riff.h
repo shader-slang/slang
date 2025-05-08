@@ -52,33 +52,17 @@ public:
     /// The value of a `FourCC`, represented as single integer.
     using RawValue = UInt32;
 
-    FourCC()
-    {
-        _rawValue = 0;
-    }
+    FourCC() { _rawValue = 0; }
 
-    FourCC(RawValue rawValue)
-    {
-        _rawValue = rawValue;
-    }
+    FourCC(RawValue rawValue) { _rawValue = rawValue; }
 
-    void operator=(RawValue rawValue)
-    {
-        _rawValue = rawValue;
-    }
+    void operator=(RawValue rawValue) { _rawValue = rawValue; }
 
-    RawValue getRawValue() const
-    {
-        return _rawValue;
-    }
+    RawValue getRawValue() const { return _rawValue; }
 
-    operator RawValue() const
-    {
-        return _rawValue;
-    }
+    operator RawValue() const { return _rawValue; }
 
 private:
-
     //
     // The storage for a `FourCC` is defined in a
     // way that makes the textual form more visible
@@ -101,13 +85,15 @@ private:
 
 #if SLANG_LITTLE_ENDIAN
 
-#define SLANG_FOUR_CC(c0, c1, c2, c3) \
-    ((FourCC::RawValue(c0) << 0) | (FourCC::RawValue(c1) << 8) | (FourCC::RawValue(c2) << 16) | (FourCC::RawValue(c3) << 24))
+#define SLANG_FOUR_CC(c0, c1, c2, c3)                                                           \
+    ((FourCC::RawValue(c0) << 0) | (FourCC::RawValue(c1) << 8) | (FourCC::RawValue(c2) << 16) | \
+     (FourCC::RawValue(c3) << 24))
 
 #else
 
-#define SLANG_FOUR_CC(c0, c1, c2, c3) \
-    ((FourCC::RawValue(c0) << 24) | (FourCC::RawValue(c1) << 16) | (FourCC::RawValue(c2) << 8) | (FourCC::RawValue(c3) << 0))
+#define SLANG_FOUR_CC(c0, c1, c2, c3)                                                            \
+    ((FourCC::RawValue(c0) << 24) | (FourCC::RawValue(c1) << 16) | (FourCC::RawValue(c2) << 8) | \
+     (FourCC::RawValue(c3) << 0))
 #endif
 
 
@@ -132,7 +118,6 @@ struct Builder;
 struct Chunk
 {
 public:
-
     //
     // The starting offset of a chunk in a RIFF file
     // is only guaranteed to be 2-byte aligned.
@@ -172,25 +157,16 @@ public:
     };
 
     /// Get the header for this chunk.
-    Header const* getHeader() const
-    {
-        return (Header const*)this;
-    }
+    Header const* getHeader() const { return (Header const*)this; }
 
     /// Get the tag from the header of this chunk.
-    FourCC getTag() const
-    {
-        return _readTagFromHeader();
-    }
+    FourCC getTag() const { return _readTagFromHeader(); }
 
     /// Get the total size of this chunk, in bytes.
     ///
     /// This size includes the chunk header.
     ///
-    UInt32 getTotalSize() const
-    {
-        return sizeof(RIFF::Chunk) + _readSizeFromHeader();
-    }
+    UInt32 getTotalSize() const { return sizeof(RIFF::Chunk) + _readSizeFromHeader(); }
 
     //
     // There are three *kinds* of chunks that can appear in a RIFF:
@@ -236,7 +212,6 @@ private:
     Header _header;
 
 protected:
-
     //
     // Rather than directly reading the `_tag` or `_size`
     // members, code should use the following accessors,
@@ -264,12 +239,8 @@ protected:
 struct DataChunk : Chunk
 {
 public:
-
     /// Get the size in bytes of the payload data of this chunk.
-    UInt32 getPayloadSize() const
-    {
-        return _readSizeFromHeader();
-    }
+    UInt32 getPayloadSize() const { return _readSizeFromHeader(); }
 
     /// Get a pointer to the payload data of this chunk.
     ///
@@ -277,10 +248,7 @@ public:
     /// up to `RIFF::Chunk::kAlignment`, for chunks of a RIFF
     /// file loaded directly into memory.
     ///
-    void const* getPayload() const
-    {
-        return static_cast<void const*>(this + 1);
-    }
+    void const* getPayload() const { return static_cast<void const*>(this + 1); }
 
     /// Write the payload data of this chunk into the given buffer.
     ///
@@ -332,33 +300,22 @@ struct BoundsCheckedChunkPtr
 {
 public:
     /// Initialize a null pointer
-    BoundsCheckedChunkPtr()
-    {}
+    BoundsCheckedChunkPtr() {}
 
     /// Initialize a null pointer
-    BoundsCheckedChunkPtr(nullptr_t)
-    {}
+    BoundsCheckedChunkPtr(nullptr_t) {}
 
 
     /// Initialize a pointer to a chunk, with a size limit.
-    BoundsCheckedChunkPtr(
-        Chunk const* chunk,
-        Size sizeLimit)
-    {
-        _set(chunk, sizeLimit);
-    }
+    BoundsCheckedChunkPtr(Chunk const* chunk, Size sizeLimit) { _set(chunk, sizeLimit); }
 
     /// Initialize a pointer to a chunk, with a limit based on its reported size.
-    BoundsCheckedChunkPtr(
-        Chunk const* chunk)
-    {
-        _set(chunk);
-    }
+    BoundsCheckedChunkPtr(Chunk const* chunk) { _set(chunk); }
 
     /// Get the underlying chunk pointer.
     Chunk const* get() const { return _ptr; }
 
-    operator Chunk const* () const { return get(); }
+    operator Chunk const*() const { return get(); }
     Chunk const* operator->() const { return get(); }
 
     BoundsCheckedChunkPtr getNextSibling() const;
@@ -376,37 +333,28 @@ template<typename T = Chunk>
 struct ChunkList
 {
 public:
-    ChunkList()
-    {}
+    ChunkList() {}
 
     ChunkList(BoundsCheckedChunkPtr firstChunk)
         : _firstChunk(firstChunk)
-    {}
+    {
+    }
 
     struct Iterator
     {
     public:
-        Iterator()
-        {}
+        Iterator() {}
 
         Iterator(BoundsCheckedChunkPtr chunk)
             : _chunk(chunk)
-        {}
-
-        T const* operator*() const
         {
-            return static_cast<T const*>(_chunk.get());
         }
 
-        void operator++()
-        {
-            _chunk = _chunk.getNextSibling();
-        }
+        T const* operator*() const { return static_cast<T const*>(_chunk.get()); }
 
-        bool operator!=(Iterator const& that) const
-        {
-            return _chunk != that._chunk;
-        }
+        void operator++() { _chunk = _chunk.getNextSibling(); }
+
+        bool operator!=(Iterator const& that) const { return _chunk != that._chunk; }
 
     private:
         BoundsCheckedChunkPtr _chunk;
@@ -421,10 +369,7 @@ public:
         return ChunkList<U>(_firstChunk);
     }
 
-    T const* getFirst() const
-    {
-        return *begin();
-    }
+    T const* getFirst() const { return *begin(); }
 
 private:
     friend struct ListChunk;
@@ -435,7 +380,6 @@ private:
 struct ListChunk : Chunk
 {
 public:
-
     //
     // A (non-root) list chunk has a tag of `"LIST"`
     // in its header.
@@ -467,10 +411,7 @@ public:
     };
 
     /// Get the header for this list chunk.
-    Header const* getHeader() const
-    {
-        return (Header const*)this;
-    }
+    Header const* getHeader() const { return (Header const*)this; }
 
     //
     // The content of a list chunk comprises zero or more
@@ -485,10 +426,7 @@ public:
     using ChildList = ChunkList<>;
 
     /// Get the list of children of this chunk.
-    ChildList getChildren() const
-    {
-        return ChildList(getFirstChild());
-    }
+    ChildList getChildren() const { return ChildList(getFirstChild()); }
 
     /// Get the first child chunk (if any) of this chunk.
     ///
@@ -510,10 +448,7 @@ public:
     ListChunk const* findListChunkRec(Chunk::Type type) const;
 
     /// Get the type of this chunk.
-    Type getType() const
-    {
-        return _readTypeFromHeader();
-    }
+    Type getType() const { return _readTypeFromHeader(); }
 
     /// Determine if a chunk is an instance of this kind.
     static bool _isChunkOfThisKind(Chunk const* chunk)
@@ -523,7 +458,6 @@ public:
     }
 
 private:
-
     //
     // Because we are inheriting from `Chunk`, we do not
     // declare a full `ListChunk::Header` here, and instead
@@ -551,7 +485,6 @@ private:
 struct RootChunk : ListChunk
 {
 public:
-
     //
     // A root chunk has a tag of `"RIFF"` in its header.
     //
@@ -563,17 +496,14 @@ public:
     /// Performs some minimal validity checks, and returns `nullptr` if
     /// the blob provided does not superficially appear to be a valid RIFF.
     ///
-    static RootChunk const* getFromBlob(
-        void const* data,
-        size_t dataSize);
+    static RootChunk const* getFromBlob(void const* data, size_t dataSize);
 
     /// Get a pointer to the root chunk of a RIFF hierarchy stored in a data blob.
     ///
     /// Performs some minimal validity checks, and returns `nullptr` if
     /// the blob provided does not superficially appear to be a valid RIFF.
     ///
-    static RootChunk const* getFromBlob(
-        ISlangBlob* blob);
+    static RootChunk const* getFromBlob(ISlangBlob* blob);
 
     /// Determine if a chunk is an instance of this kind.
     static bool _isChunkOfThisKind(Chunk const* chunk)
@@ -582,18 +512,17 @@ public:
     }
 
 private:
-    static bool _isTagForThisKind(FourCC tag)
-    {
-        return tag == kTag;
-    }
+    static bool _isTagForThisKind(FourCC tag) { return tag == kTag; }
 };
 
 inline Chunk::Kind Chunk::getKind() const
 {
     switch (getTag())
     {
-    case RootChunk::kTag: return Chunk::Kind::Root;
-    case ListChunk::kTag: return Chunk::Kind::List;
+    case RootChunk::kTag:
+        return Chunk::Kind::Root;
+    case ListChunk::kTag:
+        return Chunk::Kind::List;
     default:
         return Chunk::Kind::Data;
     }
@@ -617,8 +546,10 @@ inline Chunk::Type Chunk::getType() const
 template<typename T>
 T* as(Chunk* chunk)
 {
-    if (!chunk) return nullptr;
-    if (!T::_isChunkOfThisKind(chunk)) return nullptr;
+    if (!chunk)
+        return nullptr;
+    if (!T::_isChunkOfThisKind(chunk))
+        return nullptr;
     return static_cast<T*>(chunk);
 }
 
@@ -626,8 +557,10 @@ T* as(Chunk* chunk)
 template<typename T>
 T const* as(Chunk const* chunk)
 {
-    if (!chunk) return nullptr;
-    if (!T::_isChunkOfThisKind(chunk)) return nullptr;
+    if (!chunk)
+        return nullptr;
+    if (!T::_isChunkOfThisKind(chunk))
+        return nullptr;
     return static_cast<T const*>(chunk);
 }
 
@@ -640,8 +573,7 @@ public:
     struct Node
     {
     public:
-        Node()
-        {}
+        Node() {}
 
     private:
         friend struct InternallyLinkedList<T>;
@@ -651,51 +583,30 @@ public:
     struct Iterator
     {
     public:
-        Iterator()
-        {}
+        Iterator() {}
 
         Iterator(T* node)
             : _node(node)
-        {}
-
-        T* operator*() const
         {
-            return _node;
         }
 
-        void operator++()
-        {
-            _node = static_cast<Node const*>(_node)->_next;
-        }
+        T* operator*() const { return _node; }
 
-        bool operator!=(Iterator const& that) const
-        {
-            return _node != that._node;
-        }
+        void operator++() { _node = static_cast<Node const*>(_node)->_next; }
+
+        bool operator!=(Iterator const& that) const { return _node != that._node; }
 
     private:
         T* _node = nullptr;
     };
 
-    Iterator begin()
-    {
-        return Iterator(_first);
-    }
+    Iterator begin() { return Iterator(_first); }
 
-    Iterator end()
-    {
-        return Iterator();
-    }
+    Iterator end() { return Iterator(); }
 
-    T* getFirst() const
-    {
-        return _first;
-    }
+    T* getFirst() const { return _first; }
 
-    T* getLast() const
-    {
-        return _last;
-    }
+    T* getLast() const { return _last; }
 
     void add(T* element)
     {
@@ -724,38 +635,22 @@ private:
 class ChunkBuilder : public InternallyLinkedList<ChunkBuilder>::Node
 {
 public:
-
     /// Get the kind of the chunk being built.
-    Chunk::Kind getKind() const
-    {
-        return _kind;
-    }
+    Chunk::Kind getKind() const { return _kind; }
 
     /// Get the type of the chunk being built.
-    Chunk::Type getType() const
-    {
-        return _type;
-    }
+    Chunk::Type getType() const { return _type; }
 
     /// Set the type of the chunk being built.
-    void setType(Chunk::Type type)
-    {
-        _type = type;
-    }
+    void setType(Chunk::Type type) { _type = type; }
 
     /// Get the parent chunk of this chunk in the RIFF hierarchy.
     ///
-    ListChunkBuilder* getParent() const
-    {
-        return _parent;
-    }
+    ListChunkBuilder* getParent() const { return _parent; }
 
     /// Get the RIFF builder that this chunk belongs to.
     ///
-    RIFF::Builder* getRIFFBuilder() const
-    {
-        return _riffBuilder;
-    }
+    RIFF::Builder* getRIFFBuilder() const { return _riffBuilder; }
 
 protected:
     ChunkBuilder(
@@ -763,11 +658,9 @@ protected:
         Chunk::Type type,
         ListChunkBuilder* parent,
         RIFF::Builder* riffBuilder)
-        : _kind(kind)
-        , _type(type)
-        , _parent(parent)
-        , _riffBuilder(riffBuilder)
-    {}
+        : _kind(kind), _type(type), _parent(parent), _riffBuilder(riffBuilder)
+    {
+    }
 
     ChunkBuilder(ChunkBuilder const&) = delete;
     void operator=(ChunkBuilder const&) = delete;
@@ -824,19 +717,17 @@ public:
     }
 
 private:
-    ListChunkBuilder(
-        Chunk::Type type,
-        ListChunkBuilder* parent)
+    ListChunkBuilder(Chunk::Type type, ListChunkBuilder* parent)
         : ChunkBuilder(Chunk::Kind::List, type, parent, parent->getRIFFBuilder())
-    {}
+    {
+    }
 
     friend struct RIFF::Builder;
 
-    ListChunkBuilder(
-        Chunk::Type type,
-        RIFF::Builder* riffBuilder)
+    ListChunkBuilder(Chunk::Type type, RIFF::Builder* riffBuilder)
         : ChunkBuilder(Chunk::Kind::Root, type, nullptr, riffBuilder)
-    {}
+    {
+    }
 
     ChildList _children;
 };
@@ -846,7 +737,6 @@ private:
 class DataChunkBuilder : public ChunkBuilder
 {
 public:
-
     /// Append data to this chunk.
     void addData(void const* data, Size size);
 
@@ -883,26 +773,17 @@ public:
     {
     public:
         /// Get the payload of this shard.
-        void const* getPayload() const
-        {
-            return _payload;
-        }
+        void const* getPayload() const { return _payload; }
 
         /// Get the size of the payload of this shard.
-        Size getPayloadSize() const
-        {
-            return _payloadSize;
-        }
+        Size getPayloadSize() const { return _payloadSize; }
 
     private:
         friend class DataChunkBuilder;
 
-        Shard()
-        {}
+        Shard() {}
 
-        void setPayload(
-            void const* data,
-            Size size)
+        void setPayload(void const* data, Size size)
         {
             _payload = data;
             _payloadSize = size;
@@ -927,11 +808,10 @@ public:
 private:
     friend class ListChunkBuilder;
 
-    DataChunkBuilder(
-        Chunk::Type type,
-        ListChunkBuilder* parent)
+    DataChunkBuilder(Chunk::Type type, ListChunkBuilder* parent)
         : ChunkBuilder(Chunk::Kind::Data, type, parent, parent->getRIFFBuilder())
-    {}
+    {
+    }
 
     Shard* _addShard();
 
@@ -941,16 +821,20 @@ private:
 template<typename T>
 T* as(ChunkBuilder* chunk)
 {
-    if (!chunk) return nullptr;
-    if (!T::_isChunkOfThisKind(chunk)) return nullptr;
+    if (!chunk)
+        return nullptr;
+    if (!T::_isChunkOfThisKind(chunk))
+        return nullptr;
     return static_cast<T*>(chunk);
 }
 
 template<typename T>
 T const* as(ChunkBuilder const* chunk)
 {
-    if (!chunk) return nullptr;
-    if (!T::_isChunkOfThisKind(chunk)) return nullptr;
+    if (!chunk)
+        return nullptr;
+    if (!T::_isChunkOfThisKind(chunk))
+        return nullptr;
     return static_cast<T const*>(chunk);
 }
 
@@ -972,10 +856,7 @@ public:
     ///
     /// If a root chunk has not yet been added, returns `nullptr`.
     ///
-    ListChunkBuilder* getRootChunk() const
-    {
-        return _rootChunk;
-    }
+    ListChunkBuilder* getRootChunk() const { return _rootChunk; }
 
     /// Add a root chunk to the RIFF being built.
     ///
@@ -994,10 +875,7 @@ public:
     /// access this; it is part of the public API
     /// primarily to enable some of the unit tests.
     ///
-    MemoryArena& _getMemoryArena()
-    {
-        return _arena;
-    }
+    MemoryArena& _getMemoryArena() { return _arena; }
 
 private:
     Builder(Builder const&) = delete;
@@ -1035,16 +913,10 @@ public:
     BuildCursor(Builder& builder);
 
     /// Get the RIFF being written into, if any.
-    RIFF::Builder* getRIFFBuilder() const
-    {
-        return _riffBuilder;
-    }
+    RIFF::Builder* getRIFFBuilder() const { return _riffBuilder; }
 
     /// Get the current chunk being written into, if any.
-    ChunkBuilder* getCurrentChunk() const
-    {
-        return _currentChunk;
-    }
+    ChunkBuilder* getCurrentChunk() const { return _currentChunk; }
 
     /// Set the current chunk to write into.
     void setCurrentChunk(ChunkBuilder* chunk);
@@ -1101,12 +973,10 @@ public:
     protected:
         ScopedChunk(BuildCursor& cursor)
             : _cursor(cursor)
-        {}
-
-        ~ScopedChunk()
         {
-            _cursor.endChunk();
         }
+
+        ~ScopedChunk() { _cursor.endChunk(); }
 
     private:
         BuildCursor& _cursor;
@@ -1157,17 +1027,15 @@ struct MemoryReader
     //
 
 public:
-
     /// Initialize a reader with no bytes remaining.
     ///
-    MemoryReader()
-    {}
+    MemoryReader() {}
 
     /// Initialize a reader for the given blob.
     MemoryReader(void const* data, Size size)
-        : _cursor(static_cast<Byte const*>(data))
-        , _remainingSize(size)
-    {}
+        : _cursor(static_cast<Byte const*>(data)), _remainingSize(size)
+    {
+    }
 
     /// Read data into the given buffer.
     ///
