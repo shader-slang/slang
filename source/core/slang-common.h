@@ -147,20 +147,15 @@ typedef unsigned char Byte;
 /// size of something, in bytes, rather than being
 /// some other kind of integer.
 ///
-/// Comparable to the `isize` type in Rust.
+/// Note that this type is unsigned, despite the stated
+/// default in the Slang codebase being signed integer
+/// types. The reason for this is that variables
+/// holding sizes are often compared against the
+/// result of the `sizeof` operator, which yields
+/// a `size_t`. Our hands are, to some extent, tied
+/// on this matter.
 ///
-using Size = intptr_t;
-
-/// Unsigned integer type for sizes measured in bytes.
-///
-/// This is the unsigned equivalent of `Size`.
-/// By convention, code in the Slang codebase should
-/// default to using signed types like `Size` whenever
-/// possible, especially in the public API of types/subsystems.
-///
-/// Comparable to the `usize` type in Rust.
-///
-using USize = uintptr_t;
+using Size = size_t;
 
 // TODO(JS):
 // Perhaps these should be named Utf8, Utf16 and UnicodePoint/Rune/etc? For now, just keep it simple

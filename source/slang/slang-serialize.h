@@ -370,7 +370,7 @@ public:
     float decodeFloat32() { return float(decodeFloat()); }
     double decodeFloat64() { return decodeFloat(); }
 
-    FourCC getTag() { return _cursor ? _cursor->getType() : 0; }
+    FourCC getTag() { return _cursor ? _cursor->getType() : FourCC(0); }
 
     Int32 _decodeImpl(Int32*) { return decodeInt32(); }
     UInt32 _decodeImpl(UInt32*) { return decodeUInt32(); }

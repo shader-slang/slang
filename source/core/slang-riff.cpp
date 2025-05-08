@@ -96,7 +96,7 @@ void BoundsCheckedChunkPtr::_set(Chunk const* chunk, Size sizeLimit)
     // must be big enough to hold the larger header
     // that list chunks use.
     //
-    if (auto listChunk = as<ListChunk>(chunk))
+    if (as<ListChunk>(chunk))
     {
         if (reportedSize < sizeof(ListChunk::Header))
         {
