@@ -24,27 +24,18 @@ Texture2DArray<uint2> cudaT2DArray_u2;
 //TEST_INPUT: Texture2D(size=16, content = one, arrayLength=3):name cudaT2DArray_u4
 Texture2DArray<uint4> cudaT2DArray_u4;
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name cudaOutputBuffer
+//TEST_INPUT: ubuffer(data=[0 0 0], stride=4):out,name cudaOutputBuffer
 RWStructuredBuffer<uint> cudaOutputBuffer;
 
-[numthreads(7, 1, 1)]
+[numthreads(3, 1, 1)]
 [shader("compute")]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
     
     switch (idx)
-    {
-    case 1:
-    {
-        int var = 0;
-        uint result = cudaT1D_u[0];
-        // This is not supported in PTX.
-        //cudaOutputBuffer[idx] = result;
-    }    
-    break;
-    
-    case 2:
+    {   
+    case 0:
     {
         int2 var = int2(1, 2);
         uint result = cudaT2D_u[var];
@@ -59,7 +50,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     }
     break;
 
-    case 3:
+    case 1:
     {
         int3 var = int3(1, 1, 1);
         uint result = cudaT3D_u[var];
@@ -74,7 +65,7 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     }
     break;
 
-    case 4:
+    case 2:
     {
         int3 var = int3(0, 0, 1);
         uint result = cudaT2DArray_u[var];
@@ -90,11 +81,6 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     break;
     }
 } 
-
-// CHECK:0
-// CHECK:0
 // CHECK:FE000000
 // CHECK:FE000000
 // CHECK:FE000000
-// CHECK:0
-// CHECK:0
