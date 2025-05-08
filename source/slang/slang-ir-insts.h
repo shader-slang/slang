@@ -396,7 +396,10 @@ struct IRRequireSPIRVVersionDecoration : IRDecoration
     IR_LEAF_ISA(RequireGLSLVersionDecoration)
 
     IRConstant* getSPIRVVersionOperand() { return cast<IRConstant>(getOperand(0)); }
-    IntegerLiteralValue getSPIRVVersion() { return getSPIRVVersionOperand()->value.intVal; }
+    SemanticVersion getSPIRVVersion()
+    {
+        return SemanticVersion::fromRaw(getSPIRVVersionOperand()->value.intVal);
+    }
 };
 
 struct IRRequireCapabilityAtomDecoration : IRDecoration
@@ -420,7 +423,10 @@ struct IRRequireCUDASMVersionDecoration : IRDecoration
     IR_LEAF_ISA(RequireCUDASMVersionDecoration)
 
     IRConstant* getCUDASMVersionOperand() { return cast<IRConstant>(getOperand(0)); }
-    IntegerLiteralValue getCUDASMVersion() { return getCUDASMVersionOperand()->value.intVal; }
+    SemanticVersion getCUDASMVersion()
+    {
+        return SemanticVersion::fromRaw(getCUDASMVersionOperand()->value.intVal);
+    }
 };
 
 struct IRRequireGLSLExtensionDecoration : IRDecoration
@@ -4940,13 +4946,15 @@ public:
             getStringValue(prelude));
     }
 
+    IRInst* getSemanticVersionValue(SemanticVersion const& value)
+    {
+        SemanticVersion::RawValue rawValue = value.getRawValue();
+        return getIntValue(getBasicType(BaseType::UInt64), rawValue);
+    }
+
     void addRequireSPIRVVersionDecoration(IRInst* value, const SemanticVersion& version)
     {
-        SemanticVersion::IntegerType intValue = version.toInteger();
-        addDecoration(
-            value,
-            kIROp_RequireSPIRVVersionDecoration,
-            getIntValue(getBasicType(BaseType::UInt64), intValue));
+        addDecoration(value, kIROp_RequireSPIRVVersionDecoration, getSemanticVersionValue(version));
     }
 
     void addSPIRVNonUniformResourceDecoration(IRInst* value)
@@ -4956,11 +4964,10 @@ public:
 
     void addRequireCUDASMVersionDecoration(IRInst* value, const SemanticVersion& version)
     {
-        SemanticVersion::IntegerType intValue = version.toInteger();
         addDecoration(
             value,
             kIROp_RequireCUDASMVersionDecoration,
-            getIntValue(getBasicType(BaseType::UInt64), intValue));
+            getSemanticVersionValue(version));
     }
 
     void addRequireCapabilityAtomDecoration(IRInst* value, CapabilityName atom)
