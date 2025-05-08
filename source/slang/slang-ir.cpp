@@ -3426,7 +3426,11 @@ IRInst* IRBuilder::emitDebugInlinedAt(
     // This is optional.
     if (outerInlinedAt)
         args.add(outerInlinedAt);
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedAt, (UInt)args.getCount(), args.getBuffer());
+    return emitIntrinsicInst(
+        getVoidType(),
+        kIROp_DebugInlinedAt,
+        (UInt)args.getCount(),
+        args.getBuffer());
 }
 
 IRInst* IRBuilder::emitDebugFunction(
