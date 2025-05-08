@@ -4825,11 +4825,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
     }
 
-    LoweredValInfo visitMakeArrayFromElementExpr(MakeArrayFromElementExpr *expr)
+    LoweredValInfo visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr)
     {
-	auto irType = lowerType(context, expr->type);
-	auto irDefaultElement =
-            getSimpleVal(context, getDefaultVal(as<ArrayExpressionType>(expr->type)->getElementType()));
+        auto irType = lowerType(context, expr->type);
+        auto irDefaultElement = getSimpleVal(
+            context,
+            getDefaultVal(as<ArrayExpressionType>(expr->type)->getElementType()));
 
         return LoweredValInfo::simple(
             getBuilder()->emitMakeArrayFromElement(irType, irDefaultElement));

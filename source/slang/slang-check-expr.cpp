@@ -5181,7 +5181,7 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     }
 }
 
-Expr* SemanticsExprVisitor::visitMakeArrayFromElementExpr(MakeArrayFromElementExpr *expr)
+Expr* SemanticsExprVisitor::visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr)
 {
     return expr;
 }
