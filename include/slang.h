@@ -463,6 +463,9 @@ convention for interface methods.
     (SLANG_PROCESSOR_ARM_64 | SLANG_PROCESSOR_X86_64 | SLANG_PROCESSOR_POWER_PC_64)
 #define SLANG_PTR_IS_32 (SLANG_PTR_IS_64 ^ 1)
 
+// Is intptr_t not equal to equal-width sized integer type?
+#define SLANG_INTPTR_TYPE_IS_DISTINCT (SLANG_APPLE_FAMILY)
+
 // Processor features
 #if SLANG_PROCESSOR_FAMILY_X86
     #define SLANG_LITTLE_ENDIAN 1

@@ -346,6 +346,10 @@ SLANG_INT_VECTOR_OPS(uint)
 SLANG_INT_VECTOR_OPS(uint8_t)
 SLANG_INT_VECTOR_OPS(uint16_t)
 SLANG_INT_VECTOR_OPS(uint64_t)
+#if SLANG_INTPTR_TYPE_IS_DISTINCT
+SLANG_INT_VECTOR_OPS(intptr_t)
+SLANG_INT_VECTOR_OPS(uintptr_t)
+#endif
 
 SLANG_FLOAT_VECTOR_OPS(float)
 SLANG_FLOAT_VECTOR_OPS(double)
@@ -367,6 +371,10 @@ SLANG_VECTOR_INT_NEG_OP(uint)
 SLANG_VECTOR_INT_NEG_OP(uint8_t)
 SLANG_VECTOR_INT_NEG_OP(uint16_t)
 SLANG_VECTOR_INT_NEG_OP(uint64_t)
+#if SLANG_INTPTR_TYPE_IS_DISTINCT
+SLANG_VECTOR_INT_NEG_OP(intptr_t)
+SLANG_VECTOR_INT_NEG_OP(uintptr_t)
+#endif
 
 #define SLANG_FLOAT_VECTOR_MOD(T)                                               \
     template<int N>                                                             \
@@ -643,6 +651,10 @@ SLANG_INT_MATRIX_OPS(uint)
 SLANG_INT_MATRIX_OPS(uint8_t)
 SLANG_INT_MATRIX_OPS(uint16_t)
 SLANG_INT_MATRIX_OPS(uint64_t)
+#if SLANG_INTPTR_TYPE_IS_DISTINCT
+SLANG_INT_MATRIX_OPS(intptr_t)
+SLANG_INT_MATRIX_OPS(uintptr_t)
+#endif
 
 SLANG_FLOAT_MATRIX_OPS(float)
 SLANG_FLOAT_MATRIX_OPS(double)
@@ -665,6 +677,10 @@ SLANG_MATRIX_INT_NEG_OP(uint)
 SLANG_MATRIX_INT_NEG_OP(uint8_t)
 SLANG_MATRIX_INT_NEG_OP(uint16_t)
 SLANG_MATRIX_INT_NEG_OP(uint64_t)
+#if SLANG_INTPTR_TYPE_IS_DISTINCT
+SLANG_MATRIX_INT_NEG_OP(intptr_t)
+SLANG_MATRIX_INT_NEG_OP(uintptr_t)
+#endif
 
 #define SLANG_FLOAT_MATRIX_MOD(T)                                                             \
     template<int R, int C>                                                                    \
