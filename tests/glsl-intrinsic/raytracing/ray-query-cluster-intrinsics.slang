@@ -1,7 +1,9 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX12):-slang -compute -dx12 -output-using-type -use-dxil -profile cs_6_5 -render-feature ray-query
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature ray-query
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -entry computeMain -target glsl -profile cs_6_5 
+//TEST:SIMPLE(filecheck=CHECK_SPV): -entry computeMain -target spirv-assembly -profile cs_6_5 
 
-//TEST_INPUT: set accelStruct = AccelerationStructure
+//CHECK_GLSL:rayQueryGetIntersectionClusterIdNV 
+//CHECK_SPV:OpRayQueryGetClusterIdNV  
+
 uniform RaytracingAccelerationStructure accelStruct;
 
 float GetRayT<let RAY_QUERY_FLAGS: uint>(uint rayInlineFlags)
@@ -21,7 +23,11 @@ float GetRayT<let RAY_QUERY_FLAGS: uint>(uint rayInlineFlags)
         switch( rq.CandidateType() )
         {
             case CANDIDATE_NON_OPAQUE_TRIANGLE:
-                rq.CommitNonOpaqueTriangleHit();
+                int candidateClusterId = rq.CandidateClusterID();
+                if (candidateClusterId >= 0)
+                {
+                    rq.CommitNonOpaqueTriangleHit();
+                }
                 rq.Abort();
                 return rq.CommittedRayT();
 
@@ -44,6 +50,8 @@ float GetRayT<let RAY_QUERY_FLAGS: uint>(uint rayInlineFlags)
         }
     }
     
+    int committedClusterId = rq.CommittedClusterID();
+    ray.TMin = 0.01f + committedClusterId;
     return 0.0f;
 }
 
@@ -247,6 +255,3 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 
     outputBuffer[idx] = val;
 }
-
-// DX12: 88.5
-// VK: 88.5
