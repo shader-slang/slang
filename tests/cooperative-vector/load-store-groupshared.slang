@@ -1,5 +1,5 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -render-feature cooperative-vector -dx12-experimental -use-dxil -output-using-type -profile cs_6_8 -Xslang... -Xdxc -Vd -X.
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -dx12-experimental -use-dxil -output-using-type -profile cs_6_9
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
 // CHECK: 1
@@ -9,7 +9,7 @@
 // CHECK-NEXT: 5
 
 //TEST_INPUT:ubuffer(data=[1 2 3 4 5]):name=input
-RWByteAddressBuffer input;
+ByteAddressBuffer input;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0]):out,name=outputBuffer
 RWStructuredBuffer<uint32_t> outputBuffer;

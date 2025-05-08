@@ -1446,7 +1446,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_CoopVectorType:
         {
             auto coopVecType = (IRCoopVectorType*)type;
-            m_writer->emit("CoopVector<");
+            m_writer->emit("vector<");
             emitType(coopVecType->getElementType());
             m_writer->emit(",");
             m_writer->emit(getIntVal(coopVecType->getElementCount()));

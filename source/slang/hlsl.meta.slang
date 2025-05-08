@@ -23022,14 +23022,13 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// Copy values from another CoopVec instance into this one. The source CoopVec can have a different element type,
     /// in which case appropriate type conversion will be performed.
     /// @param other The source CoopVec to copy from.
-    [require(hlsl)] 
     [mutating] 
     [ForceInline]
     void copyFrom<U : __BuiltinArithmeticType>(CoopVec<U,N> other)
     { 
         __target_switch 
         { 
-        case hlsl: __intrinsic_asm ".CopyFrom";
+        case hlsl: __intrinsic_asm "$0 = $1";
         default:
             if (__isFloat<T>() && __isInt<U>())
                 this = __int_to_float_cast<T>(other);
@@ -23044,21 +23043,19 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     /// Fill all elements of this CoopVec with the specified value.
     /// @param t The value to fill all elements with.
-    [require(cooperative_vector)] 
     [mutating] 
-    [ForceInline]
+    [require(cooperative_vector)]
     void fill(T t)
     { 
         __target_switch
         {
+        case hlsl: __intrinsic_asm "$0 = $1"; 
         case spirv:
             this = spirv_asm {
                 OpExtension "SPV_EXT_replicated_composites";
                 OpCapability ReplicatedCompositesEXT;
                 result:$$CoopVec<T, N> = OpCompositeConstructReplicateEXT $t;
             };
-        case hlsl:
-            case hlsl: __intrinsic_asm ".Fill"; 
         default:
             for(int i = 0; i < N; ++i)
                 this[i] = t;
@@ -23072,12 +23069,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// Store all elements of this CoopVec into a buffer at a specified offset.
     /// @param buffer The destination buffer to store the values into.
     /// @param byteOffset16ByteAligned The byte offset from the start of the buffer where the data will be stored. Must be 16-byte aligned.
-    [ForceInline]
     [require(cooperative_vector)]
     void store(RWByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
         {
+        case hlsl: __intrinsic_asm "$1.Store< vector<$[0], $[1]> >($2, $0)", T, N;
         case spirv:
             let ptr = buffer.GetBufferPointer();
             spirv_asm
@@ -23085,17 +23082,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 // TODO: Should this be a byte offset
                 OpCooperativeVectorStoreNV $ptr $byteOffset16ByteAligned $this None;
             };
-#ifdef NOT_SUPPORTED_YET
-        case hlsl:
-            this.__Store(buffer, byteOffset16ByteAligned);
-#endif
         default:
             for(int i = 0; i < N; ++i)
                 buffer.StoreByteOffset(byteOffset16ByteAligned + __elemToByteOffset<T>(i), this[i]);
         }
     }
 
-    [ForceInline]
     [require(cooperative_vector)]
     void store(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
     {
@@ -23108,10 +23100,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 // TODO: Should this be a byte offset
                 OpCooperativeVectorStoreNV $ptr $byteOffset16ByteAligned $this None;
             };
-#ifdef NOT_SUPPORTED_YET
-        case hlsl:
-            this.__Store(buffer, byteOffset16ByteAligned);
-#endif
         default:
             for(int i = 0; i < N; ++i)
                 buffer[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
@@ -23122,14 +23110,13 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [require(cooperative_vector)]
     void store<let M : int>(__ref groupshared T[M] data, int32_t byteOffset16ByteAligned = 0)
     {
+        static_assert(N <= M, "The destination vector size is smaller than the input.");
         __target_switch
         {
         case spirv:
             spirv_asm{
                 OpCooperativeVectorStoreNV &data $byteOffset16ByteAligned $this None;
             };
-        case hlsl:
-            this.__Store(data, __byteToElemOffset<T>(byteOffset16ByteAligned));
         default:
             for(int i = 0; i < N; ++i)
                 data[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
@@ -23143,6 +23130,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [require(spirv, cooperative_vector)]
     void storeAny<U, let M : int>(__ref groupshared U[M] data, int32_t byteOffset16ByteAligned = 0)
     {
+        static_assert(N <= M, "The destination vector size is smaller than the input.");
         __target_switch
         {
         case spirv:
@@ -23169,7 +23157,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// @param buffer The source buffer to load data from.
     /// @param byteOffset16ByteAligned The byte offset from the start of the buffer. Must be 16-byte aligned.
     /// @return A new cooperative vector containing the loaded values.
-    [ForceInline]
     [__NoSideEffect]
     [require(cooperative_vector)]
     static CoopVec<T, N> load(ByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
@@ -23187,15 +23174,14 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             ret.__Load(buffer, byteOffset16ByteAligned);
             return ret;
         default:
-            var vec = CoopVec<T, N>();
+            CoopVec<T, N> result;
             for(int i = 0; i < N; ++i)
-                vec[i] = buffer.LoadByteOffset<T>(byteOffset16ByteAligned + __elemToByteOffset<T>(i));
-            return vec;
+                result[i] = buffer.LoadByteOffset<T>(byteOffset16ByteAligned + __elemToByteOffset<T>(i));
+            return result;
         }
         return CoopVec<T, N>();
     }
 
-    [ForceInline]
     [__NoSideEffect]
     [require(cooperative_vector)]
     static CoopVec<T, N> load(RWByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
@@ -23221,7 +23207,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         return CoopVec<T, N>();
     }
 
-    [ForceInline]
     [__NoSideEffect]
     [require(cooperative_vector)]
     static CoopVec<T, N> load(StructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
@@ -23234,12 +23219,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             {
                 result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $ptr $byteOffset16ByteAligned None;
             };
-#ifdef NOT_SUPPORTED_YET
-        case hlsl:
-            CoopVec<T, N> ret;
-            ret.__Load(buffer, byteOffset16ByteAligned);
-            return ret;
-#endif
         default:
             var vec = CoopVec<T, N>();
             for(int i = 0; i < N; ++i)
@@ -23249,7 +23228,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         return CoopVec<T, N>();
     }
 
-    [ForceInline]
     [__NoSideEffect]
     [require(spirv, cooperative_vector)]
     static CoopVec<T, N> load(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
@@ -23262,12 +23240,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             {
                 result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $ptr $byteOffset16ByteAligned None;
             };
-#ifdef NOT_SUPPORTED_YET
-        case hlsl:
-            CoopVec<T, N> ret;
-            ret.__Load(buffer, byteOffset16ByteAligned);
-            return ret;
-#endif
         default:
             var vec = CoopVec<T, N>();
             for(int i = 0; i < N; ++i)
@@ -23282,6 +23254,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [require(cooperative_vector)]
     static CoopVec<T, N> load<let M : int>(__constref groupshared const T[M] data, int32_t byteOffset16ByteAligned = 0)
     {
+        static_assert(N <= M, "The destination vector size is smaller than the input.");
         __target_switch
         {
         case spirv:
@@ -23289,9 +23262,9 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV &data $byteOffset16ByteAligned None
             };
         case hlsl:
-            CoopVec<T, N> ret;
-            ret.__Load(data, __byteToElemOffset<T>(byteOffset16ByteAligned));
-            return ret;
+            CoopVec<T,N> result;
+            result.__Load(data, __byteToElemOffset<T>(byteOffset16ByteAligned));
+            return result;
         default:
             CoopVec<T,N> result;
             for(int i = 0; i < N; ++i)
@@ -23310,6 +23283,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [require(spirv, cooperative_vector)]
     static CoopVec<T, N> loadAny<U : __BuiltinArithmeticType, let M : int>(__constref groupshared const U[M] data, int32_t byteOffset16ByteAligned = 0)
     {
+        static_assert(N <= M, "The destination vector size is smaller than the input.");
         __target_switch
         {
         case spirv:
@@ -23359,25 +23333,13 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         [ForceInline]
         [__NoSideEffect]
         [nonmutating]
-        get
-        {
-            __target_switch
-            {
-            case hlsl: __intrinsic_asm ".ReadFromIndex";
-            default: return __indexRead(index);
-            }
-        }
+        [ForceInline]
+        get { return __indexRead(index); }
 
         [ForceInline]
         [mutating]
-        set
-        {
-            __target_switch
-            {
-            case hlsl: __intrinsic_asm ".WriteToIndex";
-            default: __indexRef(index) = newValue;
-            }
-        }
+        [ForceInline]
+        set { __indexRef(index) = newValue; }
 
         // Unavailable on HLSL
         // The CoopVector HLSL spec says that indexing with a subscript
@@ -23468,12 +23430,13 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     This __pureAdd(This other);
 
     [mutating]
+    [ForceInline]
     [require(hlsl)]
     void __mutAdd(This other)
     {
         __target_switch 
         { 
-        case hlsl: __intrinsic_asm ".Add"; 
+        case hlsl: __intrinsic_asm "$0 += $1"; 
         } 
     }
 
@@ -23486,21 +23449,13 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     {
         __target_switch
         {
-        case hlsl:
-            This ret = this;
-            ret.__mutAdd(other);
-            return ret;
+        case hlsl: __intrinsic_asm "$0 + $1"; 
         default: return __pureAdd(other);
         }
     }
 
     __intrinsic_op($(kIROp_Sub))
     This __pureSub(This other);
-
-    [mutating]
-    [require(hlsl)]
-    void __mutSub(This other)
-    { __target_switch { case hlsl: __intrinsic_asm ".Subtract"; } }
 
     /// Performs component-wise subtraction with another cooperative vector.
     /// @param other The cooperative vector to subtract from this vector.
@@ -23510,21 +23465,13 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     {
         __target_switch
         {
-        case hlsl:
-            This ret = this;
-            ret.__mutSub(other);
-            return ret;
+        case hlsl: __intrinsic_asm "$0 - $1";
         default: return __pureSub(other);
         }
     }
 
     __intrinsic_op($(kIROp_Mul))
     This __pureMul(This other);
-
-    [mutating]
-    [require(hlsl)]
-    void __mutMul(This other)
-    { __target_switch { case hlsl: __intrinsic_asm ".Multiply"; } }
 
     /// Performs component-wise multiplication with another cooperative vector.
     /// @param other The cooperative vector to multiply with this vector.
@@ -23534,21 +23481,13 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     {
         __target_switch
         {
-        case hlsl:
-            This ret = this;
-            ret.__mutMul(other);
-            return ret;
+        case hlsl: __intrinsic_asm "$0 * $1";
         default: return __pureMul(other);
         }
     }
 
     __intrinsic_op($(kIROp_Div))
     This __pureDiv(This other);
-
-    [mutating]
-    [require(hlsl)]
-    void __mutDiv(This other)
-    { __target_switch { case hlsl: __intrinsic_asm ".Divide"; } }
 
     /// Performs component-wise division with another cooperative vector.
     /// @param other The cooperative vector to divide this vector by.
@@ -23558,18 +23497,10 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     {
         __target_switch
         {
-        case hlsl:
-            This ret = this;
-            ret.__mutDiv(other);
-            return ret;
+        case hlsl: __intrinsic_asm "$0 / $1";
         default: return __pureDiv(other);
         }
     }
-
-    [mutating]
-    [require(hlsl)]
-    void __mutMod(This other)
-    { __target_switch { case hlsl: __intrinsic_asm ".Mod"; } }
 
     /// Performs component-wise remainder operation between two cooperative vectors.
     /// @param other The cooperative vector to compute the remainder with.
@@ -23579,10 +23510,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     {
         __target_switch
         {
-        case hlsl:
-            This ret = this;
-            ret.__mutMod(other);
-            return ret;
+        case hlsl: __intrinsic_asm "$0 % $1";
         default:
             This ret;
             for(int i = 0; i < N; ++i)
@@ -23601,65 +23529,52 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     {
         __target_switch
         {
-        case hlsl:
-            This ret = this;
-            for(int i = 0; i < N; ++i)
-                ret[i] = -this[i];
-            return ret;
+        case hlsl: __intrinsic_asm "-$0";
         default: return __pureNeg(this);
         }
     }
-
-    [mutating]
-    [require(hlsl)]
-    void __mutScalarMul(T t)
-    { __target_switch { case hlsl: __intrinsic_asm ".ScalarMultiply"; } }
-
-    [mutating]
-    [require(hlsl)]
-    void __mutMin(This other)
-    { __target_switch { case hlsl: __intrinsic_asm ".Min"; } }
-
-    [mutating]
-    [require(hlsl)]
-    void __mutMax(This other)
-    { __target_switch { case hlsl: __intrinsic_asm ".Max"; } }
-
-    [mutating]
-    [require(hlsl)]
-    void __mutClamp(This minVal, This maxVal)
-    { __target_switch { case hlsl: __intrinsic_asm ".Clamp"; } }
 
     //
     // Internal utilities for loading and storing
     //
 
     [mutating]
+    [ForceInline]
     [require(hlsl, byteaddressbuffer)]
-    void __Load(const ByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
-    { __target_switch { case hlsl: __intrinsic_asm ".Load"; } }
+    void __Load(const ByteAddressBuffer buffer, uint byteOffset)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "$0 = $1.Load< vector<$[0], $[1]> >($2)", T, N;
+        }
+    }
 
     [mutating]
+    [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
-    void __Load(const RWByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
-    { __target_switch { case hlsl: __intrinsic_asm ".Load"; } }
+    void __Load(const RWByteAddressBuffer buffer, uint byteOffset)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "$0 = $1.Load< vector<$[0], $[1]> >($2)", T, N;
+        }
+    }
 
     __generic<let M : int>
     [mutating]
-    // Careful, this takes the offset in elements
+    [ForceInline]
     [require(hlsl)]
     void __Load(__constref groupshared T buffer[M], uint elemOffset)
-    { __target_switch { case hlsl: __intrinsic_asm ".Load"; } }
-
-    [require(hlsl, byteaddressbuffer_rw)]
-    void __Store(RWByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
-    { __target_switch { case hlsl: __intrinsic_asm ".Store"; } }
-
-    __generic<let M : int>
-    [require(hlsl)]
-    // Careful, this takes the offset in elements
-    void __Store(__ref groupshared T buffer[M], uint elemOffset)
-    { __target_switch { case hlsl: __intrinsic_asm ".Store"; } }
+    {
+        static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
+        __target_switch
+        {
+        case hlsl:
+            [ForceUnroll]
+            for(int i = 0; i < N; ++i)
+                this[i] = buffer[i + elemOffset];
+        }
+    }
 
 ${{{{
 static const struct {
@@ -23673,6 +23588,7 @@ static const struct {
 for(auto buffer : kByteAddressBufferCases) {
 }}}}
     [mutating]
+    [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
     void __mutMatMul<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input, uint inputInterpretationHLSL,
@@ -23681,11 +23597,26 @@ for(auto buffer : kByteAddressBufferCases) {
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".MatMul";
+        case hlsl:
+            if (T is __BuiltinSignedArithmeticType)
+            {
+                if (U is __BuiltinSignedArithmeticType)
+                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
+                else
+                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
+            }
+            else
+            {
+                if (U is __BuiltinSignedArithmeticType)
+                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
+                else
+                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
+            }
         }
     }
 
     [mutating]
+    [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
     void __mutMatMulAdd<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input, uint inputInterpretationHLSL,
@@ -23695,7 +23626,21 @@ for(auto buffer : kByteAddressBufferCases) {
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".MatMulAdd";
+        case hlsl:
+            if (T is __BuiltinSignedArithmeticType)
+            {
+                if (U is __BuiltinSignedArithmeticType)
+                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
+                else
+                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
+            }
+            else
+            {
+                if (U is __BuiltinSignedArithmeticType)
+                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
+                else
+                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
+            }
         }
     }
 
@@ -23713,7 +23658,6 @@ for(auto buffer : kByteAddressBufferCases) {
     /// can be packed into each element of the input vector. The k parameter specifies the actual number of
     /// values to use from the packed input.
     [mutating]
-    [ForceInline]
     void matMulAccumPacked<U : __BuiltinArithmeticType, let PackedK : int>(
         CoopVec<U, PackedK> input,
         constexpr CoopVecComponentType inputInterpretation,
@@ -23804,7 +23748,6 @@ for(auto buffer : kByteAddressBufferCases) {
     }
 
     [mutating]
-    [ForceInline]
     void matMulAddAccumPacked<U : __BuiltinArithmeticType, let PackedK : int>(
         CoopVec<U, PackedK> input,
         constexpr CoopVecComponentType inputInterpretation,
@@ -23915,6 +23858,24 @@ for(auto buffer : kByteAddressBufferCases) {
         );
     }
 
+    [ForceInline]
+    [require(hlsl, byteaddressbuffer_rw)]
+    void __OuterProductAccumulate<let K : int>(
+        CoopVec<T, K> b,
+        $(buffer.type) matrix,
+        int32_t matrixOffset,
+        uint matrixStride,
+        uint memoryLayout,
+        uint matrixInterpretation,
+    )
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "__builtin_OuterProductAccumulate($0, $1, $2, $3, $6, $5, $4)";
+        }
+    }
+
 
 ${{{{
 }
@@ -23951,6 +23912,8 @@ CoopVec<T, N> operator *(CoopVec<T, N> lhs, const T rhs)
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "$0 * $1";
     case spirv:
         if (__isFloat<T>())
         {
@@ -23967,10 +23930,6 @@ CoopVec<T, N> operator *(CoopVec<T, N> lhs, const T rhs)
             }
             return lhs;
         }
-    case hlsl:
-        CoopVec<T, N> ret = lhs;
-        ret.__mutScalarMul(rhs);
-        return ret;
     default:
         for (int i = 0; i < N; ++i)
         {
@@ -23994,15 +23953,13 @@ CoopVec<T, N> min<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, 
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "min($0, $1)";
     case spirv:
         return spirv_asm
         {
             result:$$CoopVec<T, N> = OpExtInst glsl450 FMin $x $y;
         };
-    case hlsl:
-        CoopVec<T, N> ret = x;
-        ret.__mutMin(y);
-        return ret;
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
@@ -24018,15 +23975,13 @@ CoopVec<T, N> max<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, 
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "max($0, $1)";
     case spirv:
         return spirv_asm
         {
             result:$$CoopVec<T, N> = OpExtInst glsl450 FMax $x $y;
         };
-    case hlsl:
-        CoopVec<T, N> ret = x;
-        ret.__mutMax(y);
-        return ret;
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
@@ -24041,15 +23996,13 @@ CoopVec<T, N> clamp<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "clamp($0, $1, $2)";
     case spirv:
         return spirv_asm
         {
             result:$$CoopVec<T, N> = OpExtInst glsl450 FClamp $x $minVal $maxVal;
         };
-    case hlsl:
-        CoopVec<T, N> ret = x;
-        ret.__mutClamp(minVal, maxVal);
-        return ret;
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
@@ -24064,6 +24017,8 @@ CoopVec<T, N> min<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVe
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "min($0, $1)";
     case spirv:
         if (__isSignedInt<T>())
         {
@@ -24079,10 +24034,6 @@ CoopVec<T, N> min<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVe
                 result:$$CoopVec<T, N> = OpExtInst glsl450 UMin $x $y
             };
         }
-    case hlsl:
-        CoopVec<T, N> ret = x;
-        ret.__mutMin(y);
-        return ret;
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
@@ -24098,6 +24049,8 @@ CoopVec<T, N> max<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVe
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "max($0, $1)";
     case spirv:
         if (__isSignedInt<T>())
         {
@@ -24113,10 +24066,6 @@ CoopVec<T, N> max<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVe
                 result:$$CoopVec<T, N> = OpExtInst glsl450 UMax $x $y
             };
         }
-    case hlsl:
-        CoopVec<T, N> ret = x;
-        ret.__mutMax(y);
-        return ret;
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
@@ -24131,6 +24080,8 @@ CoopVec<T, N> clamp<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, Coop
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "clamp($0, $1, $2)";
     case spirv:
         if (__isSignedInt<T>())
         {
@@ -24146,10 +24097,6 @@ CoopVec<T, N> clamp<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, Coop
                 result:$$CoopVec<T, N> = OpExtInst glsl450 UClamp $x $minVal $maxVal
             };
         }
-    case hlsl:
-        CoopVec<T, N> ret = x;
-        ret.__mutClamp(minVal, maxVal);
-        return ret;
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
@@ -24164,6 +24111,8 @@ CoopVec<T, N> step<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> ed
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "step($0, $1)";
     case spirv:
         return spirv_asm
         {
@@ -24183,6 +24132,8 @@ CoopVec<T, N> exp<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "exp($0)";
     case spirv:
         return spirv_asm
         {
@@ -24202,6 +24153,8 @@ CoopVec<T, N> log<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 {
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "log($0)";
     case spirv:
         return spirv_asm
         {
@@ -24221,6 +24174,10 @@ CoopVec<T, N> tanh<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 {
     __target_switch
     {
+#ifdef NOT_SUPPORTED_DXC_PREVIEW
+    case hlsl:
+        __intrinsic_asm "tanh($0)";
+#endif
     case spirv:
         return spirv_asm
         {
@@ -24234,14 +24191,16 @@ CoopVec<T, N> tanh<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
     }
 }
 
-// TODO: Why does this fail when inlined on HLSL,
-// We generate some really weird code...
 // [ForceInline]
 [require(cooperative_vector)]
 CoopVec<T, N> atan<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> yOverX)
 {
     __target_switch
     {
+#ifdef NOT_SUPPORTED_DXC_PREVIEW
+    case hlsl:
+        __intrinsic_asm "atan($0)";
+#endif
     case spirv:
         return spirv_asm
         {
@@ -24264,6 +24223,8 @@ CoopVec<T, N> fma<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> a, 
     // dxc generated substantially different code
     __target_switch
     {
+    case hlsl:
+        __intrinsic_asm "mad($0, $1, $2)";
     case spirv:
         return spirv_asm
         {
@@ -24521,34 +24482,40 @@ uint32_t __getHLSLCoopVecComponentType(CoopVecComponentType componentType)
 {
     switch (componentType)
     {
-    case CoopVecComponentType::Float16:
-        return 0;
-    case CoopVecComponentType::Float32:
-        return 1;
-    case CoopVecComponentType::UnsignedInt8:
+    case CoopVecComponentType::SignedInt16:
         return 2;
     case CoopVecComponentType::UnsignedInt16:
         return 3;
-    case CoopVecComponentType::UnsignedInt32:
-        return 4;
-    case CoopVecComponentType::SignedInt8:
-        return 5;
-    case CoopVecComponentType::SignedInt16:
-        return 6;
     case CoopVecComponentType::SignedInt32:
+        return 4;
+    case CoopVecComponentType::UnsignedInt32:
+        return 5;
+    case CoopVecComponentType::SignedInt64:
+        return 6;
+    case CoopVecComponentType::UnsignedInt64:
         return 7;
-    case CoopVecComponentType::SignedInt8Packed:
+    case CoopVecComponentType::Float16:
         return 8;
-    case CoopVecComponentType::UnsignedInt8Packed:
+    case CoopVecComponentType::Float32:
         return 9;
-    case CoopVecComponentType::FloatE4M3:
+    case CoopVecComponentType::Float64:
         return 10;
+    case CoopVecComponentType::SignedInt8Packed:
+        return 17;
+    case CoopVecComponentType::UnsignedInt8Packed:
+        return 18;
+    case CoopVecComponentType::UnsignedInt8:
+        return 19;
+    case CoopVecComponentType::SignedInt8:
+        return 20;
+    case CoopVecComponentType::FloatE4M3:
+        return 21;
     case CoopVecComponentType::FloatE5M2:
-        return 11;
+        return 22;
     default:
         static_assert(false, "unsupported componentType value");
     }
-    return 32;
+    return 0; // ComponentType::Invalid
 }
 
 [ForceInline]
@@ -25007,7 +24974,9 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "$0.OuterProductAccumulate($1, $2, $3, $4, $5, $6)";
+        uint matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
+        uint memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
+        return a.__OuterProductAccumulate(b, matrix, matrixOffset, matrixStride, memoryLayoutHLSL, matrixInterpretationHLSL);
     case spirv:
         let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
         let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
@@ -25088,7 +25057,7 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
     __target_switch
     {
     case hlsl:
-        __intrinsic_asm "$0.ReduceSumAccumulate($1, $2)";
+        __intrinsic_asm "__builtin_ReduceSumAccumulate($0, $1, $2)";
     case spirv:
         let bufferPtr = buffer.GetBufferPointer();
         spirv_asm
