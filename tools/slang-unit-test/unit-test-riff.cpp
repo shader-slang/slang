@@ -31,110 +31,104 @@ static void _writeRandom(
     }
 
     // Should be a single block with same data as the List
-    auto dataChunk =
-        as<RIFF::DataChunkBuilder>(cursor.getCurrentChunk());
+    auto dataChunk = as<RIFF::DataChunkBuilder>(cursor.getCurrentChunk());
     SLANG_ASSERT(dataChunk);
 }
 
 namespace
 {
-    struct DumpContext
+struct DumpContext
+{
+private:
+    WriterHelper _writer;
+    Count _indent = 0;
+    Count _hexByteCount = 0;
+    bool _isRoot = true;
+
+public:
+    DumpContext(ISlangWriter* writer)
+        : _writer(writer)
     {
-    private:
-        WriterHelper _writer;
-        Count _indent = 0;
-        Count _hexByteCount = 0;
-        bool _isRoot = true;
+    }
 
-    public:
-        DumpContext(ISlangWriter* writer)
-            : _writer(writer)
-        {}
+    void beginListChunk(RIFF::Chunk::Type type)
+    {
+        _dumpIndent();
+        // If it's the root it's 'riff'
+        _dumpRiffType(_isRoot ? RIFF::RootChunk::kTag : RIFF::ListChunk::kTag);
+        _writer.put(" ");
+        _dumpRiffType(type);
+        _writer.put("\n");
+        _indent++;
+    }
 
-        void beginListChunk(RIFF::Chunk::Type type)
+    void endListChunk() { _indent--; }
+
+    void beginDataChunk(RIFF::Chunk::Type type)
+    {
+        _dumpIndent();
+        // Write out the name
+        _dumpRiffType(type);
+        _writer.put("\n");
+        _indent++;
+
+        _hexByteCount = 0;
+    }
+
+    void endDataChunk() { _indent--; }
+
+    void handleData(void const* data, Size size)
+    {
+        auto cursor = static_cast<Byte const*>(data);
+        auto remainingSize = size;
+        while (remainingSize--)
         {
-            _dumpIndent();
-            // If it's the root it's 'riff'
-            _dumpRiffType(_isRoot ? RIFF::RootChunk::kTag : RIFF::ListChunk::kTag);
-            _writer.put(" ");
-            _dumpRiffType(type);
-            _writer.put("\n");
-            _indent++;
-        }
+            auto byte = *cursor++;
 
-        void endListChunk()
-        {
-            _indent--;
-        }
-
-        void beginDataChunk(RIFF::Chunk::Type type)
-        {
-            _dumpIndent();
-            // Write out the name
-            _dumpRiffType(type);
-            _writer.put("\n");
-            _indent++;
-
-            _hexByteCount = 0;
-        }
-
-        void endDataChunk()
-        {
-            _indent--;
-        }
-
-        void handleData(void const* data, Size size)
-        {
-            auto cursor = static_cast<Byte const*>(data);
-            auto remainingSize = size;
-            while (remainingSize--)
+            static const Count kBytesPerLine = 32;
+            static const Count kBytesPerCluster = 4;
+            if (_hexByteCount % kBytesPerLine == 0)
             {
-                auto byte = *cursor++;
-
-                static const Count kBytesPerLine = 32;
-                static const Count kBytesPerCluster = 4;
-                if (_hexByteCount % kBytesPerLine == 0)
-                {
-                    _writer.put("\n");
-                    _dumpIndent();
-                }
-                else if (_hexByteCount % kBytesPerCluster == 0)
-                {
-                    _writer.put(" ");
-                }
-                _hexByteCount++;
-
-                char text[4] = { 0, 0, ' ', 0};
-
-                char const* hexDigits = "0123456789abcdef";
-                text[0] = hexDigits[(byte >> 4) & 0xF];
-                text[1] = hexDigits[(byte >> 0) & 0xF];
-
-                _writer.put(text);
+                _writer.put("\n");
+                _dumpIndent();
             }
-        }
-
-        void _dumpIndent()
-        {
-            for (int i = 0; i < _indent; ++i)
+            else if (_hexByteCount % kBytesPerCluster == 0)
             {
-                _writer.put("  ");
+                _writer.put(" ");
             }
-        }
-        void _dumpRiffType(FourCC fourCC)
-        {
-            auto rawValue = FourCC::RawValue(fourCC);
+            _hexByteCount++;
 
-            char text[5];
-            for (int i = 0; i < 4; ++i)
-            {
-                text[i] = char(rawValue & 0xFF);
-                rawValue >>= 8;
-            }
-            text[4] = 0;
+            char text[4] = {0, 0, ' ', 0};
+
+            char const* hexDigits = "0123456789abcdef";
+            text[0] = hexDigits[(byte >> 4) & 0xF];
+            text[1] = hexDigits[(byte >> 0) & 0xF];
+
             _writer.put(text);
         }
-    };
+    }
+
+    void _dumpIndent()
+    {
+        for (int i = 0; i < _indent; ++i)
+        {
+            _writer.put("  ");
+        }
+    }
+    void _dumpRiffType(FourCC fourCC)
+    {
+        auto rawValue = FourCC::RawValue(fourCC);
+
+        char text[5];
+        for (int i = 0; i < 4; ++i)
+        {
+            text[i] = char(rawValue & 0xFF);
+            rawValue >>= 8;
+        }
+        text[4] = 0;
+        _writer.put(text);
+    }
+};
 
 } // namespace
 
@@ -305,11 +299,7 @@ SLANG_UNIT_TEST(riff)
             RefPtr<RandomGenerator> rand = RandomGenerator::create(0x345234);
 
             List<uint8_t> data;
-            _writeRandom(
-                rand,
-                builder._getMemoryArena().getBlockPayloadSize() / 2,
-                cursor,
-                data);
+            _writeRandom(rand, builder._getMemoryArena().getBlockPayloadSize() / 2, cursor, data);
 
             // Should be a single block with same data as the List
             RIFF::DataChunkBuilder* dataChunk =

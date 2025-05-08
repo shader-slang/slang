@@ -414,7 +414,7 @@ SlangResult SerialSourceLocReader::read(
     SLANG_ASSERT(listChunk->getType() == SerialSourceLocData::kDebugFourCc);
 
     clear();
-    for(auto chunk : listChunk->getChildren())
+    for (auto chunk : listChunk->getChildren())
     {
         auto dataChunk = as<RIFF::DataChunk>(chunk);
         if (!dataChunk)

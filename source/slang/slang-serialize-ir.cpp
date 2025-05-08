@@ -344,9 +344,7 @@ Result _writeInstArrayChunk(
     return SerialRiffUtil::writeArrayChunk(chunkId, array, cursor);
 }
 
-/* static */ Result IRSerialWriter::writeTo(
-    const IRSerialData& data,
-    RIFF::BuildCursor& cursor)
+/* static */ Result IRSerialWriter::writeTo(const IRSerialData& data, RIFF::BuildCursor& cursor)
 {
     SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, Bin::kIRModuleFourCc);
 
@@ -411,9 +409,7 @@ Result _writeInstArrayChunk(
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! IRSerialReader !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-static Result _readInstArrayChunk(
-    RIFF::DataChunk const* chunk,
-    List<IRSerialData::Inst>& arrayOut)
+static Result _readInstArrayChunk(RIFF::DataChunk const* chunk, List<IRSerialData::Inst>& arrayOut)
 {
     SerialRiffUtil::ListResizerForType<IRSerialData::Inst> resizer(arrayOut);
     return SerialRiffUtil::readArrayChunk(chunk, resizer);
@@ -427,7 +423,7 @@ static Result _readInstArrayChunk(
 
     outData->clear();
 
-    for(auto chunk : irModuleChunk->getChildren())
+    for (auto chunk : irModuleChunk->getChildren())
     {
         auto dataChunk = as<RIFF::DataChunk>(chunk);
         if (!dataChunk)

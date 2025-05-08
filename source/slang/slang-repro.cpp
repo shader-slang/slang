@@ -14,10 +14,8 @@
 namespace Slang
 {
 
-/* static */ const SemanticVersion ReproUtil::g_semanticVersion = SemanticVersion(
-    ReproUtil::kMajorVersion,
-    ReproUtil::kMinorVersion,
-    ReproUtil::kPatchVersion);
+/* static */ const SemanticVersion ReproUtil::g_semanticVersion =
+    SemanticVersion(ReproUtil::kMajorVersion, ReproUtil::kMinorVersion, ReproUtil::kPatchVersion);
 
 // We can't just use sizeof for the sizes of these types, because the hash will be dependent on the
 // ptr size, which isn't an issue for serialization (we turn all pointers into Offset32Ptr ->
@@ -1235,7 +1233,7 @@ struct LoadContext
     List<uint8_t>& outBuffer)
 {
     auto rootChunk = RIFF::RootChunk::getFromBlob(data, dataSize);
-    if(!rootChunk)
+    if (!rootChunk)
     {
         sink->diagnose(SourceLoc(), Diagnostics::unableToReadRiff);
         return SLANG_FAIL;

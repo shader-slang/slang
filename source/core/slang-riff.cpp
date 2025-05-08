@@ -60,7 +60,7 @@ void BoundsCheckedChunkPtr::_set(Chunk const* chunk, Size sizeLimit)
     // If the available size isn't even enough for the
     // header of a RIFF chunk, then something is wrong.
     //
-    if(sizeLimit < sizeof(Chunk::Header))
+    if (sizeLimit < sizeof(Chunk::Header))
     {
         SLANG_UNEXPECTED("invalid RIFF");
         return;
@@ -134,7 +134,8 @@ void BoundsCheckedChunkPtr::_set(Chunk const* chunk)
 BoundsCheckedChunkPtr BoundsCheckedChunkPtr::getNextSibling() const
 {
     SLANG_ASSERT(_ptr != nullptr);
-    if (!_ptr) return nullptr;
+    if (!_ptr)
+        return nullptr;
 
     // The RIFF chunk reports its own size, and when navigating
     // the children of a list chunk, each child chunk starts
@@ -201,7 +202,7 @@ BoundsCheckedChunkPtr ListChunk::getFirstChild() const
     // their own validation checks.
     //
     Size reportedParentSize = getTotalSize();
-    if(reportedParentSize < firstChildOffset)
+    if (reportedParentSize < firstChildOffset)
     {
         SLANG_UNEXPECTED("invalid RIFF");
         UNREACHABLE_RETURN(nullptr);
@@ -304,14 +305,11 @@ ListChunk const* ListChunk::findListChunkRec(Chunk::Type type) const
 }
 
 
-
 //
 // RIFF::RootChunk
 //
 
-RootChunk const* RootChunk::getFromBlob(
-    void const* data,
-    size_t dataSize)
+RootChunk const* RootChunk::getFromBlob(void const* data, size_t dataSize)
 {
     // Our goal is to determine whether the given
     // blob superficially looks like a RIFF.
@@ -323,12 +321,14 @@ RootChunk const* RootChunk::getFromBlob(
 
     // If there's no data, then it's obvious not usable.
     //
-    if(!data) return nullptr;
+    if (!data)
+        return nullptr;
 
     // If there isn't even enough data to store the header
     // for a root, chunk, then the blob is too small.
     //
-    if(dataSize < sizeof(RootChunk::Header)) return nullptr;
+    if (dataSize < sizeof(RootChunk::Header))
+        return nullptr;
 
     // We cast the data pointer to a root chunk here, so that
     // we can access the fields in the header, but we are not
@@ -341,7 +341,8 @@ RootChunk const* RootChunk::getFromBlob(
     // tag. This acts as a kind of "magic number" to mark the
     // start of a RIFF.
     //
-    if (rootChunk->getTag() != RootChunk::kTag) return nullptr;
+    if (rootChunk->getTag() != RootChunk::kTag)
+        return nullptr;
 
     // By reading the size field from the root chunk, we can
     // determine how big of a file the root chunk claims that
@@ -354,7 +355,8 @@ RootChunk const* RootChunk::getFromBlob(
     // and we would be at risk of reading past the end of the
     // buffer if we attempted to use it.
     //
-    if (reportedSize > dataSize) return nullptr;
+    if (reportedSize > dataSize)
+        return nullptr;
 
     // Note: It is possible that the `reportedSize` is strictly
     // *less than* the `dataSize` that was passed in, and there
@@ -381,8 +383,7 @@ RootChunk const* RootChunk::getFromBlob(
     return rootChunk;
 }
 
-RootChunk const* RootChunk::getFromBlob(
-    ISlangBlob* blob)
+RootChunk const* RootChunk::getFromBlob(ISlangBlob* blob)
 {
     SLANG_ASSERT(blob);
     return getFromBlob(blob->getBufferPointer(), blob->getBufferSize());
@@ -513,9 +514,8 @@ Result ChunkBuilder::_writeTo(Stream* stream) const
         // (for a root chunk) or `"LIST"` (for any
         // other list chunk).
         //
-        header.chunkHeader.tag = listChunk->getKind() == Chunk::Kind::Root
-            ? RootChunk::kTag
-            : ListChunk::kTag;
+        header.chunkHeader.tag =
+            listChunk->getKind() == Chunk::Kind::Root ? RootChunk::kTag : ListChunk::kTag;
 
         // The type of a list chunk is stored in the
         // additional header field after the base
@@ -561,7 +561,7 @@ Result ChunkBuilder::_writeTo(Stream* stream) const
             auto remainingPaddingToWrite = paddingSize;
             while (remainingPaddingToWrite--)
             {
-                static const Byte kPadding[1] = { 0 };
+                static const Byte kPadding[1] = {0};
                 stream->write(kPadding, 1);
             }
 
@@ -602,14 +602,14 @@ MemoryArena& ChunkBuilder::_getMemoryArena() const
 
 DataChunkBuilder* ListChunkBuilder::addDataChunk(Chunk::Type type)
 {
-    auto chunk = new(_getMemoryArena()) DataChunkBuilder(type, this);
+    auto chunk = new (_getMemoryArena()) DataChunkBuilder(type, this);
     _children.add(chunk);
     return chunk;
 }
 
 ListChunkBuilder* ListChunkBuilder::addListChunk(Chunk::Type type)
 {
-    auto chunk = new(_getMemoryArena()) ListChunkBuilder(type, this);
+    auto chunk = new (_getMemoryArena()) ListChunkBuilder(type, this);
     _children.add(chunk);
     return chunk;
 }
@@ -622,7 +622,7 @@ void DataChunkBuilder::addData(void const* data, Size size)
 {
     // Adding no data should be a no-op.
     //
-    if(size == 0)
+    if (size == 0)
         return;
 
     // The most interesting implementation detail here
@@ -700,9 +700,7 @@ void DataChunkBuilder::addData(void const* data, Size size)
     auto shard = _addShard();
     auto payload = arena.allocateUnaligned(size);
     ::memcpy(payload, data, size);
-    shard->setPayload(
-        payload,
-        size);
+    shard->setPayload(payload, size);
 }
 
 void DataChunkBuilder::addUnownedData(void const* data, size_t size)
@@ -710,14 +708,12 @@ void DataChunkBuilder::addUnownedData(void const* data, size_t size)
     // Unowned data will always have to be added as its own shard.
     //
     auto shard = _addShard();
-    shard->setPayload(
-        data,
-        size);
+    shard->setPayload(data, size);
 }
 
 DataChunkBuilder::Shard* DataChunkBuilder::_addShard()
 {
-    auto shard = new(_getMemoryArena()) Shard();
+    auto shard = new (_getMemoryArena()) Shard();
     _shards.add(shard);
     return shard;
 }
@@ -767,20 +763,17 @@ ListChunkBuilder* Builder::addRootChunk(Chunk::Type type)
     // There must not already be a root chunk set.
     SLANG_ASSERT(getRootChunk() == nullptr);
 
-    auto chunk = new(_getMemoryArena()) ListChunkBuilder(type, this);
+    auto chunk = new (_getMemoryArena()) ListChunkBuilder(type, this);
     _rootChunk = chunk;
     return chunk;
 }
-
 
 
 //
 // RIFF::BuildCursor
 //
 
-BuildCursor::BuildCursor()
-{
-}
+BuildCursor::BuildCursor() {}
 
 BuildCursor::BuildCursor(Builder& builder)
     : _riffBuilder(&builder)
@@ -880,6 +873,6 @@ void BuildCursor::addUnownedData(void const* data, Size size)
     dataChunk->addUnownedData(data, size);
 }
 
-}
+} // namespace RIFF
 
 } // namespace Slang

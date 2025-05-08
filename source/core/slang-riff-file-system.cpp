@@ -182,8 +182,7 @@ SlangResult RiffFileSystem::loadArchive(const void* archive, size_t archiveSizeI
             reader.read(srcEntry);
 
             // Check if seems plausible
-            if (sizeof(RiffFileSystemBinary::Entry) + srcEntry.compressedSize +
-                    srcEntry.pathSize !=
+            if (sizeof(RiffFileSystemBinary::Entry) + srcEntry.compressedSize + srcEntry.pathSize !=
                 payloadSize)
             {
                 return SLANG_FAIL;
@@ -208,7 +207,8 @@ SlangResult RiffFileSystem::loadArchive(const void* archive, size_t archiveSizeI
                     }
 
                     // Get the compressed data
-                    dstEntry.m_contents = RawBlob::create(reader.getRemainingData(), srcEntry.compressedSize);
+                    dstEntry.m_contents =
+                        RawBlob::create(reader.getRemainingData(), srcEntry.compressedSize);
                     break;
                 }
             case SLANG_PATH_TYPE_DIRECTORY:
@@ -297,8 +297,9 @@ SlangResult RiffFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob** outB
 /* static */ bool RiffFileSystem::isArchive(const void* data, size_t sizeInBytes)
 {
     auto rootList = RIFF::RootChunk::getFromBlob(data, sizeInBytes);
-    if (!rootList) return false;
-    
+    if (!rootList)
+        return false;
+
     return rootList->getType() == RiffFileSystemBinary::kContainerFourCC;
 }
 

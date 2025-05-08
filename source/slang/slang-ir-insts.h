@@ -396,7 +396,10 @@ struct IRRequireSPIRVVersionDecoration : IRDecoration
     IR_LEAF_ISA(RequireGLSLVersionDecoration)
 
     IRConstant* getSPIRVVersionOperand() { return cast<IRConstant>(getOperand(0)); }
-    SemanticVersion getSPIRVVersion() { return SemanticVersion::fromRaw(getSPIRVVersionOperand()->value.intVal); }
+    SemanticVersion getSPIRVVersion()
+    {
+        return SemanticVersion::fromRaw(getSPIRVVersionOperand()->value.intVal);
+    }
 };
 
 struct IRRequireCapabilityAtomDecoration : IRDecoration
@@ -420,7 +423,10 @@ struct IRRequireCUDASMVersionDecoration : IRDecoration
     IR_LEAF_ISA(RequireCUDASMVersionDecoration)
 
     IRConstant* getCUDASMVersionOperand() { return cast<IRConstant>(getOperand(0)); }
-    SemanticVersion getCUDASMVersion() { return SemanticVersion::fromRaw(getCUDASMVersionOperand()->value.intVal); }
+    SemanticVersion getCUDASMVersion()
+    {
+        return SemanticVersion::fromRaw(getCUDASMVersionOperand()->value.intVal);
+    }
 };
 
 struct IRRequireGLSLExtensionDecoration : IRDecoration
@@ -4948,10 +4954,7 @@ public:
 
     void addRequireSPIRVVersionDecoration(IRInst* value, const SemanticVersion& version)
     {
-        addDecoration(
-            value,
-            kIROp_RequireSPIRVVersionDecoration,
-            getSemanticVersionValue(version));
+        addDecoration(value, kIROp_RequireSPIRVVersionDecoration, getSemanticVersionValue(version));
     }
 
     void addSPIRVNonUniformResourceDecoration(IRInst* value)
