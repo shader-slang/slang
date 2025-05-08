@@ -1957,7 +1957,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 nullptr,
-                as<IRDebugFunction>(inst));
+                as<IRDebugFunction>(inst),
+                nullptr);
         case kIROp_DebugInlinedAt:
             return emitDebugInlinedAt(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
@@ -3045,7 +3046,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     getSection(SpvLogicalSectionID::ConstantsAndTypes),
                     spvBlock,
                     spvFunc,
-                    irDebugFunc);
+                    irDebugFunc,
+                    irFunc->getDataType());
             }
             if (funcDebugScope)
             {
@@ -4107,7 +4109,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 nullptr,
                 nullptr,
-                as<IRDebugFunction>(inst));
+                as<IRDebugFunction>(inst),
+                nullptr);
         case kIROp_DebugInlinedAt:
             return emitDebugInlinedAt(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
@@ -7442,23 +7445,37 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvInstParent* parent,
         SpvInst* firstBlock,
         SpvInst* spvFunc,
-        IRDebugFunction* debugFunc)
+        IRDebugFunction* debugFunc,
+        IRFuncType* debugType)
     {
+        SpvInst* debugFuncInfo = nullptr;
+        if (debugFunc && m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
+        {
+            return debugFuncInfo;
+        }
+
         auto scope = findDebugScope(debugFunc);
         if (!scope)
             return nullptr;
 
-        auto debugType = emitDebugType(as<IRType>(debugFunc->getDebugType()));
-        IRBuilder builder(debugFunc);
+        SpvInst* neededDebugType = nullptr;
+        if (debugType)
+        {
+            neededDebugType = emitDebugType(debugType);
+        }
+        else
+        {
+            neededDebugType = emitDebugType(as<IRFuncType>(debugFunc->getDebugType()));
+        }
 
-        SpvInst* debugFuncInfo = nullptr;
+        IRBuilder builder(debugFunc);
         debugFuncInfo = emitOpDebugFunction(
             parent,
             debugFunc,
             m_voidType,
             getNonSemanticDebugInfoExtInst(),
             debugFunc->getName(),
-            debugType,
+            neededDebugType,
             debugFunc->getFile(),
             debugFunc->getLine(),
             debugFunc->getCol(),

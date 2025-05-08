@@ -669,9 +669,8 @@ struct InliningPassBase
         }
         // For any debugInlinedAt without an outerinlinedAt, emit a new debugInlinedAt with the
         // outer set, and delete the older debugInlinedAt
-        for (Index i = 0; i < debugInlinedInsts.getCount(); ++i)
+        for (auto inst : debugInlinedInsts)
         {
-            auto inst = debugInlinedInsts[i];
             if (newDebugInlinedAt && !inst->isOuterInlinedPresent())
             {
                 builder->setInsertAfter(inst);
