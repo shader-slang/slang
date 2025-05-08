@@ -355,10 +355,6 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
         {
             elementCount = getIntVal(getIntType(), elementCountConstantInt->getValue());
         }
-        else if (auto elementCountSpecConstInt = as<SpecializationConstantIntVal>(elementCount))
-        {
-            elementCount = getSpecConstIntVal(getIntType(), elementCountSpecConstInt->getValue());
-        }
         else
         {
             elementCount = getTypeCastIntVal(getIntType(), elementCount);

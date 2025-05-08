@@ -781,6 +781,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         opCode = _arithmeticOpCodeConvert(irOpCode, basicType);
         if (opCode == SpvOpUndef)
         {
+            switch(irOpCode)
+            {
+            case kIROp_IntCast:
+                {
+                    auto typeStyle = getTypeStyle(basicType->getBaseType());
+                    if (typeStyle == kIROp_FloatType)
+                    {
+                        return SpvOpConvertFToU;
+                    }
+                    else if (typeStyle == kIROp_IntType)
+                    {
+                        return SpvOpUConvert;
+                    }
+                    break;
+                }
+            default: break;
+            }
             return opCode;
         }
         return opCode;
@@ -2098,12 +2115,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (inst->findDecoration<IRSpecializationConstantOpDecoration>())
                 {
                     auto globalConstant = as<IRGlobalConstant>(inst);
-                    auto spvInst = emitSpecializationConstantOp(globalConstant->getValue());
-                    if (!m_mapIRInstToSpvInst.tryGetValue(globalConstant->getValue(), spvInst))
-                    {
-                        registerInst(globalConstant->getValue(), spvInst);
-                    }
-                    return spvInst;
+                    return emitSpecializationConstantOp(globalConstant->getValue());
                 }
                 break;
             }
@@ -2113,6 +2125,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return nullptr;
             }
         }
+
         String e = "Unhandled global inst in spirv-emit:\n" +
                    dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
         SLANG_UNIMPLEMENTED_X(e.begin());

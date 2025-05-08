@@ -492,7 +492,7 @@ struct SharedIRGenContext
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
 
-    Dictionary<SpecializationConstantIntVal*, IRInst*> mapSpecConstValToIRInst;
+    Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
 
     void setGlobalValue(Decl* decl, LoweredValInfo value)
     {
@@ -1594,22 +1594,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             tryEnv);
     }
 
-    LoweredValInfo visitSpecializationConstantIntVal(SpecializationConstantIntVal* val)
-    {
-        auto specConstVal = val->getValue();
-        SLANG_RELEASE_ASSERT(specConstVal);
-
-        if (as<FuncCallIntVal>(specConstVal))
-        {
-            return lowerVal(context, specConstVal);
-        }
-        else if (auto declRefBase = as<DeclRefBase>(specConstVal))
-        {
-            return lowerDecl(context, declRefBase->getDecl());
-        }
-        SLANG_UNREACHABLE("Specialization constant value is not a declRef or function call");
-    }
-
     LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
     {
         auto baseVal = lowerVal(context, val->getBase());
@@ -2075,27 +2059,21 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         if (!type->isUnsized())
         {
             IRInst* elementCount = nullptr;
-            if (auto specConstIntVal = as<SpecializationConstantIntVal>(type->getElementCount()))
+            auto sizeVal = type->getElementCount();
+            if (!as<ConstantIntVal>(sizeVal) && !as<GenericParamIntVal>(sizeVal))
             {
+                // We will always insert the specialization constant size into global scope.
                 auto sharedContext = context->shared;
-                IRInst* irInitVal = nullptr;
-
-                // Note the mapping of specialization constant value to IRInst is very important
-                // because when an array has size of specialize constant, the only way to check the
-                // type match on spirv is to check the if the type inst for two arrays are the same
-                // inst. So if two arrays have the same specialization constant size, we should
-                // avoid lowering two global constant variables.
                 if (!sharedContext->mapSpecConstValToIRInst.tryGetValue(
-                        specConstIntVal,
+                        sizeVal,
                         elementCount))
                 {
                     IRBuilderInsertLocScope insertScope(getBuilder());
                     getBuilder()->setInsertInto(getBuilder()->getModule());
-                    irInitVal = lowerSimpleVal(context, specConstIntVal);
+                    auto irInitVal = lowerSimpleVal(context, sizeVal);
                     elementCount =
-                        getBuilder()->emitGlobalConstant(irInitVal->getDataType(), irInitVal);
-
-                    sharedContext->mapSpecConstValToIRInst.add(specConstIntVal, elementCount);
+                         getBuilder()->emitGlobalConstant(irInitVal->getDataType(), irInitVal);
+                    sharedContext->mapSpecConstValToIRInst.add(sizeVal, elementCount);
                     getBuilder()->addDecoration(
                         elementCount,
                         kIROp_SpecializationConstantOpDecoration);
@@ -11885,7 +11863,12 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     if (compileRequest->optionSet.shouldDumpIR())
     {
         DiagnosticSinkWriter writer(compileRequest->getSink());
-        dumpIR(module, &writer, "GENERATED");
+        dumpIR(
+            module,
+            compileRequest->m_irDumpOptions,
+            "GENERATED",
+            compileRequest->getSourceManager(),
+            &writer);
     }
 #endif
 

@@ -2336,10 +2336,6 @@ static LayoutSize GetElementCount(IntVal* val)
             return LayoutSize::infinite();
         return LayoutSize(LayoutSize::RawValue(constantVal->getValue()));
     }
-    else if (as<SpecializationConstantIntVal>(val))
-    {
-        return LayoutSize::infinite();
-    }
     else if (const auto varRefVal = as<GenericParamIntVal>(val))
     {
         // TODO: We want to treat the case where the number of
@@ -2353,6 +2349,10 @@ static LayoutSize GetElementCount(IntVal* val)
         return 0;
     }
     else if (const auto polyIntVal = as<PolynomialIntVal>(val))
+    {
+        return 0;
+    }
+    else if (as<FuncCallIntVal>(val))
     {
         return 0;
     }

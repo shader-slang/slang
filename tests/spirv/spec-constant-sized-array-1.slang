@@ -2,10 +2,10 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
 
 // CHECK: %[[C0:[0-9A-Za-z_]+]] = OpSpecConstant %int 5
-// CHECK: %[[I2:[0-9A-Za-z_]+]] = OpConstant %int 2
-// CHECK: %[[COP0:[0-9A-Za-z_]+]] = OpSpecConstantOp %int IMul %[[C0]] %[[I2]]
 // CHECK: %[[I3:[0-9A-Za-z_]+]] = OpConstant %int 3
-// CHECK: %[[COP1:[0-9A-Za-z_]+]] = OpSpecConstantOp %int SRem %[[C0]] %[[I3]]
+// CHECK: %[[COP0:[0-9A-Za-z_]+]] = OpSpecConstantOp %int SRem %[[C0]] %[[I3]]
+// CHECK: %[[I2:[0-9A-Za-z_]+]] = OpConstant %int 2
+// CHECK: %[[COP1:[0-9A-Za-z_]+]] = OpSpecConstantOp %int IMul %[[I2]] %[[C0]]
 // CHECK: %[[COP2:[0-9A-Za-z_]+]] = OpSpecConstantOp %int IAdd %[[COP0]] %[[COP1]]
 // CHECK: %[[ARR_TYPE:[0-9A-Za-z_]+]] = OpTypeArray %float %[[COP2]]
 // CHECK: %[[PT_TYPE:[0-9A-Za-z_]+]] = OpTypePointer Workgroup %[[ARR_TYPE]]
