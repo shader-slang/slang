@@ -217,8 +217,6 @@ public:
         {
             if (auto irModule = module->getIRModule())
             {
-                Encoder::WithKeyValuePair withKey(&_encoder, PropertyKeys<Module>::IRModule);
-
                 IRSerialData serialData;
                 IRSerialWriter writer;
                 SLANG_RETURN_ON_FAIL(
@@ -468,11 +466,11 @@ String ModuleChunk::getName() const
 
 IRModuleChunk const* ModuleChunk::findIR() const
 {
-    auto foundProperty = findListChunk(PropertyKeys<Module>::IRModule);
-    if (!foundProperty)
+    auto foundChunk = findListChunk(IRSerialBinary::kIRModuleFourCc);
+    if (!foundChunk)
         return nullptr;
 
-    return static_cast<IRModuleChunk const*>(foundProperty->getFirstChild().get());
+    return static_cast<IRModuleChunk const*>(foundChunk);
 }
 
 ASTModuleChunk const* ModuleChunk::findAST() const

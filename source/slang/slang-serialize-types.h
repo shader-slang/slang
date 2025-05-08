@@ -125,7 +125,6 @@ struct PropertyKeys<Module>
 {
     static const FourCC::RawValue Digest = SLANG_FOUR_CC('S', 'H', 'A', '1');
     static const FourCC::RawValue ASTModule = SLANG_FOUR_CC('a', 's', 't', ' ');
-    static const FourCC::RawValue IRModule = SLANG_FOUR_CC('i', 'r', ' ', ' ');
     static const FourCC::RawValue FileDependencies = SLANG_FOUR_CC('f', 'd', 'e', 'p');
 };
 
