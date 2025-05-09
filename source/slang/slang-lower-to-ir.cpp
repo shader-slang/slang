@@ -8242,6 +8242,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             subType = DeclRefType::create(context->astBuilder, makeDeclRef(parentDecl));
         }
+        bool isGenericExtension = false;
+        // Test if we are in a generic extension context
+        if (parentDecl->parentDecl)
+        {
+            auto genDecl = as<GenericDecl>(parentDecl->parentDecl);
+            if (genDecl)
+            {
+                isGenericExtension = true;
+            }
+        }
 
         // What is the super-type that we have declared we inherit from?
         Type* superType = inheritanceDecl->base.type;
@@ -8304,14 +8314,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             // Construct the mangled name for the witness table, which depends
             // on the type that is conforming, and the type that it conforms to.
-            //
-            // TODO: This approach doesn't really make sense for generic `extension`
-            // conformances.
-            auto mangledName = getMangledNameForConformanceWitness(
-                context->astBuilder,
-                subType,
-                superType,
-                irSubType->getOp());
+            String mangledName;
+            if (isGenericExtension)
+            {
+                mangledName =
+                    getMangledNameForConformanceWitness(context->astBuilder, parentDecl, superType);
+            }
+            else
+            {
+                mangledName =
+                    getMangledNameForConformanceWitness(context->astBuilder, subType, superType);
+            }
 
             // TODO(JS):
             // Should the mangled name take part in obfuscation if enabled?
