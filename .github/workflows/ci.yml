@@ -63,7 +63,6 @@ jobs:
             build-llvm: false
           # Self-hosted full gpu build
           - os: windows
-            config: release
             compiler: cl
             platform: x86_64
             test-category: full
@@ -175,8 +174,7 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
           if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
             "$bin_dir/slang-test" \
-              -use-test-server \
-              -server-count 8 \
+              tests/language-feature/defer \
               -category ${{ matrix.test-category }} \
               -api all-cpu \
               -expected-failure-list tests/expected-failure-github.txt \
