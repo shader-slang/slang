@@ -63,6 +63,7 @@ jobs:
             build-llvm: false
           # Self-hosted full gpu build
           - os: windows
+            config: release
             compiler: cl
             platform: x86_64
             test-category: full
