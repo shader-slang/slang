@@ -7769,6 +7769,12 @@ IntInfo getIntTypeInfo(const IRType* intType)
         return {32, false};
     case kIROp_UInt64Type:
         return {64, false};
+    case kIROp_UIntPtrType:
+#if SLANG_PTR_IS_32
+        return {32, false};
+#else
+        return {64, false};
+#endif
     case kIROp_Int8Type:
         return {8, true};
     case kIROp_Int16Type:
@@ -7777,9 +7783,12 @@ IntInfo getIntTypeInfo(const IRType* intType)
         return {32, true};
     case kIROp_Int64Type:
         return {64, true};
-
-    case kIROp_IntPtrType:  // target platform dependent
-    case kIROp_UIntPtrType: // target platform dependent
+    case kIROp_IntPtrType:
+#if SLANG_PTR_IS_32
+        return {32, true};
+#else
+        return {64, true};
+#endif
     default:
         SLANG_UNEXPECTED("Unhandled type passed to getIntTypeInfo");
     }
