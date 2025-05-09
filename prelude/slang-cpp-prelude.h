@@ -16,18 +16,18 @@
 #define SLANG_PRELUDE_STD
 #endif
 
+#include <assert.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#endif // SLANG_LLVM
+
 // Is intptr_t not equal to equal-width sized integer type?
 #if defined(__APPLE__)
 #define SLANG_INTPTR_TYPE_IS_DISTINCT 1
 #else
 #define SLANG_INTPTR_TYPE_IS_DISTINCT 0
 #endif
-
-#include <assert.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#endif // SLANG_LLVM
 
 #if defined(_MSC_VER)
 #define SLANG_PRELUDE_SHARED_LIB_EXPORT __declspec(dllexport)
