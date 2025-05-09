@@ -3249,6 +3249,9 @@ struct AutoDiffPass : public InstPassBase
                     }
                 }
 
+                // Destroy the old witness table
+                innerResult.diffWitness->replaceUsesWith(newWitnessTable);
+                innerResult.diffWitness->removeAndDeallocate();
                 result.diffWitness =
                     hoistValueFromGeneric(builder, newWitnessTable, specInst, true);
             }
