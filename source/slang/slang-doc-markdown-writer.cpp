@@ -1989,7 +1989,7 @@ void DocMarkdownWriter::writeAggType(
         _getDeclsOfType<PropertyDecl>(this, page, properties);
         if (properties.getCount())
         {
-            out << toSlice("## m_currentPage->path\n\n");
+            out << toSlice("## Properties\n\n");
             _appendAsBullets(_getAsNameAndTextList(properties), true, 0);
             out << toSlice("\n");
         }
@@ -2166,6 +2166,7 @@ String DocMarkdownWriter::translateToMarkdownWithLinks(String text, bool strictC
                 sb.append(Path::getPathWithoutExt(Path::getRelativePath(
                     Path::getParentDirectory(m_currentPage->path),
                     page->path)));
+                sb.append(".html");
                 if (sectionName.getLength())
                     sb << "#" << sectionName;
                 sb.append(")");
