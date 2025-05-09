@@ -347,6 +347,7 @@ ArrayExpressionType* ASTBuilder::getArrayType(Type* elementType, IntVal* element
 {
     if (!elementCount)
         elementCount = getIntVal(getIntType(), kUnsizedArrayMagicLength);
+
     if (elementCount->getType() != getIntType())
     {
         // Canonicalize constant elementCount to int.

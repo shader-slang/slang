@@ -314,6 +314,23 @@ IRIntegerValue getIntVal(IRInst* inst)
     }
 }
 
+IRIntegerValue getArraySizeVal(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_IntLit:
+        return static_cast<IRConstant*>(inst)->value.intVal;
+        break;
+    // Treat specialization constant array as the unsized array here.
+    case kIROp_GlobalConstant:
+        return kUnsizedArrayMagicLength;
+        break;
+    default:
+        SLANG_UNEXPECTED("needed a known integer value");
+        UNREACHABLE_RETURN(0);
+    }
+}
+
 // IRCapabilitySet
 
 CapabilitySet IRCapabilitySet::getCaps()

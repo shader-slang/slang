@@ -2352,6 +2352,10 @@ static LayoutSize GetElementCount(IntVal* val)
     {
         return 0;
     }
+    else if (as<SpecializationConstantIntVal>(val))
+    {
+        return 0;
+    }
     SLANG_UNEXPECTED("unhandled integer literal kind");
     UNREACHABLE_RETURN(LayoutSize(0));
 }

@@ -2110,6 +2110,7 @@ public:
     {
         CompileTime,
         LinkTime,
+        SpecializationConstant
     };
     Expr* checkExpressionAndExpectIntegerConstant(
         Expr* expr,

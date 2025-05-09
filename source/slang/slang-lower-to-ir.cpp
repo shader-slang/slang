@@ -492,6 +492,8 @@ struct SharedIRGenContext
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
 
+    Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
+
     void setGlobalValue(Decl* decl, LoweredValInfo value)
     {
         globalEnv.mapDeclToValue[decl] = value;
@@ -1609,6 +1611,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             getBuilder()->emitLookupInterfaceMethodInst(type, witnessVal.val, key));
     }
 
+    LoweredValInfo visitSpecializationConstantIntVal(SpecializationConstantIntVal* val)
+    {
+        auto specConstVal = val->getValue();
+        return lowerVal(context, specConstVal);
+    }
+
     LoweredValInfo visitPolynomialIntVal(PolynomialIntVal* val)
     {
         auto irBuilder = getBuilder();
@@ -2056,7 +2064,31 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto elementType = lowerType(context, type->getElementType());
         if (!type->isUnsized())
         {
-            auto elementCount = lowerSimpleVal(context, type->getElementCount());
+            IRInst* elementCount = nullptr;
+            auto sizeVal = type->getElementCount();
+            auto typeCastIntVal = as<TypeCastIntVal>(sizeVal);
+            if ((typeCastIntVal && as<SpecializationConstantIntVal>(typeCastIntVal->getBase())) ||
+                as<SpecializationConstantIntVal>(sizeVal))
+            {
+                auto sharedContext = context->shared;
+                if (!sharedContext->mapSpecConstValToIRInst.tryGetValue(sizeVal, elementCount))
+                {
+                    IRBuilderInsertLocScope insertScope(getBuilder());
+                    getBuilder()->setInsertInto(getBuilder()->getModule());
+                    auto irInitVal = lowerSimpleVal(context, sizeVal);
+                    elementCount =
+                        getBuilder()->emitGlobalConstant(irInitVal->getDataType(), irInitVal);
+                    sharedContext->mapSpecConstValToIRInst.add(sizeVal, elementCount);
+                    getBuilder()->addDecoration(
+                        elementCount,
+                        kIROp_SpecializationConstantOpDecoration);
+                }
+            }
+            if (!elementCount)
+            {
+                elementCount = lowerSimpleVal(context, type->getElementCount());
+            }
+
             return getBuilder()->getArrayType(elementType, elementCount);
         }
         else
@@ -11802,9 +11834,15 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     }
 
 #if 0
+    if (compileRequest->optionSet.shouldDumpIR())
     {
         DiagnosticSinkWriter writer(compileRequest->getSink());
-        dumpIR(module, &writer, "GENERATED");
+        dumpIR(
+            module,
+            compileRequest->m_irDumpOptions,
+            "GENERATED",
+            compileRequest->getSourceManager(),
+            &writer);
     }
 #endif
 
