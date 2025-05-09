@@ -10,7 +10,7 @@ slangc -h
 # To generate this file
 slangc -help-style markdown -h
 ```
-## Quick Links
+### Quick Links
 
 * [General](#General)
 * [Target](#Target)
@@ -38,12 +38,12 @@ slangc -help-style markdown -h
 * [file-extension](#file-extension)
 
 <a id="General"></a>
-# General
+## General
 
 General options 
 
 <a id="D"></a>
-## -D
+### -D
 
 **-D&lt;name&gt;\[=&lt;value&gt;\], -D &lt;name&gt;\[=&lt;value&gt;\]**
 
@@ -53,7 +53,7 @@ The space between - D and &lt;name&gt; is optional. If no &lt;value&gt; is speci
 
 
 <a id="depfile"></a>
-## -depfile
+### -depfile
 
 **-depfile &lt;path&gt;**
 
@@ -61,7 +61,7 @@ Save the source file dependency list in a file.
 
 
 <a id="entry"></a>
-## -entry
+### -entry
 
 **-entry &lt;name&gt;**
 
@@ -75,7 +75,7 @@ If no [-entry](#entry) options are given, compiler will use \[shader(...)\] attr
 
 
 <a id="specialize"></a>
-## -specialize
+### -specialize
 
 **-specialize &lt;typename&gt;**
 
@@ -85,12 +85,12 @@ Specialize the last entrypoint with &lt;typename&gt;.
 
 
 <a id="emit-ir"></a>
-## -emit-ir
+### -emit-ir
 Emit IR typically as a '.slang-module' when outputting to a container. 
 
 
 <a id="h"></a>
-## -h, -help, --help
+### -h, -help, --help
 
 **-h or -h &lt;help-category&gt;**
 
@@ -98,7 +98,7 @@ Print this message, or help in specified category.
 
 
 <a id="help-style-1"></a>
-## -help-style
+### -help-style
 
 **-help-style &lt;[help-style](#help-style)&gt;**
 
@@ -106,7 +106,7 @@ Help formatting style
 
 
 <a id="I"></a>
-## -I
+### -I
 
 **-I&lt;path&gt;, -I &lt;path&gt;**
 
@@ -114,7 +114,7 @@ Add a path to be used in resolving '#include' and 'import' operations.
 
 
 <a id="lang"></a>
-## -lang
+### -lang
 
 **-lang &lt;[language](#language)&gt;**
 
@@ -122,42 +122,42 @@ Set the language for the following input files.
 
 
 <a id="matrix-layout-column-major"></a>
-## -matrix-layout-column-major
+### -matrix-layout-column-major
 Set the default matrix layout to column-major. 
 
 
 <a id="matrix-layout-row-major"></a>
-## -matrix-layout-row-major
+### -matrix-layout-row-major
 Set the default matrix layout to row-major. 
 
 
 <a id="restrictive-capability-check"></a>
-## -restrictive-capability-check
+### -restrictive-capability-check
 Many capability warnings will become an error. 
 
 
 <a id="ignore-capabilities"></a>
-## -ignore-capabilities
+### -ignore-capabilities
 Do not warn or error if capabilities are violated 
 
 
 <a id="minimum-slang-optimization"></a>
-## -minimum-slang-optimization
+### -minimum-slang-optimization
 Perform minimum code optimization in Slang to favor compilation time. 
 
 
 <a id="disable-non-essential-validations"></a>
-## -disable-non-essential-validations
+### -disable-non-essential-validations
 Disable non-essential IR validations such as use of uninitialized variables. 
 
 
 <a id="disable-source-map"></a>
-## -disable-source-map
+### -disable-source-map
 Disable source mapping in the Obfuscation. 
 
 
 <a id="module-name"></a>
-## -module-name
+### -module-name
 
 **-module-name &lt;name&gt;**
 
@@ -165,7 +165,7 @@ Set the module name to use when compiling multiple .slang source files into a si
 
 
 <a id="o"></a>
-## -o
+### -o
 
 **-o &lt;path&gt;**
 
@@ -175,7 +175,7 @@ If no [-target](#target-1) or [-stage](#stage-1) is specified, one may be inferr
 
 
 <a id="profile"></a>
-## -profile
+### -profile
 
 **-profile &lt;profile&gt;\[+&lt;[capability](#capability)&gt;...\]**
 
@@ -197,7 +197,7 @@ When multiple [-target](#target-1) options are present, each [-profile](#profile
 
 
 <a id="stage-1"></a>
-## -stage
+### -stage
 
 **-stage &lt;[stage](#stage)&gt;**
 
@@ -209,7 +209,7 @@ May be omitted if entry-point function has a \[shader(...)\] attribute; otherwis
 
 
 <a id="target-1"></a>
-## -target
+### -target
 
 **-target &lt;[target](#target)&gt;**
 
@@ -217,14 +217,14 @@ Specifies the format in which code should be generated.
 
 
 <a id="v"></a>
-## -v, -version
+### -v, -version
 Display the build version. This is the contents of git describe --tags. 
 
 It is typically only set from automated builds(such as distros available on github).A user build will by default be 'unknown'. 
 
 
 <a id="warnings-as-errors"></a>
-## -warnings-as-errors
+### -warnings-as-errors
 
 **-warnings-as-errors all or -warnings-as-errors &lt;id&gt;\[,&lt;id&gt;...\]**
 
@@ -236,7 +236,7 @@ all - Treat all warnings as errors.
 
 
 <a id="warnings-disable"></a>
-## -warnings-disable
+### -warnings-disable
 
 **-warnings-disable &lt;id&gt;\[,&lt;id&gt;...\]**
 
@@ -244,7 +244,7 @@ Disable specific warning ids.
 
 
 <a id="W"></a>
-## -W
+### -W
 
 **-W&lt;id&gt;**
 
@@ -252,7 +252,7 @@ Enable a warning with the specified id.
 
 
 <a id="Wno"></a>
-## -Wno-
+### -Wno-
 
 **-Wno-&lt;id&gt;**
 
@@ -260,37 +260,37 @@ Disable warning with &lt;id&gt;
 
 
 <a id="dump-warning-diagnostics"></a>
-## -dump-warning-diagnostics
+### -dump-warning-diagnostics
 Dump to output list of warning diagnostic numeric and name ids. 
 
 
 <a id="id"></a>
-## --
+### --
 Treat the rest of the command line as input files. 
 
 
 <a id="report-downstream-time"></a>
-## -report-downstream-time
+### -report-downstream-time
 Reports the time spent in the downstream compiler. 
 
 
 <a id="report-perf-benchmark"></a>
-## -report-perf-benchmark
+### -report-perf-benchmark
 Reports compiler performance benchmark results. 
 
 
 <a id="report-checkpoint-intermediates"></a>
-## -report-checkpoint-intermediates
+### -report-checkpoint-intermediates
 Reports information about checkpoint contexts used for reverse-mode automatic differentiation. 
 
 
 <a id="skip-spirv-validation"></a>
-## -skip-spirv-validation
+### -skip-spirv-validation
 Skips spirv validation. 
 
 
 <a id="source-embed-style-1"></a>
-## -source-embed-style
+### -source-embed-style
 
 **-source-embed-style &lt;[source-embed-style](#source-embed-style)&gt;**
 
@@ -304,7 +304,7 @@ Note for C/C++ with u16/u32/u64 types it is necessary to have "#include &lt;stdi
 
 
 <a id="source-embed-name"></a>
-## -source-embed-name
+### -source-embed-name
 
 **-source-embed-name &lt;name&gt;**
 
@@ -312,7 +312,7 @@ The name used as the basis for variables output for source embedding.
 
 
 <a id="source-embed-language"></a>
-## -source-embed-language
+### -source-embed-language
 
 **-source-embed-language &lt;[language](#language)&gt;**
 
@@ -320,22 +320,22 @@ The language to be used for source embedding. Defaults to C/C++. Currently only 
 
 
 <a id="disable-short-circuit"></a>
-## -disable-short-circuit
+### -disable-short-circuit
 Disable short-circuiting for "&amp;&amp;" and "||" operations 
 
 
 <a id="unscoped-enum"></a>
-## -unscoped-enum
+### -unscoped-enum
 Treat enums types as unscoped by default. 
 
 
 <a id="preserve-params"></a>
-## -preserve-params
+### -preserve-params
 Preserve all resource parameters in the output code, even if they are not used by the shader. 
 
 
 <a id="reflection-json"></a>
-## -reflection-json
+### -reflection-json
 
 **reflection-json &lt;path&gt;**
 
@@ -344,12 +344,12 @@ Emit reflection data in JSON format to a file.
 
 
 <a id="Target"></a>
-# Target
+## Target
 
 Target code generation options 
 
 <a id="capability-1"></a>
-## -capability
+### -capability
 
 **-capability &lt;[capability](#capability)&gt;\[+&lt;[capability](#capability)&gt;...\]**
 
@@ -357,22 +357,22 @@ Add optional capabilities to a code generation target. See Capabilities below.
 
 
 <a id="default-image-format-unknown"></a>
-## -default-image-format-unknown
+### -default-image-format-unknown
 Set the format of R/W images with unspecified format to 'unknown'. Otherwise try to guess the format. 
 
 
 <a id="disable-dynamic-dispatch"></a>
-## -disable-dynamic-dispatch
+### -disable-dynamic-dispatch
 Disables generating dynamic dispatch code. 
 
 
 <a id="disable-specialization"></a>
-## -disable-specialization
+### -disable-specialization
 Disables generics and specialization pass. 
 
 
 <a id="fp-mode-1"></a>
-## -fp-mode, -floating-point-mode
+### -fp-mode, -floating-point-mode
 
 **-fp-mode &lt;[fp-mode](#fp-mode)&gt;, -floating-point-mode &lt;[fp-mode](#fp-mode)&gt;**
 
@@ -380,7 +380,7 @@ Control floating point optimizations
 
 
 <a id="g"></a>
-## -g
+### -g
 
 **-g, -g&lt;[debug-info-format](#debug-info-format)&gt;, -g&lt;[debug-level](#debug-level)&gt;**
 
@@ -394,7 +394,7 @@ It is valid to have multiple [-g](#g) options, such as a [&lt;debug-level&gt;](#
 
 
 <a id="line-directive-mode-1"></a>
-## -line-directive-mode
+### -line-directive-mode
 
 **-line-directive-mode &lt;[line-directive-mode](#line-directive-mode)&gt;**
 
@@ -404,7 +404,7 @@ If not specified, default behavior is to use C-style `#line` directives for HLSL
 
 
 <a id="O"></a>
-## -O
+### -O
 
 **-O&lt;[optimization-level](#optimization-level)&gt;**
 
@@ -412,22 +412,22 @@ Set the optimization level.
 
 
 <a id="obfuscate"></a>
-## -obfuscate
+### -obfuscate
 Remove all source file information from outputs. 
 
 
 <a id="force-glsl-scalar-layout"></a>
-## -force-glsl-scalar-layout, -fvk-use-scalar-layout
+### -force-glsl-scalar-layout, -fvk-use-scalar-layout
 Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or SPIRV. 
 
 
 <a id="fvk-use-dx-layout"></a>
-## -fvk-use-dx-layout
+### -fvk-use-dx-layout
 Pack members using FXCs member packing rules when targeting GLSL or SPIRV. 
 
 
 <a id="fvk-b-shift"></a>
-## -fvk-b-shift, -fvk-s-shift, -fvk-t-shift, -fvk-u-shift
+### -fvk-b-shift, -fvk-s-shift, -fvk-t-shift, -fvk-u-shift
 
 **-fvk-&lt;[vulkan-shift](#vulkan-shift)&gt;-shift &lt;N&gt; &lt;space&gt;**
 
@@ -441,7 +441,7 @@ For example '-fvk-b-shift &lt;N&gt; &lt;space&gt;' shifts by N the inferred bind
 
 
 <a id="fvk-bind-globals"></a>
-## -fvk-bind-globals
+### -fvk-bind-globals
 
 **-fvk-bind-globals &lt;N&gt; &lt;descriptor-set&gt;**
 
@@ -455,57 +455,57 @@ It lets you specify the descriptor for the source at a certain register.
 
 
 <a id="fvk-invert-y"></a>
-## -fvk-invert-y
+### -fvk-invert-y
 Negates (additively inverts) SV_Position.y before writing to stage output. 
 
 
 <a id="fvk-use-dx-position-w"></a>
-## -fvk-use-dx-position-w
+### -fvk-use-dx-position-w
 Reciprocates (multiplicatively inverts) SV_Position.w after reading from stage input. For use in fragment shaders only. 
 
 
 <a id="fvk-use-entrypoint-name"></a>
-## -fvk-use-entrypoint-name
+### -fvk-use-entrypoint-name
 Uses the entrypoint name from the source instead of 'main' in the spirv output. 
 
 
 <a id="fvk-use-gl-layout"></a>
-## -fvk-use-gl-layout
+### -fvk-use-gl-layout
 Use std430 layout instead of D3D buffer layout for raw buffer load/stores. 
 
 
 <a id="fspv-reflect"></a>
-## -fspv-reflect
+### -fspv-reflect
 Include reflection decorations in the resulting SPIRV for shader parameters. 
 
 
 <a id="enable-effect-annotations"></a>
-## -enable-effect-annotations
+### -enable-effect-annotations
 Enables support for legacy effect annotation syntax. 
 
 
 <a id="emit-spirv-via-glsl"></a>
-## -emit-spirv-via-glsl
+### -emit-spirv-via-glsl
 Generate SPIR-V output by compiling generated GLSL with glslang 
 
 
 <a id="emit-spirv-directly"></a>
-## -emit-spirv-directly
+### -emit-spirv-directly
 Generate SPIR-V output directly (default) 
 
 
 <a id="spirv-core-grammar"></a>
-## -spirv-core-grammar
+### -spirv-core-grammar
 A path to a specific spirv.core.grammar.json to use when generating SPIR-V output 
 
 
 <a id="incomplete-library"></a>
-## -incomplete-library
+### -incomplete-library
 Allow generating code from incomplete libraries with unresolved external functions 
 
 
 <a id="bindless-space-index"></a>
-## -bindless-space-index
+### -bindless-space-index
 
 **-bindless-space-index &lt;index&gt;**
 
@@ -514,12 +514,12 @@ Specify the space index for the system defined global bindless resource array.
 
 
 <a id="Downstream"></a>
-# Downstream
+## Downstream
 
 Downstream compiler options 
 
 <a id="none-path"></a>
-## -none-path, -fxc-path, -dxc-path, -glslang-path, -spirv-dis-path, -clang-path, -visualstudio-path, -gcc-path, -genericcpp-path, -nvrtc-path, -llvm-path, -spirv-opt-path, -metal-path, -tint-path
+### -none-path, -fxc-path, -dxc-path, -glslang-path, -spirv-dis-path, -clang-path, -visualstudio-path, -gcc-path, -genericcpp-path, -nvrtc-path, -llvm-path, -spirv-opt-path, -metal-path, -tint-path
 
 **-&lt;[compiler](#compiler)&gt;-path &lt;path&gt;**
 
@@ -529,7 +529,7 @@ Specify path to a downstream [&lt;compiler&gt;](#compiler) executable or library
 
 
 <a id="default-downstream-compiler"></a>
-## -default-downstream-compiler
+### -default-downstream-compiler
 
 **-default-downstream-compiler &lt;[language](#language)&gt; &lt;[compiler](#compiler)&gt;**
 
@@ -537,7 +537,7 @@ Set a default compiler for the given language. See [-lang](#lang) for the list o
 
 
 <a id="X"></a>
-## -X
+### -X
 
 **-X&lt;[compiler](#compiler)&gt; &lt;option&gt; -X&lt;[compiler](#compiler)&gt;... &lt;options&gt; -X.**
 
@@ -545,7 +545,7 @@ Pass arguments to downstream [&lt;compiler&gt;](#compiler). Just [-X&lt;compiler
 
 
 <a id="pass-through"></a>
-## -pass-through
+### -pass-through
 
 **-pass-through &lt;[compiler](#compiler)&gt;**
 
@@ -556,17 +556,17 @@ These are intended for debugging/testing purposes, when you want to be able to s
 
 
 <a id="Debugging"></a>
-# Debugging
+## Debugging
 
 Compiler debugging/instrumentation options 
 
 <a id="dump-ast"></a>
-## -dump-ast
+### -dump-ast
 Dump the AST to a .slang-ast file next to the input. 
 
 
 <a id="dump-intermediate-prefix"></a>
-## -dump-intermediate-prefix
+### -dump-intermediate-prefix
 
 **-dump-intermediate-prefix &lt;prefix&gt;**
 
@@ -574,78 +574,78 @@ File name prefix for [-dump-intermediates](#dump-intermediates) outputs, default
 
 
 <a id="dump-intermediates"></a>
-## -dump-intermediates
+### -dump-intermediates
 Dump intermediate outputs for debugging. 
 
 
 <a id="dump-ir"></a>
-## -dump-ir
+### -dump-ir
 Dump the IR for debugging. 
 
 
 <a id="dump-ir-ids"></a>
-## -dump-ir-ids
+### -dump-ir-ids
 Dump the IDs with [-dump-ir](#dump-ir) (debug builds only) 
 
 
 <a id="E"></a>
-## -E, -output-preprocessor
+### -E, -output-preprocessor
 Output the preprocessing result and exit. 
 
 
 <a id="no-codegen"></a>
-## -no-codegen
+### -no-codegen
 Skip the code generation step, just check the code and generate layout. 
 
 
 <a id="output-includes"></a>
-## -output-includes
+### -output-includes
 Print the hierarchy of the processed source files. 
 
 
 <a id="serial-ir"></a>
-## -serial-ir
+### -serial-ir
 Serialize the IR between front-end and back-end. 
 
 
 <a id="skip-codegen"></a>
-## -skip-codegen
+### -skip-codegen
 Skip the code generation phase. 
 
 
 <a id="validate-ir"></a>
-## -validate-ir
+### -validate-ir
 Validate the IR between the phases. 
 
 
 <a id="verbose-paths"></a>
-## -verbose-paths
+### -verbose-paths
 When displaying diagnostic output aim to display more detailed path information. In practice this is typically the complete 'canonical' path to the source file used. 
 
 
 <a id="verify-debug-serial-ir"></a>
-## -verify-debug-serial-ir
+### -verify-debug-serial-ir
 Verify IR in the front-end. 
 
 
 <a id="dump-module"></a>
-## -dump-module
+### -dump-module
 Disassemble and print the module IR. 
 
 
 
 <a id="Repro"></a>
-# Repro
+## Repro
 
 Slang repro system related 
 
 <a id="dump-repro-on-error"></a>
-## -dump-repro-on-error
+### -dump-repro-on-error
 Dump `.slang-repro` file on any compilation error. 
 
 
 <a id="extract-repro"></a>
-## -extract-repro
+### -extract-repro
 
 **-extract-repro &lt;name&gt;**
 
@@ -653,7 +653,7 @@ Extract the repro files into a folder.
 
 
 <a id="load-repro-directory"></a>
-## -load-repro-directory
+### -load-repro-directory
 
 **-load-repro-directory &lt;path&gt;**
 
@@ -661,7 +661,7 @@ Use repro along specified path
 
 
 <a id="load-repro"></a>
-## -load-repro
+### -load-repro
 
 **-load-repro &lt;name&gt;**
 
@@ -669,7 +669,7 @@ Load repro
 
 
 <a id="repro-file-system"></a>
-## -repro-file-system
+### -repro-file-system
 
 **-repro-file-system &lt;name&gt;**
 
@@ -677,14 +677,14 @@ Use a repro as a file system
 
 
 <a id="dump-repro"></a>
-## -dump-repro
+### -dump-repro
 Dump a `.slang-repro` file that can be used to reproduce a compilation on another machine. 
 
 
 
 
 <a id="repro-fallback-directory <path>"></a>
-## -repro-fallback-directory <path>
+### -repro-fallback-directory <path>
 
 **Specify a directory to use if a file isn't found in a repro. Should be specified *before* any repro usage such as `load-repro`. 
 There are two *special* directories: 
@@ -695,12 +695,12 @@ There are two *special* directories:
 
 
 <a id="Experimental"></a>
-# Experimental
+## Experimental
 
 Experimental options (use at your own risk) 
 
 <a id="file-system"></a>
-## -file-system
+### -file-system
 
 **-file-system &lt;[file-system-type](#file-system-type)&gt;**
 
@@ -708,53 +708,53 @@ Set the filesystem hook to use for a compile request.
 
 
 <a id="heterogeneous"></a>
-## -heterogeneous
+### -heterogeneous
 Output heterogeneity-related code. 
 
 
 <a id="no-mangle"></a>
-## -no-mangle
+### -no-mangle
 Do as little mangling of names as possible. 
 
 
 <a id="no-hlsl-binding"></a>
-## -no-hlsl-binding
+### -no-hlsl-binding
 Do not include explicit parameter binding semantics in the output HLSL code,except for parameters that has explicit bindings in the input source. 
 
 
 <a id="no-hlsl-pack-constant-buffer-elements"></a>
-## -no-hlsl-pack-constant-buffer-elements
+### -no-hlsl-pack-constant-buffer-elements
 Do not pack elements of constant buffers into structs in the output HLSL code. 
 
 
 <a id="validate-uniformity"></a>
-## -validate-uniformity
+### -validate-uniformity
 Perform uniformity validation analysis. 
 
 
 <a id="allow-glsl"></a>
-## -allow-glsl
+### -allow-glsl
 Enable GLSL as an input language. 
 
 
 <a id="enable-experimental-passes"></a>
-## -enable-experimental-passes
+### -enable-experimental-passes
 Enable experimental compiler passes 
 
 
 <a id="embed-downstream-ir"></a>
-## -embed-downstream-ir
+### -embed-downstream-ir
 Embed downstream IR into emitted slang IR 
 
 
 
 <a id="Internal"></a>
-# Internal
+## Internal
 
 Internal-use options (use at your own risk) 
 
 <a id="archive-type-1"></a>
-## -archive-type
+### -archive-type
 
 **-archive-type &lt;[archive-type](#archive-type)&gt;**
 
@@ -762,17 +762,17 @@ Set the archive type for [-save-core-module](#save-core-module). Default is zip.
 
 
 <a id="compile-core-module"></a>
-## -compile-core-module
+### -compile-core-module
 Compile the core module from embedded sources. Will return a failure if there is already a core module available. 
 
 
 <a id="doc"></a>
-## -doc
+### -doc
 Write documentation for [-compile-core-module](#compile-core-module) 
 
 
 <a id="ir-compression"></a>
-## -ir-compression
+### -ir-compression
 
 **-ir-compression &lt;type&gt;**
 
@@ -782,7 +782,7 @@ Accepted compression types: none, lite
 
 
 <a id="load-core-module"></a>
-## -load-core-module
+### -load-core-module
 
 **-load-core-module &lt;filename&gt;**
 
@@ -790,7 +790,7 @@ Load the core module from file.
 
 
 <a id="r"></a>
-## -r
+### -r
 
 **-r &lt;name&gt;**
 
@@ -798,7 +798,7 @@ reference module &lt;name&gt;
 
 
 <a id="save-core-module"></a>
-## -save-core-module
+### -save-core-module
 
 **-save-core-module &lt;filename&gt;**
 
@@ -806,7 +806,7 @@ Save the core module to an archive file.
 
 
 <a id="save-core-module-bin-source"></a>
-## -save-core-module-bin-source
+### -save-core-module-bin-source
 
 **-save-core-module-bin-source &lt;filename&gt;**
 
@@ -816,7 +816,7 @@ Same as [-save-core-module](#save-core-module) but output the data as a C array.
 
 
 <a id="save-glsl-module-bin-source"></a>
-## -save-glsl-module-bin-source
+### -save-glsl-module-bin-source
 
 **-save-glsl-module-bin-source &lt;filename&gt;**
 
@@ -826,34 +826,34 @@ Save the serialized glsl module as a C array.
 
 
 <a id="track-liveness"></a>
-## -track-liveness
+### -track-liveness
 Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output source to indicate value liveness. 
 
 
 <a id="loop-inversion"></a>
-## -loop-inversion
+### -loop-inversion
 Enable loop inversion in the code-gen optimization. Default is off 
 
 
 
 <a id="Deprecated"></a>
-# Deprecated
+## Deprecated
 
 Deprecated options (allowed but ignored; may be removed in future) 
 
 <a id="parameter-blocks-use-register-spaces"></a>
-## -parameter-blocks-use-register-spaces
+### -parameter-blocks-use-register-spaces
 Parameter blocks will use register spaces 
 
 
 <a id="zero-initialize"></a>
-## -zero-initialize
+### -zero-initialize
 Initialize all variables to zero.Structs will set all struct-fields without an init expression to 0.All variables will call their default constructor if not explicitly initialized as usual. 
 
 
 
 <a id="compiler"></a>
-# compiler
+## compiler
 
 Downstream Compilers (aka Pass through) 
 
@@ -873,7 +873,7 @@ Downstream Compilers (aka Pass through)
 * `tint` : Tint compiler 
 
 <a id="language"></a>
-# language
+## language
 
 Language 
 
@@ -885,7 +885,7 @@ Language
 * `cu`, `cuda` : CUDA 
 
 <a id="archive-type"></a>
-# archive-type
+## archive-type
 
 Archive Type 
 
@@ -895,7 +895,7 @@ Archive Type
 * `riff` : Slang RIFF without compression 
 
 <a id="line-directive-mode"></a>
-# line-directive-mode
+## line-directive-mode
 
 Line Directive Mode 
 
@@ -906,7 +906,7 @@ Line Directive Mode
 * `glsl` : Emit GLSL-style directives with file *number* instead of name. 
 
 <a id="debug-info-format"></a>
-# debug-info-format
+## debug-info-format
 
 Debug Info Format 
 
@@ -918,7 +918,7 @@ Debug Info Format
 * `dwarf` : DWARF debug format 
 
 <a id="fp-mode"></a>
-# fp-mode
+## fp-mode
 
 Floating Point Mode 
 
@@ -927,7 +927,7 @@ Floating Point Mode
 * `default` : Default floating point mode 
 
 <a id="help-style"></a>
-# help-style
+## help-style
 
 Help Style 
 
@@ -936,7 +936,7 @@ Help Style
 * `no-link-markdown` : Markdown without links 
 
 <a id="optimization-level"></a>
-# optimization-level
+## optimization-level
 
 Optimization Level 
 
@@ -946,7 +946,7 @@ Optimization Level
 * `3`, `maximal` : Enable further optimizations, which might have a significant impact on compile time, or involve unwanted tradeoffs in terms of code size. 
 
 <a id="debug-level"></a>
-# debug-level
+## debug-level
 
 Debug Level 
 
@@ -956,7 +956,7 @@ Debug Level
 * `3`, `maximal` : Emit as much debug information as possible for each target. 
 
 <a id="file-system-type"></a>
-# file-system-type
+## file-system-type
 
 File System Type 
 
@@ -965,7 +965,7 @@ File System Type
 * `os` : Use the OS based file system directly (without file system caching) 
 
 <a id="source-embed-style"></a>
-# source-embed-style
+## source-embed-style
 
 Source Embed Style 
 
@@ -979,7 +979,7 @@ Source Embed Style
 * `u64` : Embed as uint64_t. 
 
 <a id="target"></a>
-# target
+## target
 
 Target 
 
@@ -1015,7 +1015,7 @@ Target
 * `slangvm`, `slang-vm` : Slang VM byte code 
 
 <a id="stage"></a>
-# stage
+## stage
 
 Stage 
 
@@ -1036,7 +1036,7 @@ Stage
 * `dispatch` 
 
 <a id="vulkan-shift"></a>
-# vulkan-shift
+## vulkan-shift
 
 Vulkan Shift 
 
@@ -1046,7 +1046,7 @@ Vulkan Shift
 * `u` : Unorderd access view 
 
 <a id="capability"></a>
-# capability
+## capability
 
 A capability describes an optional feature that a target may or may not support. When a [-capability](#capability-1) is specified, the compiler may assume that the target supports that capability, and generate code accordingly. 
 
@@ -1468,7 +1468,7 @@ A capability describes an optional feature that a target may or may not support.
 * `all` 
 
 <a id="file-extension"></a>
-# file-extension
+## file-extension
 
 A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) may be inferred from the extension of an input or [-o](#o) path 
 
