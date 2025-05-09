@@ -330,7 +330,10 @@ TypeTag SemanticsVisitor::getTypeTags(Type* type)
                 sized = true;
             }
         }
-        else if (as<SpecializationConstantIntVal>(arrayType->getElementCount()))
+        else if (as<FuncCallIntVal>(arrayType->getElementCount()) ||
+                 as<PolynomialIntVal>(arrayType->getElementCount()) ||
+                 as<GenericParamIntVal>(arrayType->getElementCount()) ||
+                 as<TypeCastIntVal>(arrayType->getElementCount()))
         {
             sized = true;
             typeTag = (TypeTag)((int)typeTag | (int)TypeTag::SpecializationConstantSized);

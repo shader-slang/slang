@@ -781,7 +781,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         opCode = _arithmeticOpCodeConvert(irOpCode, basicType);
         if (opCode == SpvOpUndef)
         {
-            switch (irOpCode)
+            switch(irOpCode)
             {
             case kIROp_IntCast:
                 {
@@ -796,8 +796,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     }
                     break;
                 }
-            default:
-                break;
+            default: break;
             }
             return opCode;
         }

@@ -1611,12 +1611,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             getBuilder()->emitLookupInterfaceMethodInst(type, witnessVal.val, key));
     }
 
-    LoweredValInfo visitSpecializationConstantIntVal(SpecializationConstantIntVal* val)
-    {
-        auto specConstVal = val->getValue();
-        return lowerVal(context, specConstVal);
-    }
-
     LoweredValInfo visitPolynomialIntVal(PolynomialIntVal* val)
     {
         auto irBuilder = getBuilder();
@@ -2066,25 +2060,26 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         {
             IRInst* elementCount = nullptr;
             auto sizeVal = type->getElementCount();
-            auto typeCastIntVal = as<TypeCastIntVal>(sizeVal);
-            if ((typeCastIntVal && as<SpecializationConstantIntVal>(typeCastIntVal->getBase())) ||
-                as<SpecializationConstantIntVal>(sizeVal))
+            if (!as<ConstantIntVal>(sizeVal) && !as<GenericParamIntVal>(sizeVal))
             {
+                // We will always insert the specialization constant size into global scope.
                 auto sharedContext = context->shared;
-                if (!sharedContext->mapSpecConstValToIRInst.tryGetValue(sizeVal, elementCount))
+                if (!sharedContext->mapSpecConstValToIRInst.tryGetValue(
+                        sizeVal,
+                        elementCount))
                 {
                     IRBuilderInsertLocScope insertScope(getBuilder());
                     getBuilder()->setInsertInto(getBuilder()->getModule());
                     auto irInitVal = lowerSimpleVal(context, sizeVal);
                     elementCount =
-                        getBuilder()->emitGlobalConstant(irInitVal->getDataType(), irInitVal);
+                         getBuilder()->emitGlobalConstant(irInitVal->getDataType(), irInitVal);
                     sharedContext->mapSpecConstValToIRInst.add(sizeVal, elementCount);
                     getBuilder()->addDecoration(
                         elementCount,
                         kIROp_SpecializationConstantOpDecoration);
                 }
             }
-            if (!elementCount)
+            else
             {
                 elementCount = lowerSimpleVal(context, type->getElementCount());
             }

@@ -1745,7 +1745,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     IntVal* argVals[kMaxArgs];
     IntegerLiteralValue constArgVals[kMaxArgs];
     bool allConst = true;
-    bool isSpecConst = false;
     for (Index a = 0; a < argCount; ++a)
     {
         auto argExpr = getArg(invokeExpr, a);
@@ -1761,9 +1760,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         }
         else
         {
-            if (as<SpecializationConstantIntVal>(argVal))
-                isSpecConst = true;
-
             allConst = false;
         }
     }
@@ -1789,35 +1785,34 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
         auto opName = funcDeclRef.getName();
 
-        IntVal* result = nullptr;
         // handle binary operators
         if (opName == getName("-"))
         {
             if (argCount == 1)
             {
-                result = PolynomialIntVal::neg(m_astBuilder, argVals[0]);
+                return PolynomialIntVal::neg(m_astBuilder, argVals[0]);
             }
             else if (argCount == 2)
             {
-                result = PolynomialIntVal::sub(m_astBuilder, argVals[0], argVals[1]);
+                return PolynomialIntVal::sub(m_astBuilder, argVals[0], argVals[1]);
             }
         }
         else if (opName == getName("+"))
         {
             if (argCount == 1)
             {
-                result = argVals[0];
+                return argVals[0];
             }
             else if (argCount == 2)
             {
-                result = PolynomialIntVal::add(m_astBuilder, argVals[0], argVals[1]);
+                return PolynomialIntVal::add(m_astBuilder, argVals[0], argVals[1]);
             }
         }
         else if (opName == getName("*"))
         {
             if (argCount == 2)
             {
-                result = PolynomialIntVal::mul(m_astBuilder, argVals[0], argVals[1]);
+                return PolynomialIntVal::mul(m_astBuilder, argVals[0], argVals[1]);
             }
         }
         else if (
@@ -1828,26 +1823,17 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             opName == getName("^") || opName == getName("~") || opName == getName("%") ||
             opName == getName("?:") || opName == getName("<<") || opName == getName(">>"))
         {
-            auto rs = m_astBuilder->getOrCreate<FuncCallIntVal>(
+            auto result = m_astBuilder->getOrCreate<FuncCallIntVal>(
                 invokeExpr.getExpr()->type.type,
                 funcDeclRef,
                 as<Type>(funcDeclRefExpr.getExpr()->type->substitute(
                     m_astBuilder,
                     funcDeclRefExpr.getSubsts())),
                 makeArrayView(argVals, argCount));
-            SLANG_RELEASE_ASSERT(rs->getFuncType());
-            result = rs;
+            SLANG_RELEASE_ASSERT(result->getFuncType());
+            return result;
         }
-
-        // We wrap a SpecializationConstantIntVal on top of result to differentiate it from link
-        // time constant such as generic parameter.
-        if (isSpecConst && result)
-        {
-            return m_astBuilder->getOrCreate<SpecializationConstantIntVal>(
-                result->getType(),
-                result);
-        }
-        return result;
+        return nullptr;
     }
 
     // At this point, all the operands had simple integer values, so we are golden.
@@ -1987,13 +1973,12 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
     // The values of specialization constants aren't known at compile time even
     // if they're marked `const`.
     if ((decl->hasModifier<SpecializationConstantAttribute>() ||
-         decl->hasModifier<VkConstantIdAttribute>()) &&
+        decl->hasModifier<VkConstantIdAttribute>()) &&
         kind == ConstantFoldingKind::SpecializationConstant)
     {
-        auto val = m_astBuilder->getOrCreate<GenericParamIntVal>(
+        return m_astBuilder->getOrCreate<GenericParamIntVal>(
             declRef.substitute(m_astBuilder, declRef.getDecl()->getType()),
             declRef);
-        return m_astBuilder->getOrCreate<SpecializationConstantIntVal>(val->getType(), val);
     }
 
     if (decl->hasModifier<ExternModifier>())
@@ -2416,6 +2401,17 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                     return CreateErrorExpr(subscriptExpr);
                 }
             }
+            // if (auto specConstElementCount = as<FuncCallIntVal>(elementCount))
+            // {
+            //     // We need to check if the specialization constant has valid specConst expression
+            //     if (!specConstElementCount->getValue())
+            //     {
+            //         getSink()->diagnose(
+            //             subscriptExpr->indexExprs[0],
+            //             Diagnostics::invalidArraySize);
+            //         return CreateErrorExpr(subscriptExpr);
+            //     }
+            // }
         }
         else if (subscriptExpr->indexExprs.getCount() != 0)
         {

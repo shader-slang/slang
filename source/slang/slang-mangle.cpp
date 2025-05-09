@@ -343,10 +343,6 @@ void emitVal(ManglingContext* context, Val* val)
         emitRaw(context, "k");
         emit(context, (UInt)constantIntVal->getValue());
     }
-    else if (auto specConstIntVal = dynamicCast<SpecializationConstantIntVal>(val))
-    {
-        emitVal(context, specConstIntVal->getValue());
-    }
     else if (auto funcCallIntVal = dynamicCast<FuncCallIntVal>(val))
     {
         emitRaw(context, "KC");
