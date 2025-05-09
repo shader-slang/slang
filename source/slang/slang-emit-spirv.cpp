@@ -500,6 +500,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     HashSet<SpvId> m_decoratedSpvInsts;
 
     SpvAddressingModel m_addressingMode = SpvAddressingModelLogical;
+    SpvMemoryModel m_memoryModel = SpvMemoryModelGLSL450;
 
     // We will store the logical sections of the SPIR-V module
     // in a single array so that we can easily look up a
@@ -1366,7 +1367,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             getSection(SpvLogicalSectionID::MemoryModel),
             nullptr,
             m_addressingMode,
-            SpvMemoryModelGLSL450);
+            m_memoryModel);
     }
 
     IRInst* m_defaultDebugSource = nullptr;
@@ -1685,6 +1686,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         case kIROp_CoopMatrixType:
             {
+                m_memoryModel = SpvMemoryModelVulkanKHR;
+                requireSPIRVCapability(SpvCapabilityVulkanMemoryModel);
+
                 requireSPIRVCapability(SpvCapabilityCooperativeMatrixKHR);
                 ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_cooperative_matrix"));
 

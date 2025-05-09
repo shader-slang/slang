@@ -14,7 +14,7 @@ ByteAddressBuffer input2;
 //TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-typealias CoopMatType = CoopMat<float, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
+typealias CoopMatType = CoopMat<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
 
 [numthreads(32, 1, 1)]
 void computeMain(uint3 threadIndex : SV_DispatchThreadID)
@@ -22,8 +22,8 @@ void computeMain(uint3 threadIndex : SV_DispatchThreadID)
     let stride = 4;
     let matrixLayout = CoopMatMatrixLayout::RowMajor;
 
-    let mat1 = CoopMatType.load(input1, 0, stride, matrixLayout);
-    let mat2 = CoopMatType.load(input2, 0, stride, matrixLayout);
+    let mat1 = CoopMatType.Load<CoopMatMatrixLayout::RowMajor>(input1, 0, stride);
+    let mat2 = CoopMatType.Load<CoopMatMatrixLayout::RowMajor>(input2, 0, stride);
 
     uint32_t equals = mat1 == mat2 ? 1 : 0;
     uint32_t lessThan = mat1 < mat2 ? 1 : 0;
