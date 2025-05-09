@@ -175,7 +175,7 @@ function(set_default_compile_options target)
             ON
             # C++ standard
             CXX_STANDARD
-            17
+            20
             # pic
             POSITION_INDEPENDENT_CODE
             ON
