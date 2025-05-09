@@ -7811,6 +7811,37 @@ IROp getIntTypeOpFromInfo(const IntInfo info)
     }
 }
 
+IROp getOppositeSignIntTypeOp(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_UInt8Type:
+        return kIROp_Int8Type;
+    case kIROp_UInt16Type:
+        return kIROp_Int16Type;
+    case kIROp_UIntType:
+        return kIROp_IntType;
+    case kIROp_UInt64Type:
+        return kIROp_Int64Type;
+    case kIROp_UIntPtrType:
+        return kIROp_IntPtrType;
+
+    case kIROp_Int8Type:
+        return kIROp_UInt8Type;
+    case kIROp_Int16Type:
+        return kIROp_UInt16Type;
+    case kIROp_IntType:
+        return kIROp_UIntType;
+    case kIROp_Int64Type:
+        return kIROp_UInt64Type;
+    case kIROp_IntPtrType:
+        return kIROp_UIntPtrType;
+
+    default:
+        SLANG_UNEXPECTED("Unhandled type passed to getOppositeSignIntTypeOp");
+    }
+}
+
 FloatInfo getFloatingTypeInfo(const IRType* floatType)
 {
     switch (floatType->getOp())
