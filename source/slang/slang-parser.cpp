@@ -217,7 +217,7 @@ public:
     ReturnStmt* ParseReturnStatement();
     DeferStmt* ParseDeferStatement();
     ThrowStmt* ParseThrowStatement();
-    CatchStmt* ParseCatchStatement(Stmt* parseBody);
+    CatchStmt* ParseCatchStatement(Stmt* parseBody, ContainerDecl* parentDecl);
     ExpressionStmt* ParseExpressionStatement();
     Expr* ParseExpression(Precedence level = Precedence::Comma);
 
@@ -5940,6 +5940,7 @@ Stmt* Parser::parseBlockStatement()
         return emptyStmt;
     }
 
+    ContainerDecl* catchParentDecl = currentScope->containerDecl;
     ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
     BlockStmt* blockStatement = astBuilder->create<BlockStmt>();
     blockStatement->scopeDecl = scopeDecl;
@@ -6010,9 +6011,7 @@ Stmt* Parser::parseBlockStatement()
         {
             // Move preceding instructions in block inside the catch statement,
             // then replace the current contents with the catch statement.
-            PopScope();
-
-            auto catchStmt = ParseCatchStatement(body);
+            auto catchStmt = ParseCatchStatement(body, catchParentDecl);
             body = nullptr;
             catchSegment = true;
             if (catchStmt)
@@ -6348,10 +6347,14 @@ ThrowStmt* Parser::ParseThrowStatement()
     return throwStatement;
 }
 
-CatchStmt* Parser::ParseCatchStatement(Stmt* tryBody)
+CatchStmt* Parser::ParseCatchStatement(Stmt* tryBody, ContainerDecl* parentDecl)
 {
     ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
-    pushScopeAndSetParent(scopeDecl);
+    // The scope of the catch block is a bit odd, it's not the same as the block
+    // it's in but the one above it. That's because `try` may cause jumps over
+    // variables declared in the direct parent.
+    scopeDecl->parentDecl = parentDecl;
+    PushScope(scopeDecl);
 
     CatchStmt* catchStatement = astBuilder->create<CatchStmt>();
     FillPosition(catchStatement);

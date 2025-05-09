@@ -57,6 +57,8 @@ struct DeferLoweringContext : InstPassBase
         // Clone blocks first
         for (auto block : deferBlocks)
         {
+            SLANG_ASSERT(block->getTerminator());
+
             auto clonedBlock = builder->createBlock();
             builder->addInst(clonedBlock);
             env.mapOldValToNew[block] = clonedBlock;
@@ -158,15 +160,15 @@ struct DeferLoweringContext : InstPassBase
             // parentBlock and not dominated by mergeBlock.
             auto deferDominatedBlocks = dom->getProperlyDominatedBlocks(firstDeferBlock);
             List<IRBlock*> deferBlocks;
-            deferBlocks.add(firstDeferBlock);
             for (IRBlock* block : deferDominatedBlocks)
             {
                 if (!dom->properlyDominates(mergeBlock, block) && block != mergeBlock)
                     deferBlocks.add(block);
             }
+            deferBlocks.add(firstDeferBlock);
+            deferBlocks.reverse();
 
             auto dominatedBlocks = dom->getProperlyDominatedBlocks(mergeBlock);
-
 
             HashSet<IRBlock*> scopeSuccessorBlocksSet = findSuccessorBlocks(func, scopeEndBlock);
             HashSet<IRBlock*> scopeBlocksSet;

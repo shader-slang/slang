@@ -6719,44 +6719,43 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // This approach allows for it to generate valid SPIR-V. Just jumping
         // around with unstructured conditional jumps doesn't work there.
 
-        IRBlock* handleBlock = createBlock();
-        IRBlock* mergeBlock = createBlock();
-        IRBlock* endBlock = createBlock();
+        IRBlock* loopHead = createBlock();
+        IRBlock* breakLabel = createBlock();
+        IRBlock* continueLabel = createBlock();
 
         CatchHandler catchHandler;
         catchHandler.errorType = lowerType(context, stmt->errorVar->getType());
-        catchHandler.errorHandler = handleBlock;
-        catchHandler.mergeBlock = mergeBlock;
+        catchHandler.errorHandler = continueLabel;
+        catchHandler.mergeBlock = breakLabel;
         catchHandler.prev = context->catchHandler;
         context->catchHandler = &catchHandler;
 
-        auto loopHead = createBlock();
-        builder->emitLoop(loopHead, mergeBlock, endBlock);
+        builder->emitLoop(loopHead, breakLabel, continueLabel);
         insertBlock(loopHead);
 
         // Note that the tryBody doesn't actually have to have it's own scope or
         // block. If there's a `defer` in the tryBody, it can run after the
         // catch statement.
         lowerStmt(context, stmt->tryBody);
-        emitBranchIfNeeded(endBlock);
 
-        insertBlock(endBlock);
-        emitBranchIfNeeded(mergeBlock);
+        // Put break; at the end of the body if there's nothing else there yet.
+        // This prevents the catch handler from running.
+        emitBranchIfNeeded(breakLabel);
 
         context->catchHandler = catchHandler.prev;
 
-        insertBlock(handleBlock);
+        insertBlock(continueLabel);
 
+        // The catch handler is hidden in the continue label.
         auto irParam = builder->emitParam(catchHandler.errorType);
         auto paramVal = LoweredValInfo::simple(irParam);
         context->setGlobalValue(stmt->errorVar, paramVal);
 
-        IRBlock* prevScopeEndBlock = pushScopeBlock(mergeBlock);
+        IRBlock* prevScopeEndBlock = pushScopeBlock(breakLabel);
         lowerStmt(context, stmt->handleBody);
         popScopeBlock(prevScopeEndBlock, true);
 
-        emitBranchIfNeeded(mergeBlock);
-        insertBlock(mergeBlock);
+        insertBlock(breakLabel);
     }
 
     void visitDiscardStmt(DiscardStmt* stmt)

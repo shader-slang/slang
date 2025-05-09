@@ -59,6 +59,7 @@ struct ErrorHandlingLoweringContext
         funcType->removeAndDeallocate();
     }
 
+    /*
     void cloneHandlerBlock(
         IRBuilder* builder,
         IRDominatorTree* dom,
@@ -105,6 +106,7 @@ struct ErrorHandlingLoweringContext
         errorParam->replaceUsesWith(errVal);
         errorParam->removeAndDeallocate();
     }
+    */
 
     void processTryCall(IRTryCall* tryCall)
     {
@@ -143,13 +145,11 @@ struct ErrorHandlingLoweringContext
 
         auto successBlock = tryCall->getSuccessBlock();
         auto failBlock = tryCall->getFailureBlock();
-        auto mergeBlock = tryCall->getMergeBlock();
+        //auto mergeBlock = tryCall->getMergeBlock();
 
         auto parentFunc = cast<IRFunc>(successBlock->getParent());
         SLANG_ASSERT(parentFunc);
-        auto dom = module->findOrCreateDominatorTree(parentFunc);
-
-        auto handlerBlock = builder.createBlock();
+        //auto dom = module->findOrCreateDominatorTree(parentFunc);
 
         builder.setInsertBefore(tryCall);
 
@@ -163,12 +163,21 @@ struct ErrorHandlingLoweringContext
         tryCall->transferDecorationsTo(call);
 
         auto isError = builder.emitIsResultError(call);
-
-        auto branch = builder.emitIfElse(isError, handlerBlock, successBlock, successBlock);
+        auto catchBlock = builder.createBlock();
+        auto branch = builder.emitIfElse(isError, catchBlock, successBlock, successBlock);
 
         // Replace the params in failBlock to `getResultError(call)`.
         builder.setInsertAfter(branch->getParent());
-        cloneHandlerBlock(&builder, dom, failBlock, mergeBlock, handlerBlock, call);
+        builder.addInst(catchBlock);
+        builder.setInsertInto(catchBlock);
+
+        auto errorValue = builder.emitGetResultError(call);
+        builder.emitBranch(failBlock, 1, &errorValue);
+
+        //auto errorParam = failBlock->getFirstParam();
+        //errorParam->replaceUsesWith(errorValue);
+        //errorParam->removeAndDeallocate();
+        //cloneHandlerBlock(&builder, dom, failBlock, mergeBlock, handlerBlock, call);
 
         // Replace the params in successBlock to `getResultValue(call)`.
         builder.setInsertBefore(successBlock->getFirstOrdinaryInst());
@@ -181,7 +190,7 @@ struct ErrorHandlingLoweringContext
 
         // Some blocks got removed and added, so mark analysis of the
         // function with defer as outdated.
-        module->invalidateAnalysisForInst(parentFunc);
+        //module->invalidateAnalysisForInst(parentFunc);
     }
 
     void processReturn(IRReturn* ret)
@@ -280,6 +289,7 @@ struct ErrorHandlingLoweringContext
             processFuncType(funcType);
         }
 
+        /*
         // Remove all catch blocks, their contents were already duplicated
         // before, so they're just dead code now.
         for (IRBlock* catchBlock : catchBlocks)
@@ -291,6 +301,7 @@ struct ErrorHandlingLoweringContext
 
             module->invalidateAnalysisForInst(parentFunc);
         }
+        */
     }
 };
 
