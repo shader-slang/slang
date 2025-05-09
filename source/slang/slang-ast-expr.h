@@ -139,6 +139,12 @@ class StringLiteralExpr : public LiteralExpr
     FIDDLE() String value;
 };
 
+FIDDLE()
+class MakeArrayFromElementExpr : public Expr
+{
+    FIDDLE(...)
+};
+
 // An initializer list, e.g. `{ 1, 2, 3 }`
 FIDDLE()
 class InitializerListExpr : public Expr
