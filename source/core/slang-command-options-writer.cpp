@@ -157,7 +157,7 @@ void MarkdownCommandOptionsWriter::_appendQuickLinks()
     const auto& categories = m_commandOptions->getCategories();
     const auto count = categories.getCount();
 
-    m_builder << "## Quick Links\n\n";
+    m_builder << "### Quick Links\n\n";
 
     for (Index categoryIndex = 0; categoryIndex < count; ++categoryIndex)
     {
@@ -317,7 +317,7 @@ void MarkdownCommandOptionsWriter::_appendDescriptionForCategory(Index categoryI
                       << "\"></a>\n";
         }
 
-        m_builder << "# " << category.name << "\n\n";
+        m_builder << "## " << category.name << "\n\n";
 
         // If there is a description output, making \n split paragraphs
         if (category.description.getLength() > 0)
@@ -351,7 +351,7 @@ void MarkdownCommandOptionsWriter::_appendDescriptionForCategory(Index categoryI
                               << "\"></a>\n";
                 }
 
-                m_builder << "## ";
+                m_builder << "### ";
                 StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), m_builder);
                 m_builder << "\n";
 
