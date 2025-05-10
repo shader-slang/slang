@@ -6817,8 +6817,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             auto constVal = as<ConstantIntVal>(caseStmt->exprVal);
             SLANG_ASSERT(constVal);
             auto caseType = lowerType(context, constVal->getType());
-            auto caseValInfo = LoweredValInfo::simple(
-                    getBuilder()->getIntValue(caseType, constVal->getValue()));
+            auto caseValInfo =
+                LoweredValInfo::simple(getBuilder()->getIntValue(caseType, constVal->getValue()));
             auto caseVal = getSimpleVal(context, caseValInfo);
 
             // Figure out where we are branching to.
