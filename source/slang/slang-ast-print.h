@@ -28,6 +28,8 @@ public:
             /// type name defined on an extension when
             /// printing the target type of an extension decl.
             NoSpecializedExtensionTypeName = 0x10,
+            // Output `= blah` when function type parameters have a default value
+            DefaultParamValues = 0x20,
         };
     };
 
@@ -125,6 +127,8 @@ public:
 
     /// Add a type
     void addType(Type* type);
+    /// Add an expr
+    void addExpr(Expr* type);
     /// Add a value
     void addVal(Val* val);
 

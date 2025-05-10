@@ -203,6 +203,26 @@ advanced_option(
     "Build using user defined path for glslang"
     OFF
 )
+advanced_option(
+    SLANG_OVERRIDE_GLM_PATH
+    "Build using user defined path for glm"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_IMGUI_PATH
+    "Build using user defined path for imgui"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_SLANG_RHI_PATH
+    "Build using user defined path for slang-rhi"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_TINYOBJLOADER_PATH
+    "Build using user defined path for tinyobjloader"
+    OFF
+)
 
 advanced_option(
     SLANG_EXCLUDE_DAWN

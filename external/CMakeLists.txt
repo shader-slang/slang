@@ -157,11 +157,19 @@ endif()
 
 # imgui
 add_library(imgui INTERFACE)
-target_include_directories(
-    imgui
-    ${system}
-    INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui"
-)
+if(NOT SLANG_OVERRIDE_IMGUI_PATH)
+    target_include_directories(
+        imgui
+        ${system}
+        INTERFACE "${CMAKE_CURRENT_LIST_DIR}/imgui"
+    )
+else()
+    target_include_directories(
+        imgui
+        ${system}
+        INTERFACE "${SLANG_OVERRIDE_IMGUI_PATH}"
+    )
+endif()
 
 # stb
 add_library(stb INTERFACE)
@@ -196,7 +204,16 @@ if(SLANG_ENABLE_SLANG_RHI)
         set(SLANG_RHI_ENABLE_D3D11 OFF)
         set(SLANG_RHI_ENABLE_D3D12 OFF)
     endif()
-    add_subdirectory(slang-rhi)
+    if(NOT SLANG_OVERRIDE_SLANG_RHI_PATH)
+        add_subdirectory(slang-rhi)
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_SLANG_RHI_PATH}
+            slang-rhi
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
 endif()
 
 # Tidy things up:
