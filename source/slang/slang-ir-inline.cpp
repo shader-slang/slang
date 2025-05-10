@@ -890,32 +890,40 @@ struct InliningPassBase
                 IRBlock* clonedBlock = as<IRBlock>(env->mapOldValToNew.getValue(calleeBlock));
                 setInsertBeforeOrdinaryInst(builder, clonedBlock->getFirstOrdinaryInst());
                 builder->emitDebugScope(calleeDebugFunc, newDebugInlinedAt);
+
+                List<IRInst*> debugNoScopeToRemove;
+                List<IRDebugInlinedAt*> debugInlinedAtToProcess;
                 for (auto inst : clonedBlock->getChildren())
                 {
                     if (as<IRDebugNoScope>(inst))
                     {
-                        builder->setInsertAfter(inst);
-                        builder->emitDebugScope(calleeDebugFunc, newDebugInlinedAt);
-                        inst->removeAndDeallocate();
+                        debugNoScopeToRemove.add(inst);
                     }
-                }
-                for (auto inst : clonedBlock->getChildren())
-                {
                     if (auto inlinedAt = as<IRDebugInlinedAt>(inst))
                     {
                         if (!inlinedAt->isOuterInlinedPresent())
                         {
-                            builder->setInsertAfter(inst);
-                            auto newInlinedAt = builder->emitDebugInlinedAt(
-                                inlinedAt->getLine(),
-                                inlinedAt->getCol(),
-                                inlinedAt->getFile(),
-                                inlinedAt->getDebugFunc(),
-                                newDebugInlinedAt);
-                            inlinedAt->replaceUsesWith(newInlinedAt);
-                            inlinedAt->removeAndDeallocate();
+                            debugInlinedAtToProcess.add(inlinedAt);
                         }
                     }
+                }
+                for (auto inst : debugNoScopeToRemove)
+                {
+                    builder->setInsertAfter(inst);
+                    builder->emitDebugScope(calleeDebugFunc, newDebugInlinedAt);
+                    inst->removeAndDeallocate();
+                }
+                for (auto inlinedAt : debugInlinedAtToProcess)
+                {
+                    builder->setInsertAfter(inlinedAt);
+                    auto newInlinedAt = builder->emitDebugInlinedAt(
+                        inlinedAt->getLine(),
+                        inlinedAt->getCol(),
+                        inlinedAt->getFile(),
+                        inlinedAt->getDebugFunc(),
+                        newDebugInlinedAt);
+                    inlinedAt->replaceUsesWith(newInlinedAt);
+                    inlinedAt->removeAndDeallocate();
                 }
             }
         }

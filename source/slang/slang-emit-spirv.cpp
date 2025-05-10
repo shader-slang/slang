@@ -3016,6 +3016,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             auto spvBlock = emitOpLabel(spvFunc, irBlock);
             if (irBlock == irFunc->getFirstBlock())
             {
+                // This emit has to be the first because spirv requires DebugFunctionDefinition 
+                // must appear before anything else in the first block.
+                IRDebugFunction* irDebugFunc = nullptr;
+                if (auto debugFuncDecor = irFunc->findDecoration<IRDebugFuncDecoration>())
+                {
+                    irDebugFunc = as<IRDebugFunction>(debugFuncDecor->getDebugFunc());
+                }
+                funcDebugScope = emitDebugFunction(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    spvBlock,
+                    spvFunc,
+                    irDebugFunc,
+                    irFunc->getDataType());
                 // OpVariable and OpDebugVariable
                 // All variables used in the function must be declared before anything else.
                 for (auto block : irFunc->getBlocks())
@@ -3036,18 +3049,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         }
                     }
                 }
-                // DebugInfo.
-                IRDebugFunction* irDebugFunc = nullptr;
-                if (auto debugFuncDecor = irFunc->findDecoration<IRDebugFuncDecoration>())
-                {
-                    irDebugFunc = as<IRDebugFunction>(debugFuncDecor->getDebugFunc());
-                }
-                funcDebugScope = emitDebugFunction(
-                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                    spvBlock,
-                    spvFunc,
-                    irDebugFunc,
-                    irFunc->getDataType());
             }
             if (funcDebugScope)
             {
