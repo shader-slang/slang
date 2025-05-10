@@ -806,7 +806,7 @@ void main()
 }
 
 ```
-See  [if-let syntax](convenience-features.html#if_let-syntax) for more details.
+See  [if-let syntax](03-convenience-features.html#if_let-syntax) for more details.
 
 
 Generic Interfaces
