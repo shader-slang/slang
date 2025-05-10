@@ -6814,20 +6814,11 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             subBuilder.setInsertInto(info->initialBlock);
             subContext.irBuilder = &subBuilder;
 
-            auto caseValInfo = lowerRValueExpr(&subContext, caseStmt->expr);
-            if (caseValInfo.flavor != LoweredValInfo::Flavor::Simple)
-            {
-                // This expression would emit instructions other than a direct
-                // value, which we don't support yet here. If there was a
-                // constant value found during checking, we can use that value
-                // instead.
-                auto constVal = as<ConstantIntVal>(caseStmt->exprVal);
-                SLANG_ASSERT(constVal);
-                auto caseType = lowerType(context, constVal->getType());
-                caseValInfo = LoweredValInfo::simple(
+            auto constVal = as<ConstantIntVal>(caseStmt->exprVal);
+            SLANG_ASSERT(constVal);
+            auto caseType = lowerType(context, constVal->getType());
+            auto caseValInfo = LoweredValInfo::simple(
                     getBuilder()->getIntValue(caseType, constVal->getValue()));
-            }
-
             auto caseVal = getSimpleVal(context, caseValInfo);
 
             // Figure out where we are branching to.
