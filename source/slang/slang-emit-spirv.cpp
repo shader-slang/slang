@@ -6599,11 +6599,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
         const auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
         const auto toType = getVectorOrCoopMatrixElementType(toTypeV);
+        IRBuilder builder(inst);
 
         if (as<IRBoolType>(fromType))
         {
             // Cast from bool to int.
-            IRBuilder builder(inst);
             builder.setInsertBefore(inst);
             auto zero = builder.getIntValue(toType, 0);
             auto one = builder.getIntValue(toType, 1);
@@ -6635,7 +6635,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         else if (as<IRBoolType>(toType))
         {
             // Cast from int to bool.
-            IRBuilder builder(inst);
             builder.setInsertBefore(inst);
             auto zero = builder.getIntValue(fromType, 0);
             if (auto vecType = as<IRVectorType>(toTypeV))
@@ -6667,20 +6666,35 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         const auto toInfo = getIntTypeInfo(toType);
 
         if (fromInfo == toInfo)
+        {
+            // Same exact integer types, copy the object.
             return emitOpCopyObject(parent, inst, toTypeV, inst->getOperand(0));
+        }
         else if (fromInfo.width == toInfo.width)
+        {
+            // Same bit width, perform bit cast.
             return emitOpBitcast(parent, inst, toTypeV, inst->getOperand(0));
+        }
         else if (!fromInfo.isSigned && !toInfo.isSigned)
-            // unsigned to unsigned, don't sign extend
+        {
+            // Unsigned to unsigned, don't sign extend.
             return emitOpUConvert(parent, inst, toTypeV, inst->getOperand(0));
-        else if (toInfo.isSigned)
-            // unsigned to signed, sign extend
-            return emitOpSConvert(parent, inst, toTypeV, inst->getOperand(0));
+        }
+        else if (!fromInfo.isSigned && toInfo.isSigned)
+        {
+            // Unsigned to signed with different widths, don't sign extend.
+            // Perform unsigned conversion first to an unsigned integer of the same width as the
+            // result then perform bit cast to the signed result type. This is done because SPIRV's
+            // unsigned conversion (`OpUConvert`) requires result type to be unsigned.
+            auto unsignedV = emitOpUConvert(
+                parent,
+                nullptr,
+                builder.getType(getOppositeSignIntTypeOp(toType->getOp())),
+                inst->getOperand(0));
+            return emitOpBitcast(parent, inst, toTypeV, unsignedV);
+        }
         else if (fromInfo.isSigned)
-            // signed to unsigned, sign extend
-            return emitOpSConvert(parent, inst, toTypeV, inst->getOperand(0));
-        else if (fromInfo.isSigned && toInfo.isSigned)
-            // signed to signed, sign extend
+            // Signed to signed and signed to unsigned, sign extend.
             return emitOpSConvert(parent, inst, toTypeV, inst->getOperand(0));
 
         SLANG_UNREACHABLE(__func__);
