@@ -21,12 +21,12 @@ public:
     typedef SerialStringData::StringIndex StringIndex;
 
     // The list that contains all the subsequent modules
-    static const FourCC kDebugFourCc = SLANG_FOUR_CC('S', 'd', 'e', 'b');
+    static const FourCC::RawValue kDebugFourCc = SLANG_FOUR_CC('S', 'd', 'e', 'b');
 
-    static const FourCC kDebugStringFourCc = SLANG_FOUR_CC('S', 'd', 's', 't');
-    static const FourCC kDebugLineInfoFourCc = SLANG_FOUR_CC('S', 'd', 'l', 'n');
-    static const FourCC kDebugAdjustedLineInfoFourCc = SLANG_FOUR_CC('S', 'd', 'a', 'l');
-    static const FourCC kDebugSourceInfoFourCc = SLANG_FOUR_CC('S', 'd', 's', 'o');
+    static const FourCC::RawValue kDebugStringFourCc = SLANG_FOUR_CC('S', 'd', 's', 't');
+    static const FourCC::RawValue kDebugLineInfoFourCc = SLANG_FOUR_CC('S', 'd', 'l', 'n');
+    static const FourCC::RawValue kDebugAdjustedLineInfoFourCc = SLANG_FOUR_CC('S', 'd', 'a', 'l');
+    static const FourCC::RawValue kDebugSourceInfoFourCc = SLANG_FOUR_CC('S', 'd', 's', 'o');
 
     struct SourceRange
     {
@@ -135,8 +135,8 @@ public:
 
     bool operator==(const ThisType& rhs) const;
 
-    Result writeContainer(RiffContainer* container);
-    Result readContainer(RiffContainer::ListChunk* listChunk);
+    Result writeTo(RIFF::BuildCursor& cursor);
+    Result readFrom(RIFF::ListChunk const* chunk);
 
     List<char> m_stringTable;                   ///< String table for debug use only
     List<LineInfo> m_lineInfos;                 ///< Line information

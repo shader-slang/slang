@@ -29,14 +29,17 @@ struct ReproUtil
         kPatchVersion = 0,
     };
 
-    static const uint32_t kSlangStateFourCC =
-        SLANG_FOUR_CC('S', 'L', 'S', 'T'); ///< Holds all the slang specific chunks
-    static const RiffSemanticVersion g_semanticVersion;
+    static const FourCC::RawValue kSlangStateFileFourCC =
+        SLANG_FOUR_CC('S', 'L', 'S', 'T'); ///< Root chunk for repro state file.
+
+    static const FourCC::RawValue kSlangStateDataFourCC =
+        SLANG_FOUR_CC('d', 'a', 't', 'a'); ///< Holds the actual binary data.
+
+    static const SemanticVersion g_semanticVersion;
 
     struct Header
     {
-        RiffHeader m_chunk;                    ///< The chunk
-        RiffSemanticVersion m_semanticVersion; ///< The semantic version
+        SemanticVersion m_semanticVersion; ///< The semantic version
         StableHashCode32
             m_typeHash; ///< A hash based on the binary representation. If doesn't match then not
                         ///< binary compatible (extra check over semantic versioning)

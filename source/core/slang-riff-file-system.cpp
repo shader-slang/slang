@@ -117,14 +117,10 @@ SlangResult RiffFileSystem::saveFileBlob(const char* path, ISlangBlob* dataBlob)
 SlangResult RiffFileSystem::loadArchive(const void* archive, size_t archiveSizeInBytes)
 {
     // Load the riff
-    RiffContainer container;
+    auto rootList = RIFF::RootChunk::getFromBlob(archive, archiveSizeInBytes);
 
-    MemoryStreamBase stream(FileAccess::Read, archive, archiveSizeInBytes);
-    SLANG_RETURN_ON_FAIL(RiffUtil::read(&stream, container));
-
-    RiffContainer::ListChunk* rootList = container.getRoot();
     // Make sure it's the right type
-    if (rootList == nullptr || rootList->m_fourCC != RiffFileSystemBinary::kContainerFourCC)
+    if (rootList == nullptr || rootList->getType() != RiffFileSystemBinary::kContainerFourCC)
     {
         return SLANG_FAIL;
     }
@@ -133,10 +129,11 @@ SlangResult RiffFileSystem::loadArchive(const void* archive, size_t archiveSizeI
     _clear();
 
     // Find the header
-    const auto header = rootList->findContainedData<RiffFileSystemBinary::Header>(
-        RiffFileSystemBinary::kHeaderFourCC);
+    auto headerChunk = rootList->findDataChunk(RiffFileSystemBinary::kHeaderFourCC);
 
-    CompressionSystemType compressionType = CompressionSystemType(header->compressionSystemType);
+    const auto header = headerChunk->readPayloadAs<RiffFileSystemBinary::Header>();
+
+    CompressionSystemType compressionType = CompressionSystemType(header.compressionSystemType);
     switch (compressionType)
     {
     case CompressionSystemType::None:
@@ -162,52 +159,56 @@ SlangResult RiffFileSystem::loadArchive(const void* archive, size_t archiveSizeI
     // Read all of the contained data
 
     {
-        List<RiffContainer::DataChunk*> srcEntries;
-        rootList->findContained(RiffFileSystemBinary::kEntryFourCC, srcEntries);
-
-        for (auto chunk : srcEntries)
+        for (auto chunk : rootList->getChildren())
         {
-            auto data = chunk->getSingleData();
+            auto dataChunk = as<RIFF::DataChunk>(chunk);
+            if (!dataChunk)
+                continue;
 
-            const uint8_t* srcData = (const uint8_t*)data->getPayload();
-            const size_t dataSize = data->getSize();
+            if (dataChunk->getType() != RiffFileSystemBinary::kEntryFourCC)
+                continue;
 
-            if (dataSize < sizeof(RiffFileSystemBinary::Entry))
+            auto payloadData = (const uint8_t*)dataChunk->getPayload();
+            auto payloadSize = dataChunk->getPayloadSize();
+
+            if (payloadSize < sizeof(RiffFileSystemBinary::Entry))
             {
                 return SLANG_FAIL;
             }
 
-            auto srcEntry = (const RiffFileSystemBinary::Entry*)srcData;
-            srcData += sizeof(*srcEntry);
+            MemoryReader reader(payloadData, payloadSize);
+
+            RiffFileSystemBinary::Entry srcEntry;
+            reader.read(srcEntry);
 
             // Check if seems plausible
-            if (sizeof(RiffFileSystemBinary::Entry) + srcEntry->compressedSize +
-                    srcEntry->pathSize !=
-                dataSize)
+            if (sizeof(RiffFileSystemBinary::Entry) + srcEntry.compressedSize + srcEntry.pathSize !=
+                payloadSize)
             {
                 return SLANG_FAIL;
             }
 
             Entry dstEntry;
 
-            const char* path = (const char*)srcData;
-            srcData += srcEntry->pathSize;
+            const char* path = (const char*)reader.getRemainingData();
+            reader.skip(srcEntry.pathSize);
 
-            dstEntry.m_canonicalPath = UnownedStringSlice(path, srcEntry->pathSize - 1);
-            dstEntry.m_type = (SlangPathType)srcEntry->pathType;
-            dstEntry.m_uncompressedSizeInBytes = srcEntry->uncompressedSize;
+            dstEntry.m_canonicalPath = UnownedStringSlice(path, srcEntry.pathSize - 1);
+            dstEntry.m_type = (SlangPathType)srcEntry.pathType;
+            dstEntry.m_uncompressedSizeInBytes = srcEntry.uncompressedSize;
 
             switch (dstEntry.m_type)
             {
             case SLANG_PATH_TYPE_FILE:
                 {
-                    if (srcData + srcEntry->compressedSize != data->getPayloadEnd())
+                    if (reader.getRemainingSize() != srcEntry.compressedSize)
                     {
                         return SLANG_FAIL;
                     }
 
                     // Get the compressed data
-                    dstEntry.m_contents = RawBlob::create(srcData, srcEntry->compressedSize);
+                    dstEntry.m_contents =
+                        RawBlob::create(reader.getRemainingData(), srcEntry.compressedSize);
                     break;
                 }
             case SLANG_PATH_TYPE_DIRECTORY:
@@ -235,11 +236,9 @@ SlangResult RiffFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob** outB
     // All blobs are owned in this style
     SLANG_UNUSED(blobOwnsContent)
 
-    RiffContainer container;
-    RiffContainer::ScopeChunk scopeContainer(
-        &container,
-        RiffContainer::Chunk::Kind::List,
-        RiffFileSystemBinary::kContainerFourCC);
+    RIFF::Builder builder;
+    RIFF::BuildCursor cursor(builder);
+    SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, RiffFileSystemBinary::kContainerFourCC);
 
     {
         RiffFileSystemBinary::Header header;
@@ -247,7 +246,7 @@ SlangResult RiffFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob** outB
                                                           ? m_compressionSystem->getSystemType()
                                                           : CompressionSystemType::None;
         header.compressionSystemType = uint32_t(compressionSystemType);
-        container.addDataChunk(RiffFileSystemBinary::kHeaderFourCC, &header, sizeof(header));
+        cursor.addDataChunk(RiffFileSystemBinary::kHeaderFourCC, &header, sizeof(header));
     }
 
     for (const auto& [_, srcEntry] : m_entries)
@@ -258,10 +257,7 @@ SlangResult RiffFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob** outB
             continue;
         }
 
-        RiffContainer::ScopeChunk scopeData(
-            &container,
-            RiffContainer::Chunk::Kind::Data,
-            RiffFileSystemBinary::kEntryFourCC);
+        SLANG_SCOPED_RIFF_BUILDER_DATA_CHUNK(cursor, RiffFileSystemBinary::kEntryFourCC);
 
         RiffFileSystemBinary::Entry dstEntry;
         dstEntry.uncompressedSize = 0;
@@ -278,41 +274,33 @@ SlangResult RiffFileSystem::storeArchive(bool blobOwnsContent, ISlangBlob** outB
         }
 
         // Entry header
-        container.write(&dstEntry, sizeof(dstEntry));
+        cursor.addData(&dstEntry, sizeof(dstEntry));
 
         // Path
-        container.write(
+        cursor.addData(
             srcEntry.m_canonicalPath.getBuffer(),
             srcEntry.m_canonicalPath.getLength() + 1);
 
         // Add the contained data without copying
         if (blob)
         {
-            RiffContainer::Data* data = container.addData();
-            container.setUnowned(
-                data,
+            cursor.addUnownedData(
                 const_cast<void*>(blob->getBufferPointer()),
                 blob->getBufferSize());
         }
     }
 
-    OwnedMemoryStream stream(FileAccess::Write);
-    // We now write the RiffContainer to the stream
-    SLANG_RETURN_ON_FAIL(RiffUtil::write(container.getRoot(), true, &stream));
-
-    List<uint8_t> data;
-    stream.swapContents(data);
-
-    *outBlob = ListBlob::moveCreate(data).detach();
+    SLANG_RETURN_ON_FAIL(builder.writeToBlob(outBlob));
     return SLANG_OK;
 }
 
 /* static */ bool RiffFileSystem::isArchive(const void* data, size_t sizeInBytes)
 {
-    MemoryStreamBase stream(FileAccess::Read, data, sizeInBytes);
-    RiffListHeader header;
-    return SLANG_SUCCEEDED(RiffUtil::readHeader(&stream, header)) &&
-           header.subType == RiffFileSystemBinary::kContainerFourCC;
+    auto rootList = RIFF::RootChunk::getFromBlob(data, sizeInBytes);
+    if (!rootList)
+        return false;
+
+    return rootList->getType() == RiffFileSystemBinary::kContainerFourCC;
 }
 
 } // namespace Slang

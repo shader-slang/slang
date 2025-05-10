@@ -188,7 +188,7 @@ public:
         SLANG_OVERRIDE;
 
     /// Ctor
-    StringWriter(StringBuilder* builder, WriterFlags flags)
+    StringWriter(StringBuilder* builder, WriterFlags flags = 0)
         : Parent(flags), m_builder(builder)
     {
     }

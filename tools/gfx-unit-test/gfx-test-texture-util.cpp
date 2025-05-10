@@ -42,7 +42,7 @@ TextureAspect getTextureAspect(Format format)
     }
 }
 
-Size getTexelSize(Format format)
+gfx::Size getTexelSize(Format format)
 {
     FormatInfo info;
     GFX_CHECK_CALL_ABORT(gfxGetFormatInfo(format, &info));
@@ -285,8 +285,8 @@ List<uint8_t> removePadding(
     ISlangBlob* pixels,
     GfxCount width,
     GfxCount height,
-    Size rowPitch,
-    Size pixelSize)
+    gfx::Size rowPitch,
+    gfx::Size pixelSize)
 {
     List<uint8_t> buffer;
     buffer.setCount(height * rowPitch);

@@ -947,8 +947,7 @@ void CUDASourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
     {
         if (auto smDecoration = as<IRRequireCUDASMVersionDecoration>(decoration))
         {
-            SemanticVersion version;
-            version.setFromInteger(SemanticVersion::IntegerType(smDecoration->getCUDASMVersion()));
+            SemanticVersion version = smDecoration->getCUDASMVersion();
             m_extensionTracker->requireSMVersion(version);
         }
     }

@@ -152,6 +152,9 @@ Versions
 `hlsl_nvapi`
 > Represents HLSL NVAPI support.
 
+`hlsl_2018`
+> Represet HLSL compatibility support.
+
 `dxil_lib`
 > Represents capabilities required for DXIL Library compilation.
 

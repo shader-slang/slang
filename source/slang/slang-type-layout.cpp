@@ -4582,7 +4582,7 @@ static TypeLayoutResult _updateLayout(
     if (layoutResultPtr)
     {
         // Check the layout is the same!
-        SLANG_ASSERT(layoutResultPtr->layout.get() == result.layout);
+        SLANG_ASSERT(layoutResultPtr->layout == result.layout);
         // Update the info
         layoutResultPtr->info = result.info;
     }

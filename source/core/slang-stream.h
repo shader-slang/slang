@@ -303,6 +303,12 @@ struct StreamUtil
     /// Appends all bytes that can be read from stream into bytes
     static SlangResult readAll(Stream* stream, size_t readSize, List<Byte>& ioBytes);
 
+    /// Appends all bytes that can be read from stream into bytes
+    static SlangResult readAll(Stream* stream, List<Byte>& ioBytes)
+    {
+        return readAll(stream, 0, ioBytes);
+    }
+
     /// Read as much as can be read until a 0 sized read, or an error and append onto ioBytes
     /// Read size controls the size of each buffer read. Passing 0, will use the default read size.
     static SlangResult read(Stream* stream, size_t readSize, List<Byte>& ioBytes);

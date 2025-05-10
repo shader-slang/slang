@@ -21,7 +21,7 @@ template<typename ReadByteFunc>
 Char32 getUnicodePointFromUTF8(const ReadByteFunc& readByte)
 {
     Char32 codePoint = 0;
-    uint32_t leading = Byte(readByte());
+    uint32_t leading = uint32_t(readByte());
     uint32_t mask = 0x80;
     Index count = 0;
     while (leading & mask)
