@@ -6693,8 +6693,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 inst->getOperand(0));
             return emitOpBitcast(parent, inst, toTypeV, unsignedV);
         }
-        else if (fromInfo.isSigned && toInfo.isSigned)
-            // signed to signed, sign extend
+        else if (fromInfo.isSigned)
+            // Signed to signed and signed to unsigned, sign extend.
             return emitOpSConvert(parent, inst, toTypeV, inst->getOperand(0));
 
         SLANG_UNREACHABLE(__func__);
