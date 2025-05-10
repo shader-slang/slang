@@ -1810,6 +1810,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // Scan through the entry points and find the max version required.
         auto processInst = [&](IRInst* globalInst)
         {
+            if (globalInst->getOp() == kIROp_CoopMatrixType)
+                m_sharedContext->m_memoryModel = SpvMemoryModelVulkan;
+
             for (auto decor : globalInst->getDecorations())
             {
                 switch (decor->getOp())
@@ -1844,11 +1847,24 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             processInst(globalInst);
         }
 
+        if (targetCaps.implies(CapabilityAtom::SPV_KHR_vulkan_memory_model))
+        {
+            m_sharedContext->m_memoryModel = SpvMemoryModelVulkan;
+        }
+
         if (m_sharedContext->m_spvVersion < 0x10300)
         {
             // Direct SPIRV backend does not support generating SPIRV before 1.3,
             // we will issue an error message here.
             m_sharedContext->m_sink->diagnose(SourceLoc(), Diagnostics::spirvVersionNotSupported);
+
+            if (m_sharedContext->m_memoryModel == SpvMemoryModelVulkan)
+            {
+                m_sharedContext->m_memoryModel = SpvMemoryModelGLSL450;
+                m_sharedContext->m_sink->diagnose(
+                    SourceLoc(),
+                    Diagnostics::spirvMemoryModelNotSupported);
+            }
         }
     }
 

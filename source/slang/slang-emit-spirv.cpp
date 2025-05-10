@@ -1507,7 +1507,94 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             getSection(SpvLogicalSectionID::MemoryModel),
             nullptr,
             m_addressingMode,
-            SpvMemoryModelGLSL450);
+            m_memoryModel);
+
+        if (m_memoryModel == SpvMemoryModelVulkan)
+        {
+            requireSPIRVCapability(SpvCapabilityVulkanMemoryModel);
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_vulkan_memory_model"));
+
+            auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
+            if (targetCaps.implies(CapabilityAtom::spvVulkanMemoryModelDeviceScopeKHR))
+            {
+                requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
+            }
+        }
+    }
+
+    bool requiresCoherentLoadOrStore(IRInst* inst)
+    {
+        if (m_memoryModel != SpvMemoryModelVulkan)
+            return false;
+
+        auto ptrType = as<IRPtrTypeBase>(inst->getFullType());
+        if (!ptrType)
+            return false;
+
+        SpvStorageClass storageClass = SpvStorageClassFunction;
+        if (ptrType->hasAddressSpace())
+            storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
+
+        // "NonPrivatePointerKHR requires a pointer in Uniform, Workgroup, CrossWorkgroup, Generic, Image or StorageBuffer storage classes."
+        switch (storageClass)
+        {
+        case SpvStorageClassUniform:
+        case SpvStorageClassWorkgroup:
+        case SpvStorageClassCrossWorkgroup:
+        case SpvStorageClassGeneric:
+        case SpvStorageClassImage:
+        case SpvStorageClassStorageBuffer:
+            break;
+        default:
+            return false;
+        }
+
+        IRInst* baseObj = inst;
+        for (bool mayNeedToRetry = true; mayNeedToRetry && baseObj;)
+        {
+            switch (baseObj->getOp())
+            {
+            case kIROp_FieldAddress:
+                if (auto fieldAddress = as<IRFieldAddress>(baseObj))
+                {
+                    baseObj = fieldAddress->getField();
+                }
+                break;
+            case kIROp_RWStructuredBufferGetElementPtr:
+                if (auto rwsb = as<IRRWStructuredBufferGetElementPtr>(baseObj))
+                {
+                    baseObj = rwsb->getBase();
+                }
+                break;
+            case kIROp_GetElementPtr:
+                if (auto getElementPtr = as<IRGetElementPtr>(baseObj))
+                {
+                    baseObj = getElementPtr->getBase();
+                }
+                break;
+            default:
+                mayNeedToRetry = false;
+                break;
+            }
+        }
+
+        if (baseObj == nullptr)
+            return false;
+
+        for (auto decoration : baseObj->getDecorations())
+        {
+            if (decoration->getOp() == kIROp_MemoryQualifierSetDecoration)
+            {
+                auto collection = as<IRMemoryQualifierSetDecoration>(decoration);
+                IRIntegerValue flags = collection->getMemoryQualifierBit();
+                if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     IRInst* m_defaultDebugSource = nullptr;
@@ -4208,6 +4295,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_AtomicInc:
             {
+                if (m_memoryModel == SpvMemoryModelVulkan)
+                    requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
+
                 IRBuilder builder{inst};
                 const auto memoryScope =
                     emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
@@ -4225,6 +4315,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_AtomicDec:
             {
+                if (m_memoryModel == SpvMemoryModelVulkan)
+                    requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
+
                 IRBuilder builder{inst};
                 const auto memoryScope =
                     emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
@@ -4245,6 +4338,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 IRBuilder builder{inst};
                 if (isAtomicableAddressSpace(inst->getOperand(0)->getDataType()))
                 {
+                    if (m_memoryModel == SpvMemoryModelVulkan)
+                        requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
+
                     const auto memoryScope =
                         emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
                     const auto memorySemantics =
@@ -4260,7 +4356,22 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 else
                 {
-                    result = emitOpLoad(parent, inst, inst->getFullType(), inst->getOperand(0));
+                    auto operand = inst->getOperand(0);
+                    if (requiresCoherentLoadOrStore(operand))
+                    {
+                        requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
+
+                        result = emitOpLoadCoherent(
+                            parent,
+                            inst,
+                            inst->getFullType(),
+                            operand,
+                            emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType()));
+                    }
+                    else
+                    {
+                        result = emitOpLoad(parent, inst, inst->getFullType(), operand);
+                    }
                 }
             }
             break;
@@ -4269,6 +4380,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 IRBuilder builder{inst};
                 if (isAtomicableAddressSpace(inst->getOperand(0)->getDataType()))
                 {
+                    if (m_memoryModel == SpvMemoryModelVulkan)
+                        requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
+
                     const auto memoryScope =
                         emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
                     const auto memorySemantics =
@@ -4284,7 +4398,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 else
                 {
-                    result = emitOpStore(parent, inst, inst->getOperand(0), inst->getOperand(1));
+                    auto operand0 = inst->getOperand(0);
+                    auto operand1 = inst->getOperand(1);
+                    if (requiresCoherentLoadOrStore(operand0))
+                    {
+                        requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
+
+                        result = emitOpStoreCoherent(
+                            parent,
+                            inst,
+                            operand0,
+                            operand1,
+                            emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType()));
+                    }
+                    else
+                    {
+                        result = emitOpStore(parent, inst, operand0, operand1);
+                    }
                 }
             }
             break;
@@ -4293,6 +4423,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 IRBuilder builder{inst};
                 if (isAtomicableAddressSpace(inst->getOperand(0)->getDataType()))
                 {
+                    if (m_memoryModel == SpvMemoryModelVulkan)
+                        requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
+
                     const auto memoryScope =
                         emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
                     const auto memorySemantics =
@@ -4309,12 +4442,31 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 else
                 {
-                    result = emitOpStore(parent, inst, inst->getOperand(0), inst->getOperand(1));
+                    auto operand0 = inst->getOperand(0);
+                    auto operand1 = inst->getOperand(1);
+                    if (requiresCoherentLoadOrStore(operand0))
+                    {
+                        requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
+
+                        result = emitOpStoreCoherent(
+                            parent,
+                            inst,
+                            operand0,
+                            operand1,
+                            emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType()));
+                    }
+                    else
+                    {
+                        result = emitOpStore(parent, inst, operand0, operand1);
+                    }
                 }
             }
             break;
         case kIROp_AtomicCompareExchange:
             {
+                if (m_memoryModel == SpvMemoryModelVulkan)
+                    requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
+
                 IRBuilder builder{inst};
                 const auto memoryScope =
                     emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
@@ -4343,6 +4495,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_AtomicOr:
         case kIROp_AtomicXor:
             {
+                if (m_memoryModel == SpvMemoryModelVulkan)
+                    requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
+
                 IRBuilder builder{inst};
                 const auto memoryScope =
                     emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType());
@@ -5194,21 +5349,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto collection = as<IRMemoryQualifierSetDecoration>(decoration);
                 IRIntegerValue flags = collection->getMemoryQualifierBit();
-                if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+
+                // https://github.khronos.org/SPIRV-Registry/extensions/KHR/SPV_KHR_vulkan_memory_model.html#_modifications_to_the_spir_v_specification_version_1_3
+                // "Coherent is not allowed when the declared memory model is VulkanKHR."
+                // "Volatile is not allowed when the declared memory model is VulkanKHR"
+                if (m_memoryModel != SpvMemoryModelVulkan)
                 {
-                    emitOpDecorate(
-                        getSection(SpvLogicalSectionID::Annotations),
-                        nullptr,
-                        dstID,
-                        SpvDecorationCoherent);
-                }
-                if (flags & MemoryQualifierSetModifier::Flags::kVolatile)
-                {
-                    emitOpDecorate(
-                        getSection(SpvLogicalSectionID::Annotations),
-                        nullptr,
-                        dstID,
-                        SpvDecorationVolatile);
+                    if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+                    {
+                        emitOpDecorate(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            dstID,
+                            SpvDecorationCoherent);
+                    }
+                    if (flags & MemoryQualifierSetModifier::Flags::kVolatile)
+                    {
+                        emitOpDecorate(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            dstID,
+                            SpvDecorationVolatile);
+                    }
                 }
                 if (flags & MemoryQualifierSetModifier::Flags::kRestrict)
                 {
@@ -5389,23 +5551,29 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 else if (auto collection = as<IRMemoryQualifierSetDecoration>(decor))
                 {
                     IRIntegerValue flags = collection->getMemoryQualifierBit();
-                    if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+                    // https://github.khronos.org/SPIRV-Registry/extensions/KHR/SPV_KHR_vulkan_memory_model.html#_modifications_to_the_spir_v_specification_version_1_3
+                    // "Coherent is not allowed when the declared memory model is VulkanKHR."
+                    // "Volatile is not allowed when the declared memory model is VulkanKHR"
+                    if (m_memoryModel != SpvMemoryModelVulkan)
                     {
-                        emitOpMemberDecorate(
-                            getSection(SpvLogicalSectionID::Annotations),
-                            nullptr,
-                            spvStructID,
-                            SpvLiteralInteger::from32(id),
-                            SpvDecorationCoherent);
-                    }
-                    if (flags & MemoryQualifierSetModifier::Flags::kVolatile)
-                    {
-                        emitOpMemberDecorate(
-                            getSection(SpvLogicalSectionID::Annotations),
-                            nullptr,
-                            spvStructID,
-                            SpvLiteralInteger::from32(id),
-                            SpvDecorationVolatile);
+                        if (flags & MemoryQualifierSetModifier::Flags::kCoherent)
+                        {
+                            emitOpMemberDecorate(
+                                getSection(SpvLogicalSectionID::Annotations),
+                                nullptr,
+                                spvStructID,
+                                SpvLiteralInteger::from32(id),
+                                SpvDecorationCoherent);
+                        }
+                        if (flags & MemoryQualifierSetModifier::Flags::kVolatile)
+                        {
+                            emitOpMemberDecorate(
+                                getSection(SpvLogicalSectionID::Annotations),
+                                nullptr,
+                                spvStructID,
+                                SpvLiteralInteger::from32(id),
+                                SpvDecorationVolatile);
+                        }
                     }
                     if (flags & MemoryQualifierSetModifier::Flags::kRestrict)
                     {
@@ -6718,7 +6886,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         else
         {
-            return emitOpLoad(parent, inst, inst->getDataType(), inst->getPtr());
+            auto operand = inst->getPtr();
+            if (requiresCoherentLoadOrStore(operand))
+            {
+                requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
+
+                IRBuilder builder{inst};
+                return emitOpLoadCoherent(
+                    parent,
+                    inst,
+                    inst->getDataType(),
+                    operand,
+                    emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType()));
+            }
+            else
+            {
+                return emitOpLoad(parent, inst, inst->getDataType(), operand);
+            }
         }
     }
 
@@ -6749,7 +6933,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         else
         {
-            return emitOpStore(parent, inst, inst->getPtr(), inst->getVal());
+            auto instPtr = inst->getPtr();
+            auto instVal = inst->getVal();
+            if (requiresCoherentLoadOrStore(instPtr))
+            {
+                requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
+
+                IRBuilder builder{inst};
+                return emitOpStoreCoherent(
+                    parent,
+                    inst,
+                    instPtr,
+                    instVal,
+                    emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType()));
+            }
+            else
+            {
+                return emitOpStore(parent, inst, instPtr, instVal);
+            }
         }
     }
 
@@ -7887,7 +8088,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // We can simply emit a store into the backing variable for the DebugValue operation.
         //
         builder.setInsertBefore(debugValue);
-        return emitOpStore(parent, debugValue, debugValue->getDebugVar(), debugValue->getValue());
+        auto debugVar = debugValue->getDebugVar();
+        auto debugValueValue = debugValue->getValue();
+        if (requiresCoherentLoadOrStore(debugVar))
+        {
+            requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
+
+            return emitOpStoreCoherent(
+                parent,
+                debugValue,
+                debugVar,
+                debugValueValue,
+                emitIntConstant(IRIntegerValue{SpvScopeDevice}, builder.getUIntType()));
+        }
+        else
+        {
+            return emitOpStore(parent, debugValue, debugVar, debugValueValue);
+        }
     }
 
     IRInst* getName(IRInst* inst)
@@ -8593,6 +8810,34 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 default:
                     break;
                 }
+
+                if (m_memoryModel == SpvMemoryModelVulkan)
+                {
+                    switch (opcode)
+                    {
+                    case SpvOpControlBarrier:
+                    case SpvOpMemoryBarrier:
+                    case SpvOpAtomicLoad:
+                    case SpvOpAtomicStore:
+                    case SpvOpAtomicExchange:
+                    case SpvOpAtomicCompareExchange:
+                    case SpvOpAtomicCompareExchangeWeak:
+                    case SpvOpAtomicIIncrement:
+                    case SpvOpAtomicIDecrement:
+                    case SpvOpAtomicIAdd:
+                    case SpvOpAtomicISub:
+                    case SpvOpAtomicSMin:
+                    case SpvOpAtomicUMin:
+                    case SpvOpAtomicSMax:
+                    case SpvOpAtomicUMax:
+                    case SpvOpAtomicAnd:
+                    case SpvOpAtomicOr:
+                    case SpvOpAtomicXor:
+                        requireSPIRVCapability(SpvCapabilityVulkanMemoryModelDeviceScope);
+                        break;
+                    }
+                }
+
                 const auto opParent = parentForOpCode(opcode, parent);
                 const auto opInfo = m_grammarInfo->opInfos.lookup(opcode);
 

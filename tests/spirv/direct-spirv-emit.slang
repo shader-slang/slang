@@ -5,7 +5,7 @@
 // Test ability to directly output SPIR-V
 
 // CHECK: OpCapability Shader
-// CHECK: OpMemoryModel Logical GLSL450
+// CHECK: OpMemoryModel Logical
 // CHECK: OpEntryPoint GLCompute %computeMain "main"
 // CHECK: OpExecutionMode %computeMain LocalSize 4 1 1
 
