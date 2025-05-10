@@ -3442,6 +3442,60 @@ struct IRDebugValue : IRInst
     IRInst* getValue() { return getOperand(1); }
 };
 
+struct IRDebugInlinedAt : IRInst
+{
+    IR_LEAF_ISA(DebugInlinedAt)
+    IRInst* getLine() { return getOperand(0); }
+    IRInst* getCol() { return getOperand(1); }
+    IRInst* getFile() { return getOperand(2); }
+    IRInst* getDebugFunc() { return getOperand(3); }
+    IRInst* getOuterInlinedAt()
+    {
+        if (operandCount == 5)
+            return getOperand(4);
+        return nullptr;
+    }
+    void setDebugFunc(IRInst* func) { setOperand(3, func); }
+    bool isOuterInlinedPresent() { return operandCount == 5; }
+};
+
+struct IRDebugScope : IRInst
+{
+    IR_LEAF_ISA(DebugScope)
+    IRInst* getScope() { return getOperand(0); }
+    IRInst* getInlinedAt() { return getOperand(1); }
+    void setInlinedAt(IRInst* inlinedAt) { setOperand(1, inlinedAt); }
+};
+
+struct IRDebugNoScope : IRInst
+{
+    IR_LEAF_ISA(DebugNoScope)
+    IRInst* getScope() { return getOperand(0); }
+};
+
+struct IRDebugInlinedVariable : IRInst
+{
+    IR_LEAF_ISA(DebugInlinedVariable)
+    IRInst* getVariable() { return getOperand(0); }
+    IRInst* getInlinedAt() { return getOperand(1); }
+};
+
+struct IRDebugFunction : IRInst
+{
+    IR_LEAF_ISA(DebugFunction)
+    IRInst* getName() { return getOperand(0); }
+    IRInst* getLine() { return getOperand(1); }
+    IRInst* getCol() { return getOperand(2); }
+    IRInst* getFile() { return getOperand(3); }
+    IRInst* getDebugType() { return getOperand(4); }
+};
+
+struct IRDebugFuncDecoration : IRInst
+{
+    IR_LEAF_ISA(DebugFunctionDecoration)
+    IRInst* getDebugFunc() { return getOperand(0); }
+};
+
 struct IRDebugLocationDecoration : IRDecoration
 {
     IRInst* getSource() { return getOperand(0); }
@@ -3943,6 +3997,21 @@ public:
         IRInst* col,
         IRInst* argIndex = nullptr);
     IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue);
+    IRInst* emitDebugInlinedAt(
+        IRInst* line,
+        IRInst* col,
+        IRInst* file,
+        IRInst* debugFunc,
+        IRInst* outerInlinedAt);
+    IRInst* emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt);
+    IRInst* emitDebugScope(IRInst* scope, IRInst* inlinedAt);
+    IRInst* emitDebugNoScope();
+    IRInst* emitDebugFunction(
+        IRInst* name,
+        IRInst* line,
+        IRInst* col,
+        IRInst* file,
+        IRInst* debugType);
 
     /// Emit an LiveRangeStart instruction indicating the referenced item is live following this
     /// instruction
@@ -5010,6 +5079,11 @@ public:
             debugSource,
             getIntValue(getUIntType(), line),
             getIntValue(getUIntType(), col));
+    }
+
+    void addDebugFunctionDecoration(IRInst* value, IRInst* debugFunction)
+    {
+        addDecoration(value, kIROp_DebugFunctionDecoration, debugFunction);
     }
 
     void addUnsafeForceInlineDecoration(IRInst* value)
