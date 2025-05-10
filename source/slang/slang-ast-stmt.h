@@ -295,6 +295,22 @@ class DeferStmt : public Stmt
 };
 
 FIDDLE()
+class ThrowStmt : public Stmt
+{
+    FIDDLE(...)
+    FIDDLE() Expr* expression = nullptr;
+};
+
+FIDDLE()
+class CatchStmt : public Stmt
+{
+    FIDDLE(...)
+    FIDDLE() LetDecl* errorVar = nullptr;
+    FIDDLE() Stmt* tryBody = nullptr;
+    FIDDLE() Stmt* handleBody = nullptr;
+};
+
+FIDDLE()
 class ExpressionStmt : public Stmt
 {
     FIDDLE(...)

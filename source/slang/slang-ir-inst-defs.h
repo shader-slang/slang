@@ -58,7 +58,7 @@ INST(Nop, nop, 0, 0)
 
     INST(ConjunctionType, Conjunction, 0, HOISTABLE)
     INST(AttributedType, Attributed, 0, HOISTABLE)
-    INST(ResultType, Result, 2, HOISTABLE)
+    INST(ResultType, Result, 3, HOISTABLE)
     INST(OptionalType, Optional, 1, HOISTABLE)
     INST(EnumType, Enum, 1, PARENT)
 
@@ -648,8 +648,8 @@ INST(ifElse, ifElse, 4, 0)
 INST_RANGE(ConditionalBranch, conditionalBranch, ifElse)
 
 INST(Throw, throw, 1, 0)
-// tryCall <successBlock> <failBlock> <callee> <args>...
-INST(TryCall, tryCall, 3, 0)
+// tryCall <successBlock> <failBlock> <mergeBlock> <callee> <args>...
+INST(TryCall, tryCall, 4, 0)
 // switch <val> <break> <default> <caseVal1> <caseBlock1> ...
 INST(Switch, switch, 3, 0)
 // target_switch <break> <targetName1> <block1> ...
@@ -1327,7 +1327,7 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
         INST(TypeSizeAttr, size, 2, HOISTABLE)
         INST(VarOffsetAttr, offset, 2, HOISTABLE)
     INST_RANGE(LayoutResourceInfoAttr, TypeSizeAttr, VarOffsetAttr)
-    INST(FuncThrowTypeAttr, FuncThrowType, 1, HOISTABLE)
+    INST(FuncThrowTypeAttr, FuncThrowType, 2, HOISTABLE)
     
 INST_RANGE(Attr, PendingLayoutAttr, FuncThrowTypeAttr)
 

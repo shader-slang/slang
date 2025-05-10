@@ -2,6 +2,8 @@
 
 #include "slang-ir-lower-error-handling.h"
 
+#include "slang-ir-clone.h"
+#include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
 
@@ -15,6 +17,8 @@ struct ErrorHandlingLoweringContext
 
     InstWorkList workList;
     InstHashSet workListSet;
+    List<IRFuncType*> oldFuncTypes;
+    HashSet<IRBlock*> catchBlocks;
 
     ErrorHandlingLoweringContext(IRModule* inModule)
         : module(inModule), workList(inModule), workListSet(inModule)
@@ -37,8 +41,12 @@ struct ErrorHandlingLoweringContext
             return;
         IRBuilder builder(module);
         builder.setInsertBefore(funcType);
-        auto resultType =
-            builder.getResultType(funcType->getResultType(), throwAttr->getErrorType());
+
+        auto resultType = builder.getResultType(
+            funcType->getResultType(),
+            throwAttr->getErrorType(),
+            throwAttr->getErrorTypeWitness());
+
         List<IRType*> paramTypes;
         for (UInt i = 0; i < funcType->getParamCount(); i++)
         {
@@ -48,6 +56,54 @@ struct ErrorHandlingLoweringContext
         }
         auto newFuncType = builder.getFuncType(paramTypes, resultType);
         funcType->replaceUsesWith(newFuncType);
+        funcType->removeAndDeallocate();
+    }
+
+    void cloneHandlerBlock(
+        IRBuilder* builder,
+        IRDominatorTree* dom,
+        IRBlock* handler,
+        IRBlock* merge,
+        IRBlock* clonedHandler,
+        IRInst* resultVal
+    ){
+        auto handlerDominatedBlocks = dom->getProperlyDominatedBlocks(handler);
+        List<IRBlock*> handlerBlocks;
+        IRCloneEnv env;
+
+        catchBlocks.add(handler);
+        handlerBlocks.add(handler);
+        builder->addInst(clonedHandler);
+        env.mapOldValToNew[handler] = clonedHandler;
+
+        for (IRBlock* block : handlerDominatedBlocks)
+        {
+            if (!dom->properlyDominates(merge, block) && block != merge)
+            {
+                catchBlocks.add(block);
+                handlerBlocks.add(block);
+                auto clonedBlock = builder->createBlock();
+                builder->addInst(clonedBlock);
+                env.mapOldValToNew[block] = clonedBlock;
+            }
+        }
+
+        IRBlock* handlerBlock = nullptr;
+        for (auto block : handlerBlocks)
+        {
+            auto clonedBlock = as<IRBlock>(env.mapOldValToNew.getValue(block));
+            if (handlerBlock == nullptr)
+                handlerBlock = clonedBlock;
+            builder->setInsertInto(clonedBlock);
+            for (auto inst : block->getChildren())
+                cloneInst(&env, builder, inst);
+        }
+
+        builder->setInsertBefore(clonedHandler->getFirstOrdinaryInst());
+        auto errVal = builder->emitGetResultError(resultVal);
+        auto errorParam = clonedHandler->getFirstParam();
+        errorParam->replaceUsesWith(errVal);
+        errorParam->removeAndDeallocate();
     }
 
     void processTryCall(IRTryCall* tryCall)
@@ -84,9 +140,20 @@ struct ErrorHandlingLoweringContext
         auto errorType = throwAttr->getErrorType();
 
         IRBuilder builder(module);
+
+        auto successBlock = tryCall->getSuccessBlock();
+        auto failBlock = tryCall->getFailureBlock();
+        auto mergeBlock = tryCall->getMergeBlock();
+
+        auto parentFunc = cast<IRFunc>(successBlock->getParent());
+        SLANG_ASSERT(parentFunc);
+        auto dom = module->findOrCreateDominatorTree(parentFunc);
+
+        auto handlerBlock = builder.createBlock();
+
         builder.setInsertBefore(tryCall);
 
-        auto resultType = builder.getResultType(resultValueType, errorType);
+        auto resultType = builder.getResultType(resultValueType, errorType, throwAttr->getErrorTypeWitness());
         List<IRInst*> args;
         for (UInt i = 0; i < tryCall->getArgCount(); i++)
         {
@@ -95,18 +162,13 @@ struct ErrorHandlingLoweringContext
         auto call = builder.emitCallInst(resultType, tryCall->getCallee(), args);
         tryCall->transferDecorationsTo(call);
 
-        auto isFail = builder.emitIsResultError(call);
-        auto failBlock = tryCall->getFailureBlock();
-        auto successBlock = tryCall->getSuccessBlock();
+        auto isError = builder.emitIsResultError(call);
 
-        builder.emitIf(isFail, failBlock, successBlock);
+        auto branch = builder.emitIfElse(isError, handlerBlock, successBlock, successBlock);
 
         // Replace the params in failBlock to `getResultError(call)`.
-        builder.setInsertBefore(failBlock->getFirstOrdinaryInst());
-        auto errorParam = failBlock->getFirstParam();
-        auto errVal = builder.emitGetResultError(call);
-        errorParam->replaceUsesWith(errVal);
-        errorParam->removeAndDeallocate();
+        builder.setInsertAfter(branch->getParent());
+        cloneHandlerBlock(&builder, dom, failBlock, mergeBlock, handlerBlock, call);
 
         // Replace the params in successBlock to `getResultValue(call)`.
         builder.setInsertBefore(successBlock->getFirstOrdinaryInst());
@@ -116,6 +178,10 @@ struct ErrorHandlingLoweringContext
         resultParam->removeAndDeallocate();
 
         tryCall->removeAndDeallocate();
+
+        // Some blocks got removed and added, so mark analysis of the
+        // function with defer as outdated.
+        module->invalidateAnalysisForInst(parentFunc);
     }
 
     void processReturn(IRReturn* ret)
@@ -133,7 +199,7 @@ struct ErrorHandlingLoweringContext
         IRBuilder builder(module);
         builder.setInsertBefore(ret);
         auto resultType =
-            builder.getResultType(funcType->getResultType(), throwAttr->getErrorType());
+            builder.getResultType(funcType->getResultType(), throwAttr->getErrorType(), throwAttr->getErrorTypeWitness());
         IRInst* resultVal = nullptr;
         auto val = cast<IRReturn>(ret)->getVal();
         resultVal = builder.emitMakeResultValue(resultType, val);
@@ -154,7 +220,7 @@ struct ErrorHandlingLoweringContext
         IRBuilder builder(module);
         builder.setInsertBefore(throwInst);
         auto resultType =
-            builder.getResultType(funcType->getResultType(), throwAttr->getErrorType());
+            builder.getResultType(funcType->getResultType(), throwAttr->getErrorType(), throwAttr->getErrorTypeWitness());
         IRInst* resultVal = builder.emitMakeResultError(resultType, throwInst->getValue());
         builder.emitReturn(resultVal);
         throwInst->removeAndDeallocate();
@@ -172,6 +238,9 @@ struct ErrorHandlingLoweringContext
             break;
         case kIROp_Throw:
             processThrow(cast<IRThrow>(inst));
+            break;
+        case kIROp_FuncType:
+            oldFuncTypes.add(cast<IRFuncType>(inst));
             break;
         default:
             break;
@@ -206,21 +275,21 @@ struct ErrorHandlingLoweringContext
         // Lower all functypes.
         // Function types with an IRThrowTypeAttribute will be translated into a normal function
         // type that returns `Result<T,E>`.
-        List<IRFuncType*> oldFuncTypes;
-        for (auto child : module->getGlobalInsts())
-        {
-            switch (child->getOp())
-            {
-            case kIROp_FuncType:
-                oldFuncTypes.add(cast<IRFuncType>(child));
-                break;
-            default:
-                break;
-            }
-        }
         for (auto funcType : oldFuncTypes)
         {
             processFuncType(funcType);
+        }
+
+        // Remove all catch blocks, their contents were already duplicated
+        // before, so they're just dead code now.
+        for (IRBlock* catchBlock : catchBlocks)
+        {
+            auto parentFunc = cast<IRFunc>(catchBlock->getParent());
+            SLANG_ASSERT(parentFunc);
+
+            catchBlock->removeAndDeallocate();
+
+            module->invalidateAnalysisForInst(parentFunc);
         }
     }
 };

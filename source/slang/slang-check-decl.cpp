@@ -652,6 +652,15 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitDeferStmt(DeferStmt* stmt) { dispatchIfNotNull(stmt->statement); }
 
+    void visitThrowStmt(ThrowStmt* stmt) { dispatchIfNotNull(stmt->expression); }
+
+    void visitCatchStmt(CatchStmt* stmt)
+    {
+        dispatchIfNotNull(stmt->errorVar);
+        dispatchIfNotNull(stmt->tryBody);
+        dispatchIfNotNull(stmt->handleBody);
+    }
+
     void visitWhileStmt(WhileStmt* stmt)
     {
         dispatchIfNotNull(stmt->predicate);
@@ -9689,6 +9698,14 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     if (errorType.exp)
     {
         errorType = CheckProperType(errorType);
+        SubtypeWitness* errorResultWitness = tryGetSubtypeWitness(
+            errorType.type,
+            m_astBuilder->getErrorResultType());
+        if (!errorResultWitness)
+        {
+            getSink()->diagnose(decl->errorType, Diagnostics::errorTypeDoesNotConformToIError, errorType);
+        }
+        decl->errorTypeWitness = errorResultWitness;
     }
     else
     {
