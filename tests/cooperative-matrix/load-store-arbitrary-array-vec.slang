@@ -23,7 +23,7 @@ RWByteAddressBuffer input;
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<uint32_t> outputBuffer;
 
-typealias CoopMatType = CoopMat<uint32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
+typealias CoopMatType = CoopMat<uint32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>;
 
 groupshared float3[128] tempShared;
 
@@ -31,11 +31,9 @@ groupshared float3[128] tempShared;
 void computeMain()
 {
     let stride = 16;
-    let matrixLayout = CoopMatMatrixLayout::RowMajor;
+    let mat = coopMatLoad<uint32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator, CoopMatMatrixLayout.RowMajor>(input, 0, stride);
+    mat.Store<CoopMatMatrixLayout.RowMajor>(tempShared, 0, stride);
 
-    let mat = coopMatLoad<uint32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>(input, 0, stride, matrixLayout);
-    mat.storeAny(tempShared, 0, stride, matrixLayout);
-
-    let result = CoopMatType.loadAny(tempShared, 0, stride, matrixLayout);
-    result.store(outputBuffer, 0, stride, matrixLayout);
+    let result = CoopMatType.Load<CoopMatMatrixLayout.RowMajor>(tempShared, 0, stride);
+    result.Store<CoopMatMatrixLayout.RowMajor>(outputBuffer, 0, stride);
 }

@@ -6,9 +6,9 @@
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-typealias CoopMatAType = CoopMat<float16_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>;
-typealias CoopMatBType = CoopMat<float16_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixB>;
-typealias CoopMatCType = CoopMat<float32_t, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
+typealias CoopMatAType = CoopMat<float16_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>;
+typealias CoopMatBType = CoopMat<float16_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixB>;
+typealias CoopMatCType = CoopMat<float32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
 
 [numthreads(32, 1, 1)]
 void computeMain()
@@ -18,6 +18,6 @@ void computeMain()
     let matB = CoopMatBType(5.0);
     let matC = CoopMatCType(1.0);
 
-    let result = coopMatMulAdd(matA, matB, matC, CoopMatMatrixOperands::None);
-    result.store(outputBuffer, 0, 16, CoopMatMatrixLayout::RowMajor);
+    let result = coopMatMulAdd<float, false>(matA, matB, matC);
+    result.Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 0, 16);
 }
