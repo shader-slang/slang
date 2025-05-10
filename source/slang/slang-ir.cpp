@@ -3420,12 +3420,12 @@ IRInst* IRBuilder::emitDebugInlinedAt(
 {
     if (outerInlinedAt)
     {
-        IRInst* args[] = { line, col, file, debugFunc, outerInlinedAt };
+        IRInst* args[] = {line, col, file, debugFunc, outerInlinedAt};
         return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedAt, 5, args);
     }
     else
     {
-        IRInst* args[] = { line, col, file, debugFunc };
+        IRInst* args[] = {line, col, file, debugFunc};
         return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedAt, 4, args);
     }
 }

@@ -3016,7 +3016,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             auto spvBlock = emitOpLabel(spvFunc, irBlock);
             if (irBlock == irFunc->getFirstBlock())
             {
-                // This emit has to be the first because spirv requires DebugFunctionDefinition 
+                // This emit has to be the first because spirv requires DebugFunctionDefinition
                 // must appear before anything else in the first block.
                 IRDebugFunction* irDebugFunc = nullptr;
                 if (auto debugFuncDecor = irFunc->findDecoration<IRDebugFuncDecoration>())
