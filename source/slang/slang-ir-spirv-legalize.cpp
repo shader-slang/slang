@@ -1716,7 +1716,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 }
                 break;
             case kIROp_Func:
-                eliminateContinueBlocksInFunc(m_module, as<IRFunc>(inst));
+                // eliminateContinueBlocksInFunc(m_module, as<IRFunc>(inst));
                 [[fallthrough]];
             default:
                 for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
