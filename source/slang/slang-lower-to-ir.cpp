@@ -11017,6 +11017,31 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             }
         }
 
+        // Add debugfunction decoration and emit debug function. This
+        // is needed for emitting debug information
+        auto nameHint = irFunc->findDecoration<IRNameHintDecoration>();
+        IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
+        if (nameOperand)
+        {
+            getBuilder()->setInsertInto(getBuilder()->getModule()->getModuleInst());
+
+            auto locationDecor = irFunc->findDecoration<IRDebugLocationDecoration>();
+            IRInst* debugType = irFunc->getDataType();
+
+            if (locationDecor && debugType)
+            {
+                auto debugFuncCallee = getBuilder()->emitDebugFunction(
+                    nameOperand,
+                    locationDecor->getLine(),
+                    locationDecor->getCol(),
+                    locationDecor->getSource(),
+                    debugType);
+
+                // Add a decoration to link the function to its debug function
+                getBuilder()->addDecoration(irFunc, kIROp_DebugFunctionDecoration, debugFuncCallee);
+            }
+        }
+
         // For convenience, ensure that any additional global
         // values that were emitted while outputting the function
         // body appear before the function itself in the list
