@@ -6813,7 +6813,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             IRBuilder subBuilder = *getBuilder();
             subBuilder.setInsertInto(info->initialBlock);
             subContext.irBuilder = &subBuilder;
-            auto caseVal = getSimpleVal(context, lowerRValueExpr(&subContext, caseStmt->expr));
+
+            auto constVal = as<ConstantIntVal>(caseStmt->exprVal);
+            SLANG_ASSERT(constVal);
+            auto caseType = lowerType(context, constVal->getType());
+            auto caseValInfo =
+                LoweredValInfo::simple(getBuilder()->getIntValue(caseType, constVal->getValue()));
+            auto caseVal = getSimpleVal(context, caseValInfo);
 
             // Figure out where we are branching to.
             auto label = getLabelForCase(info);
