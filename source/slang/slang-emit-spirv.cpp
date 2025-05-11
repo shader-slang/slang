@@ -1535,7 +1535,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (ptrType->hasAddressSpace())
             storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
 
-        // "NonPrivatePointerKHR requires a pointer in Uniform, Workgroup, CrossWorkgroup, Generic, Image or StorageBuffer storage classes."
+        // "NonPrivatePointerKHR requires a pointer in Uniform, Workgroup, CrossWorkgroup, Generic,
+        // Image or StorageBuffer storage classes."
         switch (storageClass)
         {
         case SpvStorageClassUniform:
