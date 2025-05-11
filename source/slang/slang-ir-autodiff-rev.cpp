@@ -275,6 +275,11 @@ InstPair BackwardDiffTranscriberBase::transcribeInstImpl(IRBuilder* builder, IRI
     case kIROp_WrapExistential:
     case kIROp_MakeExistential:
     case kIROp_MakeExistentialWithRTTI:
+    case kIROp_DebugInlinedAt:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+    case kIROp_DebugInlinedVariable:
+    case kIROp_DebugFunction:
         return transcribeNonDiffInst(builder, origInst);
 
     case kIROp_StructKey:
