@@ -990,6 +990,9 @@ Compound Capabilities
 `tensor_addressing`
 > Capabilities needed to use tensor addressing
 
+`cooperative_matrix_2`
+> Capabilities needed to use tensor addressing
+
 `any_stage`
 > Collection of all shader stages
 
