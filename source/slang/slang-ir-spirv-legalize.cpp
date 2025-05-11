@@ -1318,31 +1318,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         addToWorkList(loop->getTargetBlock());
     }
 
-    void processIfElse(IRIfElse* inst)
-    {
-        duplicateMergeBlockIfNeeded(&inst->afterBlock);
-
-        // SPIRV does not allow using merge block directly as true/false block,
-        // so we need to create an intermediate block if this is the case.
-        IRBuilder builder(inst);
-        if (inst->getTrueBlock() == inst->getAfterBlock())
-        {
-            builder.setInsertBefore(inst->getAfterBlock());
-            auto newBlock = builder.emitBlock();
-            builder.emitBranch(inst->getAfterBlock());
-            inst->trueBlock.set(newBlock);
-            addToWorkList(newBlock);
-        }
-        if (inst->getFalseBlock() == inst->getAfterBlock())
-        {
-            builder.setInsertBefore(inst->getAfterBlock());
-            auto newBlock = builder.emitBlock();
-            builder.emitBranch(inst->getAfterBlock());
-            inst->falseBlock.set(newBlock);
-            addToWorkList(newBlock);
-        }
-    }
-
     void processSwitch(IRSwitch* inst)
     {
         duplicateMergeBlockIfNeeded(&inst->breakLabel);
@@ -1663,9 +1638,6 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
             case kIROp_loop:
                 processLoop(as<IRLoop>(inst));
-                break;
-            case kIROp_ifElse:
-                processIfElse(as<IRIfElse>(inst));
                 break;
             case kIROp_Switch:
                 processSwitch(as<IRSwitch>(inst));
