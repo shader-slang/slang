@@ -1431,9 +1431,9 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
 
 #define CASE(KIND, NAME, VERSION)                                                   \
     case CapabilityAtom::NAME:                                                      \
-        requiredCapabilityVersions.add(DownstreamCompileOptions::CapabilityVersion( \
+        requiredCapabilityVersions.add(DownstreamCompileOptions::CapabilityVersion{ \
             DownstreamCompileOptions::CapabilityVersion::Kind::KIND,                \
-            VERSION));                                                              \
+            VERSION});                                                              \
         break
 
                 CASE(CUDASM, _cuda_sm_1_0, SemanticVersion(1, 0));
