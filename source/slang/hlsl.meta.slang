@@ -503,6 +503,7 @@ struct __ShapeCube : __ITextureShape
 /// @category misc_types
 __magic_type(TextureShapeBufferType)
 __intrinsic_type($(kIROp_TextureShapeBufferType))
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
 struct __ShapeBuffer : __ITextureShape
 {
     static const int flavor = $(SLANG_TEXTURE_BUFFER);
