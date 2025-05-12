@@ -2654,7 +2654,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                                             &resultExpr,
                                             expr->arguments[0]->type,
                                             expr->arguments[0],
-                                            getSink(),
+                                            &tempSink,
                                             &conversionCost);
                 if (coerceResult)
                     return resultExpr;
