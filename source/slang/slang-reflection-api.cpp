@@ -560,22 +560,41 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(
     return nullptr;
 }
 
-SLANG_API size_t spReflectionType_GetElementCount(SlangReflectionType* inType)
+SLANG_API size_t
+spReflectionType_GetElementCount(SlangReflectionType* inType, SlangReflection* reflection)
 {
     auto type = convert(inType);
     if (!type)
         return 0;
 
+    IntVal* elementCount;
+    bool isUnsized;
     if (auto arrayType = as<ArrayExpressionType>(type))
     {
-        return !arrayType->isUnsized() ? (size_t)getIntVal(arrayType->getElementCount()) : 0;
+        elementCount = arrayType->getElementCount();
+        isUnsized = arrayType->isUnsized();
     }
     else if (auto vectorType = as<VectorExpressionType>(type))
     {
-        return (size_t)getIntVal(vectorType->getElementCount());
+        elementCount = vectorType->getElementCount();
+        isUnsized = false;
+    }
+    else
+    {
+        return 0;
     }
 
-    return 0;
+    if (const auto program = convert(reflection))
+    {
+        if (const auto componentType = program->getProgram())
+        {
+            if (const auto c = componentType->tryFoldIntVal(elementCount))
+                return c->getValue();
+        }
+    }
+
+    const auto isWithoutSize = isUnsized || elementCount->isLinkTimeVal();
+    return isWithoutSize ? 0 : (size_t)getIntVal(elementCount);
 }
 
 SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionType* inType)
@@ -1936,7 +1955,9 @@ struct ExtendedTypeLayoutContext
             LayoutSize elementCount = LayoutSize::infinite();
             if (auto arrayType = as<ArrayExpressionType>(arrayTypeLayout->type))
             {
-                if (!arrayType->isUnsized())
+                const auto isWithoutSize =
+                    arrayType->isUnsized() || arrayType->getElementCount()->isLinkTimeVal();
+                if (!isWithoutSize)
                 {
                     elementCount = LayoutSize::RawValue(getIntVal(arrayType->getElementCount()));
                 }
