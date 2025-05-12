@@ -796,7 +796,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     }
                     break;
                 }
-            default: break;
+            default:
+                break;
             }
             return opCode;
         }
