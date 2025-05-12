@@ -85,8 +85,13 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
     // Load and link program
     ComPtr<IShaderProgram> shaderProgram;
     slang::ProgramLayout* slangReflection;
-    GFX_CHECK_CALL_ABORT(
-        loadProgram(device, shaderProgram, "main", "lib", "computeMain", slangReflection));
+    GFX_CHECK_CALL_ABORT(loadProgram(
+        device,
+        shaderProgram,
+        "link-time-constant-array-size-main",
+        "link-time-constant-array-size-lib",
+        "computeMain",
+        slangReflection));
 
     // Create compute pipeline
     ComputePipelineStateDesc pipelineDesc = {};
@@ -99,10 +104,11 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
     const int N = 4; // This should match the constant in lib.slang
 
     // Create buffer for struct S with array of size N
+    int32_t initialData[] = {1, 2, 3, 4};
     IBufferResource::Desc bufferDesc = {};
-    bufferDesc.sizeInBytes = sizeof(int) * N;
+    bufferDesc.sizeInBytes = N * sizeof(int32_t);
     bufferDesc.format = gfx::Format::Unknown;
-    bufferDesc.elementSize = sizeof(int) * N;
+    bufferDesc.elementSize = N * sizeof(int32_t);
     bufferDesc.allowedStates = ResourceStateSet(
         ResourceState::ShaderResource,
         ResourceState::UnorderedAccess,
@@ -111,33 +117,16 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
     bufferDesc.defaultState = ResourceState::UnorderedAccess;
     bufferDesc.memoryType = MemoryType::DeviceLocal;
 
-    // Initialize with zeros
-    int initialData[N] = {0};
-    ComPtr<IBufferResource> outputBuffer;
+    ComPtr<IBufferResource> numbersBuffer;
     GFX_CHECK_CALL_ABORT(
-        device->createBufferResource(bufferDesc, initialData, outputBuffer.writeRef()));
+        device->createBufferResource(bufferDesc, (void*)initialData, numbersBuffer.writeRef()));
 
-    // Create UAV for the buffer
-    ComPtr<IResourceView> outputView;
+    ComPtr<IResourceView> bufferView;
     IResourceView::Desc viewDesc = {};
     viewDesc.type = IResourceView::Type::UnorderedAccess;
     viewDesc.format = Format::Unknown;
     GFX_CHECK_CALL_ABORT(
-        device->createBufferView(outputBuffer, nullptr, viewDesc, outputView.writeRef()));
-
-    // Create parameter block for struct S
-    int paramData[N] = {1, 2, 3, 4}; // Input values
-
-    ComPtr<IBufferResource> paramBuffer;
-    bufferDesc.sizeInBytes = sizeof(int) * N;
-    bufferDesc.elementSize = sizeof(int) * N;
-    GFX_CHECK_CALL_ABORT(
-        device->createBufferResource(bufferDesc, paramData, paramBuffer.writeRef()));
-
-    ComPtr<IResourceView> paramView;
-    viewDesc.type = IResourceView::Type::ShaderResource;
-    GFX_CHECK_CALL_ABORT(
-        device->createBufferView(paramBuffer, nullptr, viewDesc, paramView.writeRef()));
+        device->createBufferView(numbersBuffer, nullptr, viewDesc, bufferView.writeRef()));
 
     // Record and execute command buffer
     {
@@ -149,13 +138,10 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
 
         auto rootObject = encoder->bindPipeline(pipelineState);
 
-        ShaderCursor entryPointCursor(rootObject->getEntryPoint(0));
+        ShaderCursor rootCursor(rootObject);
 
         // Bind output buffer
-        entryPointCursor.getPath("b").setResource(outputView);
-
-        // Bind parameter block
-        entryPointCursor.getPath("p").setResource(paramView);
+        rootCursor.getPath("b").setResource(bufferView);
 
         encoder->dispatchCompute(1, 1, 1);
         encoder->endEncoding();
@@ -164,9 +150,11 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
         queue->waitOnHost();
     }
 
+    // int32_t* buf = numbersBuffer->#guard
+
     // Expected results: each element is input * N
     // With N=4 and inputs [1,2,3,4], expected output is [4,8,12,16]
-    compareComputeResult(device, outputBuffer, Slang::makeArray<int>(4, 6, 12, 16));
+    compareComputeResult(device, numbersBuffer, Slang::makeArray<int>(4, 8, 12, 16));
 }
 
 SLANG_UNIT_TEST(linkTimeConstantArraySizeD3D12)
