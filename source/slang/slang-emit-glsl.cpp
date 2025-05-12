@@ -2078,6 +2078,25 @@ bool GLSLSourceEmitter::_tryEmitBitBinOp(
     return true;
 }
 
+static bool isDerivedFromPtrType(IRInst* ptr, IRPtrType* ptrType)
+{
+    if (!ptr)
+        return false;
+
+    // If it's directly using this pointer type
+    if (ptr->getDataType() == ptrType)
+        return true;
+
+    // Check if it's derived through operations like field address, element address, etc.
+    if (auto fieldAddr = as<IRFieldAddress>(ptr))
+        return isDerivedFromPtrType(fieldAddr->getBase(), ptrType);
+    
+    if (auto elemAddr = as<IRGetElementPtr>(ptr))
+        return isDerivedFromPtrType(elemAddr->getBase(), ptrType);
+        
+    return false;
+}
+
 void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
 {
     auto ptrType = as<IRPtrType>(type);
@@ -2096,7 +2115,76 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
     auto alignment = sizeAlignment.alignment;
     m_writer->emit("layout(buffer_reference, std430, buffer_reference_align = ");
     m_writer->emitInt64(alignment);
-    m_writer->emit(") readonly buffer ");
+
+    // Check if this pointer type is used for writing operations
+    bool isReadOnly = true;
+    
+    // Traverse all uses of this pointer type to check for writing operations
+    for (auto use = ptrType->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        
+        // Direct store to this pointer type
+        if (auto storeInst = as<IRStore>(user))
+        {
+            if (isDerivedFromPtrType(storeInst->getPtr(), ptrType))
+            {
+                isReadOnly = false;
+                break;
+            }
+        }
+        
+        // If this pointer is used to derive other pointers that are written to
+        if (auto fieldAddr = as<IRFieldAddress>(user))
+        {
+            // Continue traversing uses of the field address to find writes
+            for (auto fieldUse = fieldAddr->firstUse; fieldUse; fieldUse = fieldUse->nextUse)
+            {
+                if (auto storeInst = as<IRStore>(fieldUse->getUser()))
+                {
+                    if (storeInst->getPtr() == fieldAddr)
+                    {
+                        isReadOnly = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (!isReadOnly)
+                break;
+        }
+        
+        // Element address (indexing)
+        if (auto elemAddr = as<IRGetElementPtr>(user))
+        {
+            // Continue traversing uses of the element address to find writes
+            for (auto elemUse = elemAddr->firstUse; elemUse; elemUse = elemUse->nextUse)
+            {
+                if (auto storeInst = as<IRStore>(elemUse->getUser()))
+                {
+                    if (storeInst->getPtr() == elemAddr)
+                    {
+                        isReadOnly = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (!isReadOnly)
+                break;
+        }
+    }
+
+    // Only add readonly qualifier if the pointer is not used for writing
+    if (isReadOnly)
+    {
+        m_writer->emit(") readonly buffer ");
+    }
+    else
+    {
+        m_writer->emit(") buffer ");
+    }
+    
     m_writer->emit(ptrTypeName);
     m_writer->emit("\n");
     m_writer->emit("{\n");
