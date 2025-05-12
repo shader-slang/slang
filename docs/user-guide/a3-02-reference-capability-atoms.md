@@ -426,6 +426,9 @@ Extensions
 > Represents the SPIR-V extension for shader invocation reorder.
 > Requires SPV_KHR_ray_tracing.
 
+`SPV_NV_cluster_acceleration_structure`
+> Represents the SPIR-V extension for cluster acceleration structure.
+
 `SPV_NV_shader_image_footprint`
 > Represents the SPIR-V extension for shader image footprint.
 
@@ -536,6 +539,9 @@ Extensions
 
 `spvShaderInvocationReorderNV`
 > Represents the SPIR-V capability for shader invocation reorder.
+
+`spvRayTracingClusterAccelerationStructureNV`
+> Represents the SPIR-V capability for cluster acceleration structure.
 
 `spvShaderClockKHR`
 > Represents the SPIR-V capability for shader clock.
@@ -743,6 +749,9 @@ Extensions
 
 `GL_NV_shader_texture_footprint`
 > Represents the GL_NV_shader_texture_footprint extension.
+
+`GL_NV_cluster_acceleration_structure`
+> Represents the GL_NV_cluster_acceleration_structure extension.
 
 Compound Capabilities
 ----------------------

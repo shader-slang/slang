@@ -494,7 +494,7 @@ public:
 
     void encodeValue(uint8_t value) { encoder->encode(UInt32(value)); }
 
-    void encodeValue(nullptr_t) { encoder->encode(nullptr); }
+    void encodeValue(std::nullptr_t) { encoder->encode(nullptr); }
 
     template<typename T>
     void encodeEnum(T value)

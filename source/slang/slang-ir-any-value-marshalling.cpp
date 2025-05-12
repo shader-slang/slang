@@ -862,11 +862,19 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
     case kIROp_FloatType:
     case kIROp_UIntType:
     case kIROp_BoolType:
+#if SLANG_PTR_IS_32
+    case kIROp_IntPtrType:
+    case kIROp_UIntPtrType:
+#endif
         return alignUp(offset, 4) + 4;
     case kIROp_UInt64Type:
     case kIROp_Int64Type:
     case kIROp_DoubleType:
     case kIROp_PtrType:
+#if SLANG_PTR_IS_64
+    case kIROp_IntPtrType:
+    case kIROp_UIntPtrType:
+#endif
         return alignUp(offset, 8) + 8;
     case kIROp_Int16Type:
     case kIROp_UInt16Type:
