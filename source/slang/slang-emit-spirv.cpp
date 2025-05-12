@@ -1433,6 +1433,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return ensureExtensionDeclaration(name);
     }
 
+    // Ensure cluster acceleration structure extensions and capabilities are declared
+    void requireRayTracingClusterAccelerationStructure()
+    {
+        requireSPIRVCapability(SpvCapabilityRayTracingClusterAccelerationStructureNV);
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_cluster_acceleration_structure"));
+    }
+
     bool hasExtensionDeclaration(const UnownedStringSlice& name)
     {
         return m_extensionInsts.containsKey(name);
