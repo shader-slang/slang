@@ -1,0 +1,41 @@
+name: Check Command Line Reference (comment /regenerate-cmdline-ref to auto-fix)
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  check-cmdline-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: linux
+          compiler: gcc
+          platform: x86_64
+          config: release
+          build-llvm: false
+
+      - name: Build Slang
+        run: |
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+          cmake --workflow --preset release
+
+      - name: Generate command line reference
+        run: |
+          mkdir -p temp
+          ./build/bin/release/slangc -help-style markdown -h > temp/command-line-slangc-reference.md
+
+      - name: Compare with existing reference
+        id: compare
+        run: |
+          if ! diff -q temp/command-line-slangc-reference.md docs/command-line-slangc-reference.md > /dev/null; then
+            echo "Command line reference is out of date. Please run 'slangc -help-style markdown -h > docs/command-line-slangc-reference.md' or comment '/regenerate-cmdline-ref' on your PR."
+            exit 1
+          fi 
