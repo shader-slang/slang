@@ -2401,17 +2401,6 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                     return CreateErrorExpr(subscriptExpr);
                 }
             }
-            // if (auto specConstElementCount = as<FuncCallIntVal>(elementCount))
-            // {
-            //     // We need to check if the specialization constant has valid specConst expression
-            //     if (!specConstElementCount->getValue())
-            //     {
-            //         getSink()->diagnose(
-            //             subscriptExpr->indexExprs[0],
-            //             Diagnostics::invalidArraySize);
-            //         return CreateErrorExpr(subscriptExpr);
-            //     }
-            // }
         }
         else if (subscriptExpr->indexExprs.getCount() != 0)
         {

@@ -1366,13 +1366,6 @@ DIAGNOSTIC(
     Error,
     variableCannotBePushAndSpecializationConstant,
     "'$0' cannot be a push constant and a specialization constant at the same time")
-
-DIAGNOSTIC(
-    31221,
-    Error,
-    arraySizeCannotBeSpecializationConstant,
-    "'$0' cannot has specialization constant size. Only static global, group shared or local array "
-    "can have specialization constant size.")
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType, "invalid tag type for 'enum': '$0'")
