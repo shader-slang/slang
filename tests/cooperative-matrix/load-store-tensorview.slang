@@ -73,7 +73,7 @@ void computeMain()
 
 #if defined(BLOCK_LOAD)
     //SPIRV_BL: = OpCooperativeMatrixLoadTensorNV %{{.*}} TensorView|DecodeFunc %
-    let mat = CoopMatType.LoadDecode<uint32_t>(inputBuffer, 0, tl3, tvRowMajor, decodeFunc);
+    let mat = CoopMatType.Load<uint32_t>(inputBuffer, 0, tl3, tvRowMajor, decodeFunc);
 
 #else // #if defined(BLOCK_LOAD)
     //SPIRV: OpCooperativeMatrixLoadTensorNV %

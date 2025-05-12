@@ -4,8 +4,8 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -skip-spirv-validation -render-feature cooperative-matrix-tensor-addressing
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -skip-spirv-validation -render-feature cooperative-matrix-tensor-addressing -Xslang -DRW
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BL):-vk -output-using-type -emit-spirv-directly -Xslang -DBLOCK_LOAD -skip-spirv-validation -render-feature cooperative-matrix-block-loads
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BL):-vk -output-using-type -emit-spirv-directly -Xslang -DBLOCK_LOAD -skip-spirv-validation -render-feature cooperative-matrix-block-loads -Xslang -DRW
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BL):-vk -output-using-type -emit-spirv-directly -skip-spirv-validation -render-feature cooperative-matrix-block-loads -Xslang -DBLOCK_LOAD
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BL):-vk -output-using-type -emit-spirv-directly -skip-spirv-validation -render-feature cooperative-matrix-block-loads -Xslang -DBLOCK_LOAD -Xslang -DRW
 
 //CHECK: 0
 //CHECK-NEXT: 0
@@ -74,7 +74,7 @@ void computeMain()
 
 #if defined(BLOCK_LOAD)
     //SPIRV_BL: = OpCooperativeMatrixLoadTensorNV %{{.*}} DecodeFunc %
-    let mat = CoopMatType.LoadDecode<uint32_t>(inputBuffer, 0, tl5, decodeFunc);
+    let mat = CoopMatType.Load<uint32_t>(inputBuffer, 0, tl5, decodeFunc);
 
 #else // #if defined(BLOCK_LOAD)
     //SPIRV: = OpCooperativeMatrixLoadTensorNV %{{.*}} None

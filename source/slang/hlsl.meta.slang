@@ -22523,13 +22523,13 @@ enum CoopMatMatrixUse
     MatrixAccumulator = 2,
 };
 
-enum CoopMatMatrixLayout : uint
+enum CoopMatMatrixLayout
 {
     RowMajor = 0,
     ColumnMajor = 1,
 };
 
-enum CoopMatClampMode : uint
+enum CoopMatClampMode
 {
     Undefined,
     Constant,
@@ -22565,7 +22565,7 @@ __intrinsic_type($(kIROp_TensorAddressingTensorLayoutType))
 [require(tensor_addressing)]
 __generic<
     let Dim : uint32_t,
-    let ClampMode : uint32_t = 0 // CoopMatClampMode = CoopMatClampMode.Undefined
+    let ClampMode : CoopMatClampMode = CoopMatClampMode.Undefined
 >
 struct TensorLayout
 {
@@ -22600,7 +22600,7 @@ ${{{{
 
 
 extension<
-    let ClampMode : uint32_t //  : CoopMatClampMode
+    let ClampMode : CoopMatClampMode
 > TensorLayout<$(iDim), ClampMode>
 {
     [require(tensor_addressing)]
@@ -23024,22 +23024,24 @@ struct CoopMat
 
     [require(cooperative_matrix)]
     void Store<
-        let matrixLayout : uint32_t //  : CoopMatMatrixLayout
+        let matrixLayout : CoopMatMatrixLayout
     >(RWByteAddressBuffer buffer, uint element, uint stride)
     {
-        __store(__getEquivalentStructuredBuffer<T>(buffer), element, stride, matrixLayout);
+        __store<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
     }
 
     [require(cooperative_matrix)]
     void Store<
-        let matrixLayout : uint32_t //  : CoopMatMatrixLayout
+        let matrixLayout : CoopMatMatrixLayout
     >(RWStructuredBuffer<T> buffer, uint element, uint stride)
     {
-        __store(buffer, element, stride, matrixLayout);
+        __store<matrixLayout>(buffer, element, stride);
     }
 
     [require(cooperative_matrix)]
-    internal void __Store(RWStructuredBuffer<T> buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+    internal void __store<
+        let matrixLayout : CoopMatMatrixLayout
+    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
     {
         let zero = 0;
         let alignment = 16U;
@@ -23053,7 +23055,7 @@ struct CoopMat
 
     [require(cooperative_matrix)]
     void Store<
-        let matrixLayout : uint32_t //  : CoopMatMatrixLayout
+        let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
     {
         let alignment = 16U;
@@ -23067,7 +23069,7 @@ struct CoopMat
     [ForceInline]
     [require(cooperative_matrix)]
     void Store<
-        let matrixLayout : uint32_t, //  : CoopMatMatrixLayout
+        let matrixLayout : CoopMatMatrixLayout,
         let V : int
     >(__ref groupshared T[V] data, uint element, uint stride)
     {
@@ -23083,7 +23085,7 @@ struct CoopMat
     [ForceInline]
     [require(cooperative_matrix)]
     void Store<
-        let matrixLayout : uint32_t, //  : CoopMatMatrixLayout
+        let matrixLayout : CoopMatMatrixLayout,
         U,
         let V : int
     >(__ref groupshared U[V] data, uint element, uint stride)
@@ -23100,7 +23102,7 @@ struct CoopMat
     [ForceInline]
     [require(cooperative_matrix)]
     void Store<
-        let matrixLayout : uint32_t, //  : CoopMatMatrixLayout
+        let matrixLayout : CoopMatMatrixLayout,
         U,
         let V : int,
         let L : int
@@ -23120,11 +23122,19 @@ struct CoopMat
     // Load
     //
 
+${{{{
+    for (const char* RW : { "", "RW" })
+    {
+}}}}
+
     [__NoSideEffect]
     [require(cooperative_matrix)]
     static This Load<
-        let matrixLayout : uint32_t //  : CoopMatMatrixLayout
-    >(ByteAddressBuffer buffer, uint element, uint stride)
+        let matrixLayout : CoopMatMatrixLayout
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        uint stride)
     {
         return Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
     }
@@ -23132,17 +23142,11 @@ struct CoopMat
     [__NoSideEffect]
     [require(cooperative_matrix)]
     static This Load<
-        let matrixLayout : uint32_t //  : CoopMatMatrixLayout
-    >(RWByteAddressBuffer buffer, uint element, uint stride)
-    {
-        return Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
-    }
-
-    [__NoSideEffect]
-    [require(cooperative_matrix)]
-    static This Load<
-        let matrixLayout : uint32_t //  : CoopMatMatrixLayout
-    >(StructuredBuffer<T> buffer, uint element, uint stride)
+        let matrixLayout : CoopMatMatrixLayout
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        uint stride)
     {
         let zero = 0;
         let alignment = 16U;
@@ -23154,27 +23158,15 @@ struct CoopMat
         };
     }
 
-    [__NoSideEffect]
-    [require(cooperative_matrix)]
-    static This Load<
-        let matrixLayout : uint32_t //  : CoopMatMatrixLayout
-    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
-    {
-        let zero = 0;
-        let alignment = 16U;
-        return spirv_asm
-        {
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
-    }
+${{{{
+    } // RW
+}}}}
 
     [ForceInline]
     [__NoSideEffect]
     [require(cooperative_matrix)]
     static This Load<
-        let matrixLayout : uint32_t //  : CoopMatMatrixLayout
+        let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
     {
         let alignment = 16;
@@ -23188,7 +23180,7 @@ struct CoopMat
     [ForceInline]
     [require(cooperative_matrix)]
     static This Load<
-        let matrixLayout : uint32_t, //  : CoopMatMatrixLayout
+        let matrixLayout : CoopMatMatrixLayout,
         let V : int
     >(__constref groupshared T[V] data, uint element, uint stride)
     {
@@ -23204,7 +23196,7 @@ struct CoopMat
     [ForceInline]
     [require(cooperative_matrix)]
     static This Load<
-        let matrixLayout : uint32_t, //  : CoopMatMatrixLayout
+        let matrixLayout : CoopMatMatrixLayout,
         U,
         let V : int
     >(__constref groupshared U[V] data, uint element, uint stride)
@@ -23221,7 +23213,7 @@ struct CoopMat
     [ForceInline]
     [require(cooperative_matrix)]
     static This Load<
-        let matrixLayout : uint32_t, //  : CoopMatMatrixLayout
+        let matrixLayout : CoopMatMatrixLayout,
         U,
         let V : int,
         let L : int
@@ -23317,79 +23309,6 @@ struct CoopMat
     // Load with TensorLayout and TensorView
     //
 
-    [require(cooperative_matrix_tensor_addressing)]
-    static This Load<
-        let Dim : uint32_t,
-        let ClampMode : uint32_t //  : CoopMatClampMode
-    >(
-        ByteAddressBuffer buffer,
-        uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout)
-    {
-        return Load<Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout);
-    }
-
-    [require(cooperative_matrix_tensor_addressing)]
-    static This Load<
-        let Dim : uint32_t,
-        let ClampMode : uint32_t //  : CoopMatClampMode
-    >(
-        RWByteAddressBuffer buffer,
-        uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout)
-    {
-        return Load<Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout);
-    }
-
-    [require(cooperative_matrix_tensor_addressing)]
-    static This Load<
-        let Dim : uint32_t,
-        let ClampMode : uint32_t //  : CoopMatClampMode
-    >(
-        StructuredBuffer<T> buffer,
-        uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout)
-    {
-        let zero = 0;
-        let alignment = 16U;
-
-        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
-        This ret;
-        return spirv_asm
-        {
-            OpCapability CooperativeMatrixTensorAddressingNV;
-            OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment None;
-        };
-    }
-
-    [require(cooperative_matrix_tensor_addressing)]
-    static This Load<
-        let Dim : uint32_t,
-        let ClampMode : uint32_t //  : CoopMatClampMode
-    >(
-        RWStructuredBuffer<T> buffer,
-        uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout)
-    {
-        let zero = 0;
-        let alignment = 16U;
-
-        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
-        This ret;
-        return spirv_asm
-        {
-            OpCapability CooperativeMatrixTensorAddressingNV;
-            OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment None;
-        };
-    }
-
-
 ${{{{
     StringBuilder tensorViewTypes;
     StringBuilder tensorViewParams;
@@ -23398,49 +23317,100 @@ ${{{{
         tensorViewTypes << ", let p" << j << " : uint32_t = " << kMaxCoopMatTensorDimension;
         tensorViewParams << ", p" << j;
     }
+
+    for (const char* RW : { "", "RW" })
+    {
 }}}}
 
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
         let Dim : uint32_t,
-        let ClampMode : uint32_t, //  : CoopMatClampMode
-        let DimView : uint32_t,
-        let HasDimensions : bool
-        $(tensorViewTypes)
+        let ClampMode : CoopMatClampMode
     >(
-        ByteAddressBuffer buffer,
+        $(RW)ByteAddressBuffer buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
-        tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout)
     {
-        return Load<Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView);
+        return __loadLayout<Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout);
     }
 
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
         let Dim : uint32_t,
-        let ClampMode : uint32_t, //  : CoopMatClampMode
-        let DimView : uint32_t,
-        let HasDimensions : bool
-        $(tensorViewTypes)
+        let ClampMode : CoopMatClampMode
     >(
-        RWByteAddressBuffer buffer,
+        $(RW)StructuredBuffer<T> buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
-        tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout)
     {
-        return Load<Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView);
+        return __loadLayout<Dim, ClampMode>(buffer, element, tensorLayout);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This __loadLayout<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        This ret;
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            %storagePointerType = OpTypePointer StorageBuffer $$T;
+            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment None;
+        };
     }
 
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
         let Dim : uint32_t,
-        let ClampMode : uint32_t, //  : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
         $(tensorViewTypes)
     >(
-        StructuredBuffer<T> buffer,
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
+        tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+    {
+        return __loadView<Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
+        tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
+    {
+        return __loadView<Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(buffer, element, tensorLayout, tensorView);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This __loadView<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
         uint element,
         tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
         tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
@@ -23460,77 +23430,41 @@ ${{{{
         };
     }
 
-    [require(cooperative_matrix_tensor_addressing)]
+    [require(cooperative_matrix_block_load)]
     static This Load<
-        let Dim : uint32_t,
-        let ClampMode : uint32_t, //  : CoopMatClampMode
-        let DimView : uint32_t,
-        let HasDimensions : bool
-        $(tensorViewTypes)
-    >(
-        RWStructuredBuffer<T> buffer,
-        uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
-        tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
-    {
-        let zero = 0;
-        let alignment = 16U;
-
-        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
-        This ret;
-        return spirv_asm
-        {
-            OpCapability CooperativeMatrixTensorAddressingNV;
-            OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment TensorView $tensorView;
-        };
-    }
-
-    //
-    // TODO: The name should be just `Load` but using `LoadDecode` for now.
-    //   It is beause the name `Load` somehow conflicts with the other overloading,
-    //     `This Load<let matrixLayout : CoopMatMatrixLayout>(...)`.
-    //   The error message is:
-    //     "expected an expression of type 'uint', got 'typeof(uint32_t)'"
-    //
-
-    [require(cooperative_matrix_block_load)]
-    static This LoadDecode<
         U,
         let Dim : uint32_t,
-        let ClampMode : uint32_t //  : CoopMatClampMode
+        let ClampMode : CoopMatClampMode
     >(
-        ByteAddressBuffer buffer,
+        $(RW)ByteAddressBuffer buffer,
         uint element,
         tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
-        return LoadDecode<U, Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, decodeFunc);
+        return __loadLayoutDecode<U, Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, decodeFunc);
     }
 
     [require(cooperative_matrix_block_load)]
-    static This LoadDecode<
+    static This Load<
         U,
         let Dim : uint32_t,
-        let ClampMode : uint32_t //  : CoopMatClampMode
+        let ClampMode : CoopMatClampMode
     >(
-        RWByteAddressBuffer buffer,
+        $(RW)StructuredBuffer<T> buffer,
         uint element,
         tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
-        return LoadDecode<U, Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, decodeFunc);
+        return __loadLayoutDecode<U, Dim, ClampMode>(buffer, element, tensorLayout, decodeFunc);
     }
 
     [require(cooperative_matrix_block_load)]
-    static This LoadDecode<
+    static This __loadLayoutDecode<
         U,
         let Dim : uint32_t,
-        let ClampMode : uint32_t //  : CoopMatClampMode
+        let ClampMode : CoopMatClampMode
     >(
-        StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T> buffer,
         uint element,
         tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
@@ -23551,77 +23485,51 @@ ${{{{
     }
 
     [require(cooperative_matrix_block_load)]
-    static This LoadDecode<
+    static This Load<
         U,
         let Dim : uint32_t,
-        let ClampMode : uint32_t //  : CoopMatClampMode
-    >(
-        RWStructuredBuffer<T> buffer,
-        uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
-        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
-    {
-        let zero = 0;
-        let alignment = 16U;
-
-        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
-        This ret;
-        return spirv_asm
-        {
-            OpCapability CooperativeMatrixBlockLoadsNV;
-            OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment DecodeFunc $decodeFunc;
-        };
-    }
-
-    [require(cooperative_matrix_block_load)]
-    static This LoadDecode<
-        U,
-        let Dim : uint32_t,
-        let ClampMode : uint32_t, //  : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
         $(tensorViewTypes)
     >(
-        ByteAddressBuffer buffer,
+        $(RW)ByteAddressBuffer buffer,
         uint element,
         tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
         tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
-        return LoadDecode<U, Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView, decodeFunc);
+        return __loadViewDecode<U, Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView, decodeFunc);
     }
 
     [require(cooperative_matrix_block_load)]
-    static This LoadDecode<
+    static This Load<
         U,
         let Dim : uint32_t,
-        let ClampMode : uint32_t, //  : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
         $(tensorViewTypes)
     >(
-        RWByteAddressBuffer buffer,
+        $(RW)StructuredBuffer<T> buffer,
         uint element,
         tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
         tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
-        return LoadDecode<U, Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView, decodeFunc);
+        return __loadViewDecode<U, Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(buffer, element, tensorLayout, tensorView, decodeFunc);
     }
 
     [require(cooperative_matrix_block_load)]
-    static This LoadDecode<
+    static This __loadViewDecode<
         U,
         let Dim : uint32_t,
-        let ClampMode : uint32_t, //  : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
         $(tensorViewTypes)
     >(
-        StructuredBuffer<T> buffer,
+        $(RW)StructuredBuffer<T> buffer,
         uint element,
         tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
         tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
@@ -23643,41 +23551,14 @@ ${{{{
         };
     }
 
-    [require(cooperative_matrix_block_load)]
-    static This LoadDecode<
-        U,
-        let Dim : uint32_t,
-        let ClampMode : uint32_t, //  : CoopMatClampMode
-        let DimView : uint32_t,
-        let HasDimensions : bool
-        $(tensorViewTypes)
-    >(
-        RWStructuredBuffer<T> buffer,
-        uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
-        tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
-        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
-    {
-        let zero = 0;
-        let alignment = 16U;
-
-        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
-        This ret;
-        return spirv_asm
-        {
-            OpCapability CooperativeMatrixTensorAddressingNV;
-            OpCapability CooperativeMatrixBlockLoadsNV;
-            OpExtension "SPV_NV_cooperative_matrix2";
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment TensorView|DecodeFunc $tensorView $decodeFunc;
-        };
-    }
+${{{{
+    } // RW
+}}}}
 
     [require(cooperative_matrix_tensor_addressing)]
     void Store<
         let Dim : uint32_t,
-        let ClampMode : uint32_t //  : CoopMatClampMode
+        let ClampMode : CoopMatClampMode
     >(
         RWByteAddressBuffer buffer,
         uint element,
@@ -23689,7 +23570,7 @@ ${{{{
     [require(cooperative_matrix_tensor_addressing)]
     void Store<
         let Dim : uint32_t,
-        let ClampMode : uint32_t //  : CoopMatClampMode
+        let ClampMode : CoopMatClampMode
     >(
         RWStructuredBuffer<T> buffer,
         uint element,
@@ -23715,7 +23596,7 @@ ${{{{
     [require(cooperative_matrix_tensor_addressing)]
     void Store<
         let Dim : uint32_t,
-        let ClampMode : uint32_t, //  : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
         $(tensorViewTypes)
@@ -23731,7 +23612,7 @@ ${{{{
     [require(cooperative_matrix_tensor_addressing)]
     void Store<
         let Dim : uint32_t,
-        let ClampMode : uint32_t, //  : CoopMatClampMode
+        let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
         $(tensorViewTypes)
@@ -23774,7 +23655,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
-    let matrixLayout : uint32_t //  : CoopMatMatrixLayout
+    let matrixLayout : CoopMatMatrixLayout
 >(
     ByteAddressBuffer buffer,
     uint element,
@@ -23791,7 +23672,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
-    let matrixLayout : uint32_t //  : CoopMatMatrixLayout
+    let matrixLayout : CoopMatMatrixLayout
 >(
     RWByteAddressBuffer buffer,
     uint element,
@@ -23808,7 +23689,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
-    let matrixLayout : uint32_t //  : CoopMatMatrixLayout
+    let matrixLayout : CoopMatMatrixLayout
 >(
     StructuredBuffer<T> buffer,
     uint element,
@@ -23825,7 +23706,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
-    let matrixLayout : uint32_t //  : CoopMatMatrixLayout
+    let matrixLayout : CoopMatMatrixLayout
 >(
     RWStructuredBuffer<T> buffer,
     uint element,
@@ -23842,7 +23723,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
-    let matrixLayout : uint32_t //  : CoopMatMatrixLayout
+    let matrixLayout : CoopMatMatrixLayout
 >(
     T* buffer,
     uint element,
@@ -23859,7 +23740,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     let M : int,
     let N : int,
     let R : CoopMatMatrixUse,
-    let matrixLayout : uint32_t, //  : CoopMatMatrixLayout
+    let matrixLayout : CoopMatMatrixLayout,
     let U : int
 >(
     __constref groupshared T[U] data,
