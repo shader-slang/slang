@@ -73,6 +73,107 @@ static Slang::Result loadProgram(
     return SLANG_OK;
 }
 
+// Function to validate the array size in struct S
+static void validateArraySizeInStruct(
+    UnitTestContext* context,
+    slang::ProgramLayout* slangReflection,
+    int expectedSize)
+{
+    // Check reflection is available
+    SLANG_CHECK(slangReflection != nullptr);
+
+    // Get the global scope layout
+    auto globalScope = slangReflection->getGlobalParamsVarLayout();
+    SLANG_CHECK_MSG(globalScope != nullptr, "Could not get global scope layout");
+
+    auto typeLayout = globalScope->getTypeLayout();
+    SLANG_CHECK_MSG(typeLayout != nullptr, "Global scope has no type layout");
+
+    // Check if the global scope is a struct type
+    auto kind = typeLayout->getKind();
+    SLANG_CHECK_MSG(
+        kind == slang::TypeReflection::Kind::Struct,
+        "Global scope is not a struct type");
+
+    // Find the buffer resource 'b'
+    bool foundBuffer = false;
+    auto fieldCount = typeLayout->getFieldCount();
+
+    for (unsigned int i = 0; i < fieldCount; i++)
+    {
+        auto fieldLayout = typeLayout->getFieldByIndex(i);
+        const char* fieldName = fieldLayout->getName();
+
+        if (fieldName && strcmp(fieldName, "b") == 0)
+        {
+            foundBuffer = true;
+
+            // Get the type layout of the field
+            auto fieldTypeLayout = fieldLayout->getTypeLayout();
+            SLANG_CHECK_MSG(fieldTypeLayout != nullptr, "Field has no type layout");
+
+            // Get the element type of the structured buffer
+            auto elementTypeLayout = fieldTypeLayout->getElementTypeLayout();
+            SLANG_CHECK_MSG(
+                elementTypeLayout != nullptr,
+                "Structured buffer has no element type layout");
+
+            // Check if it's a struct type
+            auto elementKind = elementTypeLayout->getKind();
+            SLANG_CHECK_MSG(
+                elementKind == slang::TypeReflection::Kind::Struct,
+                "Buffer element is not a struct type");
+
+            // Get the field count of the struct
+            auto structFieldCount = elementTypeLayout->getFieldCount();
+            SLANG_CHECK_MSG(structFieldCount >= 1, "Struct has no fields");
+
+            // Check for the 'xs' field
+            bool foundXsField = false;
+            for (unsigned int j = 0; j < structFieldCount; j++)
+            {
+                auto structField = elementTypeLayout->getFieldByIndex(j);
+                const char* structFieldName = structField->getName();
+
+                if (structFieldName && strcmp(structFieldName, "xs") == 0)
+                {
+                    foundXsField = true;
+
+                    // Check that it's an array type
+                    auto structFieldTypeLayout = structField->getTypeLayout();
+                    auto structFieldTypeKind = structFieldTypeLayout->getKind();
+
+                    SLANG_CHECK_MSG(
+                        structFieldTypeKind == slang::TypeReflection::Kind::Array,
+                        "Field 'xs' is not an array type");
+
+                    // Check the array size
+                    auto arraySize = structFieldTypeLayout->getElementCount();
+                    // 0 becuase we haven't resolved the constant
+                    SLANG_CHECK_MSG(
+                        arraySize == 0,
+                        "Field 'xs' array size does not match expected size");
+
+                    // 4 because we're resolving it
+                    const auto resolvedArraySize =
+                        structFieldTypeLayout->getElementCount(slangReflection);
+                    SLANG_CHECK_MSG(
+                        resolvedArraySize == expectedSize,
+                        "Field 'xs' array size does not match expected size");
+
+                    break;
+                }
+            }
+
+            SLANG_CHECK_MSG(foundXsField, "Could not find field 'xs' in struct S");
+            break;
+        }
+    }
+
+    SLANG_CHECK_MSG(foundBuffer, "Could not find buffer 'b' in global scope");
+}
+
+
 void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context)
 {
     // Create transient heap
@@ -93,6 +194,11 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
         "computeMain",
         slangReflection));
 
+    // Check array size through reflection
+    const int N = 4; // This should match the constant in lib.slang
+
+    validateArraySizeInStruct(context, slangReflection, N);
+
     // Create compute pipeline
     ComputePipelineStateDesc pipelineDesc = {};
     pipelineDesc.program = shaderProgram.get();
@@ -100,15 +206,12 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
     GFX_CHECK_CALL_ABORT(
         device->createComputePipelineState(pipelineDesc, pipelineState.writeRef()));
 
-    // Create structured buffer for output
-    const int N = 4; // This should match the constant in lib.slang
-
     // Create buffer for struct S with array of size N
     int32_t initialData[] = {1, 2, 3, 4};
     IBufferResource::Desc bufferDesc = {};
     bufferDesc.sizeInBytes = N * sizeof(int32_t);
     bufferDesc.format = gfx::Format::Unknown;
-    bufferDesc.elementSize = N * sizeof(int32_t);
+    bufferDesc.elementSize = sizeof(int32_t);
     bufferDesc.allowedStates = ResourceStateSet(
         ResourceState::ShaderResource,
         ResourceState::UnorderedAccess,
@@ -139,8 +242,6 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
         auto rootObject = encoder->bindPipeline(pipelineState);
 
         ShaderCursor rootCursor(rootObject);
-
-        // Bind output buffer
         rootCursor.getPath("b").setResource(bufferView);
 
         encoder->dispatchCompute(1, 1, 1);
@@ -149,8 +250,6 @@ void linkTimeConstantArraySizeTestImpl(IDevice* device, UnitTestContext* context
         queue->executeCommandBuffer(commandBuffer);
         queue->waitOnHost();
     }
-
-    // int32_t* buf = numbersBuffer->#guard
 
     // Expected results: each element is input * N
     // With N=4 and inputs [1,2,3,4], expected output is [4,8,12,16]
