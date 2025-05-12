@@ -87,6 +87,7 @@ static bool _isSubCommand(const char* arg)
         "  -use-shared-library            Run tests in-process using shared library\n"
         "  -use-test-server               Run tests using test server\n"
         "  -use-fully-isolated-test-server  Run each test in isolated server\n"
+        "  -capability <name>             Compile with the given capability\n"
         "\n"
         "Output modes:\n"
         "  -appveyor                      Use AppVeyor output format\n"
@@ -358,6 +359,16 @@ static bool _isSubCommand(const char* arg)
         else if (strcmp(arg, "-emit-spirv-via-glsl") == 0)
         {
             optionsOut->emitSPIRVDirectly = false;
+        }
+        else if (strcmp(arg, "-capability") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
+            }
+            optionsOut->capabilities.add(*argCursor++);
         }
         else if (strcmp(arg, "-expected-failure-list") == 0)
         {

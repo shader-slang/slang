@@ -4905,6 +4905,35 @@ public property uint gl_HitKindEXT
     }
 }
 
+public property int gl_ClusterIDNV
+{
+    [require(glsl_spirv, raytracing_anyhit_closesthit)]
+    get
+    {
+        setupExtForRayTracingBuiltIn();
+        __target_switch
+        {
+        case glsl:
+        {
+            __requireTargetExtension("GL_NV_cluster_acceleration_structure");
+            __intrinsic_asm "(gl_ClusterIDNV)";
+        }
+        case spirv:
+        {
+            return spirv_asm
+            {
+                OpCapability RayTracingClusterAccelerationStructureNV;
+                OpExtension "SPV_NV_cluster_acceleration_structure";
+                result:$$int = OpLoad builtin(ClusterIDNV:int);
+            };
+        }
+        }
+    }
+}
+// Constant to indicate that a cluster acceleration structure was not hit.
+// Corresponds to VK_GEOMETRY_INSTANCE_CLUSTER_ID_NONE_NV in Vulkan
+public static const int gl_ClusterIDNoneNV = -1;
+
 public property mat4x3 gl_ObjectToWorldEXT 
 {
     [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]

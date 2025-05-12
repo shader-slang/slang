@@ -29,11 +29,16 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     {
         testResult = 0;
     }
-    uintptr_t b = 0uz;
+    uintptr_t b = 50uz;
     actualSize = getSizeOf(b);
     if (expectedSize != actualSize)
     {
         testResult = 0;
     }
     outputBuffer[dispatchThreadID.x] = testResult;
+    outputBuffer[dispatchThreadID.x+1] = int(b >> 1);
+
+    vector<uintptr_t, 2> c = vector<uintptr_t, 2>(2uz);
+    vector<uintptr_t, 2> d = vector<uintptr_t, 2>(3uz);
+    outputBuffer[dispatchThreadID.x+2] = int((c+d).y);
 }

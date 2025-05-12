@@ -1053,6 +1053,8 @@ IntInfo getIntTypeInfo(const IRType* intType);
 // left-inverse of getIntTypeInfo
 IROp getIntTypeOpFromInfo(const IntInfo info);
 
+IROp getOppositeSignIntTypeOp(IROp op);
+
 struct FloatInfo
 {
     Int width;
