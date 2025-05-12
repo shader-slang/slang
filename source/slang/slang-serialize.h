@@ -83,7 +83,7 @@ public:
         encodeData(SerialBinary::kDataFourCC, data, size);
     }
 
-    void encode(nullptr_t) { encodeData(SerialBinary::kNullFourCC, nullptr, 0); }
+    void encode(std::nullptr_t) { encodeData(SerialBinary::kNullFourCC, nullptr, 0); }
 
     void encodeBool(bool value)
     {

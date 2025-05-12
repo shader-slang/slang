@@ -211,6 +211,15 @@ static SlangResult _compileProgramImpl(
         sessionOptionEntries.add(entry);
     }
 
+    for (auto& capability : options.capabilities)
+    {
+        slang::CompilerOptionEntry entry;
+        entry.name = slang::CompilerOptionName::Capability;
+        entry.value.kind = slang::CompilerOptionValueKind::String;
+        entry.value.stringValue0 = capability.getBuffer();
+        sessionOptionEntries.add(entry);
+    }
+
     sessionDesc.compilerOptionEntryCount = sessionOptionEntries.getCount();
     sessionDesc.compilerOptionEntries = sessionOptionEntries.getBuffer();
 
