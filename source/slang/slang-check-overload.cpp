@@ -481,7 +481,11 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             }
             else
             {
-                arg = coerce(CoercionSite::Argument, getType(m_astBuilder, valParamRef), arg);
+                arg = coerce(
+                    CoercionSite::Argument,
+                    getType(m_astBuilder, valParamRef),
+                    arg,
+                    getSink());
             }
 
             // If we have an argument to work with, then we will
@@ -712,7 +716,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
         }
         else
         {
-            Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr);
+            Expr* coercedExpr = coerce(CoercionSite::Argument, paramType, arg.argExpr, getSink());
 
             // Check if concrete-to-interface coercion caused loss of l-valueness.
             if (coercedExpr && !coercedExpr->type.isLeftValue && paramType.isLeftValue &&
@@ -2650,6 +2654,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                                             &resultExpr,
                                             expr->arguments[0]->type,
                                             expr->arguments[0],
+                                            getSink(),
                                             &conversionCost);
                 if (coerceResult)
                     return resultExpr;

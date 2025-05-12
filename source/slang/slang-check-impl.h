@@ -1646,7 +1646,7 @@ public:
         InitializerListExpr* fromInitializerListExpr);
 
     /// Report that implicit type coercion is not possible.
-    bool _failedCoercion(Type* toType, Expr** outToExpr, Expr* fromExpr);
+    bool _failedCoercion(Type* toType, Expr** outToExpr, Expr* fromExpr, DiagnosticSink* sink);
 
     /// Central engine for implementing implicit coercion logic
     ///
@@ -1674,6 +1674,7 @@ public:
         Expr** outToExpr,
         QualType fromType,
         Expr* fromExpr,
+        DiagnosticSink* sink,
         ConversionCost* outCost);
 
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.
@@ -1698,7 +1699,7 @@ public:
     Expr* createCastToInterfaceExpr(Type* toType, Expr* fromExpr, Val* witness);
 
     /// Implicitly coerce `fromExpr` to `toType` and diagnose errors if it isn't possible
-    Expr* coerce(CoercionSite site, Type* toType, Expr* fromExpr);
+    Expr* coerce(CoercionSite site, Type* toType, Expr* fromExpr, DiagnosticSink* sink);
 
     // Fill in default substitutions for the 'subtype' part of a type constraint decl
     void CheckConstraintSubType(TypeExp& typeExp);
