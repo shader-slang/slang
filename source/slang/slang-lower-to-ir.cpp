@@ -1554,6 +1554,14 @@ static bool _isTrivialLookupFromInterfaceThis(IRGenContext* context, DeclRefBase
 
 
 //
+static void maybePropagateRate(IRBuilder* builder, IRType* rateQulifiedType, IRInst* inst)
+{
+    if (isSpecConstRateType(rateQulifiedType))
+    {
+        inst->setFullType(
+            builder->getRateQualifiedType(builder->getSpecConstRate(), inst->getFullType()));
+    }
+}
 
 struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, LoweredValInfo>
 {
@@ -1579,27 +1587,35 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         TryClauseEnvironment tryEnv;
         List<IRInst*> args;
+        IRType* specConstRateType = nullptr;
         for (auto arg : val->getArgs())
         {
             auto loweredArg = lowerVal(context, arg);
             args.add(loweredArg.val);
+            if (!specConstRateType && isSpecConstRateType(loweredArg.val->getFullType()))
+                specConstRateType = loweredArg.val->getFullType();
         }
         auto funcType = lowerType(context, val->getFuncType());
-        return emitCallToDeclRef(
+        auto resVal = emitCallToDeclRef(
             context,
             as<IRFuncType>(funcType)->getResultType(),
             val->getFuncDeclRef(),
             funcType,
             args,
             tryEnv);
+        maybePropagateRate(getBuilder(), specConstRateType, resVal.val);
+        return resVal;
     }
 
     LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
     {
         auto baseVal = lowerVal(context, val->getBase());
+
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
         auto type = lowerType(context, val->getType());
-        return LoweredValInfo::simple(getBuilder()->emitCast(type, baseVal.val));
+        auto resVal = LoweredValInfo::simple(getBuilder()->emitCast(type, baseVal.val));
+        maybePropagateRate(getBuilder(), baseVal.val->getFullType(), resVal.val);
+        return resVal;
     }
 
     LoweredValInfo visitWitnessLookupIntVal(WitnessLookupIntVal* val)
@@ -1627,8 +1643,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 {
                     termVal = irBuilder->emitMul(factorVal->getDataType(), termVal, factorVal);
                 }
+                maybePropagateRate(getBuilder(), factorVal->getFullType(), termVal);
             }
             resultVal = irBuilder->emitAdd(termVal->getDataType(), resultVal, termVal);
+            maybePropagateRate(getBuilder(), termVal->getFullType(), resultVal);
         }
         return LoweredValInfo::simple(resultVal);
     }
@@ -2060,30 +2078,16 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         {
             IRInst* elementCount = nullptr;
             auto sizeVal = type->getElementCount();
-            if (!as<ConstantIntVal>(sizeVal) && !as<GenericParamIntVal>(sizeVal))
+            auto sharedContext = context->shared;
+            if (!sharedContext->mapSpecConstValToIRInst.tryGetValue(sizeVal, elementCount))
             {
-                // We will always insert the specialization constant size into global scope.
-                auto sharedContext = context->shared;
-                if (!sharedContext->mapSpecConstValToIRInst.tryGetValue(
-                        sizeVal,
-                        elementCount))
+                elementCount = lowerSimpleVal(context, sizeVal);
+                if (isSpecConstRateType(elementCount->getFullType()))
                 {
-                    IRBuilderInsertLocScope insertScope(getBuilder());
-                    getBuilder()->setInsertInto(getBuilder()->getModule());
-                    auto irInitVal = lowerSimpleVal(context, sizeVal);
-                    elementCount =
-                         getBuilder()->emitGlobalConstant(irInitVal->getDataType(), irInitVal);
                     sharedContext->mapSpecConstValToIRInst.add(sizeVal, elementCount);
-                    getBuilder()->addDecoration(
-                        elementCount,
-                        kIROp_SpecializationConstantOpDecoration);
+                    hoistInstAndOperandsToGlobal(getBuilder(), elementCount);
                 }
             }
-            else
-            {
-                elementCount = lowerSimpleVal(context, type->getElementCount());
-            }
-
             return getBuilder()->getArrayType(elementType, elementCount);
         }
         else
@@ -2472,6 +2476,13 @@ void maybeSetRate(IRGenContext* context, IRInst* inst, Decl* decl)
     {
         inst->setFullType(
             builder->getRateQualifiedType(builder->getActualGlobalRate(), inst->getFullType()));
+    }
+    else if (
+        decl->hasModifier<SpecializationConstantAttribute>() ||
+        decl->hasModifier<VkConstantIdAttribute>())
+    {
+        inst->setFullType(
+            builder->getRateQualifiedType(builder->getSpecConstRate(), inst->getFullType()));
     }
 }
 

@@ -2292,11 +2292,6 @@ struct ReplaceGlobalConstantsPass
     {
         if (auto globalConstant = as<IRGlobalConstant>(inst))
         {
-            // If the global constant is the result from a specialization constant operation, don't
-            // remove it.
-            if (globalConstant->findDecoration<IRSpecializationConstantOpDecoration>())
-                return;
-
             if (auto val = globalConstant->getValue())
             {
                 // Attempt to transfer the name hint from the global

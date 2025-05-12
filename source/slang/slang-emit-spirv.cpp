@@ -781,7 +781,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         opCode = _arithmeticOpCodeConvert(irOpCode, basicType);
         if (opCode == SpvOpUndef)
         {
-            switch(irOpCode)
+            switch (irOpCode)
             {
             case kIROp_IntCast:
                 {
@@ -2110,25 +2110,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitDebugInlinedAt(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 as<IRDebugInlinedAt>(inst));
-        case kIROp_GlobalConstant:
-            {
-                if (inst->findDecoration<IRSpecializationConstantOpDecoration>())
-                {
-                    auto globalConstant = as<IRGlobalConstant>(inst);
-                    return emitSpecializationConstantOp(globalConstant->getValue());
-                }
-                break;
-            }
         default:
             {
-                if (as<IRSPIRVAsmOperand>(inst))
+                if (isSpecConstRateType(inst->getFullType()))
+                    return emitSpecializationConstantOp(inst);
+
+                else if (as<IRSPIRVAsmOperand>(inst))
                     return nullptr;
+
+                String e = "Unhandled global inst in spirv-emit:\n" +
+                           dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+                SLANG_UNIMPLEMENTED_X(e.begin());
             }
         }
-
-        String e = "Unhandled global inst in spirv-emit:\n" +
-                   dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
-        SLANG_UNIMPLEMENTED_X(e.begin());
     }
 
     SpvImageFormat getSpvImageFormat(IRTextureTypeBase* type)

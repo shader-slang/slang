@@ -321,11 +321,11 @@ IRIntegerValue getArraySizeVal(IRInst* inst)
     case kIROp_IntLit:
         return static_cast<IRConstant*>(inst)->value.intVal;
         break;
-    // Treat specialization constant array as the unsized array here.
-    case kIROp_GlobalConstant:
-        return kUnsizedArrayMagicLength;
-        break;
     default:
+        // Treat specialization constant array as the unsized array here.
+        if (isSpecConstRateType(inst->getFullType()))
+            return kUnsizedArrayMagicLength;
+
         SLANG_UNEXPECTED("needed a known integer value");
         UNREACHABLE_RETURN(0);
     }
@@ -3210,6 +3210,10 @@ IRGroupSharedRate* IRBuilder::getGroupSharedRate()
 IRActualGlobalRate* IRBuilder::getActualGlobalRate()
 {
     return (IRActualGlobalRate*)getType(kIROp_ActualGlobalRate);
+}
+IRSpecConstRate* IRBuilder::getSpecConstRate()
+{
+    return (IRSpecConstRate*)getType(kIROp_SpecConstRate);
 }
 
 IRRateQualifiedType* IRBuilder::getRateQualifiedType(IRRate* rate, IRType* dataType)

@@ -2974,8 +2974,6 @@ struct IRGlobalConstant : IRInst
     IRInst* getValue() { return getOperandCount() != 0 ? getOperand(0) : nullptr; }
 };
 
-IR_SIMPLE_DECORATION(SpecializationConstantOpDecoration)
-
 // An entry in a witness table (see below)
 struct IRWitnessTableEntry : IRInst
 {
@@ -3940,6 +3938,7 @@ public:
     IRConstExprRate* getConstExprRate();
     IRGroupSharedRate* getGroupSharedRate();
     IRActualGlobalRate* getActualGlobalRate();
+    IRSpecConstRate* getSpecConstRate();
 
     IRRateQualifiedType* getRateQualifiedType(IRRate* rate, IRType* dataType);
 

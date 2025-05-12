@@ -1973,7 +1973,7 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
     // The values of specialization constants aren't known at compile time even
     // if they're marked `const`.
     if ((decl->hasModifier<SpecializationConstantAttribute>() ||
-        decl->hasModifier<VkConstantIdAttribute>()) &&
+         decl->hasModifier<VkConstantIdAttribute>()) &&
         kind == ConstantFoldingKind::SpecializationConstant)
     {
         return m_astBuilder->getOrCreate<GenericParamIntVal>(

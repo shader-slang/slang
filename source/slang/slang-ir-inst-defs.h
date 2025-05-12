@@ -95,6 +95,7 @@ INST(Nop, nop, 0, 0)
 
     /* Rate */
         INST(ConstExprRate, ConstExpr, 0, HOISTABLE)
+        INST(SpecConstRate, SpecConst, 0, HOISTABLE)
         INST(GroupSharedRate, GroupShared, 0, HOISTABLE)
         INST(ActualGlobalRate, ActualGlobalRate, 0, HOISTABLE)
     INST_RANGE(Rate, ConstExprRate, GroupSharedRate)
@@ -1038,9 +1039,6 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(MethodDecoration, method, 0, 0)
     INST(PackOffsetDecoration, packoffset, 2, 0)
     INST(SpecializationConstantDecoration, SpecializationConstantDecoration, 1, 0)
-        /// Decorate a new specialization constant that results from arithmetic expression.
-    INST(SpecializationConstantOpDecoration, SpecializationConstantOpDecoration, 1, 0)
-
 
         // Reflection metadata for a shader parameter that provides the original type name.
     INST(UserTypeNameDecoration, UserTypeName, 1, 0)
