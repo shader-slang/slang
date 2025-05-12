@@ -5,7 +5,7 @@ on:
     # Also run on pushes to the main branch so that we can keep the llvm and sccache
     # caches filled in a scope available to everyone
     branches:
-      - master
+      - main
     paths-ignore:
       - "docs/**"
       - "LICENSES/**"
