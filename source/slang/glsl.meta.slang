@@ -17,9 +17,9 @@
 // Section 4.1. 'asic Types'
 //
 
-public typealias f16vec2 = vector<half, 2>;
-public typealias f16vec3 = vector<half, 3>;
-public typealias f16vec4 = vector<half, 4>;
+public typealias f16vec2 = half2;
+public typealias f16vec3 = half3;
+public typealias f16vec4 = half4;
 
 public typealias vec2 = vector<float, 2>;
 public typealias vec3 = vector<float, 3>;
