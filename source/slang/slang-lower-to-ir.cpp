@@ -6813,7 +6813,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             IRBuilder subBuilder = *getBuilder();
             subBuilder.setInsertInto(info->initialBlock);
             subContext.irBuilder = &subBuilder;
-            auto caseVal = getSimpleVal(context, lowerRValueExpr(&subContext, caseStmt->expr));
+
+            auto constVal = as<ConstantIntVal>(caseStmt->exprVal);
+            SLANG_ASSERT(constVal);
+            auto caseType = lowerType(context, constVal->getType());
+            auto caseValInfo =
+                LoweredValInfo::simple(getBuilder()->getIntValue(caseType, constVal->getValue()));
+            auto caseVal = getSimpleVal(context, caseValInfo);
 
             // Figure out where we are branching to.
             auto label = getLabelForCase(info);
@@ -11008,6 +11014,31 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     isInline = true;
                     break;
                 }
+            }
+        }
+
+        // Add debugfunction decoration and emit debug function. This
+        // is needed for emitting debug information
+        auto nameHint = irFunc->findDecoration<IRNameHintDecoration>();
+        IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
+        if (nameOperand)
+        {
+            getBuilder()->setInsertInto(getBuilder()->getModule()->getModuleInst());
+
+            auto locationDecor = irFunc->findDecoration<IRDebugLocationDecoration>();
+            IRInst* debugType = irFunc->getDataType();
+
+            if (locationDecor && debugType)
+            {
+                auto debugFuncCallee = getBuilder()->emitDebugFunction(
+                    nameOperand,
+                    locationDecor->getLine(),
+                    locationDecor->getCol(),
+                    locationDecor->getSource(),
+                    debugType);
+
+                // Add a decoration to link the function to its debug function
+                getBuilder()->addDecoration(irFunc, kIROp_DebugFunctionDecoration, debugFuncCallee);
             }
         }
 

@@ -170,6 +170,19 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             outOptions.generateSPIRVDirectly = false;
         }
+        else if (argValue == "-capability" || argValue == "-capabilities")
+        {
+            String capabilities;
+            SLANG_RETURN_ON_FAIL(reader.expectArg(capabilities));
+
+            List<UnownedStringSlice> values;
+            StringUtil::split(capabilities.getUnownedSlice(), ',', values);
+
+            for (const auto& value : values)
+            {
+                outOptions.capabilities.add(value);
+            }
+        }
         else if (argValue == "-only-startup")
         {
             outOptions.onlyStartup = true;
