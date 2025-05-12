@@ -125,7 +125,7 @@ SlangResult StreamReader::readBuffer()
     return SLANG_OK;
 }
 
-char StreamReader::readBufferChar()
+Byte StreamReader::readBufferByte()
 {
     if (m_index < m_buffer.getCount())
     {
