@@ -1812,43 +1812,43 @@ alias GLSL_430_SPIRV_1_0 = _GLSL_430 + GLSL_420_SPIRV_1_0 | GLSL_420_SPIRV_1_0;
 //
 /// cuda 1.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_1_0 = _cuda_sm_1_0 | sm_4_0;
+alias cuda_sm_1_0 = _cuda_sm_1_0;
 
 /// cuda 2.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_2_0 = _cuda_sm_2_0 | sm_4_1;
+alias cuda_sm_2_0 = _cuda_sm_2_0 | cuda_sm_1_0 | sm_4_0;
 
 /// cuda 3.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_3_0 = _cuda_sm_3_0 | sm_6_0;
+alias cuda_sm_3_0 = _cuda_sm_3_0 | cuda_sm_2_0;
 
 /// cuda 3.5 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_3_5 = _cuda_sm_3_5 | sm_6_0;
+alias cuda_sm_3_5 = _cuda_sm_3_5 | cuda_sm_3_0;
 
 /// cuda 4.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_4_0 = _cuda_sm_4_0 | sm_6_0;
+alias cuda_sm_4_0 = _cuda_sm_4_0 | cuda_sm_3_5;
 
 /// cuda 5.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_5_0 = _cuda_sm_5_0 | sm_6_0;
+alias cuda_sm_5_0 = _cuda_sm_5_0 | cuda_sm_4_0;
 
 /// cuda 6.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_6_0 = _cuda_sm_6_0 | sm_6_0;
+alias cuda_sm_6_0 = _cuda_sm_6_0 | cuda_sm_5_0 | sm_4_1;
 
 /// cuda 7.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_7_0 = _cuda_sm_7_0 | sm_5_1;
+alias cuda_sm_7_0 = _cuda_sm_7_0 | cuda_sm_6_0;
 
 /// cuda 8.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_8_0 = _cuda_sm_8_0 | sm_5_1;
+alias cuda_sm_8_0 = _cuda_sm_8_0 | cuda_sm_7_0;
 
 /// cuda 9.0 and related capabilities of other targets.
 /// [Version]
-alias cuda_sm_9_0 = _cuda_sm_9_0 | sm_5_1;
+alias cuda_sm_9_0 = _cuda_sm_9_0 | cuda_sm_8_0 | sm_5_0;
 
 // Metal profile capabilities
 //
