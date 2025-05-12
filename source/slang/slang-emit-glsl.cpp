@@ -2090,10 +2090,10 @@ static bool isDerivedFromPtrType(IRInst* ptr, IRPtrType* ptrType)
     // Check if it's derived through operations like field address, element address, etc.
     if (auto fieldAddr = as<IRFieldAddress>(ptr))
         return isDerivedFromPtrType(fieldAddr->getBase(), ptrType);
-    
+
     if (auto elemAddr = as<IRGetElementPtr>(ptr))
         return isDerivedFromPtrType(elemAddr->getBase(), ptrType);
-        
+
     return false;
 }
 
@@ -2118,12 +2118,12 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
 
     // Check if this pointer type is used for writing operations
     bool isReadOnly = true;
-    
+
     // Traverse all uses of this pointer type to check for writing operations
     for (auto use = ptrType->firstUse; use; use = use->nextUse)
     {
         auto user = use->getUser();
-        
+
         // Direct store to this pointer type
         if (auto storeInst = as<IRStore>(user))
         {
@@ -2133,7 +2133,7 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
                 break;
             }
         }
-        
+
         // If this pointer is used to derive other pointers that are written to
         if (auto fieldAddr = as<IRFieldAddress>(user))
         {
@@ -2149,11 +2149,11 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
                     }
                 }
             }
-            
+
             if (!isReadOnly)
                 break;
         }
-        
+
         // Element address (indexing)
         if (auto elemAddr = as<IRGetElementPtr>(user))
         {
@@ -2169,7 +2169,7 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
                     }
                 }
             }
-            
+
             if (!isReadOnly)
                 break;
         }
@@ -2184,7 +2184,7 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
     {
         m_writer->emit(") buffer ");
     }
-    
+
     m_writer->emit(ptrTypeName);
     m_writer->emit("\n");
     m_writer->emit("{\n");
