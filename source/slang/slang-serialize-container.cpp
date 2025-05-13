@@ -26,7 +26,7 @@ private:
     RefPtr<SerialSourceLocWriter> _sourceLocWriter;
 
     RIFF::Builder _riff;
-    Encoder _encoder;
+    RIFF::BuildCursor _cursor;
 
 public:
     ModuleEncodingContext(SerialContainerUtil::WriteOptions const& options, Stream* stream)
@@ -37,12 +37,12 @@ public:
             _sourceLocWriter = new SerialSourceLocWriter(options.sourceManager);
         }
 
-        _encoder = Encoder(_riff);
+        _cursor = RIFF::BuildCursor(_riff);
     }
 
     ~ModuleEncodingContext()
     {
-        _encoder = Encoder(_riff.getRootChunk());
+        _cursor = RIFF::BuildCursor(_riff.getRootChunk());
         encodeFinalPieces();
         _riff.writeTo(_stream);
     }
@@ -53,7 +53,7 @@ public:
         // is simply a matter of encoding the module for each
         // of the translation units that got compiled.
         //
-        Encoder::WithKeyValuePair withArray(&_encoder, SerialBinary::kModuleListFourCc);
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kModuleListFourCc);
         for (TranslationUnitRequest* translationUnit : frontEndReq->translationUnits)
         {
             SLANG_RETURN_ON_FAIL(encode(translationUnit->module));
@@ -63,14 +63,14 @@ public:
 
     SlangResult encode(FrontEndCompileRequest* frontEndReq)
     {
-        Encoder::WithObject withObject(&_encoder, SerialBinary::kContainerFourCc);
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kContainerFourCc);
         SLANG_RETURN_ON_FAIL(encodeModuleList(frontEndReq));
         return SLANG_OK;
     }
 
     SlangResult encode(EndToEndCompileRequest* request)
     {
-        Encoder::WithObject withObject(&_encoder, SerialBinary::kContainerFourCc);
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kContainerFourCc);
 
         // Encoding an end-to-end compile request starts with the same
         // work as for a front-end request: we encode each of
@@ -99,7 +99,7 @@ public:
         auto sink = request->getSink();
         auto program = request->getSpecializedGlobalAndEntryPointsComponentType();
         {
-            Encoder::WithArray withArray(&_encoder);
+            SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kArrayFourCC);
 
             for (auto target : linkage->targets)
             {
@@ -112,7 +112,7 @@ public:
         // and we need to encode information about each of them.
         //
         {
-            Encoder::WithArray withArray(&_encoder, SerialBinary::kEntryPointListFourCc);
+            SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kEntryPointListFourCc);
 
             auto entryPointCount = program->getEntryPointCount();
             for (Index ii = 0; ii < entryPointCount; ++ii)
@@ -142,34 +142,41 @@ public:
 
         SLANG_RETURN_ON_FAIL(
             writer.write(irModule, _sourceLocWriter, _options.optionFlags, &serialData));
-        SLANG_RETURN_ON_FAIL(IRSerialWriter::writeTo(serialData, _encoder));
+        SLANG_RETURN_ON_FAIL(IRSerialWriter::writeTo(serialData, _cursor));
 
         return SLANG_OK;
     }
 
-    void encode(Name* name) { _encoder.encode(name->text); }
+    void encodeData(void const* data, size_t size, FourCC type = SerialBinary::kDataFourCC)
+    {
+        _cursor.addDataChunk(type, data, size);
+    }
 
-    void encode(String const& value) { _encoder.encode(value); }
+    void encode(String const& value, FourCC type = SerialBinary::kStringFourCC)
+    {
+        encodeData(value.getBuffer(), value.getLength(), type);
+    }
 
-    void encode(uint32_t value) { _encoder.encode(UInt(value)); }
+    void encode(Name* name, FourCC type = SerialBinary::kNameFourCC) { encode(name->text, type); }
 
-    void encodeData(void const* data, size_t size) { _encoder.encodeData(data, size); }
+
+    void encode(uint32_t value, FourCC type = SerialBinary::kUInt32FourCC)
+    {
+        encodeData(&value, sizeof(value), type);
+    }
 
     SlangResult encode(EntryPoint* entryPoint, String const& entryPointMangledName)
     {
-        Encoder::WithObject withObject(&_encoder, SerialBinary::kEntryPointFourCc);
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kEntryPointFourCc);
 
         {
-            Encoder::WithObject withProperty(&_encoder, SerialBinary::kNameFourCC);
-            encode(entryPoint->getName());
+            encode(entryPoint->getName(), SerialBinary::kNameFourCC);
         }
         {
-            Encoder::WithObject withProperty(&_encoder, SerialBinary::kProfileFourCC);
-            encode(entryPoint->getProfile().raw);
+            encode(entryPoint->getProfile().raw, SerialBinary::kProfileFourCC);
         }
         {
-            Encoder::WithObject withProperty(&_encoder, SerialBinary::kMangledNameFourCC);
-            encode(entryPointMangledName);
+            encode(entryPointMangledName, SerialBinary::kMangledNameFourCC);
         }
 
         return SLANG_OK;
@@ -181,7 +188,7 @@ public:
         if (!(_options.optionFlags & (SerialOptionFlag::IRModule | SerialOptionFlag::ASTModule)))
             return SLANG_OK;
 
-        Encoder::WithObject withModule(&_encoder, SerialBinary::kModuleFourCC);
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kModuleFourCC);
 
         // The first piece that we write for a module is its header.
         // The header is intended to provide information that can be
@@ -194,15 +201,15 @@ public:
             // sense to serialize it separately from all the rest.
             //
             {
-                Encoder::WithObject withProperty(&_encoder, SerialBinary::kNameFourCC);
-                _encoder.encodeString(module->getNameObj()->text);
+                SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kNameFourCC);
+                encode(module->getNameObj()->text);
             }
 
             // The header includes a digest of all the compile options and
             // the files that the compiled result depended on.
             //
             auto digest = module->computeDigest();
-            _encoder.encodeData(PropertyKeys<Module>::Digest, digest.data, sizeof(digest.data));
+            _cursor.addDataChunk(PropertyKeys<Module>::Digest, digest.data, sizeof(digest.data));
 
             // The header includes an array of the paths of all of the
             // files that the compiled result depended on.
@@ -221,7 +228,7 @@ public:
                 IRSerialWriter writer;
                 SLANG_RETURN_ON_FAIL(
                     writer.write(irModule, _sourceLocWriter, _options.optionFlags, &serialData));
-                SLANG_RETURN_ON_FAIL(IRSerialWriter::writeTo(serialData, _encoder));
+                SLANG_RETURN_ON_FAIL(IRSerialWriter::writeTo(serialData, _cursor));
             }
         }
 
@@ -232,9 +239,8 @@ public:
         {
             if (auto moduleDecl = module->getModuleDecl())
             {
-                Encoder::WithKeyValuePair withKey(&_encoder, PropertyKeys<Module>::ASTModule);
-
-                writeSerializedModuleAST(&_encoder, moduleDecl, _sourceLocWriter);
+                SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<Module>::ASTModule);
+                writeSerializedModuleAST(_cursor, moduleDecl, _sourceLocWriter);
             }
         }
 
@@ -243,7 +249,7 @@ public:
 
     SlangResult encodeModuleDependencyPaths(Module* module)
     {
-        Encoder::WithObject withProperty(&_encoder, PropertyKeys<Module>::FileDependencies);
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<Module>::FileDependencies);
 
         // TODO(tfoley): This is some of the most complicated logic
         // in the encoding system, because it tries to translate
@@ -317,7 +323,6 @@ public:
         }
         Path::getCanonical(linkageRoot, linkageRoot);
 
-        Encoder::WithArray withArray(&_encoder);
         for (auto file : fileDependencies)
         {
             if (file->getPathInfo().hasFoundPath())
@@ -334,26 +339,26 @@ public:
                         auto relativeModulePath =
                             Path::getRelativePath(linkageRoot, canonicalModulePath);
 
-                        _encoder.encodeString(relativeModulePath);
+                        encode(relativeModulePath);
                     }
                     else
                     {
                         // For all other dependnet files, store them as relative paths with respect
                         // to the module's path.
                         canonicalFilePath = Path::getRelativePath(moduleDir, canonicalFilePath);
-                        _encoder.encodeString(canonicalFilePath);
+                        encode(canonicalFilePath);
                     }
                 }
                 else
                 {
                     // If the module is coming from string instead of an actual file, store it as
                     // is.
-                    _encoder.encodeString(canonicalModulePath);
+                    encode(canonicalModulePath);
                 }
             }
             else
             {
-                _encoder.encodeString(file->getPathInfo().getMostUniqueIdentity());
+                encode(file->getPathInfo().getMostUniqueIdentity());
             }
         }
 
@@ -369,18 +374,16 @@ public:
             SerialSourceLocData debugData;
             _sourceLocWriter->write(&debugData);
 
-            debugData.writeTo(_encoder);
+            debugData.writeTo(_cursor);
         }
 
         // Write the container string table
         if (_containerStringPool.getAdded().getCount() > 0)
         {
-            Encoder::WithKeyValuePair withKey(&_encoder, SerialBinary::kStringTableFourCc);
-
             List<char> encodedTable;
             SerialStringTableUtil::encodeStringTable(_containerStringPool, encodedTable);
 
-            _encoder.encodeData(encodedTable.getBuffer(), encodedTable.getCount());
+            _cursor.addDataChunk(SerialBinary::kStringTableFourCc, encodedTable.getBuffer(), encodedTable.getCount());
         }
 
         return SLANG_OK;
@@ -425,14 +428,16 @@ public:
 
 String StringChunk::getValue() const
 {
-    return Decoder(this).decodeString();
+    return String(
+        UnownedStringSlice((char const*)getPayload(), getPayloadSize()));
 }
 
 RIFF::ChunkList<StringChunk> ModuleChunk::getFileDependencies() const
 {
-    Decoder decoder(this);
-    Decoder::WithProperty withProperty(decoder, PropertyKeys<Module>::FileDependencies);
-    return as<RIFF::ListChunk>(decoder.getCurrentChunk())->getChildren().cast<StringChunk>();
+    auto found = findListChunk(PropertyKeys<Module>::FileDependencies);
+    if (!found)
+        return RIFF::ChunkList<StringChunk>();
+    return found->getChildren().cast<StringChunk>();
 }
 
 ModuleChunk const* ModuleChunk::find(RIFF::ListChunk const* baseChunk)
@@ -453,14 +458,12 @@ SHA1::Digest ModuleChunk::getDigest() const
 
 String ModuleChunk::getName() const
 {
-    // TODO(tfoley): This kind of logic needs a way
-    // to be greatly simplified, so that we don't
-    // have to express such complicated logic for
-    // simply extracting a single string property...
-    //
-    Decoder decoder(this);
-    Decoder::WithProperty withProperty(decoder, SerialBinary::kNameFourCC);
-    return decoder.decodeString();
+    auto found = findDataChunk(SerialBinary::kNameFourCC);
+    if (!found)
+    {
+        SLANG_UNEXPECTED("module chunk had no name");
+    }
+    return static_cast<StringChunk const*>(found)->getValue();
 }
 
 
@@ -506,41 +509,32 @@ RIFF::ChunkList<EntryPointChunk> ContainerChunk::getEntryPoints() const
 
 String EntryPointChunk::getMangledName() const
 {
-    // TODO(tfoley): This kind of logic needs a way
-    // to be greatly simplified, so that we don't
-    // have to express such complicated logic for
-    // simply extracting a single string property...
-    //
-    Decoder decoder(this);
-    Decoder::WithProperty withProperty(decoder, SerialBinary::kMangledNameFourCC);
-    return decoder.decodeString();
+    auto found = findDataChunk(SerialBinary::kMangledNameFourCC);
+    if (!found)
+    {
+        SLANG_UNEXPECTED("entry point chunk had no mangled name");
+    }
+    return static_cast<StringChunk const*>(found)->getValue();
 }
 
 String EntryPointChunk::getName() const
 {
-    // TODO(tfoley): This kind of logic needs a way
-    // to be greatly simplified, so that we don't
-    // have to express such complicated logic for
-    // simply extracting a single string property...
-    //
-    Decoder decoder(this);
-    Decoder::WithProperty withProperty(decoder, SerialBinary::kNameFourCC);
-    return decoder.decodeString();
+    auto found = findDataChunk(SerialBinary::kNameFourCC);
+    if (!found)
+    {
+        SLANG_UNEXPECTED("entry point chunk had no name");
+    }
+    return static_cast<StringChunk const*>(found)->getValue();
 }
 
 Profile EntryPointChunk::getProfile() const
 {
-    // TODO(tfoley): This kind of logic needs a way
-    // to be greatly simplified, so that we don't
-    // have to express such complicated logic for
-    // simply extracting a single string property...
-    //
-    Decoder decoder(this);
-    Decoder::WithProperty withProperty(decoder, SerialBinary::kProfileFourCC);
-
-    Profile::RawVal rawVal;
-    decoder.decode(rawVal);
-
+    auto found = findDataChunk(SerialBinary::kProfileFourCC);
+    if (!found)
+    {
+        SLANG_UNEXPECTED("entry point chunk had no profile");
+    }
+    auto rawVal = found->readPayloadAs<Profile::RawVal>();
     return Profile(rawVal);
 }
 
