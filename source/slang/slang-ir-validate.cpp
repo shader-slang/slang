@@ -37,6 +37,8 @@ void validate(IRValidateContext* context, bool condition, IRInst* inst, char con
         }
         else
         {
+            printf("op: %s\n", getIROpInfo(inst->m_op).name);
+            inst->dump();
             SLANG_ASSERT_FAILURE("IR validation failed");
         }
     }

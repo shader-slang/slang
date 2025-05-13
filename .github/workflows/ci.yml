@@ -222,7 +222,6 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
           "$bin_dir/slang-test" \
             -use-test-server \
-            -server-count 8 \
             -category ${{ matrix.test-category }} \
             -emit-spirv-via-glsl \
             -api vk \
