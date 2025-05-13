@@ -127,13 +127,7 @@ int HelloWorldExample::createComputePipelineFromShader()
 
     sessionDesc.targets = &targetDesc;
     sessionDesc.targetCount = 1;
-
-    std::vector<slang::CompilerOptionEntry> options;
-    options.push_back(
-        {slang::CompilerOptionName::EmitSpirvDirectly,
-         {slang::CompilerOptionValueKind::Int, 1, 0, nullptr, nullptr}});
-    sessionDesc.compilerOptionEntries = options.data();
-    sessionDesc.compilerOptionEntryCount = options.size();
+    sessionDesc.compilerOptionEntryCount = 0;
 
     ComPtr<slang::ISession> session;
     RETURN_ON_FAIL(slangGlobalSession->createSession(sessionDesc, session.writeRef()));
