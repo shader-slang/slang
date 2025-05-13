@@ -2330,8 +2330,8 @@ static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type*
         return invoke;
     }
 
-    // At the last, we will check if the type is a C-style type, if it is, we will use empty initializer
-    // list to construct the default constructor.
+    // At the last, we will check if the type is a C-style type, if it is, we will use empty
+    // initializer list to construct the default constructor.
     HashSet<Type*> isVisit;
     if (visitor->isCStyleType(type, isVisit))
     {
