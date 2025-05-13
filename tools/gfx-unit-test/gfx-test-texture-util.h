@@ -12,9 +12,9 @@ namespace gfx_test
 {
 struct Strides
 {
-    Size x;
-    Size y;
-    Size z;
+    gfx::Size x;
+    gfx::Size y;
+    gfx::Size z;
 };
 
 struct ValidationTextureFormatBase : RefObject
@@ -194,7 +194,7 @@ struct TextureInfo : RefObject
 };
 
 TextureAspect getTextureAspect(Format format);
-Size getTexelSize(Format format);
+gfx::Size getTexelSize(Format format);
 GfxIndex getSubresourceIndex(GfxIndex mipLevel, GfxCount mipLevelCount, GfxIndex baseArrayLayer);
 RefPtr<ValidationTextureFormatBase> getValidationTextureFormat(Format format);
 void generateTextureData(
@@ -205,8 +205,8 @@ List<uint8_t> removePadding(
     ISlangBlob* pixels,
     GfxCount width,
     GfxCount height,
-    Size rowPitch,
-    Size pixelSize);
+    gfx::Size rowPitch,
+    gfx::Size pixelSize);
 Slang::Result writeImage(const char* filename, ISlangBlob* pixels, uint32_t width, uint32_t height);
 Slang::Result writeImage(
     const char* filename,

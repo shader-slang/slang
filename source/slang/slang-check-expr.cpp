@@ -5181,6 +5181,11 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     }
 }
 
+Expr* SemanticsExprVisitor::visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr)
+{
+    return expr;
+}
+
 Expr* SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)
 {
     // If we are assigned a type, expr has already been legalized

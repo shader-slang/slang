@@ -3,6 +3,8 @@
 
 #include "../core/slang-performance-profiler.h"
 #include "slang-ir-ssa-simplification.h"
+#include "slang-ir-util.h"
+
 // This file provides general facilities for inlining function calls.
 
 //
@@ -290,6 +292,124 @@ struct InliningPassBase
         return true;
     }
 
+    // Find an existing debug function for the given function
+    IRInst* findExistingDebugFunc(IRFunc* func)
+    {
+        if (auto debugFuncDecor = func->findDecoration<IRDebugFuncDecoration>())
+        {
+            return debugFuncDecor->getDebugFunc();
+        }
+        return nullptr;
+    }
+
+    struct DebugInlineInfo
+    {
+        IRInst* newDebugInlinedAt = nullptr;
+        IRInst* calleeDebugFunc = nullptr;
+    };
+
+    // Sets up the initial debug information structures required *before* inlining a call site.
+    //
+    // This function performs the following steps:
+    // 1. Checks if the callee function has associated debug location information.
+    // 2. Obtain the call inst's existing debug information.
+    // 3. Finds the last `IRDebugLine` preceding the `call` instruction to determine the source
+    //    location (line, col, file) of the call site.
+    // 4. Emits an `IRDebugInlinedAt` instruction with outer set to callDebugInlinedAt.
+    // 5. Inserts the newly created `IRDebugInlinedAt` instruction immediately *before* the `call`
+    // instruction.
+    DebugInlineInfo emitCalleeDebugInlinedAt(IRCall* call, IRFunc* callee, IRBuilder& builder)
+    {
+        IRDebugLine* lastDebugLine = nullptr;
+        IRInst* newDebugInlinedAt = nullptr;
+        IRInst* callerDebugFunc = nullptr;
+        IRInst* calleeDebugFunc = nullptr;
+
+        if (!callee->findDecoration<IRDebugLocationDecoration>())
+        {
+            return DebugInlineInfo();
+        }
+        else
+        {
+            // Check if the call inst is part of an existing scope. If yes, then we restore
+            // that scope after the inlining of callee. This case can occur when we have out of
+            // order inlining. See forceinline-basic-block-inline-order.slang test for that use
+            // case. If we are travesing back the call inst and if we find a DebugNoScope, it means
+            // that there's another function that was inlined. We don't want that scope. If the call
+            // inst truly belongs to another DebugScope, then we should hit a DebugScope inst
+            // *before* we see a DebugNoScope
+            IRDebugScope* callDebugScope = nullptr;
+            builder.setInsertAfter(call);
+            for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
+            {
+                if (as<IRDebugNoScope>(inst))
+                {
+                    break;
+                }
+                if (as<IRDebugScope>(inst))
+                {
+                    callDebugScope = as<IRDebugScope>(inst);
+                    builder.emitDebugScope(
+                        callDebugScope->getScope(),
+                        callDebugScope->getInlinedAt());
+                    break;
+                }
+            }
+            if (!callDebugScope)
+            {
+                builder.emitDebugNoScope();
+            }
+
+            IRDebugInlinedAt* callDebugInlinedAt = nullptr;
+            for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
+            {
+                if (as<IRDebugNoScope>(inst))
+                {
+                    break;
+                }
+                if (as<IRDebugInlinedAt>(inst))
+                {
+                    callDebugInlinedAt = as<IRDebugInlinedAt>(inst);
+                    break;
+                }
+            }
+
+            // Find the last IRDebugLine to extract debug info.
+            for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
+            {
+                if (auto debugLine = as<IRDebugLine>(inst))
+                {
+                    lastDebugLine = debugLine;
+                    break;
+                }
+            }
+
+            if (!lastDebugLine)
+                return DebugInlineInfo();
+
+            calleeDebugFunc = findExistingDebugFunc(callee);
+
+            // The caller func is the right lexical scope needed for nsight to show where
+            // the function is getting inlined inside.
+            auto callerFunc = getParentFunc(call);
+            callerDebugFunc = findExistingDebugFunc(callerFunc);
+
+            builder.setInsertBefore(call);
+            newDebugInlinedAt = builder.emitDebugInlinedAt(
+                lastDebugLine->getLineStart(),
+                lastDebugLine->getColStart(),
+                lastDebugLine->getSource(),
+                callerDebugFunc,
+                callDebugInlinedAt);
+
+            if (newDebugInlinedAt && calleeDebugFunc)
+            {
+                return DebugInlineInfo{newDebugInlinedAt, calleeDebugFunc};
+            }
+        }
+        return DebugInlineInfo();
+    }
+
     /// Inline the given `callSite`, which is assumed to have been validated
     void inlineCallSite(CallSiteInfo const& callSite)
     {
@@ -481,7 +601,9 @@ struct InliningPassBase
     void inlineSingleBlockFuncBody(
         CallSiteInfo const& callSite,
         IRCloneEnv* env,
-        IRBuilder* builder)
+        IRBuilder* builder,
+        IRInst* newDebugInlinedAt,
+        IRInst* calleeDebugFunc)
     {
         auto call = callSite.call;
         auto callee = callSite.callee;
@@ -495,18 +617,22 @@ struct InliningPassBase
         // them into the same basic block as the `call`.
         //
         builder->setInsertBefore(call);
+        IRInst* calleeDebugScope = nullptr;
+        if (calleeDebugFunc && newDebugInlinedAt)
+        {
+            calleeDebugScope = builder->emitDebugScope(calleeDebugFunc, newDebugInlinedAt);
+        }
 
         // Along the way, we will detect any `return` instruction,
         // and remember the (clone of the) returned value.
         //
         IRInst* returnVal = nullptr;
-
+        List<IRDebugInlinedAt*> debugInlinedInsts;
         for (auto inst : firstBlock->getChildren())
         {
             switch (inst->getOp())
             {
             default:
-                // In the common case we just clone the instruction as-is
                 _cloneInstWithSourceLoc(callSite, env, builder, inst);
                 break;
 
@@ -524,9 +650,40 @@ struct InliningPassBase
                 SLANG_ASSERT(!returnVal);
                 returnVal = findCloneForOperand(env, inst->getOperand(0));
                 break;
+
+            case kIROp_DebugNoScope:
+                {
+                    if (calleeDebugScope)
+                        _cloneInstWithSourceLoc(callSite, env, builder, calleeDebugScope);
+                    break;
+                }
+
+            case kIROp_DebugInlinedAt:
+                {
+                    auto clonedInst = _cloneInstWithSourceLoc(callSite, env, builder, inst);
+                    if (!as<IRDebugInlinedAt>(clonedInst)->isOuterInlinedPresent())
+                        debugInlinedInsts.add(as<IRDebugInlinedAt>(clonedInst));
+                    break;
+                }
             }
         }
-
+        // For any debugInlinedAt without an outerinlinedAt, emit a new debugInlinedAt with the
+        // outer set, and delete the older debugInlinedAt
+        for (auto inst : debugInlinedInsts)
+        {
+            if (newDebugInlinedAt && !inst->isOuterInlinedPresent())
+            {
+                builder->setInsertAfter(inst);
+                auto newInlinedAt = builder->emitDebugInlinedAt(
+                    inst->getLine(),
+                    inst->getCol(),
+                    inst->getFile(),
+                    inst->getDebugFunc(),
+                    newDebugInlinedAt);
+                inst->replaceUsesWith(newInlinedAt);
+                inst->removeAndDeallocate();
+            }
+        }
         // We are going to remove the original `call` now that the callee
         // has been inlined, but before we do that we need to replace
         // all uses of the `call` with whatever value was produced by the
@@ -547,10 +704,28 @@ struct InliningPassBase
     }
 
     /// Inline the body of the callee for `callSite`.
+    // Here is the algorithm for inserting debug information for slang inlined functions:
+    // 1. Check if the call inst belongs to an existing debug scope and find corresponding
+    // debugInlinedAt. [callDebugScope, callDebugInlinedAt]
+    //    1a. If callDebugScope exists, emit this debug Scope* after* the call inst.
+    // 2. Emit a new DebugInlinedAt inst, with debugFunc of the callee, and outer debugInlinedAt is
+    // callDebugInlinedAt. [newDebugInlinedAt]
+    //    2a. If calleDebugScope does not exist, emit debugNoScope after the call inst.
+    // 3. Clone the callee body.
+    // 4. For each cloned block, do this:
+    //    4a.Emit a new DebugScope inst setting the current scope to newDebugInlinedAt.
+    //    [calleeDebugScope] 4b.Emit a DebugNoScope at the end of each block. 4c.If callDebugScope
+    //    exists, do not emit a DebugNoScope for the last block.
+    // 5. For each cloned debugInlinedAt inst, if its outer inlined at operand is null, set it to
+    // the new DebugInlinedAt inst inserted at the top of the block.
+    // 6. For each cloned debugNoScope inst, replace it with calleeDebugScope. (This is because all
+    // cloned insts are in callee's scope).
     void inlineFuncBody(CallSiteInfo const& callSite, IRCloneEnv* env, IRBuilder* builder)
     {
-        auto call = callSite.call;
         auto callee = callSite.callee;
+        auto call = callSite.call;
+
+        auto debugInlineInfo = emitCalleeDebugInlinedAt(call, callee, *builder);
 
         // If the callee consists of a single basic block *and* that block
         // ends with a `return` instruction, then we can apply a simple approach
@@ -561,9 +736,34 @@ struct InliningPassBase
         SLANG_ASSERT(firstBlock);
         if (!firstBlock->getNextBlock() && as<IRReturn>(firstBlock->getTerminator()))
         {
-            inlineSingleBlockFuncBody(callSite, env, builder);
+            inlineSingleBlockFuncBody(
+                callSite,
+                env,
+                builder,
+                debugInlineInfo.newDebugInlinedAt,
+                debugInlineInfo.calleeDebugFunc);
             return;
         }
+
+        // If the callee has multiple blocks, use the more complex inlining approach
+        inlineMultipleBlockFuncBody(
+            callSite,
+            env,
+            builder,
+            debugInlineInfo.newDebugInlinedAt,
+            debugInlineInfo.calleeDebugFunc);
+    }
+
+    // Inline the body of the callee for `callSite`, for a callee that has multiple basic blocks.
+    void inlineMultipleBlockFuncBody(
+        CallSiteInfo const& callSite,
+        IRCloneEnv* env,
+        IRBuilder* builder,
+        IRInst* newDebugInlinedAt,
+        IRInst* calleeDebugFunc)
+    {
+        auto call = callSite.call;
+        auto callee = callSite.callee;
 
         // If the callee has any non-trivial control flow (multiple basic blocks
         // and terminators other than `return`), we will need to split the control
@@ -680,7 +880,53 @@ struct InliningPassBase
             }
             isFirstBlock = false;
         }
+        // For each existing debugNoScope inst, replace it with new debug scope we emit.
+        // For any debugInlinedAt without an outerinlinedAt, emit a new debugInlinedAt with the
+        // outer set, and delete the older debugInlinedAt
+        if (newDebugInlinedAt && callee->findDecoration<IRDebugLocationDecoration>())
+        {
+            for (auto calleeBlock : callee->getBlocks())
+            {
+                IRBlock* clonedBlock = as<IRBlock>(env->mapOldValToNew.getValue(calleeBlock));
+                setInsertBeforeOrdinaryInst(builder, clonedBlock->getFirstOrdinaryInst());
+                builder->emitDebugScope(calleeDebugFunc, newDebugInlinedAt);
 
+                List<IRInst*> debugNoScopeToRemove;
+                List<IRDebugInlinedAt*> debugInlinedAtToProcess;
+                for (auto inst : clonedBlock->getChildren())
+                {
+                    if (as<IRDebugNoScope>(inst))
+                    {
+                        debugNoScopeToRemove.add(inst);
+                    }
+                    if (auto inlinedAt = as<IRDebugInlinedAt>(inst))
+                    {
+                        if (!inlinedAt->isOuterInlinedPresent())
+                        {
+                            debugInlinedAtToProcess.add(inlinedAt);
+                        }
+                    }
+                }
+                for (auto inst : debugNoScopeToRemove)
+                {
+                    builder->setInsertAfter(inst);
+                    builder->emitDebugScope(calleeDebugFunc, newDebugInlinedAt);
+                    inst->removeAndDeallocate();
+                }
+                for (auto inlinedAt : debugInlinedAtToProcess)
+                {
+                    builder->setInsertAfter(inlinedAt);
+                    auto newInlinedAt = builder->emitDebugInlinedAt(
+                        inlinedAt->getLine(),
+                        inlinedAt->getCol(),
+                        inlinedAt->getFile(),
+                        inlinedAt->getDebugFunc(),
+                        newDebugInlinedAt);
+                    inlinedAt->replaceUsesWith(newInlinedAt);
+                    inlinedAt->removeAndDeallocate();
+                }
+            }
+        }
         // If there was a `returnVal` instruction that established
         // the return value of the inlined function, then that value
         // should be used to replace any uses of the original call.

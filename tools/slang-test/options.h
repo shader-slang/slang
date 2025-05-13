@@ -123,6 +123,7 @@ struct Options
 
     bool emitSPIRVDirectly = true;
 
+    Slang::HashSet<Slang::String> capabilities;
     Slang::HashSet<Slang::String> expectedFailureList;
 
     /// Parse the args, report any errors into stdError, and write the results into optionsOut
