@@ -82,6 +82,7 @@ namespace Slang
      BaseTypeInfo::Flag::Signed | BaseTypeInfo::Flag::Integer,
      uint8_t(BaseType::IntPtr)},
     {uint8_t(sizeof(uintptr_t)), BaseTypeInfo::Flag::Integer, uint8_t(BaseType::UIntPtr)},
+    {uint8_t(sizeof(uint16_t)), BaseTypeInfo::Flag::FloatingPoint, uint8_t(BaseType::BFloat16)},
 };
 
 /* static */ bool BaseTypeInfo::check()
@@ -133,6 +134,8 @@ namespace Slang
         return UnownedStringSlice::fromLiteral("intptr_t");
     case BaseType::UIntPtr:
         return UnownedStringSlice::fromLiteral("uintptr_t");
+    case BaseType::BFloat16:
+        return UnownedStringSlice::fromLiteral("bfloat16");
     default:
         {
             SLANG_ASSERT(!"Unknown basic type");
@@ -3194,7 +3197,8 @@ static void _calcViewInitiatingHierarchy(
     for (auto& [_, value] : outHierarchy)
     {
         value.sort(
-            [](SourceView* a, SourceView* b) -> bool {
+            [](SourceView* a, SourceView* b) -> bool
+            {
                 return a->getInitiatingSourceLoc().getRaw() < b->getInitiatingSourceLoc().getRaw();
             });
     }

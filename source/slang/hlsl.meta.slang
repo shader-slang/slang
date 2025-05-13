@@ -8691,6 +8691,25 @@ T dot(vector<T, N> x, vector<T, N> y)
     }
 }
 
+__generic<let N : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+bfloat16 dot(vector<bfloat16, N> x, vector<bfloat16, N> y)
+{
+    __target_switch
+    {
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_KHR_bfloat16";
+            OpCapability BFloat16DotProductKHR;
+            result:$$bfloat16 = OpDot $x $y;
+        };
+    default:
+        __intrinsic_asm "dot";
+    }
+}
+
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]

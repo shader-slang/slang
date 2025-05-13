@@ -56,6 +56,7 @@ enum BaseTypeConversionRank : uint8_t
     kBaseTypeConversionRank_Int32,
     kBaseTypeConversionRank_IntPtr,
     kBaseTypeConversionRank_Int64,
+    kBaseTypeConversionRank_Bfloat16,
     kBaseTypeConversionRank_Error,
 };
 
@@ -149,6 +150,12 @@ static const BaseTypeConversionInfo kBaseTypes[] = {
      UINT_MASK,
      kBaseTypeConversionKind_Unsigned,
      kBaseTypeConversionRank_IntPtr},
+
+    {"bfloat16",
+     BaseType::BFloat16,
+     FLOAT_MASK,
+     kBaseTypeConversionKind_Float,
+     kBaseTypeConversionRank_Bfloat16},
 };
 
 void Session::finalizeSharedASTBuilder()
@@ -185,6 +192,12 @@ ConversionCost getBaseTypeConversionCost(
     {
         // Thse should represent the exact same type.
         return kConversionCost_None;
+    }
+
+    if (toInfo.tag == BaseType::BFloat16 || fromInfo.tag == BaseType::BFloat16)
+    {
+        // TODO: determine this properly.
+        return kConversionCost_GeneralConversion;
     }
 
     // Conversions within the same kind are easist to handle

@@ -22,6 +22,7 @@ namespace Slang
     X(Char)                  \
     X(IntPtr)                \
     X(UIntPtr)               \
+    X(BFloat16)              \
     /* end */
 
 enum class BaseType
