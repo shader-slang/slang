@@ -2338,7 +2338,12 @@ static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type*
         auto initListExpr = visitor->getASTBuilder()->create<InitializerListExpr>();
         initListExpr->type = visitor->getASTBuilder()->getInitializerListType();
         Expr* outExpr = nullptr;
-        if (visitor->_coerceInitializerList(type, &outExpr, initListExpr))
+        auto fromType = type;
+        if (auto atomicType = as<AtomicType>(fromType))
+        {
+            fromType = atomicType->getElementType();
+        }
+        if (visitor->_coerceInitializerList(fromType, &outExpr, initListExpr))
             return outExpr;
     }
 
