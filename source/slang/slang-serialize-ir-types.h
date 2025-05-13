@@ -20,20 +20,20 @@ class Name;
 struct IRSerialBinary
 {
     /// IR module list
-    static const FourCC kIRModuleFourCc = SLANG_FOUR_CC('S', 'i', 'm', 'd');
+    static const FourCC::RawValue kIRModuleFourCc = SLANG_FOUR_CC('S', 'i', 'm', 'd');
 
     /* NOTE! All FourCC that can be compressed must start with capital 'S', because compressed
     version is the same FourCC with the 'S' replaced with 's' */
 
-    static const FourCC kInstFourCc = SLANG_FOUR_CC('S', 'L', 'i', 'n');
-    static const FourCC kChildRunFourCc = SLANG_FOUR_CC('S', 'L', 'c', 'r');
-    static const FourCC kExternalOperandsFourCc = SLANG_FOUR_CC('S', 'L', 'e', 'o');
+    static const FourCC::RawValue kInstFourCc = SLANG_FOUR_CC('S', 'L', 'i', 'n');
+    static const FourCC::RawValue kChildRunFourCc = SLANG_FOUR_CC('S', 'L', 'c', 'r');
+    static const FourCC::RawValue kExternalOperandsFourCc = SLANG_FOUR_CC('S', 'L', 'e', 'o');
 
-    static const FourCC kUInt32RawSourceLocFourCc = SLANG_FOUR_CC('S', 'r', 's', '4');
+    static const FourCC::RawValue kUInt32RawSourceLocFourCc = SLANG_FOUR_CC('S', 'r', 's', '4');
 
     /// Debug information is held elsewhere, but if this optional section exists, it maps
     /// instructions to locs
-    static const FourCC kDebugSourceLocRunFourCc = SLANG_FOUR_CC('S', 'd', 's', 'r');
+    static const FourCC::RawValue kDebugSourceLocRunFourCc = SLANG_FOUR_CC('S', 'd', 's', 'r');
 };
 
 struct IRSerialData

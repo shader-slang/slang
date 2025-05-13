@@ -37,7 +37,7 @@ struct BaseCopyTextureTest
     IDevice* device;
     UnitTestContext* context;
 
-    Size alignedRowStride;
+    gfx::Size alignedRowStride;
 
     RefPtr<TextureInfo> srcTextureInfo;
     RefPtr<TextureInfo> dstTextureInfo;

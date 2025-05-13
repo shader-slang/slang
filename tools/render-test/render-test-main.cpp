@@ -838,7 +838,7 @@ void RenderTestApp::_initializeAccelerationStructure()
     {
         AccelerationStructureInstanceDescType nativeInstanceDescType =
             getAccelerationStructureInstanceDescType(m_device);
-        Size nativeInstanceDescSize =
+        rhi::Size nativeInstanceDescSize =
             getAccelerationStructureInstanceDescSize(nativeInstanceDescType);
 
         List<AccelerationStructureInstanceDescGeneric> genericInstanceDescs;

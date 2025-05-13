@@ -7,12 +7,12 @@ Capability Atoms
 
 ### Sections:
 
-1. [Targets](#targets)
-2. [Stages](#stages)
-3. [Versions](#versions)
-4. [Extensions](#extensions)
-5. [Compound Capabilities](#compound-capabilities)
-6. [Other](#other)
+1. [Targets](#Targets)
+2. [Stages](#Stages)
+3. [Versions](#Versions)
+4. [Extensions](#Extensions)
+5. [Compound Capabilities](#Compound-Capabilities)
+6. [Other](#Other)
 
 Targets
 ----------------------
@@ -151,6 +151,9 @@ Versions
 
 `hlsl_nvapi`
 > Represents HLSL NVAPI support.
+
+`hlsl_2018`
+> Represet HLSL compatibility support.
 
 `dxil_lib`
 > Represents capabilities required for DXIL Library compilation.
