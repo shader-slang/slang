@@ -782,7 +782,7 @@ void DocMarkdownWriter::writeExtensionConditions(
             {
                 genericParamDecl = extTypeParamDecl.getDecl();
             }
-            else if (auto extValueParamVal = as<GenericParamIntVal>(arg))
+            else if (auto extValueParamVal = as<DeclRefIntVal>(arg))
             {
                 genericParamDecl = extValueParamVal->getDeclRef().getDecl();
             }

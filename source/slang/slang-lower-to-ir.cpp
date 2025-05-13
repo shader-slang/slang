@@ -1575,7 +1575,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    LoweredValInfo visitGenericParamIntVal(GenericParamIntVal* val)
+    LoweredValInfo visitDeclRefIntVal(DeclRefIntVal* val)
     {
         return emitDeclRef(
             context,
