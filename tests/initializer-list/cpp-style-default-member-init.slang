@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj -vk -output-using-type
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER):-shaderobj -output-using-type
 
 struct NonCStyle
 {
