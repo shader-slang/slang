@@ -1103,6 +1103,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_subgroup_rotate` : enables the SPV_KHR_subgroup_rotate extension 
 * `SPV_NV_ray_tracing_motion_blur` : enables the SPV_NV_ray_tracing_motion_blur extension 
 * `SPV_NV_shader_invocation_reorder` : enables the SPV_NV_shader_invocation_reorder extension 
+* `SPV_NV_cluster_acceleration_structure` : enables the SPV_NV_cluster_acceleration_structure extension 
 * `SPV_NV_shader_image_footprint` : enables the SPV_NV_shader_image_footprint extension 
 * `SPV_KHR_compute_shader_derivatives` : enables the SPV_KHR_compute_shader_derivatives extension 
 * `SPV_GOOGLE_user_type` : enables the SPV_GOOGLE_user_type extension 
@@ -1139,6 +1140,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvRayQueryKHR` 
 * `spvRayQueryPositionFetchKHR` 
 * `spvShaderInvocationReorderNV` 
+* `spvRayTracingClusterAccelerationStructureNV` 
 * `spvShaderClockKHR` 
 * `spvShaderNonUniformEXT` 
 * `spvShaderNonUniform` 
@@ -1253,6 +1255,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_NV_shader_invocation_reorder` : enables the GL_NV_shader_invocation_reorder extension 
 * `GL_NV_shader_subgroup_partitioned` : enables the GL_NV_shader_subgroup_partitioned extension 
 * `GL_NV_shader_texture_footprint` : enables the GL_NV_shader_texture_footprint extension 
+* `GL_NV_cluster_acceleration_structure` : enables the GL_NV_cluster_acceleration_structure extension 
 * `nvapi` 
 * `raytracing` 
 * `ser` 
