@@ -43,6 +43,8 @@ jobs:
         id: compare
         run: |
           if ! diff -q temp/command-line-slangc-reference.md docs/command-line-slangc-reference.md > /dev/null; then
-            echo "Command line reference is out of date. Please run 'slangc -help-style markdown -h > docs/command-line-slangc-reference.md' or comment '/regenerate-cmdline-ref' on your PR."
+            echo "Command line reference is out of date. Diff:"
+            diff -u docs/command-line-slangc-reference.md temp/command-line-slangc-reference.md
+            echo "Please run 'slangc -help-style markdown -h > docs/command-line-slangc-reference.md 2>&1' or comment '/regenerate-cmdline-ref' on your PR."
             exit 1
           fi
