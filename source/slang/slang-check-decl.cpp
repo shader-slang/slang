@@ -382,7 +382,7 @@ private:
 
     MemberExpr* createMemberExpr(ThisExpr* thisExpr, Scope* scope, Decl* member);
     Expr* createCtorParamExpr(ConstructorDecl* ctor, Index paramIndex);
-    void maybeInsertDefaultInitExpr(FunctionDeclBase* decl);
+    void maybeInsertDefaultInitExpr(StructDecl* structDecl);
 };
 
 template<typename VisitorType>
@@ -8179,7 +8179,6 @@ SemanticsContext SemanticsDeclBodyVisitor::registerDifferentiableTypesForFunc(
 void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
 {
     auto newContext = registerDifferentiableTypesForFunc(decl);
-    maybeInsertDefaultInitExpr(decl);
     decl->body = maybeParseStmt(decl->body, newContext);
     if (const auto body = decl->body)
     {
@@ -9370,24 +9369,24 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMember(
 }
 
 
-void SemanticsDeclBodyVisitor::maybeInsertDefaultInitExpr(FunctionDeclBase* decl)
+void SemanticsDeclBodyVisitor::maybeInsertDefaultInitExpr(StructDecl* structDecl)
 {
-    auto ctor = as<ConstructorDecl>(decl);
-    if (!ctor || !ctor->findModifier<SynthesizedModifier>())
+    if (!_hasExplicitConstructor(structDecl, false))
         return;
 
-    auto structDecl = as<StructDecl>(decl->parentDecl);
-    if (!structDecl)
-        return;
-
-    ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
-    thisExpr->scope = ctor->ownedScope;
-    thisExpr->type = ctor->returnType.type;
-    Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
-    auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
     auto seqStmtChild = m_astBuilder->create<SeqStmt>();
     seqStmtChild->stmts.reserve(structDecl->members.getCount());
+    Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
 
+    // We use first ctor to create the `this` expression, so that we can modify the
+    // members in assign expression later.
+    auto firstCtor = structDecl->getMembersOfType<ConstructorDecl>().getFirst();
+    ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+    thisExpr->scope = firstCtor->ownedScope;
+    thisExpr->type = firstCtor->returnType.type;
+
+    // Because the following assign statements will be the same in every ctor, we will
+    // construct the statement first, then just insert the statement to every ctor body.
     for (auto& member : structDecl->members)
     {
         if (auto varDeclBase = as<VarDeclBase>(member))
@@ -9397,7 +9396,7 @@ void SemanticsDeclBodyVisitor::maybeInsertDefaultInitExpr(FunctionDeclBase* decl
                 varDeclBase->initExpr == nullptr)
                 continue;
 
-            MemberExpr* memberExpr = createMemberExpr(thisExpr, ctor->ownedScope, member);
+            MemberExpr* memberExpr = createMemberExpr(thisExpr, firstCtor->ownedScope, member);
 
             if (!memberExpr->type.isLeftValue)
                 continue;
@@ -9424,9 +9423,15 @@ void SemanticsDeclBodyVisitor::maybeInsertDefaultInitExpr(FunctionDeclBase* decl
         }
     }
 
+    // If the struct has an explicit ctor, we won't synthesize any ctor
+    // for it, so every ctor will be explict ctor.
     if (seqStmtChild->stmts.getCount() != 0)
     {
-        seqStmt->stmts.insert(0, seqStmtChild);
+        for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
+        {
+            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+            seqStmt->stmts.insert(0, seqStmtChild);
+        }
     }
 }
 
@@ -9535,6 +9540,7 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
     }
 
     synthesizeCtorBody(structDeclInfo, inheritanceDefaultCtorList, structDecl);
+    maybeInsertDefaultInitExpr(structDecl);
 
     if (structDeclInfo.defaultCtor)
     {
