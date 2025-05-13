@@ -24,6 +24,11 @@ jobs:
           path: target-branch
           submodules: "recursive"
 
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev
+
       - name: Setup
         uses: ./target-branch/.github/actions/common-setup
         with:
