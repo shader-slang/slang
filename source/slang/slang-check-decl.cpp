@@ -382,6 +382,7 @@ private:
 
     MemberExpr* createMemberExpr(ThisExpr* thisExpr, Scope* scope, Decl* member);
     Expr* createCtorParamExpr(ConstructorDecl* ctor, Index paramIndex);
+    void maybeInsertDefaultInitExpr(FunctionDeclBase* decl);
 };
 
 template<typename VisitorType>
@@ -8178,6 +8179,7 @@ SemanticsContext SemanticsDeclBodyVisitor::registerDifferentiableTypesForFunc(
 void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
 {
     auto newContext = registerDifferentiableTypesForFunc(decl);
+    maybeInsertDefaultInitExpr(decl);
     decl->body = maybeParseStmt(decl->body, newContext);
     if (const auto body = decl->body)
     {
@@ -9367,6 +9369,66 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMember(
     seqStmtChild->stmts.add(stmt);
 }
 
+
+void SemanticsDeclBodyVisitor::maybeInsertDefaultInitExpr(FunctionDeclBase* decl)
+{
+    auto ctor = as<ConstructorDecl>(decl);
+    if (!ctor || !ctor->findModifier<SynthesizedModifier>())
+        return;
+
+    auto structDecl = as<StructDecl>(decl->parentDecl);
+    if (!structDecl)
+        return;
+
+    ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+    thisExpr->scope = ctor->ownedScope;
+    thisExpr->type = ctor->returnType.type;
+    Dictionary<Decl*, Expr*> cachedDeclToCheckedVar;
+    auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+    auto seqStmtChild = m_astBuilder->create<SeqStmt>();
+    seqStmtChild->stmts.reserve(structDecl->members.getCount());
+
+    for (auto& member : structDecl->members)
+    {
+        if (auto varDeclBase = as<VarDeclBase>(member))
+        {
+            if (varDeclBase->hasModifier<HLSLStaticModifier>() ||
+                varDeclBase->getName() == nullptr ||
+                varDeclBase->initExpr == nullptr)
+                continue;
+
+            MemberExpr* memberExpr = createMemberExpr(thisExpr, ctor->ownedScope, member);
+
+            if (!memberExpr->type.isLeftValue)
+                continue;
+
+            auto assign = m_astBuilder->create<AssignExpr>();
+            assign->left = memberExpr;
+            assign->right = varDeclBase->initExpr;
+            assign->loc = member->loc;
+
+            auto stmt = m_astBuilder->create<ExpressionStmt>();
+            stmt->expression = assign;
+            stmt->loc = member->loc;
+
+            Expr* checkedMemberVarExpr;
+            if (cachedDeclToCheckedVar.containsKey(member))
+                checkedMemberVarExpr = cachedDeclToCheckedVar[member];
+            else
+            {
+                checkedMemberVarExpr = CheckTerm(memberExpr);
+                cachedDeclToCheckedVar.add({member, checkedMemberVarExpr});
+            }
+
+            seqStmtChild->stmts.add(stmt);
+        }
+    }
+
+    if (seqStmtChild->stmts.getCount() != 0)
+    {
+        seqStmt->stmts.insert(0, seqStmtChild);
+    }
+}
 
 void SemanticsDeclBodyVisitor::synthesizeCtorBody(
     DeclAndCtorInfo& structDeclInfo,
