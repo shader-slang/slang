@@ -13,6 +13,7 @@ jobs:
           repository: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
           ref: ${{ github.event.client_payload.pull_request.head.ref }}
           path: pr-branch
+          submodules: "recursive"
 
       - name: Checkout target branch
         uses: actions/checkout@v4
@@ -21,6 +22,7 @@ jobs:
           repository: ${{ github.event.client_payload.pull_request.base.repo.full_name }}
           ref: ${{ github.event.client_payload.pull_request.base.ref }}
           path: target-branch
+          submodules: "recursive"
 
       - name: Setup
         uses: ./target-branch/.github/actions/common-setup
@@ -30,7 +32,7 @@ jobs:
           platform: x86_64
           config: release
           build-llvm: false
-          
+
       - name: Build Slang
         id: build
         run: |
@@ -100,4 +102,4 @@ jobs:
           repository: ${{ github.event.client_payload.github.payload.repository.full_name }}
           comment-id: ${{ github.event.client_payload.github.payload.comment.id }}
           reactions-edit-mode: replace
-          reactions: hooray 
+          reactions: hooray
