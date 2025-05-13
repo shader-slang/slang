@@ -61,12 +61,10 @@ static bool findEntryPointLayoutInfo(
     return false;
 }
 
-// Find semantic decoration for the return value of a function
-// Find semantic information for the return value of a function
 static bool findReturnValueSemanticInfo(
     IRFunc* func,
     UnownedStringSlice& outSemanticName,
-    UInt& outSemanticIndex)
+    IRIntegerValue& outSemanticIndex)
 {
     // Check for semantic on function itself
     if (auto semanticDecor = findSemanticDecoration(func))
@@ -81,7 +79,7 @@ static bool findReturnValueSemanticInfo(
     IRVarLayout* paramsLayout = nullptr;
     IRVarLayout* resultLayout = nullptr;
 
-    if (findEntryPointLayoutInfo(func, entryLayout, paramsLayout, resultLayout) && resultLayout)
+    if (findEntryPointLayoutInfo(func, entryLayout, paramsLayout, resultLayout))
     {
         for (UInt i = 0; i < resultLayout->getOperandCount(); i++)
         {
@@ -105,7 +103,7 @@ struct ParamInfo
     IRType* valueType;        // Parameter value type (without out/inout wrapper)
     bool isOut;               // Is an out parameter
     bool isInOut;             // Is an inout parameter
-    IRParam* newParam;        // New param (nullptr for pure out params)
+    IRParam* newParam;        // New param once created, pure out params will always be null here
     IRVar* outVar;            // Out variable (nullptr for non-out params)
     IRStructKey* outFieldKey; // Field key (for out params)
 };
@@ -175,7 +173,7 @@ static IRStructKey* createResultKey(IRFunc* func, IRBuilder& builder, List<IRStr
 
     // Transfer semantic decoration from function return value to struct key
     UnownedStringSlice semanticName;
-    UInt semanticIndex = 0;
+    IRIntegerValue semanticIndex = 0;
     if (findReturnValueSemanticInfo(func, semanticName, semanticIndex))
     {
         builder.addSemanticDecoration(resultKey, semanticName, semanticIndex);
@@ -429,11 +427,6 @@ IRFunc* lowerOutParameters(
     [[maybe_unused]] DiagnosticSink* sink,
     bool alwaysUseReturnStruct)
 {
-    {
-        SourceManager s;
-        DiagnosticSinkWriter w(sink);
-        dumpIR(func->getModule(), {}, "MODULE BEFORE", &s, &w);
-    }
     IRBuilder builder(func->getModule());
     IRCloneEnv cloneEnv;
 
@@ -483,13 +476,6 @@ IRFunc* lowerOutParameters(
     auto funcType = builder.getFuncType(newParamTypes, resultType);
     newFunc->setFullType(funcType);
 
-    // Set up layout information first, before creating the function body
-    // This ensures we have a consistent layout structure
-    // if (returnStruct)
-    // {
-    //     setupEntryPointLayout(func, newFunc, outKeys, paramToKeyMap, origToNewParamMap, builder);
-    // }
-
     // Create function body
     auto firstBlock = builder.createBlock();
     newFunc->addBlock(firstBlock);
@@ -507,20 +493,9 @@ IRFunc* lowerOutParameters(
 
     builder.emitReturn(returnValue);
 
-    // // Set up layout information
-    // if (returnStruct)
-    // {
-    //     setupEntryPointLayout(func, newFunc, outKeys, paramToKeyMap, origToNewParamMap, builder);
-    // }
-
     // Handle cleanup of original function
     handleOriginalFunction(func, callResult);
 
-    {
-        SourceManager s;
-        DiagnosticSinkWriter w(sink);
-        dumpIR(newFunc->getModule(), {}, "MODULE AFTER", &s, &w);
-    }
     return newFunc;
 }
 

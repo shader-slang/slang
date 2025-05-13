@@ -4914,7 +4914,7 @@ public:
     IRSemanticDecoration* addSemanticDecoration(
         IRInst* value,
         UnownedStringSlice const& text,
-        int index = 0)
+        IRIntegerValue index = 0)
     {
         return as<IRSemanticDecoration>(addDecoration(
             value,
