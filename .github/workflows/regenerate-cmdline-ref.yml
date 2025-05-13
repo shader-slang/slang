@@ -51,7 +51,7 @@ jobs:
         run: |
           cd pr-branch
           mkdir -p docs
-          ./build/bin/release/slangc -help-style markdown -h > docs/command-line-slangc-reference.md
+          "$bin_dir/slangc" -help-style markdown -h > docs/command-line-slangc-reference.md
 
       - name: Configure Git commit signing
         id: git-info
