@@ -64,10 +64,19 @@ jobs:
           # Self-hosted full gpu build
           - os: windows
             compiler: cl
+            config: release
             platform: x86_64
             test-category: full
             full-gpu-tests: true
             runs-on: [Windows, self-hosted]
+            has-gpu: true
+          - os: windows
+            compiler: cl
+            config: debug
+            platform: x86_64
+            test-category: full
+            full-gpu-tests: true
+            runs-on: [Windows, self-hosted, 'GCP-T4']
             has-gpu: true
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
@@ -222,6 +231,7 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
           "$bin_dir/slang-test" \
             -use-test-server \
+            -server-count 8 \
             -category ${{ matrix.test-category }} \
             -emit-spirv-via-glsl \
             -api vk \
