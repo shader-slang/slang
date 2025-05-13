@@ -4520,6 +4520,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             boundMemberInfo->type = nullptr;
             boundMemberInfo->base = loweredBase;
             boundMemberInfo->declRef = callableDeclRef;
+
+            context->shared->extValues.add(boundMemberInfo);
             return LoweredValInfo::boundMember(boundMemberInfo);
         }
         else if (auto propertyDeclRef = declRef.as<PropertyDecl>())
