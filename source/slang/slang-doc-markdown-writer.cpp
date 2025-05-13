@@ -2036,7 +2036,7 @@ void DocMarkdownWriter::writeAggType(
                 ASTPrinter printer(m_astBuilder);
                 printer.addDeclPath(aggTypeDecl->getDefaultDeclRef());
                 out << "`" << printer.getString() << "` additionally conforms to `";
-                out << escapeMarkdownText(inheritanceDecl->base.type->toString());
+                out << inheritanceDecl->base.type->toString();
                 if (nonEmptyLines.getCount() != 0)
                 {
                     out << "` when the following conditions are met:\n\n";
