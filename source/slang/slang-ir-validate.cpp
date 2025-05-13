@@ -1,7 +1,6 @@
 // slang-ir-validate.cpp
 #include "slang-ir-validate.h"
 
-#include "slang-compiler.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
