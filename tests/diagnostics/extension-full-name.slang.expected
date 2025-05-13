@@ -1,39 +1,40 @@
 result code = -1
 standard error = {
-tests/diagnostics/extension-full-name.slang(184): error 30019: expected an expression of type 'GenericType<half>.State', got 'int'
+tests/diagnostics/extension-full-name.slang(185): error 30019: expected an expression of type 'GenericType<half>.State', got 'int'
     state1 = 0;    // Error: expected expr of type 'GenericType<half>.State', got 'int'
              ^
-tests/diagnostics/extension-full-name.slang(185): error 30019: expected an expression of type 'GenericType<float>.InnerType.Options', got 'int'
+tests/diagnostics/extension-full-name.slang(186): error 30019: expected an expression of type 'GenericType<float>.InnerType.Options', got 'int'
     options1 = 0;  // Error: expected expr of type 'GenericType<float>.InnerType.Options', got 'int'
                ^
-tests/diagnostics/extension-full-name.slang(186): error 30019: expected an expression of type 'NonGenericType.Config', got 'int'
+tests/diagnostics/extension-full-name.slang(187): error 30019: expected an expression of type 'NonGenericType.Config', got 'int'
     config1 = 0;   // Error: expected expr of type 'NonGenericType.Config', got 'int'
               ^
-tests/diagnostics/extension-full-name.slang(187): error 30019: expected an expression of type 'Container.Nested.Settings', got 'int'
+tests/diagnostics/extension-full-name.slang(188): error 30019: expected an expression of type 'Container.Nested.Settings', got 'int'
     settings1 = 0; // Error: expected expr of type 'Container.Nested.Settings', got 'int'
                 ^
-tests/diagnostics/extension-full-name.slang(188): error 30019: expected an expression of type 'Container.Nested.DeepNested.Record', got 'int'
+tests/diagnostics/extension-full-name.slang(189): error 30019: expected an expression of type 'Container.Nested.DeepNested.Record', got 'int'
     record1 = 0;   // Error: expected expr of type 'Container.Nested.DeepNested.Record', got 'int'
               ^
-tests/diagnostics/extension-full-name.slang(196): error 30027: 'getOptions' is not a member of 'GenericType<int>.InnerType'.
+tests/diagnostics/extension-full-name.slang(189): note: explicit conversion from 'int' to 'Container.Nested.DeepNested.Record' is possible
+tests/diagnostics/extension-full-name.slang(197): error 30027: 'getOptions' is not a member of 'GenericType<int>.InnerType'.
         intInner.getOptions(); // This won't compile as intInner doesn't have getOptions
                  ^~~~~~~~~~
-tests/diagnostics/extension-full-name.slang(226): error 30019: expected an expression of type 'GenericType<float>.InnerType.Options', got 'GenericType<half>.State'
+tests/diagnostics/extension-full-name.slang(227): error 30019: expected an expression of type 'GenericType<float>.InnerType.Options', got 'GenericType<half>.State'
             .createState(); // Error: expected expr of type 'GenericType<float>.InnerType.Options',
                         ^
-tests/diagnostics/extension-full-name.slang(228): error 30019: expected an expression of type 'GenericType<half>.State', got 'NonGenericType.Config'
+tests/diagnostics/extension-full-name.slang(229): error 30019: expected an expression of type 'GenericType<half>.State', got 'NonGenericType.Config'
     state1 = nonGenType.createConfig(); // Error: expected expr of type 'GenericType<half>.State',
                                     ^
-tests/diagnostics/extension-full-name.slang(230): error 30019: expected an expression of type 'NonGenericType.Config', got 'Container.Nested.Settings'
+tests/diagnostics/extension-full-name.slang(231): error 30019: expected an expression of type 'NonGenericType.Config', got 'Container.Nested.Settings'
     config1 = nested.createSettings();  // Error: expected expr of type 'NonGenericType.Config', got
                                    ^
-tests/diagnostics/extension-full-name.slang(304): error 30019: expected an expression of type 'Bar[3].DataStats', got 'int'
+tests/diagnostics/extension-full-name.slang(305): error 30019: expected an expression of type 'Bar[3].DataStats', got 'int'
     barStats = 0; // Error: expected expr of type 'Bar[3].DataStats', got 'int'
                ^
-tests/diagnostics/extension-full-name.slang(312): error 30019: expected an expression of type 'Bar[2].DataStats', got 'Bar[3].DataStats'
+tests/diagnostics/extension-full-name.slang(313): error 30019: expected an expression of type 'Bar[2].DataStats', got 'Bar[3].DataStats'
     bar2Stats = barArray.computeStats(); // Error: expected expr of type 'Bar[2].DataStats', got 'Bar[3].DataStats'
                                      ^
-tests/diagnostics/extension-full-name.slang(355): error 30019: expected an expression of type 'SimpleBase.NamedConfig', got 'int'
+tests/diagnostics/extension-full-name.slang(356): error 30019: expected an expression of type 'SimpleBase.NamedConfig', got 'int'
     config = 0; // Error: expected expr of type 'SimpleBase.NamedConfig', got 'int'
              ^
 }

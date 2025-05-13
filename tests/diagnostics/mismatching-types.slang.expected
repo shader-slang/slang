@@ -20,6 +20,7 @@ tests/diagnostics/mismatching-types.slang(63): error 30019: expected an expressi
 tests/diagnostics/mismatching-types.slang(66): error 30019: expected an expression of type 'NonGenericOuter.GenericInner<int>', got 'int'
     c.i = 0;
           ^
+tests/diagnostics/mismatching-types.slang(66): note: explicit conversion from 'int' to 'NonGenericOuter.GenericInner<int>' is possible
 tests/diagnostics/mismatching-types.slang(68): error 30019: expected an expression of type 'NonGenericOuter.GenericInner<int>', got 'NonGenericOuter.GenericInner<float>'
     c.i = c.f;
             ^
