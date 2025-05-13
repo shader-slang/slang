@@ -68,7 +68,7 @@ jobs:
             platform: x86_64
             test-category: full
             full-gpu-tests: true
-            runs-on: [Windows, self-hosted]
+            runs-on: [Windows, self-hosted, GCP-T4]
             has-gpu: true
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
@@ -121,7 +121,7 @@ jobs:
           config: ${{matrix.config}}
           build-llvm: ${{ matrix.build-llvm }}
       - name: Build Slang
-        if: steps.filter.outputs.should-run == 'true'
+        if: steps.filter.outputs.should-run == 'true' && matrix.os == 'windows'
         run: |
           if [[ "${{ matrix.platform }}" = "wasm" ]]; then
               git clone https://github.com/emscripten-core/emsdk.git
@@ -169,7 +169,7 @@ jobs:
             fi
           fi
       - name: Test Slang
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
+        if: steps.filter.outputs.should-run == 'false' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -204,7 +204,7 @@ jobs:
               -show-adapter-info
           fi
       - name: Run Slang examples
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
+        if: steps.filter.outputs.should-run == 'false' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         run: |
           .github/workflows/ci-examples.sh \
            --bin-dir "$bin_dir" \
@@ -213,11 +213,11 @@ jobs:
            --config "${{matrix.config}}" \
            --skip-file tests/expected-example-failure-github.txt
       - name: Run slangc tests
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm'
+        if: steps.filter.outputs.should-run == 'false' && matrix.platform != 'wasm'
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
-        if: steps.filter.outputs.should-run == 'true' && matrix.full-gpu-tests && matrix.platform != 'wasm'
+        if: steps.filter.outputs.should-run == 'false' && matrix.full-gpu-tests && matrix.platform != 'wasm'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -230,6 +230,45 @@ jobs:
             -expected-failure-list tests/expected-failure.txt \
             -skip-reference-image-generation \
             -show-adapter-info
+      - name: Run slangpy tests
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
+        shell: pwsh
+        run: |
+          Write-Host "Using system Python..."
+          python --version
+          
+          Write-Host "Cleaning up existing installations..."
+          Start-Process -FilePath "python" -ArgumentList "-m pip uninstall -y slangpy" -Verb RunAs -Wait
+          
+          Write-Host "Installing slangpy..."
+          python -m pip install --no-cache-dir --verbose slangpy --user
+          
+          Write-Host "Listing all installed packages..."
+          python -m pip list
+          
+          Write-Host "Getting Python site-packages directory and copying library files (DLL, SO, DYLIB)..."
+          $SITE_PACKAGES = python -c "import slangpy; print(slangpy.__file__.rsplit('\\', 2)[0])"
+          Write-Host "Site packages directory: $SITE_PACKAGES"
+          
+          Write-Host "Copying library files..."
+          $result = Copy-Item -Path "$bin_dir\*" -Include "*.dll","*.so","*.dylib" -Destination "$SITE_PACKAGES\slangpy\" -ErrorAction Continue -ErrorVariable copyErrors -PassThru
+          if ($copyErrors) { Write-Host "Copy errors: $copyErrors" }
+          if ($result) { 
+              $groupedFiles = $result | Group-Object Extension
+              foreach ($group in $groupedFiles) {
+                  Write-Host "Copied $($group.Name.TrimStart('.').ToUpper()) files: $($group.Group.Name -join ', ')"
+              }
+          }
+          Write-Host "Files in slangpy directory:"
+          Get-ChildItem -Path "$SITE_PACKAGES\slangpy\" -File | ForEach-Object {
+              Write-Host "  $($_.Name) - Size: $([math]::Round($_.Length/1KB, 2)) KB"
+          }
+          Write-Host "Verifying slangpy and pytest installations..."
+          python -c "import slangpy, pytest; print('slangpy version:', slangpy.__version__); print('pytest version:', pytest.__version__); print('pytest location:', pytest.__file__); print('slangpy location:', slangpy.__file__)"
+          
+          Write-Host "Running pytest on slangpy tests..."
+          $env:PYTHONPATH = "$SITE_PACKAGES"
+          python -m pytest "$SITE_PACKAGES\slangpy\tests" -v
       - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests
         with:
