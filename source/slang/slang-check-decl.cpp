@@ -9392,8 +9392,7 @@ void SemanticsDeclBodyVisitor::maybeInsertDefaultInitExpr(StructDecl* structDecl
         if (auto varDeclBase = as<VarDeclBase>(member))
         {
             if (varDeclBase->hasModifier<HLSLStaticModifier>() ||
-                varDeclBase->getName() == nullptr ||
-                varDeclBase->initExpr == nullptr)
+                varDeclBase->getName() == nullptr || varDeclBase->initExpr == nullptr)
                 continue;
 
             MemberExpr* memberExpr = createMemberExpr(thisExpr, firstCtor->ownedScope, member);
