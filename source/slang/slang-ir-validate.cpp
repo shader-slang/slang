@@ -555,11 +555,11 @@ static void validateVectorElementCount(DiagnosticSink* sink, IRVectorType* vecto
 {
     const auto elementCount = as<IRIntLit>(vectorType->getElementCount())->getValue();
 
-    // Vectors with a single element should have already been lowered to scalars.
-    SLANG_ASSERT(elementCount > 1);
-
+    // 1-vectors are supported and are legalized/transformed properly when targetting unsupported
+    // backends.
+    const IRIntegerValue minCount = 1;
     const IRIntegerValue maxCount = 4;
-    if (elementCount > maxCount)
+    if ((elementCount < minCount) || (elementCount > maxCount))
     {
         sink->diagnose(
             vectorType->sourceLoc,
