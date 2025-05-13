@@ -4,12 +4,8 @@ public struct Visibility
 {
   internal int x;
   public int y = 5;
-  // the compiler does not synthesize any ctor.
-  // the compiler will try to synthesize:
-  //     public __init(int y);
-  // but then it will find that `x` cannot be initialized.
-  // so this synthesis will fail and no ctor will be added
-  // to the type.
+  // will synthesize a constructor
+  // __init(int y = 0)
 }
 
 void test()

@@ -2295,6 +2295,18 @@ static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type*
         return invoke;
     }
 
+    // At the last, we will check if the type is a C-style type, if it is, we will use empty initializer
+    // list to construct the default constructor.
+    HashSet<Type*> isVisit;
+    if (visitor->isCStyleType(type, isVisit))
+    {
+        auto initListExpr = visitor->getASTBuilder()->create<InitializerListExpr>();
+        initListExpr->type = visitor->getASTBuilder()->getInitializerListType();
+        Expr* outExpr = nullptr;
+        if (visitor->_coerceInitializerList(type, &outExpr, initListExpr))
+            return outExpr;
+    }
+
     return nullptr;
 }
 
@@ -12676,7 +12688,13 @@ static Expr* _getParamDefaultValue(SemanticsVisitor* visitor, VarDeclBase* varDe
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    return constructDefaultConstructorForType(visitor, varDecl->type.type);
+    if (auto expr = constructDefaultConstructorForType(visitor, varDecl->type.type))
+    {
+        expr->loc = varDecl->loc;
+        return expr;
+    }
+
+    return nullptr;
 }
 
 bool SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* structDecl)
