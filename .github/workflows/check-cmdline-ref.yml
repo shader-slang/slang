@@ -37,7 +37,7 @@ jobs:
       - name: Generate command line reference
         run: |
           mkdir -p temp
-          "$bin_dir/slangc" -help-style markdown -h > temp/command-line-slangc-reference.md
+          "$bin_dir/slangc" -help-style markdown -h > temp/command-line-slangc-reference.md 2>&1
 
       - name: Compare with existing reference
         id: compare
