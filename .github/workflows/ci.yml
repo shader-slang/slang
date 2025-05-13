@@ -68,7 +68,7 @@ jobs:
             platform: x86_64
             test-category: full
             full-gpu-tests: true
-            runs-on: [Windows, self-hosted]
+            runs-on: [Windows, self-hosted, GCP-T4]
             has-gpu: true
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
@@ -121,7 +121,7 @@ jobs:
           config: ${{matrix.config}}
           build-llvm: ${{ matrix.build-llvm }}
       - name: Build Slang
-        if: steps.filter.outputs.should-run == 'true'
+        if: steps.filter.outputs.should-run == 'true' && matrix.os == 'windows'
         run: |
           if [[ "${{ matrix.platform }}" = "wasm" ]]; then
               git clone https://github.com/emscripten-core/emsdk.git
@@ -169,7 +169,7 @@ jobs:
             fi
           fi
       - name: Test Slang
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
+        if: steps.filter.outputs.should-run == 'false' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -204,7 +204,7 @@ jobs:
               -show-adapter-info
           fi
       - name: Run Slang examples
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
+        if: steps.filter.outputs.should-run == 'false' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         run: |
           .github/workflows/ci-examples.sh \
            --bin-dir "$bin_dir" \
@@ -213,11 +213,11 @@ jobs:
            --config "${{matrix.config}}" \
            --skip-file tests/expected-example-failure-github.txt
       - name: Run slangc tests
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm'
+        if: steps.filter.outputs.should-run == 'false' && matrix.platform != 'wasm'
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
-        if: steps.filter.outputs.should-run == 'true' && matrix.full-gpu-tests && matrix.platform != 'wasm'
+        if: steps.filter.outputs.should-run == 'false' && matrix.full-gpu-tests && matrix.platform != 'wasm'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
@@ -230,6 +230,35 @@ jobs:
             -expected-failure-list tests/expected-failure.txt \
             -skip-reference-image-generation \
             -show-adapter-info
+      - name: Run slangpy tests
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
+        shell: pwsh
+        run: |
+          Write-Host "Setting PATH to include Python directories..."
+          $env:PATH = "C:\Python311;C:\Python311\Scripts;C:\Python311\Lib\site-packages" + $env:PATH
+          $env:PYTHONPATH = "C:\Python311\Lib\site-packages"
+          Write-Host "PATH: $env:PATH"
+          Write-Host "Installing slangpy and pytest..."
+          python -m pip install --upgrade pip
+          python -m pip install "pytest>=7.0.0" slangpy
+          Write-Host "Getting Python site-packages directory..."
+          $SITE_PACKAGES = python -c "import site; print(site.getsitepackages()[1])"
+          Write-Host "Copying DLL files to $SITE_PACKAGES\slangpy..."
+          Copy-Item -Path "$bin_dir\*.dll" -Destination "$SITE_PACKAGES\slangpy\" -ErrorAction SilentlyContinue
+          Write-Host "Copying SO files to $SITE_PACKAGES\slangpy..."
+          Copy-Item -Path "$bin_dir\*.so" -Destination "$SITE_PACKAGES\slangpy\" -ErrorAction SilentlyContinue
+          Write-Host "Copying DYLIB files to $SITE_PACKAGES\slangpy..."
+          Copy-Item -Path "$bin_dir\*.dylib" -Destination "$SITE_PACKAGES\slangpy\" -ErrorAction SilentlyContinue
+          Write-Host "Running pytest on slangpy tests..."
+          python -m pytest "$SITE_PACKAGES\slangpy\tests"
+      - name: Cleanup test environment
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
+        run: |
+          pip uninstall -y slangpy pytest
+          rm -rf "$bin_dir"/*.log || true
+          rm -rf "$bin_dir"/test_output || true
+          unset SLANG_RUN_SPIRV_VALIDATION
+          unset SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN
       - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests
         with:
