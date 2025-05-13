@@ -2097,7 +2097,6 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
     m_writer->emit("layout(buffer_reference, std430, buffer_reference_align = ");
     m_writer->emitInt64(alignment);
     m_writer->emit(") buffer ");
-
     m_writer->emit(ptrTypeName);
     m_writer->emit("\n");
     m_writer->emit("{\n");
