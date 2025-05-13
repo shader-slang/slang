@@ -2537,7 +2537,10 @@ struct TypeLayoutReflection
     }
 
     // only useful if `getKind() == Kind::Array`
-    size_t getElementCount(ShaderReflection* reflection = nullptr) { return getType()->getElementCount((SlangReflection*)reflection); }
+    size_t getElementCount(ShaderReflection* reflection = nullptr)
+    {
+        return getType()->getElementCount((SlangReflection*)reflection);
+    }
 
     size_t getTotalArrayElementCount() { return getType()->getTotalArrayElementCount(); }
 
