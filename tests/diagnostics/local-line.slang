@@ -2,7 +2,7 @@
 //TEST:SIMPLE_LINE:-entry computeMain -target dxil -profile cs_6_0 
 //TEST:SIMPLE_LINE:-entry computeMain -target dxbc  -stage compute
 //TEST:SIMPLE_LINE:-entry computeMain -target shader-dll -stage compute
-//TEST:SIMPLE_LINE:-entry computeMain -target ptx -stage compute
+//TEST:SIMPLE_LINE:-entry computeMain -capability cuda_sm_8_0 -target ptx -stage compute 
 //TEST:SIMPLE_LINE(filecheck=CHECK):-entry computeMain -target spirv -stage compute -emit-spirv-via-glsl
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer

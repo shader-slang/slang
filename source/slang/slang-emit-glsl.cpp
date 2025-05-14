@@ -3074,11 +3074,8 @@ void GLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
             }
         case kIROp_RequireSPIRVVersionDecoration:
             {
-                auto intValue =
-                    static_cast<IRRequireSPIRVVersionDecoration*>(decoration)->getSPIRVVersion();
-                SemanticVersion version;
-                version.setFromInteger(SemanticVersion::IntegerType(intValue));
-                _requireSPIRVVersion(version);
+                _requireSPIRVVersion(
+                    static_cast<IRRequireSPIRVVersionDecoration*>(decoration)->getSPIRVVersion());
                 break;
             }
         }
