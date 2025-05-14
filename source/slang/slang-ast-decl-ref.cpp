@@ -41,7 +41,7 @@ DeclRefBase* _getDeclRefFromVal(Val* val)
 {
     if (auto declRefType = as<DeclRefType>(val))
         return declRefType->getDeclRef();
-    else if (auto genParamIntVal = as<GenericParamIntVal>(val))
+    else if (auto genParamIntVal = as<DeclRefIntVal>(val))
         return genParamIntVal->getDeclRef();
     else if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(val))
         return declaredSubtypeWitness->getDeclRef();

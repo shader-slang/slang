@@ -323,7 +323,7 @@ void emitVal(ManglingContext* context, Val* val)
         // to mangle in the constraints even when
         // the whole thing is specialized...
     }
-    else if (auto genericParamIntVal = dynamicCast<GenericParamIntVal>(val))
+    else if (auto genericParamIntVal = dynamicCast<DeclRefIntVal>(val))
     {
         // TODO: we shouldn't be including the names of generic parameters
         // anywhere in mangled names, since changing parameter names
