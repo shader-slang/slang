@@ -3906,7 +3906,7 @@ SLANG_API int64_t spReflectionGeneric_GetConcreteIntVal(
 
     auto valueParamDeclRef = convert(valueParam);
 
-    Val* valResult = astBuilder->getOrCreate<GenericParamIntVal>(
+    Val* valResult = astBuilder->getOrCreate<DeclRefIntVal>(
         valueParamDeclRef.substitute(
             astBuilder,
             as<GenericValueParamDecl>(valueParamDeclRef.getDecl())->getType()),

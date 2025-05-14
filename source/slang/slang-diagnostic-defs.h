@@ -1994,6 +1994,12 @@ DIAGNOSTIC(
     vectorWithDisallowedElementTypeEncountered,
     "vector with disallowed element type '$0' encountered")
 
+DIAGNOSTIC(
+    38203,
+    Error,
+    vectorWithInvalidElementCountEncountered,
+    "vector has invalid element count '$0', valid values are between '$1' and '$2' inclusive")
+
 // 39xxx - Type layout and parameter binding.
 
 DIAGNOSTIC(
