@@ -1110,7 +1110,8 @@ void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, Stri
 
 inline String CLikeSourceEmitter::maybeMakeEntryPointNameValid(String name, DiagnosticSink* sink)
 {
-    if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) || isMetalTarget(getTargetReq()))
+    if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) ||
+        isMetalTarget(getTargetReq()))
     {
         String remappedName;
         if (s_entryPointRenameMap.tryGetValue(name, remappedName))
