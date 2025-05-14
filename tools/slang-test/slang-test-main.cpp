@@ -5077,7 +5077,11 @@ SlangResult innerMain(int argc, char** argv)
                     testOptions.categories.add(unitTestCategory);
                     testOptions.categories.add(smokeTestCategory);
                     // Use default spawn type for unit tests as the test server one is unstable
-                    runUnitTestModule(&context, testOptions, SpawnType::Default, "slang-unit-test-tool");
+                    runUnitTestModule(
+                        &context,
+                        testOptions,
+                        SpawnType::Default,
+                        "slang-unit-test-tool");
                 }
 
                 {
