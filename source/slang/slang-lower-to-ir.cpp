@@ -10849,10 +10849,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 getBuilder()->addSimpleDecoration<IRReadNoneDecoration>(irFunc);
             }
-            else if (as<NoReturnAttribute>(modifier))
-            {
-                getBuilder()->addSimpleDecoration<IRNoReturnDecoration>(irFunc);
-            }
             else if (as<NoSideEffectAttribute>(modifier))
             {
                 getBuilder()->addSimpleDecoration<IRNoSideEffectDecoration>(irFunc);
