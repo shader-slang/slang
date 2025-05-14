@@ -12604,6 +12604,7 @@ void SemanticsDeclAttributesVisitor::checkHLSLRegisterSemantic(
         case 's':
             if (!resType->isCombined())
                 isValid = false;
+            break;
         default:
             isValid = false;
             break;
