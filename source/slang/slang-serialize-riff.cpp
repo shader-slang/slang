@@ -397,7 +397,7 @@ void RIFFSerialReader::handleBool(bool& value)
 
     default:
         SLANG_UNEXPECTED("invalid format in RIFF");
-        UNREACHABLE_RETURN(false);
+        break;
     }
 }
 
