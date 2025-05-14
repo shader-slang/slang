@@ -5058,21 +5058,20 @@ SlangResult innerMain(int argc, char** argv)
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);
 
-            for (bool isRetry : {false, true})
+            // Try the unit tests up to 3 times
+            for (bool isRetry : {false, true, true})
             {
-                auto spawnType = context.getFinalSpawnType();
-
-                context.isRetry = false;
+                // Use default spawn type for unit tests as the test server one is unstable
+                auto spawnType = SpawnType::Default;
+                context.isRetry = isRetry;
                 if (isRetry)
                 {
                     if (context.failedUnitTests.getCount() == 0)
                         break;
 
                     printf("Retrying unit tests with default spawn type...\n");
-                    context.isRetry = true;
                     context.options.testPrefixes = context.failedUnitTests;
                     context.failedUnitTests.clear();
-                    spawnType = SpawnType::Default;
                 }
 
                 // Run the unit tests
@@ -5080,11 +5079,10 @@ SlangResult innerMain(int argc, char** argv)
                     TestOptions testOptions;
                     testOptions.categories.add(unitTestCategory);
                     testOptions.categories.add(smokeTestCategory);
-                    // Use default spawn type for unit tests as the test server one is unstable
                     runUnitTestModule(
                         &context,
                         testOptions,
-                        SpawnType::Default,
+                        spawnType,
                         "slang-unit-test-tool");
                 }
 
@@ -5095,7 +5093,7 @@ SlangResult innerMain(int argc, char** argv)
                     runUnitTestModule(
                         &context,
                         testOptions,
-                        SpawnType::Default,
+                        spawnType,
                         "gfx-unit-test-tool");
                 }
             }
@@ -5105,13 +5103,14 @@ SlangResult innerMain(int argc, char** argv)
 
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
         // excution or driver instability. We can try running them again.
-        static constexpr int kFailedTestLimitForRetry = 16;
+        static constexpr int kFailedTestLimitForRetry = 100;
         if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
         {
             if (context.failedFileTests.getCount() > 0)
                 printf("Retrying %d failed tests...\n", (int)context.failedFileTests.getCount());
             for (auto& test : context.failedFileTests)
             {
+                context.isRetry = true;
                 FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
                 TestReporter::SuiteScope suiteScope(&reporter, "tests");
                 TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
