@@ -3121,7 +3121,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         case kIROp_MakeCoopVector:
             {
                 emitType(coopVecType, getName(inst));
-                m_writer->emit(isCoopvecPoc  ? ";\n" : " = { ");
+                m_writer->emit(isCoopvecPoc ? ";\n" : " = { ");
 
                 auto elemCount = as<IRIntLit>(coopVecType->getOperand(1));
                 IRIntegerValue elemCountValue = elemCount->getValue();
