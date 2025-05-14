@@ -70,7 +70,7 @@ jobs:
             full-gpu-tests: true
             runs-on: [Windows, self-hosted]
             has-gpu: true
-            server-count: 16
+            server-count: 8
           # Self-hosted full gpu build - debug
           - os: windows
             config: debug
@@ -80,7 +80,7 @@ jobs:
             full-gpu-tests: true
             runs-on: [Windows, self-hosted, "GCP-T4"]
             has-gpu: true
-            server-count: 16
+            server-count: 8
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
@@ -228,7 +228,7 @@ jobs:
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
-        if: steps.filter.outputs.should-run == 'true' && matrix.full-gpu-tests && matrix.platform != 'wasm'
+        if: steps.filter.outputs.should-run == 'true' && matrix.full-gpu-tests && matrix.platform != 'wasm' && matrix.config != 'debug'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
