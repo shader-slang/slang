@@ -5087,7 +5087,12 @@ SlangResult innerMain(int argc, char** argv)
                 {
                     TestOptions testOptions;
                     testOptions.categories.add(unitTestCategory);
-                    runUnitTestModule(&context, testOptions, spawnType, "gfx-unit-test-tool");
+                    // Use default spawn type for unit tests as the test server one is unstable
+                    runUnitTestModule(
+                        &context,
+                        testOptions,
+                        SpawnType::Default,
+                        "gfx-unit-test-tool");
                 }
             }
 
