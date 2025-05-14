@@ -456,14 +456,14 @@ void RIFFSerialReader::handleString(String& value)
     if (_peekChunkType() != RIFFSerial::kStringFourCC)
     {
         SLANG_UNEXPECTED("invalid format in RIFF");
-        UNREACHABLE_RETURN("");
+        return;
     }
 
     auto dataChunk = as<RIFF::DataChunk>(_cursor);
     if (!dataChunk)
     {
         SLANG_UNEXPECTED("invalid format in RIFF");
-        UNREACHABLE_RETURN("");
+        return;
     }
 
     auto size = dataChunk->getPayloadSize();
