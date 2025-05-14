@@ -2110,6 +2110,7 @@ public:
     {
         CompileTime,
         LinkTime,
+        SpecializationConstant
     };
     Expr* checkExpressionAndExpectIntegerConstant(
         Expr* expr,
@@ -2954,6 +2955,7 @@ public:
     Expr* visitMemberExpr(MemberExpr* expr);
 
     Expr* visitInitializerListExpr(InitializerListExpr* expr);
+    Expr* visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr);
 
     Expr* visitThisExpr(ThisExpr* expr);
     Expr* visitThisTypeExpr(ThisTypeExpr* expr);

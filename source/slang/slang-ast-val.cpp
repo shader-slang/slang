@@ -176,9 +176,9 @@ void ConstantIntVal::_toTextOverride(StringBuilder& out)
     out << getValue();
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! GenericParamIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclRefIntVal !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void GenericParamIntVal::_toTextOverride(StringBuilder& out)
+void DeclRefIntVal::_toTextOverride(StringBuilder& out)
 {
     Name* name = getDeclRef().getName();
     if (name)
@@ -248,7 +248,7 @@ Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet
     return paramVal;
 }
 
-Val* GenericParamIntVal::_substituteImplOverride(
+Val* DeclRefIntVal::_substituteImplOverride(
     ASTBuilder* /* astBuilder */,
     SubstitutionSet subst,
     int* ioDiff)
@@ -259,12 +259,12 @@ Val* GenericParamIntVal::_substituteImplOverride(
     return this;
 }
 
-bool GenericParamIntVal::_isLinkTimeValOverride()
+bool DeclRefIntVal::_isLinkTimeValOverride()
 {
     return getDeclRef().getDecl()->hasModifier<ExternModifier>();
 }
 
-Val* GenericParamIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*>& map)
+Val* DeclRefIntVal::_linkTimeResolveOverride(Dictionary<String, IntVal*>& map)
 {
     auto name = getMangledName(getCurrentASTBuilder(), getDeclRef().declRefBase);
     IntVal* v;

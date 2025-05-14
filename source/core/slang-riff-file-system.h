@@ -11,9 +11,9 @@ namespace Slang
 // The riff information used for RiffArchiveFileSystem
 struct RiffFileSystemBinary
 {
-    static const FourCC kContainerFourCC = SLANG_FOUR_CC('S', 'c', 'o', 'n');
-    static const FourCC kEntryFourCC = SLANG_FOUR_CC('S', 'f', 'i', 'l');
-    static const FourCC kHeaderFourCC = SLANG_FOUR_CC('S', 'h', 'e', 'a');
+    static const FourCC::RawValue kContainerFourCC = SLANG_FOUR_CC('S', 'c', 'o', 'n');
+    static const FourCC::RawValue kEntryFourCC = SLANG_FOUR_CC('S', 'f', 'i', 'l');
+    static const FourCC::RawValue kHeaderFourCC = SLANG_FOUR_CC('S', 'h', 'e', 'a');
 
     struct Header
     {
