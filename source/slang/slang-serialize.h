@@ -335,6 +335,9 @@ struct ISerializerImpl
     /// End serializing a struct value.
     virtual void endStruct() = 0;
 
+    virtual void beginVariant() = 0;
+    virtual void endVariant() = 0;
+
     /// Set the key for the next struct field to be serialized.
     ///
     /// If no name is available for the field, `name` may be `nullptr`.
@@ -623,6 +626,21 @@ private:
     Serializer _serializer;
 };
 
+struct ScopedSerializerVariant
+{
+public:
+    ScopedSerializerVariant(Serializer const& serializer)
+        : _serializer(serializer)
+    {
+        serializer->beginVariant();
+    }
+
+    ~ScopedSerializerVariant() { _serializer->endVariant(); }
+
+private:
+    Serializer _serializer;
+};
+
 struct ScopedSerializerTuple
 {
 public:
@@ -667,8 +685,8 @@ private:
 #define SLANG_SCOPED_SERIALIZER_STRUCT(SERIALIZER) \
     ::Slang::ScopedSerializerStruct SLANG_CONCAT(_scopedSerializerStruct, __LINE__)(SERIALIZER)
 
-#define SLANG_SCOPED_SERIALIZER_TAGGED_UNION(SERIALIZER) \
-    ::Slang::ScopedSerializerStruct SLANG_CONCAT(_scopedSerializerStruct, __LINE__)(SERIALIZER)
+#define SLANG_SCOPED_SERIALIZER_VARIANT(SERIALIZER) \
+    ::Slang::ScopedSerializerVariant SLANG_CONCAT(_scopedSerializerVariant, __LINE__)(SERIALIZER)
 
 #define SLANG_SCOPED_SERIALIZER_TUPLE(SERIALIZER) \
     ::Slang::ScopedSerializerTuple SLANG_CONCAT(_scopedSerializerTuple, __LINE__)(SERIALIZER)
