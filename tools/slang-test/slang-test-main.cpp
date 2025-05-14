@@ -5075,22 +5075,14 @@ SlangResult innerMain(int argc, char** argv)
                     TestOptions testOptions;
                     testOptions.categories.add(unitTestCategory);
                     testOptions.categories.add(smokeTestCategory);
-                    runUnitTestModule(
-                        &context,
-                        testOptions,
-                        spawnType,
-                        "slang-unit-test-tool");
+                    runUnitTestModule(&context, testOptions, spawnType, "slang-unit-test-tool");
                 }
 
                 {
                     TestOptions testOptions;
                     testOptions.categories.add(unitTestCategory);
                     // Use default spawn type for unit tests as the test server one is unstable
-                    runUnitTestModule(
-                        &context,
-                        testOptions,
-                        spawnType,
-                        "gfx-unit-test-tool");
+                    runUnitTestModule(&context, testOptions, spawnType, "gfx-unit-test-tool");
                 }
             }
 
