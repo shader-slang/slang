@@ -285,11 +285,37 @@ void serialize(Serializer const& serializer, CapabilityStageSet& value)
 void serialize(Serializer const& serializer, CapabilityTargetSet& value)
 {
     serialize(serializer, value.shaderStageSets);
+
+    // The value for each entry in `shaderStageSets` have
+    // a `stage` field that is redundant with the key for
+    // that entry. Rather than serialize the key as part
+    // of the `CapabilityStageSet` type, we instead copy
+    // it over from the key to the value in the case where
+    // we are reading.
+    //
+    if (isReading(serializer))
+    {
+        for (auto& p : value.shaderStageSets)
+            p.second.stage = p.first;
+    }
 }
 
 void serialize(Serializer const& serializer, CapabilitySet& value)
 {
     serialize(serializer, value.getCapabilityTargetSets());
+
+    // The value for each entry in `getCapabilityTargetSets()` have
+    // a `target` field that is redundant with the key for
+    // that entry. Rather than serialize the key as part
+    // of the `CapabilityTargetSet` type, we instead copy
+    // it over from the key to the value in the case where
+    // we are reading.
+    //
+    if (isReading(serializer))
+    {
+        for (auto& p : value.getCapabilityTargetSets())
+            p.second.target = p.first;
+    }
 }
 
 void serialize(ASTSerializer const& serializer, CandidateExtensionList& value)
