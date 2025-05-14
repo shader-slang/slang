@@ -331,17 +331,27 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 if (outProperType)
                     args.add(ExtractGenericArgVal(valParam->initExpr));
             }
-            else if (auto constraintParam = as<GenericTypeConstraintDecl>(member))
+        }
+
+        for (Decl* member : genericDeclRef.getDecl()->members)
+        {
+            if (auto constraintParam = as<GenericTypeConstraintDecl>(member))
             {
                 auto genericParam = as<DeclRefType>(constraintParam->sub.type)->getDeclRef();
                 if (!genericParam)
                     return false;
                 auto genericTypeParamDecl = as<GenericTypeParamDecl>(genericParam.getDecl());
                 if (!genericTypeParamDecl)
+                {
+                    diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
                     return false;
+                }
                 auto defaultType = CheckProperType(genericTypeParamDecl->initType);
                 if (!defaultType)
+                {
+                    diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
                     return false;
+                }
                 auto witness =
                     tryGetSubtypeWitness(defaultType, CheckProperType(constraintParam->sup));
                 if (!witness)
