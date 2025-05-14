@@ -5076,7 +5076,7 @@ SlangResult innerMain(int argc, char** argv)
                     TestOptions testOptions;
                     testOptions.categories.add(unitTestCategory);
                     testOptions.categories.add(smokeTestCategory);
-                    runUnitTestModule(&context, testOptions, spawnType, "slang-unit-test-tool");
+                    runUnitTestModule(&context, testOptions, SpawnType::Default, "slang-unit-test-tool");
                 }
 
                 {
