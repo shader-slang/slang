@@ -747,7 +747,7 @@ void serialize(S const& serializer, T (&value)[N])
     }
 }
 
-template<typename S, typename T, size_t N>
+template<typename S, typename T, int N>
 void serialize(S const& serializer, ShortList<T, N>& value)
 {
     SLANG_SCOPED_SERIALIZER_ARRAY(serializer);
