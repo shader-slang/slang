@@ -775,8 +775,8 @@ struct ASTDumpAccess
 %for _,T in ipairs(Slang.NodeBase.subclasses) do
     static void dump_($T * node, ASTDumpContext & context)
     {
-        SLANG_MAYBE_UNUSED(node);
-        SLANG_MAYBE_UNUSED(context);
+        SLANG_UNUSED(node);
+        SLANG_UNUSED(context);
 %   if T.directSuperClass then
         dump_(static_cast<$(T.directSuperClass)*>(node), context);
 %   end
