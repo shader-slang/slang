@@ -738,6 +738,12 @@ protected:
     OrderedHashSet<IRStringLit*> m_requiredPreludes;
 
     Dictionary<const char*, IRStringLit*> m_builtinPreludes;
+
+    // Dictionary for entry point names that need to be renamed on certain targets
+    static Dictionary<String, String> s_entryPointRenameMap;
+
+    // Rename entry point if target doesn't allow the name (e.g., 'main')
+    virtual String maybeMakeEntryPointNameValid(String name, DiagnosticSink* sink);
 };
 
 } // namespace Slang
