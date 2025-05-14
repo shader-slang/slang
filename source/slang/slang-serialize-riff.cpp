@@ -178,6 +178,8 @@ void RIFFSerialWriter::handleFieldKey(char const* name, Int index)
 {
     // For now we are ignoring field keys, and treating
     // structs as basically equivalent to tuples.
+    SLANG_UNUSED(name);
+    SLANG_UNUSED(index);
 }
 
 void RIFFSerialWriter::endStruct()
@@ -508,6 +510,8 @@ void RIFFSerialReader::handleFieldKey(char const* name, Int index)
 {
     // For now we are ignoring field keys, and treating
     // structs as basically equivalent to tuples.
+    SLANG_UNUSED(name);
+    SLANG_UNUSED(index);
 }
 
 void RIFFSerialReader::endStruct()

@@ -433,6 +433,8 @@ void serialize(ASTSerializer const& serializer, NameLoc& value)
 %for _,T in ipairs(Slang.NodeBase.subclasses) do
 void _serializeASTNodeContents(ASTSerializer const& serializer, $T* value)
 {
+    SLANG_MAYBE_UNUSED(serializer);
+    SLANG_MAYBE_UNUSED(value);
 %   if T.directSuperClass then
     _serializeASTNodeContents(serializer, static_cast<$(T.directSuperClass)*>(value));
 %   end
