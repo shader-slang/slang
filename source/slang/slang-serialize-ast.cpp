@@ -492,7 +492,7 @@ private:
 
     virtual void handleName(Name*& value) override { serialize(ASTSerializer(this), value->text); }
 
-    virtual void handleASTNode(NodeBase*& node)
+    virtual void handleASTNode(NodeBase*& node) override
     {
         if (auto decl = as<Decl>(node))
         {
