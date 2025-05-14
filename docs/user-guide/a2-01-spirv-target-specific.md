@@ -246,7 +246,7 @@ To generate a valid SPIR-V with multiple entry points, use `-fvk-use-entrypoint-
 Global memory pointers
 ------------------------------
 
-Slang supports global memory pointers when targeting SPIRV. See [an example and explanation](convenience-features.html#pointers-limited).
+Slang supports global memory pointers when targeting SPIRV. See [an example and explanation](03-convenience-features.html#pointers-limited).
 
 `float4*` in user code will be translated to a pointer in PhysicalStorageBuffer storage class in SPIRV.
 When a slang module uses a pointer type, the resulting SPIRV will be using the SpvAddressingModelPhysicalStorageBuffer64 addressing mode. Modules without use of pointers will use SpvAddressingModelLogical addressing mode.

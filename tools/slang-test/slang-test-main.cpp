@@ -1583,6 +1583,12 @@ static SlangResult _initSlangCompiler(TestContext* context, CommandLine& ioCmdLi
         ioCmdLine.addArgIfNotFound("-verbose-paths");
     }
 
+    for (auto& capability : context->options.capabilities)
+    {
+        ioCmdLine.addArg("-capability");
+        ioCmdLine.addArg(capability.getBuffer());
+    }
+
     // Look for definition of a slot
 
     {
@@ -3381,6 +3387,12 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
     if (!options.emitSPIRVDirectly)
     {
         ioCmdLine.addArg("-emit-spirv-via-glsl");
+    }
+
+    for (auto capability : options.capabilities)
+    {
+        ioCmdLine.addArg("-capability");
+        ioCmdLine.addArg(capability);
     }
 }
 

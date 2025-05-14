@@ -4520,6 +4520,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             boundMemberInfo->type = nullptr;
             boundMemberInfo->base = loweredBase;
             boundMemberInfo->declRef = callableDeclRef;
+
+            context->shared->extValues.add(boundMemberInfo);
             return LoweredValInfo::boundMember(boundMemberInfo);
         }
         else if (auto propertyDeclRef = declRef.as<PropertyDecl>())
@@ -4823,6 +4825,17 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             SLANG_ASSERT(type);
             return getDefaultVal(type);
         }
+    }
+
+    LoweredValInfo visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr)
+    {
+        auto irType = lowerType(context, expr->type);
+        auto irDefaultElement = getSimpleVal(
+            context,
+            getDefaultVal(as<ArrayExpressionType>(expr->type)->getElementType()));
+
+        return LoweredValInfo::simple(
+            getBuilder()->emitMakeArrayFromElement(irType, irDefaultElement));
     }
 
     LoweredValInfo visitInitializerListExpr(InitializerListExpr* expr)
@@ -6813,7 +6826,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             IRBuilder subBuilder = *getBuilder();
             subBuilder.setInsertInto(info->initialBlock);
             subContext.irBuilder = &subBuilder;
-            auto caseVal = getSimpleVal(context, lowerRValueExpr(&subContext, caseStmt->expr));
+
+            auto constVal = as<ConstantIntVal>(caseStmt->exprVal);
+            SLANG_ASSERT(constVal);
+            auto caseType = lowerType(context, constVal->getType());
+            auto caseValInfo =
+                LoweredValInfo::simple(getBuilder()->getIntValue(caseType, constVal->getValue()));
+            auto caseVal = getSimpleVal(context, caseValInfo);
 
             // Figure out where we are branching to.
             auto label = getLabelForCase(info);
@@ -8242,6 +8261,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             subType = DeclRefType::create(context->astBuilder, makeDeclRef(parentDecl));
         }
+        bool isGenericExtension = false;
+        // Test if we are in a generic extension context
+        if (parentDecl->parentDecl)
+        {
+            auto genDecl = as<GenericDecl>(parentDecl->parentDecl);
+            if (genDecl)
+            {
+                isGenericExtension = true;
+            }
+        }
 
         // What is the super-type that we have declared we inherit from?
         Type* superType = inheritanceDecl->base.type;
@@ -8304,14 +8333,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             // Construct the mangled name for the witness table, which depends
             // on the type that is conforming, and the type that it conforms to.
-            //
-            // TODO: This approach doesn't really make sense for generic `extension`
-            // conformances.
-            auto mangledName = getMangledNameForConformanceWitness(
-                context->astBuilder,
-                subType,
-                superType,
-                irSubType->getOp());
+            String mangledName;
+            if (isGenericExtension)
+            {
+                mangledName =
+                    getMangledNameForConformanceWitness(context->astBuilder, parentDecl, superType);
+            }
+            else
+            {
+                mangledName =
+                    getMangledNameForConformanceWitness(context->astBuilder, subType, superType);
+            }
 
             // TODO(JS):
             // Should the mangled name take part in obfuscation if enabled?
@@ -10995,6 +11027,31 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     isInline = true;
                     break;
                 }
+            }
+        }
+
+        // Add debugfunction decoration and emit debug function. This
+        // is needed for emitting debug information
+        auto nameHint = irFunc->findDecoration<IRNameHintDecoration>();
+        IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
+        if (nameOperand)
+        {
+            getBuilder()->setInsertInto(getBuilder()->getModule()->getModuleInst());
+
+            auto locationDecor = irFunc->findDecoration<IRDebugLocationDecoration>();
+            IRInst* debugType = irFunc->getDataType();
+
+            if (locationDecor && debugType)
+            {
+                auto debugFuncCallee = getBuilder()->emitDebugFunction(
+                    nameOperand,
+                    locationDecor->getLine(),
+                    locationDecor->getCol(),
+                    locationDecor->getSource(),
+                    debugType);
+
+                // Add a decoration to link the function to its debug function
+                getBuilder()->addDecoration(irFunc, kIROp_DebugFunctionDecoration, debugFuncCallee);
             }
         }
 
