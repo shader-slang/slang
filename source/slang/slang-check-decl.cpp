@@ -45,7 +45,7 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
     void visitVarDecl(VarDecl* decl)
     {
         visitDecl(decl);
-        
+
         // Export'd/Extern'd variables must be `const`, otherwise we may have a mismatch
         // causing errors.
         bool hasConst = false;
@@ -61,10 +61,13 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
             {
                 isExternCPP = true;
                 break;
-            }            
+            }
         }
         if (!isExternCPP && hasExportOrExtern && !hasConst)
-            getSink()->diagnose(decl, Diagnostics::ExternAndExportVarDeclMustBeConst, decl->getName());
+            getSink()->diagnose(
+                decl,
+                Diagnostics::ExternAndExportVarDeclMustBeConst,
+                decl->getName());
     }
 
     void visitDecl(Decl* decl) { checkModifiers(decl); }
