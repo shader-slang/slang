@@ -380,7 +380,11 @@ private:
         bool isMemberInitCtor,
         Index& paramIndex);
 
-    AssignExpr* createMemberAssignmentExpr(ThisExpr* thisExpr, Scope* scope, Decl* member, Expr* rightHandSideExpr);
+    AssignExpr* createMemberAssignmentExpr(
+        ThisExpr* thisExpr,
+        Scope* scope,
+        Decl* member,
+        Expr* rightHandSideExpr);
     Expr* createCtorParamExpr(ConstructorDecl* ctor, Index paramIndex);
     void maybeInsertDefaultInitExpr(StructDecl* structDecl);
 };
@@ -9399,7 +9403,11 @@ void SemanticsDeclBodyVisitor::maybeInsertDefaultInitExpr(StructDecl* structDecl
                     varDeclBase->getName() == nullptr || varDeclBase->initExpr == nullptr)
                     continue;
 
-                auto assign = createMemberAssignmentExpr(thisExpr, ctor->ownedScope, member, varDeclBase->initExpr);
+                auto assign = createMemberAssignmentExpr(
+                    thisExpr,
+                    ctor->ownedScope,
+                    member,
+                    varDeclBase->initExpr);
                 if (!assign)
                     continue;
 
