@@ -6079,7 +6079,7 @@ struct SpecializationArgModuleCollector : ComponentTypeVisitor
         {
             collectReferencedModules(type);
         }
-        else if (auto declRefVal = as<GenericParamIntVal>(val))
+        else if (auto declRefVal = as<DeclRefIntVal>(val))
         {
             collectReferencedModules(declRefVal->getDeclRef());
         }

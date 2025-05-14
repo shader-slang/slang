@@ -453,9 +453,9 @@ bool SemanticsVisitor::ValuesAreEqual(IntVal* left, IntVal* right)
         }
     }
 
-    if (auto leftVar = as<GenericParamIntVal>(left))
+    if (auto leftVar = as<DeclRefIntVal>(left))
     {
-        if (auto rightVar = as<GenericParamIntVal>(right))
+        if (auto rightVar = as<DeclRefIntVal>(right))
         {
             return leftVar->getDeclRef().equals(rightVar->getDeclRef());
         }
