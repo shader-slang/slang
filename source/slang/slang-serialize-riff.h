@@ -12,9 +12,8 @@
 // pair for a new serialization format.
 //
 
-#include "slang-serialize.h"
-
 #include "../core/slang-riff.h"
+#include "slang-serialize.h"
 
 namespace Slang
 {
@@ -29,7 +28,7 @@ namespace RIFFSerial
 // All of the serialized data will be encapsulated in a single
 // list chunk. This chunk can have its `FourCC` customized,
 // but a default is also provided.
-// 
+//
 
 /// Default type for root chunk of a serialized object graph.
 static const FourCC::RawValue kRootFourCC = SLANG_FOUR_CC('r', 'o', 'o', 't');
@@ -65,7 +64,7 @@ static const FourCC::RawValue kFalseFourCC = SLANG_FOUR_CC('f', 'a', 'l', 's');
 // that chunk holding the bytes of the UTF-8 encoded string.
 // The length of the string is stored as part of the chunk
 // header.
-// 
+//
 // We also define a `FourCC` for raw data chunks, in anticipation
 // of support for raw data being added to `ISerializerImpl` as
 // an analogue of strings.
@@ -116,13 +115,12 @@ static const FourCC::RawValue kObjectDefinitionListFourCC = SLANG_FOUR_CC('o', '
 // have been serialized.
 //
 
-}
+} // namespace RIFFSerial
 
 /// Serializer implementation for writing to a tree of RIFF chunks.
 struct RIFFSerialWriter : ISerializerImpl
 {
 public:
-
     /// Construct a writer to append to the given RIFF `chunk`.
     ///
     /// The object graph will be serialized into a child chunk
@@ -174,7 +172,7 @@ private:
     /// Information on the objects that have been referenced,
     /// and which need their definitions to be serialized into
     /// the object definition list chunk.
-    /// 
+    ///
     List<ObjectInfo> _objects;
     Index _writtenObjectDefinitionCount = 0;
 
@@ -193,7 +191,6 @@ private:
     void _writeObjectReference(ObjectIndex index);
 
 private:
-
     //
     // The following declarations are the requirements
     // of the `ISerializerImpl` interface:
@@ -239,7 +236,8 @@ private:
     virtual void handleSharedPtr(void*& value, Callback callback, void* userData) override;
     virtual void handleUniquePtr(void*& value, Callback callback, void* userData) override;
 
-    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* userData) override;
+    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* userData)
+        override;
 };
 
 /// Serializer implementation for reading from a tree of RIFF chunks.
@@ -298,7 +296,7 @@ private:
         /// Pointer to an in-memory C++ object representing the serialized object.
         ///
         /// Should only be accessed with consideration of what `state` is:
-        /// 
+        ///
         /// * If `state` is `Unread`, then this should always be null.
         ///
         /// * If `state` is `ReadingComplete`, then this should be be
@@ -315,7 +313,7 @@ private:
         /// Even if `ptr` is non-null, it may not be safe to access the
         /// contents of the pointed-to object, because there may be deferred
         /// operations pending to read some or all of its members.
-        ///   
+        ///
         void* ptr = nullptr;
 
         /// The chunk that holds the definition of this object.
@@ -379,7 +377,6 @@ private:
     void _endListChunk();
 
 private:
-
     //
     // The following declarations are the requirements
     // of the `ISerializerImpl` interface:
@@ -425,7 +422,8 @@ private:
     virtual void handleSharedPtr(void*& value, Callback callback, void* userData) override;
     virtual void handleUniquePtr(void*& value, Callback callback, void* userData) override;
 
-    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* userData) override;
+    virtual void handleDeferredObjectContents(void* valuePtr, Callback callback, void* userData)
+        override;
 };
 
 } // namespace Slang

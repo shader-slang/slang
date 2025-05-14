@@ -13,7 +13,7 @@
 //
 //      // my-thing.h
 //      ...
-// 
+//
 //      struct MyThing
 //      {
 //          float a;
@@ -23,23 +23,23 @@
 //
 // then you can declare serialization support for your type
 // with something like:
-// 
+//
 //      // my-thing.h
 //      ...
 //      #include "slang-serialize.h"
 //      ...
-// 
+//
 //      struct MyThing { ... }
-// 
+//
 //      void serialize(Serializer const& serializer, MyThing& value);
-// 
+//
 // and then implement that support with something like:
-// 
+//
 //      // my-thing.cpp
 //      #include "my-thing.h"
-// 
+//
 //      ...
-// 
+//
 //      void serialize(Serializer const& serializer, MyThing& value)
 //      {
 //          SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
@@ -66,7 +66,7 @@ namespace Slang
 // implemented using a single function. This choice makes it
 // easier for a developer to be certain that the reading and
 // writing code for a type are consistent with one another.
-// 
+//
 // In some cases, however, a serialization function may need
 // to know whether it is reading or writing serialized data.
 // For that reason, we define a simple `enum` to represent
@@ -222,7 +222,7 @@ struct ISerializerImpl
     /// An array should be used to serialize an
     /// unkeyed homogeneous collection of a varying
     /// number of elements.
-    /// 
+    ///
     /// This operation must be properly paired with a
     /// call to `endArray()`.
     ///
@@ -245,7 +245,7 @@ struct ISerializerImpl
     /// An optional should be used to serialize a
     /// collection that logically has either zero
     /// or one element.
-    /// 
+    ///
     /// This operation must be properly paired with a
     /// call to `endOptional()`.
     ///
@@ -272,7 +272,7 @@ struct ISerializerImpl
     ///
     /// Formats are required to support dictionaries with
     /// any serializable type as the key, not just strings.
-    /// 
+    ///
     /// This operation must be properly paired with a
     /// call to `endDictionary()`.
     ///
@@ -329,7 +329,7 @@ struct ISerializerImpl
     /// a fields can be read in a different order than
     /// they were written, and how to handle attempts
     /// to read a field that was not written.
-    /// 
+    ///
     virtual void beginStruct() = 0;
 
     /// End serializing a struct value.
@@ -338,9 +338,9 @@ struct ISerializerImpl
     /// Set the key for the next struct field to be serialized.
     ///
     /// If no name is available for the field, `name` may be `nullptr`.
-    /// 
+    ///
     /// If no index is available for the field, `index` may be `-1`.
-    /// 
+    ///
     /// A user must pass either a valid `name` or `index.
     ///
     virtual void handleFieldKey(char const* name, Int index) = 0;
@@ -354,7 +354,7 @@ struct ISerializerImpl
     ///
     /// If the pointer value being read/written is null, then
     /// the function returns without invoking `callback`.
-    /// 
+    ///
     /// When reading, if the serialized value is non-null,
     /// then the callback will be invoked as `callback(&value, userData)`.
     /// The callback is expected to read the members of the pointed-to
@@ -371,14 +371,14 @@ struct ISerializerImpl
     /// immediately, the concrete serializer implementation is responsible
     /// for ensuring that its internal state has been restored to
     /// be compatible with what it was when `handleUniquePtr` was called.
-    /// 
+    ///
     virtual void handleUniquePtr(void*& value, Callback callback, void* userData) = 0;
 
     /// Handle a pointer value that may have multiple references.
     ///
     /// This operation is similar to `handleUniquePtr` with the following
     /// differences:
-    /// 
+    ///
     /// * When writing, if the same pointer value has been seen before,
     ///   the `callback` will not be invoked, and instead an additional
     ///   reference to the previously-serialized value will be written.
@@ -393,7 +393,7 @@ struct ISerializerImpl
     ///
     /// Used to delay serialization of members of an object that
     /// could cause infinite recursion if serialized eagerly.
-    /// 
+    ///
     /// This operation should only be used in the body of a callback
     /// passed to `handleUniquePtr()` or `handleSharedPtr()`.
     ///
@@ -436,7 +436,8 @@ public:
     SerializerBase() = default;
     SerializerBase(T* ptr)
         : _ptr(ptr)
-    {}
+    {
+    }
 
     T* get() const { return _ptr; }
     T* operator->() const { return get(); }
@@ -656,8 +657,9 @@ private:
 #define SLANG_SCOPED_SERIALIZER_ARRAY(SERIALIZER) \
     ::Slang::ScopedSerializerArray SLANG_CONCAT(_scopedSerializerArray, __LINE__)(SERIALIZER)
 
-#define SLANG_SCOPED_SERIALIZER_DICTIONARY(SERIALIZER) \
-    ::Slang::ScopedSerializerDictionary SLANG_CONCAT(_scopedSerializerDictionary, __LINE__)(SERIALIZER)
+#define SLANG_SCOPED_SERIALIZER_DICTIONARY(SERIALIZER)                                       \
+    ::Slang::ScopedSerializerDictionary SLANG_CONCAT(_scopedSerializerDictionary, __LINE__)( \
+        SERIALIZER)
 
 #define SLANG_SCOPED_SERIALIZER_OPTIONAL(SERIALIZER) \
     ::Slang::ScopedSerializerOptional SLANG_CONCAT(_scopedSerializerOptional, __LINE__)(SERIALIZER)
@@ -675,11 +677,11 @@ private:
 // Containers like arrays and dictionaries are more
 // difficult to serialize than typical user-defined
 // types for a few reasons:
-// 
+//
 // * They typically need to have distinct code paths
 //   for reading and writing, so they don't benefit
 //   much from having a unified read/write abstraction.
-// 
+//
 // * They need to be written as templates, to abstract
 //   over the element type, and thus need to be
 //   defined in headers.
@@ -849,12 +851,12 @@ void serialize(S const& serializer, OrderedDictionary<K, V>& value)
 //
 // Serialization of pointers is the most complicated part of
 // the whole system. Dealing with pointers means contending with:
-// 
+//
 // * Multiply-referenced objects, or even cycles in the object graph.
-// 
+//
 // * Polymoprhic types, where a `Derived*` might get serialized
 //   through a `Base*` pointer.
-// 
+//
 // * Types that require going through a factory function of
 //   some kind as part of their creation (perhaps to implement
 //   deduplication/caching).
@@ -882,14 +884,14 @@ void serialize(S const& serializer, OrderedDictionary<K, V>& value)
 //   which is another customization point. The default implementation
 //   will call `new T()` when reading, so types that need more complicated
 //   creation logic should intercept this specialization point.
-// 
+//
 // * An implementation of `serializeObject()` should strive to serialize
 //   the bare minimum of members required to actually allocate the object
 //   (in the case where serialized data is being read), and then call
 //   `deferSerializeObjectContents()` to schedule the remainder of
 //   the data to be serialized. Maintaining that policy helps ensure
 //   that cycles in the object graph don't create problems.
-// 
+//
 // * `serializeObjectContents()` is the final customization point. By
 //   default it simply takes a `T* value` and does `serialize(..., *value)`
 //   to serialize the pointed-to `T` value. A custom implementation
@@ -914,10 +916,11 @@ void _serializeObjectContentsCallback(void* valuePtr, void* userData)
 template<typename S, typename T>
 void deferSerializeObjectContents(Serializer_<S> const& serializer, T* value)
 {
-    ((Serializer)serializer)->handleDeferredObjectContents(
-        value,
-        _serializeObjectContentsCallback<S,T>,
-        serializer.get());
+    ((Serializer)serializer)
+        ->handleDeferredObjectContents(
+            value,
+            _serializeObjectContentsCallback<S, T>,
+            serializer.get());
 }
 
 template<typename S, typename T>
@@ -941,19 +944,15 @@ void _serializeObjectCallback(void* valuePtr, void* userData)
 template<typename S, typename T>
 void serializeSharedPtr(Serializer_<S> const& serializer, T*& value)
 {
-    ((Serializer)serializer)->handleSharedPtr(
-        *(void**)&value,
-        _serializeObjectCallback<S, T>,
-        serializer.get());
+    ((Serializer)serializer)
+        ->handleSharedPtr(*(void**)&value, _serializeObjectCallback<S, T>, serializer.get());
 }
 
 template<typename S, typename T>
 void serializeUniquePtr(Serializer_<S> const& serializer, T*& value)
 {
-    ((Serializer)serializer)->handleUniquePtr(
-        *(void**)&value,
-        _serializeObjectCallback<S, T>,
-        serializer.get());
+    ((Serializer)serializer)
+        ->handleUniquePtr(*(void**)&value, _serializeObjectCallback<S, T>, serializer.get());
 }
 
 template<typename S, typename T>

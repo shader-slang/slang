@@ -254,11 +254,11 @@ void RIFFSerialWriter::handleSharedPtr(void*& value, Callback callback, void* us
     // simply invoked it here and now we would be at risk
     // of introducing unbounded recursion in cases where
     // the object graph contains very long pointer chains.
-    // 
+    //
     // (Note that we are not at risk of *infinite* recursion,
     // because we have already cached the index for the
     // object into `_mapPtrToObjectIndex`)
-    // 
+    //
     // We will simply add an entry to our `_objects` array
     // to represent the to-be-written object, and store
     // the pointer and callback there so that we can write
@@ -279,7 +279,10 @@ void RIFFSerialWriter::handleUniquePtr(void*& value, Callback callback, void* us
     handleSharedPtr(value, callback, userData);
 }
 
-void RIFFSerialWriter::handleDeferredObjectContents(void* valuePtr, Callback callback, void* userData)
+void RIFFSerialWriter::handleDeferredObjectContents(
+    void* valuePtr,
+    Callback callback,
+    void* userData)
 {
     // Because we are already deferring writing of the *entirety* of
     // an object's members as part of how `handleSharedPtr()` works,
@@ -366,7 +369,10 @@ RIFFSerialReader::RIFFSerialReader(RIFF::Chunk const* chunk, FourCC type)
     _initialize(type);
 }
 
-RIFFSerialReader::~RIFFSerialReader() { _flush(); }
+RIFFSerialReader::~RIFFSerialReader()
+{
+    _flush();
+}
 
 SerializationMode RIFFSerialReader::getMode()
 {
@@ -546,7 +552,7 @@ void RIFFSerialReader::handleSharedPtr(void*& value, Callback callback, void* us
 {
     // The logic here largely mirrors what appears in
     // `RIFFSerialWriter::handleSharedPtr`.
-    // 
+    //
     // We first check for an explicitly written null pointer.
     // If we find one our work is very easy.
     //
@@ -673,7 +679,10 @@ void RIFFSerialReader::handleUniquePtr(void*& value, Callback callback, void* us
     handleSharedPtr(value, callback, userData);
 }
 
-void RIFFSerialReader::handleDeferredObjectContents(void* valuePtr, Callback callback, void* userData)
+void RIFFSerialReader::handleDeferredObjectContents(
+    void* valuePtr,
+    Callback callback,
+    void* userData)
 {
     // Unlike the case in `RIFFSerialWriter::handleDeferredObjectContents()`,
     // we very much *do* want to delay invoking the callback until later.

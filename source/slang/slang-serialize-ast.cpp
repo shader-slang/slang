@@ -187,10 +187,7 @@ public:
     // implement an implicit conversion operator.
     //
 
-    operator Serializer() const
-    {
-        return Serializer(get()->getBaseSerializer());
-    }
+    operator Serializer() const { return Serializer(get()->getBaseSerializer()); }
 };
 
 /// Context type for AST serialization.
@@ -451,11 +448,9 @@ void _serializeASTNodeContents(ASTSerializer const& serializer, $T* value)
 
 void serializeASTNodeContents(ASTSerializer const& serializer, NodeBase* node)
 {
-    ASTNodeDispatcher<NodeBase,void>::dispatch(node,
-        [&](auto n)
-        {
-            _serializeASTNodeContents(serializer, n);
-        });
+    ASTNodeDispatcher<NodeBase, void>::dispatch(
+        node,
+        [&](auto n) { _serializeASTNodeContents(serializer, n); });
 }
 
 enum class PseudoASTNodeType
@@ -478,11 +473,13 @@ static ASTNodeType _getAsASTNodeType(PseudoASTNodeType type)
 struct ASTEncodingContext : ASTSerializerImpl
 {
 public:
-    ASTEncodingContext(RIFF::BuildCursor& cursor, ModuleDecl* module, SerialSourceLocWriter* sourceLocWriter)
-        : _writer(cursor.getCurrentChunk())
-        , _module(module)
-        , _sourceLocWriter(sourceLocWriter)
-    {}
+    ASTEncodingContext(
+        RIFF::BuildCursor& cursor,
+        ModuleDecl* module,
+        SerialSourceLocWriter* sourceLocWriter)
+        : _writer(cursor.getCurrentChunk()), _module(module), _sourceLocWriter(sourceLocWriter)
+    {
+    }
 
 private:
     RIFFSerialWriter _writer;
@@ -491,10 +488,7 @@ private:
 
     virtual ISerializerImpl* getBaseSerializer() override { return &_writer; }
 
-    virtual void handleName(Name*& value) override
-    {
-        serialize(ASTSerializer(this), value->text);
-    }
+    virtual void handleName(Name*& value) override { serialize(ASTSerializer(this), value->text); }
 
     virtual void handleASTNode(NodeBase*& node)
     {
@@ -751,10 +745,12 @@ private:
             return nullptr;
         }
 
-        auto importedDecl = importedFromModule->findExportFromMangledName(mangledName.getUnownedSlice());
+        auto importedDecl =
+            importedFromModule->findExportFromMangledName(mangledName.getUnownedSlice());
         if (!importedDecl)
         {
-            SLANG_ABORT_COMPILATION("failed to load an imported declaration during AST deserialization");
+            SLANG_ABORT_COMPILATION(
+                "failed to load an imported declaration during AST deserialization");
         }
         return importedDecl;
     }

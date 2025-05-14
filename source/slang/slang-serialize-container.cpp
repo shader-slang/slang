@@ -383,7 +383,10 @@ public:
             List<char> encodedTable;
             SerialStringTableUtil::encodeStringTable(_containerStringPool, encodedTable);
 
-            _cursor.addDataChunk(SerialBinary::kStringTableFourCc, encodedTable.getBuffer(), encodedTable.getCount());
+            _cursor.addDataChunk(
+                SerialBinary::kStringTableFourCc,
+                encodedTable.getBuffer(),
+                encodedTable.getCount());
         }
 
         return SLANG_OK;
@@ -428,8 +431,7 @@ public:
 
 String StringChunk::getValue() const
 {
-    return String(
-        UnownedStringSlice((char const*)getPayload(), getPayloadSize()));
+    return String(UnownedStringSlice((char const*)getPayload(), getPayloadSize()));
 }
 
 RIFF::ChunkList<StringChunk> ModuleChunk::getFileDependencies() const

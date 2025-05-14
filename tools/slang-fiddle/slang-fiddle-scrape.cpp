@@ -1184,11 +1184,11 @@ private:
 
                 if (decl->findModifier<AbstractModifier>())
                 {
-                _builder.append("protected: ");
+                    _builder.append("protected: ");
                 }
                 else
                 {
-                _builder.append("public: ");
+                    _builder.append("public: ");
                 }
                 _builder.append(decl->nameToken.getContent());
                 _builder.append("() {}" MACRO_LINE_ENDING);
