@@ -1,8 +1,8 @@
 // Test to check if we emit a warning and rename main to main_ on CUDA, CPU, metal backends
 
-//TEST:SIMPLE(filecheck=CHECK): -entry main -target cuda
-//TEST:SIMPLE(filecheck=CHECK): -entry main -target metal
-//TEST:SIMPLE(filecheck=CHECK): -entry main -target cpp
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -entry main -target cuda
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -entry main -target metal
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -entry main -target cpp
 [shader("compute")]
 [numthreads(1,1,1)]
 void main(RWBuffer<float> output)
