@@ -42,6 +42,31 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
 
     void visitDeclGroup(DeclGroup*) {}
 
+    void visitVarDecl(VarDecl* decl)
+    {
+        visitDecl(decl);
+        
+        // Export'd/Extern'd variables must be `const`, otherwise we may have a mismatch
+        // causing errors.
+        bool hasConst = false;
+        bool hasExportOrExtern = false;
+        bool isExternCPP = false;
+        for (auto m : decl->modifiers)
+        {
+            if (as<ExternModifier>(m) || as<HLSLExportModifier>(m))
+                hasExportOrExtern = true;
+            else if (as<ConstModifier>(m))
+                hasConst = true;
+            else if (as<ExternCppModifier>(m))
+            {
+                isExternCPP = true;
+                break;
+            }            
+        }
+        if (!isExternCPP && hasExportOrExtern && !hasConst)
+            getSink()->diagnose(decl, Diagnostics::ExternAndExportVarDeclMustBeConst, decl->getName());
+    }
+
     void visitDecl(Decl* decl) { checkModifiers(decl); }
 
     void visitStructDecl(StructDecl* structDecl);

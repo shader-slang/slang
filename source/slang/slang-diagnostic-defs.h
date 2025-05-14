@@ -1366,6 +1366,13 @@ DIAGNOSTIC(
     Error,
     variableCannotBePushAndSpecializationConstant,
     "'$0' cannot be a push constant and a specialization constant at the same time")
+DIAGNOSTIC(
+    31221,
+    Error,
+    ExternAndExportVarDeclMustBeConst,
+    "extern and export variables (which are not __extern_cpp) must be const: '$0'")
+
+
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType, "invalid tag type for 'enum': '$0'")
