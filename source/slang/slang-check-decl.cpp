@@ -95,6 +95,8 @@ struct SemanticsDeclAttributesVisitor : public SemanticsDeclVisitorBase,
 
     void checkVarDeclCommon(VarDeclBase* varDecl);
 
+    void checkHLSLRegisterSemantic(VarDeclBase* varDecl, HLSLRegisterSemantic* registerSematnic);
+
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
     // Synthesize the constructor declaration for a struct during header visit, as we
@@ -12547,6 +12549,10 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         {
             hasPushConstAttr = true;
         }
+        else if (auto registerSemantic = as<HLSLRegisterSemantic>(modifier))
+        {
+            checkHLSLRegisterSemantic(varDecl, registerSemantic);
+        }
     }
     if (hasSpecConstAttr && hasPushConstAttr)
     {
@@ -12561,6 +12567,90 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         {
             getSink()->diagnose(varDecl, Diagnostics::pushOrSpecializationConstantCannotBeStatic);
         }
+    }
+}
+
+void SemanticsDeclAttributesVisitor::checkHLSLRegisterSemantic(
+    VarDeclBase* varDecl,
+    HLSLRegisterSemantic* registerSemantic)
+{
+    auto registerName = registerSemantic->registerName.getContent();
+    if (registerName.getLength() < 1)
+    {
+        getSink()->diagnose(
+            registerSemantic->registerName.getLoc(),
+            Diagnostics::invalidHLSLRegisterName,
+            registerSemantic->registerName);
+        return;
+    }
+
+    // Check to make sure the HLSL semantic register name is consistent with the resource type.
+
+    auto varType = getType(m_astBuilder, DeclRef<VarDeclBase>(varDecl));
+    varType = unwrapModifiedType(unwrapArrayType(varType));
+    bool isValid = true;
+    if (auto resType = as<ResourceType>(varType))
+    {
+        switch (registerName[0])
+        {
+        case 't':
+            if (resType->getAccess() != SLANG_RESOURCE_ACCESS_READ)
+                isValid = false;
+            break;
+        case 'u':
+            if (resType->getAccess() == SLANG_RESOURCE_ACCESS_READ)
+                isValid = false;
+            break;
+        case 's':
+            if (!resType->isCombined())
+                isValid = false;
+        default:
+            isValid = false;
+            break;
+        }
+    }
+    else if (
+        as<HLSLByteAddressBufferType>(varType) || as<HLSLStructuredBufferType>(varType) ||
+        as<RaytracingAccelerationStructureType>(varType))
+    {
+        if (registerName[0] != 't')
+        {
+            isValid = false;
+        }
+    }
+    else if (
+        as<HLSLRWByteAddressBufferType>(varType) ||
+        as<HLSLRasterizerOrderedByteAddressBufferType>(varType) ||
+        as<HLSLRWStructuredBufferType>(varType) || as<HLSLConsumeStructuredBufferType>(varType) ||
+        as<HLSLAppendStructuredBufferType>(varType) ||
+        as<HLSLRasterizerOrderedStructuredBufferType>(varType))
+    {
+        if (registerName[0] != 'u')
+        {
+            isValid = false;
+        }
+    }
+    else if (as<SamplerStateType>(varType))
+    {
+        if (registerName[0] != 's')
+        {
+            isValid = false;
+        }
+    }
+    else if (as<ConstantBufferType>(varType))
+    {
+        if (registerName[0] != 'b')
+        {
+            isValid = false;
+        }
+    }
+    if (!isValid)
+    {
+        getSink()->diagnose(
+            registerSemantic->registerName.getLoc(),
+            Diagnostics::invalidHLSLRegisterNameForType,
+            registerName,
+            varType);
     }
 }
 
