@@ -5064,7 +5064,7 @@ SlangResult innerMain(int argc, char** argv)
                     if (context.failedUnitTests.getCount() == 0)
                         break;
 
-                    printf("Retrying unit tests...\n");
+                    printf("Retrying unit tests with default spawn type...\n");
                     context.isRetry = true;
                     context.options.testPrefixes = context.failedUnitTests;
                     context.failedUnitTests.clear();
@@ -5076,6 +5076,7 @@ SlangResult innerMain(int argc, char** argv)
                     TestOptions testOptions;
                     testOptions.categories.add(unitTestCategory);
                     testOptions.categories.add(smokeTestCategory);
+                    // Use default spawn type for unit tests as the test server one is unstable
                     runUnitTestModule(&context, testOptions, SpawnType::Default, "slang-unit-test-tool");
                 }
 

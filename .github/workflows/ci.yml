@@ -61,14 +61,26 @@ jobs:
             runs-on: ubuntu-24.04-arm
             has-gpu: false
             build-llvm: false
-          # Self-hosted full gpu build
+          # Self-hosted full gpu build - release
           - os: windows
+            config: release
+            compiler: cl
+            platform: x86_64
+            test-category: full
+            full-gpu-tests: true
+            runs-on: [Windows, self-hosted]
+            has-gpu: true
+            server-count: 16
+          # Self-hosted full gpu build - debug
+          - os: windows
+            config: debug
             compiler: cl
             platform: x86_64
             test-category: full
             full-gpu-tests: true
             runs-on: [Windows, self-hosted, 'GCP-T4']
             has-gpu: true
+            server-count: 16
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
@@ -175,7 +187,7 @@ jobs:
           if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 8 \
+              -server-count ${{ matrix.server-count }} \
               -category ${{ matrix.test-category }} \
               -api all-cpu \
               -expected-failure-list tests/expected-failure-github.txt \
@@ -222,7 +234,7 @@ jobs:
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
           "$bin_dir/slang-test" \
             -use-test-server \
-            -server-count 8 \
+            -server-count ${{ matrix.server-count }} \
             -category ${{ matrix.test-category }} \
             -emit-spirv-via-glsl \
             -api vk \
