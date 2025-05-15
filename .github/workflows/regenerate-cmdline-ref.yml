@@ -43,7 +43,13 @@ jobs:
         run: |
           cd pr-branch
           cmake --preset default --fresh \
-            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+            -DSLANG_ENABLE_TESTS=OFF \
+            -DSLANG_ENABLE_EXAMPLES=OFF \
+            -DSLANG_ENABLE_GFX=OFF \
+            -DSLANG_ENABLE_SLANGD=OFF \
+            -DSLANG_EXCLUDE_DAWN=ON \
+            -DSLANG_EXCLUDE_TINT=ON
           cmake --workflow --preset release
 
       - name: Regenerate Command Line Reference
