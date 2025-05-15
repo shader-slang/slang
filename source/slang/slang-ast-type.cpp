@@ -396,8 +396,7 @@ Type* TypeType::_createCanonicalTypeOverride()
 
 void GenericDeclRefType::_toTextOverride(StringBuilder& out)
 {
-    // TODO: what is appropriate here?
-    out << toSlice("<DeclRef<GenericDecl>>");
+    out << getDeclRef();
 }
 
 Type* GenericDeclRefType::_createCanonicalTypeOverride()
