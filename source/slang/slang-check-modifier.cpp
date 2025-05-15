@@ -828,7 +828,7 @@ Modifier* SemanticsVisitor::validateAttribute(
                 if (!typeChecked)
                 {
                     arg = CheckTerm(arg);
-                    arg = coerce(CoercionSite::Argument, paramDecl->getType(), arg);
+                    arg = coerce(CoercionSite::Argument, paramDecl->getType(), arg, getSink());
                 }
             }
             paramIndex++;

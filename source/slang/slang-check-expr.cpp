@@ -518,7 +518,11 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
 {
     if (auto resPtrType = as<DescriptorHandleType>(base->type))
     {
-        return coerce(CoercionSite::ExplicitCoercion, resPtrType->getElementType(), base);
+        return coerce(
+            CoercionSite::ExplicitCoercion,
+            resPtrType->getElementType(),
+            base,
+            getSink());
     }
 
     auto derefExpr = m_astBuilder->create<DerefExpr>();
@@ -2254,7 +2258,7 @@ IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
     switch (coercionType)
     {
     case IntegerConstantExpressionCoercionType::SpecificType:
-        expr = coerce(CoercionSite::General, expectedType, inExpr);
+        expr = coerce(CoercionSite::General, expectedType, inExpr, sink);
         break;
     case IntegerConstantExpressionCoercionType::AnyInteger:
         if (isScalarIntegerType(inExpr->type))
@@ -2262,7 +2266,7 @@ IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
         else if (isEnumType(inExpr->type))
             expr = inExpr;
         else
-            expr = coerce(CoercionSite::General, m_astBuilder->getIntType(), inExpr);
+            expr = coerce(CoercionSite::General, m_astBuilder->getIntType(), inExpr, sink);
         break;
     default:
         break;
@@ -2527,7 +2531,7 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
         type = atomicType->getElementType();
     }
     auto right = maybeOpenRef(expr->right);
-    expr->right = coerce(CoercionSite::Assignment, type, right);
+    expr->right = coerce(CoercionSite::Assignment, type, right, getSink());
 
     if (!expr->left->type.isLeftValue)
     {
@@ -2956,7 +2960,7 @@ Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
             // to handle if this expression doesn't support short-circuiting.
             for (auto& arg : expr->arguments)
             {
-                arg = coerce(CoercionSite::Argument, m_astBuilder->getBoolType(), arg);
+                arg = coerce(CoercionSite::Argument, m_astBuilder->getBoolType(), arg, getSink());
             }
 
             expr->functionExpr = CheckTerm(expr->functionExpr);
@@ -3920,7 +3924,11 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                         auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
 
 
-                        return coerce(CoercionSite::General, typeExp.type, checkedInitListExpr);
+                        return coerce(
+                            CoercionSite::General,
+                            typeExp.type,
+                            checkedInitListExpr,
+                            getSink());
                     }
                 }
             }

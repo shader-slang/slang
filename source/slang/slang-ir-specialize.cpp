@@ -101,7 +101,13 @@ struct SpecializationContext
         case kIROp_IntCast:
         case kIROp_FloatCast:
         case kIROp_Select:
-            return true;
+            {
+                if (isSpecConstRateType(inst->getFullType()))
+                {
+                    return false;
+                }
+                return true;
+            }
         default:
             return false;
         }

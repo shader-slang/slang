@@ -255,7 +255,7 @@ Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
     }
     Expr* e = expr;
     e = CheckTerm(e);
-    e = coerce(CoercionSite::General, m_astBuilder->getBoolType(), e);
+    e = coerce(CoercionSite::General, m_astBuilder->getBoolType(), e, getSink());
     return e;
 }
 
@@ -408,7 +408,7 @@ void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
 
     // Check that the type for the `case` is consistent with the type for the `switch`.
     auto expr = CheckExpr(stmt->expr);
-    expr = coerce(CoercionSite::Argument, switchStmt->condition->type, expr);
+    expr = coerce(CoercionSite::Argument, switchStmt->condition->type, expr, getSink());
 
     // coerce to type being switch on, and ensure that value is a compile-time constant
     // The Vals in the AST are pointer-unique, making them easy to check for duplicates
@@ -574,7 +574,7 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
             if (!m_parentLambdaExpr && expectedReturnType)
             {
                 stmt->expression =
-                    coerce(CoercionSite::Return, expectedReturnType, stmt->expression);
+                    coerce(CoercionSite::Return, expectedReturnType, stmt->expression, getSink());
             }
         }
     }
