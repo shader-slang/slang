@@ -738,6 +738,12 @@ protected:
     OrderedHashSet<IRStringLit*> m_requiredPreludes;
 
     Dictionary<const char*, IRStringLit*> m_builtinPreludes;
+
+    // Rename entry point if target doesn't allow the name (e.g., 'main')
+    virtual String maybeMakeEntryPointNameValid(String name, DiagnosticSink* sink);
+
+    // Indicates if we are emiting for DXC cooperative vector POC.
+    bool isCoopvecPoc = false;
 };
 
 } // namespace Slang

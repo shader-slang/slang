@@ -382,8 +382,13 @@ private:
         bool isMemberInitCtor,
         Index& paramIndex);
 
-    MemberExpr* createMemberExpr(ThisExpr* thisExpr, Scope* scope, Decl* member);
+    AssignExpr* createMemberAssignmentExpr(
+        ThisExpr* thisExpr,
+        Scope* scope,
+        Decl* member,
+        Expr* rightHandSideExpr);
     Expr* createCtorParamExpr(ConstructorDecl* ctor, Index paramIndex);
+    void maybeInsertDefaultInitExpr(StructDecl* structDecl);
 };
 
 template<typename VisitorType>
@@ -1870,7 +1875,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             if (auto initExpr = varDecl->initExpr)
             {
                 initExpr = CheckTerm(initExpr);
-                initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr);
+                initExpr =
+                    coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
                 varDecl->initExpr = initExpr;
 
                 maybeInferArraySizeForVariable(varDecl);
@@ -2350,7 +2356,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         if (initExpr->type.isWriteOnly)
             getSink()->diagnose(initExpr, Diagnostics::readingFromWriteOnly);
 
-        initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr);
+        initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
         varDecl->initExpr = initExpr;
 
         // We need to ensure that any variable doesn't introduce
@@ -4950,7 +4956,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     // so we also need to coerce the result of the call to
     // the expected type.
     //
-    auto coercedCall = subVisitor.coerce(CoercionSite::Return, resultType, checkedCall);
+    auto coercedCall = subVisitor.coerce(CoercionSite::Return, resultType, checkedCall, getSink());
 
     // If our overload resolution or type coercion failed,
     // then we have not been able to synthesize a witness
@@ -5805,7 +5811,7 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
             // the expected type of the property.
             //
             auto coercedMemberRef =
-                subVisitor.coerce(CoercionSite::Return, resultType, synBoundStorageExpr);
+                subVisitor.coerce(CoercionSite::Return, resultType, synBoundStorageExpr, getSink());
             auto synReturn = m_astBuilder->create<ReturnStmt>();
             synReturn->expression = coercedMemberRef;
 
@@ -8094,7 +8100,7 @@ void SemanticsDeclBodyVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
     if (auto initExpr = decl->tagExpr)
     {
         initExpr = CheckTerm(initExpr);
-        initExpr = coerce(CoercionSite::General, tagType, initExpr);
+        initExpr = coerce(CoercionSite::General, tagType, initExpr, getSink());
 
         // We want to enforce that this is an integer constant
         // expression.
@@ -9141,7 +9147,7 @@ void SemanticsDeclBodyVisitor::visitParamDecl(ParamDecl* paramDecl)
         // actual type of the parameter.
         //
         initExpr = CheckTerm(initExpr);
-        initExpr = coerce(CoercionSite::Initializer, typeExpr.type, initExpr);
+        initExpr = coerce(CoercionSite::Initializer, typeExpr.type, initExpr, getSink());
         paramDecl->initExpr = initExpr;
 
         // TODO: a default argument expression needs to
@@ -9195,10 +9201,11 @@ static SeqStmt* _ensureCtorBodyIsSeqStmt(ASTBuilder* m_astBuilder, ConstructorDe
     return as<SeqStmt>(stmt->body);
 }
 
-MemberExpr* SemanticsDeclBodyVisitor::createMemberExpr(
+AssignExpr* SemanticsDeclBodyVisitor::createMemberAssignmentExpr(
     ThisExpr* thisExpr,
     Scope* scope,
-    Decl* member)
+    Decl* member,
+    Expr* rightHandSideExpr)
 {
     MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
     memberExpr->baseExpression = thisExpr;
@@ -9208,7 +9215,15 @@ MemberExpr* SemanticsDeclBodyVisitor::createMemberExpr(
     memberExpr->name = member->getName();
     memberExpr->type = GetTypeForDeclRef(member->getDefaultDeclRef(), member->loc);
 
-    return memberExpr;
+    if (!memberExpr->type.isLeftValue)
+        return nullptr;
+
+    auto assign = m_astBuilder->create<AssignExpr>();
+    assign->left = memberExpr;
+    assign->right = rightHandSideExpr;
+    assign->loc = member->loc;
+
+    return assign;
 }
 
 Expr* SemanticsDeclBodyVisitor::createCtorParamExpr(ConstructorDecl* ctor, Index paramIndex)
@@ -9286,7 +9301,7 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(
         invoke->arguments.addRange(argumentList);
 
         auto assign = m_astBuilder->create<AssignExpr>();
-        assign->left = coerce(CoercionSite::Initializer, declRefType, thisExpr);
+        assign->left = coerce(CoercionSite::Initializer, declRefType, thisExpr, getSink());
         assign->right = invoke;
 
         auto stmt = m_astBuilder->create<ExpressionStmt>();
@@ -9346,14 +9361,9 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMember(
         }
     }
 
-    MemberExpr* memberExpr = createMemberExpr(thisExpr, ctor->ownedScope, member);
-    if (!memberExpr->type.isLeftValue)
+    auto assign = createMemberAssignmentExpr(thisExpr, ctor->ownedScope, member, initExpr);
+    if (!assign)
         return;
-
-    auto assign = m_astBuilder->create<AssignExpr>();
-    assign->left = memberExpr;
-    assign->right = initExpr;
-    assign->loc = member->loc;
 
     auto stmt = m_astBuilder->create<ExpressionStmt>();
     stmt->expression = assign;
@@ -9364,13 +9374,61 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMember(
         checkedMemberVarExpr = cachedDeclToCheckedVar[member];
     else
     {
-        checkedMemberVarExpr = CheckTerm(memberExpr);
+        checkedMemberVarExpr = CheckTerm(assign->left);
         cachedDeclToCheckedVar.add({member, checkedMemberVarExpr});
     }
 
     seqStmtChild->stmts.add(stmt);
 }
 
+// This function inserts the default initialization expression for every member who
+// has init expression at beginning of the user-defined ctor. We don't need to do this
+// for synthesized ctor, because synthesized ctor already handle this at the function
+// parameters
+void SemanticsDeclBodyVisitor::maybeInsertDefaultInitExpr(StructDecl* structDecl)
+{
+    // If there is no explicit constructor, we don't need to do anything.
+    if (!_hasExplicitConstructor(structDecl, false))
+        return;
+
+    // traverse all the constructors and insert the default initialization expressions.
+    for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
+    {
+        ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+        thisExpr->scope = ctor->ownedScope;
+        thisExpr->type = ctor->returnType.type;
+        auto seqStmtChild = m_astBuilder->create<SeqStmt>();
+        seqStmtChild->stmts.reserve(structDecl->members.getCount());
+
+        for (auto& member : structDecl->members)
+        {
+            if (auto varDeclBase = as<VarDeclBase>(member))
+            {
+                if (varDeclBase->hasModifier<HLSLStaticModifier>() ||
+                    varDeclBase->getName() == nullptr || varDeclBase->initExpr == nullptr)
+                    continue;
+
+                auto assign = createMemberAssignmentExpr(
+                    thisExpr,
+                    ctor->ownedScope,
+                    member,
+                    varDeclBase->initExpr);
+                if (!assign)
+                    continue;
+
+                auto stmt = m_astBuilder->create<ExpressionStmt>();
+                stmt->expression = assign;
+                stmt->loc = member->loc;
+                seqStmtChild->stmts.add(stmt);
+            }
+        }
+        if (seqStmtChild->stmts.getCount() != 0)
+        {
+            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+            seqStmt->stmts.insert(0, seqStmtChild);
+        }
+    }
+}
 
 void SemanticsDeclBodyVisitor::synthesizeCtorBody(
     DeclAndCtorInfo& structDeclInfo,
@@ -9477,6 +9535,7 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
     }
 
     synthesizeCtorBody(structDeclInfo, inheritanceDefaultCtorList, structDecl);
+    maybeInsertDefaultInitExpr(structDecl);
 
     if (structDeclInfo.defaultCtor)
     {

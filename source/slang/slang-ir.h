@@ -1882,6 +1882,23 @@ struct IRCoopMatrixType : IRType
     IR_LEAF_ISA(CoopMatrixType)
 };
 
+struct IRTensorAddressingTensorLayoutType : IRType
+{
+    IRInst* getDimension() { return getOperand(0); }
+    IRInst* getClampMode() { return getOperand(1); }
+
+    IR_LEAF_ISA(TensorAddressingTensorLayoutType)
+};
+
+struct IRTensorAddressingTensorViewType : IRType
+{
+    IRInst* getDimension() { return getOperand(0); }
+    IRInst* getHasDimension() { return getOperand(1); }
+    IRInst* getPermutation(int index) { return getOperand(2 + index); }
+
+    IR_LEAF_ISA(TensorAddressingTensorViewType)
+};
+
 bool isDefinition(IRInst* inVal);
 
 // A structure type is represented as a parent instruction,
