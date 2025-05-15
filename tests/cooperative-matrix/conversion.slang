@@ -12,6 +12,7 @@ RWStructuredBuffer<float> outputBuffer;
 //TEST_INPUT:ubuffer(data=[1 2 3 4], stride=4, count=256),name=input
 ByteAddressBuffer input;
 
+using namespace linalg;
 
 [numthreads(32, 1, 1)]
 void computeMain()

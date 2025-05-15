@@ -20,6 +20,8 @@ ByteAddressBuffer inputBuffer;
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWByteAddressBuffer outputBuffer;
 
+using namespace linalg;
+
 [numthreads(32, 1, 1)]
 void computeMain()
 {

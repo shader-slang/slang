@@ -23,6 +23,8 @@ RWByteAddressBuffer input;
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<uint32_t> outputBuffer;
 
+using namespace linalg;
+
 typealias CoopMatType = CoopMat<uint32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>;
 
 groupshared float[256] tempShared;

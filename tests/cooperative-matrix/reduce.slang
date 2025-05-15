@@ -27,6 +27,8 @@ StructuredBuffer<int32_t> inputBuffer;
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<int32_t> outputBuffer;
 
+using namespace linalg;
+
 int32_t CombineOp(int32_t lhs, int32_t rhs)
 {
     return lhs + rhs;

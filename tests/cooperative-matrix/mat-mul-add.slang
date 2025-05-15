@@ -6,6 +6,8 @@
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
+using namespace linalg;
+
 typealias CoopMatAType = CoopMat<float16_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>;
 typealias CoopMatBType = CoopMat<float16_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixB>;
 typealias CoopMatCType = CoopMat<float32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;

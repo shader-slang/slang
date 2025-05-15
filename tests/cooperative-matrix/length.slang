@@ -8,6 +8,8 @@
 //TEST_INPUT:ubuffer(stride=4, count=1):out,name=outputBuffer
 RWStructuredBuffer<int32_t> outputBuffer;
 
+using namespace linalg;
+
 // It appears that only Subgroup is supposed at the moment
 typealias CoopMatSubgroup    = CoopMat<int32_t, MemoryScope.Subgroup,    16, 16, CoopMatMatrixUse.MatrixAccumulator>;
 

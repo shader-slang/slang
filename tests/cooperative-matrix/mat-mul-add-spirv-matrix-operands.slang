@@ -8,6 +8,8 @@ RWStructuredBuffer<int> outputBuffer4;
 RWStructuredBuffer<uint32_t> outputBuffer5;
 RWStructuredBuffer<int> outputBuffer6;
 
+using namespace linalg;
+
 __generic<T : __BuiltinArithmeticType>
 typealias CoopMatAType = CoopMat<T, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixA>;
 

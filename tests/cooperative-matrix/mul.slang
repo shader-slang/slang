@@ -15,6 +15,8 @@ ByteAddressBuffer input1;
 //TEST_INPUT:ubuffer(data=[2 3 4 5], stride=4, count=256),name=input2
 ByteAddressBuffer input2;
 
+using namespace linalg;
+
 typealias CoopMatType = CoopMat<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
 
 [numthreads(32, 1, 1)]

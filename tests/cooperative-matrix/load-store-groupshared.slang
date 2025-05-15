@@ -15,6 +15,8 @@ ByteAddressBuffer input;
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<uint32_t> outputBuffer;
 
+using namespace linalg;
+
 groupshared uint32_t[256] tempShared;
 
 [numthreads(32, 1, 1)]

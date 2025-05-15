@@ -6,6 +6,8 @@
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<int32_t> outputBuffer;
 
+using namespace linalg;
+
 [numthreads(32, 1, 1)]
 void computeMain()
 {

@@ -22509,6 +22509,9 @@ extension<T, L : IBufferDataLayout> RasterizerOrderedStructuredBuffer<T, L> : IR
     int getCount() { uint count; uint stride; this.GetDimensions(count, stride); return count; }
 }
 
+namespace linalg
+{
+
 //
 // Cooperative Matrix enums
 //
@@ -22674,7 +22677,11 @@ struct CoopMat
     // CoopMat operations
     //
 
-    /// Returns the number of elements in the underlying storage of the cooperative matrix type.
+    /// Returns the number of elements for the current thread.
+    /// Depending on the number of threads for the given matrix, each
+    /// thread will get smaller length.
+    ///
+    /// @remarks The return value is unlikely to be same to M * N.
     [ForceInline]
     [require(cooperative_matrix)]
     static uint GetLength()
@@ -22795,7 +22802,7 @@ struct CoopMat
     }
 
     [require(cooperative_matrix)]
-    void __Store(RWStructuredBuffer<T> buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+    internal void __Store(RWStructuredBuffer<T> buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
     {
         let zero = 0;
         let alignment = 16U;
@@ -23309,6 +23316,7 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     };
 }
 
+} // namespace linalg
 
 //
 // Cooperative Vector
