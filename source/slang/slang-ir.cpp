@@ -8605,6 +8605,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
     case kIROp_GetOffsetPtr:
+    case kIROp_GetOptiXRayPayloadPtr:
     case kIROp_UpdateElement:
     case kIROp_MeshOutputRef:
     case kIROp_MakeVectorFromScalar:

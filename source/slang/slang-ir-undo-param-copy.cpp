@@ -65,8 +65,7 @@ struct UndoParameterCopyVisitor
                         // Scan for the store that initializes this varInst
                         // This store should be in the same block, after varInst.
                         // The value stored should be an IRLoad from the original parameter pointer.
-                        for (auto scanInst = varInst->getNextInst();
-                             scanInst && scanInst->getParent() == block;
+                        for (auto scanInst = varInst->getNextInst(); scanInst;
                              scanInst = scanInst->getNextInst())
                         {
                             if (auto storeInst = as<IRStore>(scanInst))
@@ -86,13 +85,13 @@ struct UndoParameterCopyVisitor
                                     break; // Found the initializing store for varInst
                                 }
                             }
-                            // Optimization: if we see another var declaration or a terminator, stop
-                            // scanning for this varInst's store.
-                            if (as<IRVar>(scanInst) || as<IRTerminatorInst>(scanInst))
+                            // Stop if we see another var declaration, or a call instruction,
+                            // before finding the specific initializing store for varInst,
+                            // then varInst is likely not following the simple
+                            // copy-in pattern this pass targets, or the store is not immediately
+                            // after it. Stop scanning for this varInst's initializer.
+                            if (as<IRVar>(scanInst) || as<IRCall>(scanInst))
                             {
-                                // If it's a terminator, we definitely won't find the store in this
-                                // block anymore. If it's another var, it's unlikely our store is
-                                // after it.
                                 break;
                             }
                         }
@@ -116,9 +115,8 @@ struct UndoParameterCopyVisitor
         }
 
         // Pass 3: Remove the temp vars and their initializing stores.
-        for (Index i = instsToRemove.getCount(); i > 0; --i)
+        for (auto& inst : instsToRemove)
         {
-            IRInst* inst = instsToRemove[i - 1];
             if (inst->getParent())
             {
                 inst->removeAndDeallocate();
