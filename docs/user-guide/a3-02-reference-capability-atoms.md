@@ -156,7 +156,7 @@ Versions
 > Represet HLSL compatibility support.
 
 `hlsl_coopvec_poc`
-> Represet HLSL compatibility support for the deprecated POC DXC
+> Represet compatibility support for the deprecated POC DXC
 
 `dxil_lib`
 > Represents capabilities required for DXIL Library compilation.

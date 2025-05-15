@@ -224,7 +224,7 @@ def hlsl_nvapi : hlsl;
 /// [Version]
 def hlsl_2018 : _sm_5_1;
 
-/// Represet HLSL compatibility support for the deprecated POC DXC
+/// Represet compatibility support for the deprecated POC DXC
 /// [Version]
 def hlsl_coopvec_poc : _sm_6_8;
 
