@@ -2276,9 +2276,9 @@ IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* o
     return oldType;
 }
 
-bool isArithmeticInst(IRInst* inst)
+bool isArithmeticInst(IROp op)
 {
-    switch (inst->getOp())
+    switch (op)
     {
     case kIROp_Add:
     case kIROp_Sub:
@@ -2310,5 +2310,26 @@ bool isArithmeticInst(IRInst* inst)
     default:
         return false;
     }
+}
+bool isArithmeticInst(IRInst* inst)
+{
+    return isArithmeticInst(inst->getOp());
+}
+
+bool isInstHoistable(IROp op, IRType* type)
+{
+    if ((getIROpInfo(op).flags & kIROpFlag_Hoistable))
+    {
+        return true;
+    }
+
+    if (isArithmeticInst(op))
+    {
+        if (type && isSpecConstRateType(type))
+        {
+            return true;
+        }
+    }
+    return false;
 }
 } // namespace Slang
