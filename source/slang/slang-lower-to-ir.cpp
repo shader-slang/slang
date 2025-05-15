@@ -846,7 +846,7 @@ LoweredValInfo emitCallToVal(
                 auto failBlock = handler.errorType ? handler.errorHandler : builder->createBlock();
 
                 auto voidType = builder->getVoidType();
-                builder->emitTryCallInst(voidType, succBlock, failBlock, handler.mergeBlock, callee, argCount, args);
+                builder->emitTryCallInst(voidType, succBlock, failBlock, callee, argCount, args);
 
                 builder->insertBlock(succBlock);
                 auto value = builder->emitParam(type);
@@ -6703,35 +6703,56 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         auto builder = getBuilder();
         startBlockIfNeeded(stmt);
 
-        // The mental model here is that the Catch statement lowers similarly to
-        // do
+        // The mental model here is that the below Catch statement:
+        //
+        // let val = try MayThrowFunc();
+        // catch(err: Error)
         // {
-        //     Result<T, E> r = mayThrowFunc();
-        //     if(isResultError(r))
-        //     {
-        //         handleError(r.getErrorValue());
-        //         break;
-        //     }
-        //     let val = r.getSuccessValue();
+        //     catchBlock(err);
         // }
-        // while(false);
+        //
+        // lowers similarly to:
+        //
+        // handlerLoop: for(;;)
+        // {
+        //     E err; // Actually just a parameter for the catchBlock, not a real variable.
+        //     bodyLoop: for(;;)
+        //     {
+        //         // Body goes here
+        //         Result<T, E> r = mayThrowFunc();
+        //         if(isResultError(r))
+        //         {
+        //             err = r.error;
+        //             break bodyLoop;
+        //         }
+        //         let val = r.getSuccessValue();
+        //         // Do stuff with val
+        //         break handlerLoop;
+        //     }
+        //     catchBlock(err);
+        //     break handlerLoop;
+        // }
         //
         // This approach allows for it to generate valid SPIR-V. Just jumping
         // around with unstructured conditional jumps doesn't work there.
 
-        IRBlock* loopHead = createBlock();
-        IRBlock* breakLabel = createBlock();
-        IRBlock* continueLabel = createBlock();
+        IRBlock* handlerLoopHead = createBlock();
+        IRBlock* handlerBreakLabel = createBlock();
+        IRBlock* bodyLoopHead = createBlock();
+        IRBlock* bodyBreakLabel = createBlock();
+
+        builder->emitLoop(handlerLoopHead, handlerBreakLabel, handlerLoopHead);
+        insertBlock(handlerLoopHead);
+
+        builder->emitLoop(bodyLoopHead, bodyBreakLabel, bodyLoopHead);
+        insertBlock(bodyLoopHead);
 
         CatchHandler catchHandler;
         catchHandler.errorType = lowerType(context, stmt->errorVar->getType());
-        catchHandler.errorHandler = continueLabel;
-        catchHandler.mergeBlock = breakLabel;
+        catchHandler.errorHandler = bodyBreakLabel;
+        catchHandler.mergeBlock = handlerBreakLabel;
         catchHandler.prev = context->catchHandler;
         context->catchHandler = &catchHandler;
-
-        builder->emitLoop(loopHead, breakLabel, continueLabel);
-        insertBlock(loopHead);
 
         // Note that the tryBody doesn't actually have to have it's own scope or
         // block. If there's a `defer` in the tryBody, it can run after the
@@ -6740,22 +6761,23 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         // Put break; at the end of the body if there's nothing else there yet.
         // This prevents the catch handler from running.
-        emitBranchIfNeeded(breakLabel);
+        emitBranchIfNeeded(handlerBreakLabel);
 
         context->catchHandler = catchHandler.prev;
 
-        insertBlock(continueLabel);
+        insertBlock(bodyBreakLabel);
 
-        // The catch handler is hidden in the continue label.
         auto irParam = builder->emitParam(catchHandler.errorType);
         auto paramVal = LoweredValInfo::simple(irParam);
         context->setGlobalValue(stmt->errorVar, paramVal);
 
-        IRBlock* prevScopeEndBlock = pushScopeBlock(breakLabel);
+        IRBlock* prevScopeEndBlock = pushScopeBlock(handlerBreakLabel);
         lowerStmt(context, stmt->handleBody);
         popScopeBlock(prevScopeEndBlock, true);
 
-        insertBlock(breakLabel);
+        emitBranchIfNeeded(handlerBreakLabel);
+
+        insertBlock(handlerBreakLabel);
     }
 
     void visitDiscardStmt(DiscardStmt* stmt)

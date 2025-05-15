@@ -18,7 +18,6 @@ struct ErrorHandlingLoweringContext
     InstWorkList workList;
     InstHashSet workListSet;
     List<IRFuncType*> oldFuncTypes;
-    HashSet<IRBlock*> catchBlocks;
 
     ErrorHandlingLoweringContext(IRModule* inModule)
         : module(inModule), workList(inModule), workListSet(inModule)
@@ -59,55 +58,6 @@ struct ErrorHandlingLoweringContext
         funcType->removeAndDeallocate();
     }
 
-    /*
-    void cloneHandlerBlock(
-        IRBuilder* builder,
-        IRDominatorTree* dom,
-        IRBlock* handler,
-        IRBlock* merge,
-        IRBlock* clonedHandler,
-        IRInst* resultVal
-    ){
-        auto handlerDominatedBlocks = dom->getProperlyDominatedBlocks(handler);
-        List<IRBlock*> handlerBlocks;
-        IRCloneEnv env;
-
-        catchBlocks.add(handler);
-        handlerBlocks.add(handler);
-        builder->addInst(clonedHandler);
-        env.mapOldValToNew[handler] = clonedHandler;
-
-        for (IRBlock* block : handlerDominatedBlocks)
-        {
-            if (!dom->properlyDominates(merge, block) && block != merge)
-            {
-                catchBlocks.add(block);
-                handlerBlocks.add(block);
-                auto clonedBlock = builder->createBlock();
-                builder->addInst(clonedBlock);
-                env.mapOldValToNew[block] = clonedBlock;
-            }
-        }
-
-        IRBlock* handlerBlock = nullptr;
-        for (auto block : handlerBlocks)
-        {
-            auto clonedBlock = as<IRBlock>(env.mapOldValToNew.getValue(block));
-            if (handlerBlock == nullptr)
-                handlerBlock = clonedBlock;
-            builder->setInsertInto(clonedBlock);
-            for (auto inst : block->getChildren())
-                cloneInst(&env, builder, inst);
-        }
-
-        builder->setInsertBefore(clonedHandler->getFirstOrdinaryInst());
-        auto errVal = builder->emitGetResultError(resultVal);
-        auto errorParam = clonedHandler->getFirstParam();
-        errorParam->replaceUsesWith(errVal);
-        errorParam->removeAndDeallocate();
-    }
-    */
-
     void processTryCall(IRTryCall* tryCall)
     {
         // If we see:
@@ -145,11 +95,6 @@ struct ErrorHandlingLoweringContext
 
         auto successBlock = tryCall->getSuccessBlock();
         auto failBlock = tryCall->getFailureBlock();
-        //auto mergeBlock = tryCall->getMergeBlock();
-
-        auto parentFunc = cast<IRFunc>(successBlock->getParent());
-        SLANG_ASSERT(parentFunc);
-        //auto dom = module->findOrCreateDominatorTree(parentFunc);
 
         builder.setInsertBefore(tryCall);
 
@@ -163,21 +108,20 @@ struct ErrorHandlingLoweringContext
         tryCall->transferDecorationsTo(call);
 
         auto isError = builder.emitIsResultError(call);
-        auto catchBlock = builder.createBlock();
-        auto branch = builder.emitIfElse(isError, catchBlock, successBlock, successBlock);
 
-        // Replace the params in failBlock to `getResultError(call)`.
+        // IfElse could otherwise just jump to the handler, but there's
+        // unfortunately the error parameter that needs to be passed as well,
+        // and it can't be done in IfElse. So there's an extra block in between
+        // to do that.
+        auto handlerJumpBlock = builder.createBlock();
+        auto branch = builder.emitIfElse(isError, handlerJumpBlock, successBlock, successBlock);
+
         builder.setInsertAfter(branch->getParent());
-        builder.addInst(catchBlock);
-        builder.setInsertInto(catchBlock);
+        builder.addInst(handlerJumpBlock);
+        builder.setInsertInto(handlerJumpBlock);
 
         auto errorValue = builder.emitGetResultError(call);
         builder.emitBranch(failBlock, 1, &errorValue);
-
-        //auto errorParam = failBlock->getFirstParam();
-        //errorParam->replaceUsesWith(errorValue);
-        //errorParam->removeAndDeallocate();
-        //cloneHandlerBlock(&builder, dom, failBlock, mergeBlock, handlerBlock, call);
 
         // Replace the params in successBlock to `getResultValue(call)`.
         builder.setInsertBefore(successBlock->getFirstOrdinaryInst());
@@ -188,9 +132,11 @@ struct ErrorHandlingLoweringContext
 
         tryCall->removeAndDeallocate();
 
-        // Some blocks got removed and added, so mark analysis of the
-        // function with defer as outdated.
-        //module->invalidateAnalysisForInst(parentFunc);
+        // Some blocks got removed and added, so mark analysis of the function
+        // as outdated.
+        //auto parentFunc = cast<IRFunc>(successBlock->getParent());
+        //if (parentFunc)
+        //    module->invalidateAnalysisForInst(parentFunc);
     }
 
     void processReturn(IRReturn* ret)
@@ -288,20 +234,6 @@ struct ErrorHandlingLoweringContext
         {
             processFuncType(funcType);
         }
-
-        /*
-        // Remove all catch blocks, their contents were already duplicated
-        // before, so they're just dead code now.
-        for (IRBlock* catchBlock : catchBlocks)
-        {
-            auto parentFunc = cast<IRFunc>(catchBlock->getParent());
-            SLANG_ASSERT(parentFunc);
-
-            catchBlock->removeAndDeallocate();
-
-            module->invalidateAnalysisForInst(parentFunc);
-        }
-        */
     }
 };
 

@@ -604,7 +604,7 @@ static IRBlock::SuccessorList getSuccessors(IRInst* terminator)
         break;
 
     case kIROp_TryCall:
-        // tryCall <successBlock> <failBlock> <mergeBlock> <callee> <args>...
+        // tryCall <successBlock> <failBlock> <callee> <args>...
         begin = operands + 0;
         end = begin + 2;
         break;
@@ -3829,17 +3829,16 @@ IRInst* IRBuilder::emitTryCallInst(
     IRType* type,
     IRBlock* successBlock,
     IRBlock* failureBlock,
-    IRBlock* mergeBlock,
     IRInst* func,
     UInt argCount,
     IRInst* const* args)
 {
-    IRInst* fixedArgs[] = {successBlock, failureBlock, mergeBlock, func};
+    IRInst* fixedArgs[] = {successBlock, failureBlock, func};
     auto inst = createInstWithTrailingArgs<IRTryCall>(
         this,
         kIROp_TryCall,
         type,
-        4,
+        3,
         fixedArgs,
         argCount,
         args);
