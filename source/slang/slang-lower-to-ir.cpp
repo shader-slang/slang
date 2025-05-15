@@ -6680,11 +6680,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         auto loweredExpr = lowerRValueExpr(context, stmt->expression);
         auto loweredVal = getSimpleVal(context, loweredExpr);
+        auto throwType = lowerType(context, stmt->expression->type);
 
         CatchHandler handler;
-        if (loweredVal && loweredVal->getDataType())
+        if (loweredVal && throwType)
         {
-            handler = findErrorHandler(context, loweredVal->getDataType());
+            handler = findErrorHandler(context, throwType);
         }
 
         if (handler.errorType)
@@ -11968,8 +11969,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // uncomment this line while debugging.
 
     //      dumpIR(module);
-    // If we are being asked to dump IR during compilation,
-    // then we can dump the initial IR for the module here.
 
     // First, lower error handling logic into normal control flow.
     // This includes lowering throwing functions into functions that

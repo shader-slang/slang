@@ -7,8 +7,9 @@
 // CHECK-NEXT: 11
 // CHECK-NEXT: 12
 // CHECK-NEXT: 6
+// CHECK-NEXT: 1
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 enum MyError1
@@ -67,6 +68,15 @@ int multiCatchFunc(int n)
     }
 }
 
+int containedThrow()
+{
+    throw MyError1.Fail;
+    catch(err: MyError1)
+    {
+        return 1;
+    }
+}
+
 [numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
@@ -83,4 +93,5 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     outputBuffer[2] = multiCatchFunc(1);
     outputBuffer[3] = multiCatchFunc(2);
     outputBuffer[4] = multiCatchFunc(3);
+    outputBuffer[5] = containedThrow();
 }
