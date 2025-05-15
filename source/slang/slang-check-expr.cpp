@@ -1976,9 +1976,14 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
 
     // The values of specialization constants aren't known at compile time even
     // if they're marked `const`.
-    if (decl->hasModifier<SpecializationConstantAttribute>() ||
-        decl->hasModifier<VkConstantIdAttribute>())
-        return nullptr;
+    if ((decl->hasModifier<SpecializationConstantAttribute>() ||
+         decl->hasModifier<VkConstantIdAttribute>()) &&
+        kind == ConstantFoldingKind::SpecializationConstant)
+    {
+        return m_astBuilder->getOrCreate<DeclRefIntVal>(
+            declRef.substitute(m_astBuilder, declRef.getDecl()->getType()),
+            declRef);
+    }
 
     if (decl->hasModifier<ExternModifier>())
     {
@@ -1986,7 +1991,7 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
         if (kind == ConstantFoldingKind::CompileTime)
             return nullptr;
         // But if we are OK with link-time constants, we can still fold it into a val.
-        auto rs = m_astBuilder->getOrCreate<GenericParamIntVal>(
+        auto rs = m_astBuilder->getOrCreate<DeclRefIntVal>(
             declRef.substitute(m_astBuilder, declRef.getDecl()->getType()),
             declRef);
         return rs;
@@ -2071,7 +2076,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
         if (auto genericValParamRef = declRef.as<GenericValueParamDecl>())
         {
-            Val* valResult = m_astBuilder->getOrCreate<GenericParamIntVal>(
+            Val* valResult = m_astBuilder->getOrCreate<DeclRefIntVal>(
                 declRef.substitute(m_astBuilder, genericValParamRef.getDecl()->getType()),
                 genericValParamRef);
             valResult = valResult->substitute(m_astBuilder, expr.getSubsts());
@@ -2387,7 +2392,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                 subscriptExpr->indexExprs[0],
                 IntegerConstantExpressionCoercionType::AnyInteger,
                 nullptr,
-                ConstantFoldingKind::LinkTime);
+                ConstantFoldingKind::SpecializationConstant);
 
             // Validate that array size is greater than zero
             if (auto constElementCount = as<ConstantIntVal>(elementCount))
@@ -5187,6 +5192,11 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     {
         return checkGeneralMemberLookupExpr(expr, baseType);
     }
+}
+
+Expr* SemanticsExprVisitor::visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr)
+{
+    return expr;
 }
 
 Expr* SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)

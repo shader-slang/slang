@@ -423,13 +423,13 @@ struct RayTracing : public WindowedAppBase
             IBufferResource::Desc asBufferDesc;
             asBufferDesc.type = IResource::Type::Buffer;
             asBufferDesc.defaultState = ResourceState::AccelerationStructure;
-            asBufferDesc.sizeInBytes = (Size)compactedSize;
+            asBufferDesc.sizeInBytes = (gfx::Size)compactedSize;
             gBLASBuffer = gDevice->createBufferResource(asBufferDesc);
             IAccelerationStructure::CreateDesc createDesc;
             createDesc.buffer = gBLASBuffer;
             createDesc.kind = IAccelerationStructure::Kind::BottomLevel;
             createDesc.offset = 0;
-            createDesc.size = (Size)compactedSize;
+            createDesc.size = (gfx::Size)compactedSize;
             gDevice->createAccelerationStructure(createDesc, gBLAS.writeRef());
 
             commandBuffer = gTransientHeaps[0]->createCommandBuffer();

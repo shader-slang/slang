@@ -74,23 +74,23 @@ protected:
         {
         case CharEncodeType::UTF8:
             {
-                codePoint = getUnicodePointFromUTF8([&]() -> Byte { return readBufferChar(); });
+                codePoint = getUnicodePointFromUTF8([&]() -> Byte { return readBufferByte(); });
                 break;
             }
         case CharEncodeType::UTF16:
             {
-                codePoint = getUnicodePointFromUTF16([&]() -> Byte { return readBufferChar(); });
+                codePoint = getUnicodePointFromUTF16([&]() -> Byte { return readBufferByte(); });
                 break;
             }
         case CharEncodeType::UTF16Reversed:
             {
                 codePoint =
-                    getUnicodePointFromUTF16Reversed([&]() -> Byte { return readBufferChar(); });
+                    getUnicodePointFromUTF16Reversed([&]() -> Byte { return readBufferByte(); });
                 break;
             }
         case CharEncodeType::UTF32:
             {
-                codePoint = getUnicodePointFromUTF32([&]() -> Byte { return readBufferChar(); });
+                codePoint = getUnicodePointFromUTF32([&]() -> Byte { return readBufferByte(); });
                 break;
             }
         }
@@ -99,11 +99,11 @@ protected:
     }
 
 private:
-    char readBufferChar();
+    Byte readBufferByte();
     SlangResult readBuffer();
 
     RefPtr<Stream> m_stream;
-    List<char> m_buffer;
+    List<Byte> m_buffer;
 
     CharEncodeType m_encodingType = CharEncodeType::UTF8;
     CharEncoding* m_encoding = nullptr;

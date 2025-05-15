@@ -1836,6 +1836,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
             varDecl->initExpr = initExpr;
             varDecl->type.type = initExpr->type;
+
+            varDecl->setCheckState(DeclCheckState::DefinitionChecked);
             _validateCircularVarDefinition(varDecl);
         }
 
@@ -3922,7 +3924,7 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             auto satisfyingValueParamDeclRef = satisfyingMemberDeclRef.as<GenericValueParamDecl>();
             SLANG_ASSERT(satisfyingValueParamDeclRef);
 
-            auto satisfyingVal = m_astBuilder->getOrCreate<GenericParamIntVal>(
+            auto satisfyingVal = m_astBuilder->getOrCreate<DeclRefIntVal>(
                 requiredValueParamDeclRef.getDecl()->getType(),
                 satisfyingValueParamDeclRef);
             satisfyingVal->getDeclRef() = satisfyingValueParamDeclRef;
@@ -8514,7 +8516,7 @@ List<Val*> getDefaultSubstitutionArgs(
             if (semantics)
                 semantics->ensureDecl(genericValueParamDecl, DeclCheckState::ReadyForLookup);
 
-            args.add(astBuilder->getOrCreate<GenericParamIntVal>(
+            args.add(astBuilder->getOrCreate<DeclRefIntVal>(
                 genericValueParamDecl->getType(),
                 astBuilder->getDirectDeclRef(genericValueParamDecl)));
         }
@@ -11770,7 +11772,7 @@ void checkDerivativeAttributeImpl(
 
                 appExpr->arguments.add(baseTypeExpr);
             }
-            else if (auto genericValParam = as<GenericParamIntVal>(arg))
+            else if (auto genericValParam = as<DeclRefIntVal>(arg))
             {
                 auto declRef = genericValParam->getDeclRef();
                 appExpr->arguments.add(

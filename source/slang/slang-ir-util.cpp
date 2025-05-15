@@ -2250,4 +2250,27 @@ bool isFirstBlock(IRInst* inst)
     return block->getParent()->getFirstBlock() == block;
 }
 
+bool isSpecConstRateType(IRType* type)
+{
+    if (auto rateQualifiedType = as<IRRateQualifiedType>(type))
+    {
+        if (as<IRSpecConstRate>(rateQualifiedType->getRate()))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+void hoistInstAndOperandsToGlobal(IRBuilder* builder, IRInst* inst)
+{
+    IRInst* moduleInst = builder->getModule()->getModuleInst();
+    UInt operandCount = inst->getOperandCount();
+    for (UInt ii = 0; ii < operandCount; ++ii)
+    {
+        auto operand = inst->getOperand(ii);
+        if (operand->parent != moduleInst)
+            hoistInstAndOperandsToGlobal(builder, operand);
+    }
+    inst->insertAt(IRInsertLoc::atStart(moduleInst));
+}
 } // namespace Slang
