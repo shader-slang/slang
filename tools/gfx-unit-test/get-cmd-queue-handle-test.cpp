@@ -38,6 +38,7 @@ void getQueueHandleTestImpl(IDevice* device, UnitTestContext* context)
 
 void getQueueHandleTestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
 {
+    gfxSetDebugLayerEnabled(context->enableDebugLayers);
     if ((api & context->enabledApis) == 0)
     {
         SLANG_IGNORE_TEST;
