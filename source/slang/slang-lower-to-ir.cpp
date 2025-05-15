@@ -1552,17 +1552,6 @@ static bool _isTrivialLookupFromInterfaceThis(IRGenContext* context, DeclRefBase
     return context->thisTypeWitness == nullptr;
 }
 
-
-//
-static void maybePropagateRate(IRBuilder* builder, IRType* rateQulifiedType, IRInst* inst)
-{
-    if (isSpecConstRateType(rateQulifiedType))
-    {
-        inst->setFullType(
-            builder->getRateQualifiedType(builder->getSpecConstRate(), inst->getFullType()));
-    }
-}
-
 struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, LoweredValInfo>
 {
     IRGenContext* context;
@@ -1596,14 +1585,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 specConstRateType = loweredArg.val->getFullType();
         }
         auto funcType = lowerType(context, val->getFuncType());
-        auto resVal = emitCallToDeclRef(
-            context,
-            as<IRFuncType>(funcType)->getResultType(),
-            val->getFuncDeclRef(),
-            funcType,
-            args,
-            tryEnv);
-        maybePropagateRate(getBuilder(), specConstRateType, resVal.val);
+        auto funcResType = maybeAddRateType(
+            getBuilder(),
+            specConstRateType,
+            as<IRFuncType>(funcType)->getResultType());
+        auto resVal =
+            emitCallToDeclRef(context, funcResType, val->getFuncDeclRef(), funcType, args, tryEnv);
         return resVal;
     }
 
@@ -1613,8 +1600,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
         auto type = lowerType(context, val->getType());
+        type = maybeAddRateType(getBuilder(), baseVal.val->getFullType(), type);
         auto resVal = LoweredValInfo::simple(getBuilder()->emitCast(type, baseVal.val));
-        maybePropagateRate(getBuilder(), baseVal.val->getFullType(), resVal.val);
         return resVal;
     }
 
@@ -1641,12 +1628,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 auto factorVal = lowerVal(context, factor->getParam()).val;
                 for (IntegerLiteralValue i = 0; i < factor->getPower(); i++)
                 {
-                    termVal = irBuilder->emitMul(factorVal->getDataType(), termVal, factorVal);
+                    termVal = irBuilder->emitMul(factorVal->getFullType(), termVal, factorVal);
                 }
-                maybePropagateRate(getBuilder(), factorVal->getFullType(), termVal);
             }
-            resultVal = irBuilder->emitAdd(termVal->getDataType(), resultVal, termVal);
-            maybePropagateRate(getBuilder(), termVal->getFullType(), resultVal);
+            resultVal = irBuilder->emitAdd(termVal->getFullType(), resultVal, termVal);
         }
         return LoweredValInfo::simple(resultVal);
     }
@@ -2076,19 +2061,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto elementType = lowerType(context, type->getElementType());
         if (!type->isUnsized())
         {
-            IRInst* elementCount = nullptr;
-            auto sizeVal = type->getElementCount();
-            auto sharedContext = context->shared;
-            if (!sharedContext->mapSpecConstValToIRInst.tryGetValue(sizeVal, elementCount))
-            {
-                elementCount = lowerSimpleVal(context, sizeVal);
-                if (isSpecConstRateType(elementCount->getFullType()))
-                {
-                    sharedContext->mapSpecConstValToIRInst.add(sizeVal, elementCount);
-                    hoistInstAndOperandsToGlobal(getBuilder(), elementCount);
-                }
-            }
-            return getBuilder()->getArrayType(elementType, elementCount);
+            return getBuilder()->getArrayType(
+                elementType,
+                lowerSimpleVal(context, type->getElementCount()));
         }
         else
         {

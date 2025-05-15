@@ -153,7 +153,7 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(
         genericParamType ? IntegerConstantExpressionCoercionType::SpecificType
                          : IntegerConstantExpressionCoercionType::AnyInteger,
         genericParamType,
-        ConstantFoldingKind::LinkTime,
+        ConstantFoldingKind::SpecializationConstant,
         sink);
     if (val)
         return val;
