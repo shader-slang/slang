@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -skip-spirv-validation
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
 
 // CHECK: OpDecorate %primitives_color Location 0
 // CHECK: OpDecorate %primitives_color PerPrimitive
