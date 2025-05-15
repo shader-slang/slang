@@ -147,7 +147,7 @@ public:
         return SLANG_OK;
     }
 
-    void encodeData(void const* data, size_t size, FourCC type = SerialBinary::kDataFourCC)
+    void encodeData(void const* data, size_t size, FourCC type)
     {
         _cursor.addDataChunk(type, data, size);
     }
@@ -201,8 +201,7 @@ public:
             // sense to serialize it separately from all the rest.
             //
             {
-                SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, SerialBinary::kNameFourCC);
-                encode(module->getNameObj()->text);
+                encode(module->getNameObj(), SerialBinary::kNameFourCC);
             }
 
             // The header includes a digest of all the compile options and
