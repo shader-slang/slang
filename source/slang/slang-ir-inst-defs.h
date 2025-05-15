@@ -95,6 +95,7 @@ INST(Nop, nop, 0, 0)
 
     /* Rate */
         INST(ConstExprRate, ConstExpr, 0, HOISTABLE)
+        INST(SpecConstRate, SpecConst, 0, HOISTABLE)
         INST(GroupSharedRate, GroupShared, 0, HOISTABLE)
         INST(ActualGlobalRate, ActualGlobalRate, 0, HOISTABLE)
     INST_RANGE(Rate, ConstExprRate, GroupSharedRate)
@@ -237,6 +238,10 @@ INST(RayQueryType, RayQuery, 1, HOISTABLE)
 INST(HitObjectType, HitObject, 0, HOISTABLE)
 INST(CoopVectorType, CoopVectorType, 2, HOISTABLE)
 INST(CoopMatrixType, CoopMatrixType, 5, HOISTABLE)
+INST(TensorAddressingTensorLayoutType, TensorAddressingTensorLayoutType, 2, HOISTABLE)
+INST(TensorAddressingTensorViewType, TensorAddressingTensorViewType, 3, HOISTABLE)
+INST(MakeTensorAddressingTensorLayout, MakeTensorAddressingTensorLayout, 0, 0)
+INST(MakeTensorAddressingTensorView, MakeTensorAddressingTensorView, 0, 0)
 
 // Opaque type that can be dynamically cast to other resource types.
 INST(DynamicResourceType, DynamicResource, 0, HOISTABLE)

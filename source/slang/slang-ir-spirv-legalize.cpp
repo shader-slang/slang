@@ -1806,6 +1806,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 }
             }
         }
+
         // Scan through the entry points and find the max version required.
         auto processInst = [&](IRInst* globalInst)
         {
