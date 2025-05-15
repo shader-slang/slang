@@ -60,7 +60,7 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
             else if (as<HLSLStaticModifier>(m))
                 hasStatic = true;
         }
-        if (hasExportOrExtern && (!hasConst || !hasStatic))
+        if (hasExportOrExtern && hasConst != hasStatic)
             getSink()->diagnose(
                 decl,
                 Diagnostics::ExternAndExportVarDeclMustBeConst,
@@ -1861,8 +1861,6 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
             varDecl->initExpr = initExpr;
             varDecl->type.type = initExpr->type;
-
-            varDecl->setCheckState(DeclCheckState::DefinitionChecked);
             _validateCircularVarDefinition(varDecl);
         }
 
