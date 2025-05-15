@@ -34,8 +34,6 @@ namespace Slang
 bool isCPUTarget(TargetRequest* targetReq);
 bool isCUDATarget(TargetRequest* targetReq);
 
-Dictionary<String, String> CLikeSourceEmitter::s_entryPointRenameMap = {{"main", "main_"}};
-
 struct CLikeSourceEmitter::ComputeEmitActionsContext
 {
     IRInst* moduleInst;
@@ -1113,11 +1111,11 @@ inline String CLikeSourceEmitter::maybeMakeEntryPointNameValid(String name, Diag
     if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) ||
         isMetalTarget(getTargetReq()))
     {
-        String remappedName;
-        if (s_entryPointRenameMap.tryGetValue(name, remappedName))
+        if (name == "main")
         {
-            sink->diagnose(SourceLoc(), Diagnostics::mainEntryPointRenamed, name, remappedName);
-            return remappedName;
+            String newName = _generateUniqueName(name.getUnownedSlice());
+            sink->diagnose(SourceLoc(), Diagnostics::mainEntryPointRenamed, name, newName);
+            return newName;
         }
     }
     return name;

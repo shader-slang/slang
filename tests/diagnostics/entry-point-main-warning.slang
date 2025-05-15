@@ -10,5 +10,5 @@ void main(RWBuffer<float> output)
     output[0] = 1.0f;
 }
 
-// CHECK: warning 40100: entry point 'main' is not allowed, and has been renamed to 'main_'
+// CHECK: warning 40100: entry point 'main' is not allowed, and has been renamed to 'main_0'
 // CHECK: void main_
