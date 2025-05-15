@@ -23329,7 +23329,7 @@ ${{{{
     >(
         $(RW)ByteAddressBuffer buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout)
+        TensorLayout<Dim, ClampMode> tensorLayout)
     {
         return __loadLayout<Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout);
     }
@@ -23341,7 +23341,7 @@ ${{{{
     >(
         $(RW)StructuredBuffer<T> buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout)
+        TensorLayout<Dim, ClampMode> tensorLayout)
     {
         return __loadLayout<Dim, ClampMode>(buffer, element, tensorLayout);
     }
@@ -23353,7 +23353,7 @@ ${{{{
     >(
         $(RW)StructuredBuffer<T> buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout)
+        TensorLayout<Dim, ClampMode> tensorLayout)
     {
         let zero = 0;
         let alignment = 16U;
@@ -23380,8 +23380,8 @@ ${{{{
     >(
         $(RW)ByteAddressBuffer buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
-        tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
     {
         return __loadView<Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView);
     }
@@ -23396,8 +23396,8 @@ ${{{{
     >(
         $(RW)StructuredBuffer<T> buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
-        tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
     {
         return __loadView<Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(buffer, element, tensorLayout, tensorView);
     }
@@ -23412,8 +23412,8 @@ ${{{{
     >(
         $(RW)StructuredBuffer<T> buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
-        tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
     {
         let zero = 0;
         let alignment = 16U;
@@ -23438,7 +23438,7 @@ ${{{{
     >(
         $(RW)ByteAddressBuffer buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorLayout<Dim, ClampMode> tensorLayout,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
         return __loadLayoutDecode<U, Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, decodeFunc);
@@ -23452,7 +23452,7 @@ ${{{{
     >(
         $(RW)StructuredBuffer<T> buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorLayout<Dim, ClampMode> tensorLayout,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
         return __loadLayoutDecode<U, Dim, ClampMode>(buffer, element, tensorLayout, decodeFunc);
@@ -23466,7 +23466,7 @@ ${{{{
     >(
         $(RW)StructuredBuffer<T> buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorLayout<Dim, ClampMode> tensorLayout,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
         let zero = 0;
@@ -23495,8 +23495,8 @@ ${{{{
     >(
         $(RW)ByteAddressBuffer buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
-        tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
         return __loadViewDecode<U, Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView, decodeFunc);
@@ -23513,8 +23513,8 @@ ${{{{
     >(
         $(RW)StructuredBuffer<T> buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
-        tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
         return __loadViewDecode<U, Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(buffer, element, tensorLayout, tensorView, decodeFunc);
@@ -23531,8 +23531,8 @@ ${{{{
     >(
         $(RW)StructuredBuffer<T> buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
-        tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
         functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
     {
         let zero = 0;
@@ -23562,7 +23562,7 @@ ${{{{
     >(
         RWByteAddressBuffer buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout)
+        TensorLayout<Dim, ClampMode> tensorLayout)
     {
         Store(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout);
     }
@@ -23574,7 +23574,7 @@ ${{{{
     >(
         RWStructuredBuffer<T> buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout)
+        TensorLayout<Dim, ClampMode> tensorLayout)
     {
         let zero = 0;
         let alignment = 16U;
@@ -23603,8 +23603,8 @@ ${{{{
     >(
         RWByteAddressBuffer buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
-        tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
     {
         Store(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView);
     }
@@ -23619,8 +23619,8 @@ ${{{{
     >(
         RWStructuredBuffer<T> buffer,
         uint element,
-        tensor_addressing.TensorLayout<Dim, ClampMode> tensorLayout,
-        tensor_addressing.TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
     {
         let zero = 0;
         let alignment = 16U;

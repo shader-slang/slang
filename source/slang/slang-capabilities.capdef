@@ -567,25 +567,25 @@ def SPV_GOOGLE_user_type : _spirv_1_0;
 /// [EXT]
 def SPV_EXT_replicated_composites : _spirv_1_0;
 
+/// Represents the SPIR-V extension for SPV_KHR_vulkan_memory_model.
+/// [EXT]
+def SPV_KHR_vulkan_memory_model : _spirv_1_3;
+
 /// Represents the SPIR-V extension for SPV_NV_cooperative_vector.
 /// [EXT]
-def SPV_NV_cooperative_vector : _spirv_1_6 + SPV_EXT_replicated_composites;
+def SPV_NV_cooperative_vector : _spirv_1_6 + SPV_EXT_replicated_composites + SPV_KHR_vulkan_memory_model;
 
 /// Represents the SPIR-V extension for SPV_KHR_cooperative_matrix.
 /// [EXT]
-def SPV_KHR_cooperative_matrix : _spirv_1_6 + SPV_EXT_physical_storage_buffer;
-
-/// Represents the SPIR-V extension for SPV_NV_cooperative_matrix2.
-/// [EXT]
-def SPV_NV_cooperative_matrix2 : _spirv_1_6 + SPV_KHR_cooperative_matrix;
+def SPV_KHR_cooperative_matrix : _spirv_1_6 + SPV_EXT_physical_storage_buffer + SPV_KHR_vulkan_memory_model;
 
 /// Represents the SPIR-V extension for SPV_NV_tensor_addressing.
 /// [EXT]
 def SPV_NV_tensor_addressing : _spirv_1_6;
 
-/// Represents the SPIR-V extension for SPV_KHR_vulkan_memory_model.
+/// Represents the SPIR-V extension for SPV_NV_cooperative_matrix2.
 /// [EXT]
-def SPV_KHR_vulkan_memory_model : _spirv_1_3;
+def SPV_NV_cooperative_matrix2 : SPV_NV_tensor_addressing + SPV_KHR_cooperative_matrix;
 
 // SPIRV Capabilities.
 
@@ -747,7 +747,7 @@ def spvCooperativeVectorTrainingNV : SPV_NV_cooperative_vector;
 
 /// Represents the SPIR-V capability for cooperative matrices
 /// [EXT]
-def spvCooperativeMatrixKHR : SPV_KHR_cooperative_matrix + SPV_KHR_vulkan_memory_model;
+def spvCooperativeMatrixKHR : SPV_KHR_cooperative_matrix;
 
 /// Represents the SPIR-V capability for cooperative matrix 2
 /// [EXT]

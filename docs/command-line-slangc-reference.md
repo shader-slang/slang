@@ -1109,11 +1109,11 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_compute_shader_derivatives` : enables the SPV_KHR_compute_shader_derivatives extension 
 * `SPV_GOOGLE_user_type` : enables the SPV_GOOGLE_user_type extension 
 * `SPV_EXT_replicated_composites` : enables the SPV_EXT_replicated_composites extension 
+* `SPV_KHR_vulkan_memory_model` : enables the SPV_KHR_vulkan_memory_model extension 
 * `SPV_NV_cooperative_vector` : enables the SPV_NV_cooperative_vector extension 
 * `SPV_KHR_cooperative_matrix` : enables the SPV_KHR_cooperative_matrix extension 
-* `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
 * `SPV_NV_tensor_addressing` : enables the SPV_NV_tensor_addressing extension 
-* `SPV_KHR_vulkan_memory_model` : enables the SPV_KHR_vulkan_memory_model extension 
+* `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
 * `spvAtomicFloat32AddEXT` 
 * `spvAtomicFloat16AddEXT` 
 * `spvAtomicFloat64AddEXT` 
@@ -1292,6 +1292,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cooperative_matrix_tensor_addressing` 
 * `cooperative_matrix_block_load` 
 * `tensor_addressing` 
+* `cooperative_matrix_2` 
 * `pixel` 
 * `tesscontrol` 
 * `tesseval` 

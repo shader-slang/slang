@@ -38,7 +38,8 @@
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWByteAddressBuffer outputBuffer;
 
-using namespace tensor_addressing;
+using namespace linalg;
+
 typealias CoopMatType = CoopMat<int32_t, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator>;
 
 int32_t decodeFunc(uint32_t* encoded, uint32_t blockCoord[2], uint32_t coordInBlock[2])

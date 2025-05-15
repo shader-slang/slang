@@ -447,20 +447,20 @@ Extensions
 `SPV_EXT_replicated_composites`
 > Represents the SPIR-V extension for SPV_EXT_replicated_composites.
 
+`SPV_KHR_vulkan_memory_model`
+> Represents the SPIR-V extension for SPV_KHR_vulkan_memory_model.
+
 `SPV_NV_cooperative_vector`
 > Represents the SPIR-V extension for SPV_NV_cooperative_vector.
 
 `SPV_KHR_cooperative_matrix`
 > Represents the SPIR-V extension for SPV_KHR_cooperative_matrix.
 
-`SPV_NV_cooperative_matrix2`
-> Represents the SPIR-V extension for SPV_NV_cooperative_matrix2.
-
 `SPV_NV_tensor_addressing`
 > Represents the SPIR-V extension for SPV_NV_tensor_addressing.
 
-`SPV_KHR_vulkan_memory_model`
-> Represents the SPIR-V extension for SPV_KHR_vulkan_memory_model.
+`SPV_NV_cooperative_matrix2`
+> Represents the SPIR-V extension for SPV_NV_cooperative_matrix2.
 
 `spvAtomicFloat32AddEXT`
 > Represents the SPIR-V capability for atomic float 32 add operations.
