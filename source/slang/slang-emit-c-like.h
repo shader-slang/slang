@@ -738,6 +738,9 @@ protected:
     OrderedHashSet<IRStringLit*> m_requiredPreludes;
 
     Dictionary<const char*, IRStringLit*> m_builtinPreludes;
+
+    // Indicates if we are emiting for DXC cooperative vector POC.
+    bool isCoopvecPoc = false;
 };
 
 } // namespace Slang
