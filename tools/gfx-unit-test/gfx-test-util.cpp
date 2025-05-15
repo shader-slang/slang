@@ -323,13 +323,7 @@ Slang::ComPtr<gfx::IDevice> createTestingDevice(
     void* extDescPtrs[2] = {&extDesc, &slangExtDesc};
     deviceDesc.extendedDescs = extDescPtrs;
 
-    // TODO: We should also set the debug callback
-    // (And in general reduce the differences (and duplication) between
-    // here and render-test-main.cpp)
-#ifdef _DEBUG
-    gfx::gfxEnableDebugLayer();
-#endif
-
+    gfx::gfxSetDebugLayerEnabled(context->enableDebugLayers);
     auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
     if (SLANG_FAILED(createDeviceResult))
     {
