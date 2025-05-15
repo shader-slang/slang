@@ -131,12 +131,6 @@ struct ErrorHandlingLoweringContext
         resultParam->removeAndDeallocate();
 
         tryCall->removeAndDeallocate();
-
-        // Some blocks got removed and added, so mark analysis of the function
-        // as outdated.
-        //auto parentFunc = cast<IRFunc>(successBlock->getParent());
-        //if (parentFunc)
-        //    module->invalidateAnalysisForInst(parentFunc);
     }
 
     void processReturn(IRReturn* ret)
