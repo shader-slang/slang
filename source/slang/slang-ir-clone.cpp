@@ -93,6 +93,9 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
         auto newOperand = findCloneForOperand(env, oldOperand);
 
         newOperands[ii] = newOperand;
+
+        if (isArithmeticInst(oldInst))
+            newType = maybeAddRateType(builder, newOperand->getFullType(), newType);
     }
 
     // Finally we create the inst with the updated operands.
