@@ -12,7 +12,7 @@ struct MyStruct
     float4x4 transform;
 }
 
-// CHECK: layout(buffer_reference, std430, buffer_reference_align = 4) readonly buffer BufferPointer_MyStruct
+// CHECK: layout(buffer_reference, std430, buffer_reference_align = 4) buffer BufferPointer_MyStruct
 // CHECK-NEXT: {
 // CHECK-NEXT: MyStruct{{.*}} _data;
 // CHECK-NEXT: }
