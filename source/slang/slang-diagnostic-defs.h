@@ -2765,6 +2765,12 @@ DIAGNOSTIC(
     noBlocksOrIntrinsic,
     "no blocks found for function definition, is there a '$0' intrinsic missing?")
 
+DIAGNOSTIC(
+    40100,
+    Warning,
+    mainEntryPointRenamed,
+    "entry point '$0' is not allowed, and has been renamed to '$1'")
+
 //
 // Ray tracing
 //
