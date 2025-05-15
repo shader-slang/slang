@@ -1075,6 +1075,7 @@ A capability describes an optional feature that a target may or may not support.
 * `metallib_3_1` 
 * `hlsl_nvapi` 
 * `hlsl_2018` 
+* `hlsl_coopvec_poc` 
 * `vertex` 
 * `fragment` 
 * `compute` 
