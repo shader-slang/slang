@@ -575,6 +575,18 @@ def SPV_NV_cooperative_vector : _spirv_1_6 + SPV_EXT_replicated_composites;
 /// [EXT]
 def SPV_KHR_cooperative_matrix : _spirv_1_6 + SPV_EXT_physical_storage_buffer;
 
+/// Represents the SPIR-V extension for SPV_NV_cooperative_matrix2.
+/// [EXT]
+def SPV_NV_cooperative_matrix2 : _spirv_1_6 + SPV_KHR_cooperative_matrix;
+
+/// Represents the SPIR-V extension for SPV_NV_tensor_addressing.
+/// [EXT]
+def SPV_NV_tensor_addressing : _spirv_1_6;
+
+/// Represents the SPIR-V extension for SPV_KHR_vulkan_memory_model.
+/// [EXT]
+def SPV_KHR_vulkan_memory_model : _spirv_1_3;
+
 // SPIRV Capabilities.
 
 /// Represents the SPIR-V capability for atomic float 32 add operations.
@@ -736,6 +748,30 @@ def spvCooperativeVectorTrainingNV : SPV_NV_cooperative_vector;
 /// Represents the SPIR-V capability for cooperative matrices
 /// [EXT]
 def spvCooperativeMatrixKHR : SPV_KHR_cooperative_matrix;
+
+/// Represents the SPIR-V capability for cooperative matrix 2
+/// [EXT]
+def spvCooperativeMatrixReductionsNV : SPV_NV_cooperative_matrix2;
+
+/// Represents the SPIR-V capability for cooperative matrix 2
+/// [EXT]
+def spvCooperativeMatrixConversionsNV : SPV_NV_cooperative_matrix2;
+
+/// Represents the SPIR-V capability for cooperative matrix 2
+/// [EXT]
+def spvCooperativeMatrixPerElementOperationsNV : SPV_NV_cooperative_matrix2;
+
+/// Represents the SPIR-V capability for cooperative matrix 2
+/// [EXT]
+def spvCooperativeMatrixTensorAddressingNV : SPV_NV_cooperative_matrix2;
+
+/// Represents the SPIR-V capability for cooperative matrix 2
+/// [EXT]
+def spvCooperativeMatrixBlockLoadsNV : SPV_NV_cooperative_matrix2;
+
+/// Represents the SPIR-V capability for tensor addressing
+/// [EXT]
+def spvTensorAddressingNV : SPV_NV_tensor_addressing;
 
 /// Represents the SPIR-V capability for maximal reconvergence.
 /// [EXT]
@@ -1129,6 +1165,24 @@ alias cooperative_vector_training = spvCooperativeVectorTrainingNV;
 
 /// Capabilities needed to use cooperative matrices
 alias cooperative_matrix = spvCooperativeMatrixKHR;
+/// Capabilities needed to use reduction operations with cooperative matrix
+/// [Compound]
+alias cooperative_matrix_reduction = spvCooperativeMatrixReductionsNV;
+/// Capabilities needed to convert cooperative matrices
+/// [Compound]
+alias cooperative_matrix_conversion = spvCooperativeMatrixConversionsNV;
+/// Capabilities needed to use MapElement operation with cooperative matrix
+/// [Compound]
+alias cooperative_matrix_map_element = spvCooperativeMatrixPerElementOperationsNV;
+/// Capabilities needed to load or store with tensor_addressing extension
+/// [Compound]
+alias cooperative_matrix_tensor_addressing = spvCooperativeMatrixTensorAddressingNV;
+/// Capabilities needed to use decodeFunc with cooperative matrix load
+/// [Compound]
+alias cooperative_matrix_block_load = spvCooperativeMatrixBlockLoadsNV;
+/// Capabilities needed to use tensor addressing
+/// [Compound]
+alias tensor_addressing = spvTensorAddressingNV;
 
 // Non-internal shader stages
 //
