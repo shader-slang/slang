@@ -160,6 +160,7 @@ public:
     virtual void handleASTNodeContents(NodeBase* value) = 0;
     virtual void handleName(Name*& value) = 0;
     virtual void handleSourceLoc(SourceLoc& value) = 0;
+    virtual void handleToken(Token& value) = 0;
 
     // Note that this type does *not* inherit from `ISerializerImpl`.
     //
@@ -376,35 +377,7 @@ void serialize(ASTSerializer const& serializer, QualType& value)
 
 void serialize(ASTSerializer const& serializer, Token& value)
 {
-    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
-    serialize(serializer, value.type);
-
-    auto v = TokenFlags(value.flags & ~TokenFlag::Name);
-    serialize(serializer, v);
-    value.flags = v | (value.flags & TokenFlag::Name);
-
-    serialize(serializer, value.loc);
-
-    {
-        SLANG_SCOPED_SERIALIZER_OPTIONAL(serializer);
-        if (isWriting(serializer))
-        {
-            if (value.hasContent())
-            {
-                String content = value.getContent();
-                serialize(serializer, content);
-            }
-        }
-        else
-        {
-            if (hasElements(serializer))
-            {
-                String content;
-                serialize(serializer, content);
-                value.setContent(content.getUnownedSlice());
-            }
-        }
-    }
+    serializer->handleToken(value);
 }
 
 void serialize(ASTSerializer const& serializer, SPIRVAsmOperand& value)
@@ -516,53 +489,14 @@ private:
 
     virtual ISerializerImpl* getBaseSerializer() override { return &_writer; }
 
-    virtual void handleName(Name*& value) override { serialize(ASTSerializer(this), value->text); }
+    virtual void handleName(Name*& value) override;
+    virtual void handleSourceLoc(SourceLoc& value) override;
+    virtual void handleToken(Token& value) override;
+    virtual void handleASTNode(NodeBase*& node) override;
+    virtual void handleASTNodeContents(NodeBase* node) override;
 
-    virtual void handleASTNode(NodeBase*& node) override
-    {
-        if (auto decl = as<Decl>(node))
-        {
-            if (auto importedFromModule = _findModuleDeclWasImportedFrom(decl))
-            {
-                if (decl == importedFromModule)
-                {
-                    _writeImportedModule(importedFromModule);
-                    return;
-                }
-                else
-                {
-                    _writeImportedDecl(decl, importedFromModule);
-                    return;
-                }
-            }
-        }
-
-        ASTSerializer serializer(this);
-
-        if (auto val = as<Val>(node))
-        {
-            val = val->resolve();
-
-            // On the reading side of things, sublcasses of `Val`
-            // are deduplicated as part of creation, and will read the
-            // operands out immediately, so we mirror that approach
-            // on the writing side to make sure the code is consistent.
-            //
-            serialize(serializer, val->astNodeType);
-            serialize(serializer, val->m_operands);
-        }
-        else
-        {
-            serialize(serializer, node->astNodeType);
-            deferSerializeObjectContents(serializer, node);
-        }
-    }
-
-    virtual void handleASTNodeContents(NodeBase* node) override
-    {
-        ASTSerializer serializer(this);
-        serializeASTNodeContents(serializer, node);
-    }
+    void _writeImportedModule(ModuleDecl* moduleDecl);
+    void _writeImportedDecl(Decl* decl, ModuleDecl* importedFromModuleDecl);
 
     ModuleDecl* _findModuleForDecl(Decl* decl)
     {
@@ -582,38 +516,6 @@ private:
         if (declModule == _module)
             return nullptr;
         return declModule;
-    }
-
-    void _writeImportedModule(ModuleDecl* moduleDecl)
-    {
-        ASTNodeType type = _getAsASTNodeType(PseudoASTNodeType::ImportedModule);
-        auto moduleName = moduleDecl->getName();
-
-        ASTSerializer serializer(this);
-        serialize(serializer, type);
-        serialize(serializer, moduleName);
-    }
-
-    void _writeImportedDecl(Decl* decl, ModuleDecl* importedFromModuleDecl)
-    {
-        ASTNodeType type = _getAsASTNodeType(PseudoASTNodeType::ImportedDecl);
-        auto mangledName = getMangledName(getCurrentASTBuilder(), decl);
-
-        ASTSerializer serializer(this);
-        serialize(serializer, type);
-        serialize(serializer, importedFromModuleDecl);
-        serialize(serializer, mangledName);
-    }
-
-    void handleSourceLoc(SourceLoc& value) override
-    {
-        ASTSerializer serializer(this);
-        SLANG_SCOPED_SERIALIZER_OPTIONAL(serializer);
-        if (_sourceLocWriter != nullptr)
-        {
-            auto rawValue = _sourceLocWriter->addSourceLoc(value);
-            serialize(serializer, rawValue);
-        }
     }
 };
 
@@ -646,60 +548,14 @@ private:
 
     virtual ISerializerImpl* getBaseSerializer() override { return &_riffReader; }
 
-    virtual void handleASTNode(NodeBase*& outNode) override
-    {
-        ASTSerializer serializer(this);
+    virtual void handleName(Name*& value) override;
+    virtual void handleSourceLoc(SourceLoc& value) override;
+    virtual void handleToken(Token& value) override;
+    virtual void handleASTNode(NodeBase*& outNode) override;
+    virtual void handleASTNodeContents(NodeBase* node) override;
 
-        ASTNodeType typeTag;
-        serialize(serializer, typeTag);
-        switch (_getPseudoASTNodeType(typeTag))
-        {
-        default:
-            break;
-
-        case PseudoASTNodeType::ImportedModule:
-            outNode = _readImportedModule();
-            return;
-
-        case PseudoASTNodeType::ImportedDecl:
-            outNode = _readImportedDecl();
-            return;
-        }
-
-        auto syntaxClass = SyntaxClass<NodeBase>(typeTag);
-        if (syntaxClass.isSubClassOf<Val>())
-        {
-            // Subclasses of `Val` are deduplicated as part
-            // of creation, so we need to read in their
-            // operands before we can create them, rather
-            // than allocating the object up front and
-            // then deserializing its content into it later.
-
-            ValNodeDesc desc;
-            desc.type = syntaxClass;
-            serialize(serializer, desc.operands);
-
-            desc.init();
-
-            auto node = _astBuilder->_getOrCreateImpl(std::move(desc));
-            outNode = node;
-        }
-        else
-        {
-            auto node = syntaxClass.createInstance(_astBuilder);
-            outNode = node;
-
-            deferSerializeObjectContents(serializer, node);
-        }
-    }
-
-    virtual void handleASTNodeContents(NodeBase* node) override
-    {
-        ASTSerializer serializer(this);
-        serializeASTNodeContents(serializer, node);
-
-        _cleanUpASTNode(node);
-    }
+    ModuleDecl* _readImportedModule();
+    NodeBase* _readImportedDecl();
 
     void _cleanUpASTNode(NodeBase* node)
     {
@@ -744,70 +600,302 @@ private:
             }
         }
     }
+};
 
-    ModuleDecl* _readImportedModule()
+//
+// We are matching up the corresponding `handle*()` operations from the
+// `AST{Encoding|Decoding}Context` types here, so that it is easier
+// to visually verify that they are serializing the same data with the
+// same ordering.
+//
+
+//
+// AST{Encoding|Decoding}Context::handleName()
+//
+
+void ASTEncodingContext::handleName(Name*& value)
+{
+    serialize(ASTSerializer(this), value->text);
+}
+
+void ASTDecodingContext::handleName(Name*& value)
+{
+    String text;
+    serialize(ASTSerializer(this), text);
+    value = _astBuilder->getNamePool()->getName(text);
+}
+
+//
+// AST{Encoding|Decoding}Context::handleSourceLoc()
+//
+
+void ASTEncodingContext::handleSourceLoc(SourceLoc& value)
+{
+    ASTSerializer serializer(this);
+    SLANG_SCOPED_SERIALIZER_OPTIONAL(serializer);
+    if (_sourceLocWriter != nullptr)
     {
-        ASTSerializer serializer(this);
-
-        Name* moduleName = nullptr;
-        serialize(serializer, moduleName);
-        auto module = _linkage->findOrImportModule(moduleName, _requestingSourceLoc, _sink);
-        if (!module)
-        {
-            SLANG_ABORT_COMPILATION("failed to load an imported module during AST deserialization");
-        }
-        return module->getModuleDecl();
+        auto rawValue = _sourceLocWriter->addSourceLoc(value);
+        serialize(serializer, rawValue);
     }
+}
 
-    NodeBase* _readImportedDecl()
+void ASTDecodingContext::handleSourceLoc(SourceLoc& value)
+{
+    ASTSerializer serializer(this);
+    SLANG_SCOPED_SERIALIZER_OPTIONAL(serializer);
+    if (hasElements(serializer))
     {
-        ASTSerializer serializer(this);
+        SerialSourceLocData::SourceLoc rawValue;
+        serialize(serializer, rawValue);
 
-        ModuleDecl* importedFromModuleDecl = nullptr;
-        String mangledName;
-
-        serialize(serializer, importedFromModuleDecl);
-        serialize(serializer, mangledName);
-
-        auto importedFromModule = importedFromModuleDecl->module;
-        if (!importedFromModule)
+        if (_sourceLocReader)
         {
-            return nullptr;
+            value = _sourceLocReader->getSourceLoc(rawValue);
         }
-
-        auto importedDecl =
-            importedFromModule->findExportFromMangledName(mangledName.getUnownedSlice());
-        if (!importedDecl)
-        {
-            SLANG_ABORT_COMPILATION(
-                "failed to load an imported declaration during AST deserialization");
-        }
-        return importedDecl;
     }
+}
 
-    virtual void handleName(Name*& value) override
-    {
-        String text;
-        serialize(ASTSerializer(this), text);
-        value = _astBuilder->getNamePool()->getName(text);
-    }
+//
+// AST{Encoding|Decoding}Context::handleToken()
+//
 
-    virtual void handleSourceLoc(SourceLoc& value) override
+void ASTDecodingContext::handleToken(Token& value)
+{
+    ASTSerializer serializer(this);
+
+    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+    serialize(serializer, value.type);
+    serialize(serializer, value.loc);
+
+    serialize(serializer, value.flags);
+
     {
-        ASTSerializer serializer(this);
         SLANG_SCOPED_SERIALIZER_OPTIONAL(serializer);
         if (hasElements(serializer))
         {
-            SerialSourceLocData::SourceLoc rawValue;
-            serialize(serializer, rawValue);
+            String content;
+            serialize(serializer, content);
 
-            if (_sourceLocReader)
+            // An important note here is that we cannot just
+            // call `value.setContent(...)` and pass in an
+            // `UnownedStringSlice` of `content`, because the
+            // `Token` will not take ownership of its own
+            // textual content.
+            //
+            // Instead, we need to get the text we just loaded
+            // into something that the `Token` can refer info,
+            // and the easiest way to accomplish that is to
+            // represent the text using a `Name`.
+            //
+            Name* name = _astBuilder->getNamePool()->getName(content);
+            value.setName(name);
+        }
+    }
+}
+
+void ASTEncodingContext::handleToken(Token& value)
+{
+    ASTSerializer serializer(this);
+
+    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+    serialize(serializer, value.type);
+    serialize(serializer, value.loc);
+
+    TokenFlags flags = TokenFlags(value.flags & ~TokenFlag::Name);
+    serialize(serializer, flags);
+
+    {
+        SLANG_SCOPED_SERIALIZER_OPTIONAL(serializer);
+        if (value.hasContent())
+        {
+            String content = value.getContent();
+            serialize(serializer, content);
+        }
+    }
+}
+
+//
+// AST{Encoding|Decoding}Context::handleASTNode()
+//
+
+void ASTEncodingContext::handleASTNode(NodeBase*& node)
+{
+    if (auto decl = as<Decl>(node))
+    {
+        if (auto importedFromModule = _findModuleDeclWasImportedFrom(decl))
+        {
+            if (decl == importedFromModule)
             {
-                value = _sourceLocReader->getSourceLoc(rawValue);
+                _writeImportedModule(importedFromModule);
+                return;
+            }
+            else
+            {
+                _writeImportedDecl(decl, importedFromModule);
+                return;
             }
         }
     }
-};
+
+    ASTSerializer serializer(this);
+
+    if (auto val = as<Val>(node))
+    {
+        val = val->resolve();
+
+        // On the reading side of things, sublcasses of `Val`
+        // are deduplicated as part of creation, and will read the
+        // operands out immediately, so we mirror that approach
+        // on the writing side to make sure the code is consistent.
+        //
+        serialize(serializer, val->astNodeType);
+        serialize(serializer, val->m_operands);
+    }
+    else
+    {
+        serialize(serializer, node->astNodeType);
+        deferSerializeObjectContents(serializer, node);
+    }
+}
+
+void ASTDecodingContext::handleASTNode(NodeBase*& outNode)
+{
+    ASTSerializer serializer(this);
+
+    ASTNodeType typeTag;
+    serialize(serializer, typeTag);
+    switch (_getPseudoASTNodeType(typeTag))
+    {
+    default:
+        break;
+
+    case PseudoASTNodeType::ImportedModule:
+        outNode = _readImportedModule();
+        return;
+
+    case PseudoASTNodeType::ImportedDecl:
+        outNode = _readImportedDecl();
+        return;
+    }
+
+    auto syntaxClass = SyntaxClass<NodeBase>(typeTag);
+    if (syntaxClass.isSubClassOf<Val>())
+    {
+        // Subclasses of `Val` are deduplicated as part
+        // of creation, so we need to read in their
+        // operands before we can create them, rather
+        // than allocating the object up front and
+        // then deserializing its content into it later.
+
+        ValNodeDesc desc;
+        desc.type = syntaxClass;
+        serialize(serializer, desc.operands);
+
+        desc.init();
+
+        auto node = _astBuilder->_getOrCreateImpl(std::move(desc));
+        outNode = node;
+    }
+    else
+    {
+        auto node = syntaxClass.createInstance(_astBuilder);
+        outNode = node;
+
+        deferSerializeObjectContents(serializer, node);
+    }
+}
+
+//
+// AST{Encoding|Decoding}Context::handleASTNodeContents()
+//
+
+void ASTEncodingContext::handleASTNodeContents(NodeBase* node)
+{
+    ASTSerializer serializer(this);
+    serializeASTNodeContents(serializer, node);
+}
+
+void ASTDecodingContext::handleASTNodeContents(NodeBase* node)
+{
+    ASTSerializer serializer(this);
+    serializeASTNodeContents(serializer, node);
+
+    _cleanUpASTNode(node);
+}
+
+//
+// AST{Encoding|Decoding}Context::_{write|read}ImportedModule()
+//
+
+void ASTEncodingContext::_writeImportedModule(ModuleDecl* moduleDecl)
+{
+    ASTNodeType type = _getAsASTNodeType(PseudoASTNodeType::ImportedModule);
+    auto moduleName = moduleDecl->getName();
+
+    ASTSerializer serializer(this);
+    serialize(serializer, type);
+    serialize(serializer, moduleName);
+}
+
+ModuleDecl* ASTDecodingContext::_readImportedModule()
+{
+    ASTSerializer serializer(this);
+
+    Name* moduleName = nullptr;
+    serialize(serializer, moduleName);
+    auto module = _linkage->findOrImportModule(moduleName, _requestingSourceLoc, _sink);
+    if (!module)
+    {
+        SLANG_ABORT_COMPILATION("failed to load an imported module during AST deserialization");
+    }
+    return module->getModuleDecl();
+}
+
+//
+// AST{Encoding|Decoding}Context::_{write|read}ImportedModule()
+//
+
+void ASTEncodingContext::_writeImportedDecl(Decl* decl, ModuleDecl* importedFromModuleDecl)
+{
+    ASTNodeType type = _getAsASTNodeType(PseudoASTNodeType::ImportedDecl);
+    auto mangledName = getMangledName(getCurrentASTBuilder(), decl);
+
+    ASTSerializer serializer(this);
+    serialize(serializer, type);
+    serialize(serializer, importedFromModuleDecl);
+    serialize(serializer, mangledName);
+}
+
+NodeBase* ASTDecodingContext::_readImportedDecl()
+{
+    ASTSerializer serializer(this);
+
+    ModuleDecl* importedFromModuleDecl = nullptr;
+    String mangledName;
+
+    serialize(serializer, importedFromModuleDecl);
+    serialize(serializer, mangledName);
+
+    auto importedFromModule = importedFromModuleDecl->module;
+    if (!importedFromModule)
+    {
+        return nullptr;
+    }
+
+    auto importedDecl =
+        importedFromModule->findExportFromMangledName(mangledName.getUnownedSlice());
+    if (!importedDecl)
+    {
+        SLANG_ABORT_COMPILATION(
+            "failed to load an imported declaration during AST deserialization");
+    }
+    return importedDecl;
+}
+
+//
+// {write|read}SerializedModuleAST()
+//
 
 void writeSerializedModuleAST(
     RIFF::BuildCursor& cursor,
