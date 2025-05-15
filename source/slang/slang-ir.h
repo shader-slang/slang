@@ -7,9 +7,6 @@
 // similar in spirit to LLVM (but much simpler).
 //
 
-#if defined(__cpp_lib_bit_cast)
-#include <bit>
-#endif
 #include "../compiler-core/slang-source-loc.h"
 #include "../compiler-core/slang-source-map.h"
 #include "../core/slang-basic.h"
@@ -17,6 +14,7 @@
 #include "slang-container-pool.h"
 #include "slang-type-system-shared.h"
 
+#include <bit>
 #include <functional>
 
 namespace Slang
@@ -105,11 +103,7 @@ enum IRMemoryOrder
 
 inline int32_t operator&(const IROpMask m, const IROp o)
 {
-#if defined(__cpp_lib_bit_cast)
     return std::bit_cast<int32_t>(m) & std::bit_cast<int32_t>(o);
-#else
-    return (int32_t)m & (int32_t)o;
-#endif
 }
 
 inline int32_t operator&(const IROp o, const IROpMask m)
@@ -1059,6 +1053,8 @@ IntInfo getIntTypeInfo(const IRType* intType);
 // left-inverse of getIntTypeInfo
 IROp getIntTypeOpFromInfo(const IntInfo info);
 
+IROp getOppositeSignIntTypeOp(IROp op);
+
 struct FloatInfo
 {
     Int width;
@@ -1165,6 +1161,11 @@ struct IRBoolLit : IRConstant
 // Get the compile-time constant integer value of an instruction,
 // if it has one, and assert-fail otherwise.
 IRIntegerValue getIntVal(IRInst* inst);
+
+// If it's a specialization constant sized array or unsized array, returns
+// kUnsizedArrayMagicLength if it's an unsized array. Otherwise just returns
+// the actual size.
+IRIntegerValue getArraySizeVal(IRInst* inst);
 
 struct IRStringLit : IRConstant
 {
@@ -1648,6 +1649,7 @@ struct IRAtomicType : IRType
 
 SIMPLE_IR_PARENT_TYPE(Rate, Type)
 SIMPLE_IR_TYPE(ConstExprRate, Rate)
+SIMPLE_IR_TYPE(SpecConstRate, Rate)
 SIMPLE_IR_TYPE(GroupSharedRate, Rate)
 SIMPLE_IR_TYPE(ActualGlobalRate, Rate)
 

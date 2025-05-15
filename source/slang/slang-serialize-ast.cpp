@@ -59,9 +59,9 @@ public:
     {
         auto containerChunk = encoder->getRIFFChunk();
 
-        RiffContainer::Chunk* declChunk = nullptr;
-        RiffContainer::Chunk* importedDeclChunk = nullptr;
-        RiffContainer::Chunk* valChunk = nullptr;
+        RIFF::ChunkBuilder* declChunk = nullptr;
+        RIFF::ChunkBuilder* importedDeclChunk = nullptr;
+        RIFF::ChunkBuilder* valChunk = nullptr;
         {
             Encoder::WithArray withList(encoder);
             declChunk = encoder->getRIFFChunk();
@@ -102,7 +102,6 @@ public:
             }
         } while (!done);
 
-        RiffContainer::calcAndSetSize(containerChunk);
         encoder->setRIFFChunk(containerChunk);
     }
 
@@ -345,7 +344,7 @@ public:
 
     void encodeValue(NameLoc const& value) { encode(value.name); }
 
-    void encodeValue(SemanticVersion value) { encoder->encode(value.toInteger()); }
+    void encodeValue(SemanticVersion value) { encoder->encode(value.getRawValue()); }
 
     void encodeValue(CapabilitySet const& value)
     {
@@ -495,7 +494,7 @@ public:
 
     void encodeValue(uint8_t value) { encoder->encode(UInt32(value)); }
 
-    void encodeValue(nullptr_t) { encoder->encode(nullptr); }
+    void encodeValue(std::nullptr_t) { encoder->encode(nullptr); }
 
     template<typename T>
     void encodeEnum(T value)
@@ -668,13 +667,13 @@ public:
         Linkage* linkage,
         ASTBuilder* astBuilder,
         DiagnosticSink* sink,
-        RiffContainer::Chunk* rootChunk,
+        RIFF::Chunk const* baseChunk,
         SerialSourceLocReader* sourceLocReader,
         SourceLoc requestingSourceLoc)
         : _linkage(linkage)
         , _astBuilder(astBuilder)
         , _sink(sink)
-        , _rootChunk(static_cast<RiffContainer::ListChunk*>(rootChunk))
+        , _baseChunk(as<RIFF::ListChunk>(baseChunk))
         , _sourceLocReader(sourceLocReader)
         , _requestingSourceLoc(requestingSourceLoc)
     {
@@ -687,7 +686,7 @@ public:
 
     SlangResult decodeAll()
     {
-        auto cursor = _rootChunk->getFirstContainedChunk();
+        auto cursor = _baseChunk->getChildren().begin();
 
         // There are a few different top-level chunks that
         // hold different arrays that we need in order
@@ -705,23 +704,23 @@ public:
         // the `ModuleDecl` itself, which should be the
         // first entry in the list.
         //
-        auto declChunk = cursor;
-        cursor = cursor->m_next;
+        auto declChunk = *cursor;
+        ++cursor;
 
         // Next there is a list of all the declarations
         // referenced inside of the module that need to
         // be imported in from outside.
         //
-        auto importedDeclChunk = cursor;
-        cursor = cursor->m_next;
+        auto importedDeclChunk = *cursor;
+        ++cursor;
 
         // Then there are all the `Val`-derived nodes that
         // are needed by the module, which will need to be
         // deduplicated so that they are unique within the
         // current compilation context.
         //
-        auto valChunk = cursor;
-        cursor = cursor->m_next;
+        auto valChunk = *cursor;
+        ++cursor;
 
         // The process of decoding the module is then spread
         // over a number of steps.
@@ -792,7 +791,7 @@ private:
     };
 
     ASTBuilder* _astBuilder = nullptr;
-    RiffContainer::ListChunk* _rootChunk = nullptr;
+    RIFF::ListChunk const* _baseChunk = nullptr;
 
     List<Decl*> _decls;
     List<Decl*> _importedDecls;
@@ -801,7 +800,7 @@ private:
     typedef Int ValID;
     Val* getValByID(ValID id) { return _vals[id]; }
 
-    SlangResult decodeImportedDecls(RiffContainer::Chunk* importedDeclChunk)
+    SlangResult decodeImportedDecls(RIFF::Chunk const* importedDeclChunk)
     {
         Decoder decoder(importedDeclChunk);
 
@@ -849,7 +848,7 @@ private:
         return module->getModuleDecl();
     }
 
-    SlangResult decodeVals(RiffContainer::Chunk* valChunk)
+    SlangResult decodeVals(RIFF::Chunk const* valChunk)
     {
         Decoder decoder(valChunk);
 
@@ -862,7 +861,7 @@ private:
         return SLANG_OK;
     }
 
-    SlangResult createEmptyShells(RiffContainer::Chunk* declChunk)
+    SlangResult createEmptyShells(RIFF::Chunk const* declChunk)
     {
         Decoder decoder(declChunk);
 
@@ -925,7 +924,7 @@ private:
         return SyntaxClass<NodeBase>(nodeType).createInstance(_astBuilder);
     }
 
-    SlangResult fillEmptyShells(RiffContainer::Chunk* declChunk)
+    SlangResult fillEmptyShells(RIFF::Chunk const* declChunk)
     {
         Index declIndex = 0;
 
@@ -1190,8 +1189,8 @@ private:
 
     void decodeValue(SemanticVersion& value, Decoder& decoder)
     {
-        SemanticVersion::IntegerType rawValue = decoder.decode<SemanticVersion::IntegerType>();
-        value.setFromInteger(rawValue);
+        SemanticVersion::RawValue rawValue = decoder.decode<SemanticVersion::RawValue>();
+        value.setRawValue(rawValue);
     }
 
     void decodeValue(CapabilitySet& value, Decoder& decoder)
@@ -1541,7 +1540,7 @@ ModuleDecl* readSerializedModuleAST(
     Linkage* linkage,
     ASTBuilder* astBuilder,
     DiagnosticSink* sink,
-    RiffContainer::Chunk* chunk,
+    RIFF::Chunk const* chunk,
     SerialSourceLocReader* sourceLocReader,
     SourceLoc requestingSourceLoc)
 {

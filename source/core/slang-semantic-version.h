@@ -12,7 +12,7 @@ struct SemanticVersion
 {
     typedef SemanticVersion ThisType;
 
-    typedef uint64_t IntegerType;
+    typedef UInt64 RawValue;
 
     SemanticVersion()
         : m_major(0), m_minor(0), m_patch(0)
@@ -34,14 +34,22 @@ struct SemanticVersion
     /// All zeros means nothing is set
     bool isSet() const { return m_major || m_minor || m_patch; }
 
-    IntegerType toInteger() const
+    RawValue getRawValue() const
     {
-        return (IntegerType(m_major) << 48) | (IntegerType(m_minor) << 32) | m_patch;
+        return (RawValue(m_major) << 48) | (RawValue(m_minor) << 32) | m_patch;
     }
-    void setFromInteger(IntegerType v)
+    void setRawValue(RawValue v)
     {
         set(int(v >> 48), int((v >> 32) & 0xffff), int(v & 0xffffffff));
     }
+
+    static SemanticVersion fromRaw(RawValue rawValue)
+    {
+        SemanticVersion result;
+        result.setRawValue(rawValue);
+        return result;
+    }
+
     void set(int major, int minor, int patch = 0)
     {
         SLANG_ASSERT(major >= 0 && minor >= 0 && patch >= 0);
@@ -52,7 +60,7 @@ struct SemanticVersion
     }
 
     /// Get hash value
-    HashCode getHashCode() const { return Slang::getHashCode(toInteger()); }
+    HashCode getHashCode() const { return Slang::getHashCode(getRawValue()); }
 
     static SlangResult parse(const UnownedStringSlice& value, SemanticVersion& outVersion);
     static SlangResult parse(
@@ -63,16 +71,29 @@ struct SemanticVersion
     static ThisType getEarliest(const ThisType* versions, Count count);
     static ThisType getLatest(const ThisType* versions, Count count);
 
+    /// Determine if this version is backwards-compatible with `otherVersion`.
+    ///
+    /// Examples of when to apply this:
+    ///
+    /// * Code for this version is asked to load data produced by `otherVersion`.
+    ///
+    /// * Code for this version is asked if it provides the API of `otherVersion`.
+    ///
+    /// This uses the rules of semantic versioning, so it should only
+    /// be applied to versions that obey those rules.
+    ///
+    bool isBackwardsCompatibleWith(const ThisType& otherVersion) const;
+
     void append(StringBuilder& buf) const;
 
-    bool operator>(const ThisType& rhs) const { return toInteger() > rhs.toInteger(); }
-    bool operator>=(const ThisType& rhs) const { return toInteger() >= rhs.toInteger(); }
+    bool operator>(const ThisType& rhs) const { return getRawValue() > rhs.getRawValue(); }
+    bool operator>=(const ThisType& rhs) const { return getRawValue() >= rhs.getRawValue(); }
 
-    bool operator<(const ThisType& rhs) const { return toInteger() < rhs.toInteger(); }
-    bool operator<=(const ThisType& rhs) const { return toInteger() <= rhs.toInteger(); }
+    bool operator<(const ThisType& rhs) const { return getRawValue() < rhs.getRawValue(); }
+    bool operator<=(const ThisType& rhs) const { return getRawValue() <= rhs.getRawValue(); }
 
-    bool operator==(const ThisType& rhs) const { return toInteger() == rhs.toInteger(); }
-    bool operator!=(const ThisType& rhs) const { return toInteger() != rhs.toInteger(); }
+    bool operator==(const ThisType& rhs) const { return getRawValue() == rhs.getRawValue(); }
+    bool operator!=(const ThisType& rhs) const { return getRawValue() != rhs.getRawValue(); }
 
     uint16_t m_major;
     uint16_t m_minor;

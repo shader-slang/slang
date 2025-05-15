@@ -109,6 +109,9 @@ CLikeSourceEmitter::CLikeSourceEmitter(const Desc& desc)
     m_codeGenContext = desc.codeGenContext;
     m_entryPointStage = desc.entryPointStage;
     m_effectiveProfile = desc.effectiveProfile;
+
+    auto targetCaps = getTargetReq()->getTargetCaps();
+    isCoopvecPoc = targetCaps.implies(CapabilityAtom::hlsl_coopvec_poc);
 }
 
 SlangResult CLikeSourceEmitter::init()
@@ -3118,18 +3121,32 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         case kIROp_MakeCoopVector:
             {
                 emitType(coopVecType, getName(inst));
-                m_writer->emit(";\n");
+                m_writer->emit(isCoopvecPoc ? ";\n" : " = { ");
 
                 auto elemCount = as<IRIntLit>(coopVecType->getOperand(1));
                 IRIntegerValue elemCountValue = elemCount->getValue();
-                for (IRIntegerValue i = 0; i < elemCountValue; ++i)
+                if (isCoopvecPoc)
                 {
-                    m_writer->emit(getName(inst));
-                    m_writer->emit(".WriteToIndex(");
-                    m_writer->emit(i);
-                    m_writer->emit(", ");
+                    for (IRIntegerValue i = 0; i < elemCountValue; ++i)
+                    {
+                        m_writer->emit(getName(inst));
+                        m_writer->emit(".WriteToIndex(");
+                        m_writer->emit(i);
+                        m_writer->emit(", ");
+                        emitDereferenceOperand(inst->getOperand(i), getInfo(EmitOp::General));
+                        m_writer->emit(");\n");
+                    }
+                }
+                else
+                {
+                    IRIntegerValue i = 0;
+                    for (; i < elemCountValue - 1; ++i)
+                    {
+                        emitDereferenceOperand(inst->getOperand(i), getInfo(EmitOp::General));
+                        m_writer->emit(", ");
+                    }
                     emitDereferenceOperand(inst->getOperand(i), getInfo(EmitOp::General));
-                    m_writer->emit(");\n");
+                    m_writer->emit("};\n");
                 }
                 return;
             }
@@ -3138,7 +3155,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             m_writer->emit(";\n");
 
             m_writer->emit(getName(inst));
-            m_writer->emit(".CopyFrom(");
+            m_writer->emit(isCoopvecPoc ? ".CopyFrom(" : " = (");
             emitCallExpr((IRCall*)inst, getInfo(EmitOp::General));
             m_writer->emit(");\n");
             return;
@@ -3147,7 +3164,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             m_writer->emit(";\n");
 
             m_writer->emit(getName(inst));
-            m_writer->emit(".CopyFrom(");
+            m_writer->emit(isCoopvecPoc ? ".CopyFrom(" : " = (");
             emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(");\n");
             return;
@@ -3168,6 +3185,11 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_DebugLine:
     case kIROp_DebugVar:
     case kIROp_DebugValue:
+    case kIROp_DebugInlinedAt:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+    case kIROp_DebugInlinedVariable:
+    case kIROp_DebugFunction:
         break;
 
     case kIROp_Unmodified:
@@ -3404,10 +3426,21 @@ void CLikeSourceEmitter::_emitStoreImpl(IRStore* store)
     auto dstPtr = store->getPtr();
     if (isPointerOfType(dstPtr->getDataType(), kIROp_CoopVectorType))
     {
-        emitDereferenceOperand(dstPtr, getInfo(EmitOp::General));
-        m_writer->emit(".CopyFrom(");
-        emitDereferenceOperand(srcVal, getInfo(EmitOp::General));
-        m_writer->emit(");\n");
+        if (isCoopvecPoc)
+        {
+            emitDereferenceOperand(dstPtr, getInfo(EmitOp::General));
+            m_writer->emit(".CopyFrom(");
+            emitDereferenceOperand(srcVal, getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+        }
+        else
+        {
+            auto prec = getInfo(EmitOp::Assign);
+            emitDereferenceOperand(dstPtr, leftSide(getInfo(EmitOp::General), prec));
+            m_writer->emit(" = ");
+            emitOperand(srcVal, rightSide(prec, getInfo(EmitOp::General)));
+            m_writer->emit(";\n");
+        }
     }
     else
     {
@@ -4700,7 +4733,7 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
             {
                 m_writer->emit(";\n");
                 m_writer->emit(getName(varDecl));
-                m_writer->emit(".CopyFrom(");
+                m_writer->emit(isCoopvecPoc ? ".CopyFrom(" : " = (");
                 emitDereferenceOperand(store->getVal()->getOperand(0), getInfo(EmitOp::General));
                 m_writer->emit(")");
             }
@@ -4708,7 +4741,7 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
             {
                 m_writer->emit(";\n");
                 m_writer->emit(getName(varDecl));
-                m_writer->emit(".CopyFrom(");
+                m_writer->emit(isCoopvecPoc ? ".CopyFrom(" : " = (");
                 emitCallExpr((IRCall*)store->getVal(), getInfo(EmitOp::General));
                 m_writer->emit(")");
             }
@@ -4721,13 +4754,14 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
                 {
                     m_writer->emit(";\n");
                     m_writer->emit(getName(varDecl));
-                    m_writer->emit(".WriteToIndex(");
+                    m_writer->emit(isCoopvecPoc ? ".WriteToIndex(" : "[");
                     m_writer->emit(i);
-                    m_writer->emit(", ");
+                    m_writer->emit(isCoopvecPoc ? ", " : "] = ");
                     emitDereferenceOperand(
                         store->getVal()->getOperand(i),
                         getInfo(EmitOp::General));
-                    m_writer->emit(")");
+                    if (isCoopvecPoc)
+                        m_writer->emit(")");
                 }
             }
             else
@@ -5150,6 +5184,16 @@ void CLikeSourceEmitter::ensureGlobalInst(
     case kIROp_Generic:
         return;
     case kIROp_ThisType:
+        return;
+    case kIROp_DebugInlinedAt:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+    case kIROp_DebugFunction:
+    case kIROp_DebugVar:
+    case kIROp_DebugLine:
+    case kIROp_DebugSource:
+    case kIROp_DebugValue:
+    case kIROp_DebugInlinedVariable:
         return;
     default:
         break;

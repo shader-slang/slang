@@ -17,6 +17,10 @@
 // Section 4.1. 'asic Types'
 //
 
+public typealias f16vec2 = half2;
+public typealias f16vec3 = half3;
+public typealias f16vec4 = half4;
+
 public typealias vec2 = vector<float, 2>;
 public typealias vec3 = vector<float, 3>;
 public typealias vec4 = vector<float, 4>;
@@ -93,6 +97,22 @@ public typealias dmat4x2 = matrix<double, 4, 2>;
 public typealias dmat4x3 = matrix<double, 4, 3>;
 public typealias dmat4x4 = matrix<double, 4, 4>;
 
+public typealias f16mat2x2 = matrix<half, 2, 2>;
+public typealias f16mat2x3 = matrix<half, 2, 3>;
+public typealias f16mat2x4 = matrix<half, 2, 4>;
+
+public typealias f16mat3x2 = matrix<half, 3, 2>;
+public typealias f16mat3x3 = matrix<half, 3, 3>;
+public typealias f16mat3x4 = matrix<half, 3, 4>;
+
+public typealias f16mat4x2 = matrix<half, 4, 2>;
+public typealias f16mat4x3 = matrix<half, 4, 3>;
+public typealias f16mat4x4 = matrix<half, 4, 4>;
+
+// Convenience aliases for square matrices
+public typealias f16mat2 = f16mat2x2;
+public typealias f16mat3 = f16mat3x3;
+public typealias f16mat4 = f16mat4x4;
 
 public out float4 gl_Position : SV_Position;
 public out float gl_PointSize : SV_PointSize;
@@ -723,6 +743,76 @@ public uvec2 unpackDouble2x32(double v)
         return uvec2(uint(u & 0xFFFFFFFF), uint(u >> 32));
     }
 }
+
+/// Unpack a 32-bit unsigned integer into 4 8-bit unsigned integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+__intrinsic_op($(kIROp_BitCast))
+public u8vec4 unpack8(uint32_t u);
+
+/// Unpack a 32-bit signed integer into 4 8-bit signed integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+__intrinsic_op($(kIROp_BitCast))
+public i8vec4 unpack8(int32_t u);
+
+/// Unpack a 16-bit unsigned integer into 2 8-bit unsigned integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+__intrinsic_op($(kIROp_BitCast))
+public u8vec2 unpack8(uint16_t u);
+
+/// Unpack a 16-bit signed integer into 2 8-bit signed integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+__intrinsic_op($(kIROp_BitCast))
+public i8vec2 unpack8(int16_t u);
+
+/// Unpack a 32-bit unsigned integer into 2 16-bit unsigned integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+__intrinsic_op($(kIROp_BitCast))
+public u16vec2 unpack16(uint32_t u);
+
+/// Unpack a 32-bit signed integer into 2 16-bit signed integers.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+__intrinsic_op($(kIROp_BitCast))
+public i16vec2 unpack16(int32_t u);
+
+/// Pack 2 16-bit unsigned integers into a 32-bit unsigned integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+__intrinsic_op($(kIROp_BitCast))
+public uint32_t pack32(u16vec2 v);
+
+/// Pack 2 16-bit signed integers into a 32-bit signed integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+__intrinsic_op($(kIROp_BitCast))
+public int32_t pack32(i16vec2 v);
+
+/// Pack 4 8-bit unsigned integers into a 32-bit unsigned integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+__intrinsic_op($(kIROp_BitCast))
+public uint32_t pack32(u8vec4 v);
+
+/// Pack 4 8-bit signed integers into a 32-bit signed integer.
+[__readNone]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+__intrinsic_op($(kIROp_BitCast))
+public int32_t pack32(i8vec4 v);
 
 //
 // Section 8.5. Geometric Functions
@@ -4814,6 +4904,35 @@ public property uint gl_HitKindEXT
         return HitKind();
     }
 }
+
+public property int gl_ClusterIDNV
+{
+    [require(glsl_spirv, raytracing_anyhit_closesthit)]
+    get
+    {
+        setupExtForRayTracingBuiltIn();
+        __target_switch
+        {
+        case glsl:
+        {
+            __requireTargetExtension("GL_NV_cluster_acceleration_structure");
+            __intrinsic_asm "(gl_ClusterIDNV)";
+        }
+        case spirv:
+        {
+            return spirv_asm
+            {
+                OpCapability RayTracingClusterAccelerationStructureNV;
+                OpExtension "SPV_NV_cluster_acceleration_structure";
+                result:$$int = OpLoad builtin(ClusterIDNV:int);
+            };
+        }
+        }
+    }
+}
+// Constant to indicate that a cluster acceleration structure was not hit.
+// Corresponds to VK_GEOMETRY_INSTANCE_CLUSTER_ID_NONE_NV in Vulkan
+public static const int gl_ClusterIDNoneNV = -1;
 
 public property mat4x3 gl_ObjectToWorldEXT 
 {

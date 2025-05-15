@@ -20,7 +20,7 @@ ModuleDecl* readSerializedModuleAST(
     Linkage* linkage,
     ASTBuilder* astBuilder,
     DiagnosticSink* sink,
-    RiffContainer::Chunk* chunk,
+    RIFF::Chunk const* chunk,
     SerialSourceLocReader* sourceLocReader,
     SourceLoc requestingSourceLoc);
 

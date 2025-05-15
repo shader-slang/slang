@@ -1836,6 +1836,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
             varDecl->initExpr = initExpr;
             varDecl->type.type = initExpr->type;
+
+            varDecl->setCheckState(DeclCheckState::DefinitionChecked);
             _validateCircularVarDefinition(varDecl);
         }
 
@@ -1866,7 +1868,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             if (auto initExpr = varDecl->initExpr)
             {
                 initExpr = CheckTerm(initExpr);
-                initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr);
+                initExpr =
+                    coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
                 varDecl->initExpr = initExpr;
 
                 maybeInferArraySizeForVariable(varDecl);
@@ -2346,7 +2349,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         if (initExpr->type.isWriteOnly)
             getSink()->diagnose(initExpr, Diagnostics::readingFromWriteOnly);
 
-        initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr);
+        initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
         varDecl->initExpr = initExpr;
 
         // We need to ensure that any variable doesn't introduce
@@ -3921,7 +3924,7 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             auto satisfyingValueParamDeclRef = satisfyingMemberDeclRef.as<GenericValueParamDecl>();
             SLANG_ASSERT(satisfyingValueParamDeclRef);
 
-            auto satisfyingVal = m_astBuilder->getOrCreate<GenericParamIntVal>(
+            auto satisfyingVal = m_astBuilder->getOrCreate<DeclRefIntVal>(
                 requiredValueParamDeclRef.getDecl()->getType(),
                 satisfyingValueParamDeclRef);
             satisfyingVal->getDeclRef() = satisfyingValueParamDeclRef;
@@ -4946,7 +4949,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     // so we also need to coerce the result of the call to
     // the expected type.
     //
-    auto coercedCall = subVisitor.coerce(CoercionSite::Return, resultType, checkedCall);
+    auto coercedCall = subVisitor.coerce(CoercionSite::Return, resultType, checkedCall, getSink());
 
     // If our overload resolution or type coercion failed,
     // then we have not been able to synthesize a witness
@@ -5801,7 +5804,7 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
             // the expected type of the property.
             //
             auto coercedMemberRef =
-                subVisitor.coerce(CoercionSite::Return, resultType, synBoundStorageExpr);
+                subVisitor.coerce(CoercionSite::Return, resultType, synBoundStorageExpr, getSink());
             auto synReturn = m_astBuilder->create<ReturnStmt>();
             synReturn->expression = coercedMemberRef;
 
@@ -8090,7 +8093,7 @@ void SemanticsDeclBodyVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
     if (auto initExpr = decl->tagExpr)
     {
         initExpr = CheckTerm(initExpr);
-        initExpr = coerce(CoercionSite::General, tagType, initExpr);
+        initExpr = coerce(CoercionSite::General, tagType, initExpr, getSink());
 
         // We want to enforce that this is an integer constant
         // expression.
@@ -8513,7 +8516,7 @@ List<Val*> getDefaultSubstitutionArgs(
             if (semantics)
                 semantics->ensureDecl(genericValueParamDecl, DeclCheckState::ReadyForLookup);
 
-            args.add(astBuilder->getOrCreate<GenericParamIntVal>(
+            args.add(astBuilder->getOrCreate<DeclRefIntVal>(
                 genericValueParamDecl->getType(),
                 astBuilder->getDirectDeclRef(genericValueParamDecl)));
         }
@@ -9137,7 +9140,7 @@ void SemanticsDeclBodyVisitor::visitParamDecl(ParamDecl* paramDecl)
         // actual type of the parameter.
         //
         initExpr = CheckTerm(initExpr);
-        initExpr = coerce(CoercionSite::Initializer, typeExpr.type, initExpr);
+        initExpr = coerce(CoercionSite::Initializer, typeExpr.type, initExpr, getSink());
         paramDecl->initExpr = initExpr;
 
         // TODO: a default argument expression needs to
@@ -9282,7 +9285,7 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(
         invoke->arguments.addRange(argumentList);
 
         auto assign = m_astBuilder->create<AssignExpr>();
-        assign->left = coerce(CoercionSite::Initializer, declRefType, thisExpr);
+        assign->left = coerce(CoercionSite::Initializer, declRefType, thisExpr, getSink());
         assign->right = invoke;
 
         auto stmt = m_astBuilder->create<ExpressionStmt>();
@@ -11769,7 +11772,7 @@ void checkDerivativeAttributeImpl(
 
                 appExpr->arguments.add(baseTypeExpr);
             }
-            else if (auto genericValParam = as<GenericParamIntVal>(arg))
+            else if (auto genericValParam = as<DeclRefIntVal>(arg))
             {
                 auto declRef = genericValParam->getDeclRef();
                 appExpr->arguments.add(

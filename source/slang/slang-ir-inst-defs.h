@@ -95,6 +95,7 @@ INST(Nop, nop, 0, 0)
 
     /* Rate */
         INST(ConstExprRate, ConstExpr, 0, HOISTABLE)
+        INST(SpecConstRate, SpecConst, 0, HOISTABLE)
         INST(GroupSharedRate, GroupShared, 0, HOISTABLE)
         INST(ActualGlobalRate, ActualGlobalRate, 0, HOISTABLE)
     INST_RANGE(Rate, ConstExprRate, GroupSharedRate)
@@ -1165,6 +1166,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         /// Decorates an inst with a debug source location (IRDebugSource, IRIntLit(line), IRIntLit(col)).
     INST(DebugLocationDecoration, DebugLocation, 3, 0)
 
+        /// Decorates a function with a link to its debug function representation
+    INST(DebugFunctionDecoration, DebugFunction, 1, 0)
+
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `Block` decoration.
     INST(SPIRVBlockDecoration, spvBlock, 0, 0)
 
@@ -1356,6 +1360,11 @@ INST(DebugSource, DebugSource, 2, HOISTABLE)
 INST(DebugLine, DebugLine, 5, 0)
 INST(DebugVar, DebugVar, 4, 0)
 INST(DebugValue, DebugValue, 2, 0)
+INST(DebugInlinedAt, DebugInlinedAt, 5, 0)
+INST(DebugFunction, DebugFunction, 5, 0)
+INST(DebugInlinedVariable, DebugInlinedVariable, 2, 0)
+INST(DebugScope, DebugScope, 2, 0)
+INST(DebugNoScope, DebugNoScope, 1, 0)
 
 /* Embedded Precompiled Libraries */
 INST(EmbeddedDownstreamIR, EmbeddedDownstreamIR, 2, 0)

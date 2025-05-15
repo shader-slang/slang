@@ -775,6 +775,147 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         m_operandStack.setCount(operandsStartIndex);
     }
 
+    SpvOp _specConstantOpcodeConvert(IROp irOpCode, IRBasicType* basicType)
+    {
+        SpvOp opCode = SpvOpUndef;
+        opCode = _arithmeticOpCodeConvert(irOpCode, basicType);
+        if (opCode == SpvOpUndef)
+        {
+            switch (irOpCode)
+            {
+            case kIROp_IntCast:
+                {
+                    auto typeStyle = getTypeStyle(basicType->getBaseType());
+                    if (typeStyle == kIROp_FloatType)
+                    {
+                        return SpvOpConvertFToU;
+                    }
+                    else if (typeStyle == kIROp_IntType)
+                    {
+                        return SpvOpUConvert;
+                    }
+                    break;
+                }
+            default:
+                break;
+            }
+            return opCode;
+        }
+        return opCode;
+    }
+
+    SpvOp _arithmeticOpCodeConvert(IROp irOpCode, IRBasicType* basicType)
+    {
+        bool isFloatingPoint = false;
+        bool isBool = false;
+        switch (basicType->getBaseType())
+        {
+        case BaseType::Float:
+        case BaseType::Double:
+        case BaseType::Half:
+            isFloatingPoint = true;
+            break;
+        case BaseType::Bool:
+            isBool = true;
+            break;
+        default:
+            break;
+        }
+        bool isSigned = isSignedType(basicType);
+        SpvOp opCode = SpvOpUndef;
+        switch (irOpCode)
+        {
+        case kIROp_Add:
+            opCode = isFloatingPoint ? SpvOpFAdd : SpvOpIAdd;
+            break;
+        case kIROp_Sub:
+            opCode = isFloatingPoint ? SpvOpFSub : SpvOpISub;
+            break;
+        case kIROp_Mul:
+            opCode = isFloatingPoint ? SpvOpFMul : SpvOpIMul;
+            break;
+        case kIROp_Div:
+            opCode = isFloatingPoint ? SpvOpFDiv : isSigned ? SpvOpSDiv : SpvOpUDiv;
+            break;
+        case kIROp_IRem:
+            opCode = isSigned ? SpvOpSRem : SpvOpUMod;
+            break;
+        case kIROp_FRem:
+            opCode = SpvOpFRem;
+            break;
+        case kIROp_Less:
+            opCode = isFloatingPoint ? SpvOpFOrdLessThan
+                     : isSigned      ? SpvOpSLessThan
+                                     : SpvOpULessThan;
+            break;
+        case kIROp_Leq:
+            opCode = isFloatingPoint ? SpvOpFOrdLessThanEqual
+                     : isSigned      ? SpvOpSLessThanEqual
+                                     : SpvOpULessThanEqual;
+            break;
+        case kIROp_Eql:
+            opCode = isFloatingPoint ? SpvOpFOrdEqual : isBool ? SpvOpLogicalEqual : SpvOpIEqual;
+            break;
+        case kIROp_Neq:
+            opCode = isFloatingPoint ? SpvOpFUnordNotEqual
+                     : isBool        ? SpvOpLogicalNotEqual
+                                     : SpvOpINotEqual;
+            break;
+        case kIROp_Geq:
+            opCode = isFloatingPoint ? SpvOpFOrdGreaterThanEqual
+                     : isSigned      ? SpvOpSGreaterThanEqual
+                                     : SpvOpUGreaterThanEqual;
+            break;
+        case kIROp_Greater:
+            opCode = isFloatingPoint ? SpvOpFOrdGreaterThan
+                     : isSigned      ? SpvOpSGreaterThan
+                                     : SpvOpUGreaterThan;
+            break;
+        case kIROp_Neg:
+            opCode = isFloatingPoint ? SpvOpFNegate : SpvOpSNegate;
+            break;
+        case kIROp_And:
+            opCode = SpvOpLogicalAnd;
+            break;
+        case kIROp_Or:
+            opCode = SpvOpLogicalOr;
+            break;
+        case kIROp_Not:
+            opCode = SpvOpLogicalNot;
+            break;
+        case kIROp_BitAnd:
+            if (isBool)
+                opCode = SpvOpLogicalAnd;
+            else
+                opCode = SpvOpBitwiseAnd;
+            break;
+        case kIROp_BitOr:
+            if (isBool)
+                opCode = SpvOpLogicalOr;
+            else
+                opCode = SpvOpBitwiseOr;
+            break;
+        case kIROp_BitXor:
+            if (isBool)
+                opCode = SpvOpLogicalNotEqual;
+            else
+                opCode = SpvOpBitwiseXor;
+            break;
+        case kIROp_BitNot:
+            if (isBool)
+                opCode = SpvOpLogicalNot;
+            else
+                opCode = SpvOpNot;
+            break;
+        case kIROp_Rsh:
+            opCode = isSigned ? SpvOpShiftRightArithmetic : SpvOpShiftRightLogical;
+            break;
+        case kIROp_Lsh:
+            opCode = SpvOpShiftLeftLogical;
+            break;
+        }
+        return opCode;
+    }
     /// Ensure that an instruction has been emitted
     SpvInst* ensureInst(IRInst* irInst)
     {
@@ -1433,6 +1574,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return ensureExtensionDeclaration(name);
     }
 
+    // Ensure cluster acceleration structure extensions and capabilities are declared
+    void requireRayTracingClusterAccelerationStructure()
+    {
+        requireSPIRVCapability(SpvCapabilityRayTracingClusterAccelerationStructureNV);
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_cluster_acceleration_structure"));
+    }
+
     bool hasExtensionDeclaration(const UnownedStringSlice& name)
     {
         return m_extensionInsts.containsKey(name);
@@ -1952,10 +2100,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_IndicesType:
         case kIROp_PrimitivesType:
             return nullptr;
+        case kIROp_DebugFunction:
+            return emitDebugFunction(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                nullptr,
+                nullptr,
+                as<IRDebugFunction>(inst),
+                nullptr);
+        case kIROp_DebugInlinedAt:
+            return emitDebugInlinedAt(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                as<IRDebugInlinedAt>(inst));
         default:
             {
-                if (as<IRSPIRVAsmOperand>(inst))
+                if (isSpecConstRateType(inst->getFullType()))
+                    return emitSpecializationConstantOp(inst);
+
+                else if (as<IRSPIRVAsmOperand>(inst))
                     return nullptr;
+
                 String e = "Unhandled global inst in spirv-emit:\n" +
                            dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
                 SLANG_UNIMPLEMENTED_X(e.begin());
@@ -2738,6 +2901,66 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
+    SpvInst* emitSpecializationConstantOp(IRInst* inst)
+    {
+        SpvInst* spv = nullptr;
+        if (m_mapIRInstToSpvInst.tryGetValue(inst, spv))
+            return spv;
+
+        // For each OpSpecConstantOp, the operand must be:
+        // 1. A specialization constant
+        // 2. A literal constant
+        // 3. Another OpSpecConstantOp
+
+        // For 1 and 2, we can just emit the specialization constant or literal constant.
+        if (auto param = as<IRGlobalParam>(inst))
+        {
+            auto layout = getVarLayout(param);
+            if (layout)
+            {
+                if (auto offset =
+                        layout->findOffsetAttr(LayoutResourceKind::SpecializationConstant))
+                {
+                    return emitSpecializationConstant(param, offset);
+                }
+            }
+            SLANG_UNREACHABLE("Non specialization constant used in OpSpecConstantOp\n");
+        }
+        else if (as<IRConstant>(inst))
+        {
+            // We need to emit the constant as a specialization constant
+            return emitLit(inst);
+        }
+
+        IRType* type = inst->getOperand(0)->getDataType();
+        IRBasicType* basicType = as<IRBasicType>(type);
+        SpvOp opCode = _specConstantOpcodeConvert(inst->getOp(), basicType);
+        if (opCode == SpvOpUndef)
+        {
+            String e = "Unhandled inst in spirv-emit:\n" +
+                       dumpIRToString(inst, {IRDumpOptions::Mode::Detailed, 0});
+            SLANG_UNIMPLEMENTED_X(e.getBuffer());
+        }
+
+        Array<SpvInst*, 3> operands;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            auto operand = inst->getOperand(i);
+            SpvInst* spvInst = emitSpecializationConstantOp(operand);
+            operands.add(spvInst);
+        }
+
+        auto resultType = inst->getFullType();
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            opCode,
+            operands);
+    }
+
     /// Emit a global parameter definition.
     SpvInst* emitGlobalParam(IRGlobalParam* param)
     {
@@ -3026,7 +3249,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     }
                 }
                 // DebugInfo.
-                funcDebugScope = emitDebugFunction(spvBlock, spvFunc, irFunc);
+                IRDebugFunction* irDebugFunc = nullptr;
+                if (auto debugFuncDecor = irFunc->findDecoration<IRDebugFuncDecoration>())
+                {
+                    irDebugFunc = as<IRDebugFunction>(debugFuncDecor->getDebugFunc());
+                }
+                funcDebugScope = emitDebugFunction(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    spvBlock,
+                    spvFunc,
+                    irDebugFunc,
+                    irFunc->getDataType());
             }
             if (funcDebugScope)
             {
@@ -4083,6 +4316,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     operands.getArrayView());
             }
             break;
+        case kIROp_DebugFunction:
+            return emitDebugFunction(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                nullptr,
+                nullptr,
+                as<IRDebugFunction>(inst),
+                nullptr);
+        case kIROp_DebugInlinedAt:
+            return emitDebugInlinedAt(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                as<IRDebugInlinedAt>(inst));
+        case kIROp_DebugScope:
+            return emitDebugScope(parent, as<IRDebugScope>(inst));
+        case kIROp_DebugNoScope:
+            return emitDebugNoScope(parent);
+        case kIROp_DebugInlinedVariable:
+            return emitDebugInlinedVariable(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                as<IRDebugInlinedVariable>(inst));
         }
         if (result)
             emitDecorations(inst, getID(result));
@@ -6599,11 +6851,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
         const auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
         const auto toType = getVectorOrCoopMatrixElementType(toTypeV);
+        IRBuilder builder(inst);
 
         if (as<IRBoolType>(fromType))
         {
             // Cast from bool to int.
-            IRBuilder builder(inst);
             builder.setInsertBefore(inst);
             auto zero = builder.getIntValue(toType, 0);
             auto one = builder.getIntValue(toType, 1);
@@ -6635,7 +6887,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         else if (as<IRBoolType>(toType))
         {
             // Cast from int to bool.
-            IRBuilder builder(inst);
             builder.setInsertBefore(inst);
             auto zero = builder.getIntValue(fromType, 0);
             if (auto vecType = as<IRVectorType>(toTypeV))
@@ -6667,20 +6918,35 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         const auto toInfo = getIntTypeInfo(toType);
 
         if (fromInfo == toInfo)
+        {
+            // Same exact integer types, copy the object.
             return emitOpCopyObject(parent, inst, toTypeV, inst->getOperand(0));
+        }
         else if (fromInfo.width == toInfo.width)
+        {
+            // Same bit width, perform bit cast.
             return emitOpBitcast(parent, inst, toTypeV, inst->getOperand(0));
+        }
         else if (!fromInfo.isSigned && !toInfo.isSigned)
-            // unsigned to unsigned, don't sign extend
+        {
+            // Unsigned to unsigned, don't sign extend.
             return emitOpUConvert(parent, inst, toTypeV, inst->getOperand(0));
-        else if (toInfo.isSigned)
-            // unsigned to signed, sign extend
-            return emitOpSConvert(parent, inst, toTypeV, inst->getOperand(0));
+        }
+        else if (!fromInfo.isSigned && toInfo.isSigned)
+        {
+            // Unsigned to signed with different widths, don't sign extend.
+            // Perform unsigned conversion first to an unsigned integer of the same width as the
+            // result then perform bit cast to the signed result type. This is done because SPIRV's
+            // unsigned conversion (`OpUConvert`) requires result type to be unsigned.
+            auto unsignedV = emitOpUConvert(
+                parent,
+                nullptr,
+                builder.getType(getOppositeSignIntTypeOp(toType->getOp())),
+                inst->getOperand(0));
+            return emitOpBitcast(parent, inst, toTypeV, unsignedV);
+        }
         else if (fromInfo.isSigned)
-            // signed to unsigned, sign extend
-            return emitOpSConvert(parent, inst, toTypeV, inst->getOperand(0));
-        else if (fromInfo.isSigned && toInfo.isSigned)
-            // signed to signed, sign extend
+            // Signed to signed and signed to unsigned, sign extend.
             return emitOpSConvert(parent, inst, toTypeV, inst->getOperand(0));
 
         SLANG_UNREACHABLE(__func__);
@@ -7136,117 +7402,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         IRType* elementType = getVectorOrCoopMatrixElementType(operands[0]->getDataType());
         IRBasicType* basicType = as<IRBasicType>(elementType);
-        bool isFloatingPoint = false;
-        bool isBool = false;
-        switch (basicType->getBaseType())
-        {
-        case BaseType::Float:
-        case BaseType::Double:
-        case BaseType::Half:
-            isFloatingPoint = true;
-            break;
-        case BaseType::Bool:
-            isBool = true;
-            break;
-        default:
-            break;
-        }
-        SpvOp opCode = SpvOpUndef;
-        bool isSigned = isSignedType(basicType);
-        switch (op)
-        {
-        case kIROp_Add:
-            opCode = isFloatingPoint ? SpvOpFAdd : SpvOpIAdd;
-            break;
-        case kIROp_Sub:
-            opCode = isFloatingPoint ? SpvOpFSub : SpvOpISub;
-            break;
-        case kIROp_Mul:
-            opCode = isFloatingPoint ? SpvOpFMul : SpvOpIMul;
-            break;
-        case kIROp_Div:
-            opCode = isFloatingPoint ? SpvOpFDiv : isSigned ? SpvOpSDiv : SpvOpUDiv;
-            break;
-        case kIROp_IRem:
-            opCode = isSigned ? SpvOpSRem : SpvOpUMod;
-            break;
-        case kIROp_FRem:
-            opCode = SpvOpFRem;
-            break;
-        case kIROp_Less:
-            opCode = isFloatingPoint ? SpvOpFOrdLessThan
-                     : isSigned      ? SpvOpSLessThan
-                                     : SpvOpULessThan;
-            break;
-        case kIROp_Leq:
-            opCode = isFloatingPoint ? SpvOpFOrdLessThanEqual
-                     : isSigned      ? SpvOpSLessThanEqual
-                                     : SpvOpULessThanEqual;
-            break;
-        case kIROp_Eql:
-            opCode = isFloatingPoint ? SpvOpFOrdEqual : isBool ? SpvOpLogicalEqual : SpvOpIEqual;
-            break;
-        case kIROp_Neq:
-            opCode = isFloatingPoint ? SpvOpFUnordNotEqual
-                     : isBool        ? SpvOpLogicalNotEqual
-                                     : SpvOpINotEqual;
-            break;
-        case kIROp_Geq:
-            opCode = isFloatingPoint ? SpvOpFOrdGreaterThanEqual
-                     : isSigned      ? SpvOpSGreaterThanEqual
-                                     : SpvOpUGreaterThanEqual;
-            break;
-        case kIROp_Greater:
-            opCode = isFloatingPoint ? SpvOpFOrdGreaterThan
-                     : isSigned      ? SpvOpSGreaterThan
-                                     : SpvOpUGreaterThan;
-            break;
-        case kIROp_Neg:
-            opCode = isFloatingPoint ? SpvOpFNegate : SpvOpSNegate;
-            break;
-        case kIROp_And:
-            opCode = SpvOpLogicalAnd;
-            break;
-        case kIROp_Or:
-            opCode = SpvOpLogicalOr;
-            break;
-        case kIROp_Not:
-            opCode = SpvOpLogicalNot;
-            break;
-        case kIROp_BitAnd:
-            if (isBool)
-                opCode = SpvOpLogicalAnd;
-            else
-                opCode = SpvOpBitwiseAnd;
-            break;
-        case kIROp_BitOr:
-            if (isBool)
-                opCode = SpvOpLogicalOr;
-            else
-                opCode = SpvOpBitwiseOr;
-            break;
-        case kIROp_BitXor:
-            if (isBool)
-                opCode = SpvOpLogicalNotEqual;
-            else
-                opCode = SpvOpBitwiseXor;
-            break;
-        case kIROp_BitNot:
-            if (isBool)
-                opCode = SpvOpLogicalNot;
-            else
-                opCode = SpvOpNot;
-            break;
-        case kIROp_Rsh:
-            opCode = isSigned ? SpvOpShiftRightArithmetic : SpvOpShiftRightLogical;
-            break;
-        case kIROp_Lsh:
-            opCode = SpvOpShiftLeftLogical;
-            break;
-        default:
+
+        SpvOp opCode = _arithmeticOpCodeConvert(op, basicType);
+        if (opCode == SpvOpUndef)
             SLANG_ASSERT(!"unknown arithmetic opcode");
-            break;
-        }
+
+        bool isFloatingPoint = (getTypeStyle(basicType->getBaseType()) == kIROp_FloatType);
+
         if (operandCount == 1)
         {
             return emitInst(parent, instToRegister, opCode, type, kResultID, operands);
@@ -7379,6 +7541,136 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             getNonSemanticDebugInfoExtInst(),
             List<SpvInst*>());
         return m_nullDwarfExpr;
+    }
+
+    SpvInst* emitDebugScope(SpvInstParent* parent, IRDebugScope* debugScope)
+    {
+        auto inlinedAt = ensureInst(debugScope->getInlinedAt());
+        if (!inlinedAt)
+            return nullptr;
+
+        SpvInst* scope = ensureInst(debugScope->getScope());
+        if (!scope)
+            return nullptr;
+
+        return emitOpDebugScope(
+            parent,
+            nullptr,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            scope,
+            inlinedAt);
+    }
+
+
+    SpvInst* emitDebugFunction(
+        SpvInstParent* parent,
+        SpvInst* firstBlock,
+        SpvInst* spvFunc,
+        IRDebugFunction* debugFunc,
+        IRFuncType* debugType)
+    {
+        SpvInst* debugFuncInfo = nullptr;
+        if (debugFunc && m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
+        {
+            return debugFuncInfo;
+        }
+
+        auto scope = findDebugScope(debugFunc);
+        if (!scope)
+            return nullptr;
+
+        SpvInst* neededDebugType = nullptr;
+        if (debugType)
+        {
+            neededDebugType = emitDebugType(debugType);
+        }
+        else
+        {
+            neededDebugType = emitDebugType(as<IRFuncType>(debugFunc->getDebugType()));
+        }
+
+        IRBuilder builder(debugFunc);
+        debugFuncInfo = emitOpDebugFunction(
+            parent,
+            debugFunc,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            debugFunc->getName(),
+            neededDebugType,
+            debugFunc->getFile(),
+            debugFunc->getLine(),
+            debugFunc->getCol(),
+            scope,
+            debugFunc->getName(),
+            builder.getIntValue(builder.getUIntType(), 0),
+            debugFunc->getLine());
+
+        if (firstBlock && spvFunc)
+        {
+            emitOpDebugFunctionDefinition(
+                firstBlock,
+                nullptr,
+                m_voidType,
+                getNonSemanticDebugInfoExtInst(),
+                debugFuncInfo,
+                spvFunc);
+        }
+        return debugFuncInfo;
+    }
+
+    SpvInst* emitDebugNoScope(SpvInstParent* parent)
+    {
+        return emitOpDebugNoScope(parent, nullptr, m_voidType, getNonSemanticDebugInfoExtInst());
+    }
+
+    SpvInst* emitDebugInlinedAt(SpvInstParent* parent, IRDebugInlinedAt* debugInlinedAt)
+    {
+        IRInst* lineInst = debugInlinedAt->getLine();
+
+        SpvInst* scope = nullptr;
+        if (as<IRDebugFunction>(debugInlinedAt->getDebugFunc()))
+        {
+            scope = ensureInst(debugInlinedAt->getDebugFunc());
+        }
+        if (scope == nullptr)
+        {
+            scope = findDebugScope(debugInlinedAt);
+        }
+
+        // If it's not chained to another IRDebugInlinedAt, we don't use this.
+        SpvInst* inlined = nullptr;
+        if (as<IRDebugInlinedAt>(debugInlinedAt)->isOuterInlinedPresent())
+        {
+            inlined = ensureInst(debugInlinedAt->getOuterInlinedAt());
+        }
+
+        return emitOpDebugInlinedAt(
+            parent,
+            debugInlinedAt,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            lineInst,
+            scope,
+            inlined);
+    }
+
+    SpvInst* emitDebugInlinedVariable(
+        SpvInstParent* parent,
+        IRDebugInlinedVariable* debugInlinedVar)
+    {
+        // Get the operands from the IRDebugInlinedVariable instruction
+        IRInst* variable = debugInlinedVar->getVariable();
+        IRInst* inlinedAt = debugInlinedVar->getInlinedAt();
+
+        // Emit the OpDebugInlinedVariable instruction
+        return emitOpDebugInlinedVariable(
+            parent,
+            debugInlinedVar,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            variable,
+            inlinedAt);
     }
 
     bool translateIRAccessChain(
@@ -7655,7 +7947,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 emitDebugType(arrayType->getElementType()),
                 sizedArrayType ? builder.getIntValue(
                                      builder.getUIntType(),
-                                     getIntVal(sizedArrayType->getElementCount()))
+                                     getArraySizeVal(sizedArrayType->getElementCount()))
                                : builder.getIntValue(builder.getUIntType(), 0));
         }
         else if (auto vectorType = as<IRVectorType>(type))
@@ -7844,46 +8136,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto result = emitDebugForwardRefsImpl(type);
         m_mapForwardRefsToDebugType[type] = result;
         return result;
-    }
-
-    SpvInst* emitDebugFunction(SpvInst* firstBlock, SpvInst* spvFunc, IRFunc* function)
-    {
-        auto scope = findDebugScope(function);
-        if (!scope)
-            return nullptr;
-        auto name = getName(function);
-        if (!name)
-            return nullptr;
-        auto debugLoc = function->findDecoration<IRDebugLocationDecoration>();
-        if (!debugLoc)
-            return nullptr;
-        auto debugType = emitDebugType(function->getDataType());
-        IRBuilder builder(function);
-        auto debugFunc = emitOpDebugFunction(
-            getSection(SpvLogicalSectionID::ConstantsAndTypes),
-            nullptr,
-            m_voidType,
-            getNonSemanticDebugInfoExtInst(),
-            name,
-            debugType,
-            debugLoc->getSource(),
-            debugLoc->getLine(),
-            debugLoc->getCol(),
-            scope,
-            name,
-            builder.getIntValue(builder.getUIntType(), 0),
-            debugLoc->getLine());
-        registerDebugInst(function, debugFunc);
-
-        emitOpDebugFunctionDefinition(
-            firstBlock,
-            nullptr,
-            m_voidType,
-            getNonSemanticDebugInfoExtInst(),
-            debugFunc,
-            spvFunc);
-
-        return debugFunc;
     }
 
     SpvInst* emitSPIRVAsm(SpvInstParent* parent, IRSPIRVAsm* inst)
