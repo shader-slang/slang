@@ -88,8 +88,9 @@ static bool _isSubCommand(const char* arg)
         "  -use-test-server               Run tests using test server\n"
         "  -use-fully-isolated-test-server  Run each test in isolated server\n"
         "  -capability <name>             Compile with the given capability\n"
- #if _DEBUG
-        "  -disable-debug-layers          Disable the debug layers (default enabled in debug build)\n"
+#if _DEBUG
+        "  -disable-debug-layers          Disable the debug layers (default enabled in debug "
+        "build)\n"
 #endif
         "\n"
         "Output modes:\n"
