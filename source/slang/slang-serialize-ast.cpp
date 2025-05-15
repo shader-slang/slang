@@ -527,10 +527,12 @@ private:
                 if (decl == importedFromModule)
                 {
                     _writeImportedModule(importedFromModule);
+                    return;
                 }
                 else
                 {
                     _writeImportedDecl(decl, importedFromModule);
+                    return;
                 }
             }
         }
