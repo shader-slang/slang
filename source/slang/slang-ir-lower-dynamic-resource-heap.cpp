@@ -62,8 +62,7 @@ IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
     IRBuilder& builder,
     IRInst* param,
     UInt spaceIndex,
-    UInt bindingIndex
-)
+    UInt bindingIndex)
 {
     SLANG_UNUSED(param);
     IRTypeLayout::Builder typeLayoutBuilder(&builder);
@@ -73,7 +72,8 @@ IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
     auto typeLayout = typeLayoutBuilder.build();
     IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
     varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->offset = spaceIndex;
-    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot)->offset = bindingIndex;
+    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot)->offset =
+        bindingIndex;
     return varLayoutBuilder.build();
 }
 
