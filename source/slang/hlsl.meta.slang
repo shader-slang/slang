@@ -22539,6 +22539,243 @@ enum CoopMatClampMode
 };
 
 
+${{{{
+// SPIRV described that the max value for `Dim` is 5.
+//
+// https://github.khronos.org/SPIRV-Registry/extensions/NV/SPV_NV_tensor_addressing.html#OpTypeTensorLayoutNV
+// OpTypeTensorLayoutNV:
+// Dim is the number of dimensions in the tensor layout, and must be a constant
+// instruction with scalar 32-bit integer type. The value must be greater than
+// zero and less than or equal to 5.
+//
+// https://github.khronos.org/SPIRV-Registry/extensions/NV/SPV_NV_tensor_addressing.html#OpTypeTensorViewNV
+// OpTypeTensorViewNV:
+// Dim is the number of dimensions in the tensor view, and must be a constant
+// instruction with scalar 32-bit integer type. The value must be greater than
+// zero and less than or equal to 5.
+//
+const int kMaxCoopMatTensorDimension = 5;
+}}}}
+
+//
+// TensorLayout
+//
+
+__intrinsic_type($(kIROp_TensorAddressingTensorLayoutType))
+[require(tensor_addressing)]
+__generic<
+    let Dim : uint32_t,
+    let ClampMode : CoopMatClampMode = CoopMatClampMode.Undefined
+>
+struct TensorLayout
+{
+    __intrinsic_op($(kIROp_MakeTensorAddressingTensorLayout))
+    __init();
+};
+
+
+${{{{
+    for (int iDim = 1; iDim < kMaxCoopMatTensorDimension; ++iDim)
+    {
+        StringBuilder dimParams;
+        StringBuilder dimAsms;
+        StringBuilder strideParams;
+        StringBuilder strideAsms;
+        StringBuilder sliceParams;
+        StringBuilder sliceAsms;
+        StringBuilder blockSizeParams;
+        StringBuilder blockSizeAsms;
+        for (int j = 1; j < iDim; ++j)
+        {
+            dimParams << ", uint32_t dim" << j;
+            dimAsms << " $dim" << j;
+            strideParams << ", uint32_t stride" << j;
+            strideAsms << " $stride" << j;
+            sliceParams << ", uint32_t offset" << j << ", uint32_t span" << j;
+            sliceAsms << " $offset" << j << " $span" << j;
+            blockSizeParams << ", uint32_t blockSize" << j;
+            blockSizeAsms << " $blockSize" << j;
+        }
+}}}}
+
+
+extension<
+    let ClampMode : CoopMatClampMode
+> TensorLayout<$(iDim), ClampMode>
+{
+    [require(tensor_addressing)]
+    This Dimension(uint32_t dim0 $(dimParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorLayoutSetDimensionNV $this $dim0 $(dimAsms)
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This Stride(uint32_t stride0 $(strideParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorLayoutSetStrideNV $this $stride0 $(strideAsms);
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This Slice(uint32_t offset0, uint32_t span0 $(sliceParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorLayoutSliceNV $this $offset0 $span0 $(sliceAsms);
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This ClampValue(CoopMatClampMode clampMode)
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorLayoutSetClampValueNV $this $clampMode;
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This BlockSize(uint32_t blockSize0 $(blockSizeParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorLayoutSetBlockSizeNV $this $blockSize0 $(blockSizeAsms);
+            };
+        }
+    }
+};
+
+${{{{
+    } // iDim
+}}}}
+
+//
+// TensorView
+//
+
+${{{{
+    StringBuilder tensorViewStruct;
+    for (int j = 0; j < kMaxCoopMatTensorDimension; ++j)
+    {
+        // Assigning the max value as a default value,
+        // because the max value is an invalid value and it allows us to check if the value
+        // is explicitly set by the user or not.
+        tensorViewStruct << ", let p" << j << " : uint32_t = 0xff";
+    }
+}}}}
+
+__intrinsic_type($(kIROp_TensorAddressingTensorViewType))
+__generic<
+    let Dim : uint32_t,
+    let HasDimensions : bool
+    $(tensorViewStruct)
+>
+struct TensorView
+{
+    __intrinsic_op($(kIROp_MakeTensorAddressingTensorView))
+    __init();
+};
+
+${{{{
+    for (int iDim = 1; iDim < kMaxCoopMatTensorDimension; ++iDim)
+    {
+        StringBuilder tensorViewTypes;
+        StringBuilder tensorViewExtensions;
+        StringBuilder dimParams;
+        StringBuilder dimAsms;
+        StringBuilder strideParams;
+        StringBuilder strideAsms;
+        for (int j = 1; j < iDim; ++j)
+        {
+            tensorViewTypes << ", let Dim" << j << " : uint32_t";
+            tensorViewExtensions << ", Dim" << j;
+            dimParams << ", uint32_t dim" << j;
+            dimAsms << " $dim" << j;
+            strideParams << ", uint32_t stride" << j;
+            strideAsms << " $stride" << j;
+        }
+        for (int j = iDim; j < kMaxCoopMatTensorDimension; ++j)
+        {
+            tensorViewExtensions << ", 0xff";
+        }
+}}}}
+
+[require(tensor_addressing)]
+extension<
+    let HasDimensions : bool,
+    let Dim0 : uint32_t
+    $(tensorViewTypes)
+> TensorView<$(iDim), HasDimensions, Dim0 $(tensorViewExtensions)>
+{
+    [require(tensor_addressing)]
+    This Dimension(uint32_t dim0 $(dimParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorViewSetDimensionNV $this $dim0 $(dimAsms);
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This Stride(uint32_t stride0 $(strideParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorViewSetStrideNV $this $stride0 $(strideAsms);
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This Clip(uint clipRowOffset, uint clipRowSpan, uint clipColOffset, uint clipColSpan)
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorViewSetClipNV $this $clipRowOffset $clipRowSpan $clipColOffset $clipColSpan;
+            };
+        }
+    }
+};
+
+${{{{
+    } // iDim
+}}}}
+
+
 //
 // Cooperative Matrix type
 //
@@ -22788,21 +23025,23 @@ struct CoopMat
     [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
-    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
+    >(RWByteAddressBuffer buffer, uint element, uint stride)
     {
-        __Store(buffer, element, stride, matrixLayout);
+        __store<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
     }
 
     [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
-    >(RWByteAddressBuffer buffer, uint element, uint stride)
+    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
     {
-        __Store(__getEquivalentStructuredBuffer<T>(buffer), element, stride, matrixLayout);
+        __store<matrixLayout>(buffer, element, stride);
     }
 
     [require(cooperative_matrix)]
-    internal void __Store(RWStructuredBuffer<T> buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+    internal void __store<
+        let matrixLayout : CoopMatMatrixLayout
+    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
     {
         let zero = 0;
         let alignment = 16U;
@@ -22883,11 +23122,19 @@ struct CoopMat
     // Load
     //
 
+${{{{
+    for (const char* RW : { "", "RW" })
+    {
+}}}}
+
     [__NoSideEffect]
     [require(cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
-    >(ByteAddressBuffer buffer, uint element, uint stride)
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        uint stride)
     {
         return Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
     }
@@ -22896,16 +23143,10 @@ struct CoopMat
     [require(cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
-    >(RWByteAddressBuffer buffer, uint element, uint stride)
-    {
-        return Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
-    }
-
-    [__NoSideEffect]
-    [require(cooperative_matrix)]
-    static This Load<
-        let matrixLayout : CoopMatMatrixLayout
-    >(StructuredBuffer<T> buffer, uint element, uint stride)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        uint stride)
     {
         let zero = 0;
         let alignment = 16U;
@@ -22917,21 +23158,9 @@ struct CoopMat
         };
     }
 
-    [__NoSideEffect]
-    [require(cooperative_matrix)]
-    static This Load<
-        let matrixLayout : CoopMatMatrixLayout
-    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
-    {
-        let zero = 0;
-        let alignment = 16U;
-        return spirv_asm
-        {
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
-    }
+${{{{
+    } // RW
+}}}}
 
     [ForceInline]
     [__NoSideEffect]
@@ -23076,6 +23305,340 @@ struct CoopMat
         return true;
     }
 
+    //
+    // Load with TensorLayout and TensorView
+    //
+
+${{{{
+    StringBuilder tensorViewTypes;
+    StringBuilder tensorViewParams;
+    for (int j = 0; j < kMaxCoopMatTensorDimension; ++j)
+    {
+        tensorViewTypes << ", let p" << j << " : uint32_t = " << kMaxCoopMatTensorDimension;
+        tensorViewParams << ", p" << j;
+    }
+
+    for (const char* RW : { "", "RW" })
+    {
+}}}}
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        return __loadLayout<Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        return __loadLayout<Dim, ClampMode>(buffer, element, tensorLayout);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This __loadLayout<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        This ret;
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            %storagePointerType = OpTypePointer StorageBuffer $$T;
+            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment None;
+        };
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+    {
+        return __loadView<Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
+    {
+        return __loadView<Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(buffer, element, tensorLayout, tensorView);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This __loadView<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        This ret;
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            %storagePointerType = OpTypePointer StorageBuffer $$T;
+            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment TensorView $tensorView;
+        };
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        return __loadLayoutDecode<U, Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, decodeFunc);
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        return __loadLayoutDecode<U, Dim, ClampMode>(buffer, element, tensorLayout, decodeFunc);
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This __loadLayoutDecode<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        This ret;
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixBlockLoadsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            %storagePointerType = OpTypePointer StorageBuffer $$T;
+            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment DecodeFunc $decodeFunc;
+        };
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        return __loadViewDecode<U, Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView, decodeFunc);
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        return __loadViewDecode<U, Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(buffer, element, tensorLayout, tensorView, decodeFunc);
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This __loadViewDecode<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        This ret;
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpCapability CooperativeMatrixBlockLoadsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            %storagePointerType = OpTypePointer StorageBuffer $$T;
+            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment TensorView|DecodeFunc $tensorView $decodeFunc;
+        };
+    }
+
+${{{{
+    } // RW
+}}}}
+
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        RWByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        Store(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        RWStructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        __target_switch
+        {
+        case spirv:
+            spirv_asm
+            {
+                OpCapability CooperativeMatrixTensorAddressingNV;
+                OpExtension "SPV_NV_cooperative_matrix2";
+                %storagePointerType = OpTypePointer StorageBuffer $$T;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+                OpCooperativeMatrixStoreTensorNV %pointer $this $tensorLayout Aligned !alignment None;
+            };
+        }
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        RWByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+    {
+        Store(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        RWStructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        __target_switch
+        {
+        case spirv:
+            spirv_asm
+            {
+                OpCapability CooperativeMatrixTensorAddressingNV;
+                OpExtension "SPV_NV_cooperative_matrix2";
+                %storagePointerType = OpTypePointer StorageBuffer $$T;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+                OpCooperativeMatrixStoreTensorNV %pointer $this $tensorLayout Aligned !alignment TensorView $tensorView;
+            };
+        }
+    }
+
 } // struct CoopMat
 
 
@@ -23098,7 +23661,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     uint element,
     uint stride)
 {
-    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
+    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
 }
 
 [ForceInline]
@@ -23115,7 +23678,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     uint element,
     uint stride)
 {
-    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
+    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
 }
 
 [ForceInline]

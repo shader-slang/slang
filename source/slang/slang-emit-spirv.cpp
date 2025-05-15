@@ -1854,6 +1854,100 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         static_cast<IRIntLit*>(coopMatType->getMatrixUse())->getValue(),
                         builder.getIntType()));
             }
+        case kIROp_TensorAddressingTensorLayoutType:
+            {
+                requireSPIRVCapability(SpvCapabilityTensorAddressingNV);
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_tensor_addressing"));
+
+                IRBuilder builder(m_irModule);
+                auto tensorLayoutType = static_cast<IRTensorAddressingTensorLayoutType*>(inst);
+                return emitOpTypeTensorLayout(
+                    tensorLayoutType,
+                    emitIntConstant(
+                        static_cast<IRIntLit*>(tensorLayoutType->getDimension())->getValue(),
+                        builder.getIntType()),
+                    emitIntConstant(
+                        static_cast<IRIntLit*>(tensorLayoutType->getClampMode())->getValue(),
+                        builder.getIntType()));
+            }
+        case kIROp_TensorAddressingTensorViewType:
+            {
+                requireSPIRVCapability(SpvCapabilityTensorAddressingNV);
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_tensor_addressing"));
+
+                IRBuilder builder(m_irModule);
+                auto tensorViewType = static_cast<IRTensorAddressingTensorViewType*>(inst);
+
+                IRIntegerValue dim =
+                    static_cast<IRIntLit*>(tensorViewType->getDimension())->getValue();
+                SpvInst* spvDim = emitIntConstant(dim, builder.getIntType());
+
+                SpvInst* spvHasDimension =
+                    ensureInst(static_cast<IRBoolLit*>(tensorViewType->getHasDimension()));
+
+                SpvInst* spvPermutations[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};
+                for (int i = 0; i < (int)dim; i++)
+                {
+                    spvPermutations[i] = emitIntConstant(
+                        static_cast<IRIntLit*>(tensorViewType->getPermutation(i))->getValue(),
+                        builder.getIntType());
+                }
+
+                if (dim == 1)
+                {
+                    return emitOpTypeTensorView(
+                        tensorViewType,
+                        spvDim,
+                        spvHasDimension,
+                        spvPermutations[0]);
+                }
+                else if (dim == 2)
+                {
+                    return emitOpTypeTensorView(
+                        tensorViewType,
+                        spvDim,
+                        spvHasDimension,
+                        spvPermutations[0],
+                        spvPermutations[1]);
+                }
+                else if (dim == 3)
+                {
+                    return emitOpTypeTensorView(
+                        tensorViewType,
+                        spvDim,
+                        spvHasDimension,
+                        spvPermutations[0],
+                        spvPermutations[1],
+                        spvPermutations[2]);
+                }
+                else if (dim == 4)
+                {
+                    return emitOpTypeTensorView(
+                        tensorViewType,
+                        spvDim,
+                        spvHasDimension,
+                        spvPermutations[0],
+                        spvPermutations[1],
+                        spvPermutations[2],
+                        spvPermutations[3]);
+                }
+                else if (dim == 5)
+                {
+                    return emitOpTypeTensorView(
+                        tensorViewType,
+                        spvDim,
+                        spvHasDimension,
+                        spvPermutations[0],
+                        spvPermutations[1],
+                        spvPermutations[2],
+                        spvPermutations[3],
+                        spvPermutations[4]);
+                }
+                else
+                {
+                    SLANG_UNEXPECTED("Unsupported tensor dimension");
+                }
+            }
         case kIROp_MatrixType:
             {
                 auto matrixType = static_cast<IRMatrixType*>(inst);
@@ -4069,6 +4163,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_MakeArray:
             result = emitConstruct(parent, inst);
+            break;
+        case kIROp_MakeTensorAddressingTensorLayout:
+            result = emitOpCreateTensorLayout(parent, inst, getID(ensureInst(inst->getDataType())));
+            break;
+        case kIROp_MakeTensorAddressingTensorView:
+            result = emitOpCreateTensorView(parent, inst, getID(ensureInst(inst->getDataType())));
             break;
         case kIROp_Select:
             result = emitInst(
