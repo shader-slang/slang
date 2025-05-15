@@ -1370,7 +1370,7 @@ DIAGNOSTIC(
     31221,
     Error,
     ExternAndExportVarDeclMustBeConst,
-    "extern and export variables (which are not __extern_cpp) must be const: '$0'")
+    "extern and export variables must be static const: '$0'")
 
 
 // Enums

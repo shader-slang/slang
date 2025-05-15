@@ -50,20 +50,17 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         // causing errors.
         bool hasConst = false;
         bool hasExportOrExtern = false;
-        bool isExternCPP = false;
+        bool hasStatic = false;
         for (auto m : decl->modifiers)
         {
             if (as<ExternModifier>(m) || as<HLSLExportModifier>(m))
                 hasExportOrExtern = true;
             else if (as<ConstModifier>(m))
                 hasConst = true;
-            else if (as<ExternCppModifier>(m))
-            {
-                isExternCPP = true;
-                break;
-            }
+            else if (as<HLSLStaticModifier>(m))
+                hasStatic = true;
         }
-        if (!isExternCPP && hasExportOrExtern && !hasConst)
+        if (hasExportOrExtern && (!hasConst || !hasStatic))
             getSink()->diagnose(
                 decl,
                 Diagnostics::ExternAndExportVarDeclMustBeConst,
