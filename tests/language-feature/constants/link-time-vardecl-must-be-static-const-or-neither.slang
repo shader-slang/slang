@@ -2,13 +2,13 @@
 //TEST:SIMPLE(filecheck=CHECK_PASS): -target spirv -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK_PASS): -target spirv -entry computeMain -stage compute -DUSE_EXTERN -DUSE_CONST -DUSE_STATIC
 //TEST:SIMPLE(filecheck=CHECK_PASS): -target spirv -entry computeMain -stage compute -DUSE_CONST -DUSE_STATIC
-//CHECK_PASS-NOT: error 31221
+//CHECK_PASS-NOT: error 31223
 
 //TEST:SIMPLE(filecheck=CHECK_FAIL): -target spirv -entry computeMain -stage compute -DUSE_EXTERN -DUSE_CONST
 //TEST:SIMPLE(filecheck=CHECK_FAIL): -target spirv -entry computeMain -stage compute -DUSE_CONST
 //TEST:SIMPLE(filecheck=CHECK_FAIL): -target spirv -entry computeMain -stage compute -DUSE_EXTERN -DUSE_STATIC
 //TEST:SIMPLE(filecheck=CHECK_FAIL): -target spirv -entry computeMain -stage compute -DUSE_STATIC
-//CHECK_FAIL: error 31221
+//CHECK_FAIL: error 31223
 
 
 #ifdef USE_CONST
