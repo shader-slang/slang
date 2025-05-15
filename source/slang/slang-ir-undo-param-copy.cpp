@@ -4,8 +4,6 @@
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
 
-#include <stdio.h> // For fprintf
-
 namespace Slang
 {
 // This pass transforms variables decorated with TempCallArgVarDecoration
