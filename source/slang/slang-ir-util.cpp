@@ -2261,16 +2261,54 @@ bool isSpecConstRateType(IRType* type)
     }
     return false;
 }
-void hoistInstAndOperandsToGlobal(IRBuilder* builder, IRInst* inst)
+
+IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* oldType)
 {
-    IRInst* moduleInst = builder->getModule()->getModuleInst();
-    UInt operandCount = inst->getOperandCount();
-    for (UInt ii = 0; ii < operandCount; ++ii)
+    if (as<IRRateQualifiedType>(oldType))
     {
-        auto operand = inst->getOperand(ii);
-        if (operand->parent != moduleInst)
-            hoistInstAndOperandsToGlobal(builder, operand);
+        return oldType;
     }
-    inst->insertAt(IRInsertLoc::atStart(moduleInst));
+
+    if (isSpecConstRateType(rateQulifiedType))
+    {
+        return builder->getRateQualifiedType(builder->getSpecConstRate(), oldType);
+    }
+    return oldType;
+}
+
+bool isArithmeticInst(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_Neg:
+    case kIROp_Not:
+    case kIROp_Eql:
+    case kIROp_Neq:
+    case kIROp_Leq:
+    case kIROp_Geq:
+    case kIROp_Less:
+    case kIROp_IRem:
+    case kIROp_FRem:
+    case kIROp_Greater:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_BitNot:
+    case kIROp_BitCast:
+    case kIROp_CastIntToFloat:
+    case kIROp_CastFloatToInt:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
+    case kIROp_Select:
+        return true;
+    default:
+        return false;
+    }
 }
 } // namespace Slang

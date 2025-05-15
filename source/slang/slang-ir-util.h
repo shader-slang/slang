@@ -391,6 +391,8 @@ bool isFirstBlock(IRInst* inst);
 
 bool isSpecConstRateType(IRType* type);
 void hoistInstAndOperandsToGlobal(IRBuilder* builder, IRInst* inst);
+IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* oldType);
+bool isArithmeticInst(IRInst* inst);
 } // namespace Slang
 
 #endif
