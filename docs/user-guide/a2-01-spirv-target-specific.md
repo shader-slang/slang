@@ -57,7 +57,7 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_GroupThreadID`            | `BuiltIn LocalInvocationId`       |
 | `SV_InnerCoverage`            | `BuiltIn FullyCoveredEXT`         |
 | `SV_InsideTessFactor`         | `BuiltIn TessLevelInner`          |
-| `SV_InstanceID`               | `BuiltIn InstanceIndex`           |
+| `SV_InstanceID`<sup>**</sup>  | `BuiltIn InstanceIndex`           |
 | `SV_IntersectionAttributes`   | *Not supported*                   |
 | `SV_IsFrontFace`              | `BuiltIn FrontFacing`             |
 | `SV_OutputControlPointID`     | `BuiltIn InvocationId`            |
@@ -78,7 +78,27 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_ViewportArrayIndex`       | `BuiltIn ViewportIndex`           |
 
 *Note* that `SV_DrawIndex`, `SV_PointSize` and `SV_PointCoord` are Slang-specific semantics that are not defined in HLSL.
+Also *Note* that `SV_InstanceID` counts all instances in a draw call, unlike how `InstanceIndex` is relative to `BaseInstance`. See [Using SV_InstanceID with SPIR-V target](#using-sv_instanceid-with-spir-v-target)
 
+Using SV_InstanceID with SPIR-V target
+--------------------------------------
+
+When using `SV_InstanceID` with SPIR-V target, it is equivalent to the difference between the `InstanceIndex` and `BaseInstance` builtins.
+This matches the behavior of D3D where `SV_InstanceID` starts from zero for each draw call, while in SPIR-V, `InstanceIndex` includes the base instance.
+
+If you need direct access to the `InstanceIndex` value, you can use parameters with `SV_InstanceID` and `SV_StartInstanceLocation` semantics:
+
+```slang
+void myVertexShader(
+    uint instanceID : SV_InstanceID,               // InstanceIndex - BaseInstance
+    uint baseInstance : SV_StartInstanceLocation)   // BaseInstance
+{
+    // If you need InstanceIndex, just add them:
+    uint instanceIndex = instanceID + baseInstance;
+
+    // Use instanceID, baseInstance, or instanceIndex as needed
+}
+```
 
 Behavior of `discard` after SPIR-V 1.6
 --------------------------------------
