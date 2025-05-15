@@ -168,7 +168,7 @@ class ConstantIntVal : public IntVal
 
 // The logical "value" of a reference to a generic value parameter
 FIDDLE()
-class GenericParamIntVal : public IntVal
+class DeclRefIntVal : public IntVal
 {
     FIDDLE(...)
     DeclRef<VarDeclBase> getDeclRef() { return as<DeclRefBase>(getOperand(1)); }
@@ -177,10 +177,7 @@ class GenericParamIntVal : public IntVal
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
-    GenericParamIntVal(Type* inType, DeclRef<VarDeclBase> inDeclRef)
-    {
-        setOperands(inType, inDeclRef);
-    }
+    DeclRefIntVal(Type* inType, DeclRef<VarDeclBase> inDeclRef) { setOperands(inType, inDeclRef); }
 
     bool _isLinkTimeValOverride();
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
@@ -319,9 +316,9 @@ public:
     // for sorting only.
     bool operator<(const PolynomialIntValFactor& other) const
     {
-        if (auto thisGenParam = as<GenericParamIntVal>(getParam()))
+        if (auto thisGenParam = as<DeclRefIntVal>(getParam()))
         {
-            if (auto thatGenParam = as<GenericParamIntVal>(other.getParam()))
+            if (auto thatGenParam = as<DeclRefIntVal>(other.getParam()))
             {
                 if (thisGenParam->equals(thatGenParam))
                     return getPower() < other.getPower();
@@ -336,7 +333,7 @@ public:
         }
         else
         {
-            if (const auto thatGenParam = as<GenericParamIntVal>(other.getParam()))
+            if (const auto thatGenParam = as<DeclRefIntVal>(other.getParam()))
             {
                 return false;
             }
@@ -347,9 +344,9 @@ public:
     // for sorting only.
     bool operator==(const PolynomialIntValFactor& other) const
     {
-        if (auto thisGenParam = as<GenericParamIntVal>(getParam()))
+        if (auto thisGenParam = as<DeclRefIntVal>(getParam()))
         {
-            if (auto thatGenParam = as<GenericParamIntVal>(other.getParam()))
+            if (auto thatGenParam = as<DeclRefIntVal>(other.getParam()))
             {
                 if (thisGenParam->equals(thatGenParam) && getPower() == other.getPower())
                     return true;

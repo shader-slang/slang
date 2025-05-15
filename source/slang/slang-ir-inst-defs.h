@@ -95,6 +95,7 @@ INST(Nop, nop, 0, 0)
 
     /* Rate */
         INST(ConstExprRate, ConstExpr, 0, HOISTABLE)
+        INST(SpecConstRate, SpecConst, 0, HOISTABLE)
         INST(GroupSharedRate, GroupShared, 0, HOISTABLE)
         INST(ActualGlobalRate, ActualGlobalRate, 0, HOISTABLE)
     INST_RANGE(Rate, ConstExprRate, GroupSharedRate)

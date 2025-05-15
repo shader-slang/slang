@@ -49,6 +49,8 @@ bool traceRayFirstHit(
         primitiveIndex = q.CommittedPrimitiveIndex();
         return true;
     }
+    primitiveIndex = q.CandidatePrimitiveIndex();
+    unused(t);
     return false;
 }
 
@@ -80,6 +82,8 @@ bool traceRayNearestHit(
         primitiveIndex = q.CommittedPrimitiveIndex();
         return true;
     }
+    primitiveIndex = q.CandidatePrimitiveIndex();
+    unused(t);
     return false;
 }
 
@@ -103,7 +107,7 @@ void computeMain(
 
     float4 resultColor = 0;
 
-    int primitiveIndex;
+    int primitiveIndex = 0;
     float intersectionT;
     if (traceRayNearestHit(sceneBVH, uniforms.cameraPosition.xyz, rayDir, intersectionT, primitiveIndex))
     {
@@ -140,5 +144,5 @@ float4 fragmentMain(
     uniform RWTexture2D t)
     : SV_Target
 {
-    return t.Load(sv_position.xy);
+    return t.Load(uint2(sv_position.xy));
 }

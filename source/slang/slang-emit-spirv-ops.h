@@ -151,6 +151,7 @@ SpvInst* emitOpTypeCoopVec(IRInst* inst, const T1& componentType, const T2& comp
         componentCount);
 }
 
+// https://github.khronos.org/SPIRV-Registry/extensions/NV/SPV_NV_cooperative_matrix.html#OpTypeCooperativeMatrixNV
 template<typename T1, typename T2>
 SpvInst* emitOpTypeCoopMat(
     IRInst* inst,

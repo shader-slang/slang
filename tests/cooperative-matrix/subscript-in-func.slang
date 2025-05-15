@@ -12,7 +12,9 @@ StructuredBuffer<float> inputBuffer;
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-typealias CoopMatType = CoopMat<float, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
+using namespace linalg;
+
+typealias CoopMatType = CoopMat<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
 
 static const int stride = 16;
 static const CoopMatMatrixLayout matrixLayout = CoopMatMatrixLayout::RowMajor;
@@ -23,12 +25,12 @@ void squareCoopMatElements(CoopMatType mat)
     {
         mat[i] = mat[i] * mat[i];
     }
-    mat.store(outputBuffer, 0, stride, matrixLayout);
+    mat.Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 0, stride);
 }
 
 [numthreads(32, 1, 1)]
 void computeMain()
 {
-    let mat = CoopMatType.load(inputBuffer, 0, stride, matrixLayout);
+    let mat = CoopMatType.Load<CoopMatMatrixLayout::RowMajor>(inputBuffer, 0, stride);
     squareCoopMatElements(mat);
 }
