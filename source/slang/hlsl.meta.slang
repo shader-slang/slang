@@ -226,13 +226,13 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint2 Load2(uint location, uint alignment)
+    uint2 Load2(uint location, int alignment)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, alignment);
+            return __byteAddressBufferLoad<uint2>(this, location, uint(alignment));
         }
     }
 
@@ -295,13 +295,13 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint3 Load3(uint location, uint alignment)
+    uint3 Load3(uint location, int alignment)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, alignment);
+            return __byteAddressBufferLoad<uint3>(this, location, uint(alignment));
         }
     }
 
@@ -362,13 +362,13 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint4 Load4(uint location, uint alignment)
+    uint4 Load4(uint location, int alignment)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, alignment);
+            return __byteAddressBufferLoad<uint4>(this, location, uint(alignment));
         }
     }
 
@@ -402,16 +402,16 @@ struct ByteAddressBuffer
 
     [__readNone]
     [ForceInline]
-    T Load<T>(int location)
+    T Load<T>(uint location)
     {
-        return __byteAddressBufferLoad<T>(this, uint(location), 0);
+        return __byteAddressBufferLoad<T>(this, location, 0);
     }
 
     [__readNone]
     [ForceInline]
-    T Load<T>(int location, uint alignment)
+    T Load<T>(uint location, uint alignment)
     {
-        return __byteAddressBufferLoad<T>(this, uint(location), alignment);
+        return __byteAddressBufferLoad<T>(this, location, alignment);
     }
 
     /// Load an element with type `T` from the buffer at the specified location with alignment of `T`.
@@ -5105,7 +5105,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load2";
         default:
-            return __byteAddressBufferLoad<uint2>(this, location, alignment);
+            return __byteAddressBufferLoad<uint2>(this, location, uint(alignment));
         }
     }
 
@@ -5167,13 +5167,13 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint3 Load3(uint location, uint alignment)
+    uint3 Load3(uint location, int alignment)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load3";
         default:
-            return __byteAddressBufferLoad<uint3>(this, location, alignment);
+            return __byteAddressBufferLoad<uint3>(this, location, uint(alignment));
         }
     }
 
@@ -5234,13 +5234,13 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint4 Load4(uint location, uint alignment)
+    uint4 Load4(uint location, int alignment)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Load4";
         default:
-            return __byteAddressBufferLoad<uint4>(this, location, alignment);
+            return __byteAddressBufferLoad<uint4>(this, location, uint(alignment));
         }
     }
 
@@ -5275,17 +5275,17 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    T Load<T>(int location)
+    T Load<T>(uint location)
     {
-        return __byteAddressBufferLoad<T>(this, uint(location), 0);
+        return __byteAddressBufferLoad<T>(this, location, 0);
     }
 
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    T Load<T>(int location, uint alignment)
+    T Load<T>(uint location, uint alignment)
     {
-        return __byteAddressBufferLoad<T>(this, uint(location), alignment);
+        return __byteAddressBufferLoad<T>(this, location, alignment);
     }
 
     /// Load an element with type `T` from the buffer at the specified location with alignment of `T`.
