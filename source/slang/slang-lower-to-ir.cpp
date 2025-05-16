@@ -562,8 +562,6 @@ struct CatchHandler
     // Block of the handler statement. Takes a value of errorType as parameter.
     IRBlock* errorHandler = nullptr;
 
-    IRBlock* mergeBlock = nullptr;
-
     CatchHandler* prev = nullptr;
 };
 
@@ -611,7 +609,7 @@ struct IRGenContext
     // The current scope end for use with `defer`.
     IRBlock* scopeEndBlock = nullptr;
 
-    // A chain of `catch` handlers for `try` and `throw.
+    // A chain of nested `catch` handlers for `try` and `throw.
     CatchHandler* catchHandler = nullptr;
 
     // Callback function to call when after lowering a type.
@@ -771,11 +769,9 @@ int32_t getIntrinsicOp(Decl* decl, IntrinsicOpModifier* intrinsicOpMod)
 
 static CatchHandler findErrorHandler(IRGenContext* context, IRType* type)
 {
-    for(
-        auto handler = context->catchHandler;
-        handler != nullptr;
-        handler = context->catchHandler->prev
-    ){
+    for (auto handler = context->catchHandler; handler != nullptr;
+         handler = context->catchHandler->prev)
+    {
         if (handler->errorType == type)
         {
             return *handler;
@@ -849,7 +845,6 @@ LoweredValInfo emitCallToVal(
 
                 auto voidType = builder->getVoidType();
                 builder->emitTryCallInst(voidType, succBlock, failBlock, callee, argCount, args);
-
                 builder->insertBlock(succBlock);
                 auto value = builder->emitParam(type);
 
@@ -3478,6 +3473,7 @@ void _lowerFuncDeclBaseTypeInfo(
         SubtypeWitness* errorTypeWitness = declRef.getDecl()->errorTypeWitness;
         auto irErrorTypeWitness = lowerSimpleVal(context, errorTypeWitness);
         builder->addKeepAliveDecoration(irErrorTypeWitness);
+
         IRInst* operands[] = {irErrorType, irErrorTypeWitness};
         IRAttr* throwTypeAttr = builder->getAttr(kIROp_FuncThrowTypeAttr, 2, operands);
         outInfo.type = builder->getFuncType(
@@ -6716,8 +6712,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         if (handler.errorType)
         {
-            auto val = getSimpleVal(context, loweredExpr);
-            builder->emitBranch(handler.errorHandler, 1, &val);
+            builder->emitBranch(handler.errorHandler, 1, &loweredVal);
         }
         else
         {
@@ -6733,6 +6728,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // The mental model here is that the below Catch statement:
         //
         // let val = try MayThrowFunc();
+        // // Do stuff with val
         // catch(err: Error)
         // {
         //     catchBlock(err);
@@ -6777,7 +6773,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         CatchHandler catchHandler;
         catchHandler.errorType = lowerType(context, stmt->errorVar->getType());
         catchHandler.errorHandler = bodyBreakLabel;
-        catchHandler.mergeBlock = handlerBreakLabel;
         catchHandler.prev = context->catchHandler;
         context->catchHandler = &catchHandler;
 
@@ -8672,7 +8667,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             subContextStorage.returnDestination = LoweredValInfo();
             subContextStorage.lowerTypeCallback = nullptr;
-
             subContextStorage.catchHandler = nullptr;
         }
 

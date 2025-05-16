@@ -3953,6 +3953,12 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
 
     auto parentFunc = this->m_parentFunc;
     auto base = as<InvokeExpr>(expr->base);
+    if (!base)
+    {
+        getSink()->diagnose(expr, Diagnostics::tryClauseMustApplyToInvokeExpr);
+        return expr;
+    }
+
     auto callee = as<DeclRefExpr>(base->functionExpr);
     if (!callee)
     {
@@ -3970,12 +3976,6 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
             return expr;
         }
         catchStmt = findMatchingCatchStmt(funcCallee->errorType);
-    }
-
-    if (!as<InvokeExpr>(expr->base))
-    {
-        getSink()->diagnose(expr, Diagnostics::tryClauseMustApplyToInvokeExpr);
-        return expr;
     }
 
     if (FindOuterStmt<DeferStmt>(catchStmt))

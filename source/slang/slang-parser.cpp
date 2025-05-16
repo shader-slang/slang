@@ -6030,8 +6030,7 @@ Stmt* Parser::parseBlockStatement()
 
         TryRecover(this);
     }
-    if (!catchSegment)
-        PopScope();
+    PopScope();
 
     // Save the closing braces source loc
     blockStatement->closingSourceLoc = closingBraceToken.loc;

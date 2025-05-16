@@ -45,8 +45,7 @@ CatchStmt* SemanticsVisitor::findMatchingCatchStmt(Type* errorType)
 {
     for (auto outerStmtInfo = m_outerStmts; outerStmtInfo; outerStmtInfo = outerStmtInfo->next)
     {
-        auto outerStmt = outerStmtInfo->stmt;
-        if (auto catchStmt = as<CatchStmt>(outerStmt))
+        if (auto catchStmt = as<CatchStmt>(outerStmtInfo->stmt))
         {
             if (catchStmt->errorVar->getType()->equals(errorType))
                 return catchStmt;
@@ -642,7 +641,7 @@ void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
 
     if (FindOuterStmt<DeferStmt>(catchStmt))
     {
-        // Allowing 'throw' escape a defer statement gets quite complex, for
+        // Allowing 'throw' to escape a defer statement gets quite complex, for
         // similar reasons as 'return' - if you have two (or more) defers,
         // both of which exit the outer scope, it's unclear which one gets
         // called and when. Both can't fully run. That kind of goes against the

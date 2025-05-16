@@ -1031,8 +1031,7 @@ public:
     template<typename T>
     T* FindOuterStmt(Stmt* searchUntil = nullptr)
     {
-        for (auto outerStmtInfo = m_outerStmts;
-             outerStmtInfo && outerStmtInfo->stmt != searchUntil;
+        for (auto outerStmtInfo = m_outerStmts; outerStmtInfo && outerStmtInfo->stmt != searchUntil;
              outerStmtInfo = outerStmtInfo->next)
         {
             auto outerStmt = outerStmtInfo->stmt;

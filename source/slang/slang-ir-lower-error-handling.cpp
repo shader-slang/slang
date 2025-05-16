@@ -2,8 +2,6 @@
 
 #include "slang-ir-lower-error-handling.h"
 
-#include "slang-ir-clone.h"
-#include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
 
@@ -92,13 +90,10 @@ struct ErrorHandlingLoweringContext
         auto errorType = throwAttr->getErrorType();
 
         IRBuilder builder(module);
-
-        auto successBlock = tryCall->getSuccessBlock();
-        auto failBlock = tryCall->getFailureBlock();
-
         builder.setInsertBefore(tryCall);
 
-        auto resultType = builder.getResultType(resultValueType, errorType, throwAttr->getErrorTypeWitness());
+        auto resultType =
+            builder.getResultType(resultValueType, errorType, throwAttr->getErrorTypeWitness());
         List<IRInst*> args;
         for (UInt i = 0; i < tryCall->getArgCount(); i++)
         {
@@ -107,21 +102,23 @@ struct ErrorHandlingLoweringContext
         auto call = builder.emitCallInst(resultType, tryCall->getCallee(), args);
         tryCall->transferDecorationsTo(call);
 
-        auto isError = builder.emitIsResultError(call);
+        auto isFail = builder.emitIsResultError(call);
+        auto failBlock = tryCall->getFailureBlock();
+        auto successBlock = tryCall->getSuccessBlock();
 
-        // IfElse could otherwise just jump to the handler, but there's
-        // unfortunately the error parameter that needs to be passed as well,
-        // and it can't be done in IfElse. So there's an extra block in between
-        // to do that.
+        // The isFail branch could otherwise just jump to the handler, but
+        // there's unfortunately the error parameter that needs to be passed as
+        // well, and it can't be done in IfElse. So there's an extra block in
+        // between to do that.
         auto handlerJumpBlock = builder.createBlock();
-        auto branch = builder.emitIfElse(isError, handlerJumpBlock, successBlock, successBlock);
+        auto branch = builder.emitIf(isFail, handlerJumpBlock, successBlock);
 
         builder.setInsertAfter(branch->getParent());
         builder.addInst(handlerJumpBlock);
         builder.setInsertInto(handlerJumpBlock);
 
-        auto errorValue = builder.emitGetResultError(call);
-        builder.emitBranch(failBlock, 1, &errorValue);
+        auto errVal = builder.emitGetResultError(call);
+        builder.emitBranch(failBlock, 1, &errVal);
 
         // Replace the params in successBlock to `getResultValue(call)`.
         builder.setInsertBefore(successBlock->getFirstOrdinaryInst());
@@ -147,8 +144,10 @@ struct ErrorHandlingLoweringContext
         // replace it with a `return makeResultValue(val)`, so that it returns a `Result<T,E>` type.
         IRBuilder builder(module);
         builder.setInsertBefore(ret);
-        auto resultType =
-            builder.getResultType(funcType->getResultType(), throwAttr->getErrorType(), throwAttr->getErrorTypeWitness());
+        auto resultType = builder.getResultType(
+            funcType->getResultType(),
+            throwAttr->getErrorType(),
+            throwAttr->getErrorTypeWitness());
         IRInst* resultVal = nullptr;
         auto val = cast<IRReturn>(ret)->getVal();
         resultVal = builder.emitMakeResultValue(resultType, val);
@@ -168,8 +167,10 @@ struct ErrorHandlingLoweringContext
         // replace it with a `return makeResultError(e)`.
         IRBuilder builder(module);
         builder.setInsertBefore(throwInst);
-        auto resultType =
-            builder.getResultType(funcType->getResultType(), throwAttr->getErrorType(), throwAttr->getErrorTypeWitness());
+        auto resultType = builder.getResultType(
+            funcType->getResultType(),
+            throwAttr->getErrorType(),
+            throwAttr->getErrorTypeWitness());
         IRInst* resultVal = builder.emitMakeResultError(resultType, throwInst->getValue());
         builder.emitReturn(resultVal);
         throwInst->removeAndDeallocate();

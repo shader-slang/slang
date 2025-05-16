@@ -933,7 +933,6 @@ DIAGNOSTIC(
     continueInsideDefer,
     "'continue' must not appear inside a defer statement.")
 DIAGNOSTIC(30110, Error, returnInsideDefer, "'return' must not appear inside a defer statement.")
-
 DIAGNOSTIC(
     30111,
     Error,
@@ -947,13 +946,22 @@ DIAGNOSTIC(
     nonCopyableTypeCapturedInLambda,
     "cannot capture non-copyable type '$0' in a lambda expression.")
 
-DIAGNOSTIC(30113, Error, uncaughtThrowInsideDefer, "'throw' expressions require a matching 'catch' inside a defer statement.")
-DIAGNOSTIC(30114, Error, uncaughtTryInsideDefer, "'try' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(
+    30113,
+    Error,
+    uncaughtThrowInsideDefer,
+    "'throw' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(
+    30114,
+    Error,
+    uncaughtTryInsideDefer,
+    "'try' expressions require a matching 'catch' inside a defer statement.")
 DIAGNOSTIC(
     30115,
     Error,
     uncaughtThrowInNonThrowFunc,
-    "the current function or environment is not declared to throw any errors, but contains an uncaught 'throw' statement.")
+    "the current function or environment is not declared to throw any errors, but contains an "
+    "uncaught 'throw' statement.")
 DIAGNOSTIC(
     30116,
     Error,

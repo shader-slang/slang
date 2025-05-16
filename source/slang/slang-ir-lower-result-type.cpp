@@ -3,7 +3,6 @@
 #include "slang-ir-lower-result-type.h"
 
 #include "slang-ir-insts.h"
-#include "slang-ir-util.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -63,7 +62,8 @@ struct ResultTypeLoweringContext
         auto witnessTable = as<IRWitnessTable>(resultType->getErrorTypeWitness());
         SLANG_ASSERT(witnessTable != nullptr);
 
-        auto successValueCreateEntry = as<IRWitnessTableEntry>(witnessTable->getEntries().getFirst());
+        auto successValueCreateEntry =
+            as<IRWitnessTableEntry>(witnessTable->getEntries().getFirst());
         SLANG_ASSERT(successValueCreateEntry != nullptr);
 
         info->successValueCreateFunc = successValueCreateEntry->getSatisfyingVal();
@@ -124,7 +124,8 @@ struct ResultTypeLoweringContext
 
         auto info = getLoweredResultType(builder, inst->getDataType());
 
-        auto successValue = builder->emitCallInst(info->errorType, info->successValueCreateFunc, 0, nullptr);
+        auto successValue =
+            builder->emitCallInst(info->errorType, info->successValueCreateFunc, 0, nullptr);
 
         if (info->loweredType->getOp() == kIROp_StructType)
         {
@@ -223,7 +224,11 @@ struct ResultTypeLoweringContext
 
         auto resultValue = inst->getResultOperand();
         auto errValue = getResultError(builder, resultValue);
-        auto isSuccess = builder->emitCallInst(builder->getBoolType(), loweredResultTypeInfo->successValueTestFunc, 1, &errValue);
+        auto isSuccess = builder->emitCallInst(
+            builder->getBoolType(),
+            loweredResultTypeInfo->successValueTestFunc,
+            1,
+            &errValue);
         auto isFailure = builder->emitNot(builder->getBoolType(), isSuccess);
 
         inst->replaceUsesWith(isFailure);

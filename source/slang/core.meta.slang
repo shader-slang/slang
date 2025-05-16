@@ -838,19 +838,16 @@ interface __EnumType : ILogical
 
 //@public:
 
-/// Error types must derive from this.
+/// To make a type throwable, it must derive from this interface.
+/// @remarks Error types must have a value that encodes the absence of an error.
+/// This way, a Result<T, E> type can detect the presence of an error without
+/// having to allocate memory / registers for an extra boolean flag. For
+/// compatibility with COM interface conventions, you should prefer to encode
+/// the success value with 0.
 [builtin]
 __magic_type(ErrorResultType)
 interface IError
 {
-    /// Error types must have a value that encodes the absence of an error. This
-    /// way, a Result<T, E> type can detect the presence of an error without
-    /// having to allocate memory / registers for an extra boolean flag.
-    ///
-    /// For compatibility with COM interface conventions, you should prefer to
-    /// encode the success value with 0.
-    ///
-
     // Note: The compiler implementation expects these two functions to be the
     // first two and in this order.
     static This createSuccessValue();
