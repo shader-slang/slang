@@ -1394,13 +1394,18 @@ DIAGNOSTIC(
     Error,
     variableCannotBePushAndSpecializationConstant,
     "'$0' cannot be a push constant and a specialization constant at the same time")
-
 DIAGNOSTIC(31221, Error, invalidHLSLRegisterName, "invalid HLSL register name '$0'.")
 DIAGNOSTIC(
     31222,
     Error,
     invalidHLSLRegisterNameForType,
     "invalid HLSL register name '$0' for type '$1'.")
+DIAGNOSTIC(
+    31223,
+    Error,
+    ExternAndExportVarDeclMustBeConst,
+    "extern and export variables must be static const: '$0'")
+
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType, "invalid tag type for 'enum': '$0'")
