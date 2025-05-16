@@ -345,6 +345,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
     case SLANG_SOURCE_LANGUAGE_UNKNOWN:
         return Payload::Unknown;
     case SLANG_SOURCE_LANGUAGE_SLANG:
+    case SLANG_SOURCE_LANGUAGE_SLANG_2026:
         return Payload::Slang;
     case SLANG_SOURCE_LANGUAGE_HLSL:
         return Payload::HLSL;

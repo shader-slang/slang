@@ -28,6 +28,7 @@ struct DownstreamCompilerInfo
             CPP = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_CPP,
             CUDA = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_CUDA,
             SPIRV = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_SPIRV,
+            Slang_2026 = SourceLanguageFlags(1) << SLANG_SOURCE_LANGUAGE_SLANG_2026,
         };
     };
 

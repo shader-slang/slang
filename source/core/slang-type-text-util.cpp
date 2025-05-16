@@ -94,6 +94,7 @@ static const NamesDescriptionValue s_languageInfos[] = {
     {SLANG_SOURCE_LANGUAGE_C, "c,C", "C language"},
     {SLANG_SOURCE_LANGUAGE_CPP, "cpp,c++,C++,cxx", "C++ language"},
     {SLANG_SOURCE_LANGUAGE_SLANG, "slang", "Slang language"},
+    {SLANG_SOURCE_LANGUAGE_SLANG_2026, "2026", "2026 Slang language"},
     {SLANG_SOURCE_LANGUAGE_GLSL, "glsl", "GLSL language"},
     {SLANG_SOURCE_LANGUAGE_HLSL, "hlsl", "HLSL language"},
     {SLANG_SOURCE_LANGUAGE_CUDA, "cu,cuda", "CUDA"},
