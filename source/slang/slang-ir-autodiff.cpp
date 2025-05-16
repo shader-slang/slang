@@ -965,7 +965,9 @@ IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRTyp
         if (as<IRThisType>(primalType) || as<IRAssociatedType>(primalType))
         {
             List<IRInterfaceType*> constraintTypes;
-            constraintTypes.add(this->commonDiffPairInterface);
+            auto diffPairInterfaceType =
+                cast<IRInterfaceType>(getOrCreateCommonDiffPairInterface(builder));
+            constraintTypes.add(diffPairInterfaceType);
             return builder->getAssociatedType(constraintTypes.getArrayView());
         }
 
@@ -3249,6 +3251,9 @@ struct AutoDiffPass : public InstPassBase
                     }
                 }
 
+                // Destroy the old witness table
+                innerResult.diffWitness->replaceUsesWith(newWitnessTable);
+                innerResult.diffWitness->removeAndDeallocate();
                 result.diffWitness =
                     hoistValueFromGeneric(builder, newWitnessTable, specInst, true);
             }

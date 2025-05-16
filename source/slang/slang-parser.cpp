@@ -7654,6 +7654,21 @@ static Expr* parseAtomicExpr(Parser* parser)
 
             return constExpr;
         }
+
+    case TokenType::CharLiteral:
+        {
+            IntegerLiteralExpr* constExpr = parser->astBuilder->create<IntegerLiteralExpr>();
+            parser->FillPosition(constExpr);
+
+            auto token = parser->tokenReader.advanceToken();
+            constExpr->token = token;
+
+            IntegerLiteralValue value = getCharLiteralValue(token);
+            constExpr->value = value;
+            constExpr->suffixType = BaseType::UInt;
+            return constExpr;
+        }
+
     case TokenType::CompletionRequest:
         {
             VarExpr* varExpr = parser->astBuilder->create<VarExpr>();

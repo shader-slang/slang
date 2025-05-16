@@ -3497,6 +3497,18 @@ enum MemoryOrder
     SeqCst = $(kIRMemoryOrder_SeqCst),
 }
 
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#_scope_id
+enum MemoryScope
+{
+    CrossDevice = 0,
+    Device = 1,
+    Workgroup = 2,
+    Subgroup = 3,
+    Invocation = 4,
+    QueueFamily = 5,
+    ShaderCallKHR = 6,
+};
+
 /// Represents types that can be used in any atomic operations.
 /// Implemented by builtin scalar types: `int`, `uint`, `int64_t`, `uint64_t`, `int8_t`, `uint8_t`, `int16_t`, `uint16_t`, `float`, `double` and `half`.
 [sealed] interface IAtomicable {}

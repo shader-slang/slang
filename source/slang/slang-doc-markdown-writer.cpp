@@ -782,7 +782,7 @@ void DocMarkdownWriter::writeExtensionConditions(
             {
                 genericParamDecl = extTypeParamDecl.getDecl();
             }
-            else if (auto extValueParamVal = as<GenericParamIntVal>(arg))
+            else if (auto extValueParamVal = as<DeclRefIntVal>(arg))
             {
                 genericParamDecl = extValueParamVal->getDeclRef().getDecl();
             }
@@ -1989,7 +1989,7 @@ void DocMarkdownWriter::writeAggType(
         _getDeclsOfType<PropertyDecl>(this, page, properties);
         if (properties.getCount())
         {
-            out << toSlice("## m_currentPage->path\n\n");
+            out << toSlice("## Properties\n\n");
             _appendAsBullets(_getAsNameAndTextList(properties), true, 0);
             out << toSlice("\n");
         }
@@ -2036,7 +2036,7 @@ void DocMarkdownWriter::writeAggType(
                 ASTPrinter printer(m_astBuilder);
                 printer.addDeclPath(aggTypeDecl->getDefaultDeclRef());
                 out << "`" << printer.getString() << "` additionally conforms to `";
-                out << escapeMarkdownText(inheritanceDecl->base.type->toString());
+                out << inheritanceDecl->base.type->toString();
                 if (nonEmptyLines.getCount() != 0)
                 {
                     out << "` when the following conditions are met:\n\n";
@@ -2166,6 +2166,7 @@ String DocMarkdownWriter::translateToMarkdownWithLinks(String text, bool strictC
                 sb.append(Path::getPathWithoutExt(Path::getRelativePath(
                     Path::getParentDirectory(m_currentPage->path),
                     page->path)));
+                sb.append(".html");
                 if (sectionName.getLength())
                     sb << "#" << sectionName;
                 sb.append(")");

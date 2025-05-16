@@ -320,7 +320,8 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
         ASTPrinter printer(
             astBuilder,
             ASTPrinter::OptionFlag::ParamNames | ASTPrinter::OptionFlag::NoInternalKeywords |
-                ASTPrinter::OptionFlag::SimplifiedBuiltinType);
+                ASTPrinter::OptionFlag::SimplifiedBuiltinType |
+                ASTPrinter::OptionFlag::DefaultParamValues);
         printer.getStringBuilder() << getDeclKindString(declRef);
         printer.addDeclSignature(declRef);
         auto printInitExpr = [&](Module* module, Type* declType, Expr* initExpr)

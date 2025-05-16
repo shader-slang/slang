@@ -6,6 +6,7 @@ namespace Slang
 struct CodeGenContext;
 class CompileRequestBase;
 class DiagnosticSink;
+class TargetRequest;
 struct IRModule;
 struct IRInst;
 
@@ -48,5 +49,10 @@ void enableIRValidationAtInsert();
 // If 'skipFuncParamValidation' is true, then the validation allows destinations that
 // lead back to in/inout parameters that we can't validate.
 void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst);
+
+void validateVectorsAndMatrices(
+    IRModule* module,
+    DiagnosticSink* sink,
+    TargetRequest* targetRequest);
 
 } // namespace Slang

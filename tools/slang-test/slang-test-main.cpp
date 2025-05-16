@@ -58,7 +58,7 @@ extern "C"
 
 extern "C"
 {
-    __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\";
+    __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\";
 }
 #endif
 
@@ -1581,6 +1581,12 @@ static SlangResult _initSlangCompiler(TestContext* context, CommandLine& ioCmdLi
     if (context->options.verbosePaths)
     {
         ioCmdLine.addArgIfNotFound("-verbose-paths");
+    }
+
+    for (auto& capability : context->options.capabilities)
+    {
+        ioCmdLine.addArg("-capability");
+        ioCmdLine.addArg(capability.getBuffer());
     }
 
     // Look for definition of a slot
@@ -3382,6 +3388,12 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
     {
         ioCmdLine.addArg("-emit-spirv-via-glsl");
     }
+
+    for (auto capability : options.capabilities)
+    {
+        ioCmdLine.addArg("-capability");
+        ioCmdLine.addArg(capability);
+    }
 }
 
 static SlangResult _extractProfileTime(const UnownedStringSlice& text, double& timeOut)
@@ -4452,7 +4464,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
                     fileTestInfo->outputStem = outputStem;
                     fileTestInfo->options = testDetails.options;
 
-                    std::lock_guard lock(context->mutexFailedFileTests);
+                    std::lock_guard lock(context->mutexFailedTests);
                     context->failedFileTests.add(fileTestInfo);
                 }
                 else
@@ -4747,17 +4759,28 @@ static SlangResult runUnitTestModule(
                     TestServerProtocol::ExecuteUnitTestArgs::g_methodName,
                     &args,
                     exeRes);
-                const auto testResult = _asTestResult(ToolReturnCode(exeRes.resultCode));
+                auto testResult = _asTestResult(ToolReturnCode(exeRes.resultCode));
+
+                bool isFailed = (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail);
 
                 // If the test fails, output any output - which might give information about
                 // individual tests that have failed.
-                if (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail)
+                if (isFailed)
                 {
                     String output = getOutput(exeRes);
                     reporter->message(TestMessageType::TestFailure, output.getBuffer());
                 }
 
-                reporter->addResult(testResult);
+                if (isFailed && !context->isRetry &&
+                    !context->getTestReporter()->m_expectedFailureList.contains(test.testName))
+                {
+                    std::lock_guard lock(context->mutexFailedTests);
+                    context->failedUnitTests.add(test.command);
+                }
+                else
+                {
+                    reporter->addResult(testResult);
+                }
             }
         }
         else
@@ -5031,20 +5054,36 @@ SlangResult innerMain(int argc, char** argv)
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);
 
-            const auto spawnType = context.getFinalSpawnType();
-
-            // Run the unit tests
+            for (bool isRetry : {false, true})
             {
-                TestOptions testOptions;
-                testOptions.categories.add(unitTestCategory);
-                testOptions.categories.add(smokeTestCategory);
-                runUnitTestModule(&context, testOptions, spawnType, "slang-unit-test-tool");
-            }
+                auto spawnType = context.getFinalSpawnType();
 
-            {
-                TestOptions testOptions;
-                testOptions.categories.add(unitTestCategory);
-                runUnitTestModule(&context, testOptions, spawnType, "gfx-unit-test-tool");
+                context.isRetry = false;
+                if (isRetry)
+                {
+                    if (context.failedUnitTests.getCount() == 0)
+                        break;
+
+                    printf("Retrying unit tests...\n");
+                    context.isRetry = true;
+                    context.options.testPrefixes = context.failedUnitTests;
+                    context.failedUnitTests.clear();
+                    spawnType = SpawnType::Default;
+                }
+
+                // Run the unit tests
+                {
+                    TestOptions testOptions;
+                    testOptions.categories.add(unitTestCategory);
+                    testOptions.categories.add(smokeTestCategory);
+                    runUnitTestModule(&context, testOptions, spawnType, "slang-unit-test-tool");
+                }
+
+                {
+                    TestOptions testOptions;
+                    testOptions.categories.add(unitTestCategory);
+                    runUnitTestModule(&context, testOptions, spawnType, "gfx-unit-test-tool");
+                }
             }
 
             TestReporter::set(nullptr);
