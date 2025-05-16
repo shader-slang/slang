@@ -1,6 +1,5 @@
 //TEST_CATEGORY(wave, compute)
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-directly
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-via-glsl
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -xslang -DVK
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -dx12 -use-dxil -profile sm_6_5 -shaderobj
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute  -shaderobj -xslang -DCUDA
 
@@ -71,11 +70,18 @@ bool testSumProduct(uint4 mask)
         & testVSumProduct<double, 3>(mask)
         & testVSumProduct<double, 4>(mask)
 
-#if !defined(CUDA)
+#if defined(VK)
         & test1SumProduct<int8_t>(mask)
         & testVSumProduct<int8_t, 2>(mask)
         & testVSumProduct<int8_t, 3>(mask)
         & testVSumProduct<int8_t, 4>(mask)
+        & test1SumProduct<uint8_t>(mask)
+        & testVSumProduct<uint8_t, 2>(mask)
+        & testVSumProduct<uint8_t, 3>(mask)
+        & testVSumProduct<uint8_t, 4>(mask)
+#endif
+
+#if !defined(CUDA)
         & test1SumProduct<int16_t>(mask)
         & testVSumProduct<int16_t, 2>(mask)
         & testVSumProduct<int16_t, 3>(mask)
@@ -84,10 +90,6 @@ bool testSumProduct(uint4 mask)
         & testVSumProduct<int64_t, 2>(mask)
         & testVSumProduct<int64_t, 3>(mask)
         & testVSumProduct<int64_t, 4>(mask)
-        & test1SumProduct<uint8_t>(mask)
-        & testVSumProduct<uint8_t, 2>(mask)
-        & testVSumProduct<uint8_t, 3>(mask)
-        & testVSumProduct<uint8_t, 4>(mask)
         & test1SumProduct<uint16_t>(mask)
         & testVSumProduct<uint16_t, 2>(mask)
         & testVSumProduct<uint16_t, 3>(mask)

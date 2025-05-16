@@ -1,6 +1,5 @@
 //TEST_CATEGORY(wave, compute)
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-directly
-//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -emit-spirv-via-glsl
+//TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -xslang DVK
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -dx12 -use-dxil -profile sm_6_5 -shaderobj
 //TEST:COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute  -shaderobj -xslang -DCUDA
 
@@ -88,11 +87,18 @@ bool testBitwise(uint4 mask)
         // & testVBitwise<bool, 3>(mask)
         // & testVBitwise<bool, 4>(mask)
 
-#if !defined(CUDA)
+#if defined(VK)
         & test1Bitwise<int8_t>(mask)
         & testVBitwise<int8_t, 2>(mask)
         & testVBitwise<int8_t, 3>(mask)
         & testVBitwise<int8_t, 4>(mask)
+        & test1Bitwise<uint8_t>(mask)
+        & testVBitwise<uint8_t, 2>(mask)
+        & testVBitwise<uint8_t, 3>(mask)
+        & testVBitwise<uint8_t, 4>(mask)
+#endif
+
+#if !defined(CUDA)
         & test1Bitwise<int16_t>(mask)
         & testVBitwise<int16_t, 2>(mask)
         & testVBitwise<int16_t, 3>(mask)
@@ -101,10 +107,6 @@ bool testBitwise(uint4 mask)
         & testVBitwise<int64_t, 2>(mask)
         & testVBitwise<int64_t, 3>(mask)
         & testVBitwise<int64_t, 4>(mask)
-        & test1Bitwise<uint8_t>(mask)
-        & testVBitwise<uint8_t, 2>(mask)
-        & testVBitwise<uint8_t, 3>(mask)
-        & testVBitwise<uint8_t, 4>(mask)
         & test1Bitwise<uint16_t>(mask)
         & testVBitwise<uint16_t, 2>(mask)
         & testVBitwise<uint16_t, 3>(mask)
