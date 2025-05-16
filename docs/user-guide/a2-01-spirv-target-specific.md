@@ -16,7 +16,7 @@ When targeting the older SPIR-V profiles, Slang may produce SPIR-V that uses the
 
 Memory model
 ------------
-By default, Slang produces the SPIRV code using GLSL450 memory model. The user can opt-in to Vulkan Memory Model by specifying `-capability vk_mem_model`. For using APIs, the following lines can be added to explicitly specify the capability.
+By default, the Slang compiler produces the SPIRV code using GLSL450 memory model. The user can opt-in to Vulkan Memory Model by specifying `-capability vk_mem_model`. For using APIs, the following lines can be added to explicitly specify the capability.
 ```
     slang::CompilerOptionEntry entry;
     entry.name = slang::CompilerOptionName::Capability;
@@ -28,7 +28,7 @@ By default, Slang produces the SPIRV code using GLSL450 memory model. The user c
     sessionDesc.compilerOptionEntryCount = 1;
 ```
 
-If the shader uses `CoopVec` or `CoopMat` intrinsics, then the Slang will automatically use `vk_mem_model` capability.
+If the shader uses `CoopVec` or `CoopMat` intrinsics, then the Slang compiler will automatically use `vk_mem_model` capability.
 
 Combined texture sampler
 ------------------------
