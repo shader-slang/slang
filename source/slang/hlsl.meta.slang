@@ -8084,9 +8084,20 @@ uint countbits(T value)
         // 16-bit support dependent on SM6.2 and dxil
         __intrinsic_asm "countbits";
     case glsl:
-        // 64-bit support dependent on GL_ARB_gpu_shader_int64
-        // 16-bit support dependent on GL_EXT_shader_16bit_storage
-        __intrinsic_asm "bitCount";
+        if(T is int64_t || T  is uint64_t)
+        {
+            return __emulatedCountbits64(__intCast<uint64_t>(value));
+        }
+        else if (T is int16_t || T  is uint16_t)
+        {
+            // emulate 16-bit
+            return countbits(__intCast<uint32_t>(value));
+        }
+        else
+        {
+            // bitCount only supports 32-bit
+            __intrinsic_asm "bitCount";
+        }
     case metal:
         if (T is int64_t || T  is uint64_t)
         {
@@ -8150,7 +8161,15 @@ vector<uint, N> countbits(vector<T, N> value)
     case hlsl:
         __intrinsic_asm "countbits";
     case glsl:
-        __intrinsic_asm "bitCount";
+        if(T is int64_t || T  is uint64_t || T is int16_t || T  is uint16_t)
+        {
+            // Emulate 64-bit and 16-bit
+            VECTOR_MAP_UNARY(uint, N, countbits, value);
+        }
+        else
+        {
+            __intrinsic_asm "bitCount";
+        }
     case metal:
         if(T is int64_t || T  is uint64_t || T is int16_t || T  is uint16_t)
         {
