@@ -1506,6 +1506,74 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    // Creates a new function with a different parameter order.
+    // OpCooperativeMatrixPerElementOpNV expects a callback function to have the parameter
+    // in the following order:
+    //   return-type CallbackFunction(uint, uint, coopmat1, functorThis, coopmat2, coopmat3, ...)
+    // But what we have by default is:
+    //   return-type CallbackFunction(functorThis, uint, uint, coopmat1, coopmat2, coopmat3, ...)
+    //
+    // The new function will do the following,
+    //   return-type newCallback(uint a, uint b, T mat1, TFunc f, T mat2, T mat3, ...)
+    //   { return targetFunc(f, a, b, mat1, mat2, mat3, ...); }
+    IRFunc* createWrapperFunctionForPerElement(IRBuilder& builder, IRFunc* targetFunc)
+    {
+        List<IRType*> paramTypes;
+        for (UInt i = 0; i < targetFunc->getParamCount(); i++)
+        {
+            paramTypes.add(targetFunc->getParamType(i));
+        }
+
+        IRType* tempTypes[4];
+        tempTypes[3] = builder.getPtrType(paramTypes[0]);
+        tempTypes[0] = paramTypes[1];
+        tempTypes[1] = paramTypes[2];
+        tempTypes[2] = paramTypes[3];
+        paramTypes[0] = tempTypes[0];
+        paramTypes[1] = tempTypes[1];
+        paramTypes[2] = tempTypes[2];
+        paramTypes[3] = tempTypes[3];
+
+        IRType* returnType = targetFunc->getDataType()->getResultType();
+
+        IRBuilderInsertLocScope insertLocScope(&builder);
+        auto wrapperFunc = builder.createFunc();
+        builder.setDataType(wrapperFunc, builder.getFuncType(paramTypes, returnType));
+        builder.setInsertInto(wrapperFunc);
+        auto block = builder.emitBlock();
+        builder.setInsertInto(block);
+
+        List<IRInst*> params;
+        for (Index i = 0; i < paramTypes.getCount(); i++)
+        {
+            params.add(builder.emitParam(paramTypes[i]));
+        }
+
+        IRInst* tempParams[4];
+        tempParams[0] = builder.emitLoad(params[3]);
+        tempParams[1] = params[0];
+        tempParams[2] = params[1];
+        tempParams[3] = params[2];
+        params[0] = tempParams[0];
+        params[1] = tempParams[1];
+        params[2] = tempParams[2];
+        params[3] = tempParams[3];
+
+        auto result = builder.emitCallInst(returnType, targetFunc, params);
+        builder.emitReturn(result);
+        return wrapperFunc;
+    }
+
+    void processCoopMatMapElementIFunc(IRCoopMatMapElementIFuncBase* mapElementIFunc)
+    {
+        IRBuilder builder{mapElementIFunc};
+        builder.setInsertBefore(mapElementIFunc);
+
+        auto ifuncCall = mapElementIFunc->getIFuncCall();
+        auto funcSynth = createWrapperFunctionForPerElement(builder, ifuncCall);
+        mapElementIFunc->setIFuncCall(funcSynth);
+    }
+
     void legalizeSPIRVEntryPoint(IRFunc* func, IREntryPointDecoration* entryPointDecor)
     {
         auto stage = entryPointDecor->getProfile().getStage();
@@ -1742,6 +1810,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_BitfieldExtract:
             case kIROp_BitfieldInsert:
                 processBitFieldOp(inst);
+                break;
+            case kIROp_CoopMatMapElementIFunc:
+                processCoopMatMapElementIFunc(as<IRCoopMatMapElementIFuncBase>(inst));
+                break;
+            case kIROp_TupleCoopMatMapElementIFunc:
+                processCoopMatMapElementIFunc(as<IRCoopMatMapElementIFuncBase>(inst));
                 break;
 
             case kIROp_DebugValue:

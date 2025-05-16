@@ -3124,6 +3124,32 @@ struct IRMakeCoopVector : IRInst
     IR_LEAF_ISA(MakeCoopVector)
 };
 
+struct IRCoopMatMapElementIFuncBase : IRInst
+{
+    IRFunc* getIFuncCall() { return as<IRFunc>(getOperand(1)); }
+    IRInst* getIFuncThis() { return getOperand(2); }
+    void setIFuncCall(IRFunc* func) { setOperand(1, func); }
+};
+
+struct IRCoopMatMapElementIFunc : IRCoopMatMapElementIFuncBase
+{
+    IR_LEAF_ISA(CoopMatMapElementIFunc)
+    IRInst* getCoopMat() { return getOperand(0); }
+};
+
+struct IRTupleCoopMatMapElementIFunc : IRCoopMatMapElementIFuncBase
+{
+    IR_LEAF_ISA(TupleCoopMatMapElementIFunc)
+    IRInst* getTuple() { return getOperand(0); }
+};
+
+struct IRTupleCoopMatMapElementFunc : IRInst
+{
+    IR_LEAF_ISA(TupleCoopMatMapElementFunc)
+    IRInst* getTuple() { return getOperand(0); }
+    IRFunc* getFuncCall() { return as<IRFunc>(getOperand(1)); }
+};
+
 // An Instruction that creates a differential pair value from a
 // primal and differential.
 
