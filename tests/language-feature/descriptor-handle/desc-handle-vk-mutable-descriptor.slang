@@ -1,5 +1,4 @@
-//TEST:SIMPLE(filecheck=WITHOUT_RAY_ACCELERATION_SUPPORT): -target spirv -stage compute -entry computeMain -DWITHOUT_RAY_ACCELERATION_SUPPORT
-//TEST:SIMPLE(filecheck=WITH_RAY_ACCELERATION_SUPPORT): -target spirv -stage compute -entry computeMain -DWITH_RAY_ACCELERATION_SUPPORT
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain
 
 // To intentionally fill up binding slots
 [[vk::binding(0, 1)]]
@@ -14,39 +13,22 @@ RWTexture1D<float> t3;
 [[vk::binding(1, 4)]]
 Texture1D<float> t4;
 
-//WITHOUT_RAY_ACCELERATION_SUPPORT-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 0
-//WITHOUT_RAY_ACCELERATION_SUPPORT-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 1
-//WITHOUT_RAY_ACCELERATION_SUPPORT-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 2
-//WITHOUT_RAY_ACCELERATION_SUPPORT-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 3
-//WITHOUT_RAY_ACCELERATION_SUPPORT-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 4
-//WITHOUT_RAY_ACCELERATION_SUPPORT-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 5
-//WITHOUT_RAY_ACCELERATION_SUPPORT-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 6
-//WITHOUT_RAY_ACCELERATION_SUPPORT-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 7
-//WITHOUT_RAY_ACCELERATION_SUPPORT-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 8
-//WITHOUT_RAY_ACCELERATION_SUPPORT-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 9
-#ifdef WITHOUT_RAY_ACCELERATION_SUPPORT
+//CHECK-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 0
+//CHECK-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 1
+//CHECK-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 2
+//CHECK-DAG: OpConvertUToAccelerationStructureKHR
+
+//CHECK-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 3
+//CHECK-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 4
+//CHECK-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 5
+//CHECK-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 6
+//CHECK-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 7
+//CHECK-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 8
+//CHECK-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 9
 export T getDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
 {
     return defaultGetDescriptorFromHandle(handleValue, BindlessDescriptorOptions.VkMutable);
 }
-#endif
-
-//WITH_RAY_ACCELERATION_SUPPORT-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 0
-//WITH_RAY_ACCELERATION_SUPPORT-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 1
-//WITH_RAY_ACCELERATION_SUPPORT-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 2
-//WITH_RAY_ACCELERATION_SUPPORT-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 3
-//WITH_RAY_ACCELERATION_SUPPORT-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 4
-//WITH_RAY_ACCELERATION_SUPPORT-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 5
-//WITH_RAY_ACCELERATION_SUPPORT-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 6
-//WITH_RAY_ACCELERATION_SUPPORT-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 7
-//WITH_RAY_ACCELERATION_SUPPORT-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 8
-//WITH_RAY_ACCELERATION_SUPPORT-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 9
-#ifdef WITH_RAY_ACCELERATION_SUPPORT
-export T getDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
-{
-    return defaultGetDescriptorFromHandle(handleValue, BindlessDescriptorOptions.VkMutableRayAcceleration);
-}
-#endif
 
 uniform SamplerState.Handle sampler;
 uniform Sampler1DShadow.Handle combinedSampler;

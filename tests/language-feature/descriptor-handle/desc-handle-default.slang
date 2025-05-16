@@ -26,13 +26,13 @@ Texture1D<float> t4;
 //MIX-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 0
 //MIX-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 5
 //MIX-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 6
-//MIX-DAG: OpDecorate %__slang_resource_heap{{.*}} Binding 8
 
 //MIX-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 1
 //MIX-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 2
 //MIX-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 3
 //MIX-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 4
 //MIX-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 7
+//MIX-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 8
 
 #ifdef SAMPLER
 //SAMPLER: OpDecorate %__slang_resource_heap{{.*}} Binding 0
@@ -98,8 +98,8 @@ uniform RWStructuredBuffer<float>.Handle rwBuffer;
 #endif
 
 #ifdef ACCELERATION_STRUCTURE
-//ACCELERATION_STRUCTURE: OpDecorate %__slang_resource_heap{{.*}} Binding 8
-//ACCELERATION_STRUCTURE-NEXT: OpDecorate %__slang_resource_heap{{.*}} DescriptorSet 3
+//ACCELERATION_STRUCTURE-NOT: OpDecorate %__slang_resource_heap{{.*}} Binding 8
+//ACCELERATION_STRUCTURE: OpConvertUToAccelerationStructureKHR
 uniform RaytracingAccelerationStructure.Handle rayAcceleration;
 #endif
 

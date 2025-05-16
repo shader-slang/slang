@@ -22409,86 +22409,31 @@ __prefix T operator*(DescriptorHandle<T> value)
 // https://registry.khronos.org/vulkan/specs/latest/man/html/VkDescriptorType.html
 enum DefaultVkBindlessBindings : uint
 {
-    // SAMPLER
-    Sampler = 0,
-    // COMBINED_IMAGE_SAMPLER
-    CombinedTextureSampler = 1,
-    // SAMPLED_IMAGE
-    Texture_Read = 2,
-    // STORAGE_IMAGE
-    Texture_Write = 3,
-    Texture_ReadWrite = 3,
-    // UNIFORM_TEXEL_BUFFER
-    TexelBuffer_Read = 4,
-    // STORAGE_TEXEL_BUFFER
-    TexelBuffer_Write = 5,
-    TexelBuffer_ReadWrite = 5,
-    // UNIFORM_BUFFER
-    Buffer_Read = 6,
-    // STORAGE_BUFFER
-    Buffer_Write = 7,
-    Buffer_ReadWrite = 7,
-    // ACCELERATION_STRUCTURE
-    AccelerationStructure = 8,
-    // Other
-    Unknown = 9,
+    Sampler = 0, /// SAMPLER
+    CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
+    Texture_Read = 2, /// SAMPLED_IMAGE
+    Texture_ReadWrite = 3, /// STORAGE_IMAGE
+    TexelBuffer_Read = 4, /// UNIFORM_TEXEL_BUFFER
+    TexelBuffer_ReadWrite = 5, /// STORAGE_TEXEL_BUFFER
+    Buffer_Read = 6, /// UNIFORM_BUFFER
+    Buffer_ReadWrite = 7, /// STORAGE_BUFFER
+    Unknown = 8, /// Other
 }
 
 // https://github.com/KhronosGroup/Vulkan-Docs/blob/main/proposals/VK_EXT_mutable_descriptor_type.adoc
 enum VkMutableBindlessBindings : uint
 {
-    // SAMPLER
-    Sampler = 0,
-    // COMBINED_IMAGE_SAMPLER
-    CombinedTextureSampler = 1,
-    // SAMPLED_IMAGE
-    Texture_Read = 2,
-    // STORAGE_IMAGE
-    Texture_Write = 2,
-    Texture_ReadWrite = 2,
-    // UNIFORM_TEXEL_BUFFER
-    TexelBuffer_Read = 2,
-    // STORAGE_TEXEL_BUFFER
-    TexelBuffer_Write = 2,
-    TexelBuffer_ReadWrite = 2,
-    // UNIFORM_BUFFER
-    Buffer_Read = 2,
-    // STORAGE_BUFFER,
-    Buffer_Write = 2,
-    Buffer_ReadWrite = 2,
-    // ACCELERATION_STRUCTURE
-    AccelerationStructure = 3,
-    // Other
-    Unknown = 4,
+    Sampler = 0, /// SAMPLER
+    CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
+    Texture_Read = 2, /// SAMPLED_IMAGE
+    Texture_ReadWrite = 2, /// STORAGE_IMAGE
+    TexelBuffer_Read = 2, /// UNIFORM_TEXEL_BUFFER
+    TexelBuffer_ReadWrite = 2, /// STORAGE_TEXEL_BUFFER
+    Buffer_Read = 2, /// UNIFORM_BUFFER
+    Buffer_ReadWrite = 2, /// STORAGE_BUFFER,
+    Unknown = 3, /// Other
 }
 
-// https://github.com/KhronosGroup/Vulkan-Docs/blob/main/proposals/VK_EXT_mutable_descriptor_type.adoc
-enum VkMutableBindlessBindingsRayAcceleration : uint
-{
-    // SAMPLER
-    Sampler = 0,
-    // COMBINED_IMAGE_SAMPLER
-    CombinedTextureSampler = 1,
-    // SAMPLED_IMAGE
-    Texture_Read = 2,
-    // STORAGE_IMAGE
-    Texture_Write = 2,
-    Texture_ReadWrite = 2,
-    // UNIFORM_TEXEL_BUFFER
-    TexelBuffer_Read = 2,
-    // STORAGE_TEXEL_BUFFER
-    TexelBuffer_Write = 2,
-    TexelBuffer_ReadWrite = 2,
-    // UNIFORM_BUFFER
-    Buffer_Read = 2,
-    // STORAGE_BUFFER,
-    Buffer_Write = 2,
-    Buffer_ReadWrite = 2,
-    // ACCELERATION_STRUCTURE
-    AccelerationStructure = 2,
-    // Other
-    Unknown = 3,
-}
 __intrinsic_op($(kIROp_GetDynamicResourceHeap))
 T[] __getDynamicResourceHeap<T:IOpaqueDescriptor>(constexpr uint bindingIndex = 0);
 
@@ -22511,9 +22456,8 @@ T __castDescriptorHandleToResource<T:IOpaqueDescriptor>(DescriptorHandle<T> ptr)
 
 public enum BindlessDescriptorOptions
 {
-    None = 0,
-    VkMutable = 1,
-    VkMutableRayAcceleration = 2,
+    None = 0, /// Bind assuming regular binding model rules.
+    VkMutable = 1, /// Bind assuming `VK_EXT_mutable_descriptor_type` without mutable `AccelerationStructure` binding support.
 }
 
 /// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
@@ -22532,6 +22476,9 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
             return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
     case spirv:
     case glsl:
+
+        switch(bindlessOptions)
+        {
 ${{{{
 {
     static const struct 
@@ -22542,61 +22489,59 @@ ${{{{
     {
         {"None", "DefaultVkBindlessBindings"},
         {"VkMutable", "VkMutableBindlessBindings"},
-        {"VkMutableRayAcceleration", "VkMutableBindlessBindingsRayAcceleration"},
     };
 
-    bool firstBindlessOption = true;
     for(auto bindlessOption : kBindlessOptions)
     {
         StringBuilder bindlessOptionIfElsePre;
         StringBuilder bindlessOptionIfElsePost;
-        if(firstBindlessOption)
-            bindlessOptionIfElsePre << "if";
-        else
-            bindlessOptionIfElsePre << "else if";
 
-        bindlessOptionIfElsePre << "(bindlessOptions == BindlessDescriptorOptions." << bindlessOption.option <<"){\n";
+        bindlessOptionIfElsePre << "case BindlessDescriptorOptions." << bindlessOption.option <<":\n{\n";
         bindlessOptionIfElsePost << "}\n";
 }}}}
     $(bindlessOptionIfElsePre.toString())
-    if(DescriptorKind.Sampler == T.kind)
+    switch(T.kind)
+    {
+    case DescriptorKind.Sampler:
         return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Sampler)[((uint2)handleValue).x];
-    else if(DescriptorKind.CombinedTextureSampler == T.kind)
+    case DescriptorKind.CombinedTextureSampler:
         return __getDynamicResourceHeap<T>($(bindlessOption.enumType).CombinedTextureSampler)[((uint2)handleValue).x];
-    else if(DescriptorKind.Texture == T.kind)
+    case DescriptorKind.Texture:
     {
         if(DescriptorAccess.Read == T.descriptorAccess)
             return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Texture_Read)[((uint2)handleValue).x];
         else
             return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Texture_ReadWrite)[((uint2)handleValue).x];
     }
-    else if(DescriptorKind.TexelBuffer == T.kind)
+    case DescriptorKind.TexelBuffer:
     {
         if(DescriptorAccess.Read == T.descriptorAccess)
             return __getDynamicResourceHeap<T>($(bindlessOption.enumType).TexelBuffer_Read)[((uint2)handleValue).x];
         else
             return __getDynamicResourceHeap<T>($(bindlessOption.enumType).TexelBuffer_ReadWrite)[((uint2)handleValue).x];
     }
-    else if(DescriptorKind.Buffer == T.kind)
+    case DescriptorKind.Buffer:
     {
         if(DescriptorAccess.Read == T.descriptorAccess)
             return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Buffer_Read)[((uint2)handleValue).x];
         else
             return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Buffer_ReadWrite)[((uint2)handleValue).x];
     }
-    else if(DescriptorKind.AccelerationStructure == T.kind)
-        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).AccelerationStructure)[((uint2)handleValue).x];
-    else
+    case DescriptorKind.AccelerationStructure:
+        return __slang_noop_cast<T>(RaytracingAccelerationStructure(__asuint64((uint2)handleValue)));
+    default:
         return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Unknown)[((uint2)handleValue).x];
+    }
     $(bindlessOptionIfElsePost.toString())
 ${{{{
     }
 }
 }}}}
-    else
+    default:
     {
         static_assert(false, "Impossible to end up here unless something went very wrong");
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
+    }
     }
     case wgsl:
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
