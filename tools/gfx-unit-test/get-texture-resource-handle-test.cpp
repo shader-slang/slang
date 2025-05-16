@@ -50,7 +50,7 @@ void getTextureResourceHandleTestImpl(IDevice* device, UnitTestContext* context)
 
 void getTextureResourceHandleTestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
 {
-    gfxSetDebugLayerEnabled(context->enableDebugLayers);
+    gfxEnableDebugLayer(context->enableDebugLayers);
     if ((api & context->enabledApis) == 0)
     {
         SLANG_IGNORE_TEST;

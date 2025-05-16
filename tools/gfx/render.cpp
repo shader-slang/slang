@@ -434,7 +434,7 @@ namespace gfx
             return SLANG_OK;
         }
 
-        SLANG_GFX_API void SLANG_MCALL gfxSetDebugLayerEnabled(bool enable)
+        SLANG_GFX_API void SLANG_MCALL gfxEnableDebugLayer(bool enable)
         {
             debugLayerEnabled = enable;
         }

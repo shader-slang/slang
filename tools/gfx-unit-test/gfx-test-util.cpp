@@ -323,7 +323,7 @@ Slang::ComPtr<gfx::IDevice> createTestingDevice(
     void* extDescPtrs[2] = {&extDesc, &slangExtDesc};
     deviceDesc.extendedDescs = extDescPtrs;
 
-    gfx::gfxSetDebugLayerEnabled(context->enableDebugLayers);
+    gfx::gfxEnableDebugLayer(context->enableDebugLayers);
     auto createDeviceResult = gfxCreateDevice(&deviceDesc, device.writeRef());
     if (SLANG_FAILED(createDeviceResult))
     {
