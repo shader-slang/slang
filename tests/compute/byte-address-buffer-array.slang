@@ -34,6 +34,6 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // CHECK3: OpLoad %v4float
     // CHECK3: OpStore
     buffer.Store(0, buffer.LoadAligned<Block>(0));
-    buffer.StoreAligned(16, buffer.Load<Block>(4, 16));
+    buffer.StoreAligned(16, buffer.LoadAligned<Block>(4, 16));
 }
 
