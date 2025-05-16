@@ -1547,9 +1547,10 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             auto base = inst->getOperand(0);
             auto outerPrec = getInfo(EmitOp::General);
             emitOperand(base, outerPrec);
+            m_writer->emit(")");
             m_writer->emit("[");
             emitOperand(inst->getOperand(1), EmitOpInfo());
-            m_writer->emit("]))");
+            m_writer->emit("])");
             return true;
         }
     case kIROp_swizzle:
