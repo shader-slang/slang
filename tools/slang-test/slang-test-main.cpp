@@ -5085,7 +5085,6 @@ SlangResult innerMain(int argc, char** argv)
                 {
                     TestOptions testOptions;
                     testOptions.categories.add(unitTestCategory);
-                    // Use default spawn type for unit tests as the test server one is unstable
                     runUnitTestModule(&context, testOptions, spawnType, "gfx-unit-test-tool");
                 }
             }
@@ -5095,7 +5094,7 @@ SlangResult innerMain(int argc, char** argv)
 
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
         // excution or driver instability. We can try running them again.
-        static constexpr int kFailedTestLimitForRetry = 100;
+        static constexpr int kFailedTestLimitForRetry = 16;
         if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
         {
             if (context.failedFileTests.getCount() > 0)

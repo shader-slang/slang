@@ -192,7 +192,8 @@ jobs:
               -api all-cpu \
               -expected-failure-list tests/expected-failure-github.txt \
               -skip-reference-image-generation \
-              -show-adapter-info
+              -show-adapter-info \
+              ${{ matrix.config == 'debug' && '-disable-debug-layers' || '' }}
           elif [[ "${{matrix.has-gpu}}" == "true" ]]; then
             "$bin_dir/slang-test" \
               -use-test-server \
@@ -202,7 +203,8 @@ jobs:
               -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
-              -show-adapter-info
+              -show-adapter-info  \
+              ${{ matrix.config == 'debug' && '-disable-debug-layers' || '' }}
           else
             "$bin_dir/slang-test" \
               -use-test-server \
@@ -212,7 +214,8 @@ jobs:
               -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
-              -show-adapter-info
+              -show-adapter-info \
+              ${{ matrix.config == 'debug' && '-disable-debug-layers' || '' }}
           fi
       - name: Run Slang examples
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
