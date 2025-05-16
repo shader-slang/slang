@@ -32,7 +32,7 @@ jobs:
           - { os: macos, compiler: gcc }
           - { os: macos, compiler: cl }
         include:
-          - { os: linux, runs-on: ubuntu-latest }
+          - { os: linux, runs-on: ubuntu-22.04 }
           - { os: macos, runs-on: macos-latest }
           - { os: windows, runs-on: windows-latest }
           # Warnings are treated as errors by default.
@@ -111,6 +111,11 @@ jobs:
               sudo apt-get update
               sudo apt-get install -y libx11-dev
           fi
+      - name: Setup Node.js
+        if: matrix.os == 'linux'
+        uses: actions/setup-node@v4
+        with: 
+          node-version: '20.x'
       - name: Setup
         if: steps.filter.outputs.should-run == 'true'
         uses: ./.github/actions/common-setup
