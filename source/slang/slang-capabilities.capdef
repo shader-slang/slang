@@ -813,6 +813,7 @@ def _GL_EXT_shader_atomic_float : glsl;
 def _GL_EXT_shader_atomic_float_min_max : glsl;
 def _GL_EXT_shader_atomic_float2 : glsl;
 def _GL_EXT_shader_atomic_int64 : glsl;
+def _GL_EXT_shader_explicit_arithmetic_types : _GLSL_140;
 def _GL_EXT_shader_explicit_arithmetic_types_int64 : _GLSL_140;
 def _GL_EXT_shader_image_load_store : _GLSL_130;
 def _GL_EXT_shader_realtime_clock : glsl;
@@ -936,6 +937,10 @@ alias GL_EXT_shader_atomic_float2 = _GL_EXT_shader_atomic_float2 | spvAtomicFloa
 /// Represents the GL_EXT_shader_atomic_int64 extension.
 /// [EXT]
 alias GL_EXT_shader_atomic_int64 = _GL_EXT_shader_atomic_int64 | spvInt64Atomics;
+
+/// Represents the GL_EXT_shader_explicit_arithmetic_types extension.
+/// [EXT]
+alias GL_EXT_shader_explicit_arithmetic_types = _GL_EXT_shader_explicit_arithmetic_types | _spirv_1_0;
 
 /// Represents the GL_EXT_shader_explicit_arithmetic_types_int64 extension.
 /// [EXT]
