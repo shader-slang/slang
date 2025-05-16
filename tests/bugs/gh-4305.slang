@@ -32,7 +32,8 @@ layout(local_size_x = 2, local_size_y = 2, local_size_z = 1) in;
 [DerivativeGroupLinear]
 #endif // #ifdef QUAD
 [numthreads(2, 2, 1)]
-#endif //#ifndef MODIFIER
+#endif // #ifndef MODIFIER
+[shader("compute")]
 void computeMain()
 {
     //BUF:1

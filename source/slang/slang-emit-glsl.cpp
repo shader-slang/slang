@@ -1080,9 +1080,11 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
         break;
 
     case kIROp_Int8Type:
+        _requireBaseType(cast<IRBasicType>(type)->getBaseType());
         m_writer->emit("i8");
         break;
     case kIROp_Int16Type:
+        _requireBaseType(cast<IRBasicType>(type)->getBaseType());
         m_writer->emit("i16");
         break;
     case kIROp_IntType:
@@ -1106,9 +1108,11 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
         }
 
     case kIROp_UInt8Type:
+        _requireBaseType(cast<IRBasicType>(type)->getBaseType());
         m_writer->emit("u8");
         break;
     case kIROp_UInt16Type:
+        _requireBaseType(cast<IRBasicType>(type)->getBaseType());
         m_writer->emit("u16");
         break;
     case kIROp_UIntType:
@@ -1327,8 +1331,10 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     }
                 case BaseType::Int16:
                     {
+                        emitType(type);
+                        m_writer->emit("(");
                         m_writer->emit(int16_t(litInst->value.intVal));
-                        m_writer->emit("S");
+                        m_writer->emit("S)");
                         return;
                     }
                 case BaseType::Int:
@@ -1346,8 +1352,10 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     }
                 case BaseType::UInt16:
                     {
+                        emitType(type);
+                        m_writer->emit("(");
                         m_writer->emit(UInt(uint16_t(litInst->value.intVal)));
-                        m_writer->emit("US");
+                        m_writer->emit("US)");
                         return;
                     }
                 case BaseType::UInt:
@@ -2288,6 +2296,12 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 {
                     emitType(inst->getDataType());
                 }
+                break;
+            case BaseType::UInt8:
+                emitType(inst->getDataType());
+                break;
+            case BaseType::Int8:
+                emitType(inst->getDataType());
                 break;
             case BaseType::UInt16:
                 if (fromType == BaseType::Half)
