@@ -3658,8 +3658,7 @@ TestResult runComputeComparisonImpl(
                   nullptr,
                   ".expected.txt",
                   actualOutputContent,
-                  [](const auto& a, const auto& e)
-                  {
+                  [](const auto& a, const auto& e) {
                       return SLANG_SUCCEEDED(
                           _compareWithType(a.getUnownedSlice(), e.getUnownedSlice()));
                   });
