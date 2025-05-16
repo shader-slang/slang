@@ -16,17 +16,14 @@ struct UndoParameterCopyVisitor
     IRModule* module;
     bool changed = false;
 
+    // Track instructions to remove
+    List<IRInst*> instsToRemove;
+
     UndoParameterCopyVisitor(IRModule* module)
         : module(module)
     {
         builder.setInsertInto(module);
     }
-
-    // Map from temporary variables (IRVar) to original parameter pointers
-    Dictionary<IRInst*, IRInst*> tempVarToOriginalParamPtrMap;
-
-    // Track instructions to remove (temp vars and their initializing stores)
-    List<IRInst*> instsToRemove;
 
     // Process the entire module
     void processModule()
@@ -44,11 +41,11 @@ struct UndoParameterCopyVisitor
     // Process a single function
     void processFunc(IRFunc* func)
     {
-        tempVarToOriginalParamPtrMap.clear();
         instsToRemove.clear();
+        HashSet<IRInst*> originalPtrsForCopyBackCandidates; // Tracks original params that might
+                                                            // have a redundant copy-back
 
-        // Pass 1: Identify TempCallArgVars and map them to their original parameter\'s pointer.
-        // Also, collect the temp var and its initializing store for removal.
+        // Single pass to identify temps, replace uses, and identify redundant copy-back stores.
         for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
         {
             for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
@@ -71,23 +68,27 @@ struct UndoParameterCopyVisitor
                                 if (storeInst->getPtr() == varInst)
                                 {
                                     initializingStore = storeInst;
-
                                     if (auto loadInst = as<IRLoad>(storeInst->getVal()))
                                     {
                                         originalParamPtr = loadInst->getPtr();
-                                        tempVarToOriginalParamPtrMap[varInst] = originalParamPtr;
+
+                                        // Found the pattern: var, store(var, load(originalParam))
+                                        this->changed = true;
+
+                                        // Replace uses of varInst with originalParamPtr immediately
+                                        varInst->replaceUsesWith(originalParamPtr);
+
+                                        // Mark for removal
                                         instsToRemove.add(initializingStore);
                                         instsToRemove.add(varInst);
-                                    }
 
+                                        // Record originalParamPtr for copy-back optimization check
+                                        originalPtrsForCopyBackCandidates.add(originalParamPtr);
+                                    }
                                     break; // Found the initializing store for varInst
                                 }
                             }
-                            // Stop if we see another var declaration, or a call instruction,
-                            // before finding the specific initializing store for varInst,
-                            // then varInst is likely not following the simple
-                            // copy-in pattern this pass targets, or the store is not immediately
-                            // after it. Stop scanning for this varInst's initializer.
+                            // Stop scanning if another var declaration or a call is encountered
                             if (as<IRVar>(scanInst) || as<IRCall>(scanInst))
                             {
                                 break;
@@ -95,24 +96,27 @@ struct UndoParameterCopyVisitor
                         }
                     }
                 }
+                else if (auto storeInst = as<IRStore>(inst))
+                {
+                    // Check for redundant copy-back: store(originalParam, load(originalParam))
+                    IRInst* destPtr = storeInst->getPtr();
+                    if (originalPtrsForCopyBackCandidates.contains(destPtr))
+                    {
+                        if (auto loadVal = as<IRLoad>(storeInst->getVal()))
+                        {
+                            if (loadVal->getPtr() == destPtr)
+                            {
+                                // This is a redundant copy-back store
+                                instsToRemove.add(storeInst);
+                                this->changed = true;
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        if (tempVarToOriginalParamPtrMap.getCount() == 0)
-        {
-            return;
-        }
-
-        changed = true;
-        // Pass 2: Replace uses of temp vars with their original parameter pointers.
-        for (auto& pair : tempVarToOriginalParamPtrMap)
-        {
-            IRInst* tempVar = pair.first;
-            IRInst* originalParamPointer = pair.second;
-            tempVar->replaceUsesWith(originalParamPointer);
-        }
-
-        // Pass 3: Remove the temp vars and their initializing stores.
+        // Removal pass
         for (auto& inst : instsToRemove)
         {
             if (inst->getParent())
