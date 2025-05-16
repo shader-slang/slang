@@ -20,7 +20,7 @@ struct TestStruct
 }
 
 // CHECK: void main_kernel(uint3 tid{{.*}}
-// CHECK: int tid{{.*}} = int(tid{{.*}}.x);
+// CHECK: uint(int(tid{{.*}}.x))
 
 [numthreads(1,1,1)]
 void main_kernel(int tid: SV_DispatchThreadID)

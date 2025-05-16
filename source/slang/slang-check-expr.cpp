@@ -2887,6 +2887,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             }
         }
     }
+    rs->checked = true;
     return rs;
 }
 
@@ -4209,9 +4210,9 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     if (m_parentFunc)
     {
         nameBuilder << getText(m_parentFunc->getName());
+        nameBuilder << "_";
+        nameBuilder << m_parentFunc->members.getCount();
     }
-    nameBuilder << "_";
-    nameBuilder << m_parentFunc->members.getCount();
     auto name = getName(nameBuilder.getBuffer());
     lambdaStructDecl->nameAndLoc.name = name;
     lambdaStructDecl->nameAndLoc.loc = lambdaExpr->loc;
@@ -4283,6 +4284,7 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     auto resultLambdaObj = synthesizer.emitCtorInvokeExpr(
         synthesizer.emitStaticTypeExpr(DeclRefType::create(m_astBuilder, lambdaStructDecl)),
         _Move(args));
+    resultLambdaObj->loc = lambdaExpr->loc;
     auto checkedResultExpr = dispatchExpr(resultLambdaObj, *this);
     return checkedResultExpr;
 }

@@ -33,26 +33,26 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // CHECK1: float {{.*}} = buffer0_{{.*}}.{{.*}} = {{.*}};
     // CHECK1: float {{.*}} = buffer0_{{.*}}.{{.*}} = {{.*}};
 
-    // CHECK2: float4 {{.*}} = (buffer0_0).Load<float4 >(int(32));
-    // CHECK2: buffer0_0.Store(int(32),{{.*}});
-    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(int(8));
-    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(int(12));
-    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(int(16));
-    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(int(20));
-    // CHECK2: buffer0_0.Store(int(32),float4({{.*}}, {{.*}}, {{.*}}, {{.*}}));
-    // CHECK2: float4 {{.*}} = (buffer0_0).Load<float4 >(int(32));
-    // CHECK2: buffer0_0.Store(int(8),{{.*}}[int(0)]);
-    // CHECK2: buffer0_0.Store(int(12),{{.*}}[int(1)]);
-    // CHECK2: buffer0_0.Store(int(16),{{.*}}[int(2)]);
-    // CHECK2: buffer0_0.Store(int(20),{{.*}}[int(3)]);
-    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(int(8));
-    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(int(12));
-    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(int(16));
-    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(int(20));
-    // CHECK2: buffer0_0.Store(int(8),{{.*}});
-    // CHECK2: buffer0_0.Store(int(12),{{.*}});
-    // CHECK2: buffer0_0.Store(int(16),{{.*}});
-    // CHECK2: buffer0_0.Store(int(20),{{.*}});
+    // CHECK2: float4 {{.*}} = (buffer0_0).Load<float4 >(32U);
+    // CHECK2: buffer0_0.Store(32U,{{.*}});
+    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(8U);
+    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(12U);
+    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(16U);
+    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(20U);
+    // CHECK2: buffer0_0.Store(32U,float4({{.*}}, {{.*}}, {{.*}}, {{.*}}));
+    // CHECK2: float4 {{.*}} = (buffer0_0).Load<float4 >(32U);
+    // CHECK2: buffer0_0.Store(8U,{{.*}}[int(0)]);
+    // CHECK2: buffer0_0.Store(12U,{{.*}}[int(1)]);
+    // CHECK2: buffer0_0.Store(16U,{{.*}}[int(2)]);
+    // CHECK2: buffer0_0.Store(20U,{{.*}}[int(3)]);
+    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(8U);
+    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(12U);
+    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(16U);
+    // CHECK2: float {{.*}} = (buffer0_0).Load<float >(20U);
+    // CHECK2: buffer0_0.Store(8U,{{.*}});
+    // CHECK2: buffer0_0.Store(12U,{{.*}});
+    // CHECK2: buffer0_0.Store(16U,{{.*}});
+    // CHECK2: buffer0_0.Store(20U,{{.*}});
 
     // CHECK3-DAG: %[[v4f:[a-zA-Z0-9_]+]] = OpTypeVector %float 4
     // CHECK3-DAG: %[[SBv4f:[a-zA-Z0-9_]+]] = OpTypePointer StorageBuffer %[[v4f]]

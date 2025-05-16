@@ -19,21 +19,21 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
     // CHECK-NOT: warning
 
-    // CHECK2: float4 {{.*}}[int(2)] = (buffer_0).Load<float4 [int(2)] >(int(0));
-    // CHECK2: buffer_0.Store(int(0),{{.*}});
-    // CHECK2: float {{.*}} = (buffer_0).Load<float >(int(4));
-    // CHECK2: float {{.*}} = (buffer_0).Load<float >(int(8));
-    // CHECK2: float {{.*}} = (buffer_0).Load<float >(int(12));
-    // CHECK2: float {{.*}} = (buffer_0).Load<float >(int(16));
+    // CHECK2: float4 {{.*}}[int(2)] = (buffer_0).Load<float4 [int(2)] >(0U);
+    // CHECK2: buffer_0.Store(0U,{{.*}});
+    // CHECK2: float {{.*}} = (buffer_0).Load<float >(4U);
+    // CHECK2: float {{.*}} = (buffer_0).Load<float >(8U);
+    // CHECK2: float {{.*}} = (buffer_0).Load<float >(12U);
+    // CHECK2: float {{.*}} = (buffer_0).Load<float >(16U);
     // CHECK2: float4 {{.*}} = float4({{.*}}, {{.*}}, {{.*}}, {{.*}});
-    // CHECK2: float4 {{.*}} = (buffer_0).Load<float4 >(int(20));
-    // CHECK2: buffer_0.Store(int(16),{{.*}});
-    // CHECK2: buffer_0.Store(int(32),{{.*}});
+    // CHECK2: float4 {{.*}} = (buffer_0).Load<float4 >(20U);
+    // CHECK2: buffer_0.Store(16U,{{.*}});
+    // CHECK2: buffer_0.Store(32U,{{.*}});
 
     // CHECK3: OpAccessChain
     // CHECK3: OpLoad %v4float
     // CHECK3: OpStore
     buffer.Store(0, buffer.LoadAligned<Block>(0));
-    buffer.StoreAligned(16, buffer.Load<Block>(4, 16));
+    buffer.StoreAligned(16, buffer.LoadAligned<Block>(4, 16));
 }
 

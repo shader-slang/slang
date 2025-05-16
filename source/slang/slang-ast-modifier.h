@@ -158,6 +158,14 @@ class SynthesizedModifier : public Modifier
     FIDDLE(...)
 };
 
+// Marks that the definition of a func decl is synthesized static invoke func for
+// a lambda that doesn't capture anything.
+FIDDLE()
+class SynthesizedStaticLambdaFuncModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
 // Marks a synthesized variable as local temporary variable.
 FIDDLE()
 class LocalTempVarModifier : public Modifier
