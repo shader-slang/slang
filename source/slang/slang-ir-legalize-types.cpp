@@ -112,6 +112,12 @@ static void registerLegalizedValue(
     IRInst* irValue,
     LegalVal const& legalVal)
 {
+    if (legalVal.flavor == LegalFlavor::none)
+    {
+        // TODO: Not sure what needs to happen.
+        int a = 0;
+        ++a;
+    }
     context->mapValToLegalVal[irValue] = legalVal;
 }
 
