@@ -1451,6 +1451,15 @@ public:
     ///
     void ensureDeclBase(DeclBase* decl, DeclCheckState state, SemanticsContext* baseContext);
 
+    // Check if `lambdaStruct` can be coerced to `funcType`, if so returns the coerced
+    // expression in `outExpr`. The coercion is only valid if the lambda struct
+    // does not contain any captures.
+    bool tryCoerceLambdaToFuncType(
+        DeclRef<StructDecl> lambdaStruct,
+        FuncType* funcType,
+        Expr* fromExpr,
+        Expr** outExpr);
+
     // A "proper" type is one that can be used as the type of an expression.
     // Put simply, it can be a concrete type like `int`, or a generic
     // type that is applied to arguments, like `Texture2D<float4>`.
