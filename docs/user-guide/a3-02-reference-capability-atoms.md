@@ -7,12 +7,12 @@ Capability Atoms
 
 ### Sections:
 
-1. [Targets](#Targets)
-2. [Stages](#Stages)
-3. [Versions](#Versions)
-4. [Extensions](#Extensions)
-5. [Compound Capabilities](#Compound-Capabilities)
-6. [Other](#Other)
+1. [Targets](#targets)
+2. [Stages](#stages)
+3. [Versions](#versions)
+4. [Extensions](#extensions)
+5. [Compound Capabilities](#compound-capabilities)
+6. [Other](#other)
 
 Targets
 ----------------------
@@ -455,9 +455,6 @@ Extensions
 
 `SPV_KHR_cooperative_matrix`
 > Represents the SPIR-V extension for SPV_KHR_cooperative_matrix.
-
-`SPV_KHR_vulkan_memory_model`
-> Represents the SPIR-V extension for SPV_KHR_vulkan_memory_model.
 
 `SPV_NV_tensor_addressing`
 > Represents the SPIR-V extension for SPV_NV_tensor_addressing.
@@ -984,9 +981,6 @@ Compound Capabilities
 `cooperative_matrix`
 > Capabilities needed to use cooperative matrices
 
-`vk_mem_model`
-> Capabilities needed to use vulkan memory model
-
 `cooperative_matrix_reduction`
 > Capabilities needed to use reduction operations with cooperative matrix
 
@@ -1007,6 +1001,9 @@ Compound Capabilities
 
 `cooperative_matrix_2`
 > Capabilities needed to use tensor addressing
+
+`vk_mem_model`
+> Capabilities needed to use vulkan memory model
 
 `any_stage`
 > Collection of all shader stages
