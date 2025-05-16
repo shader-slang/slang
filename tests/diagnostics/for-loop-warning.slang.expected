@@ -30,6 +30,9 @@ tests/diagnostics/for-loop-warning.slang(28): warning 30504: the for loop is sta
 tests/diagnostics/for-loop-warning.slang(32): warning 30504: the for loop is statically determined to terminate within 5 iterations, which is less than what [MaxIters] specifies.
     [MaxIters(6)] // warn
      ^~~~~~~~
+tests/diagnostics/for-loop-warning.slang(10): warning 41008: loop might execute indefinitely
+    for (int j = 0; j < 3; j += 0) // warn.
+    ^~~
 }
 standard output = {
 }
