@@ -580,7 +580,7 @@ struct ReflectionParameterBlocksExampleApp : public TestBase
         // Vulkan device up and running.
 
 #ifdef _DEBUG
-        gfx::gfxEnableDebugLayer();
+        gfx::gfxEnableDebugLayer(true);
 #endif
         gfx::IDevice::Desc deviceDesc = {};
         deviceDesc.deviceType = gfx::DeviceType::Vulkan;
