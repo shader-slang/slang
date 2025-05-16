@@ -4474,7 +4474,7 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
         auto synStaticModifier = m_astBuilder->create<HLSLStaticModifier>();
         synthesized->modifiers.first = synStaticModifier;
     }
-    else
+    else if (context)
     {
         // For a non-`static` requirement, we need a `this` parameter.
         //

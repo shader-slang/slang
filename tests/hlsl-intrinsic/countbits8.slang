@@ -6,7 +6,7 @@
 // Not testing the following:
 // -dx12/hlsl, No support for uint8_t with hlsl
 // -wgpu, only has 32-bit support
-// -vk/glsl, No support for uint8_t with glsl
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHK):-slang -vk -compute -emit-spirv-via-glsl
 
 //CHK:1
 

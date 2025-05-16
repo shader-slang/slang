@@ -43,7 +43,13 @@ jobs:
         run: |
           cd pr-branch
           cmake --preset default --fresh \
-            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+            -DSLANG_ENABLE_TESTS=OFF \
+            -DSLANG_ENABLE_EXAMPLES=OFF \
+            -DSLANG_ENABLE_GFX=OFF \
+            -DSLANG_ENABLE_SLANGD=OFF \
+            -DSLANG_EXCLUDE_DAWN=ON \
+            -DSLANG_EXCLUDE_TINT=ON
           cmake --workflow --preset release
 
       - name: Regenerate Command Line Reference
@@ -51,7 +57,7 @@ jobs:
         run: |
           cd pr-branch
           mkdir -p docs
-          "$bin_dir/slangc" -help-style markdown -h > docs/command-line-slangc-reference.md 2>&1
+          ./build/${{ env.cmake_config }}/bin/slangc -help-style markdown -h > docs/command-line-slangc-reference.md 2>&1
 
       - name: Configure Git commit signing
         id: git-info
