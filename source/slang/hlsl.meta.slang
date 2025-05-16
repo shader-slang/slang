@@ -22251,6 +22251,7 @@ enum DescriptorKind
     Buffer, /// A buffer descriptor.
     Sampler, /// A sampler state descriptor.
     AccelerationStructure, /// A ray tracing acceleration structure descriptor.
+    TexelBuffer /// A texel buffer descriptor.
 }
 
 enum DescriptorAccess
@@ -22303,7 +22304,9 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
 
     typealias Handle = DescriptorHandle<This>;
 
-    static const DescriptorKind kind = isCombined != 0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture;
+    static const DescriptorKind kind = (Shape.flavor == __ShapeBuffer.flavor ?
+        DescriptorKind.TexelBuffer : (isCombined != 0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture)
+);
     static const DescriptorAccess descriptorAccess = (DescriptorAccess)access;
 
     __implicit_conversion($(kConversionCost_ImplicitDereference))
@@ -22422,8 +22425,36 @@ __prefix T operator*(DescriptorHandle<T> value)
     return getDescriptorFromHandle(value);
 }
 
+// https://registry.khronos.org/vulkan/specs/latest/man/html/VkDescriptorType.html
+enum DefaultVkBindlessBindings : uint
+{
+    Sampler = 0, /// SAMPLER
+    CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
+    Texture_Read = 2, /// SAMPLED_IMAGE
+    Texture_ReadWrite = 3, /// STORAGE_IMAGE
+    TexelBuffer_Read = 4, /// UNIFORM_TEXEL_BUFFER
+    TexelBuffer_ReadWrite = 5, /// STORAGE_TEXEL_BUFFER
+    Buffer_Read = 6, /// UNIFORM_BUFFER
+    Buffer_ReadWrite = 7, /// STORAGE_BUFFER
+    Unknown = 8, /// Other
+}
+
+// https://github.com/KhronosGroup/Vulkan-Docs/blob/main/proposals/VK_EXT_mutable_descriptor_type.adoc
+enum VkMutableBindlessBindings : uint
+{
+    Sampler = 0, /// SAMPLER
+    CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
+    Texture_Read = 2, /// SAMPLED_IMAGE
+    Texture_ReadWrite = 2, /// STORAGE_IMAGE
+    TexelBuffer_Read = 2, /// UNIFORM_TEXEL_BUFFER
+    TexelBuffer_ReadWrite = 2, /// STORAGE_TEXEL_BUFFER
+    Buffer_Read = 2, /// UNIFORM_BUFFER
+    Buffer_ReadWrite = 2, /// STORAGE_BUFFER,
+    Unknown = 3, /// Other
+}
+
 __intrinsic_op($(kIROp_GetDynamicResourceHeap))
-T[] __getDynamicResourceHeap<T:IOpaqueDescriptor>();
+T[] __getDynamicResourceHeap<T:IOpaqueDescriptor>(constexpr uint bindingIndex = 0);
 
 
 // Used by the HLSL backend only, load a sampler state handle from SamplerDescriptorHeap.
@@ -22442,10 +22473,16 @@ T __makeCombinedTextureSamplerFromHandle<T, U>(U handle);
 __intrinsic_op($(kIROp_CastDescriptorHandleToResource))
 T __castDescriptorHandleToResource<T:IOpaqueDescriptor>(DescriptorHandle<T> ptr);
 
+public enum BindlessDescriptorOptions
+{
+    None = 0, /// Bind assuming regular binding model rules.
+    VkMutable = 1, /// Bind assuming `VK_EXT_mutable_descriptor_type` without mutable `AccelerationStructure` binding support.
+}
+
 /// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
 /// to a descriptor object.
 [ForceInline]
-T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
+T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.None)
 {
     __target_switch
     {
@@ -22458,6 +22495,73 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
             return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
     case spirv:
     case glsl:
+
+        switch(bindlessOptions)
+        {
+${{{{
+{
+    static const struct 
+    {
+        char const* option;
+        char const* enumType;
+    }kBindlessOptions[] =
+    {
+        {"None", "DefaultVkBindlessBindings"},
+        {"VkMutable", "VkMutableBindlessBindings"},
+    };
+
+    for(auto bindlessOption : kBindlessOptions)
+    {
+        StringBuilder bindlessOptionIfElsePre;
+        StringBuilder bindlessOptionIfElsePost;
+
+        bindlessOptionIfElsePre << "case BindlessDescriptorOptions." << bindlessOption.option <<":\n{\n";
+        bindlessOptionIfElsePost << "}\n";
+}}}}
+    $(bindlessOptionIfElsePre.toString())
+    switch(T.kind)
+    {
+    case DescriptorKind.Sampler:
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Sampler)[((uint2)handleValue).x];
+    case DescriptorKind.CombinedTextureSampler:
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).CombinedTextureSampler)[((uint2)handleValue).x];
+    case DescriptorKind.Texture:
+    {
+        if(DescriptorAccess.Read == T.descriptorAccess)
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Texture_Read)[((uint2)handleValue).x];
+        else
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Texture_ReadWrite)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.TexelBuffer:
+    {
+        if(DescriptorAccess.Read == T.descriptorAccess)
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).TexelBuffer_Read)[((uint2)handleValue).x];
+        else
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).TexelBuffer_ReadWrite)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.Buffer:
+    {
+        if(DescriptorAccess.Read == T.descriptorAccess)
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Buffer_Read)[((uint2)handleValue).x];
+        else
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Buffer_ReadWrite)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.AccelerationStructure:
+        return __slang_noop_cast<T>(RaytracingAccelerationStructure(__asuint64((uint2)handleValue)));
+    default:
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Unknown)[((uint2)handleValue).x];
+    }
+    $(bindlessOptionIfElsePost.toString())
+${{{{
+    }
+}
+}}}}
+    default:
+    {
+        static_assert(false, "Impossible to end up here unless something went very wrong");
+        return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
+    }
+    }
     case wgsl:
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
     default:
