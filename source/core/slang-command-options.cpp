@@ -333,7 +333,11 @@ void CommandOptions::addValuesWithAliases(const ConstArrayView<NameValue>& inVal
     List<NameValue> values;
     values.addRange(inValues.getBuffer(), inValues.getCount());
 
-    values.sort([](const NameValue& a, const NameValue& b) -> bool { return a.value < b.value; });
+    // Use stable_sort to preserve the original order for names with the same value.
+    std::stable_sort(
+        values.begin(),
+        values.end(),
+        [](const NameValue& a, const NameValue& b) -> bool { return a.value < b.value; });
 
     List<UnownedStringSlice> names;
 
@@ -346,6 +350,7 @@ void CommandOptions::addValuesWithAliases(const ConstArrayView<NameValue>& inVal
         const auto value = values[i].value;
         names.add(UnownedStringSlice(values[i++].name));
 
+        // For all names with the same value, preserve their original order (primary first)
         for (; i < count && values[i].value == value; ++i)
         {
             names.add(UnownedStringSlice(values[i].name));

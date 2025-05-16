@@ -614,105 +614,6 @@ static void unexportNonEmbeddableIR(CodeGenTarget target, IRModule* irModule)
     }
 }
 
-static void validateVectorOrMatrixElementType(
-    DiagnosticSink* sink,
-    SourceLoc sourceLoc,
-    IRType* elementType,
-    uint32_t allowedWidths,
-    const DiagnosticInfo& disallowedElementTypeEncountered)
-{
-    if (!isFloatingType(elementType))
-    {
-        if (isIntegralType(elementType))
-        {
-            IntInfo info = getIntTypeInfo(elementType);
-            if (allowedWidths == 0U)
-            {
-                sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
-            }
-            else
-            {
-                bool widthAllowed = false;
-                SLANG_ASSERT((allowedWidths & ~(0xfU << 3)) == 0U);
-                for (uint32_t p = 3U; p <= 6U; p++)
-                {
-                    uint32_t width = 1U << p;
-                    if (!(allowedWidths & width))
-                        continue;
-                    widthAllowed = widthAllowed || (info.width == width);
-                }
-                if (!widthAllowed)
-                {
-                    sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
-                }
-            }
-        }
-        else if (!as<IRBoolType>(elementType))
-        {
-            sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
-        }
-    }
-}
-
-static void validateVectorsAndMatrices(
-    DiagnosticSink* sink,
-    IRModule* module,
-    TargetRequest* targetRequest)
-{
-    for (auto globalInst : module->getGlobalInsts())
-    {
-        if (auto matrixType = as<IRMatrixType>(globalInst))
-        {
-            // Matrices with row/col dimension 1 are only well-supported on D3D targets
-            if (!isD3DTarget(targetRequest))
-            {
-                // Verify that neither row nor col count is 1
-                auto colCount = as<IRIntLit>(matrixType->getColumnCount());
-                auto rowCount = as<IRIntLit>(matrixType->getRowCount());
-
-                if ((rowCount && (rowCount->getValue() == 1)) ||
-                    (colCount && (colCount->getValue() == 1)))
-                {
-                    sink->diagnose(matrixType->sourceLoc, Diagnostics::matrixColumnOrRowCountIsOne);
-                }
-            }
-
-            // Verify that the element type is a floating point type, or an allowed integral type
-            auto elementType = matrixType->getElementType();
-            uint32_t allowedWidths = 0U;
-            if (isCPUTarget(targetRequest))
-                allowedWidths = 8U | 16U | 32U | 64U;
-            else if (isCUDATarget(targetRequest))
-                allowedWidths = 32U | 64U;
-            else if (isD3DTarget(targetRequest))
-                allowedWidths = 16U | 32U;
-            validateVectorOrMatrixElementType(
-                sink,
-                matrixType->sourceLoc,
-                elementType,
-                allowedWidths,
-                Diagnostics::matrixWithDisallowedElementTypeEncountered);
-        }
-        else if (auto vectorType = as<IRVectorType>(globalInst))
-        {
-            // Verify that the element type is a floating point type, or an allowed integral type
-            auto elementType = vectorType->getElementType();
-            uint32_t allowedWidths = 0U;
-            if (isWGPUTarget(targetRequest))
-                allowedWidths = 32U;
-            else
-                allowedWidths = 8U | 16U | 32U | 64U;
-
-            validateVectorOrMatrixElementType(
-                sink,
-                vectorType->sourceLoc,
-                elementType,
-                allowedWidths,
-                Diagnostics::vectorWithDisallowedElementTypeEncountered);
-        }
-    }
-}
-
 Result linkAndOptimizeIR(
     CodeGenContext* codeGenContext,
     LinkingAndOptimizationOptions const& options,
@@ -1730,7 +1631,7 @@ Result linkAndOptimizeIR(
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Validate vectors and matrices according to what the target allows
-    validateVectorsAndMatrices(sink, irModule, targetRequest);
+    validateVectorsAndMatrices(irModule, sink, targetRequest);
 
     // The resource-based specialization pass above
     // may create specialized versions of functions, but

@@ -1366,6 +1366,18 @@ DIAGNOSTIC(
     Error,
     variableCannotBePushAndSpecializationConstant,
     "'$0' cannot be a push constant and a specialization constant at the same time")
+DIAGNOSTIC(31221, Error, invalidHLSLRegisterName, "invalid HLSL register name '$0'.")
+DIAGNOSTIC(
+    31222,
+    Error,
+    invalidHLSLRegisterNameForType,
+    "invalid HLSL register name '$0' for type '$1'.")
+DIAGNOSTIC(
+    31223,
+    Error,
+    ExternAndExportVarDeclMustBeConst,
+    "extern and export variables must be static const: '$0'")
+
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType, "invalid tag type for 'enum': '$0'")
@@ -1986,6 +1998,12 @@ DIAGNOSTIC(
     Error,
     vectorWithDisallowedElementTypeEncountered,
     "vector with disallowed element type '$0' encountered")
+
+DIAGNOSTIC(
+    38203,
+    Error,
+    vectorWithInvalidElementCountEncountered,
+    "vector has invalid element count '$0', valid values are between '$1' and '$2' inclusive")
 
 // 39xxx - Type layout and parameter binding.
 
@@ -2758,6 +2776,12 @@ DIAGNOSTIC(
     Internal,
     noBlocksOrIntrinsic,
     "no blocks found for function definition, is there a '$0' intrinsic missing?")
+
+DIAGNOSTIC(
+    40100,
+    Warning,
+    mainEntryPointRenamed,
+    "entry point '$0' is not allowed, and has been renamed to '$1'")
 
 //
 // Ray tracing
