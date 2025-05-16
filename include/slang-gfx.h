@@ -207,8 +207,13 @@ public:
 
     virtual SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL findTypeByName(const char* name) = 0;
 };
-#define SLANG_UUID_IShaderProgram \
-    {0x9d32d0ad, 0x915c, 0x4ffd, {0x91, 0xe2, 0x50, 0x85, 0x54, 0xa0, 0x4a, 0x76}}
+#define SLANG_UUID_IShaderProgram                          \
+    {                                                      \
+        0x9d32d0ad, 0x915c, 0x4ffd,                        \
+        {                                                  \
+            0x91, 0xe2, 0x50, 0x85, 0x54, 0xa0, 0x4a, 0x76 \
+        }                                                  \
+    }
 
 // TODO: Confirm with Yong that we really want this naming convention
 // TODO: Rename to what?
@@ -606,8 +611,13 @@ public:
         GfxCount vertexStreamCount = 0;
     };
 };
-#define SLANG_UUID_IInputLayout \
-    {0x45223711, 0xa84b, 0x455c, {0xbe, 0xfa, 0x49, 0x37, 0x42, 0x1e, 0x8e, 0x2e}}
+#define SLANG_UUID_IInputLayout                            \
+    {                                                      \
+        0x45223711, 0xa84b, 0x455c,                        \
+        {                                                  \
+            0xbe, 0xfa, 0x49, 0x37, 0x42, 0x1e, 0x8e, 0x2e \
+        }                                                  \
+    }
 
 class IResource : public ISlangUnknown
 {
@@ -644,8 +654,13 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL setDebugName(const char* name) = 0;
     virtual SLANG_NO_THROW const char* SLANG_MCALL getDebugName() = 0;
 };
-#define SLANG_UUID_IResource \
-    {0xa0e39f34, 0x8398, 0x4522, {0x95, 0xc2, 0xeb, 0xc0, 0xf9, 0x84, 0xef, 0x3f}}
+#define SLANG_UUID_IResource                               \
+    {                                                      \
+        0xa0e39f34, 0x8398, 0x4522,                        \
+        {                                                  \
+            0x95, 0xc2, 0xeb, 0xc0, 0xf9, 0x84, 0xef, 0x3f \
+        }                                                  \
+    }
 
 struct MemoryRange
 {
@@ -669,8 +684,13 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL map(MemoryRange* rangeToRead, void** outPointer) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL unmap(MemoryRange* writtenRange) = 0;
 };
-#define SLANG_UUID_IBufferResource \
-    {0x1b274efe, 0x5e37, 0x492b, {0x82, 0x6e, 0x7e, 0xe7, 0xe8, 0xf5, 0xa4, 0x9b}}
+#define SLANG_UUID_IBufferResource                         \
+    {                                                      \
+        0x1b274efe, 0x5e37, 0x492b,                        \
+        {                                                  \
+            0x82, 0x6e, 0x7e, 0xe7, 0xe8, 0xf5, 0xa4, 0x9b \
+        }                                                  \
+    }
 
 struct DepthStencilClearValue
 {
@@ -805,8 +825,13 @@ public:
 
     virtual SLANG_NO_THROW Desc* SLANG_MCALL getDesc() = 0;
 };
-#define SLANG_UUID_ITextureResource \
-    {0xcf88a31c, 0x6187, 0x46c5, {0xa4, 0xb7, 0xeb, 0x58, 0xc7, 0x33, 0x40, 0x17}}
+#define SLANG_UUID_ITextureResource                        \
+    {                                                      \
+        0xcf88a31c, 0x6187, 0x46c5,                        \
+        {                                                  \
+            0xa4, 0xb7, 0xeb, 0x58, 0xc7, 0x33, 0x40, 0x17 \
+        }                                                  \
+    }
 
 
 enum class ComparisonFunc : uint8_t
@@ -869,8 +894,13 @@ public:
     /// When using Vulkan, this will be a VkSampler.
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outNativeHandle) = 0;
 };
-#define SLANG_UUID_ISamplerState \
-    {0x8b8055df, 0x9377, 0x401d, {0x91, 0xff, 0x3f, 0xa3, 0xbf, 0x66, 0x64, 0xf4}}
+#define SLANG_UUID_ISamplerState                           \
+    {                                                      \
+        0x8b8055df, 0x9377, 0x401d,                        \
+        {                                                  \
+            0x91, 0xff, 0x3f, 0xa3, 0xbf, 0x66, 0x64, 0xf4 \
+        }                                                  \
+    }
 
 class IResourceView : public ISlangUnknown
 {
@@ -916,8 +946,13 @@ public:
     /// view.
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outNativeHandle) = 0;
 };
-#define SLANG_UUID_IResourceView \
-    {0x7b6c4926, 0x884, 0x408c, {0xad, 0x8a, 0x50, 0x3a, 0x8e, 0x23, 0x98, 0xa4}}
+#define SLANG_UUID_IResourceView                           \
+    {                                                      \
+        0x7b6c4926, 0x884, 0x408c,                         \
+        {                                                  \
+            0xad, 0x8a, 0x50, 0x3a, 0x8e, 0x23, 0x98, 0xa4 \
+        }                                                  \
+    }
 
 class IAccelerationStructure : public IResourceView
 {
@@ -1076,8 +1111,13 @@ public:
 
     virtual SLANG_NO_THROW DeviceAddress SLANG_MCALL getDeviceAddress() = 0;
 };
-#define SLANG_UUID_IAccelerationStructure \
-    {0xa5cdda3c, 0x1d4e, 0x4df7, {0x8e, 0xf2, 0xb7, 0x3f, 0xce, 0x4, 0xde, 0x3b}}
+#define SLANG_UUID_IAccelerationStructure                 \
+    {                                                     \
+        0xa5cdda3c, 0x1d4e, 0x4df7,                       \
+        {                                                 \
+            0x8e, 0xf2, 0xb7, 0x3f, 0xce, 0x4, 0xde, 0x3b \
+        }                                                 \
+    }
 
 class IFence : public ISlangUnknown
 {
@@ -1097,8 +1137,13 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getSharedHandle(InteropHandle* outHandle) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outNativeHandle) = 0;
 };
-#define SLANG_UUID_IFence \
-    {0x7fe1c283, 0xd3f4, 0x48ed, {0xaa, 0xf3, 0x1, 0x51, 0x96, 0x4e, 0x7c, 0xb5}}
+#define SLANG_UUID_IFence                                 \
+    {                                                     \
+        0x7fe1c283, 0xd3f4, 0x48ed,                       \
+        {                                                 \
+            0xaa, 0xf3, 0x1, 0x51, 0x96, 0x4e, 0x7c, 0xb5 \
+        }                                                 \
+    }
 
 struct ShaderOffset
 {
@@ -1196,8 +1241,13 @@ public:
         return entryPoint;
     }
 };
-#define SLANG_UUID_IShaderObject \
-    {0xc1fa997e, 0x5ca2, 0x45ae, {0x9b, 0xcb, 0xc4, 0x35, 0x9e, 0x85, 0x5, 0x85}}
+#define SLANG_UUID_IShaderObject                          \
+    {                                                     \
+        0xc1fa997e, 0x5ca2, 0x45ae,                       \
+        {                                                 \
+            0x9b, 0xcb, 0xc4, 0x35, 0x9e, 0x85, 0x5, 0x85 \
+        }                                                 \
+    }
 
 enum class StencilOp : uint8_t
 {
@@ -1358,8 +1408,13 @@ public:
         TargetLayout* depthStencil = nullptr;
     };
 };
-#define SLANG_UUID_IFramebufferLayout \
-    {0xa838785, 0xc13a, 0x4832, {0xad, 0x88, 0x64, 0x6, 0xb5, 0x4b, 0x5e, 0xba}}
+#define SLANG_UUID_IFramebufferLayout                     \
+    {                                                     \
+        0xa838785, 0xc13a, 0x4832,                        \
+        {                                                 \
+            0xad, 0x88, 0x64, 0x6, 0xb5, 0x4b, 0x5e, 0xba \
+        }                                                 \
+    }
 
 struct GraphicsPipelineStateDesc
 {
@@ -1440,16 +1495,26 @@ public:
         IShaderProgram* program;
     };
 };
-#define SLANG_UUID_IShaderTable \
-    {0xa721522c, 0xdf31, 0x4c2f, {0xa5, 0xe7, 0x3b, 0xe0, 0x12, 0x4b, 0x31, 0x78}}
+#define SLANG_UUID_IShaderTable                            \
+    {                                                      \
+        0xa721522c, 0xdf31, 0x4c2f,                        \
+        {                                                  \
+            0xa5, 0xe7, 0x3b, 0xe0, 0x12, 0x4b, 0x31, 0x78 \
+        }                                                  \
+    }
 
 class IPipelineState : public ISlangUnknown
 {
 public:
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) = 0;
 };
-#define SLANG_UUID_IPipelineState \
-    {0xca7e57d, 0x8a90, 0x44f3, {0xbd, 0xb1, 0xfe, 0x9b, 0x35, 0x3f, 0x5a, 0x72}}
+#define SLANG_UUID_IPipelineState                          \
+    {                                                      \
+        0xca7e57d, 0x8a90, 0x44f3,                         \
+        {                                                  \
+            0xbd, 0xb1, 0xfe, 0x9b, 0x35, 0x3f, 0x5a, 0x72 \
+        }                                                  \
+    }
 
 
 struct ScissorRect
@@ -1481,8 +1546,13 @@ public:
         IFramebufferLayout* layout;
     };
 };
-#define SLANG_UUID_IFrameBuffer \
-    {0xf0c0d9a, 0x4ef3, 0x4e18, {0x9b, 0xa9, 0x34, 0x60, 0xea, 0x69, 0x87, 0x95}}
+#define SLANG_UUID_IFrameBuffer                            \
+    {                                                      \
+        0xf0c0d9a, 0x4ef3, 0x4e18,                         \
+        {                                                  \
+            0x9b, 0xa9, 0x34, 0x60, 0xea, 0x69, 0x87, 0x95 \
+        }                                                  \
+    }
 
 struct WindowHandle
 {
@@ -1559,8 +1629,13 @@ public:
         TargetAccessDesc* depthStencilAccess = nullptr;
     };
 };
-#define SLANG_UUID_IRenderPassLayout \
-    {0xdaab0b1a, 0xf45d, 0x4ae9, {0xbf, 0x2c, 0xe0, 0xbb, 0x76, 0x7d, 0xfa, 0xd1}}
+#define SLANG_UUID_IRenderPassLayout                       \
+    {                                                      \
+        0xdaab0b1a, 0xf45d, 0x4ae9,                        \
+        {                                                  \
+            0xbf, 0x2c, 0xe0, 0xbb, 0x76, 0x7d, 0xfa, 0xd1 \
+        }                                                  \
+    }
 
 enum class QueryType
 {
@@ -1584,8 +1659,13 @@ public:
     getResult(GfxIndex queryIndex, GfxCount count, uint64_t* data) = 0;
     virtual SLANG_NO_THROW Result SLANG_MCALL reset() = 0;
 };
-#define SLANG_UUID_IQueryPool \
-    {0xc2cc3784, 0x12da, 0x480a, {0xa8, 0x74, 0x8b, 0x31, 0x96, 0x1c, 0xa4, 0x36}}
+#define SLANG_UUID_IQueryPool                              \
+    {                                                      \
+        0xc2cc3784, 0x12da, 0x480a,                        \
+        {                                                  \
+            0xa8, 0x74, 0x8b, 0x31, 0x96, 0x1c, 0xa4, 0x36 \
+        }                                                  \
+    }
 
 
 class ICommandEncoder : public ISlangUnknown
@@ -2000,8 +2080,13 @@ public:
 
     virtual SLANG_NO_THROW Result SLANG_MCALL getNativeHandle(InteropHandle* outHandle) = 0;
 };
-#define SLANG_UUID_ICommandBuffer \
-    {0x5d56063f, 0x91d4, 0x4723, {0xa7, 0xa7, 0x7a, 0x15, 0xaf, 0x93, 0xeb, 0x48}}
+#define SLANG_UUID_ICommandBuffer                          \
+    {                                                      \
+        0x5d56063f, 0x91d4, 0x4723,                        \
+        {                                                  \
+            0xa7, 0xa7, 0x7a, 0x15, 0xaf, 0x93, 0xeb, 0x48 \
+        }                                                  \
+    }
 
 class ICommandBufferD3D12 : public ICommandBuffer
 {
@@ -2009,8 +2094,13 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL invalidateDescriptorHeapBinding() = 0;
     virtual SLANG_NO_THROW void SLANG_MCALL ensureInternalDescriptorHeapsBound() = 0;
 };
-#define SLANG_UUID_ICommandBufferD3D12 \
-    {0xd56b7616, 0x6c14, 0x4841, {0x9d, 0x9c, 0x7b, 0x7f, 0xdb, 0x9f, 0xd9, 0xb8}}
+#define SLANG_UUID_ICommandBufferD3D12                     \
+    {                                                      \
+        0xd56b7616, 0x6c14, 0x4841,                        \
+        {                                                  \
+            0x9d, 0x9c, 0x7b, 0x7f, 0xdb, 0x9f, 0xd9, 0xb8 \
+        }                                                  \
+    }
 
 class ICommandQueue : public ISlangUnknown
 {
@@ -2050,8 +2140,13 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
     waitForFenceValuesOnDevice(GfxCount fenceCount, IFence** fences, uint64_t* waitValues) = 0;
 };
-#define SLANG_UUID_ICommandQueue \
-    {0x14e2bed0, 0xad0, 0x4dc8, {0xb3, 0x41, 0x6, 0x3f, 0xe7, 0x2d, 0xbf, 0xe}}
+#define SLANG_UUID_ICommandQueue                         \
+    {                                                    \
+        0x14e2bed0, 0xad0, 0x4dc8,                       \
+        {                                                \
+            0xb3, 0x41, 0x6, 0x3f, 0xe7, 0x2d, 0xbf, 0xe \
+        }                                                \
+    }
 
 class ITransientResourceHeap : public ISlangUnknown
 {
@@ -2099,8 +2194,13 @@ public:
         return result;
     }
 };
-#define SLANG_UUID_ITransientResourceHeap \
-    {0xcd48bd29, 0xee72, 0x41b8, {0xbc, 0xff, 0xa, 0x2b, 0x3a, 0xaa, 0x6d, 0xeb}}
+#define SLANG_UUID_ITransientResourceHeap                 \
+    {                                                     \
+        0xcd48bd29, 0xee72, 0x41b8,                       \
+        {                                                 \
+            0xbc, 0xff, 0xa, 0x2b, 0x3a, 0xaa, 0x6d, 0xeb \
+        }                                                 \
+    }
 
 class ITransientResourceHeapD3D12 : public ISlangUnknown
 {
@@ -2116,8 +2216,13 @@ public:
         Offset& outDescriptorOffset,
         void** outD3DDescriptorHeapHandle) = 0;
 };
-#define SLANG_UUID_ITransientResourceHeapD3D12 \
-    {0x9bc6a8bc, 0x5f7a, 0x454a, {0x93, 0xef, 0x3b, 0x10, 0x5b, 0xb7, 0x63, 0x7e}}
+#define SLANG_UUID_ITransientResourceHeapD3D12             \
+    {                                                      \
+        0x9bc6a8bc, 0x5f7a, 0x454a,                        \
+        {                                                  \
+            0x93, 0xef, 0x3b, 0x10, 0x5b, 0xb7, 0x63, 0x7e \
+        }                                                  \
+    }
 
 class ISwapchain : public ISlangUnknown
 {
@@ -2153,8 +2258,13 @@ public:
     // Toggle full screen mode.
     virtual SLANG_NO_THROW Result SLANG_MCALL setFullScreenMode(bool mode) = 0;
 };
-#define SLANG_UUID_ISwapchain \
-    {0xbe91ba6c, 0x784, 0x4308, {0xa1, 0x0, 0x19, 0xc3, 0x66, 0x83, 0x44, 0xb2}}
+#define SLANG_UUID_ISwapchain                             \
+    {                                                     \
+        0xbe91ba6c, 0x784, 0x4308,                        \
+        {                                                 \
+            0xa1, 0x0, 0x19, 0xc3, 0x66, 0x83, 0x44, 0xb2 \
+        }                                                 \
+    }
 
 struct AdapterLUID
 {
@@ -2717,8 +2827,13 @@ public:
         IShaderObject** outObject) = 0;
 };
 
-#define SLANG_UUID_IDevice \
-    {0x715bdf26, 0x5135, 0x11eb, {0xAE, 0x93, 0x02, 0x42, 0xAC, 0x13, 0x00, 0x02}}
+#define SLANG_UUID_IDevice                                 \
+    {                                                      \
+        0x715bdf26, 0x5135, 0x11eb,                        \
+        {                                                  \
+            0xAE, 0x93, 0x02, 0x42, 0xAC, 0x13, 0x00, 0x02 \
+        }                                                  \
+    }
 
 struct ShaderCacheStats
 {
@@ -2739,8 +2854,13 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL resetShaderCacheStats() = 0;
 };
 
-#define SLANG_UUID_IShaderCache \
-    {0x8eccc8ec, 0x5c04, 0x4a51, {0x99, 0x75, 0x13, 0xf8, 0xfe, 0xa1, 0x59, 0xf3}}
+#define SLANG_UUID_IShaderCache                            \
+    {                                                      \
+        0x8eccc8ec, 0x5c04, 0x4a51,                        \
+        {                                                  \
+            0x99, 0x75, 0x13, 0xf8, 0xfe, 0xa1, 0x59, 0xf3 \
+        }                                                  \
+    }
 
 class IPipelineCreationAPIDispatcher : public ISlangUnknown
 {
@@ -2765,11 +2885,21 @@ public:
     virtual SLANG_NO_THROW Result SLANG_MCALL
     afterCreateRayTracingState(IDevice* device, slang::IComponentType* program) = 0;
 };
-#define SLANG_UUID_IPipelineCreationAPIDispatcher \
-    {0xc3d5f782, 0xeae1, 0x4da6, {0xab, 0x40, 0x75, 0x32, 0x31, 0x2, 0xb7, 0xdc}}
+#define SLANG_UUID_IPipelineCreationAPIDispatcher         \
+    {                                                     \
+        0xc3d5f782, 0xeae1, 0x4da6,                       \
+        {                                                 \
+            0xab, 0x40, 0x75, 0x32, 0x31, 0x2, 0xb7, 0xdc \
+        }                                                 \
+    }
 
-#define SLANG_UUID_IVulkanPipelineCreationAPIDispatcher \
-    {0x4fcf1274, 0x8752, 0x4743, {0xb3, 0x51, 0x47, 0xcb, 0x83, 0x71, 0xef, 0x99}}
+#define SLANG_UUID_IVulkanPipelineCreationAPIDispatcher    \
+    {                                                      \
+        0x4fcf1274, 0x8752, 0x4743,                        \
+        {                                                  \
+            0xb3, 0x51, 0x47, 0xcb, 0x83, 0x71, 0xef, 0x99 \
+        }                                                  \
+    }
 
 // Global public functions
 
