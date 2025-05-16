@@ -214,7 +214,7 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 #endif
         }
 
-        gfxSetDebugLayerEnabled(useValidationLayer);
+        gfxEnableDebugLayer(useValidationLayer);
         if (isGfxDebugLayerEnabled())
             instanceExtensions.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 
