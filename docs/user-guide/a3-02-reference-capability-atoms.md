@@ -152,6 +152,12 @@ Versions
 `hlsl_nvapi`
 > Represents HLSL NVAPI support.
 
+`hlsl_2018`
+> Represet HLSL compatibility support.
+
+`hlsl_coopvec_poc`
+> Represet compatibility support for the deprecated POC DXC
+
 `dxil_lib`
 > Represents capabilities required for DXIL Library compilation.
 
@@ -423,6 +429,9 @@ Extensions
 > Represents the SPIR-V extension for shader invocation reorder.
 > Requires SPV_KHR_ray_tracing.
 
+`SPV_NV_cluster_acceleration_structure`
+> Represents the SPIR-V extension for cluster acceleration structure.
+
 `SPV_NV_shader_image_footprint`
 > Represents the SPIR-V extension for shader image footprint.
 
@@ -438,11 +447,20 @@ Extensions
 `SPV_EXT_replicated_composites`
 > Represents the SPIR-V extension for SPV_EXT_replicated_composites.
 
+`SPV_KHR_vulkan_memory_model`
+> Represents the SPIR-V extension for SPV_KHR_vulkan_memory_model.
+
 `SPV_NV_cooperative_vector`
 > Represents the SPIR-V extension for SPV_NV_cooperative_vector.
 
 `SPV_KHR_cooperative_matrix`
 > Represents the SPIR-V extension for SPV_KHR_cooperative_matrix.
+
+`SPV_NV_tensor_addressing`
+> Represents the SPIR-V extension for SPV_NV_tensor_addressing.
+
+`SPV_NV_cooperative_matrix2`
+> Represents the SPIR-V extension for SPV_NV_cooperative_matrix2.
 
 `spvAtomicFloat32AddEXT`
 > Represents the SPIR-V capability for atomic float 32 add operations.
@@ -534,6 +552,9 @@ Extensions
 `spvShaderInvocationReorderNV`
 > Represents the SPIR-V capability for shader invocation reorder.
 
+`spvRayTracingClusterAccelerationStructureNV`
+> Represents the SPIR-V capability for cluster acceleration structure.
+
 `spvShaderClockKHR`
 > Represents the SPIR-V capability for shader clock.
 
@@ -560,6 +581,24 @@ Extensions
 
 `spvCooperativeMatrixKHR`
 > Represents the SPIR-V capability for cooperative matrices
+
+`spvCooperativeMatrixReductionsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixConversionsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixPerElementOperationsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixTensorAddressingNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixBlockLoadsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvTensorAddressingNV`
+> Represents the SPIR-V capability for tensor addressing
 
 `spvMaximalReconvergenceKHR`
 > Represents the SPIR-V capability for maximal reconvergence.
@@ -740,6 +779,9 @@ Extensions
 
 `GL_NV_shader_texture_footprint`
 > Represents the GL_NV_shader_texture_footprint extension.
+
+`GL_NV_cluster_acceleration_structure`
+> Represents the GL_NV_cluster_acceleration_structure extension.
 
 Compound Capabilities
 ----------------------
@@ -926,6 +968,27 @@ Compound Capabilities
 
 `cooperative_vector_training`
 > Capabilities needed to train cooperative vectors
+
+`cooperative_matrix_reduction`
+> Capabilities needed to use reduction operations with cooperative matrix
+
+`cooperative_matrix_conversion`
+> Capabilities needed to convert cooperative matrices
+
+`cooperative_matrix_map_element`
+> Capabilities needed to use MapElement operation with cooperative matrix
+
+`cooperative_matrix_tensor_addressing`
+> Capabilities needed to load or store with tensor_addressing extension
+
+`cooperative_matrix_block_load`
+> Capabilities needed to use decodeFunc with cooperative matrix load
+
+`tensor_addressing`
+> Capabilities needed to use tensor addressing
+
+`cooperative_matrix_2`
+> Capabilities needed to use tensor addressing
 
 `any_stage`
 > Collection of all shader stages

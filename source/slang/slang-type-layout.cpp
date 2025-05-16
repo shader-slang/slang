@@ -2336,7 +2336,7 @@ static LayoutSize GetElementCount(IntVal* val)
             return LayoutSize::infinite();
         return LayoutSize(LayoutSize::RawValue(constantVal->getValue()));
     }
-    else if (const auto varRefVal = as<GenericParamIntVal>(val))
+    else if (const auto varRefVal = as<DeclRefIntVal>(val))
     {
         // TODO: We want to treat the case where the number of
         // elements in an array depends on a generic parameter
@@ -2349,6 +2349,10 @@ static LayoutSize GetElementCount(IntVal* val)
         return 0;
     }
     else if (const auto polyIntVal = as<PolynomialIntVal>(val))
+    {
+        return 0;
+    }
+    else if (as<FuncCallIntVal>(val))
     {
         return 0;
     }
@@ -4582,7 +4586,7 @@ static TypeLayoutResult _updateLayout(
     if (layoutResultPtr)
     {
         // Check the layout is the same!
-        SLANG_ASSERT(layoutResultPtr->layout.get() == result.layout);
+        SLANG_ASSERT(layoutResultPtr->layout == result.layout);
         // Update the info
         layoutResultPtr->info = result.info;
     }

@@ -194,6 +194,22 @@ static SlangResult _compileProgramImpl(
     else
         sessionTargetDesc.flags = 0;
 
+    {
+        slang::CompilerOptionEntry entry;
+        entry.value.kind = slang::CompilerOptionValueKind::Int;
+        if (options.generateSPIRVDirectly)
+        {
+            entry.name = slang::CompilerOptionName::EmitSpirvDirectly;
+            entry.value.intValue0 = int(options.generateSPIRVDirectly);
+        }
+        else
+        {
+            entry.name = slang::CompilerOptionName::EmitSpirvViaGLSL;
+            entry.value.intValue0 = int(!options.generateSPIRVDirectly);
+        }
+        sessionOptionEntries.add(entry);
+    }
+
     // Not expecting argument parsing to have added any targets
     SLANG_ASSERT(sessionDesc.targetCount == 0);
     sessionDesc.targetCount = 1;
@@ -208,6 +224,15 @@ static SlangResult _compileProgramImpl(
         entry.value.intValue0 =
             int(options.disableDebugInfo ? SlangDebugInfoLevel::SLANG_DEBUG_INFO_LEVEL_NONE
                                          : SlangDebugInfoLevel::SLANG_DEBUG_INFO_LEVEL_STANDARD);
+        sessionOptionEntries.add(entry);
+    }
+
+    for (auto& capability : options.capabilities)
+    {
+        slang::CompilerOptionEntry entry;
+        entry.name = slang::CompilerOptionName::Capability;
+        entry.value.kind = slang::CompilerOptionValueKind::String;
+        entry.value.stringValue0 = capability.getBuffer();
         sessionOptionEntries.add(entry);
     }
 

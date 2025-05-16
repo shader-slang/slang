@@ -101,6 +101,18 @@ public typealias f16mat2x2 = matrix<half, 2, 2>;
 public typealias f16mat2x3 = matrix<half, 2, 3>;
 public typealias f16mat2x4 = matrix<half, 2, 4>;
 
+public typealias f16mat3x2 = matrix<half, 3, 2>;
+public typealias f16mat3x3 = matrix<half, 3, 3>;
+public typealias f16mat3x4 = matrix<half, 3, 4>;
+
+public typealias f16mat4x2 = matrix<half, 4, 2>;
+public typealias f16mat4x3 = matrix<half, 4, 3>;
+public typealias f16mat4x4 = matrix<half, 4, 4>;
+
+// Convenience aliases for square matrices
+public typealias f16mat2 = f16mat2x2;
+public typealias f16mat3 = f16mat3x3;
+public typealias f16mat4 = f16mat4x4;
 
 public out float4 gl_Position : SV_Position;
 public out float gl_PointSize : SV_PointSize;
@@ -4892,6 +4904,35 @@ public property uint gl_HitKindEXT
         return HitKind();
     }
 }
+
+public property int gl_ClusterIDNV
+{
+    [require(glsl_spirv, raytracing_anyhit_closesthit)]
+    get
+    {
+        setupExtForRayTracingBuiltIn();
+        __target_switch
+        {
+        case glsl:
+        {
+            __requireTargetExtension("GL_NV_cluster_acceleration_structure");
+            __intrinsic_asm "(gl_ClusterIDNV)";
+        }
+        case spirv:
+        {
+            return spirv_asm
+            {
+                OpCapability RayTracingClusterAccelerationStructureNV;
+                OpExtension "SPV_NV_cluster_acceleration_structure";
+                result:$$int = OpLoad builtin(ClusterIDNV:int);
+            };
+        }
+        }
+    }
+}
+// Constant to indicate that a cluster acceleration structure was not hit.
+// Corresponds to VK_GEOMETRY_INSTANCE_CLUSTER_ID_NONE_NV in Vulkan
+public static const int gl_ClusterIDNoneNV = -1;
 
 public property mat4x3 gl_ObjectToWorldEXT 
 {

@@ -1,0 +1,116 @@
+name: Regenerate Command Line Reference
+on:
+  repository_dispatch:
+    types: [regenerate-cmdline-ref-command]
+jobs:
+  regenerate-cmdline-ref:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SLANGBOT_PAT }}
+          repository: ${{ github.event.client_payload.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.client_payload.pull_request.head.ref }}
+          path: pr-branch
+          submodules: "recursive"
+
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.SLANGBOT_PAT }}
+          repository: ${{ github.event.client_payload.pull_request.base.repo.full_name }}
+          ref: ${{ github.event.client_payload.pull_request.base.ref }}
+          path: target-branch
+          submodules: "recursive"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libx11-dev
+
+      - name: Setup
+        uses: ./target-branch/.github/actions/common-setup
+        with:
+          os: linux
+          compiler: gcc
+          platform: x86_64
+          config: release
+          build-llvm: false
+
+      - name: Build Slang
+        id: build
+        run: |
+          cd pr-branch
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+            -DSLANG_ENABLE_TESTS=OFF \
+            -DSLANG_ENABLE_EXAMPLES=OFF \
+            -DSLANG_ENABLE_GFX=OFF \
+            -DSLANG_ENABLE_SLANGD=OFF \
+            -DSLANG_EXCLUDE_DAWN=ON \
+            -DSLANG_EXCLUDE_TINT=ON
+          cmake --workflow --preset release
+
+      - name: Regenerate Command Line Reference
+        id: regen
+        run: |
+          cd pr-branch
+          mkdir -p docs
+          ./build/${{ env.cmake_config }}/bin/slangc -help-style markdown -h > docs/command-line-slangc-reference.md 2>&1
+
+      - name: Configure Git commit signing
+        id: git-info
+        run: |
+          echo "${{ secrets.SLANGBOT_SIGNING_KEY }}" > "${{runner.temp}}"/signing_key
+          chmod 600 "${{runner.temp}}"/signing_key
+          git -C pr-branch config commit.gpgsign true
+          git -C pr-branch config gpg.format ssh
+          git -C pr-branch config user.signingkey "${{runner.temp}}"/signing_key
+          bot_info=$(curl -s -H "Authorization: Bearer ${{ secrets.SLANGBOT_PAT }}" \
+            "https://api.github.com/user")
+          echo "bot_identity=$(echo $bot_info | jq --raw-output '.login + " <" + (.id|tostring) + "+" + .login + "@users.noreply.github.com>"')" >> $GITHUB_OUTPUT
+          echo "bot_name=$(echo $bot_info | jq --raw-output '.login')" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        id: create-pr
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.SLANGBOT_PAT }}
+          path: pr-branch
+          commit-message: "regenerate command line reference"
+          title: "Regenerate command line reference for PR #${{ github.event.client_payload.pull_request.number }}"
+          body: "Automated command line reference generation for ${{ github.event.client_payload.pull_request.html_url }}"
+          committer: ${{ steps.git-info.outputs.bot_identity }}
+          author: ${{ steps.git-info.outputs.bot_identity }}
+          branch: regenerate-cmdline-ref-${{ github.event.client_payload.pull_request.number }}-${{ github.event.client_payload.pull_request.head.ref }}
+          base: ${{ github.event.client_payload.pull_request.head.ref }}
+          push-to-fork: ${{ steps.git-info.outputs.bot_name }}/slang
+          delete-branch: true
+
+      - name: Comment on PR
+        uses: peter-evans/create-or-update-comment@v4
+        if: always()
+        with:
+          token: ${{ secrets.SLANGBOT_PAT }}
+          repository: ${{ github.event.client_payload.github.payload.repository.full_name }}
+          issue-number: ${{ github.event.client_payload.pull_request.number }}
+          body: |
+            ${{ 
+              steps.build.conclusion == 'failure'
+              && format('❌ Slang build failed. Please check the [workflow run](https://github.com/{0}/actions/runs/{1})', github.repository, github.run_id)
+              || (steps.regen.conclusion == 'failure' 
+                  && format('❌ Command line reference generation failed. Please check the [workflow run](https://github.com/{0}/actions/runs/{1})', github.repository, github.run_id)
+                  || (steps.create-pr.conclusion == 'failure' 
+                      && format('❌ Failed to create regenerate command line reference pull request. Please check the [workflow run](https://github.com/{0}/actions/runs/{1})', github.repository, github.run_id)
+                      || format('🌈 Regenerated command line reference, please merge the changes from [this PR]({0})', steps.create-pr.outputs.pull-request-url)))
+            }}
+
+      - name: Add reaction
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          token: ${{ secrets.SLANGBOT_PAT }}
+          repository: ${{ github.event.client_payload.github.payload.repository.full_name }}
+          comment-id: ${{ github.event.client_payload.github.payload.comment.id }}
+          reactions-edit-mode: replace
+          reactions: hooray

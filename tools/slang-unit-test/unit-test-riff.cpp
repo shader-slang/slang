@@ -9,7 +9,7 @@ using namespace Slang;
 static void _writeRandom(
     RandomGenerator* rand,
     size_t maxSize,
-    RiffContainer& ioContainer,
+    RIFF::BuildCursor& cursor,
     List<uint8_t>& ioData)
 {
     while (true)
@@ -27,84 +27,257 @@ static void _writeRandom(
         rand->nextData(ioData.getBuffer() + oldCount, allocSize);
 
         // Write
-        ioContainer.write(ioData.getBuffer() + oldCount, allocSize);
+        cursor.addData(ioData.getBuffer() + oldCount, allocSize);
     }
 
     // Should be a single block with same data as the List
-    RiffContainer::DataChunk* dataChunk =
-        as<RiffContainer::DataChunk>(ioContainer.getCurrentChunk());
+    auto dataChunk = as<RIFF::DataChunkBuilder>(cursor.getCurrentChunk());
     SLANG_ASSERT(dataChunk);
+}
+
+namespace
+{
+struct DumpContext
+{
+private:
+    WriterHelper _writer;
+    Count _indent = 0;
+    Count _hexByteCount = 0;
+    bool _isRoot = true;
+
+public:
+    DumpContext(ISlangWriter* writer)
+        : _writer(writer)
+    {
+    }
+
+    void beginListChunk(RIFF::Chunk::Type type)
+    {
+        _dumpIndent();
+        // If it's the root it's 'riff'
+        _dumpRiffType(_isRoot ? RIFF::RootChunk::kTag : RIFF::ListChunk::kTag);
+        _writer.put(" ");
+        _dumpRiffType(type);
+        _writer.put("\n");
+        _indent++;
+    }
+
+    void endListChunk() { _indent--; }
+
+    void beginDataChunk(RIFF::Chunk::Type type)
+    {
+        _dumpIndent();
+        // Write out the name
+        _dumpRiffType(type);
+        _writer.put("\n");
+        _indent++;
+
+        _hexByteCount = 0;
+    }
+
+    void endDataChunk() { _indent--; }
+
+    void handleData(void const* data, Size size)
+    {
+        auto cursor = static_cast<Byte const*>(data);
+        auto remainingSize = size;
+        while (remainingSize--)
+        {
+            auto byte = *cursor++;
+
+            static const Count kBytesPerLine = 32;
+            static const Count kBytesPerCluster = 4;
+            if (_hexByteCount % kBytesPerLine == 0)
+            {
+                _writer.put("\n");
+                _dumpIndent();
+            }
+            else if (_hexByteCount % kBytesPerCluster == 0)
+            {
+                _writer.put(" ");
+            }
+            _hexByteCount++;
+
+            char text[4] = {0, 0, ' ', 0};
+
+            char const* hexDigits = "0123456789abcdef";
+            text[0] = hexDigits[(byte >> 4) & 0xF];
+            text[1] = hexDigits[(byte >> 0) & 0xF];
+
+            _writer.put(text);
+        }
+    }
+
+    void _dumpIndent()
+    {
+        for (int i = 0; i < _indent; ++i)
+        {
+            _writer.put("  ");
+        }
+    }
+    void _dumpRiffType(FourCC fourCC)
+    {
+        auto rawValue = FourCC::RawValue(fourCC);
+
+        char text[5];
+        for (int i = 0; i < 4; ++i)
+        {
+            text[i] = char(rawValue & 0xFF);
+            rawValue >>= 8;
+        }
+        text[4] = 0;
+        _writer.put(text);
+    }
+};
+
+} // namespace
+
+static void _dump(RIFF::Chunk const* chunk, DumpContext context)
+{
+    if (auto listChunk = as<RIFF::ListChunk>(chunk))
+    {
+        context.beginListChunk(listChunk->getType());
+        for (auto child : listChunk->getChildren())
+            _dump(child, context);
+        context.endListChunk();
+    }
+    else if (auto dataChunk = as<RIFF::DataChunk>(chunk))
+    {
+        context.beginDataChunk(dataChunk->getType());
+        context.handleData(dataChunk->getPayload(), dataChunk->getPayloadSize());
+        context.endDataChunk();
+    }
+}
+
+static void _dump(RIFF::ChunkBuilder* chunk, DumpContext context)
+{
+    if (auto listChunk = as<RIFF::ListChunkBuilder>(chunk))
+    {
+        context.beginListChunk(listChunk->getType());
+        for (auto child : listChunk->getChildren())
+            _dump(child, context);
+        context.endListChunk();
+    }
+    else if (auto dataChunk = as<RIFF::DataChunkBuilder>(chunk))
+    {
+        context.beginDataChunk(dataChunk->getType());
+        for (auto shard : dataChunk->getShards())
+            context.handleData(shard->getPayload(), shard->getPayloadSize());
+        context.endDataChunk();
+    }
+}
+
+static bool _isSingleShard(RIFF::DataChunkBuilder* chunk)
+{
+    Count count = 0;
+    for (auto shard : chunk->getShards())
+    {
+        count++;
+        if (count > 1)
+            break;
+    }
+    return count == 1;
+}
+
+static bool _isEqual(RIFF::DataChunkBuilder* chunk, void const* data, Size size)
+{
+    auto remainingData = static_cast<Byte const*>(data);
+    auto remainingSize = size;
+
+    for (auto shard : chunk->getShards())
+    {
+        // If there is more content in the chunk than remains
+        // to compare against, then there is no chance of a match.
+        //
+        auto shardSize = shard->getPayloadSize();
+        if (shard->getPayloadSize() > remainingSize)
+        {
+            return false;
+        }
+
+        // Contents must match, byte-for-byte.
+        //
+        if (::memcmp(remainingData, shard->getPayload(), shardSize) != 0)
+        {
+            return false;
+        }
+
+        remainingData += shardSize;
+        remainingSize -= shardSize;
+    }
+
+    // If we reach the end of the chunk, then we have
+    // a match if there is no data remaining to
+    // compare against.
+    //
+    return remainingSize == 0;
 }
 
 SLANG_UNIT_TEST(riff)
 {
-    typedef RiffContainer::ScopeChunk ScopeChunk;
-    typedef RiffContainer::Chunk::Kind Kind;
-
     const FourCC markThings = SLANG_FOUR_CC('T', 'H', 'I', 'N');
     const FourCC markData = SLANG_FOUR_CC('D', 'A', 'T', 'A');
 
     {
-        RiffContainer container;
+        RIFF::Builder riffBuilder;
+        RIFF::BuildCursor cursor(riffBuilder);
 
         {
-            ScopeChunk scopeContainer(&container, Kind::List, markThings);
+            SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, markThings);
             {
-                ScopeChunk scopeChunk(&container, Kind::Data, markData);
+                SLANG_SCOPED_RIFF_BUILDER_DATA_CHUNK(cursor, markData);
 
                 const char hello[] = "Hello ";
                 const char world[] = "World!";
 
-                container.write(hello, sizeof(hello));
-                container.write(world, sizeof(world));
+                cursor.addData(hello, sizeof(hello));
+                cursor.addData(world, sizeof(world));
             }
 
             {
-                ScopeChunk scopeChunk(&container, Kind::Data, markData);
+                SLANG_SCOPED_RIFF_BUILDER_DATA_CHUNK(cursor, markData);
 
                 const char test0[] = "Testing... ";
                 const char test1[] = "Testing!";
 
-                container.write(test0, sizeof(test0));
-                container.write(test1, sizeof(test1));
+                cursor.addData(test0, sizeof(test0));
+                cursor.addData(test1, sizeof(test1));
             }
 
             {
-                ScopeChunk innerScopeContainer(&container, Kind::List, markThings);
+                SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, markThings);
 
                 {
-                    ScopeChunk scopeChunk(&container, Kind::Data, markData);
+                    SLANG_SCOPED_RIFF_BUILDER_DATA_CHUNK(cursor, markData);
 
                     const char another[] = "Another?";
-                    container.write(another, sizeof(another));
+                    cursor.addData(another, sizeof(another));
                 }
             }
         }
 
-        SLANG_CHECK(container.isFullyConstructed());
-        SLANG_CHECK(RiffContainer::isChunkOk(container.getRoot()));
+        SLANG_CHECK(cursor.getCurrentChunk() == nullptr);
+        SLANG_CHECK(riffBuilder.getRootChunk() != nullptr);
 
         {
             StringBuilder builder;
             {
-                StringWriter writer(&builder, 0);
-                RiffUtil::dump(container.getRoot(), &writer);
+                StringWriter writer(&builder);
+                _dump(riffBuilder.getRootChunk(), &writer);
             }
 
             {
-                OwnedMemoryStream stream(FileAccess::ReadWrite);
-                SLANG_CHECK(SLANG_SUCCEEDED(RiffUtil::write(container.getRoot(), true, &stream)));
+                ComPtr<ISlangBlob> blob;
+                SLANG_CHECK(SLANG_SUCCEEDED(riffBuilder.writeToBlob(blob.writeRef())));
 
-                stream.seek(SeekOrigin::Start, 0);
-
-                RiffContainer readContainer;
-                SLANG_CHECK(SLANG_SUCCEEDED(RiffUtil::read(&stream, readContainer)));
+                auto rootChunk = RIFF::RootChunk::getFromBlob(blob);
+                SLANG_CHECK(rootChunk != nullptr);
 
                 // Dump the read contents
                 StringBuilder readBuilder;
                 {
                     StringWriter writer(&readBuilder, 0);
-                    RiffUtil::dump(readContainer.getRoot(), &writer);
+                    _dump(rootChunk, &writer);
                 }
 
                 // They should be the same
@@ -116,29 +289,27 @@ SLANG_UNIT_TEST(riff)
     // Test writing as a stream only allocates a single data block (as long as there is enough
     // space).
     {
-        RiffContainer container;
+        RIFF::Builder builder;
+        RIFF::BuildCursor cursor(builder);
 
-        ScopeChunk scopeChunk(&container, Kind::List, markData);
+        SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, markThings);
         {
-            ScopeChunk scopeChunk(&container, Kind::Data, markData);
+            SLANG_SCOPED_RIFF_BUILDER_DATA_CHUNK(cursor, markData);
+
             RefPtr<RandomGenerator> rand = RandomGenerator::create(0x345234);
 
             List<uint8_t> data;
-            _writeRandom(
-                rand,
-                container.getMemoryArena().getBlockPayloadSize() / 2,
-                container,
-                data);
+            _writeRandom(rand, builder._getMemoryArena().getBlockPayloadSize() / 2, cursor, data);
 
             // Should be a single block with same data as the List
-            RiffContainer::DataChunk* dataChunk =
-                as<RiffContainer::DataChunk>(container.getCurrentChunk());
+            RIFF::DataChunkBuilder* dataChunk =
+                as<RIFF::DataChunkBuilder>(cursor.getCurrentChunk());
             SLANG_ASSERT(dataChunk);
 
-            // It should be a single block
-            SLANG_CHECK(dataChunk->getSingleData() != nullptr);
+            // It should be a single shard
+            SLANG_CHECK(_isSingleShard(dataChunk));
 
-            SLANG_CHECK(dataChunk->isEqual(data.getBuffer(), data.getCount()));
+            SLANG_CHECK(_isEqual(dataChunk, data.getBuffer(), data.getCount()));
         }
     }
 
@@ -148,23 +319,24 @@ SLANG_UNIT_TEST(riff)
 
         for (Int i = 0; i < 100; ++i)
         {
-            RiffContainer container;
+            RIFF::Builder builder;
+            RIFF::BuildCursor cursor(builder);
 
             const size_t maxSize = rand->nextInt32InRange(
                 1,
-                int32_t(container.getMemoryArena().getBlockPayloadSize() * 3));
+                int32_t(builder._getMemoryArena().getBlockPayloadSize() * 3));
 
-            ScopeChunk scopeChunk(&container, Kind::List, markData);
+            SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(cursor, markThings);
             {
-                ScopeChunk scopeChunk(&container, Kind::Data, markData);
+                SLANG_SCOPED_RIFF_BUILDER_DATA_CHUNK(cursor, markData);
 
                 List<uint8_t> data;
-                _writeRandom(rand, maxSize, container, data);
+                _writeRandom(rand, maxSize, cursor, data);
 
                 // Should be a single block with same data as the List
-                RiffContainer::DataChunk* dataChunk =
-                    as<RiffContainer::DataChunk>(container.getCurrentChunk());
-                SLANG_CHECK(dataChunk && dataChunk->isEqual(data.getBuffer(), data.getCount()));
+                RIFF::DataChunkBuilder* dataChunk =
+                    as<RIFF::DataChunkBuilder>(cursor.getCurrentChunk());
+                SLANG_CHECK(dataChunk && _isEqual(dataChunk, data.getBuffer(), data.getCount()));
             }
         }
     }
