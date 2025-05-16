@@ -5092,8 +5092,13 @@ SlangResult innerMain(int argc, char** argv)
         }
 
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
-        // excution or driver instability. We can try running them again.
+        // excution or driver instability. We can try running them again. Debug build has more
+        // instability at this moment, so we allow more retries.
+#if _DEBUG
+        static constexpr int kFailedTestLimitForRetry = 32;
+#else
         static constexpr int kFailedTestLimitForRetry = 16;
+#endif
         if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
         {
             if (context.failedFileTests.getCount() > 0)
