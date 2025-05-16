@@ -51,16 +51,12 @@ struct ShaderModelInfo
 };
 // List of shader models. Do not change oldest to newest order.
 static ShaderModelInfo kKnownShaderModels[] = {
-#define SHADER_MODEL_INFO_DXBC(major, minor)                                    \
-    {                                                                           \
-        D3D_SHADER_MODEL_##major##_##minor, SLANG_DXBC, "sm_" #major "_" #minor \
-    }
+#define SHADER_MODEL_INFO_DXBC(major, minor) \
+    {D3D_SHADER_MODEL_##major##_##minor, SLANG_DXBC, "sm_" #major "_" #minor}
     SHADER_MODEL_INFO_DXBC(5, 1),
 #undef SHADER_MODEL_INFO_DXBC
-#define SHADER_MODEL_INFO_DXIL(major, minor)                                    \
-    {                                                                           \
-        (D3D_SHADER_MODEL)0x##major##minor, SLANG_DXIL, "sm_" #major "_" #minor \
-    }
+#define SHADER_MODEL_INFO_DXIL(major, minor) \
+    {(D3D_SHADER_MODEL)0x##major##minor, SLANG_DXIL, "sm_" #major "_" #minor}
     SHADER_MODEL_INFO_DXIL(6, 0),
     SHADER_MODEL_INFO_DXIL(6, 1),
     SHADER_MODEL_INFO_DXIL(6, 2),
