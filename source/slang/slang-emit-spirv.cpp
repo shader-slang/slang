@@ -4591,8 +4591,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (coherentImage)
                 {
                     emitOperand(
-                        SpvImageOperandsMakeTexelVisibleMask |
-                        SpvImageOperandsNonPrivateTexelMask);
+                        SpvImageOperandsMakeTexelVisibleMask | SpvImageOperandsNonPrivateTexelMask);
 
                     emitOperand(memoryScope);
                 }
@@ -8945,7 +8944,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                 else
                                     requiredMask |= SpvImageOperandsMakeTexelAvailableMask;
 
-                                // If user specified any of the required masks, we cannot specified anymore.
+                                // If user specified any of the required masks, we cannot specified
+                                // anymore.
                                 if (usedMask & requiredMask)
                                     return;
 
