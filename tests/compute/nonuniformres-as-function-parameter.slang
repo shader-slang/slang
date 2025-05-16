@@ -2,7 +2,7 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL_SPV):-target spirv -entry main -stage compute -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry main -stage compute
-RWStructuredBuffer<uint> globalBuffer[] : register(t0, space0);
+RWStructuredBuffer<uint> globalBuffer[] : register(u0, space1);
 RWStructuredBuffer<uint3> outputBuffer;
 
 struct MyStruct

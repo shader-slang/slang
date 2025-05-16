@@ -24,22 +24,27 @@ void func(out float buffer[constValue0 / constValue1])
     }
 }
 
+struct MyStruct<let N: int>
+{
+    float buffer[N / constValue1];
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // This test checks that when we are using local constant that are computed from spec constant,
-    // the size can be defined in global scope, and type check can pass the when we call `func`.
-    const int localConst = constValue0 / constValue1;
-    float buffer[localConst];
+    // This test checks we can use spec constants for generic arguments, and also
+    // we can show that the array size is computed correctly.
+    // The function call shows that the two arrays are the same type.
+    MyStruct<constValue0> s;
     // CHECK: OpVariable %[[PT_TYPE]] Function
 
-    func(buffer);
+    func(s.buffer);
 
     float temp = 0.0f;
-    for (uint i = 0; i < localConst; i++)
+    for (uint i = 0; i < constValue0 / constValue1; i++)
     {
-        temp += buffer[i] * 2;
+        temp += s.buffer[i] * 2;
     }
 
     // Result will be (0 + localConst-1) * localConst = 15 * 16 = 240

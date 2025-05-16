@@ -2784,7 +2784,12 @@ Type* ComponentType::getTypeFromString(String const& typeStr, DiagnosticSink* si
     SLANG_AST_BUILDER_RAII(linkage->getASTBuilder());
 
     Expr* typeExpr = linkage->parseTermString(typeStr, scope);
-    type = checkProperType(linkage, TypeExp(typeExpr), sink);
+    SharedSemanticsContext sharedSemanticsContext(linkage, nullptr, sink);
+    SemanticsVisitor visitor(&sharedSemanticsContext);
+    type = visitor.TranslateTypeNode(typeExpr);
+    auto typeOut = visitor.tryCoerceToProperType(TypeExp(type));
+    if (typeOut.type)
+        type = typeOut.type;
 
     if (type)
     {
