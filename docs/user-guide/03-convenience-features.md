@@ -754,6 +754,85 @@ by using the `[ForceInline]` decoration:
 int f(int x) { return x + 1; }
 ```
 
+Error handling
+-----------------
+
+Slang supports an error handling mechanism that is superficially similar to
+exceptions in many other languages, but has some unique characteristics.
+
+In contrast to C++ exceptions, this mechanism makes the control flow of errors
+explicit, and the performance charasteristics are similar to adding an
+if-statement after every potentially throwing function call to check and handle
+the error.
+
+In order to be able to throw an error, a function must declare the type of that
+error with `throws`:
+```
+int f() throws MyError
+{
+    if (computerIsBroken())
+        throw MyError.CatastrophicFailure;
+    return 42;
+}
+```
+Currently, functions may only throw a single type of error.
+
+Only error types that implement the `IError` interface can be thrown. `IError`
+requires that the error type must have a dedicated value for "success". That
+success value is implicitly created when a `throws` function doesn't throw, and
+is used to detect when its return value is valid.
+
+You can easily implement `IError` for your own error types:
+```
+enum MyError
+{
+    Success = 0,
+    Failure = 1,
+    CatastrophicFailure = 2
+}
+
+extension MyError : IError
+{
+    static MyError createSuccessValue() { return Success; }
+    bool isSuccessValue() { return this == Success; }
+}
+```
+
+To call a function that may throw, you must prepend it with `try`:
+
+```
+let result = try f();
+```
+
+If you don't catch the `try`, related errors are re-thrown and the calling
+function must declare that it `throws` that error type:
+
+```
+void g() throws MyError
+{
+    // This would not compile if `g()` wasn't declared to throw MyError as well.
+    let result = try f();
+    printf("Success: %d\n", result);
+}
+```
+
+To catch an error, you can use the `catch` statement:
+
+```
+void g()
+{
+    let result = try f();
+    printf("Success: %d\n", result);
+    catch(err: MyError)
+    {
+        printf("Not good!\n");
+    }
+}
+```
+
+`catch` statements must always appear at the end of a block; no other type of
+statement can occur after a `catch`. You can have multiple catch statements for
+different types of errors.
 
 Special Scoping Syntax
 -------------------
