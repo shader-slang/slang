@@ -1226,6 +1226,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_EXT_shader_atomic_float_min_max` : enables the GL_EXT_shader_atomic_float_min_max extension 
 * `GL_EXT_shader_atomic_float2` : enables the GL_EXT_shader_atomic_float2 extension 
 * `GL_EXT_shader_atomic_int64` : enables the GL_EXT_shader_atomic_int64 extension 
+* `GL_EXT_shader_explicit_arithmetic_types` : enables the GL_EXT_shader_explicit_arithmetic_types extension 
 * `GL_EXT_shader_explicit_arithmetic_types_int64` : enables the GL_EXT_shader_explicit_arithmetic_types_int64 extension 
 * `GL_EXT_shader_image_load_store` : enables the GL_EXT_shader_image_load_store extension 
 * `GL_EXT_shader_realtime_clock` : enables the GL_EXT_shader_realtime_clock extension 
