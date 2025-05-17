@@ -806,10 +806,6 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    // Lower `Result<T,E>` types into ordinary struct types.
-    if (requiredLoweringPassSet.resultType)
-        lowerResultType(irModule, sink);
-
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "UNIONS DESUGARED");
 #endif
@@ -950,6 +946,12 @@ Result linkAndOptimizeIR(
         if (!changed)
             break;
     }
+
+    // Lower `Result<T,E>` types into ordinary struct types. This must happen
+    // after specialization, since otherwise incompatible copies of the lowered
+    // result structure are generated.
+    if (requiredLoweringPassSet.resultType)
+        lowerResultType(irModule, sink);
 
     // Report checkpointing information
     if (codeGenContext->shouldReportCheckpointIntermediates())

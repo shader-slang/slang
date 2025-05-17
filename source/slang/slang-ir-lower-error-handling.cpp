@@ -15,6 +15,7 @@ struct ErrorHandlingLoweringContext
 
     InstWorkList workList;
     InstHashSet workListSet;
+    List<IRFuncType*> oldFuncTypes;
 
     ErrorHandlingLoweringContext(IRModule* inModule)
         : module(inModule), workList(inModule), workListSet(inModule)
@@ -37,8 +38,12 @@ struct ErrorHandlingLoweringContext
             return;
         IRBuilder builder(module);
         builder.setInsertBefore(funcType);
-        auto resultType =
-            builder.getResultType(funcType->getResultType(), throwAttr->getErrorType());
+
+        auto resultType = builder.getResultType(
+            funcType->getResultType(),
+            throwAttr->getErrorType(),
+            throwAttr->getErrorTypeWitness());
+
         List<IRType*> paramTypes;
         for (UInt i = 0; i < funcType->getParamCount(); i++)
         {
@@ -48,6 +53,7 @@ struct ErrorHandlingLoweringContext
         }
         auto newFuncType = builder.getFuncType(paramTypes, resultType);
         funcType->replaceUsesWith(newFuncType);
+        funcType->removeAndDeallocate();
     }
 
     void processTryCall(IRTryCall* tryCall)
@@ -86,7 +92,8 @@ struct ErrorHandlingLoweringContext
         IRBuilder builder(module);
         builder.setInsertBefore(tryCall);
 
-        auto resultType = builder.getResultType(resultValueType, errorType);
+        auto resultType =
+            builder.getResultType(resultValueType, errorType, throwAttr->getErrorTypeWitness());
         List<IRInst*> args;
         for (UInt i = 0; i < tryCall->getArgCount(); i++)
         {
@@ -99,14 +106,19 @@ struct ErrorHandlingLoweringContext
         auto failBlock = tryCall->getFailureBlock();
         auto successBlock = tryCall->getSuccessBlock();
 
-        builder.emitIf(isFail, failBlock, successBlock);
+        // The isFail branch could otherwise just jump to the handler, but
+        // there's unfortunately the error parameter that needs to be passed as
+        // well, and it can't be done in IfElse. So there's an extra block in
+        // between to do that.
+        auto handlerJumpBlock = builder.createBlock();
+        auto branch = builder.emitIf(isFail, handlerJumpBlock, successBlock);
 
-        // Replace the params in failBlock to `getResultError(call)`.
-        builder.setInsertBefore(failBlock->getFirstOrdinaryInst());
-        auto errorParam = failBlock->getFirstParam();
+        builder.setInsertAfter(branch->getParent());
+        builder.addInst(handlerJumpBlock);
+        builder.setInsertInto(handlerJumpBlock);
+
         auto errVal = builder.emitGetResultError(call);
-        errorParam->replaceUsesWith(errVal);
-        errorParam->removeAndDeallocate();
+        builder.emitBranch(failBlock, 1, &errVal);
 
         // Replace the params in successBlock to `getResultValue(call)`.
         builder.setInsertBefore(successBlock->getFirstOrdinaryInst());
@@ -132,8 +144,10 @@ struct ErrorHandlingLoweringContext
         // replace it with a `return makeResultValue(val)`, so that it returns a `Result<T,E>` type.
         IRBuilder builder(module);
         builder.setInsertBefore(ret);
-        auto resultType =
-            builder.getResultType(funcType->getResultType(), throwAttr->getErrorType());
+        auto resultType = builder.getResultType(
+            funcType->getResultType(),
+            throwAttr->getErrorType(),
+            throwAttr->getErrorTypeWitness());
         IRInst* resultVal = nullptr;
         auto val = cast<IRReturn>(ret)->getVal();
         resultVal = builder.emitMakeResultValue(resultType, val);
@@ -153,8 +167,10 @@ struct ErrorHandlingLoweringContext
         // replace it with a `return makeResultError(e)`.
         IRBuilder builder(module);
         builder.setInsertBefore(throwInst);
-        auto resultType =
-            builder.getResultType(funcType->getResultType(), throwAttr->getErrorType());
+        auto resultType = builder.getResultType(
+            funcType->getResultType(),
+            throwAttr->getErrorType(),
+            throwAttr->getErrorTypeWitness());
         IRInst* resultVal = builder.emitMakeResultError(resultType, throwInst->getValue());
         builder.emitReturn(resultVal);
         throwInst->removeAndDeallocate();
@@ -172,6 +188,9 @@ struct ErrorHandlingLoweringContext
             break;
         case kIROp_Throw:
             processThrow(cast<IRThrow>(inst));
+            break;
+        case kIROp_FuncType:
+            oldFuncTypes.add(cast<IRFuncType>(inst));
             break;
         default:
             break;
@@ -206,18 +225,6 @@ struct ErrorHandlingLoweringContext
         // Lower all functypes.
         // Function types with an IRThrowTypeAttribute will be translated into a normal function
         // type that returns `Result<T,E>`.
-        List<IRFuncType*> oldFuncTypes;
-        for (auto child : module->getGlobalInsts())
-        {
-            switch (child->getOp())
-            {
-            case kIROp_FuncType:
-                oldFuncTypes.add(cast<IRFuncType>(child));
-                break;
-            default:
-                break;
-            }
-        }
         for (auto funcType : oldFuncTypes)
         {
             processFuncType(funcType);

@@ -620,6 +620,12 @@ static IRBlock::SuccessorList getSuccessors(IRInst* terminator)
         end = begin + 1;
         break;
 
+    case kIROp_TryCall:
+        // tryCall <successBlock> <failBlock> <callee> <args>...
+        begin = operands + 0;
+        end = begin + 2;
+        break;
+
     default:
         SLANG_UNEXPECTED("unhandled terminator instruction");
         UNREACHABLE_RETURN(IRBlock::SuccessorList(nullptr, nullptr));
@@ -2908,10 +2914,13 @@ IRExpandType* IRBuilder::getExpandTypeOrVal(
         args.getArrayView().getBuffer());
 }
 
-IRResultType* IRBuilder::getResultType(IRType* valueType, IRType* errorType)
+IRResultType* IRBuilder::getResultType(
+    IRType* valueType,
+    IRType* errorType,
+    IRInst* errorTypeWitness)
 {
-    IRInst* operands[] = {valueType, errorType};
-    return (IRResultType*)getType(kIROp_ResultType, 2, operands);
+    IRInst* operands[] = {valueType, errorType, errorTypeWitness};
+    return (IRResultType*)getType(kIROp_ResultType, 3, operands);
 }
 
 IROptionalType* IRBuilder::getOptionalType(IRType* valueType)

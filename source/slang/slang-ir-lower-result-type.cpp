@@ -24,6 +24,8 @@ struct ResultTypeLoweringContext
     {
         IRType* resultType = nullptr;
         IRType* errorType = nullptr;
+        IRInst* successValueCreateFunc = nullptr;
+        IRInst* successValueTestFunc = nullptr;
         IRType* valueType = nullptr;
         IRType* loweredType = nullptr;
         IRStructField* valueField = nullptr;
@@ -53,10 +55,26 @@ struct ResultTypeLoweringContext
             return nullptr;
 
         RefPtr<LoweredResultTypeInfo> info = new LoweredResultTypeInfo();
-        info->resultType = (IRType*)type;
-        info->errorType = cast<IRResultType>(type)->getErrorType();
-
         auto resultType = cast<IRResultType>(type);
+        info->resultType = (IRType*)type;
+
+        info->errorType = resultType->getErrorType();
+        auto witnessTable = as<IRWitnessTable>(resultType->getErrorTypeWitness());
+        SLANG_ASSERT(witnessTable != nullptr);
+
+        auto successValueCreateEntry =
+            as<IRWitnessTableEntry>(witnessTable->getEntries().getFirst());
+        SLANG_ASSERT(successValueCreateEntry != nullptr);
+
+        info->successValueCreateFunc = successValueCreateEntry->getSatisfyingVal();
+        SLANG_ASSERT(info->successValueCreateFunc != nullptr);
+
+        auto successValueTestEntry = as<IRWitnessTableEntry>(successValueCreateEntry->next);
+        SLANG_ASSERT(successValueTestEntry != nullptr);
+
+        info->successValueTestFunc = successValueTestEntry->getSatisfyingVal();
+        SLANG_ASSERT(info->successValueTestFunc != nullptr);
+
         auto valueType = resultType->getValueType();
         if (valueType->getOp() != kIROp_VoidType)
         {
@@ -98,30 +116,6 @@ struct ResultTypeLoweringContext
         workListSet.add(inst);
     }
 
-    IRInst* getSuccessErrorValue(IRType* type)
-    {
-        switch (type->getOp())
-        {
-        case kIROp_Int8Type:
-        case kIROp_Int16Type:
-        case kIROp_IntType:
-        case kIROp_Int64Type:
-        case kIROp_IntPtrType:
-        case kIROp_UInt8Type:
-        case kIROp_UInt16Type:
-        case kIROp_UIntType:
-        case kIROp_UInt64Type:
-        case kIROp_UIntPtrType:
-            break;
-        default:
-            SLANG_ASSERT_FAILURE("error type is not lowered to an integer type.");
-        }
-        IRBuilder builderStorage(module);
-        auto builder = &builderStorage;
-        builder->setInsertInto(module);
-        return builder->getIntValue(type, 0);
-    }
-
     void processMakeResultValue(IRMakeResultValue* inst)
     {
         IRBuilder builderStorage(module);
@@ -129,18 +123,21 @@ struct ResultTypeLoweringContext
         builder->setInsertBefore(inst);
 
         auto info = getLoweredResultType(builder, inst->getDataType());
+
+        auto successValue =
+            builder->emitCallInst(info->errorType, info->successValueCreateFunc, 0, nullptr);
+
         if (info->loweredType->getOp() == kIROp_StructType)
         {
             List<IRInst*> operands;
             operands.add(inst->getOperand(0));
-            operands.add(getSuccessErrorValue(info->errorType));
+            operands.add(successValue);
             auto makeStruct = builder->emitMakeStruct(info->loweredType, operands);
             inst->replaceUsesWith(makeStruct);
         }
         else
         {
-            auto errCode = getSuccessErrorValue(info->errorType);
-            inst->replaceUsesWith(errCode);
+            inst->replaceUsesWith(successValue);
         }
         inst->removeAndDeallocate();
     }
@@ -208,7 +205,7 @@ struct ResultTypeLoweringContext
         SLANG_ASSERT(loweredResultTypeInfo);
         SLANG_ASSERT(loweredResultTypeInfo->valueField);
         auto getElement = builder->emitFieldExtract(
-            loweredResultTypeInfo->errorType,
+            loweredResultTypeInfo->valueType,
             base,
             loweredResultTypeInfo->valueField->getKey());
         inst->replaceUsesWith(getElement);
@@ -224,13 +221,17 @@ struct ResultTypeLoweringContext
         auto base = inst->getResultOperand();
         auto loweredResultTypeInfo = getLoweredResultType(builder, base->getDataType());
         SLANG_ASSERT(loweredResultTypeInfo);
-        SLANG_ASSERT(loweredResultTypeInfo->valueField);
 
         auto resultValue = inst->getResultOperand();
         auto errValue = getResultError(builder, resultValue);
-        auto isSuccess =
-            builder->emitNeq(errValue, getSuccessErrorValue(loweredResultTypeInfo->errorType));
-        inst->replaceUsesWith(isSuccess);
+        auto isSuccess = builder->emitCallInst(
+            builder->getBoolType(),
+            loweredResultTypeInfo->successValueTestFunc,
+            1,
+            &errValue);
+        auto isFailure = builder->emitNot(builder->getBoolType(), isSuccess);
+
+        inst->replaceUsesWith(isFailure);
         inst->removeAndDeallocate();
     }
 

@@ -526,6 +526,7 @@ DIAGNOSTIC(
     Error,
     unexpectedBodyAfterSemicolon,
     "unexpected function body after signature declaration, is this ';' a typo?")
+DIAGNOSTIC(20103, Error, catchBeforeEndOfScope, "catch statements must be last in scope.")
 DIAGNOSTIC(30102, Error, declNotAllowed, "$0 is not allowed here.")
 
 // 29xxx - Snippet parsing and inline asm
@@ -944,6 +945,33 @@ DIAGNOSTIC(
     Error,
     nonCopyableTypeCapturedInLambda,
     "cannot capture non-copyable type '$0' in a lambda expression.")
+
+DIAGNOSTIC(
+    30113,
+    Error,
+    uncaughtThrowInsideDefer,
+    "'throw' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(
+    30114,
+    Error,
+    uncaughtTryInsideDefer,
+    "'try' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(
+    30115,
+    Error,
+    uncaughtThrowInNonThrowFunc,
+    "the current function or environment is not declared to throw any errors, but contains an "
+    "uncaught 'throw' statement.")
+DIAGNOSTIC(
+    30116,
+    Error,
+    throwTypeIncompatibleWithErrorType,
+    "the type `$0` of `throw` is not compatible with function's error type `$1`.")
+DIAGNOSTIC(
+    30117,
+    Error,
+    errorTypeDoesNotConformToIError,
+    "the function's error type `$0` does not conform to interface `IError`.")
 
 // Include
 DIAGNOSTIC(

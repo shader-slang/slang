@@ -216,6 +216,8 @@ public:
     ContinueStmt* ParseContinueStatement();
     ReturnStmt* ParseReturnStatement();
     DeferStmt* ParseDeferStatement();
+    ThrowStmt* ParseThrowStatement();
+    CatchStmt* ParseCatchStatement(Stmt* parseBody, ContainerDecl* parentDecl);
     ExpressionStmt* ParseExpressionStatement();
     Expr* ParseExpression(Precedence level = Precedence::Comma);
 
@@ -5781,6 +5783,10 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
     {
         statement = ParseExpressionStatement();
     }
+    else if (LookAheadToken("throw"))
+    {
+        statement = ParseThrowStatement();
+    }
     else if (LookAheadToken(TokenType::Identifier) || LookAheadToken(TokenType::Scope))
     {
         if (LookAheadToken(TokenType::Identifier) && LookAheadToken(TokenType::Colon, 1))
@@ -5934,13 +5940,14 @@ Stmt* Parser::parseBlockStatement()
         return emptyStmt;
     }
 
+    ContainerDecl* catchParentDecl = currentScope->containerDecl;
     ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
     BlockStmt* blockStatement = astBuilder->create<BlockStmt>();
     blockStatement->scopeDecl = scopeDecl;
     pushScopeAndSetParent(scopeDecl);
 
     Stmt* body = nullptr;
-
+    bool catchSegment = false;
 
     if (!tokenReader.isAtEnd())
     {
@@ -5999,6 +6006,21 @@ Stmt* Parser::parseBlockStatement()
             auto typeDefDecl = parseTypeAliasDecl(this, nullptr);
             AddMember(scopeDecl, (Decl*)typeDefDecl);
             continue;
+        }
+        else if (LookAheadToken("catch"))
+        {
+            // Move preceding instructions in block inside the catch statement,
+            // then replace the current contents with the catch statement.
+            auto catchStmt = ParseCatchStatement(body, catchParentDecl);
+            body = nullptr;
+            catchSegment = true;
+            if (catchStmt)
+                addStmt(catchStmt);
+            continue;
+        }
+        else if (catchSegment)
+        {
+            sink->diagnose(tokenReader.peekLoc(), Diagnostics::catchBeforeEndOfScope);
         }
 
         auto stmt = ParseStatement();
@@ -6313,6 +6335,53 @@ DeferStmt* Parser::ParseDeferStatement()
     ReadToken("defer");
     deferStatement->statement = ParseStatement();
     return deferStatement;
+}
+
+ThrowStmt* Parser::ParseThrowStatement()
+{
+    ThrowStmt* throwStatement = astBuilder->create<ThrowStmt>();
+    FillPosition(throwStatement);
+    ReadToken("throw");
+    throwStatement->expression = ParseExpression();
+    return throwStatement;
+}
+
+CatchStmt* Parser::ParseCatchStatement(Stmt* tryBody, ContainerDecl* parentDecl)
+{
+    ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
+    // The scope of the catch block is a bit odd, it's not the same as the block
+    // it's in but the one above it. That's because `try` may cause jumps over
+    // variables declared in the direct parent.
+    scopeDecl->parentDecl = parentDecl;
+    PushScope(scopeDecl);
+
+    CatchStmt* catchStatement = astBuilder->create<CatchStmt>();
+    FillPosition(catchStatement);
+    ReadToken("catch");
+    ReadToken(TokenType::LParent);
+
+    LetDecl* errorVar = astBuilder->create<LetDecl>();
+    FillPosition(errorVar);
+    if (_peekModernStyleVarDecl(this))
+    {
+        errorVar->nameAndLoc = NameLoc(ReadToken(TokenType::Identifier));
+        ReadToken(TokenType::Colon);
+        errorVar->type = ParseTypeExp();
+    }
+    else
+    {
+        errorVar->type = ParseTypeExp();
+        errorVar->nameAndLoc = NameLoc(ReadToken(TokenType::Identifier));
+    }
+    catchStatement->errorVar = errorVar;
+    AddMember(scopeDecl, errorVar);
+
+    ReadToken(TokenType::RParent);
+    catchStatement->tryBody = tryBody;
+    catchStatement->handleBody = ParseStatement();
+
+    PopScope();
+    return catchStatement;
 }
 
 ExpressionStmt* Parser::ParseExpressionStatement()
