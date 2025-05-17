@@ -65,11 +65,39 @@ struct GlobalVarTranslationContext
             if (!entryPointFunc)
                 continue;
 
-            // It's an error to mix GLSL-flavored global in/out vars and entry point params.
-            // Before we continue, check for this here and throw an error if mixing is
-            // detected.
+            // Mixing GLSL-flavored global in/out vars and entry point params is only allowed
+            // when either all global in/out vars or all entry point params have a system value
+            // binding semantic. It may be possible to mix these in general, but binding offsets
+            // and other items would likely need to be recalculated.
+            bool allGlobalsHaveSVBindingSemantic = true;
+            bool allEntryParamsHaveSVBindingSemantic = true;
 
-            if (entryPointFunc->getParamCount() != 0)
+            for (auto param : entryPointFunc->getParams())
+            {
+
+                auto semanticDecor = param->findDecoration<IRSemanticDecoration>();
+                if (semanticDecor && semanticDecor->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
+                    continue;
+                else
+                {
+                    allEntryParamsHaveSVBindingSemantic = false;
+                    break;
+                }
+            }
+
+            for (auto input : inputVars)
+            {
+                auto semanticDecor = input->findDecoration<IRSemanticDecoration>();
+                if (semanticDecor && semanticDecor->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
+                    continue;
+                else
+                {
+                    allGlobalsHaveSVBindingSemantic = false;
+                    break;
+                }
+            }
+
+            if (!(allEntryParamsHaveSVBindingSemantic || allGlobalsHaveSVBindingSemantic))
             {
                 context->getSink()->diagnose(
                     entryPointFunc,
@@ -86,6 +114,32 @@ struct GlobalVarTranslationContext
             builder.setInsertBefore(entryPointFunc);
             auto inputStructType = builder.createStructType();
             IRStructTypeLayout::Builder inputStructTypeLayoutBuilder(&builder);
+
+            // Go through the existing parameter layouts and add them to the
+            // replacement struct type first.
+
+            auto entryPointLayoutDecor = entryPointFunc->findDecoration<IRLayoutDecoration>();
+            if (!entryPointLayoutDecor)
+                continue;
+
+            auto entryPointLayout = as<IREntryPointLayout>(entryPointLayoutDecor->getLayout());
+            if (!entryPointLayout)
+                continue;
+
+            // The parameter layout for an entry point will either be a structure
+            // type layout, or a parameter group type layout.
+            auto entryPointParamsStructLayout = getScopeStructLayout(entryPointLayout);
+            if (!entryPointParamsStructLayout)
+                continue;
+
+            for (auto attr : entryPointParamsStructLayout->getFieldLayoutAttrs())
+            {
+                IRVarLayout* fieldLayout = attr->getLayout();
+                IRInst* key = attr->getFieldKey();
+                inputStructTypeLayoutBuilder.addField(key, fieldLayout);
+            }
+
+            // Add the global vars to the replacement struct.
             UInt inputVarIndex = 0;
             List<IRStructKey*> inputKeys;
             for (auto input : inputVars)
@@ -267,18 +321,33 @@ struct GlobalVarTranslationContext
                     }
                 }
             }
-            if (auto entryPointLayoutDecor = entryPointFunc->findDecoration<IRLayoutDecoration>())
+            if (entryPointLayout)
             {
-                if (auto entryPointLayout =
-                        as<IREntryPointLayout>(entryPointLayoutDecor->getLayout()))
+                if (paramLayout)
                 {
-                    if (paramLayout)
-                        builder.replaceOperand(entryPointLayout->getOperands(), paramLayout);
-                    if (resultVarLayout)
-                        builder.replaceOperand(
-                            entryPointLayout->getOperands() + 1,
-                            resultVarLayout);
+                    if (auto paramGroupTypeLayout = as<IRParameterGroupTypeLayout>(entryPointParamsStructLayout))
+                    {
+                        IRParameterGroupTypeLayout::Builder paramGroupTypeLayoutBuilder(&builder);
+                        paramGroupTypeLayoutBuilder.setContainerVarLayout(paramGroupTypeLayout->getContainerVarLayout());
+                        paramGroupTypeLayoutBuilder.setElementVarLayout(paramLayout);
+                        paramGroupTypeLayoutBuilder.setOffsetElementTypeLayout(paramTypeLayout);
+                        builder.replaceOperand(entryPointLayout->getParamsLayout()->getOperands(), paramGroupTypeLayoutBuilder.build());
+                    }
+                    else if (as<IRStructTypeLayout>(entryPointParamsStructLayout))
+                    {
+                        builder.replaceOperand(entryPointLayout->getParamsLayout()->getOperands(), paramTypeLayout);
+                    }
+                    else
+                    {
+                        // ???: Replace this instance and the one in slang-emit.cpp with
+                        // a diagnostic?
+                        SLANG_UNEXPECTED("uhandled global-scope binding layout");
+                    }
                 }
+                if (resultVarLayout)
+                    builder.replaceOperand(
+                        entryPointLayout->getOperands() + 1,
+                        resultVarLayout);
             }
             // Update func type for the entry point.
             List<IRType*> paramTypes;
