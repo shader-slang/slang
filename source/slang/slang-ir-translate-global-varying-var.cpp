@@ -65,15 +65,27 @@ struct GlobalVarTranslationContext
             if (!entryPointFunc)
                 continue;
 
-            // It's an error to mix GLSL-flavored global in/out vars and entry point params.
+            // It's an error to mix GLSL-flavored global in/out vars lacking SV semantics and entry point params.
             // Before we continue, check for this here and throw an error if mixing is
             // detected.
 
+            // If we have entry point params, we need to make sure that all of the GLSL style in/out vars have
+            // system value binding semantics.
+            // TODO: It may be possible to mix with non SV semantics as well, but offsets would need to be recalculated.
             if (entryPointFunc->getParamCount() != 0)
             {
-                context->getSink()->diagnose(
-                    entryPointFunc,
-                    Diagnostics::mixingGLSLFlavoredGlobalInOutVarsWithEntryPointParams);
+                for (auto input : inputVars)
+                {
+                    // ???: Is it possible for a user to make a semantic that starts with SV_ ?
+                    //      Is there a better way to check for a system value semantic below?
+                    auto semanticDecor = input->findDecoration<IRSemanticDecoration>();
+                    if (!semanticDecor && !semanticDecor->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
+                    {
+                        context->getSink()->diagnose(
+                            entryPointFunc,
+                            Diagnostics::mixingGLSLFlavoredGlobalInOutVarsWithEntryPointParams);
+                    }
+                }
             }
 
             auto entryPointDecor = entryPointFunc->findDecoration<IREntryPointDecoration>();
@@ -82,10 +94,36 @@ struct GlobalVarTranslationContext
             IRVarLayout* paramLayout = nullptr;
             IRType* resultType = entryPointFunc->getResultType();
 
+            auto entryPointLayoutDecor = entryPointFunc->findDecoration<IRLayoutDecoration>();
+            if (!entryPointLayoutDecor)
+                continue; // Throw error?
+
+            auto entryPointLayout = as<IREntryPointLayout>(entryPointLayoutDecor->getLayout());
+            if (!entryPointLayout)
+                continue; // Throw error?
+
+            // The parameter layout for an entry point will either be a structure
+            // type layout, or a parameter group type layout.
+            auto entryPointParamsStructLayout = getScopeStructLayout(entryPointLayout);
+            if (!entryPointParamsStructLayout)
+                continue;
+
             // Create a struct type to receive all inputs.
             builder.setInsertBefore(entryPointFunc);
             auto inputStructType = builder.createStructType();
             IRStructTypeLayout::Builder inputStructTypeLayoutBuilder(&builder);
+
+            // Go through the existing parameter layouts and add them to the
+            // replacement struct type first.
+            for (auto attr : entryPointParamsStructLayout->getFieldLayoutAttrs())
+            {
+                // Do we need to distinguish between in/out here?
+                IRVarLayout* fieldLayout = attr->getLayout();
+                IRInst* key = attr->getFieldKey();
+                inputStructTypeLayoutBuilder.addField(key, fieldLayout);
+            }
+
+            // Add the global vars to the replacement struct.
             UInt inputVarIndex = 0;
             List<IRStructKey*> inputKeys;
             for (auto input : inputVars)
@@ -157,6 +195,7 @@ struct GlobalVarTranslationContext
             paramLayout = paramVarLayoutBuilder.build();
 
             // Add an entry point parameter for all the inputs.
+            // We correctly add to entry point params here, it's just the layout that's wrong
             auto firstBlock = entryPointFunc->getFirstBlock();
             builder.setInsertInto(firstBlock);
             auto inputParam = builder.emitParam(
@@ -267,13 +306,30 @@ struct GlobalVarTranslationContext
                     }
                 }
             }
-            if (auto entryPointLayoutDecor = entryPointFunc->findDecoration<IRLayoutDecoration>())
+            if (entryPointLayoutDecor)
             {
-                if (auto entryPointLayout =
-                        as<IREntryPointLayout>(entryPointLayoutDecor->getLayout()))
+                if (entryPointLayout) // does entryPointLayout imply entryPointLayoutDecor? Can we simplify this?
                 {
                     if (paramLayout)
-                        builder.replaceOperand(entryPointLayout->getOperands(), paramLayout);
+                    {
+                        if (auto paramGroupTypeLayout = as<IRParameterGroupTypeLayout>(entryPointParamsStructLayout))
+                        {
+                            IRParameterGroupTypeLayout::Builder paramGroupTypeLayoutBuilder(&builder);
+                            paramGroupTypeLayoutBuilder.setContainerVarLayout(paramGroupTypeLayout->getContainerVarLayout());
+                            paramGroupTypeLayoutBuilder.setElementVarLayout(paramLayout);
+                            paramGroupTypeLayoutBuilder.setOffsetElementTypeLayout(paramTypeLayout);
+                            builder.replaceOperand(entryPointLayout->getParamsLayout()->getOperands(), paramGroupTypeLayoutBuilder.build());
+                        }
+
+                        else if (auto paramGroupTypeLayout = as<IRStructTypeLayout>(entryPointParamsStructLayout))
+                        {
+                            builder.replaceOperand(entryPointLayout->getParamsLayout()->getOperands(), paramTypeLayout);
+                        }
+                        else
+                        {
+                            // error?
+                        }
+                    }
                     if (resultVarLayout)
                         builder.replaceOperand(
                             entryPointLayout->getOperands() + 1,
