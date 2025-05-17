@@ -2804,10 +2804,10 @@ DIAGNOSTIC(
     58004,
     Error,
     mixingGLSLFlavoredGlobalInOutVarsWithEntryPointParams,
-    "Mixing of GLSL-flavored global in/out variables with "
+    "Mixing GLSL-flavored global in/out variables with "
     "entry point parameters is only supported when using "
-    "built in system-defined binding semantics on varying entry "
-    "point parameters.")
+    "system-defined binding semantics on either all global "
+    "in/out variables or all entry point parameters.")
 
 DIAGNOSTIC(
     58003,

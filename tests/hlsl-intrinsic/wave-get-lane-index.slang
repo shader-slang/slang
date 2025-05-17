@@ -4,25 +4,14 @@
 //TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0 -shaderobj
 //TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
-//TEST:COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -Xslang -DWGPU
-//TEST:COMPARE_COMPUTE_EX:-metal -compute -shaderobj -Xslang -DMETAL
+//TEST:COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
+//TEST:COMPARE_COMPUTE_EX:-metal -compute -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-// wgpu and metal use global in variables for WaveGetLaneIndex (see __builtinWaveLaneIndex)
-// but mixing these with entry point variables is not supported, so we need to
-// account for this here.
-#if defined(WGPU) || defined(METAL)
-in uint3 dispatchThreadID : SV_DispatchThreadID;
-#endif
-
 [numthreads(4, 1, 1)]
-#if defined(WGPU) || defined(METAL)
-void computeMain()
-#else
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
-#endif
+void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
     uint laneId = WaveGetLaneIndex();
