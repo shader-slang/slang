@@ -5856,6 +5856,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             case IRTargetBuiltinVarName::SpvBaseInstance:
                 requireSPIRVCapability(SpvCapabilityDrawParameters);
                 return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaseInstance, inst);
+            case IRTargetBuiltinVarName::SpvVertexIndex:
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInVertexIndex, inst);
+            case IRTargetBuiltinVarName::SpvBaseVertex:
+                requireSPIRVCapability(SpvCapabilityDrawParameters);
+                return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInBaseVertex, inst);
             }
         }
         if (auto layout = getVarLayout(inst))
@@ -5948,7 +5953,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInvocationId, inst);
                 }
-                else if (semanticName == "sv_instanceid")
+                else if (semanticName == "sv_vulkaninstanceid")
                 {
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInInstanceIndex, inst);
                 }
@@ -6046,7 +6051,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityTessellation);
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInTessLevelInner, inst);
                 }
-                else if (semanticName == "sv_vertexid")
+                else if (semanticName == "sv_vulkanvertexid")
                 {
                     return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInVertexIndex, inst);
                 }
