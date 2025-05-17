@@ -880,6 +880,7 @@ Language
 * `c`, `C` : C language 
 * `cpp`, `c++`, `C++`, `cxx` : C++ language 
 * `slang` : Slang language 
+* `2026` : 2026 Slang language
 * `glsl` : GLSL language 
 * `hlsl` : HLSL language 
 * `cu`, `cuda` : CUDA 

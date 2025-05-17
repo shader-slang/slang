@@ -138,6 +138,7 @@ static SlangResult _compileProgramImpl(
         macros.add({"__GLSL__", "1"});
         break;
 
+    case SLANG_SOURCE_LANGUAGE_SLANG_2026:
     case SLANG_SOURCE_LANGUAGE_SLANG:
         macros.add({"__SLANG__", "1"});
         // fall through
