@@ -42,6 +42,31 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
 
     void visitDeclGroup(DeclGroup*) {}
 
+    void visitVarDecl(VarDecl* decl)
+    {
+        visitDecl(decl);
+
+        // Export'd/Extern'd variables must be `const`, otherwise we may have a mismatch
+        // causing errors.
+        bool hasConst = false;
+        bool hasExportOrExtern = false;
+        bool hasStatic = false;
+        for (auto m : decl->modifiers)
+        {
+            if (as<ExternModifier>(m) || as<HLSLExportModifier>(m))
+                hasExportOrExtern = true;
+            else if (as<ConstModifier>(m))
+                hasConst = true;
+            else if (as<HLSLStaticModifier>(m))
+                hasStatic = true;
+        }
+        if (hasExportOrExtern && hasConst != hasStatic)
+            getSink()->diagnose(
+                decl,
+                Diagnostics::ExternAndExportVarDeclMustBeConst,
+                decl->getName());
+    }
+
     void visitDecl(Decl* decl) { checkModifiers(decl); }
 
     void visitStructDecl(StructDecl* structDecl);
@@ -94,6 +119,8 @@ struct SemanticsDeclAttributesVisitor : public SemanticsDeclVisitorBase,
         PrimalSubstituteOfAttribute* attr);
 
     void checkVarDeclCommon(VarDeclBase* varDecl);
+
+    void checkHLSLRegisterSemantic(VarDeclBase* varDecl, HLSLRegisterSemantic* registerSematnic);
 
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
@@ -380,8 +407,13 @@ private:
         bool isMemberInitCtor,
         Index& paramIndex);
 
-    MemberExpr* createMemberExpr(ThisExpr* thisExpr, Scope* scope, Decl* member);
+    AssignExpr* createMemberAssignmentExpr(
+        ThisExpr* thisExpr,
+        Scope* scope,
+        Decl* member,
+        Expr* rightHandSideExpr);
     Expr* createCtorParamExpr(ConstructorDecl* ctor, Index paramIndex);
+    void maybeInsertDefaultInitExpr(StructDecl* structDecl);
 };
 
 template<typename VisitorType>
@@ -4442,7 +4474,7 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
         auto synStaticModifier = m_astBuilder->create<HLSLStaticModifier>();
         synthesized->modifiers.first = synStaticModifier;
     }
-    else
+    else if (context)
     {
         // For a non-`static` requirement, we need a `this` parameter.
         //
@@ -9194,10 +9226,11 @@ static SeqStmt* _ensureCtorBodyIsSeqStmt(ASTBuilder* m_astBuilder, ConstructorDe
     return as<SeqStmt>(stmt->body);
 }
 
-MemberExpr* SemanticsDeclBodyVisitor::createMemberExpr(
+AssignExpr* SemanticsDeclBodyVisitor::createMemberAssignmentExpr(
     ThisExpr* thisExpr,
     Scope* scope,
-    Decl* member)
+    Decl* member,
+    Expr* rightHandSideExpr)
 {
     MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
     memberExpr->baseExpression = thisExpr;
@@ -9207,7 +9240,15 @@ MemberExpr* SemanticsDeclBodyVisitor::createMemberExpr(
     memberExpr->name = member->getName();
     memberExpr->type = GetTypeForDeclRef(member->getDefaultDeclRef(), member->loc);
 
-    return memberExpr;
+    if (!memberExpr->type.isLeftValue)
+        return nullptr;
+
+    auto assign = m_astBuilder->create<AssignExpr>();
+    assign->left = memberExpr;
+    assign->right = rightHandSideExpr;
+    assign->loc = member->loc;
+
+    return assign;
 }
 
 Expr* SemanticsDeclBodyVisitor::createCtorParamExpr(ConstructorDecl* ctor, Index paramIndex)
@@ -9345,14 +9386,9 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMember(
         }
     }
 
-    MemberExpr* memberExpr = createMemberExpr(thisExpr, ctor->ownedScope, member);
-    if (!memberExpr->type.isLeftValue)
+    auto assign = createMemberAssignmentExpr(thisExpr, ctor->ownedScope, member, initExpr);
+    if (!assign)
         return;
-
-    auto assign = m_astBuilder->create<AssignExpr>();
-    assign->left = memberExpr;
-    assign->right = initExpr;
-    assign->loc = member->loc;
 
     auto stmt = m_astBuilder->create<ExpressionStmt>();
     stmt->expression = assign;
@@ -9363,13 +9399,61 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMember(
         checkedMemberVarExpr = cachedDeclToCheckedVar[member];
     else
     {
-        checkedMemberVarExpr = CheckTerm(memberExpr);
+        checkedMemberVarExpr = CheckTerm(assign->left);
         cachedDeclToCheckedVar.add({member, checkedMemberVarExpr});
     }
 
     seqStmtChild->stmts.add(stmt);
 }
 
+// This function inserts the default initialization expression for every member who
+// has init expression at beginning of the user-defined ctor. We don't need to do this
+// for synthesized ctor, because synthesized ctor already handle this at the function
+// parameters
+void SemanticsDeclBodyVisitor::maybeInsertDefaultInitExpr(StructDecl* structDecl)
+{
+    // If there is no explicit constructor, we don't need to do anything.
+    if (!_hasExplicitConstructor(structDecl, false))
+        return;
+
+    // traverse all the constructors and insert the default initialization expressions.
+    for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
+    {
+        ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+        thisExpr->scope = ctor->ownedScope;
+        thisExpr->type = ctor->returnType.type;
+        auto seqStmtChild = m_astBuilder->create<SeqStmt>();
+        seqStmtChild->stmts.reserve(structDecl->members.getCount());
+
+        for (auto& member : structDecl->members)
+        {
+            if (auto varDeclBase = as<VarDeclBase>(member))
+            {
+                if (varDeclBase->hasModifier<HLSLStaticModifier>() ||
+                    varDeclBase->getName() == nullptr || varDeclBase->initExpr == nullptr)
+                    continue;
+
+                auto assign = createMemberAssignmentExpr(
+                    thisExpr,
+                    ctor->ownedScope,
+                    member,
+                    varDeclBase->initExpr);
+                if (!assign)
+                    continue;
+
+                auto stmt = m_astBuilder->create<ExpressionStmt>();
+                stmt->expression = assign;
+                stmt->loc = member->loc;
+                seqStmtChild->stmts.add(stmt);
+            }
+        }
+        if (seqStmtChild->stmts.getCount() != 0)
+        {
+            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+            seqStmt->stmts.insert(0, seqStmtChild);
+        }
+    }
+}
 
 void SemanticsDeclBodyVisitor::synthesizeCtorBody(
     DeclAndCtorInfo& structDeclInfo,
@@ -9476,6 +9560,7 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
     }
 
     synthesizeCtorBody(structDeclInfo, inheritanceDefaultCtorList, structDecl);
+    maybeInsertDefaultInitExpr(structDecl);
 
     if (structDeclInfo.defaultCtor)
     {
@@ -12548,6 +12633,10 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         {
             hasPushConstAttr = true;
         }
+        else if (auto registerSemantic = as<HLSLRegisterSemantic>(modifier))
+        {
+            checkHLSLRegisterSemantic(varDecl, registerSemantic);
+        }
     }
     if (hasSpecConstAttr && hasPushConstAttr)
     {
@@ -12562,6 +12651,91 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         {
             getSink()->diagnose(varDecl, Diagnostics::pushOrSpecializationConstantCannotBeStatic);
         }
+    }
+}
+
+void SemanticsDeclAttributesVisitor::checkHLSLRegisterSemantic(
+    VarDeclBase* varDecl,
+    HLSLRegisterSemantic* registerSemantic)
+{
+    auto registerName = registerSemantic->registerName.getContent();
+    if (registerName.getLength() < 1)
+    {
+        getSink()->diagnose(
+            registerSemantic->registerName.getLoc(),
+            Diagnostics::invalidHLSLRegisterName,
+            registerSemantic->registerName);
+        return;
+    }
+
+    // Check to make sure the HLSL semantic register name is consistent with the resource type.
+
+    auto varType = getType(m_astBuilder, DeclRef<VarDeclBase>(varDecl));
+    varType = unwrapModifiedType(unwrapArrayType(varType));
+    bool isValid = true;
+    if (auto resType = as<ResourceType>(varType))
+    {
+        switch (registerName[0])
+        {
+        case 't':
+            if (resType->getAccess() != SLANG_RESOURCE_ACCESS_READ)
+                isValid = false;
+            break;
+        case 'u':
+            if (resType->getAccess() == SLANG_RESOURCE_ACCESS_READ)
+                isValid = false;
+            break;
+        case 's':
+            if (!resType->isCombined())
+                isValid = false;
+            break;
+        default:
+            isValid = false;
+            break;
+        }
+    }
+    else if (
+        as<HLSLByteAddressBufferType>(varType) || as<HLSLStructuredBufferType>(varType) ||
+        as<RaytracingAccelerationStructureType>(varType))
+    {
+        if (registerName[0] != 't')
+        {
+            isValid = false;
+        }
+    }
+    else if (
+        as<HLSLRWByteAddressBufferType>(varType) ||
+        as<HLSLRasterizerOrderedByteAddressBufferType>(varType) ||
+        as<HLSLRWStructuredBufferType>(varType) || as<HLSLConsumeStructuredBufferType>(varType) ||
+        as<HLSLAppendStructuredBufferType>(varType) ||
+        as<HLSLRasterizerOrderedStructuredBufferType>(varType))
+    {
+        if (registerName[0] != 'u')
+        {
+            isValid = false;
+        }
+    }
+    else if (as<SamplerStateType>(varType))
+    {
+        if (registerName[0] != 's')
+        {
+            isValid = false;
+        }
+    }
+    else if (as<ConstantBufferType>(varType))
+    {
+        if (registerName[0] != 'b')
+        {
+            isValid = false;
+        }
+    }
+    if (!isValid)
+    {
+        getSink()->diagnose(
+            registerSemantic->registerName.getLoc(),
+            Diagnostics::invalidHLSLRegisterNameForType,
+            registerName,
+            varType);
     }
 }
 

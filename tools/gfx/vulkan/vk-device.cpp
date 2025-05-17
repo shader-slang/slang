@@ -214,7 +214,8 @@ Result DeviceImpl::initVulkanInstanceAndDevice(
 #endif
         }
 
-        if (ENABLE_VALIDATION_LAYER || isGfxDebugLayerEnabled())
+        gfxEnableDebugLayer(useValidationLayer);
+        if (isGfxDebugLayerEnabled())
             instanceExtensions.add(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 
         VkInstanceCreateInfo instanceCreateInfo = {VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
@@ -1027,7 +1028,7 @@ SlangResult DeviceImpl::initialize(const Desc& desc)
         descriptorSetAllocator.m_api = &m_api;
         initDeviceResult = initVulkanInstanceAndDevice(
             desc.existingDeviceHandles.handles,
-            ENABLE_VALIDATION_LAYER != 0 || isGfxDebugLayerEnabled());
+            isGfxDebugLayerEnabled());
         if (initDeviceResult == SLANG_OK)
             break;
     }

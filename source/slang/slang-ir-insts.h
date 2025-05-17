@@ -488,6 +488,7 @@ IR_SIMPLE_DECORATION(DownstreamModuleImportDecoration)
 IR_SIMPLE_DECORATION(MaximallyReconvergesDecoration)
 IR_SIMPLE_DECORATION(QuadDerivativesDecoration)
 IR_SIMPLE_DECORATION(RequireFullQuadsDecoration)
+IR_SIMPLE_DECORATION(TempCallArgVarDecoration)
 
 struct IRAvailableInDownstreamIRDecoration : IRDecoration
 {

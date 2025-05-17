@@ -174,6 +174,56 @@ SpvInst* emitOpTypeCoopMat(
         matrixUse);
 }
 
+// https://github.khronos.org/SPIRV-Registry/extensions/NV/SPV_NV_tensor_addressing.html#OpTypeTensorLayoutNV
+template<typename T1, typename T2>
+SpvInst* emitOpTypeTensorLayout(IRInst* inst, const T1& dim, const T2& clampMode)
+{
+    static_assert(isSingular<T1>);
+    return emitInstMemoized(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeTensorLayoutNV,
+        kResultID,
+        dim,
+        clampMode);
+}
+
+// https://github.khronos.org/SPIRV-Registry/extensions/NV/SPV_NV_tensor_addressing.html#OpTypeTensorViewNV
+template<typename T1, typename T2, typename... TPerms>
+SpvInst* emitOpTypeTensorView(
+    IRInst* inst,
+    const T1& dim,
+    const T2& hasDimensions,
+    const TPerms&... perms)
+{
+    static_assert(isSingular<T1>);
+    static_assert(isSingular<T2>);
+    return emitInstMemoized(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeTensorViewNV,
+        kResultID,
+        dim,
+        hasDimensions,
+        perms...);
+}
+
+// https://github.khronos.org/SPIRV-Registry/extensions/NV/SPV_NV_tensor_addressing.html#OpCreateTensorLayoutNV
+template<typename T1>
+SpvInst* emitOpCreateTensorLayout(SpvInstParent* parent, IRInst* inst, const T1& idResultType)
+{
+    static_assert(isSingular<T1>);
+    return emitInst(parent, inst, SpvOpCreateTensorLayoutNV, idResultType, kResultID);
+}
+
+// https://github.khronos.org/SPIRV-Registry/extensions/NV/SPV_NV_tensor_addressing.html#OpCreateTensorViewNV
+template<typename T1>
+SpvInst* emitOpCreateTensorView(SpvInstParent* parent, IRInst* inst, const T1& idResultType)
+{
+    static_assert(isSingular<T1>);
+    return emitInst(parent, inst, SpvOpCreateTensorViewNV, idResultType, kResultID);
+}
+
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeMatrix
 template<typename T>
 SpvInst* emitOpTypeMatrix(IRInst* inst, const T& columnType, const SpvLiteralInteger& columnCount)

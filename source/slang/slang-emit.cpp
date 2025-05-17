@@ -106,6 +106,7 @@
 #include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-translate-global-varying-var.h"
+#include "slang-ir-undo-param-copy.h"
 #include "slang-ir-uniformity.h"
 #include "slang-ir-user-type-hint.h"
 #include "slang-ir-validate.h"
@@ -1594,6 +1595,13 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
+        // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with direct
+        // pointers
+        undoParameterCopy(irModule);
+#if 0
+        dumpIRIfEnabled(codeGenContext, irModule, "PARAMETER COPIES REPLACED WITH DIRECT POINTERS");
+#endif
+        validateIRModuleIfEnabled(codeGenContext, irModule);
         moveGlobalVarInitializationToEntryPoints(irModule, targetProgram);
         introduceExplicitGlobalContext(irModule, target);
         if (target == CodeGenTarget::CPPSource)

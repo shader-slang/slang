@@ -1113,9 +1113,25 @@ void CLikeSourceEmitter::appendScrubbedName(const UnownedStringSlice& name, Stri
     }
 }
 
+inline String CLikeSourceEmitter::maybeMakeEntryPointNameValid(String name, DiagnosticSink* sink)
+{
+    if (isCPUTarget(getTargetReq()) || isCUDATarget(getTargetReq()) ||
+        isMetalTarget(getTargetReq()))
+    {
+        if (name == "main")
+        {
+            String newName = _generateUniqueName(name.getUnownedSlice());
+            sink->diagnose(SourceLoc(), Diagnostics::mainEntryPointRenamed, name, newName);
+            return newName;
+        }
+    }
+    return name;
+}
+
 String CLikeSourceEmitter::generateEntryPointNameImpl(IREntryPointDecoration* entryPointDecor)
 {
-    return entryPointDecor->getName()->getStringSlice();
+    String name = entryPointDecor->getName()->getStringSlice();
+    return maybeMakeEntryPointNameValid(name, getSink());
 }
 
 String CLikeSourceEmitter::_generateUniqueName(const UnownedStringSlice& name)

@@ -180,7 +180,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load";
         default:
-            return __byteAddressBufferLoad<uint>(this, location, 0);
+            return __byteAddressBufferLoad<uint>(this, uint(location), 0);
         }
     }
 
@@ -213,7 +213,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint2 Load2(int location)
+    uint2 Load2(uint location)
     {
         __target_switch
         {
@@ -226,7 +226,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint2 Load2(int location, int alignment)
+    uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -239,7 +239,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
-    uint2 Load2(int location, out uint status)
+    uint2 Load2(uint location, out uint status)
     {
         __target_switch
         {
@@ -255,7 +255,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint2 Load2Aligned(int location)
+    uint2 Load2Aligned(uint location)
     {
         __target_switch
         {
@@ -282,7 +282,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint3 Load3(int location)
+    uint3 Load3(uint location)
     {
         __target_switch
         {
@@ -295,7 +295,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint3 Load3(int location, int alignment)
+    uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -308,7 +308,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
-    uint3 Load3(int location, out uint status)
+    uint3 Load3(uint location, out uint status)
     {
         __target_switch
         {
@@ -323,7 +323,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint3 Load3Aligned(int location)
+    uint3 Load3Aligned(uint location)
     {
         __target_switch
         {
@@ -349,7 +349,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint4 Load4(int location)
+    uint4 Load4(uint location)
     {
         __target_switch
         {
@@ -362,7 +362,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint4 Load4(int location, int alignment)
+    uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -375,7 +375,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
-    uint4 Load4(int location, out uint status)
+    uint4 Load4(uint location, out uint status)
     {
         __target_switch
         {
@@ -390,7 +390,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint4 Load4Aligned(int location)
+    uint4 Load4Aligned(uint location)
     {
         __target_switch
         {
@@ -402,14 +402,14 @@ struct ByteAddressBuffer
 
     [__readNone]
     [ForceInline]
-    T Load<T>(int location)
+    T Load<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
     }
 
     [__readNone]
     [ForceInline]
-    T Load<T>(int location, int alignment)
+    T LoadAligned<T>(uint location, uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
@@ -421,7 +421,7 @@ struct ByteAddressBuffer
     ///Currently, this function only supports when `T` is scalar, vector or matrix type.
     [__readNone]
     [ForceInline]
-    T LoadAligned<T>(int location)
+    T LoadAligned<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
     }
@@ -4785,23 +4785,23 @@ uint64_t __asuint64(uint2 i)
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer)]
-T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, int offset, int alignment);
+T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, uint offset, uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, int offset, int alignment);
+T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, uint offset, uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, int alignment);
+T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, int offset, int alignment, T value);
+void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, uint offset, uint alignment, T value);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, int alignment, T value);
+void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment, T value);
 
 __intrinsic_op($(kIROp_GetUntypedBufferPtr))
 [require(spirv, byteaddressbuffer)]
@@ -5053,7 +5053,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load";
         default:
-            return __byteAddressBufferLoad<uint>(this, location, 0);
+            return __byteAddressBufferLoad<uint>(this, uint(location), 0);
         }
     }
 
@@ -5086,7 +5086,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint2 Load2(int location)
+    uint2 Load2(uint location)
     {
         __target_switch
         {
@@ -5099,7 +5099,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint2 Load2(int location, int alignment)
+    uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -5116,7 +5116,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint2 Load2Aligned(int location)
+    uint2 Load2Aligned(uint location)
     {
         __target_switch
         {
@@ -5129,7 +5129,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
-    uint2 Load2(int location, out uint status)
+    uint2 Load2(uint location, out uint status)
     {
         __target_switch
         {
@@ -5154,7 +5154,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint3 Load3(int location)
+    uint3 Load3(uint location)
     {
         __target_switch
         {
@@ -5167,7 +5167,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint3 Load3(int location, int alignment)
+    uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -5184,7 +5184,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint3 Load3Aligned(int location)
+    uint3 Load3Aligned(uint location)
     {
         __target_switch
         {
@@ -5197,7 +5197,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
-    uint3 Load3(int location, out uint status)
+    uint3 Load3(uint location, out uint status)
     {
         __target_switch
         {
@@ -5221,7 +5221,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint4 Load4(int location)
+    uint4 Load4(uint location)
     {
         __target_switch
         {
@@ -5234,7 +5234,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint4 Load4(int location, int alignment)
+    uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -5251,7 +5251,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint4 Load4Aligned(int location)
+    uint4 Load4Aligned(uint location)
     {
         __target_switch
         {
@@ -5264,7 +5264,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
-    uint4 Load4(int location, out uint status)
+    uint4 Load4(uint location, out uint status)
     {
         __target_switch
         {
@@ -5275,7 +5275,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    T Load<T>(int location)
+    T Load<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
     }
@@ -5283,7 +5283,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    T Load<T>(int location, int alignment)
+    T LoadAligned<T>(uint location, uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
@@ -5296,7 +5296,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    T LoadAligned<T>(int location)
+    T LoadAligned<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
     }
@@ -8084,9 +8084,20 @@ uint countbits(T value)
         // 16-bit support dependent on SM6.2 and dxil
         __intrinsic_asm "countbits";
     case glsl:
-        // 64-bit support dependent on GL_ARB_gpu_shader_int64
-        // 16-bit support dependent on GL_EXT_shader_16bit_storage
-        __intrinsic_asm "bitCount";
+        if(T is int64_t || T  is uint64_t)
+        {
+            return __emulatedCountbits64(__intCast<uint64_t>(value));
+        }
+        else if (T is int16_t || T  is uint16_t)
+        {
+            // emulate 16-bit
+            return countbits(__intCast<uint32_t>(value));
+        }
+        else
+        {
+            // bitCount only supports 32-bit
+            __intrinsic_asm "bitCount";
+        }
     case metal:
         if (T is int64_t || T  is uint64_t)
         {
@@ -8150,7 +8161,15 @@ vector<uint, N> countbits(vector<T, N> value)
     case hlsl:
         __intrinsic_asm "countbits";
     case glsl:
-        __intrinsic_asm "bitCount";
+        if(T is int64_t || T  is uint64_t || T is int16_t || T  is uint16_t)
+        {
+            // Emulate 64-bit and 16-bit
+            VECTOR_MAP_UNARY(uint, N, countbits, value);
+        }
+        else
+        {
+            __intrinsic_asm "bitCount";
+        }
     case metal:
         if(T is int64_t || T  is uint64_t || T is int16_t || T  is uint16_t)
         {
@@ -22232,6 +22251,7 @@ enum DescriptorKind
     Buffer, /// A buffer descriptor.
     Sampler, /// A sampler state descriptor.
     AccelerationStructure, /// A ray tracing acceleration structure descriptor.
+    TexelBuffer /// A texel buffer descriptor.
 }
 
 enum DescriptorAccess
@@ -22284,7 +22304,9 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
 
     typealias Handle = DescriptorHandle<This>;
 
-    static const DescriptorKind kind = isCombined != 0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture;
+    static const DescriptorKind kind = (Shape.flavor == __ShapeBuffer.flavor ?
+        DescriptorKind.TexelBuffer : (isCombined != 0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture)
+);
     static const DescriptorAccess descriptorAccess = (DescriptorAccess)access;
 
     __implicit_conversion($(kConversionCost_ImplicitDereference))
@@ -22403,8 +22425,36 @@ __prefix T operator*(DescriptorHandle<T> value)
     return getDescriptorFromHandle(value);
 }
 
+// https://registry.khronos.org/vulkan/specs/latest/man/html/VkDescriptorType.html
+enum DefaultVkBindlessBindings : uint
+{
+    Sampler = 0, /// SAMPLER
+    CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
+    Texture_Read = 2, /// SAMPLED_IMAGE
+    Texture_ReadWrite = 3, /// STORAGE_IMAGE
+    TexelBuffer_Read = 4, /// UNIFORM_TEXEL_BUFFER
+    TexelBuffer_ReadWrite = 5, /// STORAGE_TEXEL_BUFFER
+    Buffer_Read = 6, /// UNIFORM_BUFFER
+    Buffer_ReadWrite = 7, /// STORAGE_BUFFER
+    Unknown = 8, /// Other
+}
+
+// https://github.com/KhronosGroup/Vulkan-Docs/blob/main/proposals/VK_EXT_mutable_descriptor_type.adoc
+enum VkMutableBindlessBindings : uint
+{
+    Sampler = 0, /// SAMPLER
+    CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
+    Texture_Read = 2, /// SAMPLED_IMAGE
+    Texture_ReadWrite = 2, /// STORAGE_IMAGE
+    TexelBuffer_Read = 2, /// UNIFORM_TEXEL_BUFFER
+    TexelBuffer_ReadWrite = 2, /// STORAGE_TEXEL_BUFFER
+    Buffer_Read = 2, /// UNIFORM_BUFFER
+    Buffer_ReadWrite = 2, /// STORAGE_BUFFER,
+    Unknown = 3, /// Other
+}
+
 __intrinsic_op($(kIROp_GetDynamicResourceHeap))
-T[] __getDynamicResourceHeap<T:IOpaqueDescriptor>();
+T[] __getDynamicResourceHeap<T:IOpaqueDescriptor>(constexpr uint bindingIndex = 0);
 
 
 // Used by the HLSL backend only, load a sampler state handle from SamplerDescriptorHeap.
@@ -22423,10 +22473,16 @@ T __makeCombinedTextureSamplerFromHandle<T, U>(U handle);
 __intrinsic_op($(kIROp_CastDescriptorHandleToResource))
 T __castDescriptorHandleToResource<T:IOpaqueDescriptor>(DescriptorHandle<T> ptr);
 
+public enum BindlessDescriptorOptions
+{
+    None = 0, /// Bind assuming regular binding model rules.
+    VkMutable = 1, /// Bind assuming `VK_EXT_mutable_descriptor_type` without mutable `AccelerationStructure` binding support.
+}
+
 /// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
 /// to a descriptor object.
 [ForceInline]
-T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
+T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.None)
 {
     __target_switch
     {
@@ -22439,6 +22495,73 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
             return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
     case spirv:
     case glsl:
+
+        switch(bindlessOptions)
+        {
+${{{{
+{
+    static const struct 
+    {
+        char const* option;
+        char const* enumType;
+    }kBindlessOptions[] =
+    {
+        {"None", "DefaultVkBindlessBindings"},
+        {"VkMutable", "VkMutableBindlessBindings"},
+    };
+
+    for(auto bindlessOption : kBindlessOptions)
+    {
+        StringBuilder bindlessOptionIfElsePre;
+        StringBuilder bindlessOptionIfElsePost;
+
+        bindlessOptionIfElsePre << "case BindlessDescriptorOptions." << bindlessOption.option <<":\n{\n";
+        bindlessOptionIfElsePost << "}\n";
+}}}}
+    $(bindlessOptionIfElsePre.toString())
+    switch(T.kind)
+    {
+    case DescriptorKind.Sampler:
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Sampler)[((uint2)handleValue).x];
+    case DescriptorKind.CombinedTextureSampler:
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).CombinedTextureSampler)[((uint2)handleValue).x];
+    case DescriptorKind.Texture:
+    {
+        if(DescriptorAccess.Read == T.descriptorAccess)
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Texture_Read)[((uint2)handleValue).x];
+        else
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Texture_ReadWrite)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.TexelBuffer:
+    {
+        if(DescriptorAccess.Read == T.descriptorAccess)
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).TexelBuffer_Read)[((uint2)handleValue).x];
+        else
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).TexelBuffer_ReadWrite)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.Buffer:
+    {
+        if(DescriptorAccess.Read == T.descriptorAccess)
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Buffer_Read)[((uint2)handleValue).x];
+        else
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Buffer_ReadWrite)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.AccelerationStructure:
+        return __slang_noop_cast<T>(RaytracingAccelerationStructure(__asuint64((uint2)handleValue)));
+    default:
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Unknown)[((uint2)handleValue).x];
+    }
+    $(bindlessOptionIfElsePost.toString())
+${{{{
+    }
+}
+}}}}
+    default:
+    {
+        static_assert(false, "Impossible to end up here unless something went very wrong");
+        return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
+    }
+    }
     case wgsl:
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
     default:
@@ -22537,6 +22660,243 @@ enum CoopMatClampMode
     Repeat,
     RepeatMirrored
 };
+
+
+${{{{
+// SPIRV described that the max value for `Dim` is 5.
+//
+// https://github.khronos.org/SPIRV-Registry/extensions/NV/SPV_NV_tensor_addressing.html#OpTypeTensorLayoutNV
+// OpTypeTensorLayoutNV:
+// Dim is the number of dimensions in the tensor layout, and must be a constant
+// instruction with scalar 32-bit integer type. The value must be greater than
+// zero and less than or equal to 5.
+//
+// https://github.khronos.org/SPIRV-Registry/extensions/NV/SPV_NV_tensor_addressing.html#OpTypeTensorViewNV
+// OpTypeTensorViewNV:
+// Dim is the number of dimensions in the tensor view, and must be a constant
+// instruction with scalar 32-bit integer type. The value must be greater than
+// zero and less than or equal to 5.
+//
+const int kMaxCoopMatTensorDimension = 5;
+}}}}
+
+//
+// TensorLayout
+//
+
+__intrinsic_type($(kIROp_TensorAddressingTensorLayoutType))
+[require(tensor_addressing)]
+__generic<
+    let Dim : uint32_t,
+    let ClampMode : CoopMatClampMode = CoopMatClampMode.Undefined
+>
+struct TensorLayout
+{
+    __intrinsic_op($(kIROp_MakeTensorAddressingTensorLayout))
+    __init();
+};
+
+
+${{{{
+    for (int iDim = 1; iDim < kMaxCoopMatTensorDimension; ++iDim)
+    {
+        StringBuilder dimParams;
+        StringBuilder dimAsms;
+        StringBuilder strideParams;
+        StringBuilder strideAsms;
+        StringBuilder sliceParams;
+        StringBuilder sliceAsms;
+        StringBuilder blockSizeParams;
+        StringBuilder blockSizeAsms;
+        for (int j = 1; j < iDim; ++j)
+        {
+            dimParams << ", uint32_t dim" << j;
+            dimAsms << " $dim" << j;
+            strideParams << ", uint32_t stride" << j;
+            strideAsms << " $stride" << j;
+            sliceParams << ", uint32_t offset" << j << ", uint32_t span" << j;
+            sliceAsms << " $offset" << j << " $span" << j;
+            blockSizeParams << ", uint32_t blockSize" << j;
+            blockSizeAsms << " $blockSize" << j;
+        }
+}}}}
+
+
+extension<
+    let ClampMode : CoopMatClampMode
+> TensorLayout<$(iDim), ClampMode>
+{
+    [require(tensor_addressing)]
+    This Dimension(uint32_t dim0 $(dimParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorLayoutSetDimensionNV $this $dim0 $(dimAsms)
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This Stride(uint32_t stride0 $(strideParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorLayoutSetStrideNV $this $stride0 $(strideAsms);
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This Slice(uint32_t offset0, uint32_t span0 $(sliceParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorLayoutSliceNV $this $offset0 $span0 $(sliceAsms);
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This ClampValue(CoopMatClampMode clampMode)
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorLayoutSetClampValueNV $this $clampMode;
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This BlockSize(uint32_t blockSize0 $(blockSizeParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorLayoutSetBlockSizeNV $this $blockSize0 $(blockSizeAsms);
+            };
+        }
+    }
+};
+
+${{{{
+    } // iDim
+}}}}
+
+//
+// TensorView
+//
+
+${{{{
+    StringBuilder tensorViewStruct;
+    for (int j = 0; j < kMaxCoopMatTensorDimension; ++j)
+    {
+        // Assigning the max value as a default value,
+        // because the max value is an invalid value and it allows us to check if the value
+        // is explicitly set by the user or not.
+        tensorViewStruct << ", let p" << j << " : uint32_t = 0xff";
+    }
+}}}}
+
+__intrinsic_type($(kIROp_TensorAddressingTensorViewType))
+__generic<
+    let Dim : uint32_t,
+    let HasDimensions : bool
+    $(tensorViewStruct)
+>
+struct TensorView
+{
+    __intrinsic_op($(kIROp_MakeTensorAddressingTensorView))
+    __init();
+};
+
+${{{{
+    for (int iDim = 1; iDim < kMaxCoopMatTensorDimension; ++iDim)
+    {
+        StringBuilder tensorViewTypes;
+        StringBuilder tensorViewExtensions;
+        StringBuilder dimParams;
+        StringBuilder dimAsms;
+        StringBuilder strideParams;
+        StringBuilder strideAsms;
+        for (int j = 1; j < iDim; ++j)
+        {
+            tensorViewTypes << ", let Dim" << j << " : uint32_t";
+            tensorViewExtensions << ", Dim" << j;
+            dimParams << ", uint32_t dim" << j;
+            dimAsms << " $dim" << j;
+            strideParams << ", uint32_t stride" << j;
+            strideAsms << " $stride" << j;
+        }
+        for (int j = iDim; j < kMaxCoopMatTensorDimension; ++j)
+        {
+            tensorViewExtensions << ", 0xff";
+        }
+}}}}
+
+[require(tensor_addressing)]
+extension<
+    let HasDimensions : bool,
+    let Dim0 : uint32_t
+    $(tensorViewTypes)
+> TensorView<$(iDim), HasDimensions, Dim0 $(tensorViewExtensions)>
+{
+    [require(tensor_addressing)]
+    This Dimension(uint32_t dim0 $(dimParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorViewSetDimensionNV $this $dim0 $(dimAsms);
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This Stride(uint32_t stride0 $(strideParams))
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorViewSetStrideNV $this $stride0 $(strideAsms);
+            };
+        }
+    }
+
+    [require(tensor_addressing)]
+    This Clip(uint clipRowOffset, uint clipRowSpan, uint clipColOffset, uint clipColSpan)
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                result:$$This = OpTensorViewSetClipNV $this $clipRowOffset $clipRowSpan $clipColOffset $clipColSpan;
+            };
+        }
+    }
+};
+
+${{{{
+    } // iDim
+}}}}
 
 
 //
@@ -22788,21 +23148,23 @@ struct CoopMat
     [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
-    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
+    >(RWByteAddressBuffer buffer, uint element, uint stride)
     {
-        __Store(buffer, element, stride, matrixLayout);
+        __store<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
     }
 
     [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
-    >(RWByteAddressBuffer buffer, uint element, uint stride)
+    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
     {
-        __Store(__getEquivalentStructuredBuffer<T>(buffer), element, stride, matrixLayout);
+        __store<matrixLayout>(buffer, element, stride);
     }
 
     [require(cooperative_matrix)]
-    internal void __Store(RWStructuredBuffer<T> buffer, uint element, uint stride, constexpr CoopMatMatrixLayout matrixLayout)
+    internal void __store<
+        let matrixLayout : CoopMatMatrixLayout
+    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
     {
         let zero = 0;
         let alignment = 16U;
@@ -22883,11 +23245,19 @@ struct CoopMat
     // Load
     //
 
+${{{{
+    for (const char* RW : { "", "RW" })
+    {
+}}}}
+
     [__NoSideEffect]
     [require(cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
-    >(ByteAddressBuffer buffer, uint element, uint stride)
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        uint stride)
     {
         return Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
     }
@@ -22896,16 +23266,10 @@ struct CoopMat
     [require(cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
-    >(RWByteAddressBuffer buffer, uint element, uint stride)
-    {
-        return Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
-    }
-
-    [__NoSideEffect]
-    [require(cooperative_matrix)]
-    static This Load<
-        let matrixLayout : CoopMatMatrixLayout
-    >(StructuredBuffer<T> buffer, uint element, uint stride)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        uint stride)
     {
         let zero = 0;
         let alignment = 16U;
@@ -22917,21 +23281,9 @@ struct CoopMat
         };
     }
 
-    [__NoSideEffect]
-    [require(cooperative_matrix)]
-    static This Load<
-        let matrixLayout : CoopMatMatrixLayout
-    >(RWStructuredBuffer<T> buffer, uint element, uint stride)
-    {
-        let zero = 0;
-        let alignment = 16U;
-        return spirv_asm
-        {
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
-    }
+${{{{
+    } // RW
+}}}}
 
     [ForceInline]
     [__NoSideEffect]
@@ -23076,6 +23428,340 @@ struct CoopMat
         return true;
     }
 
+    //
+    // Load with TensorLayout and TensorView
+    //
+
+${{{{
+    StringBuilder tensorViewTypes;
+    StringBuilder tensorViewParams;
+    for (int j = 0; j < kMaxCoopMatTensorDimension; ++j)
+    {
+        tensorViewTypes << ", let p" << j << " : uint32_t = " << kMaxCoopMatTensorDimension;
+        tensorViewParams << ", p" << j;
+    }
+
+    for (const char* RW : { "", "RW" })
+    {
+}}}}
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        return __loadLayout<Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        return __loadLayout<Dim, ClampMode>(buffer, element, tensorLayout);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This __loadLayout<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        This ret;
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            %storagePointerType = OpTypePointer StorageBuffer $$T;
+            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment None;
+        };
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+    {
+        return __loadView<Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
+    {
+        return __loadView<Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(buffer, element, tensorLayout, tensorView);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This __loadView<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        This ret;
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            %storagePointerType = OpTypePointer StorageBuffer $$T;
+            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment TensorView $tensorView;
+        };
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        return __loadLayoutDecode<U, Dim, ClampMode>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, decodeFunc);
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        return __loadLayoutDecode<U, Dim, ClampMode>(buffer, element, tensorLayout, decodeFunc);
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This __loadLayoutDecode<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        This ret;
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixBlockLoadsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            %storagePointerType = OpTypePointer StorageBuffer $$T;
+            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment DecodeFunc $decodeFunc;
+        };
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)ByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        return __loadViewDecode<U, Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView, decodeFunc);
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        return __loadViewDecode<U, Dim, ClampMode, DimView, HasDimensions $(tensorViewParams)>(buffer, element, tensorLayout, tensorView, decodeFunc);
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This __loadViewDecode<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        $(RW)StructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        This ret;
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpCapability CooperativeMatrixBlockLoadsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            %storagePointerType = OpTypePointer StorageBuffer $$T;
+            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+            result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment TensorView|DecodeFunc $tensorView $decodeFunc;
+        };
+    }
+
+${{{{
+    } // RW
+}}}}
+
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        RWByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        Store(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode
+    >(
+        RWStructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        __target_switch
+        {
+        case spirv:
+            spirv_asm
+            {
+                OpCapability CooperativeMatrixTensorAddressingNV;
+                OpExtension "SPV_NV_cooperative_matrix2";
+                %storagePointerType = OpTypePointer StorageBuffer $$T;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+                OpCooperativeMatrixStoreTensorNV %pointer $this $tensorLayout Aligned !alignment None;
+            };
+        }
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        RWByteAddressBuffer buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+    {
+        Store(__getEquivalentStructuredBuffer<T>(buffer), element, tensorLayout, tensorView);
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes)
+    >(
+        RWStructuredBuffer<T> buffer,
+        uint element,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+    {
+        let zero = 0;
+        let alignment = 16U;
+
+        __target_switch
+        {
+        case spirv:
+            spirv_asm
+            {
+                OpCapability CooperativeMatrixTensorAddressingNV;
+                OpExtension "SPV_NV_cooperative_matrix2";
+                %storagePointerType = OpTypePointer StorageBuffer $$T;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+                OpCooperativeMatrixStoreTensorNV %pointer $this $tensorLayout Aligned !alignment TensorView $tensorView;
+            };
+        }
+    }
+
 } // struct CoopMat
 
 
@@ -23098,7 +23784,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     uint element,
     uint stride)
 {
-    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
+    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
 }
 
 [ForceInline]
@@ -23115,7 +23801,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     uint element,
     uint stride)
 {
-    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
+    return CoopMat<T, S, M, N, R>.Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
 }
 
 [ForceInline]

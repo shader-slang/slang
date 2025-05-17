@@ -58,10 +58,11 @@ UInt findUnusedSpaceIndex(TargetProgram* targetProgram, IRModule* module)
     return index;
 }
 
-IRVarLayout* createResourceHeapVarLayoutWithSpace(
+IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
     IRBuilder& builder,
     IRInst* param,
-    UInt spaceIndex)
+    UInt spaceIndex,
+    UInt bindingIndex)
 {
     SLANG_UNUSED(param);
     IRTypeLayout::Builder typeLayoutBuilder(&builder);
@@ -71,7 +72,8 @@ IRVarLayout* createResourceHeapVarLayoutWithSpace(
     auto typeLayout = typeLayoutBuilder.build();
     IRVarLayout::Builder varLayoutBuilder(&builder, typeLayout);
     varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::RegisterSpace)->offset = spaceIndex;
-    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot)->offset = 0;
+    varLayoutBuilder.findOrAddResourceInfo(LayoutResourceKind::DescriptorTableSlot)->offset =
+        bindingIndex;
     return varLayoutBuilder.build();
 }
 
@@ -93,8 +95,14 @@ void lowerDynamicResourceHeap(TargetProgram* targetProgram, IRModule* module, Di
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
 
+        auto bindingIndex = (UInt)as<IRIntLit>(inst->getOperand(0))->getValue();
+
         auto param = builder.createGlobalParam(arrayType);
-        auto varLayout = createResourceHeapVarLayoutWithSpace(builder, param, unusedSpaceIndex);
+        auto varLayout = createResourceHeapVarLayoutWithSpaceAndBinding(
+            builder,
+            param,
+            unusedSpaceIndex,
+            bindingIndex);
         builder.addLayoutDecoration(param, varLayout);
         builder.addNameHintDecoration(param, toSlice("__slang_resource_heap"));
         inst->replaceUsesWith(param);

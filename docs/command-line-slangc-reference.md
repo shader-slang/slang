@@ -1109,11 +1109,11 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_compute_shader_derivatives` : enables the SPV_KHR_compute_shader_derivatives extension 
 * `SPV_GOOGLE_user_type` : enables the SPV_GOOGLE_user_type extension 
 * `SPV_EXT_replicated_composites` : enables the SPV_EXT_replicated_composites extension 
+* `SPV_KHR_vulkan_memory_model` : enables the SPV_KHR_vulkan_memory_model extension 
 * `SPV_NV_cooperative_vector` : enables the SPV_NV_cooperative_vector extension 
 * `SPV_KHR_cooperative_matrix` : enables the SPV_KHR_cooperative_matrix extension 
-* `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
 * `SPV_NV_tensor_addressing` : enables the SPV_NV_tensor_addressing extension 
-* `SPV_KHR_vulkan_memory_model` : enables the SPV_KHR_vulkan_memory_model extension 
+* `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
 * `spvAtomicFloat32AddEXT` 
 * `spvAtomicFloat16AddEXT` 
 * `spvAtomicFloat64AddEXT` 
@@ -1162,6 +1162,8 @@ A capability describes an optional feature that a target may or may not support.
 * `spvTensorAddressingNV` 
 * `spvMaximalReconvergenceKHR` 
 * `spvQuadControlKHR` 
+* `spvVulkanMemoryModelKHR` 
+* `spvVulkanMemoryModelDeviceScopeKHR` 
 * `metallib_latest` 
 * `dxil_lib` 
 * `any_target` 
@@ -1226,6 +1228,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_EXT_shader_atomic_float_min_max` : enables the GL_EXT_shader_atomic_float_min_max extension 
 * `GL_EXT_shader_atomic_float2` : enables the GL_EXT_shader_atomic_float2 extension 
 * `GL_EXT_shader_atomic_int64` : enables the GL_EXT_shader_atomic_int64 extension 
+* `GL_EXT_shader_explicit_arithmetic_types` : enables the GL_EXT_shader_explicit_arithmetic_types extension 
 * `GL_EXT_shader_explicit_arithmetic_types_int64` : enables the GL_EXT_shader_explicit_arithmetic_types_int64 extension 
 * `GL_EXT_shader_image_load_store` : enables the GL_EXT_shader_image_load_store extension 
 * `GL_EXT_shader_realtime_clock` : enables the GL_EXT_shader_realtime_clock extension 
@@ -1292,6 +1295,8 @@ A capability describes an optional feature that a target may or may not support.
 * `cooperative_matrix_tensor_addressing` 
 * `cooperative_matrix_block_load` 
 * `tensor_addressing` 
+* `cooperative_matrix_2` 
+* `vk_mem_model` 
 * `pixel` 
 * `tesscontrol` 
 * `tesseval` 
