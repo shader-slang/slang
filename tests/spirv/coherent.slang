@@ -1,6 +1,7 @@
 // Test that globallycoherent works.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry main -emit-spirv-directly
+//TEST:SIMPLE(filecheck=VK_MEM_MODEL): -target spirv -stage compute -entry main -emit-spirv-directly -capability vk_mem_model
 
 struct S
 {
@@ -17,4 +18,5 @@ void main(int tid : SV_DispatchThreadID)
     output[tid] = buffer[0].member;
     // CHECK-DAG: OpMemberDecorate {{.*}} 0 Coherent
     // CHECK-DAG: OpDecorate %buffer Coherent
+    // VK_MEM_MODEL: OpLoad {{.*}} MakePointerVisible|NonPrivatePointer
 }

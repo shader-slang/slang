@@ -1,6 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-per-element-operations -skip-spirv-validation -Xslang -DTEST_MODE=0
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-per-element-operations -skip-spirv-validation -Xslang -DTEST_MODE=1
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-per-element-operations -skip-spirv-validation -Xslang -DTEST_MODE=2
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-per-element-operations -Xslang -DTEST_MODE=0
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-per-element-operations -Xslang -DTEST_MODE=1
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-feature cooperative-matrix-per-element-operations -Xslang -DTEST_MODE=2
 
 //CHECK: type: int32_t
 //CHECK-NEXT: 2
