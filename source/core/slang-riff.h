@@ -1007,11 +1007,15 @@ private:
     ChunkBuilder* _currentChunk = nullptr;
 };
 
-#define SLANG_SCOPED_RIFF_BUILDER_DATA_CHUNK(CURSOR, TYPE) \
-    ::Slang::RIFF::BuildCursor::ScopedDataChunk _scopedRIFFBuilderDataChunk(CURSOR, TYPE)
+#define SLANG_SCOPED_RIFF_BUILDER_DATA_CHUNK(CURSOR, TYPE)    \
+    ::Slang::RIFF::BuildCursor::ScopedDataChunk SLANG_CONCAT( \
+        _scopedRIFFBuilderDataChunk,                          \
+        __LINE__)(CURSOR, TYPE)
 
-#define SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(CURSOR, TYPE) \
-    ::Slang::RIFF::BuildCursor::ScopedListChunk _scopedRIFFBuilderListChunk(CURSOR, TYPE)
+#define SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(CURSOR, TYPE)    \
+    ::Slang::RIFF::BuildCursor::ScopedListChunk SLANG_CONCAT( \
+        _scopedRIFFBuilderListChunk,                          \
+        __LINE__)(CURSOR, TYPE)
 
 } // namespace RIFF
 

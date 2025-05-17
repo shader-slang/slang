@@ -41,7 +41,7 @@ class NodeBase
     /// The type of the node. ASTNodeType(-1) is an invalid node type, and shouldn't appear on any
     /// correctly constructed (through ASTBuilder) NodeBase derived class.
     /// The actual type is set when constructed on the ASTBuilder.
-    FIDDLE() ASTNodeType astNodeType = ASTNodeType(-1);
+    ASTNodeType astNodeType = ASTNodeType(-1);
 
 #ifdef _DEBUG
     SLANG_UNREFLECTED int32_t _debugUID = 0;
@@ -752,7 +752,7 @@ public:
     FIDDLE() NameLoc nameAndLoc;
     FIDDLE() CapabilitySet inferredCapabilityRequirements;
 
-    FIDDLE() RefPtr<MarkupEntry> markup;
+    RefPtr<MarkupEntry> markup;
 
     Name* getName() const { return nameAndLoc.name; }
     SourceLoc getNameLoc() const { return nameAndLoc.loc; }

@@ -758,7 +758,7 @@ class DerivativeRequirementDecl : public FunctionDeclBase
 // A reference to a synthesized decl representing a differentiable function requirement, this decl
 // will be a child in the orignal function.
 FIDDLE()
-class DerivativeRequirementReferenceDecl : public FunctionDeclBase
+class DerivativeRequirementReferenceDecl : public Decl
 {
     FIDDLE(...)
     FIDDLE() DerivativeRequirementDecl* referencedDecl;
