@@ -11,7 +11,7 @@
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(4, 1, 1)]
-void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int idx = dispatchThreadID.x;
     uint laneId = WaveGetLaneIndex();
