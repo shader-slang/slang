@@ -31,13 +31,17 @@ void validate(IRValidateContext* context, bool condition, IRInst* inst, char con
 {
     if (!condition)
     {
+        std::string opName = getIROpInfo(inst->m_op).name;
+        std::string msg =
+            message + std::string("-: ") + opName + std::string(" ==== IR Validation Failed ====\n");
+        inst->dump();
         if (context)
         {
-            context->getSink()->diagnose(inst, Diagnostics::irValidationFailed, message);
+            context->getSink()->diagnose(inst, Diagnostics::irValidationFailed, msg.c_str());
         }
         else
         {
-            SLANG_ASSERT_FAILURE("IR validation failed");
+            SLANG_ASSERT_FAILURE(msg.c_str());
         }
     }
 }
@@ -250,7 +254,9 @@ void validateIRInstOperand(IRValidateContext* context, IRInst* inst, IRUse* oper
     //
     // We failed to find `operandParent` while walking the ancestors of `inst`,
     // so something had gone wrong.
-    validate(context, false, inst, "def must be ancestor of use");
+    std::string opname {getIROpInfo(inst->m_op).name};
+    std::string msg = opname + std::string(" def must be ancestor of use\n");
+    validate(context, false, inst, msg.c_str());
 }
 
 void validateIRInstOperands(IRValidateContext* context, IRInst* inst)
