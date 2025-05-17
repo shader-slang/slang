@@ -168,6 +168,16 @@ Expr* ASTSynthesizer::emitMemberExpr(Type* type, Name* name)
     return rs;
 }
 
+Expr* ASTSynthesizer::emitMemberExpr(QualType exprType, Expr* base, DeclRef<Decl> declRef)
+{
+    auto rs = m_builder->create<MemberExpr>();
+    rs->baseExpression = base;
+    rs->declRef = declRef;
+    rs->type = exprType;
+    rs->checked = base->checked;
+    return rs;
+}
+
 Expr* ASTSynthesizer::emitIndexExpr(Expr* base, Expr* index)
 {
     auto rs = m_builder->create<IndexExpr>();
