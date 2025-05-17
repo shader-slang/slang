@@ -351,6 +351,10 @@ String CLikeSourceEmitter::getTargetBuiltinVarName(IRInst* inst, IRTargetBuiltin
         return "gl_InstanceIndex";
     case IRTargetBuiltinVarName::SpvBaseInstance:
         return "gl_BaseInstance";
+    case IRTargetBuiltinVarName::SpvVertexIndex:
+        return "gl_VertexIndex";
+    case IRTargetBuiltinVarName::SpvBaseVertex:
+        return "gl_BaseVertex";
     }
     if (auto linkage = inst->findDecoration<IRLinkageDecoration>())
         return linkage->getMangledName();

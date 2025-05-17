@@ -3187,6 +3187,7 @@ protected:
                 break;
             }
         case SystemValueSemanticName::InstanceID:
+        case SystemValueSemanticName::VulkanInstanceID:
             {
                 result.systemValueName = toSlice("instance_id");
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
@@ -3250,6 +3251,7 @@ protected:
                 break;
             }
         case SystemValueSemanticName::VertexID:
+        case SystemValueSemanticName::VulkanVertexID:
             {
                 result.systemValueName = toSlice("vertex_id");
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
@@ -3853,6 +3855,7 @@ protected:
             break;
 
         case SystemValueSemanticName::InstanceID:
+        case SystemValueSemanticName::VulkanInstanceID:
             {
                 result.systemValueName = toSlice("instance_index");
                 result.permittedTypes.add(builder.getUIntType());
@@ -3906,6 +3909,7 @@ protected:
             }
 
         case SystemValueSemanticName::VertexID:
+        case SystemValueSemanticName::VulkanVertexID:
             {
                 result.systemValueName = toSlice("vertex_index");
                 result.permittedTypes.add(builder.getUIntType());

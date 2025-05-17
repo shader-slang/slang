@@ -636,6 +636,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
             case IRTargetBuiltinVarName::SpvInstanceIndex:
             case IRTargetBuiltinVarName::SpvBaseInstance:
+            case IRTargetBuiltinVarName::SpvVertexIndex:
+            case IRTargetBuiltinVarName::SpvBaseVertex:
                 return AddressSpace::BuiltinInput;
             }
         }
