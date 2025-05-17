@@ -285,8 +285,7 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope*
             paramDecl->loc = member->loc;
             paramDecl->setCheckState(DeclCheckState::DefinitionChecked);
 
-            paramDecl->parentDecl = attrDecl;
-            attrDecl->members.add(paramDecl);
+            attrDecl->addMember(paramDecl);
         }
     }
 
@@ -297,8 +296,7 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope*
     //
     // TODO: handle the case where `parentDecl` is generic?
     //
-    attrDecl->parentDecl = parentDecl;
-    parentDecl->members.add(attrDecl);
+    parentDecl->addMember(attrDecl);
 
     SLANG_ASSERT(!parentDecl->isMemberDictionaryValid());
 
@@ -830,7 +828,7 @@ Modifier* SemanticsVisitor::validateAttribute(
                 if (!typeChecked)
                 {
                     arg = CheckTerm(arg);
-                    arg = coerce(CoercionSite::Argument, paramDecl->getType(), arg);
+                    arg = coerce(CoercionSite::Argument, paramDecl->getType(), arg, getSink());
                 }
             }
             paramIndex++;

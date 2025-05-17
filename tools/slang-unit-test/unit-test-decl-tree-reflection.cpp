@@ -209,10 +209,10 @@ SLANG_UNIT_TEST(declTreeReflection)
     SLANG_CHECK(typeParamTConstraintCount == 2);
     auto typeParamTConstraintType1 =
         genericReflection->getTypeParameterConstraintType(typeParamT, 0);
-    SLANG_CHECK(getTypeFullName(typeParamTConstraintType1) == "IArithmetic");
+    SLANG_CHECK(getTypeFullName(typeParamTConstraintType1) == "IFloat");
     auto typeParamTConstraintType2 =
         genericReflection->getTypeParameterConstraintType(typeParamT, 1);
-    SLANG_CHECK(getTypeFullName(typeParamTConstraintType2) == "IFloat");
+    SLANG_CHECK(getTypeFullName(typeParamTConstraintType2) == "IArithmetic");
 
     auto innerStruct = genericReflection->getInnerDecl();
     SLANG_CHECK(innerStruct->getKind() == slang::DeclReflection::Kind::Struct);

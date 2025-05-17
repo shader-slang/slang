@@ -149,6 +149,8 @@ struct Lexer
         return ((m_lexerFlags & kLexerFlag_SuppressDiagnostics) == 0) ? m_sink : nullptr;
     }
 
+    SourceLoc findNextLineEnd(SourceLoc from, UInt& lineCount) const;
+
     SourceView* m_sourceView;
     DiagnosticSink* m_sink;
     NamePool* m_namePool;
@@ -182,6 +184,8 @@ IntegerLiteralValue getIntegerLiteralValue(
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
     UnownedStringSlice* outSuffix = 0);
+
+IntegerLiteralValue getCharLiteralValue(Token const& token);
 } // namespace Slang
 
 #endif

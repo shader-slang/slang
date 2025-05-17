@@ -60,6 +60,7 @@ INST(Nop, nop, 0, 0)
     INST(AttributedType, Attributed, 0, HOISTABLE)
     INST(ResultType, Result, 2, HOISTABLE)
     INST(OptionalType, Optional, 1, HOISTABLE)
+    INST(EnumType, Enum, 1, PARENT)
 
     INST(DifferentialPairType, DiffPair, 1, HOISTABLE)
     INST(DifferentialPairUserCodeType, DiffPairUserCode, 1, HOISTABLE)
@@ -94,6 +95,7 @@ INST(Nop, nop, 0, 0)
 
     /* Rate */
         INST(ConstExprRate, ConstExpr, 0, HOISTABLE)
+        INST(SpecConstRate, SpecConst, 0, HOISTABLE)
         INST(GroupSharedRate, GroupShared, 0, HOISTABLE)
         INST(ActualGlobalRate, ActualGlobalRate, 0, HOISTABLE)
     INST_RANGE(Rate, ConstExprRate, GroupSharedRate)
@@ -236,6 +238,10 @@ INST(RayQueryType, RayQuery, 1, HOISTABLE)
 INST(HitObjectType, HitObject, 0, HOISTABLE)
 INST(CoopVectorType, CoopVectorType, 2, HOISTABLE)
 INST(CoopMatrixType, CoopMatrixType, 5, HOISTABLE)
+INST(TensorAddressingTensorLayoutType, TensorAddressingTensorLayoutType, 2, HOISTABLE)
+INST(TensorAddressingTensorViewType, TensorAddressingTensorViewType, 3, HOISTABLE)
+INST(MakeTensorAddressingTensorLayout, MakeTensorAddressingTensorLayout, 0, 0)
+INST(MakeTensorAddressingTensorView, MakeTensorAddressingTensorView, 0, 0)
 
 // Opaque type that can be dynamically cast to other resource types.
 INST(DynamicResourceType, DynamicResource, 0, HOISTABLE)
@@ -746,7 +752,7 @@ INST(GpuForeach, gpuForeach, 3, 0)
 
 // Wrapper for OptiX intrinsics used to load and store ray payload data using
 // a pointer represented by two payload registers.
-INST(GetOptiXRayPayloadPtr, getOptiXRayPayloadPtr, 0, 0)
+INST(GetOptiXRayPayloadPtr, getOptiXRayPayloadPtr, 0, HOISTABLE)
 
 // Wrapper for OptiX intrinsics used to load a single hit attribute
 // Takes two arguments: the type (either float or int), and the hit 
@@ -994,6 +1000,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(MaximallyReconvergesDecoration, MaximallyReconverges, 0, 0)
     INST(QuadDerivativesDecoration, QuadDerivatives, 0, 0)
     INST(RequireFullQuadsDecoration, RequireFullQuads, 0, 0)
+    INST(TempCallArgVarDecoration, TempCallArgVar, 0, 0)
 
         // Marks a type to be non copyable, causing SSA pass to skip turning variables of the the type into SSA values.
     INST(NonCopyableTypeDecoration, nonCopyable, 0, 0)
@@ -1164,6 +1171,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         /// Decorates an inst with a debug source location (IRDebugSource, IRIntLit(line), IRIntLit(col)).
     INST(DebugLocationDecoration, DebugLocation, 3, 0)
 
+        /// Decorates a function with a link to its debug function representation
+    INST(DebugFunctionDecoration, DebugFunction, 1, 0)
+
         /// Recognized by SPIRV-emit pass so we can emit a SPIRV `Block` decoration.
     INST(SPIRVBlockDecoration, spvBlock, 0, 0)
 
@@ -1232,6 +1242,9 @@ INST(CastPtrToInt, CastPtrToInt, 1, 0)
 INST(CastIntToPtr, CastIntToPtr, 1, 0)
 INST(CastToVoid, castToVoid, 1, 0)
 INST(PtrCast, PtrCast, 1, 0)
+INST(CastEnumToInt, CastEnumToInt, 1, 0)
+INST(CastIntToEnum, CastIntToEnum, 1, 0)
+INST(EnumCast, EnumCast, 1, 0)
 INST(CastUInt2ToDescriptorHandle, CastUInt2ToDescriptorHandle, 1, 0)
 INST(CastDescriptorHandleToUInt2, CastDescriptorHandleToUInt2, 1, 0)
 
@@ -1352,6 +1365,11 @@ INST(DebugSource, DebugSource, 2, HOISTABLE)
 INST(DebugLine, DebugLine, 5, 0)
 INST(DebugVar, DebugVar, 4, 0)
 INST(DebugValue, DebugValue, 2, 0)
+INST(DebugInlinedAt, DebugInlinedAt, 5, 0)
+INST(DebugFunction, DebugFunction, 5, 0)
+INST(DebugInlinedVariable, DebugInlinedVariable, 2, 0)
+INST(DebugScope, DebugScope, 2, 0)
+INST(DebugNoScope, DebugNoScope, 1, 0)
 
 /* Embedded Precompiled Libraries */
 INST(EmbeddedDownstreamIR, EmbeddedDownstreamIR, 2, 0)

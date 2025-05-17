@@ -15,8 +15,10 @@
 #include "slang-emit-glsl.h"
 #include "slang-emit-hlsl.h"
 #include "slang-emit-metal.h"
+#include "slang-emit-slang.h"
 #include "slang-emit-source-writer.h"
 #include "slang-emit-torch.h"
+#include "slang-emit-vm.h"
 #include "slang-emit-wgsl.h"
 #include "slang-ir-any-value-inference.h"
 #include "slang-ir-autodiff.h"
@@ -70,6 +72,7 @@
 #include "slang-ir-lower-combined-texture-sampler.h"
 #include "slang-ir-lower-coopvec.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
+#include "slang-ir-lower-enum-type.h"
 #include "slang-ir-lower-generics.h"
 #include "slang-ir-lower-glsl-ssbo-types.h"
 #include "slang-ir-lower-l-value-cast.h"
@@ -103,6 +106,7 @@
 #include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-translate-global-varying-var.h"
+#include "slang-ir-undo-param-copy.h"
 #include "slang-ir-uniformity.h"
 #include "slang-ir-user-type-hint.h"
 #include "slang-ir-validate.h"
@@ -116,6 +120,7 @@
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
+#include "slang-vm-bytecode.h"
 
 #include <assert.h>
 
@@ -309,6 +314,7 @@ struct RequiredLoweringPassSet
     bool debugInfo;
     bool resultType;
     bool optionalType;
+    bool enumType;
     bool combinedTextureSamplers;
     bool reinterpret;
     bool generics;
@@ -345,6 +351,10 @@ void calcRequiredLoweringPassSet(
     case kIROp_DebugLine:
     case kIROp_DebugLocationDecoration:
     case kIROp_DebugSource:
+    case kIROp_DebugInlinedAt:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+    case kIROp_DebugFunction:
         result.debugInfo = true;
         break;
     case kIROp_ResultType:
@@ -352,6 +362,9 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_OptionalType:
         result.optionalType = true;
+        break;
+    case kIROp_EnumType:
+        result.enumType = true;
         break;
     case kIROp_TextureType:
         if (!isKhronosTarget(codeGenContext->getTargetReq()))
@@ -602,105 +615,6 @@ static void unexportNonEmbeddableIR(CodeGenTarget target, IRModule* irModule)
     }
 }
 
-static void validateVectorOrMatrixElementType(
-    DiagnosticSink* sink,
-    SourceLoc sourceLoc,
-    IRType* elementType,
-    uint32_t allowedWidths,
-    const DiagnosticInfo& disallowedElementTypeEncountered)
-{
-    if (!isFloatingType(elementType))
-    {
-        if (isIntegralType(elementType))
-        {
-            IntInfo info = getIntTypeInfo(elementType);
-            if (allowedWidths == 0U)
-            {
-                sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
-            }
-            else
-            {
-                bool widthAllowed = false;
-                SLANG_ASSERT((allowedWidths & ~(0xfU << 3)) == 0U);
-                for (uint32_t p = 3U; p <= 6U; p++)
-                {
-                    uint32_t width = 1U << p;
-                    if (!(allowedWidths & width))
-                        continue;
-                    widthAllowed = widthAllowed || (info.width == width);
-                }
-                if (!widthAllowed)
-                {
-                    sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
-                }
-            }
-        }
-        else if (!as<IRBoolType>(elementType))
-        {
-            sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
-        }
-    }
-}
-
-static void validateVectorsAndMatrices(
-    DiagnosticSink* sink,
-    IRModule* module,
-    TargetRequest* targetRequest)
-{
-    for (auto globalInst : module->getGlobalInsts())
-    {
-        if (auto matrixType = as<IRMatrixType>(globalInst))
-        {
-            // Matrices with row/col dimension 1 are only well-supported on D3D targets
-            if (!isD3DTarget(targetRequest))
-            {
-                // Verify that neither row nor col count is 1
-                auto colCount = as<IRIntLit>(matrixType->getColumnCount());
-                auto rowCount = as<IRIntLit>(matrixType->getRowCount());
-
-                if ((rowCount && (rowCount->getValue() == 1)) ||
-                    (colCount && (colCount->getValue() == 1)))
-                {
-                    sink->diagnose(matrixType->sourceLoc, Diagnostics::matrixColumnOrRowCountIsOne);
-                }
-            }
-
-            // Verify that the element type is a floating point type, or an allowed integral type
-            auto elementType = matrixType->getElementType();
-            uint32_t allowedWidths = 0U;
-            if (isCPUTarget(targetRequest))
-                allowedWidths = 8U | 16U | 32U | 64U;
-            else if (isCUDATarget(targetRequest))
-                allowedWidths = 32U | 64U;
-            else if (isD3DTarget(targetRequest))
-                allowedWidths = 16U | 32U;
-            validateVectorOrMatrixElementType(
-                sink,
-                matrixType->sourceLoc,
-                elementType,
-                allowedWidths,
-                Diagnostics::matrixWithDisallowedElementTypeEncountered);
-        }
-        else if (auto vectorType = as<IRVectorType>(globalInst))
-        {
-            // Verify that the element type is a floating point type, or an allowed integral type
-            auto elementType = vectorType->getElementType();
-            uint32_t allowedWidths = 0U;
-            if (isWGPUTarget(targetRequest))
-                allowedWidths = 32U;
-            else
-                allowedWidths = 8U | 16U | 32U | 64U;
-
-            validateVectorOrMatrixElementType(
-                sink,
-                vectorType->sourceLoc,
-                elementType,
-                allowedWidths,
-                Diagnostics::vectorWithDisallowedElementTypeEncountered);
-        }
-    }
-}
-
 Result linkAndOptimizeIR(
     CodeGenContext* codeGenContext,
     LinkingAndOptimizationOptions const& options,
@@ -825,6 +739,7 @@ Result linkAndOptimizeIR(
         switch (target)
         {
         case CodeGenTarget::HostCPPSource:
+        case CodeGenTarget::HostVM:
             break;
         case CodeGenTarget::CUDASource:
             collectOptiXEntryPointUniformParams(irModule);
@@ -859,6 +774,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::HostVM:
         break;
     }
 
@@ -1153,6 +1069,18 @@ Result linkAndOptimizeIR(
     else
         cleanupGenerics(targetProgram, irModule, sink);
     dumpIRIfEnabled(codeGenContext, irModule, "AFTER-LOWER-GENERICS");
+
+    if (requiredLoweringPassSet.enumType)
+        lowerEnumType(irModule, sink);
+
+    // Don't need to run any further target-dependent passes if we are generating code
+    // for host vm.
+    if (target == CodeGenTarget::HostVM)
+    {
+        performForceInlining(irModule);
+        simplifyIR(targetProgram, irModule, defaultIRSimplificationOptions, sink);
+        return SLANG_OK;
+    }
 
     // After dynamic dispatch logic is resolved into ordinary function calls,
     // we can now run our stage specialization logic.
@@ -1667,6 +1595,13 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
+        // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with direct
+        // pointers
+        undoParameterCopy(irModule);
+#if 0
+        dumpIRIfEnabled(codeGenContext, irModule, "PARAMETER COPIES REPLACED WITH DIRECT POINTERS");
+#endif
+        validateIRModuleIfEnabled(codeGenContext, irModule);
         moveGlobalVarInitializationToEntryPoints(irModule, targetProgram);
         introduceExplicitGlobalContext(irModule, target);
         if (target == CodeGenTarget::CPPSource)
@@ -1704,7 +1639,7 @@ Result linkAndOptimizeIR(
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Validate vectors and matrices according to what the target allows
-    validateVectorsAndMatrices(sink, irModule, targetRequest);
+    validateVectorsAndMatrices(irModule, sink, targetRequest);
 
     // The resource-based specialization pass above
     // may create specialized versions of functions, but
@@ -2325,6 +2260,49 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     ArtifactUtil::addAssociated(artifact, linkedIR.metadata);
 
     outArtifact.swap(artifact);
+
+    return SLANG_OK;
+}
+
+SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact)
+{
+    LinkedIR linkedIR;
+    LinkingAndOptimizationOptions linkingAndOptimizationOptions;
+    SLANG_RETURN_ON_FAIL(
+        linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
+
+    VMByteCodeBuilder byteCode;
+    SLANG_RETURN_ON_FAIL(emitVMByteCodeForEntryPoints(codeGenContext, linkedIR, byteCode));
+
+    String slangDeclaration;
+    SLANG_RETURN_ON_FAIL(
+        emitSlangDeclarationsForEntryPoints(codeGenContext, linkedIR, slangDeclaration));
+
+    slang::SessionDesc sessionDesc = {};
+    ComPtr<slang::ISession> slangSession;
+    SLANG_RETURN_ON_FAIL(
+        codeGenContext->getSession()->createSession(sessionDesc, slangSession.writeRef()));
+    auto linkage = static_cast<Linkage*>(slangSession.get());
+
+    ComPtr<ISlangBlob> diagnostics;
+    auto module = slangSession->loadModuleFromSource(
+        "kernel",
+        "kernel.slang",
+        StringBlob::create(slangDeclaration),
+        diagnostics.writeRef());
+    if (!module)
+        return SLANG_FAIL;
+    RefPtr<Module> newModule = new Module(linkage);
+    newModule->setModuleDecl(static_cast<Module*>(module)->getModuleDecl());
+    newModule->setIRModule(linkedIR.module);
+    newModule->setName("kernels");
+    SLANG_RETURN_ON_FAIL(newModule->serialize(byteCode.kernelBlob.writeRef()));
+
+    ComPtr<slang::IBlob> byteCodeBlob;
+    SLANG_RETURN_ON_FAIL(byteCode.serialize(byteCodeBlob.writeRef()));
+
+    outArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_HOST_VM);
+    outArtifact->addRepresentationUnknown(byteCodeBlob);
 
     return SLANG_OK;
 }

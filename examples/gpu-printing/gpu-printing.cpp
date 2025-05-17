@@ -140,8 +140,16 @@ void GPUPrinting::processGPUPrintCommands(const void* data, size_t dataSize)
         // avoid crashes from a command trying to fetch data past
         // the end of the buffer.
         //
-        if (payloadWordCount > size_t(dataCursor - dataEnd))
+        ptrdiff_t wordsAvailable = dataEnd - dataCursor;
+        if (wordsAvailable < 0 || payloadWordCount > (uint32_t)wordsAvailable)
         {
+            fprintf(
+                stderr,
+                "error: GPU printing buffer corruption or insufficient data for payload.\n"
+                "  Op: %d, Declared Payload Words: %u, Available Words: %td\n",
+                (int)op,
+                payloadWordCount,
+                (wordsAvailable < 0 ? 0 : wordsAvailable));
             break;
         }
         //

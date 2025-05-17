@@ -135,10 +135,10 @@ public:
     SLANG_NO_THROW virtual void SLANG_MCALL flush() SLANG_OVERRIDE;
     SLANG_NO_THROW virtual SlangResult SLANG_MCALL setMode(SlangWriterMode mode) SLANG_OVERRIDE;
 
-    static bool isConsole(FILE* file);
+    static bool isFileConsole(FILE* file);
     static WriterFlags getDefaultFlags(FILE* file)
     {
-        return isConsole(file) ? WriterFlags(WriterFlag::IsConsole) : 0;
+        return isFileConsole(file) ? WriterFlags(WriterFlag::IsConsole) : 0;
     }
 
     /// Ctor
@@ -188,7 +188,7 @@ public:
         SLANG_OVERRIDE;
 
     /// Ctor
-    StringWriter(StringBuilder* builder, WriterFlags flags)
+    StringWriter(StringBuilder* builder, WriterFlags flags = 0)
         : Parent(flags), m_builder(builder)
     {
     }

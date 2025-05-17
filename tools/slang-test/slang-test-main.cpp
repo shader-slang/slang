@@ -28,6 +28,7 @@
 #include "options.h"
 #include "parse-diagnostic-util.h"
 #include "slangc-tool.h"
+#include "slangi-tool.h"
 #include "test-context.h"
 #include "test-reporter.h"
 
@@ -57,7 +58,7 @@ extern "C"
 
 extern "C"
 {
-    __declspec(dllexport) extern const char* D3D12SDKPath = u8".\\D3D12\\";
+    __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\";
 }
 #endif
 
@@ -860,7 +861,7 @@ Result spawnAndWaitSharedLibrary(
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, &stdError);
         stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, &stdOut);
 
-        if (exeName == "slangc")
+        if (exeName == "slangc" || exeName == "slangi")
         {
             stdWriters.setWriter(SLANG_WRITER_CHANNEL_DIAGNOSTIC, &stdError);
         }
@@ -902,7 +903,7 @@ Result spawnAndWaitProxy(
     // Get the name of the thing to execute
     String exeName = Path::getFileNameWithoutExt(inCmdLine.m_executableLocation.m_pathOrName);
 
-    if (exeName == "slangc")
+    if (exeName == "slangc" || exeName == "slangi")
     {
         // If the test is slangc there is a command line version we can just directly use
         // return spawnAndWaitExe(context, testPath, inCmdLine, outRes);
@@ -1065,6 +1066,7 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
     case SLANG_CUDA_SOURCE:
     case SLANG_METAL:
     case SLANG_WGSL:
+    case SLANG_HOST_VM:
         {
             return 0;
         }
@@ -1302,6 +1304,10 @@ static SlangResult _extractTestRequirements(const CommandLine& cmdLine, TestRequ
     else if (exeName == "slangc")
     {
         return _extractSlangCTestRequirements(cmdLine, ioInfo);
+    }
+    else if (exeName == "slangi")
+    {
+        return SLANG_OK;
     }
     else if (exeName == "slang-reflection-test")
     {
@@ -1562,6 +1568,12 @@ String findExpectedPath(const TestInput& input, const char* postFix)
     return "";
 }
 
+static SlangResult _initSlangInterpreter(TestContext* context, CommandLine& ioCmdLine)
+{
+    ioCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slangi"));
+    return SLANG_OK;
+}
+
 static SlangResult _initSlangCompiler(TestContext* context, CommandLine& ioCmdLine)
 {
     ioCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slangc"));
@@ -1569,6 +1581,12 @@ static SlangResult _initSlangCompiler(TestContext* context, CommandLine& ioCmdLi
     if (context->options.verbosePaths)
     {
         ioCmdLine.addArgIfNotFound("-verbose-paths");
+    }
+
+    for (auto& capability : context->options.capabilities)
+    {
+        ioCmdLine.addArg("-capability");
+        ioCmdLine.addArg(capability.getBuffer());
     }
 
     // Look for definition of a slot
@@ -2371,6 +2389,67 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
     }
 
     return _validateOutput(context, input, actualOutput, false);
+}
+
+TestResult runInterpreterTest(TestContext* context, TestInput& input)
+{
+    // need to execute the stand-alone Slang compiler on the file, and compare its output to what we
+    // expect
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+
+    List<String> args;
+
+    for (Index i = 0; i < input.testOptions->args.getCount(); i++)
+    {
+        auto& arg = input.testOptions->args[i];
+        if (arg == "-disasm")
+            cmdLine.addArg(arg);
+        else if (arg == "-entry")
+        {
+            cmdLine.addArg(arg);
+            i++;
+            if (i < input.testOptions->args.getCount())
+            {
+                cmdLine.addArg(input.testOptions->args[i]);
+            }
+        }
+        else
+        {
+            args.add(arg);
+        }
+    }
+
+    cmdLine.addArg(input.filePath);
+
+    for (auto arg : args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    if (SLANG_FAILED(_initSlangInterpreter(context, cmdLine)))
+    {
+        return TestResult::Ignored;
+    }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    String actualOutput = getOutput(exeRes);
+
+    return _validateOutput(
+        context,
+        input,
+        actualOutput,
+        false,
+        "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
+        [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }
 
 TestResult runCompile(TestContext* context, TestInput& input)
@@ -3309,6 +3388,12 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
     {
         ioCmdLine.addArg("-emit-spirv-via-glsl");
     }
+
+    for (auto capability : options.capabilities)
+    {
+        ioCmdLine.addArg("-capability");
+        ioCmdLine.addArg(capability);
+    }
 }
 
 static SlangResult _extractProfileTime(const UnownedStringSlice& text, double& timeOut)
@@ -3522,8 +3607,10 @@ TestResult runComputeComparisonImpl(
     // gets misinterpreted as the result from the test.
     // This is due to the limitation that Slang RPC implementation expects only
     // one time communication.
-    if (input.spawnType != SpawnType::UseTestServer)
+    if (context->options.debugLayerEnabled && input.spawnType != SpawnType::UseTestServer)
+    {
         cmdLine.addArg("-enable-debug-layers");
+    }
 #endif
 
     if (context->isExecuting())
@@ -3952,6 +4039,7 @@ static const TestCommandInfo s_testCommandInfos[] = {
     {"SIMPLE", &runSimpleTest, 0},
     {"SIMPLE_EX", &runSimpleTest, 0},
     {"SIMPLE_LINE", &runSimpleLineTest, 0},
+    {"INTERPRET", &runInterpreterTest, 0},
     {"REFLECTION", &runReflectionTest, 0},
     {"CPU_REFLECTION", &runReflectionTest, 0},
     {"COMMAND_LINE_SIMPLE", &runSimpleCompareCommandLineTest, 0},
@@ -4258,7 +4346,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             context->setTestRequirements(&requirements);
             runTest(context, filePath, filePath, filePath, testDetails.options);
 
-            //
+
             apiUsedFlags |= requirements.usedRenderApiFlags;
             explictUsedApiFlags |= (requirements.explicitRenderApi != RenderApiType::Unknown)
                                        ? (RenderApiFlags(1) << int(requirements.explicitRenderApi))
@@ -4378,7 +4466,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
                     fileTestInfo->outputStem = outputStem;
                     fileTestInfo->options = testDetails.options;
 
-                    std::lock_guard lock(context->mutexFailedFileTests);
+                    std::lock_guard lock(context->mutexFailedTests);
                     context->failedFileTests.add(fileTestInfo);
                 }
                 else
@@ -4617,6 +4705,7 @@ static SlangResult runUnitTestModule(
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = context->options.enabledApis;
+    unitTestContext.enableDebugLayers = context->options.debugLayerEnabled;
     unitTestContext.executableDirectory = context->exeDirectoryPath.getBuffer();
 
     auto testCount = testModule->getTestCount();
@@ -4673,17 +4762,28 @@ static SlangResult runUnitTestModule(
                     TestServerProtocol::ExecuteUnitTestArgs::g_methodName,
                     &args,
                     exeRes);
-                const auto testResult = _asTestResult(ToolReturnCode(exeRes.resultCode));
+                auto testResult = _asTestResult(ToolReturnCode(exeRes.resultCode));
+
+                bool isFailed = (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail);
 
                 // If the test fails, output any output - which might give information about
                 // individual tests that have failed.
-                if (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail)
+                if (isFailed)
                 {
                     String output = getOutput(exeRes);
                     reporter->message(TestMessageType::TestFailure, output.getBuffer());
                 }
 
-                reporter->addResult(testResult);
+                if (isFailed && !context->isRetry &&
+                    !context->getTestReporter()->m_expectedFailureList.contains(test.testName))
+                {
+                    std::lock_guard lock(context->mutexFailedTests);
+                    context->failedUnitTests.add(test.command);
+                }
+                else
+                {
+                    reporter->addResult(testResult);
+                }
             }
         }
         else
@@ -4851,6 +4951,11 @@ SlangResult innerMain(int argc, char** argv)
         context.setInnerMainFunc("slangc", &SlangCTool::innerMain);
     }
 
+    {
+        // We can set the slangc command line tool, to just use the function defined here
+        context.setInnerMainFunc("slangi", &SlangITool::innerMain);
+    }
+
     SLANG_RETURN_ON_FAIL(
         Options::parse(argc, argv, &categorySet, StdWriters::getError(), &context.options));
 
@@ -4952,34 +5057,55 @@ SlangResult innerMain(int argc, char** argv)
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);
 
-            const auto spawnType = context.getFinalSpawnType();
-
-            // Run the unit tests
+            // Try the unit tests up to 3 times
+            for (bool isRetry : {false, true, true})
             {
-                TestOptions testOptions;
-                testOptions.categories.add(unitTestCategory);
-                testOptions.categories.add(smokeTestCategory);
-                runUnitTestModule(&context, testOptions, spawnType, "slang-unit-test-tool");
-            }
+                // Use default spawn type for unit tests as the test server one is unstable
+                auto spawnType = SpawnType::Default;
+                context.isRetry = isRetry;
+                if (isRetry)
+                {
+                    if (context.failedUnitTests.getCount() == 0)
+                        break;
 
-            {
-                TestOptions testOptions;
-                testOptions.categories.add(unitTestCategory);
-                runUnitTestModule(&context, testOptions, spawnType, "gfx-unit-test-tool");
+                    printf("Retrying unit tests with default spawn type...\n");
+                    context.options.testPrefixes = context.failedUnitTests;
+                    context.failedUnitTests.clear();
+                }
+
+                // Run the unit tests
+                {
+                    TestOptions testOptions;
+                    testOptions.categories.add(unitTestCategory);
+                    testOptions.categories.add(smokeTestCategory);
+                    runUnitTestModule(&context, testOptions, spawnType, "slang-unit-test-tool");
+                }
+
+                {
+                    TestOptions testOptions;
+                    testOptions.categories.add(unitTestCategory);
+                    runUnitTestModule(&context, testOptions, spawnType, "gfx-unit-test-tool");
+                }
             }
 
             TestReporter::set(nullptr);
         }
 
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
-        // excution or driver instability. We can try running them again.
+        // excution or driver instability. We can try running them again. Debug build has more
+        // instability at this moment, so we allow more retries.
+#if _DEBUG
+        static constexpr int kFailedTestLimitForRetry = 32;
+#else
         static constexpr int kFailedTestLimitForRetry = 16;
+#endif
         if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
         {
             if (context.failedFileTests.getCount() > 0)
                 printf("Retrying %d failed tests...\n", (int)context.failedFileTests.getCount());
             for (auto& test : context.failedFileTests)
             {
+                context.isRetry = true;
                 FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
                 TestReporter::SuiteScope suiteScope(&reporter, "tests");
                 TestReporter::TestScope scope(&reporter, fileTestInfo->testName);

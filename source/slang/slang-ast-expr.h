@@ -139,6 +139,12 @@ class StringLiteralExpr : public LiteralExpr
     FIDDLE() String value;
 };
 
+FIDDLE()
+class MakeArrayFromElementExpr : public Expr
+{
+    FIDDLE(...)
+};
+
 // An initializer list, e.g. `{ 1, 2, 3 }`
 FIDDLE()
 class InitializerListExpr : public Expr
@@ -671,6 +677,14 @@ class DispatchKernelExpr : public HigherOrderInvokeExpr
     FIDDLE(...)
     FIDDLE() Expr* threadGroupSize;
     FIDDLE() Expr* dispatchSize;
+};
+
+FIDDLE()
+class LambdaExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() ScopeDecl* paramScopeDecl;
+    FIDDLE() Stmt* bodyStmt;
 };
 
 /// An express to mark its inner expression as an intended non-differential call.

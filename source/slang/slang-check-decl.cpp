@@ -42,6 +42,31 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
 
     void visitDeclGroup(DeclGroup*) {}
 
+    void visitVarDecl(VarDecl* decl)
+    {
+        visitDecl(decl);
+
+        // Export'd/Extern'd variables must be `const`, otherwise we may have a mismatch
+        // causing errors.
+        bool hasConst = false;
+        bool hasExportOrExtern = false;
+        bool hasStatic = false;
+        for (auto m : decl->modifiers)
+        {
+            if (as<ExternModifier>(m) || as<HLSLExportModifier>(m))
+                hasExportOrExtern = true;
+            else if (as<ConstModifier>(m))
+                hasConst = true;
+            else if (as<HLSLStaticModifier>(m))
+                hasStatic = true;
+        }
+        if (hasExportOrExtern && hasConst != hasStatic)
+            getSink()->diagnose(
+                decl,
+                Diagnostics::ExternAndExportVarDeclMustBeConst,
+                decl->getName());
+    }
+
     void visitDecl(Decl* decl) { checkModifiers(decl); }
 
     void visitStructDecl(StructDecl* structDecl);
@@ -94,6 +119,8 @@ struct SemanticsDeclAttributesVisitor : public SemanticsDeclVisitorBase,
         PrimalSubstituteOfAttribute* attr);
 
     void checkVarDeclCommon(VarDeclBase* varDecl);
+
+    void checkHLSLRegisterSemantic(VarDeclBase* varDecl, HLSLRegisterSemantic* registerSematnic);
 
     void visitVarDecl(VarDecl* varDecl) { checkVarDeclCommon(varDecl); }
 
@@ -380,8 +407,13 @@ private:
         bool isMemberInitCtor,
         Index& paramIndex);
 
-    MemberExpr* createMemberExpr(ThisExpr* thisExpr, Scope* scope, Decl* member);
+    AssignExpr* createMemberAssignmentExpr(
+        ThisExpr* thisExpr,
+        Scope* scope,
+        Decl* member,
+        Expr* rightHandSideExpr);
     Expr* createCtorParamExpr(ConstructorDecl* ctor, Index paramIndex);
+    void maybeInsertDefaultInitExpr(StructDecl* structDecl);
 };
 
 template<typename VisitorType>
@@ -1836,6 +1868,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 
             varDecl->initExpr = initExpr;
             varDecl->type.type = initExpr->type;
+
+            varDecl->setCheckState(DeclCheckState::DefinitionChecked);
             _validateCircularVarDefinition(varDecl);
         }
 
@@ -1866,7 +1900,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             if (auto initExpr = varDecl->initExpr)
             {
                 initExpr = CheckTerm(initExpr);
-                initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr);
+                initExpr =
+                    coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
                 varDecl->initExpr = initExpr;
 
                 maybeInferArraySizeForVariable(varDecl);
@@ -2346,7 +2381,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         if (initExpr->type.isWriteOnly)
             getSink()->diagnose(initExpr, Diagnostics::readingFromWriteOnly);
 
-        initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr);
+        initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
         varDecl->initExpr = initExpr;
 
         // We need to ensure that any variable doesn't introduce
@@ -2626,9 +2661,8 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
         auto assocTypeDef = m_astBuilder->create<TypeDefDecl>();
         assocTypeDef->nameAndLoc.name = getName("Differential");
         assocTypeDef->type.type = context->conformingType;
-        assocTypeDef->parentDecl = context->parentDecl;
+        context->parentDecl->addMember(assocTypeDef);
         assocTypeDef->setCheckState(DeclCheckState::DefinitionChecked);
-        context->parentDecl->members.add(assocTypeDef);
 
         markSelfDifferentialMembersOfType(
             as<AggTypeDecl>(context->parentDecl),
@@ -2660,8 +2694,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
     if (!aggTypeDecl)
     {
         aggTypeDecl = m_astBuilder->create<StructDecl>();
-        aggTypeDecl->parentDecl = context->parentDecl;
-        context->parentDecl->members.add((aggTypeDecl));
+        context->parentDecl->addMember(aggTypeDecl);
         aggTypeDecl->nameAndLoc.name = requirementDeclRef.getName();
         aggTypeDecl->loc = context->parentDecl->nameAndLoc.loc;
         context->parentDecl->invalidateMemberDictionary();
@@ -2719,8 +2752,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
         diffField->nameAndLoc = member->nameAndLoc;
         diffField->type.type = diffMemberType;
         diffField->checkState = DeclCheckState::SignatureChecked;
-        diffField->parentDecl = aggTypeDecl;
-        aggTypeDecl->members.add(diffField);
+        aggTypeDecl->addMember(diffField);
 
         auto visibility = getDeclVisibility(member);
         addVisibilityModifier(diffField, visibility);
@@ -2775,8 +2807,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
     {
         auto inheritanceIDiffernetiable = m_astBuilder->create<InheritanceDecl>();
         inheritanceIDiffernetiable->base.type = m_astBuilder->getDiffInterfaceType();
-        inheritanceIDiffernetiable->parentDecl = aggTypeDecl;
-        aggTypeDecl->members.add(inheritanceIDiffernetiable);
+        aggTypeDecl->addMember(inheritanceIDiffernetiable);
     }
 
     // The `Differential` type of a `Differential` type is always itself.
@@ -2797,9 +2828,8 @@ bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness
         auto assocTypeDef = m_astBuilder->create<TypeDefDecl>();
         assocTypeDef->nameAndLoc.name = getName("Differential");
         assocTypeDef->type.type = satisfyingType;
-        assocTypeDef->parentDecl = aggTypeDecl;
+        aggTypeDecl->addMember(assocTypeDef);
         assocTypeDef->setCheckState(DeclCheckState::DefinitionChecked);
-        aggTypeDecl->members.add(assocTypeDef);
     }
 
     // Go through all members and collect their differential types.
@@ -3926,7 +3956,7 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             auto satisfyingValueParamDeclRef = satisfyingMemberDeclRef.as<GenericValueParamDecl>();
             SLANG_ASSERT(satisfyingValueParamDeclRef);
 
-            auto satisfyingVal = m_astBuilder->getOrCreate<GenericParamIntVal>(
+            auto satisfyingVal = m_astBuilder->getOrCreate<DeclRefIntVal>(
                 requiredValueParamDeclRef.getDecl()->getType(),
                 satisfyingValueParamDeclRef);
             satisfyingVal->getDeclRef() = satisfyingValueParamDeclRef;
@@ -4319,7 +4349,7 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
                 typeParamDeclBase->astNodeType);
             synTypeParamDeclBase->nameAndLoc = typeParamDeclBase->getNameAndLoc();
             synTypeParamDeclBase->parameterIndex = typeParamDeclBase->parameterIndex;
-            synTypeParamDeclBase->parentDecl = synGenericDecl;
+            synGenericDecl->addMember(synTypeParamDeclBase);
 
             // Note: we intentionally do not copy GenericTypeParamDecl::initType here,
             // because initType maybe dependent on the original type parameters,
@@ -4327,7 +4357,6 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             // synthesized ones. It shouldn't be required for the implementing declaration to define
             // initType anyways, so we'll just save ourselves from the trouble.
             //
-            synGenericDecl->members.add(synTypeParamDeclBase);
 
             mapOrigToSynTypeParams.add(typeParamDeclBase, synTypeParamDeclBase);
 
@@ -4345,7 +4374,7 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
         {
             auto synValParamDecl = m_astBuilder->create<GenericValueParamDecl>();
             synValParamDecl->nameAndLoc = valParamDecl->nameAndLoc;
-            synValParamDecl->parentDecl = synGenericDecl;
+            synGenericDecl->addMember(synValParamDecl);
             synValParamDecl->parameterIndex = valParamDecl->parameterIndex;
             synValParamDecl->type = valParamDecl->type;
 
@@ -4355,7 +4384,6 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             // synthesized ones. It shouldn't be required for the implementing declaration to define
             // initType anyways, so we'll just save ourselves from the trouble.
             //
-            synGenericDecl->members.add(synValParamDecl);
 
             mapOrigToSynTypeParams.add(valParamDecl, synGenericDecl);
 
@@ -4446,7 +4474,7 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
         auto synStaticModifier = m_astBuilder->create<HLSLStaticModifier>();
         synthesized->modifiers.first = synStaticModifier;
     }
-    else
+    else if (context)
     {
         // For a non-`static` requirement, we need a `this` parameter.
         //
@@ -4537,8 +4565,7 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
         // We need to add the parameter as a child declaration of
         // the method we are building.
         //
-        synParamDecl->parentDecl = synthesized;
-        synthesized->members.add(synParamDecl);
+        synthesized->addMember(synParamDecl);
 
         // Add modifiers
         paramType.isLeftValue = true;
@@ -4954,7 +4981,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     // so we also need to coerce the result of the call to
     // the expected type.
     //
-    auto coercedCall = subVisitor.coerce(CoercionSite::Return, resultType, checkedCall);
+    auto coercedCall = subVisitor.coerce(CoercionSite::Return, resultType, checkedCall, getSink());
 
     // If our overload resolution or type coercion failed,
     // then we have not been able to synthesize a witness
@@ -5508,8 +5535,7 @@ bool SemanticsVisitor::trySynthesizeWrapperTypePropertyRequirementWitness(
             // We need to add the parameter as a child declaration of
             // the accessor we are building.
             //
-            synParamDecl->parentDecl = synAccessorDecl;
-            synAccessorDecl->members.add(synParamDecl);
+            synAccessorDecl->addMember(synParamDecl);
 
             // For each paramter, we will create an argument expression
             // to represent it in the body of the accessor.
@@ -5567,8 +5593,7 @@ bool SemanticsVisitor::trySynthesizeWrapperTypePropertyRequirementWitness(
         addModifier(synAccessorDecl, m_astBuilder->create<ForceInlineAttribute>());
         synAccessorDecl->body = synBodyStmt;
 
-        synAccessorDecl->parentDecl = synPropertyDecl;
-        synPropertyDecl->members.add(synAccessorDecl);
+        synPropertyDecl->addMember(synAccessorDecl);
 
         // Register the synthesized accessor.
         //
@@ -5709,8 +5734,7 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
             // We need to add the parameter as a child declaration of
             // the accessor we are building.
             //
-            synParamDecl->parentDecl = synAccessorDecl;
-            synAccessorDecl->members.add(synParamDecl);
+            synAccessorDecl->addMember(synParamDecl);
 
             // For each paramter, we will create an argument expression
             // to represent it in the body of the accessor.
@@ -5812,7 +5836,7 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
             // the expected type of the property.
             //
             auto coercedMemberRef =
-                subVisitor.coerce(CoercionSite::Return, resultType, synBoundStorageExpr);
+                subVisitor.coerce(CoercionSite::Return, resultType, synBoundStorageExpr, getSink());
             auto synReturn = m_astBuilder->create<ReturnStmt>();
             synReturn->expression = coercedMemberRef;
 
@@ -5869,8 +5893,7 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
 
         synAccessorDecl->body = synBodyStmt;
 
-        synAccessorDecl->parentDecl = synAccesorContainer;
-        synAccesorContainer->members.add(synAccessorDecl);
+        synAccesorContainer->addMember(synAccessorDecl);
 
         // If synthesis of an accessor worked, then we will record it into
         // a local dictionary. We do *not* install the accessor into the
@@ -6377,7 +6400,9 @@ bool SemanticsVisitor::trySynthesizeEnumTypeMethodRequirementWitness(
     }
     synFunc->loc = context->parentDecl->closingSourceLoc;
     synFunc->nameAndLoc.loc = synFunc->loc;
-    context->parentDecl->members.add(synFunc);
+    // synFunc already has its parent set
+    SLANG_ASSERT(context->parentDecl == synFunc->parentDecl);
+    context->parentDecl->addMember(synFunc);
     context->parentDecl->invalidateMemberDictionary();
     addModifier(synFunc, intrinsicOpModifier);
     witnessTable->add(
@@ -6561,7 +6586,8 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     seqStmt->stmts.add(synReturn);
 
     Decl* witnessDecl = synGeneric ? (Decl*)synGeneric : synFunc;
-    context->parentDecl->members.add(witnessDecl);
+    SLANG_ASSERT(context->parentDecl == witnessDecl->parentDecl);
+    context->parentDecl->addMember(witnessDecl);
     context->parentDecl->invalidateMemberDictionary();
     addModifier(synFunc, m_astBuilder->create<SynthesizedModifier>());
 
@@ -7577,11 +7603,10 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
                     IsSubTypeOptions::NoCaching))
             {
                 InheritanceDecl* conformanceDecl = m_astBuilder->create<InheritanceDecl>();
-                conformanceDecl->parentDecl = decl;
                 conformanceDecl->loc = decl->loc;
                 conformanceDecl->base.type = defaultInitializableType;
                 conformanceDecl->nameAndLoc.name = getName("$inheritance");
-                decl->members.add(conformanceDecl);
+                decl->addMember(conformanceDecl);
             }
         }
 
@@ -7940,10 +7965,9 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
         Type* enumTypeType = getASTBuilder()->getEnumTypeType();
 
         InheritanceDecl* enumConformanceDecl = m_astBuilder->create<InheritanceDecl>();
-        enumConformanceDecl->parentDecl = decl;
         enumConformanceDecl->loc = decl->loc;
         enumConformanceDecl->base.type = getASTBuilder()->getEnumTypeType();
-        decl->members.add(enumConformanceDecl);
+        decl->addMember(enumConformanceDecl);
 
         // The `__EnumType` interface has one required member, the `__Tag` type.
         // We need to satisfy this requirement automatically, rather than require
@@ -8101,7 +8125,7 @@ void SemanticsDeclBodyVisitor::visitEnumCaseDecl(EnumCaseDecl* decl)
     if (auto initExpr = decl->tagExpr)
     {
         initExpr = CheckTerm(initExpr);
-        initExpr = coerce(CoercionSite::General, tagType, initExpr);
+        initExpr = coerce(CoercionSite::General, tagType, initExpr, getSink());
 
         // We want to enforce that this is an integer constant
         // expression.
@@ -8524,7 +8548,7 @@ List<Val*> getDefaultSubstitutionArgs(
             if (semantics)
                 semantics->ensureDecl(genericValueParamDecl, DeclCheckState::ReadyForLookup);
 
-            args.add(astBuilder->getOrCreate<GenericParamIntVal>(
+            args.add(astBuilder->getOrCreate<DeclRefIntVal>(
                 genericValueParamDecl->getType(),
                 astBuilder->getDirectDeclRef(genericValueParamDecl)));
         }
@@ -9148,7 +9172,7 @@ void SemanticsDeclBodyVisitor::visitParamDecl(ParamDecl* paramDecl)
         // actual type of the parameter.
         //
         initExpr = CheckTerm(initExpr);
-        initExpr = coerce(CoercionSite::Initializer, typeExpr.type, initExpr);
+        initExpr = coerce(CoercionSite::Initializer, typeExpr.type, initExpr, getSink());
         paramDecl->initExpr = initExpr;
 
         // TODO: a default argument expression needs to
@@ -9202,10 +9226,11 @@ static SeqStmt* _ensureCtorBodyIsSeqStmt(ASTBuilder* m_astBuilder, ConstructorDe
     return as<SeqStmt>(stmt->body);
 }
 
-MemberExpr* SemanticsDeclBodyVisitor::createMemberExpr(
+AssignExpr* SemanticsDeclBodyVisitor::createMemberAssignmentExpr(
     ThisExpr* thisExpr,
     Scope* scope,
-    Decl* member)
+    Decl* member,
+    Expr* rightHandSideExpr)
 {
     MemberExpr* memberExpr = m_astBuilder->create<MemberExpr>();
     memberExpr->baseExpression = thisExpr;
@@ -9215,7 +9240,15 @@ MemberExpr* SemanticsDeclBodyVisitor::createMemberExpr(
     memberExpr->name = member->getName();
     memberExpr->type = GetTypeForDeclRef(member->getDefaultDeclRef(), member->loc);
 
-    return memberExpr;
+    if (!memberExpr->type.isLeftValue)
+        return nullptr;
+
+    auto assign = m_astBuilder->create<AssignExpr>();
+    assign->left = memberExpr;
+    assign->right = rightHandSideExpr;
+    assign->loc = member->loc;
+
+    return assign;
 }
 
 Expr* SemanticsDeclBodyVisitor::createCtorParamExpr(ConstructorDecl* ctor, Index paramIndex)
@@ -9293,7 +9326,7 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForBases(
         invoke->arguments.addRange(argumentList);
 
         auto assign = m_astBuilder->create<AssignExpr>();
-        assign->left = coerce(CoercionSite::Initializer, declRefType, thisExpr);
+        assign->left = coerce(CoercionSite::Initializer, declRefType, thisExpr, getSink());
         assign->right = invoke;
 
         auto stmt = m_astBuilder->create<ExpressionStmt>();
@@ -9353,14 +9386,9 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMember(
         }
     }
 
-    MemberExpr* memberExpr = createMemberExpr(thisExpr, ctor->ownedScope, member);
-    if (!memberExpr->type.isLeftValue)
+    auto assign = createMemberAssignmentExpr(thisExpr, ctor->ownedScope, member, initExpr);
+    if (!assign)
         return;
-
-    auto assign = m_astBuilder->create<AssignExpr>();
-    assign->left = memberExpr;
-    assign->right = initExpr;
-    assign->loc = member->loc;
 
     auto stmt = m_astBuilder->create<ExpressionStmt>();
     stmt->expression = assign;
@@ -9371,13 +9399,61 @@ void SemanticsDeclBodyVisitor::synthesizeCtorBodyForMember(
         checkedMemberVarExpr = cachedDeclToCheckedVar[member];
     else
     {
-        checkedMemberVarExpr = CheckTerm(memberExpr);
+        checkedMemberVarExpr = CheckTerm(assign->left);
         cachedDeclToCheckedVar.add({member, checkedMemberVarExpr});
     }
 
     seqStmtChild->stmts.add(stmt);
 }
 
+// This function inserts the default initialization expression for every member who
+// has init expression at beginning of the user-defined ctor. We don't need to do this
+// for synthesized ctor, because synthesized ctor already handle this at the function
+// parameters
+void SemanticsDeclBodyVisitor::maybeInsertDefaultInitExpr(StructDecl* structDecl)
+{
+    // If there is no explicit constructor, we don't need to do anything.
+    if (!_hasExplicitConstructor(structDecl, false))
+        return;
+
+    // traverse all the constructors and insert the default initialization expressions.
+    for (auto ctor : structDecl->getMembersOfType<ConstructorDecl>())
+    {
+        ThisExpr* thisExpr = m_astBuilder->create<ThisExpr>();
+        thisExpr->scope = ctor->ownedScope;
+        thisExpr->type = ctor->returnType.type;
+        auto seqStmtChild = m_astBuilder->create<SeqStmt>();
+        seqStmtChild->stmts.reserve(structDecl->members.getCount());
+
+        for (auto& member : structDecl->members)
+        {
+            if (auto varDeclBase = as<VarDeclBase>(member))
+            {
+                if (varDeclBase->hasModifier<HLSLStaticModifier>() ||
+                    varDeclBase->getName() == nullptr || varDeclBase->initExpr == nullptr)
+                    continue;
+
+                auto assign = createMemberAssignmentExpr(
+                    thisExpr,
+                    ctor->ownedScope,
+                    member,
+                    varDeclBase->initExpr);
+                if (!assign)
+                    continue;
+
+                auto stmt = m_astBuilder->create<ExpressionStmt>();
+                stmt->expression = assign;
+                stmt->loc = member->loc;
+                seqStmtChild->stmts.add(stmt);
+            }
+        }
+        if (seqStmtChild->stmts.getCount() != 0)
+        {
+            auto seqStmt = _ensureCtorBodyIsSeqStmt(m_astBuilder, ctor);
+            seqStmt->stmts.insert(0, seqStmtChild);
+        }
+    }
+}
 
 void SemanticsDeclBodyVisitor::synthesizeCtorBody(
     DeclAndCtorInfo& structDeclInfo,
@@ -9484,6 +9560,7 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
     }
 
     synthesizeCtorBody(structDeclInfo, inheritanceDefaultCtorList, structDecl);
+    maybeInsertDefaultInitExpr(structDecl);
 
     if (structDeclInfo.defaultCtor)
     {
@@ -9556,8 +9633,7 @@ void SemanticsDeclHeaderVisitor::setFuncTypeIntoRequirementDecl(
         default:
             break;
         }
-        decl->members.add(param);
-        param->parentDecl = decl;
+        decl->addMember(param);
     }
 }
 
@@ -9576,8 +9652,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                                .as<CallableDecl>();
             auto diffFuncType = getForwardDiffFuncType(getFuncType(m_astBuilder, declRef));
             setFuncTypeIntoRequirementDecl(reqDecl, as<FuncType>(diffFuncType));
-            interfaceDecl->members.add(reqDecl);
-            reqDecl->parentDecl = interfaceDecl;
+            interfaceDecl->addMember(reqDecl);
 
             if (!decl->hasModifier<NoDiffThisAttribute>())
             {
@@ -9596,8 +9671,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
 
             auto reqRef = m_astBuilder->create<DerivativeRequirementReferenceDecl>();
             reqRef->referencedDecl = reqDecl;
-            reqRef->parentDecl = decl;
-            decl->members.add(reqRef);
+            decl->addMember(reqRef);
             isDiffFunc = true;
         }
         if (decl->hasModifier<BackwardDifferentiableAttribute>())
@@ -9612,8 +9686,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                 reqDecl->originalRequirementDecl = decl;
                 cloneModifiers(reqDecl, decl);
                 setFuncTypeIntoRequirementDecl(reqDecl, diffFuncType);
-                interfaceDecl->members.add(reqDecl);
-                reqDecl->parentDecl = interfaceDecl;
+                interfaceDecl->addMember(reqDecl);
                 if (!decl->hasModifier<NoDiffThisAttribute>())
                 {
                     // Build decl-ref-type for this-type.
@@ -9631,8 +9704,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
 
                 auto reqRef = m_astBuilder->create<DerivativeRequirementReferenceDecl>();
                 reqRef->referencedDecl = reqDecl;
-                reqRef->parentDecl = decl;
-                decl->members.add(reqRef);
+                decl->addMember(reqRef);
             }
             isDiffFunc = true;
         }
@@ -10123,8 +10195,7 @@ void SemanticsDeclHeaderVisitor::visitAbstractStorageDeclCommon(ContainerDecl* d
         GetterDecl* getterDecl = m_astBuilder->create<GetterDecl>();
         getterDecl->loc = decl->loc;
 
-        getterDecl->parentDecl = decl;
-        decl->members.add(getterDecl);
+        decl->addMember(getterDecl);
     }
 }
 
@@ -10263,8 +10334,7 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
         newValueParam->nameAndLoc.name = getName("newValue");
         newValueParam->nameAndLoc.loc = decl->loc;
 
-        newValueParam->parentDecl = decl;
-        decl->members.add(newValueParam);
+        decl->addMember(newValueParam);
     }
 
     // The new-value parameter is expected to have the
@@ -11355,6 +11425,207 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
     }
 }
 
+
+// Replace with <=> in C++20
+template<typename T>
+int compareThreeWays(T a, T b)
+{
+    if (a > b)
+        return -1;
+    else if (b > a)
+        return 1;
+    else
+        return 0;
+}
+
+// lhs and rhs cannot be nullptr
+int compareDecls(Decl& lhs, Decl& rhs);
+
+// lhs and rhs cannot be nullptr
+int compareVals(Val& lhs, Val& rhs);
+
+template<typename T, class Compare>
+int comparePtrs(T* lhs, T* rhs, Compare const& compare)
+{
+    int res = 0;
+    if (lhs == rhs)
+        res = 0;
+    else if (!lhs)
+        res = -1;
+    else if (!rhs)
+        res = 1;
+    else
+        res = compare(*lhs, *rhs);
+    return res;
+}
+
+// lhs or rhs might be nullptr
+int compareDecls(Decl* lhs, Decl* rhs)
+{
+    return comparePtrs(lhs, rhs, [&](Decl& lhs, Decl& rhs) { return compareDecls(lhs, rhs); });
+}
+
+// lhs or rhs might be nullptr
+int compareVals(Val* lhs, Val* rhs)
+{
+    return comparePtrs(lhs, rhs, [&](Val& lhs, Val& rhs) { return compareVals(lhs, rhs); });
+}
+
+// Compare operands of lhs and rhs from offset,
+// and at most count operands, if the capacity allows it.
+int compareValOperands(Val& lhs, Val& rhs, Index offset, Index count)
+{
+    const Index lN = std::clamp<Index>(lhs.getOperandCount() - offset, 0, count);
+    const Index rN = std::clamp<Index>(rhs.getOperandCount() - offset, 0, count);
+    int res = compareThreeWays(lN, rN);
+    if (res)
+        return res;
+    for (Index i = 0; i < lN; ++i)
+    {
+        auto lOp = lhs.m_operands[offset + i];
+        auto rOp = rhs.m_operands[offset + i];
+        res = compareThreeWays(lOp.kind, rOp.kind);
+        if (res)
+        {
+            break;
+        }
+        switch (lOp.kind)
+        {
+        case ValNodeOperandKind::ConstantValue:
+            res = compareThreeWays(lOp.getIntConstant(), rOp.getIntConstant());
+            break;
+        case ValNodeOperandKind::ValNode:
+            res = compareVals(lOp.getVal(), rOp.getVal());
+            break;
+        case ValNodeOperandKind::ASTNode:
+            res = compareDecls(lOp.getDecl(), rOp.getDecl());
+            break;
+        }
+        if (res)
+        {
+            break;
+        }
+    }
+    return res;
+}
+
+// Compare operands of lhs and rhs from offset to the end
+int compareValOperands(Val& lhs, Val& rhs, Index offset)
+{
+    return compareValOperands(lhs, rhs, offset, std::numeric_limits<Index>::max());
+}
+
+// Find the lowest common ancestor (LCA) of nodes a and b
+// Uppon return, a and b are modified to be direct children of the LCA
+// Returns nullptr if a and b have no common ancestor
+// (e.g. a and b are not in the same module)
+// a and b are set to each respective module
+ContainerDecl* findDeclsLowestCommonAncestor(Decl*& a, Decl*& b)
+{
+    auto ascendToRoot = [](Decl*& d)
+    {
+        UIndex depth = 0;
+        while (d->parentDecl)
+        {
+            ++depth;
+            d = d->parentDecl;
+        }
+        return depth;
+    };
+
+    Decl* aRoot = a;
+    Decl* bRoot = b;
+    auto aDepth = ascendToRoot(aRoot);
+    auto bDepth = ascendToRoot(bRoot);
+    if (aRoot != bRoot) // Not in the same tree / module
+    {
+        a = aRoot;
+        b = bRoot;
+        return nullptr;
+    }
+    // Level nodes
+    Decl** toAscend = nullptr;
+    Decl** reference = nullptr;
+    UIndex n = 0;
+    if (aDepth > bDepth)
+    {
+        toAscend = &a;
+        reference = &b;
+        n = aDepth - bDepth;
+    }
+    else if (bDepth > aDepth)
+    {
+        toAscend = &b;
+        reference = &a;
+        n = bDepth - aDepth;
+    }
+    if (n)
+    {
+        // Level until toAscend is one level under reference
+        while (n > UIndex(1))
+        {
+            *toAscend = (*toAscend)->parentDecl;
+            --n;
+        }
+        // If toAscend was a child of reference
+        if ((*toAscend)->parentDecl == *reference)
+        {
+            return (*toAscend)->parentDecl;
+        }
+        else
+        {
+            *toAscend = (*toAscend)->parentDecl;
+        }
+    }
+    while (a->parentDecl != b->parentDecl)
+    {
+        a = a->parentDecl;
+        b = b->parentDecl;
+    }
+    return a->parentDecl;
+}
+
+int compareDecls(Decl& lhs, Decl& rhs)
+{
+    int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
+    if (res)
+        return res;
+    Decl* lLCAChild = &lhs;
+    Decl* rLCAChild = &rhs;
+    if (ContainerDecl* lca = findDeclsLowestCommonAncestor(lLCAChild, rLCAChild))
+    {
+        res = compareThreeWays(lca->getDeclIndex(lLCAChild), lca->getDeclIndex(rLCAChild));
+    }
+    else
+    {
+        res = comparePtrs(
+            lLCAChild->getName(),
+            rLCAChild->getName(),
+            [](Name const& lName, Name const& rName)
+            { return strcmp(lName.text.begin(), rName.text.begin()); });
+    }
+    return res;
+}
+
+int compareVals(Val& lhs, Val& rhs)
+{
+    int res = compareThreeWays(lhs.astNodeType, rhs.astNodeType);
+    if (res)
+        return res;
+    res = compareValOperands(lhs, rhs, 0);
+    return res;
+}
+
+int compareTypes(Type* lhs, Type* rhs)
+{
+    return compareVals(lhs, rhs);
+}
+
+int compareTypes(Type& lhs, Type& rhs)
+{
+    return compareVals(lhs, rhs);
+}
+
 static void _getCanonicalConstraintTypes(List<Type*>& outTypeList, Type* type)
 {
     if (auto andType = as<AndType>(type))
@@ -11379,16 +11650,22 @@ OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericCon
     for (auto genericTypeConstraintDecl :
          getMembersOfType<GenericTypeConstraintDecl>(astBuilder, genericDecl))
     {
-        assert(
-            genericTypeConstraintDecl.getDecl()->sub.type->astNodeType == ASTNodeType::DeclRefType);
-        auto typeParamDecl =
-            as<DeclRefType>(genericTypeConstraintDecl.getDecl()->sub.type)->getDeclRef().getDecl();
-        List<Type*>* constraintTypes = genericConstraints.tryGetValue(typeParamDecl);
-        if (!constraintTypes)
-            continue;
-        constraintTypes->add(genericTypeConstraintDecl.getDecl()->getSup().type);
+        if (genericTypeConstraintDecl.getDecl()->sub.type->astNodeType == ASTNodeType::DeclRefType)
+        {
+            auto typeParamDecl = as<DeclRefType>(genericTypeConstraintDecl.getDecl()->sub.type)
+                                     ->getDeclRef()
+                                     .getDecl();
+            List<Type*>* constraintTypes = genericConstraints.tryGetValue(typeParamDecl);
+            if (!constraintTypes)
+                continue;
+            constraintTypes->add(genericTypeConstraintDecl.getDecl()->getSup().type);
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Cannot extract Cannonical Generic Constraints on non DeclRefTypes. "
+                             "Use getCanonicalGenericConstraints2(...) instead.");
+        }
     }
-
     OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> result;
     for (auto& constraints : genericConstraints)
     {
@@ -11397,8 +11674,57 @@ OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericCon
         {
             _getCanonicalConstraintTypes(typeList, type);
         }
-        // TODO: we also need to sort the types within the list for each generic type param.
-        result[constraints.key] = typeList;
+        const auto typeComparator = [&](Type* lhs, Type* rhs)
+        { return compareTypes(*lhs, *rhs) < 0; };
+        typeList.sort(typeComparator);
+        result[constraints.key] = std::move(typeList);
+    }
+    return result;
+}
+
+
+OrderedDictionary<Type*, List<Type*>> getCanonicalGenericConstraints2(
+    ASTBuilder* astBuilder,
+    DeclRef<ContainerDecl> genericDecl)
+{
+    Dictionary<Type*, HashSet<Type*>> genericConstraints;
+    for (auto genericTypeConstraintDecl :
+         getMembersOfType<GenericTypeConstraintDecl>(astBuilder, genericDecl))
+    {
+        auto subExpr = genericTypeConstraintDecl.getDecl()->sub;
+        auto supExpr = genericTypeConstraintDecl.getDecl()->sup;
+        Type* typeToAdd = subExpr.type;
+        if (typeToAdd)
+        {
+            if (!genericConstraints.containsKey(typeToAdd))
+            {
+                genericConstraints[typeToAdd] = HashSet<Type*>();
+            }
+            genericConstraints[typeToAdd].add(supExpr.type);
+        }
+    }
+    const auto typeComparator = [&](Type* lhs, Type* rhs) { return compareTypes(lhs, rhs) < 0; };
+    const List<Type*> sortedKeys = [&]()
+    {
+        List<Type*> res;
+        res.reserve(genericConstraints.getCount());
+        for (auto& t : genericConstraints)
+        {
+            res.add(t.first);
+        }
+        res.sort(typeComparator);
+        return res;
+    }();
+    OrderedDictionary<Type*, List<Type*>> result;
+    for (auto& key : sortedKeys)
+    {
+        List<Type*> typeList;
+        for (auto type : genericConstraints[key])
+        {
+            _getCanonicalConstraintTypes(typeList, type);
+        }
+        typeList.sort(typeComparator);
+        result[key] = std::move(typeList);
     }
     return result;
 }
@@ -11531,7 +11857,7 @@ void checkDerivativeAttributeImpl(
 
                 appExpr->arguments.add(baseTypeExpr);
             }
-            else if (auto genericValParam = as<GenericParamIntVal>(arg))
+            else if (auto genericValParam = as<DeclRefIntVal>(arg))
             {
                 auto declRef = genericValParam->getDeclRef();
                 appExpr->arguments.add(
@@ -12307,6 +12633,10 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         {
             hasPushConstAttr = true;
         }
+        else if (auto registerSemantic = as<HLSLRegisterSemantic>(modifier))
+        {
+            checkHLSLRegisterSemantic(varDecl, registerSemantic);
+        }
     }
     if (hasSpecConstAttr && hasPushConstAttr)
     {
@@ -12321,6 +12651,91 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         {
             getSink()->diagnose(varDecl, Diagnostics::pushOrSpecializationConstantCannotBeStatic);
         }
+    }
+}
+
+void SemanticsDeclAttributesVisitor::checkHLSLRegisterSemantic(
+    VarDeclBase* varDecl,
+    HLSLRegisterSemantic* registerSemantic)
+{
+    auto registerName = registerSemantic->registerName.getContent();
+    if (registerName.getLength() < 1)
+    {
+        getSink()->diagnose(
+            registerSemantic->registerName.getLoc(),
+            Diagnostics::invalidHLSLRegisterName,
+            registerSemantic->registerName);
+        return;
+    }
+
+    // Check to make sure the HLSL semantic register name is consistent with the resource type.
+
+    auto varType = getType(m_astBuilder, DeclRef<VarDeclBase>(varDecl));
+    varType = unwrapModifiedType(unwrapArrayType(varType));
+    bool isValid = true;
+    if (auto resType = as<ResourceType>(varType))
+    {
+        switch (registerName[0])
+        {
+        case 't':
+            if (resType->getAccess() != SLANG_RESOURCE_ACCESS_READ)
+                isValid = false;
+            break;
+        case 'u':
+            if (resType->getAccess() == SLANG_RESOURCE_ACCESS_READ)
+                isValid = false;
+            break;
+        case 's':
+            if (!resType->isCombined())
+                isValid = false;
+            break;
+        default:
+            isValid = false;
+            break;
+        }
+    }
+    else if (
+        as<HLSLByteAddressBufferType>(varType) || as<HLSLStructuredBufferType>(varType) ||
+        as<RaytracingAccelerationStructureType>(varType))
+    {
+        if (registerName[0] != 't')
+        {
+            isValid = false;
+        }
+    }
+    else if (
+        as<HLSLRWByteAddressBufferType>(varType) ||
+        as<HLSLRasterizerOrderedByteAddressBufferType>(varType) ||
+        as<HLSLRWStructuredBufferType>(varType) || as<HLSLConsumeStructuredBufferType>(varType) ||
+        as<HLSLAppendStructuredBufferType>(varType) ||
+        as<HLSLRasterizerOrderedStructuredBufferType>(varType))
+    {
+        if (registerName[0] != 'u')
+        {
+            isValid = false;
+        }
+    }
+    else if (as<SamplerStateType>(varType))
+    {
+        if (registerName[0] != 's')
+        {
+            isValid = false;
+        }
+    }
+    else if (as<ConstantBufferType>(varType))
+    {
+        if (registerName[0] != 'b')
+        {
+            isValid = false;
+        }
+    }
+    if (!isValid)
+    {
+        getSink()->diagnose(
+            registerSemantic->registerName.getLoc(),
+            Diagnostics::invalidHLSLRegisterNameForType,
+            registerName,
+            varType);
     }
 }
 

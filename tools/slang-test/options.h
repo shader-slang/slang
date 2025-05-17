@@ -83,6 +83,15 @@ struct Options
     // integration builds.
     bool dumpOutputOnFailure = false;
 
+    // When true it will run with debug layer (e.g. vulkan validation layer)
+#if _DEBUG
+    // Default is true for debug build
+    bool debugLayerEnabled = true;
+#else
+    // Default is false for release build
+    bool debugLayerEnabled = false;
+#endif
+
     // Set the default spawn type to use
     // Having tests isolated, slows down testing considerably, so using UseSharedLibrary is the most
     // desirable default usually.
@@ -123,6 +132,7 @@ struct Options
 
     bool emitSPIRVDirectly = true;
 
+    Slang::HashSet<Slang::String> capabilities;
     Slang::HashSet<Slang::String> expectedFailureList;
 
     /// Parse the args, report any errors into stdError, and write the results into optionsOut

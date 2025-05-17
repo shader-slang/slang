@@ -309,7 +309,7 @@ struct LoweredElementTypeContext
         builder.emitBlock();
         auto packedParam = builder.emitParam(refStructType);
         auto packedArray = builder.emitFieldAddress(packedParam, dataKey);
-        auto count = getIntVal(arrayType->getElementCount());
+        auto count = getArraySizeVal(arrayType->getElementCount());
         IRInst* result = nullptr;
         if (count <= kMaxArraySizeToUnroll)
         {
@@ -374,7 +374,7 @@ struct LoweredElementTypeContext
         builder.emitBlock();
         auto outParam = builder.emitParam(outLoweredType);
         auto originalParam = builder.emitParam(arrayType);
-        auto count = getIntVal(arrayType->getElementCount());
+        auto count = getArraySizeVal(arrayType->getElementCount());
         auto destArray = builder.emitFieldAddress(outParam, arrayStructKey);
         if (count <= kMaxArraySizeToUnroll)
         {
@@ -602,7 +602,8 @@ struct LoweredElementTypeContext
                 StringBuilder nameSB;
                 nameSB << "_Array_" << getLayoutName(config.layoutRule->ruleName) << "_";
                 getTypeNameHint(nameSB, arrayType->getElementType());
-                nameSB << getIntVal(arrayType->getElementCount());
+                nameSB << getArraySizeVal(arrayType->getElementCount());
+
                 builder.addNameHintDecoration(
                     loweredType,
                     nameSB.produceString().getUnownedSlice());
@@ -938,11 +939,25 @@ struct LoweredElementTypeContext
                 }
             }
             if (auto structBuffer = as<IRHLSLStructuredBufferTypeBase>(globalInst))
+            {
                 elementType = structBuffer->getElementType();
+                auto config = getTypeLoweringConfigForBuffer(target, structBuffer);
+
+                // Create size and alignment decoration for potential use
+                // in`StructuredBufferGetDimensions`.
+                IRSizeAndAlignment sizeAlignment;
+                getSizeAndAlignment(
+                    target->getOptionSet(),
+                    config.layoutRule,
+                    elementType,
+                    &sizeAlignment);
+                SLANG_UNUSED(sizeAlignment);
+            }
             else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
                 elementType = constBuffer->getElementType();
             else if (auto storageBuffer = as<IRGLSLShaderStorageBufferType>(globalInst))
                 elementType = storageBuffer->getElementType();
+
             if (as<IRTextureBufferType>(globalInst))
                 continue;
             if (!as<IRStructType>(elementType) && !as<IRMatrixType>(elementType) &&

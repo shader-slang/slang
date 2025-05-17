@@ -422,7 +422,7 @@ convention for interface methods.
     #endif
 #elif defined(__arm__)
     #define SLANG_PROCESSOR_ARM 1
-#elif defined(_M_ARM64) || defined(__aarch64__)
+#elif defined(_M_ARM64) || defined(__aarch64__) || defined(__ARM_ARCH_ISA_A64)
     #define SLANG_PROCESSOR_ARM_64 1
 #elif defined(__EMSCRIPTEN__)
     #define SLANG_PROCESSOR_WASM 1
@@ -622,6 +622,8 @@ typedef uint32_t SlangSizeT;
         SLANG_WGSL,                  ///< WebGPU shading language
         SLANG_WGSL_SPIRV_ASM,        ///< SPIR-V assembly via WebGPU shading language
         SLANG_WGSL_SPIRV,            ///< SPIR-V via WebGPU shading language
+
+        SLANG_HOST_VM, ///< Bytecode that can be interpreted by the Slang VM
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -805,6 +807,7 @@ typedef uint32_t SlangSizeT;
         SLANG_STAGE_CALLABLE,
         SLANG_STAGE_MESH,
         SLANG_STAGE_AMPLIFICATION,
+        SLANG_STAGE_DISPATCH,
         //
         SLANG_STAGE_COUNT,
 
@@ -3902,6 +3905,10 @@ struct SessionDesc
     /** Number of additional compiler option entries.
      */
     uint32_t compilerOptionEntryCount = 0;
+
+    /** Whether to skip SPIRV validation.
+     */
+    bool skipSPIRVValidation = false;
 };
 
 enum class ContainerType
@@ -4569,6 +4576,125 @@ SLANG_EXTERN_C SLANG_API void slang_shutdown();
 /* Return the last signaled internal error message.
  */
 SLANG_EXTERN_C SLANG_API const char* slang_getLastInternalErrorMessage();
+
+// Slang VM
+namespace slang
+{
+
+enum class OperandDataType
+{
+    General = 0, // General data type, can be any type.
+    Int32 = 1,   // 32-bit integer.
+    Int64 = 2,   // 64-bit integer.
+    Float32 = 3, // 32-bit floating-point number.
+    Float64 = 4, // 64-bit floating-point number.
+    String = 5,  // String data type, represented as a pointer to a null-terminated string.
+};
+
+struct VMExecOperand
+{
+    uint8_t** section; // Pointer to the section start pointer.
+    #if SLANG_PTR_IS_32
+    uint32_t padding;
+    #endif
+    uint32_t type : 8; // type of the operand data.
+    uint32_t size : 24;
+    uint32_t offset;
+    void* getPtr() const { return *section + offset; }
+    OperandDataType getType() const { return (OperandDataType)type; }
+};
+
+struct VMExecInstHeader;
+class IByteCodeRunner;
+
+typedef void (*VMExtFunction)(IByteCodeRunner* context, VMExecInstHeader* inst, void* userData);
+typedef void (*VMPrintFunc)(const char* message, void* userData);
+
+struct VMExecInstHeader
+{
+    VMExtFunction functionPtr; // Pointer to the function that executes this instruction.
+    #if SLANG_PTR_IS_32
+    uint32_t padding;
+    #endif
+    uint32_t opcodeExtension;
+    uint32_t operandCount;
+    VMExecInstHeader* getNextInst()
+    {
+        return (VMExecInstHeader*)((VMExecOperand*)(this + 1) + operandCount);
+    }
+    VMExecOperand& getOperand(SlangInt index) const
+    {
+        return *((VMExecOperand*)(this + 1) + index);
+    }
+};
+
+struct ByteCodeFuncInfo
+{
+    uint32_t parameterCount;
+    uint32_t returnValueSize;
+};
+
+struct ByteCodeRunnerDesc
+{
+    /** The size of this structure, in bytes.
+     */
+    size_t structSize = sizeof(ByteCodeRunnerDesc);
+};
+
+/// Represents a byte code runner that can execute Slang byte code.
+class IByteCodeRunner : public ISlangUnknown
+{
+public:
+    // {AFDAB195-361F-42CB-9513-9006261DD8CD}
+    SLANG_COM_INTERFACE(0xafdab195, 0x361f, 0x42cb, {0x95, 0x13, 0x90, 0x6, 0x26, 0x1d, 0xd8, 0xcd})
+
+    /// Load a byte code module into the execution context.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadModule(IBlob* moduleBlob) = 0;
+
+    /// Select a function for execution.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    selectFunctionByIndex(uint32_t functionIndex) = 0;
+
+    virtual SLANG_NO_THROW int SLANG_MCALL findFunctionByName(const char* name) = 0;
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getFunctionInfo(uint32_t index, ByteCodeFuncInfo* outInfo) = 0;
+
+    /// Obtain the current working set memory for the selected function.
+    virtual SLANG_NO_THROW void* SLANG_MCALL getCurrentWorkingSet() = 0;
+
+    /// Execute the selected function.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    execute(void* argumentData, size_t argumentSize) = 0;
+
+    /// Query the error string.
+    virtual SLANG_NO_THROW void SLANG_MCALL getErrorString(IBlob** outBlob) = 0;
+
+    /// Retrieve the return value of the last executed function.
+    virtual SLANG_NO_THROW void* SLANG_MCALL getReturnValue(size_t* outValueSize) = 0;
+
+    /// Set the user data for the external instruction handler.
+    virtual SLANG_NO_THROW void SLANG_MCALL setExtInstHandlerUserData(void* userData) = 0;
+
+    /// Register an external function that can be called from the byte code.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    registerExtCall(const char* name, VMExtFunction functionPtr) = 0;
+
+    /// Set a callback function to print messages from the byte code runner.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    setPrintCallback(VMPrintFunc callback, void* userData) = 0;
+};
+
+} // namespace slang
+
+/// Create a byte code runner that can execute Slang byte code.
+SLANG_EXTERN_C SLANG_API SlangResult slang_createByteCodeRunner(
+    const slang::ByteCodeRunnerDesc* desc,
+    slang::IByteCodeRunner** outByteCodeRunner);
+
+/// Disassemble a Slang byte code blob into human-readable text.
+SLANG_EXTERN_C SLANG_API SlangResult
+slang_disassembleByteCode(slang::IBlob* moduleBlob, slang::IBlob** outDisassemblyBlob);
 
 namespace slang
 {

@@ -19,7 +19,9 @@ ByteAddressBuffer input2;
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-typealias CoopMatType = CoopMat<float, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
+using namespace linalg;
+
+typealias CoopMatType = CoopMat<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
 
 struct MyStruct
 {
@@ -34,9 +36,9 @@ void computeMain()
     let matrixLayout = CoopMatMatrixLayout::RowMajor;
 
     MyStruct s;
-    s.mat1 = CoopMatType.load(input1, 0, stride, matrixLayout);
-    s.mat2 = CoopMatType.load(input2, 0, stride, matrixLayout);
+    s.mat1 = CoopMatType.Load<CoopMatMatrixLayout::RowMajor>(input1, 0, stride);
+    s.mat2 = CoopMatType.Load<CoopMatMatrixLayout::RowMajor>(input2, 0, stride);
 
-    s.mat1.store(outputBuffer, 0, stride, matrixLayout);
-    s.mat2.store(outputBuffer, 4, stride, matrixLayout);
+    s.mat1.Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 0, stride);
+    s.mat2.Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 4, stride);
 }

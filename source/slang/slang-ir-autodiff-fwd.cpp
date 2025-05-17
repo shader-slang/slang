@@ -2157,6 +2157,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_GetNativePtr:
     case kIROp_CastIntToFloat:
     case kIROp_CastFloatToInt:
+    case kIROp_CastIntToEnum:
+    case kIROp_CastEnumToInt:
+    case kIROp_EnumCast:
     case kIROp_DetachDerivative:
     case kIROp_GetSequentialID:
     case kIROp_GetStringHash:
@@ -2181,6 +2184,11 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_DebugLine:
     case kIROp_DebugVar:
     case kIROp_DebugValue:
+    case kIROp_DebugInlinedAt:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+    case kIROp_DebugInlinedVariable:
+    case kIROp_DebugFunction:
     case kIROp_GetArrayLength:
     case kIROp_SizeOf:
     case kIROp_AlignOf:

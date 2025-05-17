@@ -160,6 +160,11 @@ void TestReporter::addResult(TestResult result)
     m_numCurrentResults++;
 }
 
+TestResult TestReporter::getResult() const
+{
+    return m_currentInfo.testResult;
+}
+
 void TestReporter::addExecutionTime(double time)
 {
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
@@ -688,7 +693,7 @@ void TestReporter::outputSummary()
             printf("\n===\n\n");
             if (m_failedTestCount)
             {
-                printf("failing tests:\n");
+                printf("%d failing tests:\n", m_failedTestCount);
                 printf("---\n");
                 for (const auto& testInfo : m_testInfos)
                 {

@@ -96,6 +96,19 @@ if(SLANG_ENABLE_SLANGD)
     )
 endif()
 
+#
+# Slang Interpreter
+#
+if(SLANG_ENABLE_SLANGI)
+    slang_add_target(
+        slangi
+        EXECUTABLE
+        LINK_WITH_PRIVATE core compiler-core slang
+        INSTALL
+        EXPORT_SET_NAME SlangTargets
+    )
+endif()
+
 if(SLANG_ENABLE_GFX)
     #
     # `platform` contains all the platform abstractions for a GUI application.
@@ -151,6 +164,37 @@ if(SLANG_ENABLE_GFX)
         INCLUDE_DIRECTORIES_PUBLIC
             ${slang_SOURCE_DIR}
             ${slang_SOURCE_DIR}/include
+            if
+            (not ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC
+            ${slang_SOURCE_DIR}/external/spirv-tools
+            else
+            ()
+        INCLUDE_DIRECTORIES_PUBLIC
+            ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH}
+            endif
+            ()
+            if
+            (not ${SLANG_OVERRIDE_GLM_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external/glm else ()
+        INCLUDE_DIRECTORIES_PUBLIC
+            ${SLANG_OVERRIDE_GLM_PATH}
+            endif
+            ()
+            if
+            (not ${SLANG_OVERRIDE_IMGUI_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external/imgui else ()
+        INCLUDE_DIRECTORIES_PUBLIC
+            ${SLANG_OVERRIDE_IMGUI_PATH}
+            endif
+            ()
+            if
+            (not ${SLANG_OVERRIDE_TINYOBJLOADER_PATH})
+        INCLUDE_DIRECTORIES_PUBLIC
+            ${slang_SOURCE_DIR}/external/tinyobjloader
+            else
+            ()
+        INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_TINYOBJLOADER_PATH} endif ()
         INCLUDE_DIRECTORIES_PRIVATE ${NVAPI_INCLUDE_DIRS}
         INSTALL
         EXPORT_SET_NAME SlangTargets

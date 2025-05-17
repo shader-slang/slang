@@ -396,7 +396,10 @@ struct IRRequireSPIRVVersionDecoration : IRDecoration
     IR_LEAF_ISA(RequireGLSLVersionDecoration)
 
     IRConstant* getSPIRVVersionOperand() { return cast<IRConstant>(getOperand(0)); }
-    IntegerLiteralValue getSPIRVVersion() { return getSPIRVVersionOperand()->value.intVal; }
+    SemanticVersion getSPIRVVersion()
+    {
+        return SemanticVersion::fromRaw(getSPIRVVersionOperand()->value.intVal);
+    }
 };
 
 struct IRRequireCapabilityAtomDecoration : IRDecoration
@@ -420,7 +423,10 @@ struct IRRequireCUDASMVersionDecoration : IRDecoration
     IR_LEAF_ISA(RequireCUDASMVersionDecoration)
 
     IRConstant* getCUDASMVersionOperand() { return cast<IRConstant>(getOperand(0)); }
-    IntegerLiteralValue getCUDASMVersion() { return getCUDASMVersionOperand()->value.intVal; }
+    SemanticVersion getCUDASMVersion()
+    {
+        return SemanticVersion::fromRaw(getCUDASMVersionOperand()->value.intVal);
+    }
 };
 
 struct IRRequireGLSLExtensionDecoration : IRDecoration
@@ -479,6 +485,7 @@ IR_SIMPLE_DECORATION(DownstreamModuleImportDecoration)
 IR_SIMPLE_DECORATION(MaximallyReconvergesDecoration)
 IR_SIMPLE_DECORATION(QuadDerivativesDecoration)
 IR_SIMPLE_DECORATION(RequireFullQuadsDecoration)
+IR_SIMPLE_DECORATION(TempCallArgVarDecoration)
 
 struct IRAvailableInDownstreamIRDecoration : IRDecoration
 {
@@ -3442,6 +3449,60 @@ struct IRDebugValue : IRInst
     IRInst* getValue() { return getOperand(1); }
 };
 
+struct IRDebugInlinedAt : IRInst
+{
+    IR_LEAF_ISA(DebugInlinedAt)
+    IRInst* getLine() { return getOperand(0); }
+    IRInst* getCol() { return getOperand(1); }
+    IRInst* getFile() { return getOperand(2); }
+    IRInst* getDebugFunc() { return getOperand(3); }
+    IRInst* getOuterInlinedAt()
+    {
+        if (operandCount == 5)
+            return getOperand(4);
+        return nullptr;
+    }
+    void setDebugFunc(IRInst* func) { setOperand(3, func); }
+    bool isOuterInlinedPresent() { return operandCount == 5; }
+};
+
+struct IRDebugScope : IRInst
+{
+    IR_LEAF_ISA(DebugScope)
+    IRInst* getScope() { return getOperand(0); }
+    IRInst* getInlinedAt() { return getOperand(1); }
+    void setInlinedAt(IRInst* inlinedAt) { setOperand(1, inlinedAt); }
+};
+
+struct IRDebugNoScope : IRInst
+{
+    IR_LEAF_ISA(DebugNoScope)
+    IRInst* getScope() { return getOperand(0); }
+};
+
+struct IRDebugInlinedVariable : IRInst
+{
+    IR_LEAF_ISA(DebugInlinedVariable)
+    IRInst* getVariable() { return getOperand(0); }
+    IRInst* getInlinedAt() { return getOperand(1); }
+};
+
+struct IRDebugFunction : IRInst
+{
+    IR_LEAF_ISA(DebugFunction)
+    IRInst* getName() { return getOperand(0); }
+    IRInst* getLine() { return getOperand(1); }
+    IRInst* getCol() { return getOperand(2); }
+    IRInst* getFile() { return getOperand(3); }
+    IRInst* getDebugType() { return getOperand(4); }
+};
+
+struct IRDebugFuncDecoration : IRInst
+{
+    IR_LEAF_ISA(DebugFunctionDecoration)
+    IRInst* getDebugFunc() { return getOperand(0); }
+};
+
 struct IRDebugLocationDecoration : IRDecoration
 {
     IRInst* getSource() { return getOperand(0); }
@@ -3878,6 +3939,7 @@ public:
     IRConstExprRate* getConstExprRate();
     IRGroupSharedRate* getGroupSharedRate();
     IRActualGlobalRate* getActualGlobalRate();
+    IRSpecConstRate* getSpecConstRate();
 
     IRRateQualifiedType* getRateQualifiedType(IRRate* rate, IRType* dataType);
 
@@ -3943,6 +4005,21 @@ public:
         IRInst* col,
         IRInst* argIndex = nullptr);
     IRInst* emitDebugValue(IRInst* debugVar, IRInst* debugValue);
+    IRInst* emitDebugInlinedAt(
+        IRInst* line,
+        IRInst* col,
+        IRInst* file,
+        IRInst* debugFunc,
+        IRInst* outerInlinedAt);
+    IRInst* emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt);
+    IRInst* emitDebugScope(IRInst* scope, IRInst* inlinedAt);
+    IRInst* emitDebugNoScope();
+    IRInst* emitDebugFunction(
+        IRInst* name,
+        IRInst* line,
+        IRInst* col,
+        IRInst* file,
+        IRInst* debugType);
 
     /// Emit an LiveRangeStart instruction indicating the referenced item is live following this
     /// instruction
@@ -4298,6 +4375,9 @@ public:
 
     // Create an initially empty `class` type.
     IRClassType* createClassType();
+
+    // Create an an `enum` type with the given tag type.
+    IREnumType* createEnumType(IRType* tagType);
 
     // Create an initially empty `GLSLShaderStorageBufferType` type.
     IRGLSLShaderStorageBufferType* createGLSLShaderStorableBufferType();
@@ -4937,13 +5017,15 @@ public:
             getStringValue(prelude));
     }
 
+    IRInst* getSemanticVersionValue(SemanticVersion const& value)
+    {
+        SemanticVersion::RawValue rawValue = value.getRawValue();
+        return getIntValue(getBasicType(BaseType::UInt64), rawValue);
+    }
+
     void addRequireSPIRVVersionDecoration(IRInst* value, const SemanticVersion& version)
     {
-        SemanticVersion::IntegerType intValue = version.toInteger();
-        addDecoration(
-            value,
-            kIROp_RequireSPIRVVersionDecoration,
-            getIntValue(getBasicType(BaseType::UInt64), intValue));
+        addDecoration(value, kIROp_RequireSPIRVVersionDecoration, getSemanticVersionValue(version));
     }
 
     void addSPIRVNonUniformResourceDecoration(IRInst* value)
@@ -4953,11 +5035,10 @@ public:
 
     void addRequireCUDASMVersionDecoration(IRInst* value, const SemanticVersion& version)
     {
-        SemanticVersion::IntegerType intValue = version.toInteger();
         addDecoration(
             value,
             kIROp_RequireCUDASMVersionDecoration,
-            getIntValue(getBasicType(BaseType::UInt64), intValue));
+            getSemanticVersionValue(version));
     }
 
     void addRequireCapabilityAtomDecoration(IRInst* value, CapabilityName atom)
@@ -5007,6 +5088,11 @@ public:
             debugSource,
             getIntValue(getUIntType(), line),
             getIntValue(getUIntType(), col));
+    }
+
+    void addDebugFunctionDecoration(IRInst* value, IRInst* debugFunction)
+    {
+        addDecoration(value, kIROp_DebugFunctionDecoration, debugFunction);
     }
 
     void addUnsafeForceInlineDecoration(IRInst* value)

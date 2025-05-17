@@ -14,6 +14,21 @@ Experimental support for the older versions of SPIR-V
 Slang's SPIR-V backend is stable when emitting SPIR-V 1.3 and later, however, support for SPIR-V 1.0, 1.1 and 1.2 is still experimental.
 When targeting the older SPIR-V profiles, Slang may produce SPIR-V that uses the instructions and keywords that were introduced in the later versions of SPIR-V.
 
+Memory model
+------------
+By default, the Slang compiler produces the SPIRV code using GLSL450 memory model. The user can opt-in to Vulkan Memory Model by specifying `-capability vk_mem_model`. For using APIs, the following lines can be added to explicitly specify the capability.
+```
+    slang::CompilerOptionEntry entry;
+    entry.name = slang::CompilerOptionName::Capability;
+    entry.value.kind = slang::CompilerOptionValueKind::String;
+    entry.value.stringValue0 = "vk_mem_model";
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.compilerOptionEntries = &entry;
+    sessionDesc.compilerOptionEntryCount = 1;
+```
+
+If the shader uses `CoopVec` or `CoopMat` intrinsics, then the Slang compiler will automatically use `vk_mem_model` capability.
 
 Combined texture sampler
 ------------------------
@@ -57,7 +72,7 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_GroupThreadID`            | `BuiltIn LocalInvocationId`       |
 | `SV_InnerCoverage`            | `BuiltIn FullyCoveredEXT`         |
 | `SV_InsideTessFactor`         | `BuiltIn TessLevelInner`          |
-| `SV_InstanceID`               | `BuiltIn InstanceIndex`           |
+| `SV_InstanceID`<sup>**</sup>  | `BuiltIn InstanceIndex`           |
 | `SV_IntersectionAttributes`   | *Not supported*                   |
 | `SV_IsFrontFace`              | `BuiltIn FrontFacing`             |
 | `SV_OutputControlPointID`     | `BuiltIn InvocationId`            |
@@ -78,7 +93,27 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_ViewportArrayIndex`       | `BuiltIn ViewportIndex`           |
 
 *Note* that `SV_DrawIndex`, `SV_PointSize` and `SV_PointCoord` are Slang-specific semantics that are not defined in HLSL.
+Also *Note* that `SV_InstanceID` counts all instances in a draw call, unlike how `InstanceIndex` is relative to `BaseInstance`. See [Using SV_InstanceID with SPIR-V target](#using-sv_instanceid-with-spir-v-target)
 
+Using SV_InstanceID with SPIR-V target
+--------------------------------------
+
+When using `SV_InstanceID` with SPIR-V target, it is equivalent to the difference between the `InstanceIndex` and `BaseInstance` builtins.
+This matches the behavior of D3D where `SV_InstanceID` starts from zero for each draw call, while in SPIR-V, `InstanceIndex` includes the base instance.
+
+If you need direct access to the `InstanceIndex` value, you can use parameters with `SV_InstanceID` and `SV_StartInstanceLocation` semantics:
+
+```slang
+void myVertexShader(
+    uint instanceID : SV_InstanceID,               // InstanceIndex - BaseInstance
+    uint baseInstance : SV_StartInstanceLocation)   // BaseInstance
+{
+    // If you need InstanceIndex, just add them:
+    uint instanceIndex = instanceID + baseInstance;
+
+    // Use instanceID, baseInstance, or instanceIndex as needed
+}
+```
 
 Behavior of `discard` after SPIR-V 1.6
 --------------------------------------
@@ -246,7 +281,7 @@ To generate a valid SPIR-V with multiple entry points, use `-fvk-use-entrypoint-
 Global memory pointers
 ------------------------------
 
-Slang supports global memory pointers when targeting SPIRV. See [an example and explanation](convenience-features.html#pointers-limited).
+Slang supports global memory pointers when targeting SPIRV. See [an example and explanation](03-convenience-features.html#pointers-limited).
 
 `float4*` in user code will be translated to a pointer in PhysicalStorageBuffer storage class in SPIRV.
 When a slang module uses a pointer type, the resulting SPIRV will be using the SpvAddressingModelPhysicalStorageBuffer64 addressing mode. Modules without use of pointers will use SpvAddressingModelLogical addressing mode.

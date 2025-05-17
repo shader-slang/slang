@@ -468,6 +468,8 @@ Stage getStageFromAtom(CapabilityAtom atom)
         return Stage::Miss;
     case CapabilityAtom::_callable:
         return Stage::Callable;
+    case CapabilityAtom::dispatch:
+        return Stage::Dispatch;
     default:
         SLANG_UNEXPECTED("unknown stage atom");
         UNREACHABLE_RETURN(Stage::Unknown);
@@ -1416,6 +1418,39 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
         }
     }
 
+    CapabilitySet targetCaps = getTargetCaps();
+    for (auto atomSets : targetCaps.getAtomSets())
+    {
+        for (auto atomVal : atomSets)
+        {
+            auto atom = CapabilityAtom(atomVal);
+            switch (atom)
+            {
+            default:
+                break;
+
+#define CASE(KIND, NAME, VERSION)                                                   \
+    case CapabilityAtom::NAME:                                                      \
+        requiredCapabilityVersions.add(DownstreamCompileOptions::CapabilityVersion{ \
+            DownstreamCompileOptions::CapabilityVersion::Kind::KIND,                \
+            VERSION});                                                              \
+        break
+
+                CASE(CUDASM, _cuda_sm_1_0, SemanticVersion(1, 0));
+                CASE(CUDASM, _cuda_sm_2_0, SemanticVersion(2, 0));
+                CASE(CUDASM, _cuda_sm_3_0, SemanticVersion(3, 0));
+                CASE(CUDASM, _cuda_sm_4_0, SemanticVersion(4, 0));
+                CASE(CUDASM, _cuda_sm_5_0, SemanticVersion(5, 0));
+                CASE(CUDASM, _cuda_sm_6_0, SemanticVersion(6, 0));
+                CASE(CUDASM, _cuda_sm_7_0, SemanticVersion(7, 0));
+                CASE(CUDASM, _cuda_sm_8_0, SemanticVersion(8, 0));
+                CASE(CUDASM, _cuda_sm_9_0, SemanticVersion(9, 0));
+
+#undef CASE
+            }
+        }
+    }
+
     // Set the file sytem and source manager, as *may* be used by downstream compiler
     options.fileSystemExt = getFileSystemExt();
     options.sourceManager = getSourceManager();
@@ -1766,6 +1801,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     CodeGenContext* codeGenContext,
     ComPtr<IArtifact>& outArtifact);
 
+SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact);
+
 static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
 {
     switch (target)
@@ -1835,7 +1872,9 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::WGSLSPIRV:
         SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
         return SLANG_OK;
-
+    case CodeGenTarget::HostVM:
+        SLANG_RETURN_ON_FAIL(emitHostVMCode(this, outArtifact));
+        return SLANG_OK;
     default:
         break;
     }
@@ -1887,6 +1926,7 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::WGSLSPIRVAssembly:
+    case CodeGenTarget::HostVM:
         {
             SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));
 

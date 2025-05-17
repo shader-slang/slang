@@ -93,6 +93,10 @@ struct Options
 
     bool showAdapterInfo = false;
 
+    bool skipSPIRVValidation = false;
+
+    Slang::List<Slang::String> capabilities;
+
     Options() { downstreamArgs.addName("slang"); }
 
     static SlangResult parse(

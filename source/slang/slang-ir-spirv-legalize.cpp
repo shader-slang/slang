@@ -1471,6 +1471,39 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    // TODO: Currently SPIRV doesn't support non-32-bit integer types for bitfield extract and
+    // insert. We will relax this restriction once this is done:
+    // https://github.com/shader-slang/slang/issues/7015.
+    void processBitFieldOp(IRInst* inst)
+    {
+        auto dataType = inst->getDataType();
+        IRVectorType* vectorType = as<IRVectorType>(dataType);
+        Slang::IRType* elementType = dataType;
+        if (vectorType)
+            elementType = vectorType->getElementType();
+
+        const IntInfo i = getIntTypeInfo(elementType);
+
+        // SPIRV doesn't support non-32bit integer types, so we need to convert
+        if (i.width < 32)
+        {
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            IRType* intType = i.isSigned ? builder.getIntType() : builder.getUIntType();
+            auto targetType = vectorType
+                                  ? builder.getVectorType(intType, vectorType->getElementCount())
+                                  : intType;
+            auto baseInst = builder.emitCast(targetType, inst->getOperand(0));
+            builder.replaceOperand(inst->getOperands(), baseInst);
+            if (inst->getOp() == kIROp_BitfieldInsert)
+            {
+                auto insertInst = builder.emitCast(targetType, inst->getOperand(1));
+                builder.replaceOperand(inst->getOperands() + 1, insertInst);
+            }
+            inst->setFullType(intType);
+        }
+    }
+
     void legalizeSPIRVEntryPoint(IRFunc* func, IREntryPointDecoration* entryPointDecor)
     {
         auto stage = entryPointDecor->getProfile().getStage();
@@ -1704,6 +1737,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_SPIRVAsm:
                 processSPIRVAsm(as<IRSPIRVAsm>(inst));
                 break;
+            case kIROp_BitfieldExtract:
+            case kIROp_BitfieldInsert:
+                processBitFieldOp(inst);
+                break;
+
             case kIROp_DebugValue:
                 if (!isSimpleDataType(as<IRDebugValue>(inst)->getDebugVar()->getDataType()))
                     inst->removeAndDeallocate();
@@ -1768,9 +1806,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 }
             }
         }
+
         // Scan through the entry points and find the max version required.
         auto processInst = [&](IRInst* globalInst)
         {
+            switch (globalInst->getOp())
+            {
+            case kIROp_CoopVectorType:
+            case kIROp_CoopMatrixType:
+                m_sharedContext->m_memoryModel = SpvMemoryModelVulkan;
+                break;
+            }
+
             for (auto decor : globalInst->getDecorations())
             {
                 switch (decor->getOp())
@@ -1803,6 +1850,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto globalInst : m_module->getGlobalInsts())
         {
             processInst(globalInst);
+        }
+
+        if (targetCaps.implies(CapabilityAtom::SPV_KHR_vulkan_memory_model))
+        {
+            m_sharedContext->m_memoryModel = SpvMemoryModelVulkan;
         }
 
         if (m_sharedContext->m_spvVersion < 0x10300)

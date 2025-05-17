@@ -61,7 +61,7 @@ jobs:
             runs-on: ubuntu-24.04-arm
             has-gpu: false
             build-llvm: false
-          # Self-hosted full gpu build
+          # Self-hosted full gpu build - release
           - os: windows
             config: release
             compiler: cl
@@ -70,6 +70,17 @@ jobs:
             full-gpu-tests: true
             runs-on: [Windows, self-hosted]
             has-gpu: true
+            server-count: 8
+          # Self-hosted full gpu build - debug
+          - os: windows
+            config: debug
+            compiler: cl
+            platform: x86_64
+            test-category: full
+            full-gpu-tests: true
+            runs-on: [Windows, self-hosted, "GCP-T4"]
+            has-gpu: true
+            server-count: 8
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
@@ -135,8 +146,12 @@ jobs:
               cmake --install build --config Release --component generators --prefix generators
               emcmake cmake -DSLANG_GENERATORS_PATH=generators/bin --preset emscripten -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
               cmake --build --preset emscripten --config "$cmake_config" --target slang-wasm
-              [ -f "build.em/$cmake_config/bin/slang-wasm.wasm" ]
-              [ -f "build.em/$cmake_config/bin/slang-wasm.js" ]
+              mkdir "build.em/$cmake_config/bin/smoke"
+              cp tests/wasm/smoke/* "build.em/$cmake_config/bin/smoke/"
+              cd "build.em/$cmake_config/bin"
+              [ -f "slang-wasm.wasm" ]
+              [ -f "slang-wasm.js" ]
+              node smoke/smoke-test.js smoke/rand_float.slang computeMain
           else
             if [[ "${{ matrix.os }}" =~ "windows" && "${{ matrix.config }}" != "release" && "${{ matrix.config }}" != "releaseWithDebugInfo" ]]; then
               # Doing a debug build will try to link against a release built llvm, this
@@ -172,12 +187,13 @@ jobs:
           if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
             "$bin_dir/slang-test" \
               -use-test-server \
-              -server-count 8 \
+              -server-count ${{ matrix.server-count }} \
               -category ${{ matrix.test-category }} \
               -api all-cpu \
               -expected-failure-list tests/expected-failure-github.txt \
               -skip-reference-image-generation \
-              -show-adapter-info
+              -show-adapter-info \
+              ${{ matrix.config == 'debug' && '-disable-debug-layers' || '' }}
           elif [[ "${{matrix.has-gpu}}" == "true" ]]; then
             "$bin_dir/slang-test" \
               -use-test-server \
@@ -187,7 +203,8 @@ jobs:
               -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
-              -show-adapter-info
+              -show-adapter-info  \
+              ${{ matrix.config == 'debug' && '-disable-debug-layers' || '' }}
           else
             "$bin_dir/slang-test" \
               -use-test-server \
@@ -197,7 +214,8 @@ jobs:
               -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
-              -show-adapter-info
+              -show-adapter-info \
+              ${{ matrix.config == 'debug' && '-disable-debug-layers' || '' }}
           fi
       - name: Run Slang examples
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
@@ -213,13 +231,13 @@ jobs:
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
       - name: Test Slang via glsl
-        if: steps.filter.outputs.should-run == 'true' && matrix.full-gpu-tests && matrix.platform != 'wasm'
+        if: steps.filter.outputs.should-run == 'true' && matrix.full-gpu-tests && matrix.platform != 'wasm' && matrix.config != 'debug'
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
           "$bin_dir/slang-test" \
             -use-test-server \
-            -server-count 8 \
+            -server-count ${{ matrix.server-count }} \
             -category ${{ matrix.test-category }} \
             -emit-spirv-via-glsl \
             -api vk \

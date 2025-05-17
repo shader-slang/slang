@@ -314,6 +314,23 @@ IRIntegerValue getIntVal(IRInst* inst)
     }
 }
 
+IRIntegerValue getArraySizeVal(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_IntLit:
+        return static_cast<IRConstant*>(inst)->value.intVal;
+        break;
+    default:
+        // Treat specialization constant array as the unsized array here.
+        if (isSpecConstRateType(inst->getFullType()))
+            return kUnsizedArrayMagicLength;
+
+        SLANG_UNEXPECTED("needed a known integer value");
+        UNREACHABLE_RETURN(0);
+    }
+}
+
 // IRCapabilitySet
 
 CapabilitySet IRCapabilitySet::getCaps()
@@ -1804,7 +1821,7 @@ IRInst* IRBuilder::_createInst(
     m_dedupContext->getInstReplacementMap().tryGetValue(type, instReplacement);
     type = (IRType*)instReplacement;
 
-    if (getIROpInfo(op).flags & kIROpFlag_Hoistable)
+    if (isInstHoistable(op, type))
     {
         return _findOrEmitHoistableInst(
             type,
@@ -2510,7 +2527,8 @@ static void addGlobalValue(IRBuilder* builder, IRInst* value)
     //
     if (value->parent)
     {
-        SLANG_ASSERT(getIROpInfo(value->getOp()).isHoistable());
+        SLANG_ASSERT(
+            getIROpInfo(value->getOp()).isHoistable() || isSpecConstRateType(value->getFullType()));
         return;
     }
 
@@ -3194,6 +3212,10 @@ IRActualGlobalRate* IRBuilder::getActualGlobalRate()
 {
     return (IRActualGlobalRate*)getType(kIROp_ActualGlobalRate);
 }
+IRSpecConstRate* IRBuilder::getSpecConstRate()
+{
+    return (IRSpecConstRate*)getType(kIROp_SpecConstRate);
+}
 
 IRRateQualifiedType* IRBuilder::getRateQualifiedType(IRRate* rate, IRType* dataType)
 {
@@ -3409,6 +3431,53 @@ IRInst* IRBuilder::emitDebugValue(IRInst* debugVar, IRInst* debugValue)
         kIROp_DebugValue,
         (UInt)args.getCount(),
         args.getBuffer());
+}
+
+IRInst* IRBuilder::emitDebugInlinedAt(
+    IRInst* line,
+    IRInst* col,
+    IRInst* file,
+    IRInst* debugFunc,
+    IRInst* outerInlinedAt)
+{
+    if (outerInlinedAt)
+    {
+        IRInst* args[] = {line, col, file, debugFunc, outerInlinedAt};
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedAt, 5, args);
+    }
+    else
+    {
+        IRInst* args[] = {line, col, file, debugFunc};
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedAt, 4, args);
+    }
+}
+
+IRInst* IRBuilder::emitDebugFunction(
+    IRInst* name,
+    IRInst* line,
+    IRInst* col,
+    IRInst* file,
+    IRInst* debugType)
+{
+    IRInst* args[] = {name, line, col, file, debugType};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 5, args);
+}
+
+IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)
+{
+    IRInst* args[] = {variable, inlinedAt};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugInlinedVariable, 2, args);
+}
+
+IRInst* IRBuilder::emitDebugScope(IRInst* scope, IRInst* inlinedAt)
+{
+    IRInst* args[] = {scope, inlinedAt};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 2, args);
+}
+
+IRInst* IRBuilder::emitDebugNoScope()
+{
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugNoScope, 0, nullptr);
 }
 
 IRLiveRangeStart* IRBuilder::emitLiveRangeStart(IRInst* referenced)
@@ -4051,6 +4120,7 @@ enum class TypeCastStyle
     Float,
     Bool,
     Ptr,
+    Enum,
     Void
 };
 static TypeCastStyle _getTypeStyleId(IRType* type)
@@ -4083,6 +4153,8 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
     case kIROp_RefType:
     case kIROp_ConstRefType:
         return TypeCastStyle::Ptr;
+    case kIROp_EnumType:
+        return TypeCastStyle::Enum;
     case kIROp_VoidType:
         return TypeCastStyle::Void;
     default:
@@ -4131,27 +4203,42 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
         }
     };
 
-    static const OpSeq opMap[4][5] = {
-        /*      To:      Int, Float, Bool, Ptr, Void*/
+    static const OpSeq opMap[5][6] = {
+        /*      To:      Int, Float, Bool, Ptr, Enum, Void */
         /* From Int   */ {
             kIROp_IntCast,
             kIROp_CastIntToFloat,
             kIROp_IntCast,
             kIROp_CastIntToPtr,
+            kIROp_CastIntToEnum,
             kIROp_CastToVoid},
         /* From Float */
         {kIROp_CastFloatToInt,
          kIROp_FloatCast,
          {kIROp_Neq},
          {kIROp_CastFloatToInt, kIROp_CastIntToPtr},
+         {kIROp_CastFloatToInt, kIROp_CastIntToEnum},
          kIROp_CastToVoid},
         /* From Bool  */
-        {kIROp_IntCast, kIROp_CastIntToFloat, kIROp_Nop, kIROp_CastIntToPtr, kIROp_CastToVoid},
+        {kIROp_IntCast,
+         kIROp_CastIntToFloat,
+         kIROp_Nop,
+         kIROp_CastIntToPtr,
+         kIROp_CastIntToEnum,
+         kIROp_CastToVoid},
         /* From Ptr   */
         {kIROp_CastPtrToInt,
          {kIROp_CastPtrToInt, kIROp_CastIntToFloat},
          kIROp_CastPtrToBool,
          kIROp_BitCast,
+         {kIROp_CastPtrToInt, kIROp_CastIntToEnum},
+         kIROp_CastToVoid},
+        /* From Enum   */
+        {kIROp_CastEnumToInt,
+         {kIROp_CastEnumToInt, kIROp_CastIntToFloat},
+         {kIROp_CastEnumToInt, kIROp_IntCast},
+         {kIROp_CastEnumToInt, kIROp_CastIntToPtr},
+         kIROp_EnumCast,
          kIROp_CastToVoid},
     };
 
@@ -4251,6 +4338,11 @@ IRInst* IRBuilder::emitVectorReshape(IRType* type, IRInst* value)
                     args.add(emitDefaultConstruct(targetVectorType->getElementType()));
                 }
                 return emitMakeVector(targetVectorType, args);
+            }
+            else
+            {
+                // Sizes match, no need to reshape.
+                return value;
             }
         }
         auto reshape = emitIntrinsicInst(
@@ -4805,6 +4897,13 @@ IRClassType* IRBuilder::createClassType()
     IRClassType* classType = createInst<IRClassType>(this, kIROp_ClassType, getTypeKind());
     addGlobalValue(this, classType);
     return classType;
+}
+
+IREnumType* IRBuilder::createEnumType(IRType* tagType)
+{
+    IREnumType* enumType = createInst<IREnumType>(this, kIROp_EnumType, getTypeKind(), tagType);
+    addGlobalValue(this, enumType);
+    return enumType;
 }
 
 IRGLSLShaderStorageBufferType* IRBuilder::createGLSLShaderStorableBufferType()
@@ -7739,6 +7838,12 @@ IntInfo getIntTypeInfo(const IRType* intType)
         return {32, false};
     case kIROp_UInt64Type:
         return {64, false};
+    case kIROp_UIntPtrType:
+#if SLANG_PTR_IS_32
+        return {32, false};
+#else
+        return {64, false};
+#endif
     case kIROp_Int8Type:
         return {8, true};
     case kIROp_Int16Type:
@@ -7747,9 +7852,12 @@ IntInfo getIntTypeInfo(const IRType* intType)
         return {32, true};
     case kIROp_Int64Type:
         return {64, true};
-
-    case kIROp_IntPtrType:  // target platform dependent
-    case kIROp_UIntPtrType: // target platform dependent
+    case kIROp_IntPtrType:
+#if SLANG_PTR_IS_32
+        return {32, true};
+#else
+        return {64, true};
+#endif
     default:
         SLANG_UNEXPECTED("Unhandled type passed to getIntTypeInfo");
     }
@@ -7769,6 +7877,37 @@ IROp getIntTypeOpFromInfo(const IntInfo info)
         return info.isSigned ? kIROp_Int64Type : kIROp_UInt64Type;
     default:
         SLANG_UNEXPECTED("Unhandled info passed to getIntTypeOpFromInfo");
+    }
+}
+
+IROp getOppositeSignIntTypeOp(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_UInt8Type:
+        return kIROp_Int8Type;
+    case kIROp_UInt16Type:
+        return kIROp_Int16Type;
+    case kIROp_UIntType:
+        return kIROp_IntType;
+    case kIROp_UInt64Type:
+        return kIROp_Int64Type;
+    case kIROp_UIntPtrType:
+        return kIROp_IntPtrType;
+
+    case kIROp_Int8Type:
+        return kIROp_UInt8Type;
+    case kIROp_Int16Type:
+        return kIROp_UInt16Type;
+    case kIROp_IntType:
+        return kIROp_UIntType;
+    case kIROp_Int64Type:
+        return kIROp_UInt64Type;
+    case kIROp_IntPtrType:
+        return kIROp_UIntPtrType;
+
+    default:
+        SLANG_UNEXPECTED("Unhandled type passed to getOppositeSignIntTypeOp");
     }
 }
 
@@ -7871,8 +8010,8 @@ IRInstList<IRDecoration> IRInst::getDecorations()
 IRInst* IRInst::getFirstChild()
 {
     // The children come after any decorations,
-    // so if there are any decorations, then the
-    // first child is right after the last decoration.
+    // so if there are any decorations, then
+    // the first child is right after the last decoration.
     //
     if (auto lastDecoration = getLastDecoration())
         return lastDecoration->getNextInst();
@@ -8392,6 +8531,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_RTTIObject:
     case kIROp_RTTIType:
     case kIROp_Func:
+    case kIROp_DebugFunction:
     case kIROp_Generic:
     case kIROp_Var:
     case kIROp_Param:
@@ -8465,6 +8605,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
     case kIROp_GetOffsetPtr:
+    case kIROp_GetOptiXRayPayloadPtr:
     case kIROp_UpdateElement:
     case kIROp_MeshOutputRef:
     case kIROp_MakeVectorFromScalar:
@@ -8505,6 +8646,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_CastPtrToInt:
     case kIROp_CastIntToPtr:
     case kIROp_PtrCast:
+    case kIROp_CastEnumToInt:
+    case kIROp_CastIntToEnum:
+    case kIROp_EnumCast:
     case kIROp_CastUInt2ToDescriptorHandle:
     case kIROp_CastDescriptorHandleToUInt2:
     case kIROp_CastDescriptorHandleToResource:
@@ -8956,6 +9100,9 @@ bool isMovableInst(IRInst* inst)
     case kIROp_CastPtrToBool:
     case kIROp_CastPtrToInt:
     case kIROp_PtrCast:
+    case kIROp_CastEnumToInt:
+    case kIROp_CastIntToEnum:
+    case kIROp_EnumCast:
     case kIROp_CastDynamicResource:
     case kIROp_BitAnd:
     case kIROp_BitNot:

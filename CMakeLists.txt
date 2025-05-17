@@ -118,6 +118,7 @@ option(SLANG_ENABLE_PREBUILT_BINARIES "Enable using prebuilt binaries" ON)
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
 option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
 option(SLANG_ENABLE_SLANGC "Enable standalone compiler target" ON)
+option(SLANG_ENABLE_SLANGI "Enable Slang interpreter target" ON)
 option(SLANG_ENABLE_SLANGRT "Enable runtime target" ON)
 option(
     SLANG_ENABLE_SLANG_GLSLANG
@@ -200,6 +201,26 @@ advanced_option(
 advanced_option(
     SLANG_OVERRIDE_GLSLANG_PATH
     "Build using user defined path for glslang"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_GLM_PATH
+    "Build using user defined path for glm"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_IMGUI_PATH
+    "Build using user defined path for imgui"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_SLANG_RHI_PATH
+    "Build using user defined path for slang-rhi"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_TINYOBJLOADER_PATH
+    "Build using user defined path for tinyobjloader"
     OFF
 )
 

@@ -34,7 +34,7 @@ namespace Slang
 struct PathInfo;
 struct IncludeHandler;
 struct SharedSemanticsContext;
-struct ModuleChunkRef;
+struct ModuleChunk;
 
 class ProgramLayout;
 class PtrType;
@@ -92,6 +92,7 @@ enum class CodeGenTarget : SlangCompileTargetIntegral
     WGSL = SLANG_WGSL,
     WGSLSPIRVAssembly = SLANG_WGSL_SPIRV_ASM,
     WGSLSPIRV = SLANG_WGSL_SPIRV,
+    HostVM = SLANG_HOST_VM,
     CountOf = SLANG_TARGET_COUNT_OF,
 };
 
@@ -1492,7 +1493,7 @@ public:
         {
             return SLANG_E_INVALID_ARG;
         }
-
+        SLANG_AST_BUILDER_RAII(m_astBuilder);
         ComPtr<slang::IEntryPoint> entryPoint(findEntryPointByName(UnownedStringSlice(name)));
         if ((!entryPoint))
             return SLANG_FAIL;
@@ -1511,7 +1512,6 @@ public:
         {
             return SLANG_E_INVALID_ARG;
         }
-
         ComPtr<slang::IEntryPoint> entryPoint(
             findAndCheckEntryPoint(UnownedStringSlice(name), stage, outDiagnostics));
         if ((!entryPoint))
@@ -2363,20 +2363,23 @@ public:
     /// Otherwise, return null.
     ///
     RefPtr<Module> findOrLoadSerializedModuleForModuleLibrary(
-        ModuleChunkRef moduleChunk,
+        ModuleChunk const* moduleChunk,
+        RIFF::ListChunk const* libraryChunk,
         DiagnosticSink* sink);
 
     RefPtr<Module> loadSerializedModule(
         Name* moduleName,
         const PathInfo& moduleFilePathInfo,
-        ModuleChunkRef moduleChunk,
+        ModuleChunk const* moduleChunk,
+        RIFF::ListChunk const* containerChunk, //< The outer container, if there is one.
         SourceLoc const& requestingLoc,
         DiagnosticSink* sink);
 
     SlangResult loadSerializedModuleContents(
         Module* module,
         const PathInfo& moduleFilePathInfo,
-        ModuleChunkRef moduleChunk,
+        ModuleChunk const* moduleChunk,
+        RIFF::ListChunk const* containerChunk, //< The outer container, if there is one.
         DiagnosticSink* sink);
 
     SourceFile* loadSourceFile(String pathFrom, String path);
@@ -2387,8 +2390,7 @@ public:
         Name* name,
         PathInfo const& pathInfo);
 
-    bool isBinaryModuleUpToDate(String fromPath, RiffContainer* container);
-    bool isBinaryModuleUpToDate(String fromPath, ModuleChunkRef moduleChunk);
+    bool isBinaryModuleUpToDate(String fromPath, RIFF::ListChunk const* baseChunk);
 
     RefPtr<Module> findOrImportModule(
         Name* name,

@@ -1,5 +1,5 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX11):-slang -compute -shaderobj -output-using-type -render-feature hardware-device
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX11):-slang -compute -dx11 -shaderobj -output-using-type -render-feature hardware-device
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX12):-slang -compute -dx12 -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=DX12CS6):-slang -compute -dx12 -profile cs_6_0 -use-dxil -shaderobj -output-using-type -xslang -DCS60
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=VK):-vk -emit-spirv-directly -compute -shaderobj -output-using-type -render-feature hardware-device -xslang -DVK
@@ -360,10 +360,10 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     outputBuffer[idx] = val;
 }
 
-// DX11: 327
-// DX11: 327
-// DX11: 327
-// DX11: 327
+// DX11: 354
+// DX11: 354
+// DX11: 354
+// DX11: 354
 // DX12: 354
 // DX12: 354
 // DX12: 354
