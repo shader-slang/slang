@@ -14107,8 +14107,6 @@ T WaveMaskBitAnd(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveAnd($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveBitAnd($1)";
     default:
@@ -14123,8 +14121,6 @@ vector<T,N> WaveMaskBitAnd(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveAndMultiple($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveBitAnd($1)";
     default:
@@ -14138,8 +14134,6 @@ matrix<T,N,M> WaveMaskBitAnd(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda:
-            __intrinsic_asm "_waveAndMultiple($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveBitAnd($1)";
     default:
@@ -14154,8 +14148,6 @@ T WaveMaskBitOr(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveOr($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveBitOr($1)";
     default:
@@ -14169,8 +14161,6 @@ vector<T,N> WaveMaskBitOr(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveOrMultiple($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveBitOr($1)";
     default:
@@ -14185,8 +14175,6 @@ matrix<T,N,M> WaveMaskBitOr(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveOrMultiple($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveBitOr($1)";
     default:
@@ -14201,8 +14189,6 @@ T WaveMaskBitXor(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveXor($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveBitXor($1)";
     default:
@@ -14217,8 +14203,6 @@ vector<T,N> WaveMaskBitXor(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveXorMultiple($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveBitXor($1)";
     default:
@@ -14233,8 +14217,6 @@ matrix<T,N,M> WaveMaskBitXor(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveXorMultiple($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveBitXor($1)";
     default:
@@ -14249,8 +14231,6 @@ T WaveMaskMax(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveMax($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveMax($1)";
     default:
@@ -14265,8 +14245,6 @@ vector<T,N> WaveMaskMax(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveMaxMultiple($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveMax($1)";
     default:
@@ -14281,8 +14259,6 @@ matrix<T,N,M> WaveMaskMax(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveMaxMultiple($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveMax($1)";
     default:
@@ -14297,8 +14273,6 @@ T WaveMaskMin(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveMin($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveMin($1)";
     default:
@@ -14313,8 +14287,6 @@ vector<T,N> WaveMaskMin(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveMinMultiple($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveMin($1)";
     default:
@@ -14329,8 +14301,6 @@ matrix<T,N,M> WaveMaskMin(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveMinMultiple($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveMin($1)";
     default:
@@ -14345,8 +14315,6 @@ T WaveMaskProduct(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveProduct($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveProduct($1)";
     default:
@@ -14361,8 +14329,6 @@ vector<T,N> WaveMaskProduct(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveProductMultiple($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveProduct($1)";
     default:
@@ -14377,8 +14343,6 @@ matrix<T,N,M> WaveMaskProduct(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveProductMultiple($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveProduct($1)";
     default:
@@ -14393,8 +14357,6 @@ T WaveMaskSum(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveSum($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveSum($1)";
     default:
@@ -14408,8 +14370,6 @@ vector<T,N> WaveMaskSum(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveSumMultiple($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveSum($1)";
     default:
@@ -14424,8 +14384,6 @@ matrix<T,N,M> WaveMaskSum(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda:
-        __intrinsic_asm "_waveSumMultiple($0, $1)";
     case hlsl:
         __intrinsic_asm "WaveActiveSum($1)";
     default:
@@ -14500,39 +14458,21 @@ __generic<T : __BuiltinArithmeticType>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixProduct(WaveMask mask, T expr)
 {
-    __target_switch
-    {
-    case cuda:
-        __intrinsic_asm "_wavePrefixProduct($0, $1)";
-    default:
-        return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
-    }
+    return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
 }
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
 {
-    __target_switch
-    {
-    case cuda:
-        __intrinsic_asm "_wavePrefixProductMultiple($0, $1)";
-    default:
-        return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
-    }
+    return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
 }
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixProduct(WaveMask mask, matrix<T,N,M> expr)
 {
-    __target_switch
-    {
-    case cuda:
-        __intrinsic_asm "_wavePrefixProductMultiple($0, $1)";
-    default:
-        return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
-    }
+    return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -14540,13 +14480,7 @@ __generic<T : __BuiltinArithmeticType>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixSum(WaveMask mask, T expr)
 {
-    __target_switch
-    {
-    case cuda:
-        __intrinsic_asm "_wavePrefixSum($0, $1)";
-    default:
-        return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
-    }
+    return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -14554,26 +14488,14 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
 {
-    __target_switch
-    {
-    case cuda:
-        __intrinsic_asm "_wavePrefixSumMultiple($0, $1)";
-    default:
-        return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
-    }
+    return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
 }
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixSum(WaveMask mask, matrix<T,N,M> expr)
 {
-    __target_switch
-    {
-    case cuda:
-        __intrinsic_asm "_wavePrefixSumMultiple($0, $1)";
-    default:
-        return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
-    }
+    return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinType>
@@ -14684,13 +14606,7 @@ __generic<T : __BuiltinLogicalType>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixBitAnd(WaveMask mask, T expr)
 {
-    __target_switch
-    {
-    case cuda:
-        __intrinsic_asm "_wavePrefixAnd($0, $1)";
-    default:
-        return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
-    }
+    return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -14698,13 +14614,7 @@ __generic<T : __BuiltinLogicalType, let N : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitAnd(WaveMask mask, vector<T,N> expr)
 {
-    __target_switch
-    {
-    case cuda:
-        __intrinsic_asm "_wavePrefixAndMultiple($0, $1)";
-    default:
-        return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
-    }
+    return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
@@ -14712,13 +14622,7 @@ __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(cuda_hlsl, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitAnd(WaveMask mask, matrix<T,N,M> expr)
 {
-    __target_switch
-    {
-    case cuda:
-        __intrinsic_asm "_wavePrefixAndMultiple($0, $1)";
-    default:
-        return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
-    }
+    return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -14726,13 +14630,7 @@ __generic<T : __BuiltinLogicalType>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixBitOr(WaveMask mask, T expr)
 {
-    __target_switch
-    {
-    case cuda:
-        __intrinsic_asm "_wavePrefixOr($0, $1)";
-    default:
-        return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
-    }
+    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -14740,13 +14638,7 @@ __generic<T : __BuiltinLogicalType, let N : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitOr(WaveMask mask, vector<T,N> expr)
 {
-    __target_switch
-    {
-    case cuda:
-        __intrinsic_asm "_wavePrefixOrMultiple($0, $1)";
-    default:
-        return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
-    }
+    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
@@ -14754,13 +14646,7 @@ __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitOr(WaveMask mask, matrix<T,N,M> expr)
 {
-    __target_switch
-    {
-    case cuda:
-        __intrinsic_asm "_wavePrefixOrMultiple($0, $1)";
-    default:
-        return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
-    }
+    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -14768,13 +14654,7 @@ __generic<T : __BuiltinLogicalType>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixBitXor(WaveMask mask, T expr)
 {
-    __target_switch
-    {
-    case cuda:
-        __intrinsic_asm "_wavePrefixXor($0, $1)";
-    default:
-        return WaveMultiPrefixBitXor(expr, uint4(mask, 0, 0, 0));
-    }
+    return WaveMultiPrefixBitXor(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -14782,13 +14662,7 @@ __generic<T : __BuiltinLogicalType, let N : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr)
 {
-    __target_switch
-    {
-    case cuda:
-        __intrinsic_asm "_wavePrefixXorMultiple($0, $1)";
-    default:
-        return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
-    }
+    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
@@ -14796,13 +14670,7 @@ __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr)
 {
-    __target_switch
-    {
-    case cuda:
-        __intrinsic_asm "_wavePrefixXorMultiple($0, $1)";
-    default:
-        return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
-    }
+    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
 //@public:
@@ -16308,7 +16176,7 @@ T WaveMulti$(opName.name)(T value, uint4 mask)
     __target_switch
     {
     case cuda:
-        return WaveMask$(opName.name)(mask.x, value);
+        __intrinsic_asm "_wave$(opName.name)($1.x, $0)";
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.spirvName)NV";
     case spirv:
@@ -16338,7 +16206,7 @@ vector<T, N> WaveMulti$(opName.name)(vector<T, N> value, uint4 mask)
     __target_switch
     {
     case cuda:
-        return WaveMask$(opName.name)(mask.x, value);
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.spirvName)NV";
     case spirv:
@@ -16363,8 +16231,8 @@ matrix<T,N,M> WaveMulti$(opName.name)(matrix<T,N,M> value, uint4 mask)
 {
     __target_switch
     {
-    case cuda: 
-        return WaveMask$(opName.name)(mask.x, value);
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
     default:
         matrix<T, N, M> result;
         for (int i = 0; i < N; ++i)
@@ -16402,15 +16270,15 @@ struct WaveMultiPrefixSumProductEntry
 
 const WaveMultiPrefixSumProductEntry kWaveMultiPrefixSumProductNames[] =
 {
-    // name               spirvName  spirvGroupOperation         glslName        hlslName                         cudaName     cudaExtraOperation  cudaMatrixVariantSupport
-    { "InclusiveSum",     "Add",     "PartitionedInclusiveScanNV", "InclusiveAdd", "Sum($0, $1) + $0",              "Sum",       "+ value",           false },
-    { "InclusiveProduct", "Mul",     "PartitionedInclusiveScanNV", "InclusiveMul", "Product($0, $1) * $0",          "Product",   "* value",           false },
-    { "ExclusiveSum",     "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                  true  },
-    { "ExclusiveProduct", "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                  true  },
+    // name               spirvName  spirvGroupOperation         glslName        hlslName                         cudaName     cudaExtraOperation   cudaMatrixVariantSupport
+    { "InclusiveSum",     "Add",     "PartitionedInclusiveScanNV", "InclusiveAdd", "Sum($0, $1) + $0",              "Sum",       "+ $0",            false },
+    { "InclusiveProduct", "Mul",     "PartitionedInclusiveScanNV", "InclusiveMul", "Product($0, $1) * $0",          "Product",   "* $0",            false },
+    { "ExclusiveSum",     "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                true  },
+    { "ExclusiveProduct", "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                true  },
 
     // These are HLSL SM 6.5 intrinsics and are equal to the exclusive variants.
-    { "Sum",              "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                  true  },
-    { "Product",          "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                  true  },
+    { "Sum",              "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                true  },
+    { "Product",          "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                true  },
 };
 
 for (auto opName : kWaveMultiPrefixSumProductNames) {
@@ -16427,7 +16295,7 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
     __target_switch
     {
     case cuda:
-        return WaveMaskPrefix$(opName.cudaName)(mask.x, value) $(opName.cudaExtraOperation);
+        __intrinsic_asm "_wavePrefix$(opName.cudaName)($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
     case hlsl:
@@ -16459,7 +16327,7 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
     __target_switch
     {
     case cuda:
-        return WaveMaskPrefix$(opName.cudaName)(mask.x, value) $(opName.cudaExtraOperation);
+        __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
     case hlsl:
@@ -16489,7 +16357,7 @@ matrix<T,N,M> WaveMultiPrefix$(opName.name)(matrix<T,N,M> value, uint4 mask)
     {
     ${{{{ if(opName.cudaMatrixVariantSupport) { }}}}
     case cuda:
-        return WaveMaskPrefix$(opName.cudaName)(mask.x, value) $(opName.cudaExtraOperation);
+        __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
     ${{{{ } }}}}
     default:
         matrix<T, N, M> result;
@@ -16527,7 +16395,7 @@ T WaveMulti$(opName.name)(T value, uint4 mask)
     __target_switch
     {
     case cuda:
-        return WaveMask$(opName.name)(mask.x, value);
+        __intrinsic_asm "_wave$(opName.name)($1.x, $0)";
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
     case spirv:
@@ -16558,6 +16426,8 @@ vector<T, N> WaveMulti$(opName.name)(vector<T, N> value, uint4 mask)
     shader_subgroup_preamble<T>();
     __target_switch
     {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
     case spirv:
@@ -16575,8 +16445,6 @@ vector<T, N> WaveMulti$(opName.name)(vector<T, N> value, uint4 mask)
             else
                 return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformS$(opName.name) Subgroup PartitionedReduceNV $value $mask };
         }
-    case cuda:
-        return WaveMask$(opName.name)(mask.x, value);
     }
 }
 
@@ -16587,7 +16455,7 @@ matrix<T, N, M> WaveMulti$(opName.name)(matrix<T, N, M> value, uint4 mask)
     __target_switch
     {
     case cuda:
-        return WaveMask$(opName.name)(mask.x, value);
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
     default:
         matrix<T, N, M> result;
         [ForceUnroll]
@@ -16725,7 +16593,7 @@ T WaveMultiBit$(opName.name)(T value, uint4 mask)
     __target_switch
     {
     case cuda:
-        return WaveMaskBit$(opName.name)(mask.x, value);
+        __intrinsic_asm "_wave$(opName.name)($1.x, $0)";
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
     case spirv:
@@ -16749,7 +16617,7 @@ vector<T, N> WaveMultiBit$(opName.name)(vector<T, N> value, uint4 mask)
     __target_switch
     {
     case cuda:
-        return WaveMaskBit$(opName.name)(mask.x, value);
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
     case spirv:
@@ -16769,7 +16637,7 @@ matrix<T, N, M> WaveMultiBit$(opName.name)(matrix<T, N, M> value, uint4 mask)
     __target_switch
     {
     case cuda:
-        return WaveMaskBit$(opName.name)(mask.x, value);
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
     default:
         matrix<T,N,M> result;
         [ForceUnroll]
@@ -16804,18 +16672,18 @@ struct WaveMultiPrefixBitwiseEntry
 
 const WaveMultiPrefixBitwiseEntry kWaveMultiPrefixBitwiseNames[] =
 {
-    // name           spirvName  spirvGroupOperation         glslName       hlslName                   cudaExtraOperation  cudaMatrixVariantSupport
-    { "InclusiveBitAnd", "And",     "PartitionedInclusiveScanNV", "InclusiveAnd", "And($0, $1) & $0",      "& value",           false },
-    { "InclusiveBitOr",  "Or",      "PartitionedInclusiveScanNV", "InclusiveOr",  "Or($0, $1) | $0",       "| value",           false },
-    { "InclusiveBitXor", "Xor",     "PartitionedInclusiveScanNV", "InclusiveXor", "Xor($0, $1) ^ $0",      "^ value",           false },
-    { "ExclusiveBitAnd", "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",                  true  },
-    { "ExclusiveBitOr",  "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",                  true  },
-    { "ExclusiveBitXor", "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",                  true  },
+    // name           spirvName     spirvGroupOperation            glslName       hlslName              cudaExtraOperation  cudaMatrixVariantSupport
+    { "InclusiveBitAnd", "And",     "PartitionedInclusiveScanNV", "InclusiveAnd", "And($0, $1) & $0",      "& $0",          false },
+    { "InclusiveBitOr",  "Or",      "PartitionedInclusiveScanNV", "InclusiveOr",  "Or($0, $1) | $0",       "| $0",          false },
+    { "InclusiveBitXor", "Xor",     "PartitionedInclusiveScanNV", "InclusiveXor", "Xor($0, $1) ^ $0",      "^ $0",          false },
+    { "ExclusiveBitAnd", "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",               true  },
+    { "ExclusiveBitOr",  "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",               true  },
+    { "ExclusiveBitXor", "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",               true  },
 
     // These are HLSL SM 6.5 intrinsics and are equal to the exclusive variants.
-    { "BitAnd",          "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",                  true  },
-    { "BitOr",           "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",                  true  },
-    { "BitXor",          "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",                  true  },
+    { "BitAnd",          "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",               true  },
+    { "BitOr",           "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",               true  },
+    { "BitXor",          "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",               true  },
 };
 
 for (auto opName : kWaveMultiPrefixBitwiseNames) {
@@ -16832,7 +16700,7 @@ T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
     __target_switch
     {
     case cuda:
-        return WaveMaskPrefixBit$(opName.spirvName)(mask.x, value) $(opName.cudaExtraOperation);
+        __intrinsic_asm "_wavePrefix$(opName.spirvName)($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
     case hlsl:
@@ -16858,7 +16726,7 @@ vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
     __target_switch
     {
     case cuda:
-        return WaveMaskPrefixBit$(opName.spirvName)(mask.x, value) $(opName.cudaExtraOperation);
+        __intrinsic_asm "_wavePrefix$(opName.spirvName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
     case glsl:
         __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
     case hlsl:
@@ -16883,7 +16751,7 @@ ${{{{
     if (opName.cudaMatrixVariantSupport) {
 }}}}
     case cuda:
-        return WaveMaskPrefixBit$(opName.spirvName)(mask.x, value);
+        __intrinsic_asm "_wavePrefix$(opName.spirvName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
 ${{{{
     }
 }}}}
