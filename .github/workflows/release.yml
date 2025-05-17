@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     # Also run on pushes to the main branch so that we can keep the llvm and sccache
     # caches filled in a scope available to everyone
@@ -112,7 +113,7 @@ jobs:
           cmake --build --preset "${{matrix.config}}"
 
       - name: Sign and notarize binaries
-        if: matrix.os == 'macos' && startsWith(github.ref, 'refs/tags/v')
+        if: matrix.os == 'macos'
         id: notarize
         env:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
