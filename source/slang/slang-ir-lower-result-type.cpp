@@ -23,11 +23,11 @@ struct ResultTypeLoweringContext
     struct LoweredResultTypeInfo : public RefObject
     {
         IRType* resultType = nullptr;
-        IRType* errorType = nullptr;
-        IRInst* successValueCreateFunc = nullptr;
-        IRInst* successValueTestFunc = nullptr;
-        IRType* valueType = nullptr;
         IRType* loweredType = nullptr;
+        IRType* tagType = nullptr;
+        IRType* valueType = nullptr;
+        IRType* errorType = nullptr;
+        IRStructField* tagField = nullptr;
         IRStructField* valueField = nullptr;
         IRStructField* errorField = nullptr;
     };
@@ -58,44 +58,30 @@ struct ResultTypeLoweringContext
         auto resultType = cast<IRResultType>(type);
         info->resultType = (IRType*)type;
 
-        info->errorType = resultType->getErrorType();
-        auto witnessTable = as<IRWitnessTable>(resultType->getErrorTypeWitness());
-        SLANG_ASSERT(witnessTable != nullptr);
+        auto structType = builder->createStructType();
+        info->loweredType = structType;
+        builder->addNameHintDecoration(structType, UnownedStringSlice("ResultType"));
 
-        auto successValueCreateEntry =
-            as<IRWitnessTableEntry>(witnessTable->getEntries().getFirst());
-        SLANG_ASSERT(successValueCreateEntry != nullptr);
-
-        info->successValueCreateFunc = successValueCreateEntry->getSatisfyingVal();
-        SLANG_ASSERT(info->successValueCreateFunc != nullptr);
-
-        auto successValueTestEntry = as<IRWitnessTableEntry>(successValueCreateEntry->next);
-        SLANG_ASSERT(successValueTestEntry != nullptr);
-
-        info->successValueTestFunc = successValueTestEntry->getSatisfyingVal();
-        SLANG_ASSERT(info->successValueTestFunc != nullptr);
+        info->tagType = builder->getBoolType();
+        auto tagKey = builder->createStructKey();
+        builder->addNameHintDecoration(tagKey, UnownedStringSlice("tag"));
+        info->tagField = builder->createStructField(structType, tagKey, info->tagType);
 
         auto valueType = resultType->getValueType();
         if (valueType->getOp() != kIROp_VoidType)
         {
-            auto structType = builder->createStructType();
-            info->loweredType = structType;
-            builder->addNameHintDecoration(structType, UnownedStringSlice("ResultType"));
-
             info->valueType = valueType;
             auto valueKey = builder->createStructKey();
             builder->addNameHintDecoration(valueKey, UnownedStringSlice("value"));
             info->valueField = builder->createStructField(structType, valueKey, (IRType*)valueType);
+        }
 
-            auto errorType = resultType->getErrorType();
-            auto errorKey = builder->createStructKey();
-            builder->addNameHintDecoration(errorKey, UnownedStringSlice("error"));
-            info->errorField = builder->createStructField(structType, errorKey, (IRType*)errorType);
-        }
-        else
-        {
-            info->loweredType = resultType->getErrorType();
-        }
+        auto errorType = resultType->getErrorType();
+        info->errorType = errorType;
+        auto errorKey = builder->createStructKey();
+        builder->addNameHintDecoration(errorKey, UnownedStringSlice("error"));
+        info->errorField = builder->createStructField(structType, errorKey, (IRType*)errorType);
+
         mapLoweredTypeToResultTypeInfo[info->loweredType] = info;
         loweredResultTypes[type] = info;
         return info.Ptr();
@@ -124,21 +110,16 @@ struct ResultTypeLoweringContext
 
         auto info = getLoweredResultType(builder, inst->getDataType());
 
-        auto successValue =
-            builder->emitCallInst(info->errorType, info->successValueCreateFunc, 0, nullptr);
-
-        if (info->loweredType->getOp() == kIROp_StructType)
+        List<IRInst*> operands;
+        operands.add(builder->getBoolValue(false));
+        if (info->valueField)
         {
-            List<IRInst*> operands;
             operands.add(inst->getOperand(0));
-            operands.add(successValue);
-            auto makeStruct = builder->emitMakeStruct(info->loweredType, operands);
-            inst->replaceUsesWith(makeStruct);
         }
-        else
-        {
-            inst->replaceUsesWith(successValue);
-        }
+        operands.add(builder->emitDefaultConstruct(info->errorType));
+
+        auto makeStruct = builder->emitMakeStruct(info->loweredType, operands);
+        inst->replaceUsesWith(makeStruct);
         inst->removeAndDeallocate();
     }
 
@@ -149,18 +130,17 @@ struct ResultTypeLoweringContext
         builder->setInsertBefore(inst);
 
         auto info = getLoweredResultType(builder, inst->getDataType());
+
+        List<IRInst*> operands;
+        operands.add(builder->getBoolValue(true));
         if (info->valueField)
         {
-            List<IRInst*> operands;
             operands.add(builder->emitDefaultConstruct(info->valueType));
-            operands.add(inst->getErrorValue());
-            auto makeStruct = builder->emitMakeStruct(info->loweredType, operands);
-            inst->replaceUsesWith(makeStruct);
         }
-        else
-        {
-            inst->replaceUsesWith(inst->getErrorValue());
-        }
+        operands.add(inst->getErrorValue());
+
+        auto makeStruct = builder->emitMakeStruct(info->loweredType, operands);
+        inst->replaceUsesWith(makeStruct);
         inst->removeAndDeallocate();
     }
 
@@ -222,14 +202,10 @@ struct ResultTypeLoweringContext
         auto loweredResultTypeInfo = getLoweredResultType(builder, base->getDataType());
         SLANG_ASSERT(loweredResultTypeInfo);
 
-        auto resultValue = inst->getResultOperand();
-        auto errValue = getResultError(builder, resultValue);
-        auto isSuccess = builder->emitCallInst(
-            builder->getBoolType(),
-            loweredResultTypeInfo->successValueTestFunc,
-            1,
-            &errValue);
-        auto isFailure = builder->emitNot(builder->getBoolType(), isSuccess);
+        auto isFailure = builder->emitFieldExtract(
+            loweredResultTypeInfo->tagType,
+            base,
+            loweredResultTypeInfo->tagField->getKey());
 
         inst->replaceUsesWith(isFailure);
         inst->removeAndDeallocate();
