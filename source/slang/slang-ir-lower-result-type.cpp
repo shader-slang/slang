@@ -2,8 +2,8 @@
 
 #include "slang-ir-lower-result-type.h"
 
-#include "slang-ir-insts.h"
 #include "slang-ir-any-value-marshalling.h"
+#include "slang-ir-insts.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -83,10 +83,12 @@ struct ResultTypeLoweringContext
         if (errSize > anyValueSize)
             anyValueSize = errSize;
 
-        info->anyValueType = builder->getAnyValueType(builder->getIntValue(builder->getUIntType(), anyValueSize));
+        info->anyValueType =
+            builder->getAnyValueType(builder->getIntValue(builder->getUIntType(), anyValueSize));
         auto anyValueKey = builder->createStructKey();
         builder->addNameHintDecoration(anyValueKey, UnownedStringSlice("anyValue"));
-        info->anyValueField = builder->createStructField(structType, anyValueKey, info->anyValueType);
+        info->anyValueField =
+            builder->createStructField(structType, anyValueKey, info->anyValueType);
 
         mapLoweredTypeToResultTypeInfo[info->loweredType] = info;
         loweredResultTypes[type] = info;
@@ -157,8 +159,7 @@ struct ResultTypeLoweringContext
                 loweredResultTypeInfo->anyValueType,
                 resultInst,
                 loweredResultTypeInfo->anyValueField->getKey());
-            auto unpackInst = builder->emitUnpackAnyValue(
-                loweredResultTypeInfo->errorType, value);
+            auto unpackInst = builder->emitUnpackAnyValue(loweredResultTypeInfo->errorType, value);
             return unpackInst;
         }
         else
@@ -194,8 +195,7 @@ struct ResultTypeLoweringContext
             loweredResultTypeInfo->anyValueType,
             base,
             loweredResultTypeInfo->anyValueField->getKey());
-        auto unpackInst = builder->emitUnpackAnyValue(
-            loweredResultTypeInfo->valueType, getElement);
+        auto unpackInst = builder->emitUnpackAnyValue(loweredResultTypeInfo->valueType, getElement);
         inst->replaceUsesWith(unpackInst);
         inst->removeAndDeallocate();
     }
