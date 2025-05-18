@@ -120,9 +120,9 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
           IDENTITY_ID: "Developer ID Application: The Khronos Group, Inc. (TD2656HYNK)"
-          AC_PASSWORD: ${{secrets.APPLE_ID_PASSWORD}}
-          AC_PROVIDER: ${{secrets.APPLE_ID_PPOVIDER}}
-          AC_USERNAME: ${{secrets.APPLE_ID_USERNAME}}
+          AC_PASSWORD: ${{secrets.AC_PASSWORD}}
+          AC_PROVIDER: ${{secrets.AC_PPOVIDER}}
+          AC_USERNAME: ${{secrets.AC_USERNAME}}
         run: |
           brew install Bearer/tap/gon
           security find-identity -v
