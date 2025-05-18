@@ -1,7 +1,7 @@
 {
   "notarize": {
     "path": "slang-macos-dist.zip",
-    "bundle_id": "shader-slang.slang",
+    "bundle_id": "org.shader-slang.slang",
     "staple": false
   }
 }
