@@ -3,10 +3,5 @@
     "path": "slang-macos-dist.zip",
     "bundle_id": "org.shader-slang.slang",
     "staple": false
-  },
-  "apple_id": {
-    "username": "@env:AC_USERNAME",
-    "password": "@env:AC_PASSWORD",
-    "provider": "TD2656HYNK"
   }
 }
