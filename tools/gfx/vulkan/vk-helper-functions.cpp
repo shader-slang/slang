@@ -214,8 +214,7 @@ VkAccessFlags translateAccelerationStructureAccessFlag(AccessFlag access)
 {
     VkAccessFlags result = 0;
     if ((uint32_t)access & (uint32_t)AccessFlag::Read)
-        result |= VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_SHADER_READ_BIT |
-                  VK_ACCESS_TRANSFER_READ_BIT;
+        result |= VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR | VK_ACCESS_SHADER_READ_BIT;
     if ((uint32_t)access & (uint32_t)AccessFlag::Write)
         result |= VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
     return result;

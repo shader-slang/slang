@@ -606,6 +606,12 @@ Extensions
 `spvQuadControlKHR`
 > Represents the SPIR-V capability for quad group control.
 
+`spvVulkanMemoryModelKHR`
+> Represents the SPIR-V capability for vulkan memory model.
+
+`spvVulkanMemoryModelDeviceScopeKHR`
+> Represents the SPIR-V capability for vulkan memory model.
+
 `GL_EXT_buffer_reference`
 > Represents the GL_EXT_buffer_reference extension.
 
@@ -969,6 +975,9 @@ Compound Capabilities
 `cooperative_vector_training`
 > Capabilities needed to train cooperative vectors
 
+`cooperative_matrix`
+> Capabilities needed to use cooperative matrices
+
 `cooperative_matrix_reduction`
 > Capabilities needed to use reduction operations with cooperative matrix
 
@@ -989,6 +998,9 @@ Compound Capabilities
 
 `cooperative_matrix_2`
 > Capabilities needed to use tensor addressing
+
+`vk_mem_model`
+> Capabilities needed to use vulkan memory model
 
 `any_stage`
 > Collection of all shader stages
@@ -1300,9 +1312,6 @@ Compound Capabilities
 Other
 ----------------------
 *Capabilities which may be deprecated*
-
-`cooperative_matrix`
-> Capabilities needed to use cooperative matrices
 
 `SPIRV_1_0`
 > Use `spirv_1_0` instead
