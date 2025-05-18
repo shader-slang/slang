@@ -121,7 +121,7 @@ jobs:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
           IDENTITY_ID: "Developer ID Application: The Khronos Group, Inc. (TD2656HYNK)"
           AC_PASSWORD: ${{secrets.AC_PASSWORD}}
-          AC_PROVIDER: ${{secrets.AC_PPOVIDER}}
+          AC_PROVIDER: ${{secrets.AC_PROVIDER}}
           AC_USERNAME: ${{secrets.AC_USERNAME}}
         run: |
           brew install Bearer/tap/gon
@@ -161,7 +161,7 @@ jobs:
             fi
           done
 
-          timeout 1000 gon ./extras/macos-notarize.json
+          timeout 1000 gon --log-level=debug ./extras/macos-notarize.json
           cp slang-macos-dist.zip "slang-macos-dist-${{matrix.platform}}.zip"
           echo "SLANG_NOTARIZED_DIST=slang-macos-dist-${{matrix.platform}}.zip" >> "$GITHUB_OUTPUT"
 
