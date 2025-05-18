@@ -2185,10 +2185,6 @@ alias subgroup_partitioned = _sm_6_5
                            | _cuda_sm_7_0
                            | GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_arithmetic + GL_NV_shader_subgroup_partitioned;
 
-/// Capabilities needed to use HLSL wave multi prefix operations
-/// [Compound]
-alias wave_multi_prefix = subgroup_partitioned;
-
 
 /// Capabilities required to use GLSL-style subgroup rotate operations 'subgroup_rotate'
 /// [Compound]
