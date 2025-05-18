@@ -119,7 +119,7 @@ jobs:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-          IDENTITY_ID: d6ada82a113e4204aaad914e1013e9548ffd30d0
+          IDENTITY_ID: "Developer ID Application: The Khronos Group, Inc. (TD2656HYNK)"
           AC_PASSWORD: ${{secrets.APPLE_ID_PASSWORD}}
           AC_PROVIDER: ${{secrets.APPLE_ID_PPOVIDER}}
           AC_USERNAME: ${{secrets.APPLE_ID_USERNAME}}
