@@ -5,12 +5,6 @@ enum MyError
     Success
 }
 
-extension MyError: IError
-{
-    static MyError createSuccessValue() { return Success; }
-    bool isSuccessValue() { return this == Success; }
-}
-
 void f() throws MyError
 {
     defer {

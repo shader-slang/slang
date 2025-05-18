@@ -2914,13 +2914,10 @@ IRExpandType* IRBuilder::getExpandTypeOrVal(
         args.getArrayView().getBuffer());
 }
 
-IRResultType* IRBuilder::getResultType(
-    IRType* valueType,
-    IRType* errorType,
-    IRInst* errorTypeWitness)
+IRResultType* IRBuilder::getResultType(IRType* valueType, IRType* errorType)
 {
-    IRInst* operands[] = {valueType, errorType, errorTypeWitness};
-    return (IRResultType*)getType(kIROp_ResultType, 3, operands);
+    IRInst* operands[] = {valueType, errorType};
+    return (IRResultType*)getType(kIROp_ResultType, 2, operands);
 }
 
 IROptionalType* IRBuilder::getOptionalType(IRType* valueType)

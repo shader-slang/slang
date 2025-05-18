@@ -967,11 +967,6 @@ DIAGNOSTIC(
     Error,
     throwTypeIncompatibleWithErrorType,
     "the type `$0` of `throw` is not compatible with function's error type `$1`.")
-DIAGNOSTIC(
-    30117,
-    Error,
-    errorTypeDoesNotConformToIError,
-    "the function's error type `$0` does not conform to interface `IError`.")
 
 // Include
 DIAGNOSTIC(

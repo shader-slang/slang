@@ -768,6 +768,13 @@ the error.
 In order to be able to throw an error, a function must declare the type of that
 error with `throws`:
 ```
+enum MyError
+{
+    Success = 0,
+    Failure = 1,
+    CatastrophicFailure = 2
+}
+
 int f() throws MyError
 {
     if (computerIsBroken())
@@ -776,27 +783,6 @@ int f() throws MyError
 }
 ```
 Currently, functions may only throw a single type of error.
-
-Only error types that implement the `IError` interface can be thrown. `IError`
-requires that the error type must have a dedicated value for "success". That
-success value is implicitly created when a `throws` function doesn't throw, and
-is used to detect when its return value is valid.
-
-You can easily implement `IError` for your own error types:
-```
-enum MyError
-{
-    Success = 0,
-    Failure = 1,
-    CatastrophicFailure = 2
-}
-
-extension MyError : IError
-{
-    static MyError createSuccessValue() { return Success; }
-    bool isSuccessValue() { return this == Success; }
-}
-```
 
 To call a function that may throw, you must prepend it with `try`:
 

@@ -563,9 +563,6 @@ public:
     DeclRef<InterfaceDecl> getDefaultInitializableTypeInterfaceDecl();
     Type* getDefaultInitializableType();
 
-    DeclRef<InterfaceDecl> getErrorInterfaceDecl();
-    Type* getErrorInterfaceType();
-
     MeshOutputType* getMeshOutputTypeFromModifier(
         HLSLMeshShaderOutputModifier* modifier,
         Type* elementType,

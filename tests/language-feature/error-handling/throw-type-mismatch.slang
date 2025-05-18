@@ -11,18 +11,6 @@ enum MyError2
     Success
 }
 
-extension MyError1: IError
-{
-    static MyError1 createSuccessValue() { return Success; }
-    bool isSuccessValue() { return this == Success; }
-}
-
-extension MyError2: IError
-{
-    static MyError2 createSuccessValue() { return Success; }
-    bool isSuccessValue() { return this == Success; }
-}
-
 int g() throws MyError1
 {
     throw MyError2.Fail;

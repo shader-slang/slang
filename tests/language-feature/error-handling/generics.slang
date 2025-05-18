@@ -15,12 +15,6 @@ enum MyError
     Fail
 };
 
-extension MyError : IError
-{
-    static MyError createSuccessValue() { return Success; }
-    bool isSuccessValue() { return this == Success; }
-}
-
 T func<T: __BuiltinFloatingPointType>(T val) throws MyError
 {
     if (val >= T(3))

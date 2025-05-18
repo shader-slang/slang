@@ -58,7 +58,7 @@ INST(Nop, nop, 0, 0)
 
     INST(ConjunctionType, Conjunction, 0, HOISTABLE)
     INST(AttributedType, Attributed, 0, HOISTABLE)
-    INST(ResultType, Result, 3, HOISTABLE)
+    INST(ResultType, Result, 2, HOISTABLE)
     INST(OptionalType, Optional, 1, HOISTABLE)
     INST(EnumType, Enum, 1, PARENT)
 
@@ -1335,7 +1335,7 @@ INST_RANGE(Layout, VarLayout, EntryPointLayout)
         INST(TypeSizeAttr, size, 2, HOISTABLE)
         INST(VarOffsetAttr, offset, 2, HOISTABLE)
     INST_RANGE(LayoutResourceInfoAttr, TypeSizeAttr, VarOffsetAttr)
-    INST(FuncThrowTypeAttr, FuncThrowType, 2, HOISTABLE)
+    INST(FuncThrowTypeAttr, FuncThrowType, 1, HOISTABLE)
     
 INST_RANGE(Attr, PendingLayoutAttr, FuncThrowTypeAttr)
 

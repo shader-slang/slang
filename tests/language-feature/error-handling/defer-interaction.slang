@@ -10,13 +10,6 @@ enum MyError
     Success,
     Fail
 };
-
-extension MyError : IError
-{
-    static MyError createSuccessValue() { return Success; }
-    bool isSuccessValue() { return this == Success; }
-}
-
     
 int maybeThrowingFunc(int n) throws MyError
 {

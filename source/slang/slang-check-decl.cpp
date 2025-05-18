@@ -9786,16 +9786,6 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     if (errorType.exp)
     {
         errorType = CheckProperType(errorType);
-        SubtypeWitness* errorResultWitness =
-            tryGetSubtypeWitness(errorType.type, m_astBuilder->getErrorInterfaceType());
-        if (!errorResultWitness)
-        {
-            getSink()->diagnose(
-                decl->errorType,
-                Diagnostics::errorTypeDoesNotConformToIError,
-                errorType);
-        }
-        decl->errorTypeWitness = errorResultWitness;
     }
     else
     {

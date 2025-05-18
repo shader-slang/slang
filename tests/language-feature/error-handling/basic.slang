@@ -24,18 +24,6 @@ enum MyError2
     Fail
 };
 
-extension MyError1 : IError
-{
-    static MyError1 createSuccessValue() { return Success; }
-    bool isSuccessValue() { return this == Success; }
-}
-
-extension MyError2 : IError
-{
-    static MyError2 createSuccessValue() { return Success; }
-    bool isSuccessValue() { return this == Success; }
-}
-
 void throwingFunc() throws MyError1
 {
     throw MyError1.Fail;

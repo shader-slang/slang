@@ -661,13 +661,6 @@ class EnumTypeType : public BuiltinType
     // TODO: provide accessors for the declaration, the "tag" type, etc.
 };
 
-// `IError` interface type, for use with `E` in Result<T, E>
-FIDDLE()
-class ErrorResultType : public BuiltinType
-{
-    FIDDLE(...)
-};
-
 // Base class for types that map down to
 // simple pointers as part of code generation.
 FIDDLE()

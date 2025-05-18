@@ -838,22 +838,6 @@ interface __EnumType : ILogical
 
 //@public:
 
-/// To make a type throwable, it must derive from this interface.
-/// @remarks Error types must have a value that encodes the absence of an error.
-/// This way, a Result<T, E> type can detect the presence of an error without
-/// having to allocate memory / registers for an extra boolean flag. For
-/// compatibility with COM interface conventions, you should prefer to encode
-/// the success value with 0.
-[builtin]
-__magic_type(ErrorResultType)
-interface IError
-{
-    // Note: The compiler implementation expects these two functions to be the
-    // first two and in this order.
-    static This createSuccessValue();
-    bool isSuccessValue();
-};
-
 /// Represents types that provide a subscript operator so that they can be used like an immutable array.
 /// @param T The element type returned by the subscript operator.
 /// @remarks This interface is implemented by `Array`, `vector`, `matrix`, `StructuredBuffer` and `RWStructuredBuffer` types.

@@ -15,19 +15,6 @@ struct MyError
     int param = 0;
 };
 
-extension MyError : IError
-{
-    static MyError createSuccessValue()
-    {
-        return MyError(0, 0);
-    }
-
-    bool isSuccessValue()
-    {
-        return code == 0;
-    }
-}
-
 int func(int val) throws MyError
 {
     if (val >= 3)

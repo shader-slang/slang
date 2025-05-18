@@ -39,10 +39,8 @@ struct ErrorHandlingLoweringContext
         IRBuilder builder(module);
         builder.setInsertBefore(funcType);
 
-        auto resultType = builder.getResultType(
-            funcType->getResultType(),
-            throwAttr->getErrorType(),
-            throwAttr->getErrorTypeWitness());
+        auto resultType =
+            builder.getResultType(funcType->getResultType(), throwAttr->getErrorType());
 
         List<IRType*> paramTypes;
         for (UInt i = 0; i < funcType->getParamCount(); i++)
@@ -92,8 +90,7 @@ struct ErrorHandlingLoweringContext
         IRBuilder builder(module);
         builder.setInsertBefore(tryCall);
 
-        auto resultType =
-            builder.getResultType(resultValueType, errorType, throwAttr->getErrorTypeWitness());
+        auto resultType = builder.getResultType(resultValueType, errorType);
         List<IRInst*> args;
         for (UInt i = 0; i < tryCall->getArgCount(); i++)
         {
@@ -144,10 +141,8 @@ struct ErrorHandlingLoweringContext
         // replace it with a `return makeResultValue(val)`, so that it returns a `Result<T,E>` type.
         IRBuilder builder(module);
         builder.setInsertBefore(ret);
-        auto resultType = builder.getResultType(
-            funcType->getResultType(),
-            throwAttr->getErrorType(),
-            throwAttr->getErrorTypeWitness());
+        auto resultType =
+            builder.getResultType(funcType->getResultType(), throwAttr->getErrorType());
         IRInst* resultVal = nullptr;
         auto val = cast<IRReturn>(ret)->getVal();
         resultVal = builder.emitMakeResultValue(resultType, val);
@@ -167,10 +162,8 @@ struct ErrorHandlingLoweringContext
         // replace it with a `return makeResultError(e)`.
         IRBuilder builder(module);
         builder.setInsertBefore(throwInst);
-        auto resultType = builder.getResultType(
-            funcType->getResultType(),
-            throwAttr->getErrorType(),
-            throwAttr->getErrorTypeWitness());
+        auto resultType =
+            builder.getResultType(funcType->getResultType(), throwAttr->getErrorType());
         IRInst* resultVal = builder.emitMakeResultError(resultType, throwInst->getValue());
         builder.emitReturn(resultVal);
         throwInst->removeAndDeallocate();
