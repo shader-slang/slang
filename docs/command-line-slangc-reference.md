@@ -1163,6 +1163,8 @@ A capability describes an optional feature that a target may or may not support.
 * `spvTensorAddressingNV` 
 * `spvMaximalReconvergenceKHR` 
 * `spvQuadControlKHR` 
+* `spvVulkanMemoryModelKHR` 
+* `spvVulkanMemoryModelDeviceScopeKHR` 
 * `metallib_latest` 
 * `dxil_lib` 
 * `any_target` 
@@ -1295,6 +1297,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cooperative_matrix_block_load` 
 * `tensor_addressing` 
 * `cooperative_matrix_2` 
+* `vk_mem_model` 
 * `pixel` 
 * `tesscontrol` 
 * `tesseval` 

@@ -14,6 +14,21 @@ Experimental support for the older versions of SPIR-V
 Slang's SPIR-V backend is stable when emitting SPIR-V 1.3 and later, however, support for SPIR-V 1.0, 1.1 and 1.2 is still experimental.
 When targeting the older SPIR-V profiles, Slang may produce SPIR-V that uses the instructions and keywords that were introduced in the later versions of SPIR-V.
 
+Memory model
+------------
+By default, the Slang compiler produces the SPIRV code using GLSL450 memory model. The user can opt-in to Vulkan Memory Model by specifying `-capability vk_mem_model`. For using APIs, the following lines can be added to explicitly specify the capability.
+```
+    slang::CompilerOptionEntry entry;
+    entry.name = slang::CompilerOptionName::Capability;
+    entry.value.kind = slang::CompilerOptionValueKind::String;
+    entry.value.stringValue0 = "vk_mem_model";
+
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.compilerOptionEntries = &entry;
+    sessionDesc.compilerOptionEntryCount = 1;
+```
+
+If the shader uses `CoopVec` or `CoopMat` intrinsics, then the Slang compiler will automatically use `vk_mem_model` capability.
 
 Combined texture sampler
 ------------------------

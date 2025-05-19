@@ -571,6 +571,8 @@ protected:
         builder.setInsertBefore(m_firstOrdinaryInst);
 
         auto localVar = builder.emitVar(valueType);
+        // Add TempCallArgVar decoration to mark this variable as a temporary for parameter passing
+        builder.addSimpleDecoration<IRTempCallArgVarDecoration>(localVar);
         auto localVal = LegalizedVaryingVal::makeAddress(localVar);
 
         if (const auto inOutType = as<IRInOutType>(paramPtrType))
