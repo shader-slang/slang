@@ -3694,8 +3694,11 @@ tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
 }
 
 template<>
-SLANG_FORCE_INLINE SLANG_CUDA_CALL int
-tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int tex2DArrayfetch_int(
+    CUtexObject texObj,
+    int x,
+    int y,
+    int layer)
 {
     int result;
     int stub;
