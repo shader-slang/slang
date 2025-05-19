@@ -841,6 +841,10 @@ void initCommandOptions(CommandOptions& options)
          "-enable-experimental-passes",
          nullptr,
          "Enable experimental compiler passes"},
+        {OptionKind::EnableExperimentalDynamicDispatch,
+         "-enable-experimental-dynamic-dispatch",
+         nullptr,
+         "Enable experimental dynamic dispatch features"},
         {OptionKind::EmbedDownstreamIR,
          "-embed-downstream-ir",
          nullptr,
@@ -2146,6 +2150,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ValidateUniformity:
         case OptionKind::AllowGLSL:
         case OptionKind::EnableExperimentalPasses:
+        case OptionKind::EnableExperimentalDynamicDispatch:
         case OptionKind::EmitIr:
         case OptionKind::DumpIntermediates:
         case OptionKind::DumpReproOnError:

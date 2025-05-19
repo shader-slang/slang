@@ -1022,6 +1022,8 @@ typedef uint32_t SlangSizeT;
 
         SkipDownstreamLinking, // bool, experimental
         DumpModule,
+
+        EnableExperimentalDynamicDispatch, // bool, experimental
         CountOf,
     };
 
