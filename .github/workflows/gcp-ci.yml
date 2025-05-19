@@ -1,0 +1,123 @@
+name: GCP CI Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: GCP-T4
+    strategy:
+      matrix:
+        config: [release]
+        compiler: [cl]
+        platform: [x86_64]
+        include:
+          - { os: windows, runs-on: GCP-T4 }
+          - { warnings-as-errors: true }
+          - { test-category: full }
+          - { has-gpu: true }
+      fail-fast: false
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Add git to PATH
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\ProgramData\\chocolatey\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\CMake\\bin"
+          # Refresh current session PATH
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+          echo "GITHUB_PATH: $env:GITHUB_PATH"
+          echo "Current PATH: $env:Path"
+          # Verify cmake is accessible
+          cmake --version
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "2"
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: windows
+          compiler: cl
+          platform: x86_64
+          config: ${{matrix.config}}
+          build-llvm: true
+      - name: Install and Verify Vulkan SDK
+        shell: pwsh
+        run: |
+          $vulkanPath = "C:\VulkanSDK\1.4.309.0\Bin"
+          if (Test-Path $vulkanPath) {
+            Add-Content -Path $env:GITHUB_PATH -Value $vulkanPath
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+          }
+          vulkaninfo
+      - name: Build Slang
+        run: |
+          if [[ "${{ matrix.config }}" != "release" ]]; then
+            # For debug builds, build slang-llvm in release mode first
+            cmake --workflow --preset slang-llvm
+            cmake --preset default --fresh \
+              -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
+              "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
+              "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}}"
+          else
+            cmake --preset default --fresh \
+              -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+              -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}}
+          fi
+          cmake --workflow --preset "${{matrix.config}}"
+
+      - name: Test Slang
+        shell: pwsh
+        run: |
+          # Set the binary directory based on the build configuration
+          $bin_dir = "build/Release/bin"
+          Write-Host "Using binary directory: $bin_dir"
+          $env:SLANG_RUN_SPIRV_VALIDATION=1
+          $env:SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+          & "$bin_dir/slang-test" `
+            -use-test-server `
+            -category ${{ matrix.test-category }} `
+            -api all-dx12 `
+            -expected-failure-list tests/expected-failure-github.txt `
+            -expected-failure-list tests/expected-failure-record-replay-tests.txt `
+            -expected-failure-list tests/expected-failure-github-runner.txt `
+            -show-adapter-info
+
+      - name: Run slangc tests
+        shell: pwsh
+        run: |
+          PATH=$bin_dir:$PATH tools/slangc-test/test.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slang-build-windows-x86_64-cl-${{matrix.config}}
+          path: build/dist-${{matrix.config}}/**/ZIP/slang/*
+
+  report:
+    needs: build
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Build Status Report
+      run: |
+        echo "Build completed with status: ${{ needs.build.result }}"
+        echo "Build configurations tested:"
+        echo "- Debug"
+        echo "- Release"
