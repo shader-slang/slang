@@ -33,7 +33,7 @@ static bool isAssociatedTypeDecl(Decl* decl)
         return true;
     return false;
 }
-    
+
 static bool isSlang2026(CompilerOptionSet& optionSet)
 {
     if (!optionSet.hasOption(CompilerOptionName::Language))
@@ -149,7 +149,8 @@ static void validateDynUsage(
 {
     if (auto aggTypeDecl = as<AggTypeDecl>(decl))
     {
-        // Ensure if we inherit from a `dyn interface` that we do not have: opaque types, unsized types, non-copyable types 
+        // Ensure if we inherit from a `dyn interface` that we do not have: opaque types, unsized
+        // types, non-copyable types
         auto inheritedDynInterface = findDynInheritance(visitor, aggTypeDecl);
         if (inheritedDynInterface)
         {
@@ -158,12 +159,12 @@ static void validateDynUsage(
                 auto varDecl = as<VarDecl>(m);
                 if (!varDecl)
                     continue;
-                
+
                 visitor->ensureDecl(varDecl, DeclCheckState::ReadyForLookup);
-                
+
                 if (isNonCopyableType(varDecl->getType()))
                 {
-                   sink->diagnose(
+                    sink->diagnose(
                         m,
                         Diagnostics::cannotHaveNonCopyableMemberWhenInheritingDynInterface,
                         m,
@@ -187,7 +188,7 @@ static void validateDynUsage(
                         inheritedDynInterface);
             }
         }
-        
+
         // validate simple `dyn interface` rules
         auto interfaceDecl = as<InterfaceDecl>(decl);
         if (!interfaceDecl)
@@ -200,7 +201,7 @@ static void validateDynUsage(
         if (allowExperimentalDynamicDispatch(optionSet))
             return;
 
-        // cannot have extension provide conformance to dyn interface 
+        // cannot have extension provide conformance to dyn interface
         auto inheritedInterfaceDecl = findDynInheritance(visitor, extensionDecl);
         if (inheritedInterfaceDecl)
             sink->diagnose(
@@ -213,7 +214,7 @@ static void validateDynUsage(
         // if 2026 and not experiemental flag check
         if (allowExperimentalDynamicDispatch(optionSet))
             return;
-        
+
         auto innerAggTypeDecl = as<AggTypeDecl>(genericDecl->inner);
         if (!innerAggTypeDecl)
             return;
@@ -1704,7 +1705,7 @@ IntVal* SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
 void SemanticsDeclModifiersVisitor::visitInterfaceDecl(InterfaceDecl* interfaceDecl)
 {
     visitDecl(interfaceDecl);
-    
+
     if (interfaceDecl->hasModifier<AnyValueSizeAttribute>())
         addModifier(interfaceDecl, m_astBuilder->create<DynModifier>());
 }

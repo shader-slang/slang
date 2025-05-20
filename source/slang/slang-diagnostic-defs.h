@@ -829,16 +829,56 @@ DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 
 // `dyn` and `some` errors
 DIAGNOSTIC(33071, Error, cannotHaveGenericDynInterface, "dyn interfaces cannot be generic: '$0'.")
-DIAGNOSTIC(33072, Error, cannotHaveAssociatedTypeInDynInterface, "dyn interfaces cannot have associatedType members.")
-DIAGNOSTIC(33073, Error, cannotHaveGenericMethodInDynInterface, "dyn interfaces cannot have generic methods.")
-DIAGNOSTIC(33074, Error, cannotHaveMutatingMethodInDynInterface, "dyn interfaces cannot have [mutating] methods.")
-DIAGNOSTIC(33075, Error, cannotHaveDifferentiableMethodInDynInterface, "dyn interfaces cannot have [Differentiable] methods.")
-DIAGNOSTIC(33076, Error, cannotConformDynInterfaceToNonDynInterface, "dyn interface '$0' may only conform to 'dyn' interfaces. '$1' is not a dyn interface.")
-DIAGNOSTIC(33077, Error, cannotUseExtensionToMakeTypeConformToDynInterface, "cannot use a extension to conform to a dyn interface '$0'.")
-DIAGNOSTIC(33078, Error, cannotHaveUnsizedMemberWhenInheritingDynInterface, "cannot have unsized member '$0' when inheriting from dyn interface '$1'.")
-DIAGNOSTIC(33079, Error, cannotHaveOpaqueMemberWhenInheritingDynInterface, "cannot have opaque member '$0' when inheriting from dyn interface '$1'.")
-DIAGNOSTIC(33080, Error, cannotHaveNonCopyableMemberWhenInheritingDynInterface, "cannot have non-copyable member '$0' when inheriting from dyn interface '$1'.")
-DIAGNOSTIC(33081, Error, cannotConformGenericToDynInterface, "cannot conform generic type '$0' to dyn interface '$1'.")
+DIAGNOSTIC(
+    33072,
+    Error,
+    cannotHaveAssociatedTypeInDynInterface,
+    "dyn interfaces cannot have associatedType members.")
+DIAGNOSTIC(
+    33073,
+    Error,
+    cannotHaveGenericMethodInDynInterface,
+    "dyn interfaces cannot have generic methods.")
+DIAGNOSTIC(
+    33074,
+    Error,
+    cannotHaveMutatingMethodInDynInterface,
+    "dyn interfaces cannot have [mutating] methods.")
+DIAGNOSTIC(
+    33075,
+    Error,
+    cannotHaveDifferentiableMethodInDynInterface,
+    "dyn interfaces cannot have [Differentiable] methods.")
+DIAGNOSTIC(
+    33076,
+    Error,
+    cannotConformDynInterfaceToNonDynInterface,
+    "dyn interface '$0' may only conform to 'dyn' interfaces. '$1' is not a dyn interface.")
+DIAGNOSTIC(
+    33077,
+    Error,
+    cannotUseExtensionToMakeTypeConformToDynInterface,
+    "cannot use a extension to conform to a dyn interface '$0'.")
+DIAGNOSTIC(
+    33078,
+    Error,
+    cannotHaveUnsizedMemberWhenInheritingDynInterface,
+    "cannot have unsized member '$0' when inheriting from dyn interface '$1'.")
+DIAGNOSTIC(
+    33079,
+    Error,
+    cannotHaveOpaqueMemberWhenInheritingDynInterface,
+    "cannot have opaque member '$0' when inheriting from dyn interface '$1'.")
+DIAGNOSTIC(
+    33080,
+    Error,
+    cannotHaveNonCopyableMemberWhenInheritingDynInterface,
+    "cannot have non-copyable member '$0' when inheriting from dyn interface '$1'.")
+DIAGNOSTIC(
+    33081,
+    Error,
+    cannotConformGenericToDynInterface,
+    "cannot conform generic type '$0' to dyn interface '$1'.")
 
 DIAGNOSTIC(
     -1,
