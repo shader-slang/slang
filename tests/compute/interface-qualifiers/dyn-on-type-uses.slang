@@ -176,7 +176,7 @@ struct structWithUnsized : IBase6
 };
 
 // `dyn` interfaces cannot contain any methods that has a `some` IFoo return type, or has any `some` IFoo parameters.
-// TODO when `some` is added
+// TODO-INTERFACE-QUALIFIERS-ADDITION-OF-SOME
 //
 
 RWStructuredBuffer<int> outputBuffer;
