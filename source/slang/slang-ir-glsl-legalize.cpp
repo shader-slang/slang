@@ -630,6 +630,13 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         context->requireGLSLVersion(ProfileVersion::GLSL_460);
         context->requireGLSLExtension(toSlice("GL_ARB_shader_draw_parameters"));
     }
+    else if (semanticName == "sv_vulkaninstanceid")
+    {
+        // https://docs.microsoft.com/en-us/windows/desktop/direct3d11/d3d10-graphics-programming-guide-input-assembler-stage-using#instanceid
+        // uint in hlsl, int in glsl
+        requiredType = builder->getBasicType(BaseType::Int);
+        name = "gl_InstanceIndex";
+    }
     else if (semanticName == "sv_isfrontface")
     {
         // bool in hlsl & glsl
@@ -774,6 +781,16 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
             builder->getIntValue(builder->getIntType(), 2));
     }
     else if (semanticName == "sv_vertexid")
+    {
+        // uint in hlsl, int in glsl (https://www.khronos.org/opengl/wiki/Built-in_Variable_(GLSL))
+        requiredType = builder->getBasicType(BaseType::Int);
+        name = "gl_VertexIndex";
+        targetVarName = IRTargetBuiltinVarName::HlslVertexID;
+        context->requireSPIRVVersion(SemanticVersion(1, 3));
+        context->requireGLSLVersion(ProfileVersion::GLSL_460);
+        context->requireGLSLExtension(toSlice("GL_ARB_shader_draw_parameters"));
+    }
+    else if (semanticName == "sv_vulkanvertexid")
     {
         // uint in hlsl, int in glsl (https://www.khronos.org/opengl/wiki/Built-in_Variable_(GLSL))
         requiredType = builder->getBasicType(BaseType::Int);
@@ -1251,6 +1268,12 @@ void invokePathConstantFuncInHullShader(
     fixUpFuncType(constantFunc);
 }
 
+static bool targetBuiltinRequiresLegalization(IRTargetBuiltinVarName builtinVarName)
+{
+    return (builtinVarName == IRTargetBuiltinVarName::HlslInstanceID) ||
+           (builtinVarName == IRTargetBuiltinVarName::HlslVertexID);
+}
+
 ScalarizedVal createSimpleGLSLGlobalVarying(
     GLSLLegalizationContext* context,
     CodeGenContext* codeGenContext,
@@ -1284,7 +1307,7 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         // Validate the system value, convert to a regular parameter if this is not a valid system
         // value for a given target.
         if (systemSemantic && systemValueInfo && isSPIRV(codeGenContext->getTargetFormat()) &&
-            systemValueInfo->targetVarName == IRTargetBuiltinVarName::HlslInstanceID &&
+            targetBuiltinRequiresLegalization(systemValueInfo->targetVarName) &&
             ((stage == Stage::Fragment) ||
              (stage == Stage::Vertex &&
               inVarLayout->usesResourceKind(LayoutResourceKind::VaryingOutput))))
@@ -3918,12 +3941,13 @@ ScalarizedVal legalizeEntryPointReturnValueForGLSL(
     return result;
 }
 
+
 void legalizeTargetBuiltinVar(GLSLLegalizationContext& context)
 {
     List<KeyValuePair<IRTargetBuiltinVarName, IRInst*>> workItems;
     for (auto [builtinVarName, varInst] : context.builtinVarMap)
     {
-        if (builtinVarName == IRTargetBuiltinVarName::HlslInstanceID)
+        if (targetBuiltinRequiresLegalization(builtinVarName))
         {
             workItems.add(KeyValuePair(builtinVarName, varInst));
         }
@@ -3966,6 +3990,32 @@ void legalizeTargetBuiltinVar(GLSLLegalizationContext& context)
                             tryGetPointedToType(&builder, varInst->getDataType()),
                             builder.emitLoad(instanceIndex),
                             builder.emitLoad(baseInstance));
+                        user->replaceUsesWith(sub);
+                    }
+                });
+        }
+        // Repalce SV_VertexID with gl_VertexIndex - gl_BaseVertex.
+        else if (builtinVarName == IRTargetBuiltinVarName::HlslVertexID)
+        {
+            auto vertexIndex = getOrCreateBuiltinVar(
+                IRTargetBuiltinVarName::SpvVertexIndex,
+                varInst->getDataType());
+            auto baseVertex = getOrCreateBuiltinVar(
+                IRTargetBuiltinVarName::SpvBaseVertex,
+                varInst->getDataType());
+            traverseUses(
+                varInst,
+                [&](IRUse* use)
+                {
+                    auto user = use->getUser();
+                    if (user->getOp() == kIROp_Load)
+                    {
+                        IRBuilder builder(use->getUser());
+                        builder.setInsertBefore(use->getUser());
+                        auto sub = builder.emitSub(
+                            tryGetPointedToType(&builder, varInst->getDataType()),
+                            builder.emitLoad(vertexIndex),
+                            builder.emitLoad(baseVertex));
                         user->replaceUsesWith(sub);
                     }
                 });

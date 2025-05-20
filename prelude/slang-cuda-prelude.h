@@ -3479,6 +3479,38 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint4 tex2Dfetch_int(CUtexObject texObj, int 
     return make_uint4(result_x, result_y, result_z, result_w);
 }
 
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int tex2Dfetch_int(CUtexObject texObj, int x, int y)
+{
+    int result;
+    int stub;
+    asm("tex.2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
+        : "=r"(result), "=r"(stub), "=r"(stub), "=r"(stub)
+        : "l"(texObj), "r"(x), "r"(y));
+    return result;
+}
+
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int2 tex2Dfetch_int(CUtexObject texObj, int x, int y)
+{
+    int result_x, result_y;
+    int stub;
+    asm("tex.2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
+        : "=r"(result_x), "=r"(result_y), "=r"(stub), "=r"(stub)
+        : "l"(texObj), "r"(x), "r"(y));
+    return make_int2(result_x, result_y);
+}
+
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int4 tex2Dfetch_int(CUtexObject texObj, int x, int y)
+{
+    int result_x, result_y, result_z, result_w;
+    asm("tex.2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6}];"
+        : "=r"(result_x), "=r"(result_y), "=r"(result_z), "=r"(result_w)
+        : "l"(texObj), "r"(x), "r"(y));
+    return make_int4(result_x, result_y, result_z, result_w);
+}
+
 template<typename T>
 SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex3Dfetch_int(CUtexObject texObj, int x, int y, int z)
 {
@@ -3546,6 +3578,38 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint4 tex3Dfetch_int(CUtexObject texObj, int 
         : "=r"(result_x), "=r"(result_y), "=r"(result_z), "=r"(result_w)
         : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
     return make_uint4(result_x, result_y, result_z, result_w);
+}
+
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int tex3Dfetch_int(CUtexObject texObj, int x, int y, int z)
+{
+    int result;
+    int stub;
+    asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
+        : "=r"(result), "=r"(stub), "=r"(stub), "=r"(stub)
+        : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
+    return result;
+}
+
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int2 tex3Dfetch_int(CUtexObject texObj, int x, int y, int z)
+{
+    int result_x, result_y;
+    int stub;
+    asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
+        : "=r"(result_x), "=r"(result_y), "=r"(stub), "=r"(stub)
+        : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
+    return make_int2(result_x, result_y);
+}
+
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int4 tex3Dfetch_int(CUtexObject texObj, int x, int y, int z)
+{
+    int result_x, result_y, result_z, result_w;
+    asm("tex.3d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
+        : "=r"(result_x), "=r"(result_y), "=r"(result_z), "=r"(result_w)
+        : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z));
+    return make_int4(result_x, result_y, result_z, result_w);
 }
 
 template<typename T>
@@ -3627,4 +3691,42 @@ tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
         : "=r"(result_x), "=r"(result_y), "=r"(result_z), "=r"(result_w)
         : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
     return make_uint4(result_x, result_y, result_z, result_w);
+}
+
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int tex2DArrayfetch_int(
+    CUtexObject texObj,
+    int x,
+    int y,
+    int layer)
+{
+    int result;
+    int stub;
+    asm("tex.a2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
+        : "=r"(result), "=r"(stub), "=r"(stub), "=r"(stub)
+        : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
+    return result;
+}
+
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int2
+tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
+{
+    int result_x, result_y;
+    int stub;
+    asm("tex.a2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
+        : "=r"(result_x), "=r"(result_y), "=r"(stub), "=r"(stub)
+        : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
+    return make_int2(result_x, result_y);
+}
+
+template<>
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int4
+tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer)
+{
+    int result_x, result_y, result_z, result_w;
+    asm("tex.a2d.v4.f32.s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}];"
+        : "=r"(result_x), "=r"(result_y), "=r"(result_z), "=r"(result_w)
+        : "l"(texObj), "r"(x), "r"(y), "r"(layer), "r"(layer));
+    return make_int4(result_x, result_y, result_z, result_w);
 }
