@@ -81,7 +81,7 @@ jobs:
             full-gpu-tests: true
             runs-on: [Windows, self-hosted, "GCP-T4"]
             has-gpu: true
-            server-count: 8
+            server-count: 2
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
