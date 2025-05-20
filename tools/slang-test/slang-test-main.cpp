@@ -5103,7 +5103,7 @@ SlangResult innerMain(int argc, char** argv)
         // excution or driver instability. We can try running them again. Debug build has more
         // instability at this moment, so we allow more retries.
 #if _DEBUG
-        static constexpr int kFailedTestLimitForRetry = 32;
+        static constexpr int kFailedTestLimitForRetry = 100;
 #else
         static constexpr int kFailedTestLimitForRetry = 16;
 #endif
