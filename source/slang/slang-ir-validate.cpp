@@ -31,13 +31,16 @@ void validate(IRValidateContext* context, bool condition, IRInst* inst, char con
 {
     if (!condition)
     {
+        std::string debugMessage { "IR validation failed; " };
+        debugMessage = std::string(getIROpInfo(inst->m_op).name) + ": " + message + "\n";
+   
         if (context)
         {
-            context->getSink()->diagnose(inst, Diagnostics::irValidationFailed, message);
+            context->getSink()->diagnose(inst, Diagnostics::irValidationFailed, debugMessage.c_str());
         }
         else
         {
-            SLANG_ASSERT_FAILURE("IR validation failed");
+            SLANG_ASSERT_FAILURE(debugMessage.c_str());
         }
     }
 }
