@@ -4598,7 +4598,7 @@ void runTestsInDirectory(TestContext* context)
     {
         if (shouldRunTest(context, file))
         {
-            //            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
+            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
             if (SLANG_FAILED(_runTestsOnFile(context, file)))
             {
                 {
