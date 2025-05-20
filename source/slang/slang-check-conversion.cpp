@@ -536,6 +536,20 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         }
         else
         {
+            auto isLinkTimeVal =
+                as<TypeCastIntVal>(toElementCount) || as<DeclRefIntVal>(toElementCount) ||
+                as<PolynomialIntVal>(toElementCount) || as<FuncCallIntVal>(toElementType);
+            if (isLinkTimeVal)
+            {
+                auto toMakeVectorFromElementExpr =
+                    m_astBuilder->create<MakeVectorFromElementExpr>();
+                toMakeVectorFromElementExpr->loc = fromInitializerListExpr->loc;
+                toMakeVectorFromElementExpr->type = QualType(toType);
+
+                *outToExpr = toMakeVectorFromElementExpr;
+                return true;
+            }
+
             // We don't know the element count statically,
             // so what are we supposed to be doing?
             //
@@ -712,12 +726,27 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         auto toRowType =
             createVectorType(toMatrixType->getElementType(), toMatrixType->getColumnCount());
 
-        if (auto constRowCount = as<ConstantIntVal>(toMatrixType->getRowCount()))
+        auto rowCountIntVal = toMatrixType->getRowCount();
+        if (auto constRowCount = as<ConstantIntVal>(rowCountIntVal))
         {
             rowCount = (UInt)constRowCount->getValue();
         }
         else
         {
+            auto isLinkTimeVal =
+                as<TypeCastIntVal>(rowCountIntVal) || as<DeclRefIntVal>(rowCountIntVal) ||
+                as<PolynomialIntVal>(rowCountIntVal) || as<FuncCallIntVal>(rowCountIntVal);
+            if (isLinkTimeVal)
+            {
+                auto toMakeMatrixFromElementExpr =
+                    m_astBuilder->create<MakeMatrixFromElementExpr>();
+                toMakeMatrixFromElementExpr->loc = fromInitializerListExpr->loc;
+                toMakeMatrixFromElementExpr->type = QualType(toType);
+
+                *outToExpr = toMakeMatrixFromElementExpr;
+                return true;
+            }
+
             // We don't know the element count statically,
             // so what are we supposed to be doing?
             //
