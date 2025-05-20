@@ -669,6 +669,9 @@ Extensions
 `GL_EXT_shader_atomic_int64`
 > Represents the GL_EXT_shader_atomic_int64 extension.
 
+`GL_EXT_shader_explicit_arithmetic_types`
+> Represents the GL_EXT_shader_explicit_arithmetic_types extension.
+
 `GL_EXT_shader_explicit_arithmetic_types_int64`
 > Represents the GL_EXT_shader_explicit_arithmetic_types_int64 extension.
 
@@ -1218,9 +1221,6 @@ Compound Capabilities
 
 `subgroup_partitioned`
 > Capabilities required to use GLSL-style subgroup operations 'subgroup_partitioned'
-
-`wave_multi_prefix`
-> Capabilities needed to use HLSL wave multi prefix operations
 
 `subgroup_rotate`
 > Capabilities required to use GLSL-style subgroup rotate operations 'subgroup_rotate'
