@@ -1210,6 +1210,23 @@ void SemanticsVisitor::maybeUnifyUnconstraintIntParam(
     constraints.constraints.add(c);
 }
 
+// Static helper function to recursively flatten a ConcreteTypePack
+static void flattenConcreteTypePack(Type* pack, ShortList<Type*>& result)
+{
+    if (auto concretePack = as<ConcreteTypePack>(pack))
+    {
+        for (Index i = 0; i < concretePack->getTypeCount(); ++i)
+        {
+            auto element = concretePack->getElementType(i);
+            flattenConcreteTypePack(element, result);
+        }
+    }
+    else
+    {
+        result.add(pack);
+    }
+}
+
 bool SemanticsVisitor::TryUnifyTypes(
     ConstraintSystem& constraints,
     ValUnificationContext unifyCtx,
@@ -1244,58 +1261,80 @@ bool SemanticsVisitor::TryUnifyTypes(
         return TryUnifyConjunctionType(constraints, unifyCtx, fst, snd);
     }
 
+    // Use our static helper function to flatten both type packs
+    ShortList<Type*> flattenedFirst;
+    ShortList<Type*> flattenedSecond;
+
+    flattenConcreteTypePack(fst, flattenedFirst);
+    flattenConcreteTypePack(snd, flattenedSecond);
+
     // If one of the types is a type pack, we need to recursively unify the element types.
-    if (auto fstTypePack = as<ConcreteTypePack>(fst))
+    bool isFstConcrete = as<ConcreteTypePack>(fst);
+    bool isSndConcrete = as<ConcreteTypePack>(snd);
+    auto fstExpandType = as<ExpandType>(flattenedFirst.getLast());
+    auto sndExpandType = as<ExpandType>(flattenedSecond.getLast());
+
+    if ((isFstConcrete && isSndConcrete) || (isFstConcrete && sndExpandType) ||
+        (fstExpandType && isSndConcrete))
     {
-        if (auto sndTypePack = as<ConcreteTypePack>(snd))
+        if (fstExpandType && sndExpandType)
+            return false;
+
+        if (!fstExpandType && !sndExpandType &&
+            flattenedFirst.getCount() != flattenedSecond.getCount())
+            return false;
+
+        Index i = 0;
+        Index iterCount = std::min(flattenedFirst.getCount(), flattenedSecond.getCount());
+        for (i = 0; i < iterCount - 1; ++i)
         {
-            if (fstTypePack->getTypeCount() != sndTypePack->getTypeCount())
+            if (!TryUnifyTypes(
+                    constraints,
+                    unifyCtx,
+                    QualType(flattenedFirst[i], fst.isLeftValue),
+                    QualType(flattenedSecond[i], snd.isLeftValue)))
                 return false;
-            for (Index i = 0; i < fstTypePack->getTypeCount(); ++i)
+        }
+
+        Index indexInTypePack = 0;
+        if (fstExpandType)
+        {
+            for (; i < flattenedSecond.getCount(); ++i)
             {
+                ValUnificationContext subUnifyCtx = unifyCtx;
+                subUnifyCtx.indexInTypePack = indexInTypePack;
+                ++indexInTypePack;
                 if (!TryUnifyTypes(
                         constraints,
-                        unifyCtx,
-                        QualType(fstTypePack->getElementType(i), fst.isLeftValue),
-                        QualType(sndTypePack->getElementType(i), snd.isLeftValue)))
+                        subUnifyCtx,
+                        QualType(fstExpandType->getPatternType(), fst.isLeftValue),
+                        QualType(flattenedSecond[i], snd.isLeftValue)))
                     return false;
             }
             return true;
         }
-        else if (auto sndExpandType = as<ExpandType>(snd))
+        else if (sndExpandType)
         {
-            for (Index i = 0; i < fstTypePack->getTypeCount(); ++i)
+            for (; i < flattenedFirst.getCount(); ++i)
             {
                 ValUnificationContext subUnifyCtx = unifyCtx;
-                subUnifyCtx.indexInTypePack = i;
+                subUnifyCtx.indexInTypePack = indexInTypePack;
+                ++indexInTypePack;
                 if (!TryUnifyTypes(
                         constraints,
                         subUnifyCtx,
-                        QualType(fstTypePack->getElementType(i), fst.isLeftValue),
+                        QualType(flattenedFirst[i], fst.isLeftValue),
                         QualType(sndExpandType->getPatternType(), snd.isLeftValue)))
                     return false;
             }
             return true;
         }
-    }
 
-    if (auto sndTypePack = as<ConcreteTypePack>(snd))
-    {
-        if (auto fstExpandType = as<ExpandType>(fst))
-        {
-            for (Index i = 0; i < sndTypePack->getTypeCount(); ++i)
-            {
-                ValUnificationContext subUnifyCtx = unifyCtx;
-                subUnifyCtx.indexInTypePack = i;
-                if (!TryUnifyTypes(
-                        constraints,
-                        subUnifyCtx,
-                        QualType(fstExpandType->getPatternType(), fst.isLeftValue),
-                        QualType(sndTypePack->getElementType(i), snd.isLeftValue)))
-                    return false;
-            }
-            return true;
-        }
+        return TryUnifyTypes(
+            constraints,
+            unifyCtx,
+            QualType(flattenedFirst[i], fst.isLeftValue),
+            QualType(flattenedSecond[i], snd.isLeftValue));
     }
 
     // A generic parameter type can unify with anything.

@@ -578,7 +578,19 @@ Val* FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
     List<Type*> substParamTypes;
     for (Index pp = 0; pp < getParamCount(); pp++)
     {
-        substParamTypes.add(as<Type>(getParamType(pp)->substituteImpl(astBuilder, subst, &diff)));
+        auto substParamType = as<Type>(getParamType(pp)->substituteImpl(astBuilder, subst, &diff));
+        if (auto typePack = as<ConcreteTypePack>(substParamType))
+        {
+            // Unwrap the ConcreteTypePack and add each element as a parameter
+            for (Index i = 0; i < typePack->getTypeCount(); ++i)
+            {
+                substParamTypes.add(typePack->getElementType(i));
+            }
+        }
+        else
+        {
+            substParamTypes.add(substParamType);
+        }
     }
 
     // early exit for no change...

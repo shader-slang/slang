@@ -4279,6 +4279,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_CoopMatMapElementIFunc:
             result = emitCoopMatMapElementWithIFunc(parent, as<IRCoopMatMapElementIFunc>(inst));
             break;
+        case kIROp_TupleCoopMatMapElementFunc:
+            result = emitTupleCoopMatMapElementWithFunc(
+                parent,
+                as<IRTupleCoopMatMapElementFunc>(inst));
+            break;
         case kIROp_TupleCoopMatMapElementIFunc:
             result = emitTupleCoopMatMapElementWithIFunc(
                 parent,
@@ -7733,6 +7738,38 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             });
     }
 
+    SpvInst* emitTupleCoopMatMapElementWithFunc(
+        SpvInstParent* parent,
+        IRTupleCoopMatMapElementFunc* mapElementFunc)
+    {
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_cooperative_matrix2"));
+        requireSPIRVCapability(SpvCapabilityCooperativeMatrixPerElementOperationsNV);
+
+        auto funcSynth = mapElementFunc->getFuncCall();
+
+        auto tuple = mapElementFunc->getTuple();
+        UInt tupleCount = tuple->getOperandCount();
+        SLANG_ASSERT(tupleCount > 0);
+
+        IRInst* mat0 = tuple->getOperand(0);
+
+        return emitInstCustomOperandFunc(
+            parent,
+            mapElementFunc,
+            SpvOpCooperativeMatrixPerElementOpNV,
+            [&]()
+            {
+                emitOperand(mat0->getDataType());
+                emitOperand(kResultID);
+                emitOperand(mat0);
+
+                emitOperand(funcSynth);
+
+                for (UInt i = 1; i < tupleCount; i++)
+                    emitOperand(tuple->getOperand(i));
+            });
+    }
+
     SpvInst* emitTupleCoopMatMapElementWithIFunc(
         SpvInstParent* parent,
         IRTupleCoopMatMapElementIFunc* mapElementIFunc)
@@ -7740,11 +7777,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_cooperative_matrix2"));
         requireSPIRVCapability(SpvCapabilityCooperativeMatrixPerElementOperationsNV);
 
-        auto tuple = mapElementIFunc->getTuple();
-
         IRInst* ifuncThis = mapElementIFunc->getIFuncThis();
         auto funcSynth = mapElementIFunc->getIFuncCall();
 
+        auto tuple = mapElementIFunc->getTuple();
         UInt tupleCount = tuple->getOperandCount();
         SLANG_ASSERT(tupleCount > 0);
 
