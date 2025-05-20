@@ -877,9 +877,9 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
     case kIROp_GetOptiXRayPayloadPtr:
         {
-            m_writer->emit("(");
+            m_writer->emit("((");
             emitType(inst->getDataType());
-            m_writer->emit(")getOptiXRayPayloadPtr()");
+            m_writer->emit(")getOptiXRayPayloadPtr())");
             return true;
         }
     case kIROp_GetOptiXHitAttribute:
