@@ -742,6 +742,11 @@ Enable GLSL as an input language.
 Enable experimental compiler passes 
 
 
+<a id="enable-experimental-dynamic-dispatch"></a>
+### -enable-experimental-dynamic-dispatch
+Enable experimental dynamic dispatch features 
+
+
 <a id="embed-downstream-ir"></a>
 ### -embed-downstream-ir
 Embed downstream IR into emitted slang IR 
