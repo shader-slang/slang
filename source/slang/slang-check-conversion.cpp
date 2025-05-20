@@ -97,7 +97,17 @@ bool SemanticsVisitor::shouldUseInitializerDirectly(Type* toType, Expr* fromExpr
     // we want to check for is whether a direct initialization
     // is possible (a type conversion exists).
     //
-    return canCoerce(toType, fromExpr->type, fromExpr);
+    ConversionCost cost;
+    if (canCoerce(toType, fromExpr->type, fromExpr, &cost))
+    {
+        if (cost >= kConversionCost_Explicit)
+        {
+            return false;
+        }
+        return true;
+    }
+
+    return true;
 }
 
 bool SemanticsVisitor::_readValueFromInitializerList(
@@ -1544,7 +1554,6 @@ bool SemanticsVisitor::_coerce(
             *outCost = subCost + kConversionCost_ImplicitDereference;
         return true;
     }
-
 
     // The main general-purpose approach for conversion is
     // using suitable marked initializer ("constructor")
