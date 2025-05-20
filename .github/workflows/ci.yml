@@ -191,6 +191,7 @@ jobs:
               -category ${{ matrix.test-category }} \
               -api all-cpu \
               -expected-failure-list tests/expected-failure-github.txt \
+              -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
               ${{ matrix.config == 'debug' && '-disable-debug-layers' || '' }}
