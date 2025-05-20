@@ -24295,38 +24295,30 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
 }
 
 extension<
+    T : __BuiltinArithmeticType,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : linalg.CoopMatMatrixUse,
     each Ts : __BuiltinArithmeticType
-> Tuple<expand linalg.CoopMat<each Ts, S, M, N, R>>
+> Tuple<linalg.CoopMat<T, S, M, N, R>, expand linalg.CoopMat<each Ts, S, M, N, R>>
 {
-#if 0
-    // The type of `mapOp` gets ConcreteTypePack due to `expand each`
-    // and it cannot match to the regular flat function type.
-    // TODO: We need to fix it.
     __intrinsic_op($(kIROp_TupleCoopMatMapElementFunc))
-    CoopMat<TR, S, M, N, R> MapElement<
-        TR : __BuiltinArithmeticType,
-    >(functype(uint32_t, uint32_t, expand each Ts)->TR mapOp);
-#endif
+    CoopMat<T, S, M, N, R> MapElement(functype(uint32_t, uint32_t, T, expand each Ts)->T mapOp);
 
     __intrinsic_op($(kIROp_TupleCoopMatMapElementIFunc))
-    static CoopMat<TR, S, M, N, R> __MapElement<
-        TR : __BuiltinArithmeticType,
+    static CoopMat<T, S, M, N, R> __MapElement<
         TOperator,
-        TFunc : IFunc<TR, uint32_t, uint32_t, expand each Ts>
+        TFunc : IFunc<T, uint32_t, uint32_t, T, expand each Ts>
     >(This tuple, TOperator mapOp, Ptr<TFunc> pMapOp);
 
     [ForceInline]
-    CoopMat<TR, S, M, N, R> MapElement<
-        TR : __BuiltinArithmeticType,
-        TFunc : IFunc<TR, uint32_t, uint32_t, expand each Ts>
+    CoopMat<T, S, M, N, R> MapElement<
+        TFunc : IFunc<T, uint32_t, uint32_t, T, expand each Ts>
     >(TFunc mapOp)
     {
         Ptr<TFunc> pMapOp = &mapOp;
-        return __MapElement<TR>(this, mapOp.operator(), pMapOp);
+        return __MapElement(this, mapOp.operator(), pMapOp);
     }
 };
 

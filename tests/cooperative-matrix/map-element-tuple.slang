@@ -1,8 +1,9 @@
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DTEST_MODE=0 -render-feature cooperative-matrix-per-element-operations
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DTEST_MODE=1 -render-feature cooperative-matrix-per-element-operations
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DTEST_MODE=2 -render-feature cooperative-matrix-per-element-operations
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DTEST_MODE=3 -render-feature cooperative-matrix-per-element-operations
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DTEST_MODE=4 -render-feature cooperative-matrix-per-element-operations
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DTEST_MODE=0
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DTEST_MODE=1
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DTEST_MODE=2
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DTEST_MODE=3
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -DTEST_MODE=4
+//-render-feature cooperative-matrix-per-element-operations
 
 //CHECK:type: int32_t
 //CHECK-NEXT:9
@@ -47,21 +48,21 @@ void computeMain()
     CoopMatType result;
 
 #if TEST_MODE == 0
-    result = makeTuple(mat1, mat2, mat3).MapElement<int>(MapOp);
+    result = makeTuple(mat1, mat2, mat3).MapElement(MapOp);
 
 #elif TEST_MODE == 1
     let f = ((uint32_t x, uint32_t y, int a, int b, int c) => a + b + c + 1 + 2 + 3);
-    result = makeTuple(mat1, mat2, mat3).MapElement<int>(f);
+    result = makeTuple(mat1, mat2, mat3).MapElement(f);
 
 #elif TEST_MODE == 2
-    result = makeTuple(mat1, mat2, mat3).MapElement<int>((uint32_t x, uint32_t y, int a, int b, int c) => a + b + c + 1 + 2 + 3);
+    result = makeTuple(mat1, mat2, mat3).MapElement((uint32_t x, uint32_t y, int a, int b, int c) => a + b + c + 1 + 2 + 3);
 
 #elif TEST_MODE == 3
     let f = ((uint32_t x, uint32_t y, int a, int b, int c) => a + b + c + c0 + c1 + c2);
-    result = makeTuple(mat1, mat2, mat3).MapElement<int>(f);
+    result = makeTuple(mat1, mat2, mat3).MapElement(f);
 
 #elif TEST_MODE == 4
-    result = makeTuple(mat1, mat2, mat3).MapElement<int>((uint32_t x, uint32_t y, int a, int b, int c) => a + b + c + c0 + c1 + c2);
+    result = makeTuple(mat1, mat2, mat3).MapElement((uint32_t x, uint32_t y, int a, int b, int c) => a + b + c + c0 + c1 + c2);
 #endif
 
     result.Store<CoopMatMatrixLayout.RowMajor>(outputBuffer, 0, stride);
