@@ -1397,7 +1397,7 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
 }
 
 bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* decl)
-{    
+{
     switch (modifierType)
     {
         // In addition to the above cases, these are also present on empty
@@ -1673,7 +1673,7 @@ Modifier* SemanticsVisitor::checkModifier(
     {
         auto moduleDecl = getModuleDecl(decl);
         bool isGLSLInput = getOptionSet().getBoolOption(CompilerOptionName::AllowGLSL);
-        
+
         if (!isGLSLInput && moduleDecl && moduleDecl->findModifier<GLSLModuleModifier>())
             isGLSLInput = true;
         if (!isModifierAllowedOnDecl(isGLSLInput, m->astNodeType, decl))
