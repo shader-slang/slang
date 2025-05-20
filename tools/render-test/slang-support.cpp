@@ -195,6 +195,22 @@ static SlangResult _compileProgramImpl(
     else
         sessionTargetDesc.flags = 0;
 
+    {
+        slang::CompilerOptionEntry entry;
+        entry.value.kind = slang::CompilerOptionValueKind::Int;
+        if (options.generateSPIRVDirectly)
+        {
+            entry.name = slang::CompilerOptionName::EmitSpirvDirectly;
+            entry.value.intValue0 = int(options.generateSPIRVDirectly);
+        }
+        else
+        {
+            entry.name = slang::CompilerOptionName::EmitSpirvViaGLSL;
+            entry.value.intValue0 = int(!options.generateSPIRVDirectly);
+        }
+        sessionOptionEntries.add(entry);
+    }
+
     // Not expecting argument parsing to have added any targets
     SLANG_ASSERT(sessionDesc.targetCount == 0);
     sessionDesc.targetCount = 1;

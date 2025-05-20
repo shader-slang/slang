@@ -50,6 +50,8 @@ The system-value semantics are translated to the following WGSL code.
 | SV_VertexID | `@builtin(vertex_index)` |
 | SV_ViewID | *Not supported* |
 | SV_ViewportArrayIndex | *Not supported* |
+| SV_VulkanInstanceID | `@builtin(instance_index)` |
+| SV_VulkanVertexID | `@builtin(vertex_index)` |
 
 
 Supported HLSL features when targeting WGSL

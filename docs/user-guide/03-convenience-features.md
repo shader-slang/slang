@@ -604,6 +604,24 @@ When targeting SPIRV, Slang will introduce a global array of descriptors and fet
 The descriptor set ID of the global descriptor array can be configured with the `-bindless-space-index`
 (or `CompilerOptionName::BindlessSpaceIndex` when using the API) option.
 
+Default behavior assigns the following binding-indicies to each descriptor type:
+```slang
+enum DefaultVkBindlessBindings : uint
+{
+    Sampler = 0, /// SAMPLER
+    CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
+    Texture_Read = 2, /// SAMPLED_IMAGE
+    Texture_ReadWrite = 3, /// STORAGE_IMAGE
+    TexelBuffer_Read = 4, /// UNIFORM_TEXEL_BUFFER
+    TexelBuffer_ReadWrite = 5, /// STORAGE_TEXEL_BUFFER
+    Buffer_Read = 6, /// UNIFORM_BUFFER
+    Buffer_ReadWrite = 7, /// STORAGE_BUFFER
+    Unknown = 8, /// Other
+}
+``` 
+
+`ACCELERATION_STRUCTURE` is excluded from the list of types since slang by default uses the provided handle to a `RaytracingAccelerationStructure` as a GPU address into the respective `RaytracingAccelerationStructure`, casting the 64bit handle into the type.
+
 > #### Note
 > The default implementation for SPIRV may change in the future if SPIRV is extended to provide what is
 > equivalent to D3D's `ResourceDescriptorHeap` construct.
@@ -653,8 +671,32 @@ interface IOpaqueDescriptor
 The user can call `defaultGetDescriptorFromHandle` function from their implementation of
 `getDescriptorFromHandle` to dispatch to the default behavior.
 
-The `kind` and `descriptorAccess` constants allows user code to fetch from different locations
-depending on the type and access of the resource being requested. The `DescriptorKind` and
+Additionally, `defaultGetDescriptorFromHandle` has the parameter `constexpr BindlessDescriptorOptions bindlessOptions`. This parameter provides some alternative presets for how bindless indexes are assigned (currently only relevant to SPIRV):
+ ```slang
+public enum BindlessDescriptorOptions
+{
+    None = 0, /// Bind assuming regular binding model rules.
+    VkMutable = 1, /// Bind assuming `VK_EXT_mutable_descriptor_type` without mutable `AccelerationStructure` binding support.
+}
+ ```
+
+`VkMutable` provides the following bindings for descriptor types:
+```slang
+enum VkMutableBindlessBindings : uint
+{
+    Sampler = 0, /// SAMPLER
+    CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
+    Texture_Read = 2, /// SAMPLED_IMAGE
+    Texture_ReadWrite = 2, /// STORAGE_IMAGE
+    TexelBuffer_Read = 2, /// UNIFORM_TEXEL_BUFFER
+    TexelBuffer_ReadWrite = 2, /// STORAGE_TEXEL_BUFFER
+    Buffer_Read = 2, /// UNIFORM_BUFFER
+    Buffer_ReadWrite = 2, /// STORAGE_BUFFER,
+    Unknown = 3, /// Other
+}
+```
+
+The `kind` and `descriptorAccess` constants allows user code to fetch resources from different locations depending on the type and access of the resource being requested. The `DescriptorKind` and
 `DescriptorAccess` enums are defined as:
 
 ```slang
@@ -666,6 +708,7 @@ enum DescriptorKind
     Buffer, /// A buffer descriptor.
     Sampler, /// A sampler state descriptor.
     AccelerationStructure, /// A ray tracing acceleration structure descriptor.
+    TexelBuffer /// A texel buffer descriptor.
 }
 
 enum DescriptorAccess
@@ -691,6 +734,8 @@ void test(DescriptorHandle<Texture2D> t)
 
 If the resource pointer value is not uniform and `nonuniform` is not called, the result may be
 undefined.
+
+
 
 Extensions
 --------------------

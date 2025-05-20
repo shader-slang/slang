@@ -21,7 +21,7 @@ Slang::Result WindowedAppBase::initializeBase(
     // Initialize the rendering layer.
 #ifdef _DEBUG
     // Enable debug layer in debug config.
-    gfxEnableDebugLayer();
+    gfxEnableDebugLayer(true);
 #endif
     IDevice::Desc deviceDesc = {};
     deviceDesc.deviceType = deviceType;
