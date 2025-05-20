@@ -31,6 +31,7 @@
 
 #ifdef SLANG_CUDA_ENABLE_OPTIX
 #include <optix.h>
+#include <optix_device.h>
 #endif
 
 // Define slang offsetof implementation
@@ -3221,6 +3222,42 @@ __forceinline__ __device__ void* traceOptiXRay(
         r1);
 }
 
+__forceinline__ __device__ float4 optixGetSpherePositionAndRadius()
+{
+    float4 data[1];
+    optixGetSphereData(data);
+    return data;
+}
+
+typedef struct {
+    float4 row0;
+    float4 row1;
+} float2x4;
+
+__forceinline__ __device__ make_float2x4(float4 r0, float4 r1) 
+{
+    float2x4 mat;
+    mat.row0 = r0;
+    mat.row1 = r1;
+    return mat;
+}
+
+__forceinline__ __device__ float2x4 optixGetSpherePositionAndRadius()
+{
+    float4 data[2];
+    optixGetLinearCurveVertexData(data);
+    return make_float2x4(data[0], data[1]);
+}
+
+__forceinline__ __device__ bool optixIsSphereHit()
+{
+    return optixGetPrimitiveType() == OPTIX_PRIMITIVE_TYPE_SPHERE;
+}
+
+__forceinline__ __device__ bool optixIsLSSHit()
+{
+    return optixGetPrimitiveType() == OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR;
+}
 #endif
 
 static const int kSlangTorchTensorMaxDim = 5;

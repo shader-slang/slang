@@ -547,6 +547,10 @@ def SPV_NV_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
 /// [EXT]
 def SPV_NV_cluster_acceleration_structure : _spirv_1_0;
 
+/// Represents the SPIR-V extension for linear swept spheres.
+/// [EXT]
+def SPV_NV_linear_swept_spheres : _spirv_1_0;
+
 /// Represents the SPIR-V extension for shader image footprint.
 /// [EXT]
 def SPV_NV_shader_image_footprint : _spirv_1_0;
@@ -713,6 +717,10 @@ def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder;
 /// Represents the SPIR-V capability for cluster acceleration structure.
 /// [EXT]
 def spvRayTracingClusterAccelerationStructureNV : SPV_NV_cluster_acceleration_structure;
+
+/// Represents the SPIR-V capability for cluster acceleration structure.
+/// [EXT]
+def spvRayTracingLinearSweptSpheresGeometryNV : SPV_NV_linear_swept_spheres;
 
 /// Represents the SPIR-V capability for shader clock.
 /// [EXT]
