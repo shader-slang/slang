@@ -7,6 +7,7 @@
 
 #include <optional>
 #include <spirv/unified1/spirv.h>
+#include <spirv/unified1/NonSemanticShaderDebugInfo100.h>
 
 namespace Slang
 {
