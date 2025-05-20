@@ -203,8 +203,11 @@ enum class IRTargetBuiltinVarName
 {
     Unknown,
     HlslInstanceID,
+    HlslVertexID,
     SpvInstanceIndex,
     SpvBaseInstance,
+    SpvVertexIndex,
+    SpvBaseVertex,
 };
 
 struct IRInterpolationModeDecoration : IRDecoration

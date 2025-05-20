@@ -1,6 +1,7 @@
 name: Release
 
 on:
+  workflow_dispatch:
   push:
     # Also run on pushes to the main branch so that we can keep the llvm and sccache
     # caches filled in a scope available to everyone
@@ -118,9 +119,9 @@ jobs:
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-          IDENTITY_ID: d6ada82a113e4204aaad914e1013e9548ffd30d0
+          IDENTITY_ID: "Developer ID Application: The Khronos Group, Inc. (TD2656HYNK)"
           AC_PASSWORD: ${{secrets.APPLE_ID_PASSWORD}}
-          AC_PROVIDER: ${{secrets.APPLE_ID_PPOVIDER}}
+          AC_PROVIDER: ${{secrets.APPLE_ID_PROVIDER}}
           AC_USERNAME: ${{secrets.APPLE_ID_USERNAME}}
         run: |
           brew install Bearer/tap/gon
@@ -160,7 +161,7 @@ jobs:
             fi
           done
 
-          timeout 1000 gon ./extras/macos-notarize.json
+          timeout 1000 gon --log-level=debug ./extras/macos-notarize.json
           cp slang-macos-dist.zip "slang-macos-dist-${{matrix.platform}}.zip"
           echo "SLANG_NOTARIZED_DIST=slang-macos-dist-${{matrix.platform}}.zip" >> "$GITHUB_OUTPUT"
 
