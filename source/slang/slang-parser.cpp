@@ -6360,19 +6360,7 @@ CatchStmt* Parser::ParseCatchStatement(Stmt* tryBody, ContainerDecl* parentDecl)
     ReadToken("catch");
     ReadToken(TokenType::LParent);
 
-    LetDecl* errorVar = astBuilder->create<LetDecl>();
-    FillPosition(errorVar);
-    if (_peekModernStyleVarDecl(this))
-    {
-        errorVar->nameAndLoc = NameLoc(ReadToken(TokenType::Identifier));
-        ReadToken(TokenType::Colon);
-        errorVar->type = ParseTypeExp();
-    }
-    else
-    {
-        errorVar->type = ParseTypeExp();
-        errorVar->nameAndLoc = NameLoc(ReadToken(TokenType::Identifier));
-    }
+    ParamDecl* errorVar = parseModernParamDecl(this);
     catchStatement->errorVar = errorVar;
     AddMember(scopeDecl, errorVar);
 
