@@ -24921,16 +24921,16 @@ for(auto buffer : kByteAddressBufferCases) {
         __target_switch
         {
         case hlsl:
-            if (T is __BuiltinSignedArithmeticType)
+            if (__isFloat<T>() || __isSignedInt<T>())
             {
-                if (U is __BuiltinSignedArithmeticType)
+                if (__isFloat<U>() || __isSignedInt<U>())
                     __intrinsic_asm "__builtin_MatVecMul($0, false,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
                 else
                     __intrinsic_asm "__builtin_MatVecMul($0, false,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
             }
             else
             {
-                if (U is __BuiltinSignedArithmeticType)
+                if (__isFloat<U>() || __isSignedInt<U>())
                     __intrinsic_asm "__builtin_MatVecMul($0, true,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
                 else
                     __intrinsic_asm "__builtin_MatVecMul($0, true,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
@@ -24953,16 +24953,16 @@ for(auto buffer : kByteAddressBufferCases) {
         __target_switch
         {
         case hlsl:
-            if (T is __BuiltinSignedArithmeticType)
+            if (__isFloat<T>() || __isSignedInt<T>())
             {
-                if (U is __BuiltinSignedArithmeticType)
+                if (__isFloat<U>() || __isSignedInt<U>())
                     __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
                 else
                     __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
             }
             else
             {
-                if (U is __BuiltinSignedArithmeticType)
+                if (__isFloat<U>() || __isSignedInt<U>())
                     __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
                 else
                     __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
