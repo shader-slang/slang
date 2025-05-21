@@ -11,8 +11,7 @@ RWStructuredBuffer<int> outputBuffer;
 
 enum MyError
 {
-    Success,
-    Fail
+    Fail = 1
 };
 
 T func<T: __BuiltinFloatingPointType>(T val) throws MyError

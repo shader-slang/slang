@@ -14,14 +14,13 @@ RWStructuredBuffer<int> outputBuffer;
 
 enum MyError1
 {
-    Success,
     Fail
 };
 
 enum MyError2
 {
-    Success,
-    Fail
+    Fail1,
+    Fail2 = 0x12
 };
 
 void throwingFunc() throws MyError1
@@ -37,7 +36,7 @@ int maybeBadFunc1(int n) throws MyError1
 
 int maybeBadFunc2(int n) throws MyError2
 {
-    if (n == 2) throw MyError2.Fail;
+    if (n == 2) throw MyError2.Fail2;
     return n;
 }
 
@@ -52,7 +51,7 @@ int multiCatchFunc(int n)
     }
     catch(err: MyError2)
     {
-        return 0x12;
+        return reinterpret<int>(err);
     }
 }
 

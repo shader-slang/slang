@@ -1,14 +1,12 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 enum MyError1
 {
-    Fail,
-    Success
+    Fail
 }
 
 enum MyError2
 {
-    Fail,
-    Success
+    Fail
 }
 
 int g() throws MyError1

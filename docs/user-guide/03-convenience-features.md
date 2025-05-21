@@ -761,7 +761,7 @@ Slang supports an error handling mechanism that is superficially similar to
 exceptions in many other languages, but has some unique characteristics.
 
 In contrast to C++ exceptions, this mechanism makes the control flow of errors
-explicit, and the performance charasteristics are similar to adding an
+more explicit, and the performance charasteristics are similar to adding an
 if-statement after every potentially throwing function call to check and handle
 the error.
 
@@ -770,9 +770,8 @@ error with `throws`:
 ```
 enum MyError
 {
-    Success = 0,
-    Failure = 1,
-    CatastrophicFailure = 2
+    Failure,
+    CatastrophicFailure
 }
 
 int f() throws MyError

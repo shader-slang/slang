@@ -7,7 +7,6 @@ RWStructuredBuffer<int> outputBuffer;
 
 enum MyError
 {
-    Success,
     Fail
 };
     
