@@ -107,7 +107,7 @@ bool SemanticsVisitor::shouldUseInitializerDirectly(Type* toType, Expr* fromExpr
         return true;
     }
 
-    return true;
+    return false;
 }
 
 bool SemanticsVisitor::_readValueFromInitializerList(
