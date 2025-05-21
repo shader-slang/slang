@@ -223,6 +223,11 @@ advanced_option(
     "Build using user defined path for tinyobjloader"
     OFF
 )
+advanced_option(
+    SLANG_OVERRIDE_LUA_PATH
+    "Build using user defined path for lua"
+    OFF
+)
 
 advanced_option(
     SLANG_EXCLUDE_DAWN

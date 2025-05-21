@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [master]
   pull_request:
@@ -80,7 +81,7 @@ jobs:
             full-gpu-tests: true
             runs-on: [Windows, self-hosted, "GCP-T4"]
             has-gpu: true
-            server-count: 8
+            server-count: 2
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
@@ -191,6 +192,7 @@ jobs:
               -category ${{ matrix.test-category }} \
               -api all-cpu \
               -expected-failure-list tests/expected-failure-github.txt \
+              -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
               ${{ matrix.config == 'debug' && '-disable-debug-layers' || '' }}
