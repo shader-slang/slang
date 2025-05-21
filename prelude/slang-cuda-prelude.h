@@ -3229,12 +3229,13 @@ __forceinline__ __device__ float4 optixGetSpherePositionAndRadius()
     return data;
 }
 
-typedef struct {
+typedef struct
+{
     float4 row0;
     float4 row1;
 } float2x4;
 
-__forceinline__ __device__ make_float2x4(float4 r0, float4 r1) 
+__forceinline__ __device__ make_float2x4(float4 r0, float4 r1)
 {
     float2x4 mat;
     mat.row0 = r0;
