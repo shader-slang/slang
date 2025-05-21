@@ -3229,6 +3229,14 @@ __forceinline__ __device__ float4 optixGetSpherePositionAndRadius()
     return data;
 }
 
+__forceinline__ __device__ float4 optixHitObjectGetSpherePositionAndRadius()
+{
+    float4 data[1];
+    optixHitObjectGetSphereData(data);
+    return data;
+}
+
+
 typedef struct
 {
     float4 row0;
@@ -3250,14 +3258,31 @@ __forceinline__ __device__ float2x4 optixGetSpherePositionAndRadius()
     return make_float2x4(data[0], data[1]);
 }
 
+__forceinline__ __device__ float2x4 optixHitObjectGetSpherePositionAndRadius()
+{
+    float4 data[2];
+    optixHitObjectGetLinearCurveVertexData(data);
+    return make_float2x4(data[0], data[1]);
+}
+
 __forceinline__ __device__ bool optixIsSphereHit()
 {
     return optixGetPrimitiveType() == OPTIX_PRIMITIVE_TYPE_SPHERE;
 }
 
+__forceinline__ __device__ bool optixHitObjectIsSphereHit()
+{
+    return optixGetPrimitiveType(optixHitObjectGetHitKind()) == OPTIX_PRIMITIVE_TYPE_SPHERE;
+}
+
 __forceinline__ __device__ bool optixIsLSSHit()
 {
     return optixGetPrimitiveType() == OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR;
+}
+
+__forceinline__ __device__ bool optixHitObjectIsLSSHit()
+{
+    return optixGetPrimitiveType(optixHitObjectGetHitKind()) == OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR;
 }
 #endif
 

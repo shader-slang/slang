@@ -432,6 +432,9 @@ Extensions
 `SPV_NV_cluster_acceleration_structure`
 > Represents the SPIR-V extension for cluster acceleration structure.
 
+`SPV_NV_linear_swept_spheres`
+> Represents the SPIR-V extension for linear swept spheres.
+
 `SPV_NV_shader_image_footprint`
 > Represents the SPIR-V extension for shader image footprint.
 
@@ -554,6 +557,9 @@ Extensions
 
 `spvRayTracingClusterAccelerationStructureNV`
 > Represents the SPIR-V capability for cluster acceleration structure.
+
+`spvRayTracingLinearSweptSpheresGeometryNV`
+> Represents the SPIR-V capability for linear swept spheres.
 
 `spvShaderClockKHR`
 > Represents the SPIR-V capability for shader clock.

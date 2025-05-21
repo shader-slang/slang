@@ -17945,6 +17945,9 @@ float4 GetSpherePositionAndRadius()
     case spirv:
         return spirv_asm
         {
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
             %pos:$$float3 = OpLoad builtin(HitSpherePositionNV:float3);
             %rad:$$float = OpLoad builtin(HitSphereRadiusNV:float);
             result:$$float4 = OpCompositeConstruct %pos %rad;
@@ -17968,12 +17971,15 @@ float2x4 GetLssPositionsAndRadii()
     case spirv:
         return spirv_asm
         {
-            %positions:$$float2x3 = OpLoad builtin(HitLSSPositionsNV:float2x3);
-            %radii:$$float2 = OpLoad builtin(HitSphereRadiusNV:float2);
-            %r0:$$float = OpCompositeExtract $$float %radii 0;
-            %r1:$$float = OpCompositeExtract $$float %radii 1;
-            %p0:$$float3 = OpCompositeExtract $$float3 %positions 0;
-            %p1:$$float3 = OpCompositeExtract $$float3 %positions 1;
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
+            %positions:$$float3[2] = OpLoad builtin(HitLSSPositionsNV:float3[2]);
+            %radii:$$float[2] = OpLoad builtin(HitLSSRadiiNV:float[2]);
+            %r0:$$float = OpCompositeExtract %radii 0;
+            %r1:$$float = OpCompositeExtract %radii 1;
+            %p0:$$float3 = OpCompositeExtract %positions 0;
+            %p1:$$float3 = OpCompositeExtract %positions 1;
             %a:$$float4 = OpCompositeConstruct %p0 %r0;
             %b:$$float4 = OpCompositeConstruct %p1 %r1;
             result:$$float2x4 = OpCompositeConstruct %a %b;
@@ -17998,6 +18004,9 @@ bool IsSphereHit()
     case spirv:
         return spirv_asm
         {
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
             result:$$bool = OpLoad builtin(HitIsSphereNV:bool);
         };
     }
@@ -18019,6 +18028,9 @@ bool IsLssHit()
     case spirv:
         return spirv_asm
         {
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
             result:$$bool = OpLoad builtin(HitIsLSSNV:bool);
         };
     }
@@ -20572,13 +20584,14 @@ struct HitObject
         case hlsl: __intrinsic_asm "NvRtSphereObjectPositionAndRadius";
         case cuda:
             {
-                __intrinsic_asm "optixGetSpherePositionAndRadius";
+                __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
             }
         case spirv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_linear_swept_spheres";
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                OpCapability RayTracingSpheresGeometryNV;
                 %position:$$float3 = OpHitObjectGetSpherePositionNV &this;
                 %radius:$$float = OpHitObjectGetSphereRadiusNV &this;
                 result:$$float4 = OpCompositeConstruct %position %radius;
@@ -20596,19 +20609,20 @@ struct HitObject
         case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
         case cuda:
             {
-                __intrinsic_asm "optixObjectPositionsAndRadii";
+                __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
             }
         case spirv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_linear_swept_spheres";
                 OpCapability RayTracingLinearSweptSpheresGeometryNV;
-                %positions:$$float2x3 = OpHitObjectGetLSSPositionsNV &this;
-                %radii:$$float2 = OpHitObjectGetLSSRadiiNV &this;
-                %r0:$$float = OpCompositeExtract $$float %radii 0;
-                %r1:$$float = OpCompositeExtract $$float %radii 1;
-                %p0:$$float3 = OpCompositeExtract $$float3 %positions 0;
-                %p1:$$float3 = OpCompositeExtract $$float3 %positions 1;
+                OpCapability RayTracingSpheresGeometryNV;
+                %positions:$$float3[2] = OpHitObjectGetLSSPositionsNV &this;
+                %radii:$$float[2] = OpHitObjectGetLSSRadiiNV &this;
+                %r0:$$float = OpCompositeExtract %radii 0;
+                %r1:$$float = OpCompositeExtract %radii 1;
+                %p0:$$float3 = OpCompositeExtract %positions 0;
+                %p1:$$float3 = OpCompositeExtract %positions 1;
                 %a:$$float4 = OpCompositeConstruct %p0 %r0;
                 %b:$$float4 = OpCompositeConstruct %p1 %r1;
                 result:$$float2x4 = OpCompositeConstruct %a %b;
@@ -20626,7 +20640,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "NvRtIsSphereHit";
         case cuda:
             {
-                __intrinsic_asm "optixIsSphereHit";
+                __intrinsic_asm "optixHitObjectIsSphereHit";
             }
         case spirv:
             return spirv_asm
@@ -20648,7 +20662,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "NvRtIsLssHit";
         case cuda:
             {
-                __intrinsic_asm "optixIsLSSHit";
+                __intrinsic_asm "optixHitObjectIsLSSHit";
             }
         case spirv:
             return spirv_asm

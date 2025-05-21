@@ -22,21 +22,13 @@ void closestHitShaderLss(inout RayPayload payload, in BuiltInTriangleIntersectio
     payload.isSphere = IsSphereHit();
     payload.isLss = IsLssHit();
     
+// TODO: This will be enabled once issue #6647 is completed.
+#if 0
     // Test HitObject API functions
-    //HitObject hitObj;
-    //float4 sphereData = hitObj.GetSphereObjectPositionAndRadius();
-    //float2x4 lssData = hitObj.GetLssObjectPositionsAndRadii();
-    //bool isSphereHit = hitObj.IsSphereHit();
-    //bool isLssHit = hitObj.IsLssHit();
-    
-    // Modify the payload based on results
-   /* if (isSphereHit)
-    {
-        payload.color = sphereData;
-    }
-    
-    if (isLssHit)
-    {
-        payload.lssData = lssData;
-    }*/
+    HitObject hitObj;
+    float4 sphereData = hitObj.GetSphereObjectPositionAndRadius();
+    float2x4 lssData = hitObj.GetLssObjectPositionsAndRadii();
+    bool isSphereHit = hitObj.IsSphereHit();
+    bool isLssHit = hitObj.IsLssHit();
+#endif
 }
