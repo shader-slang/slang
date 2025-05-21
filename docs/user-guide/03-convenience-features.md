@@ -801,13 +801,16 @@ void g() throws MyError
 }
 ```
 
-To catch an error, you can use the `catch` statement:
+To catch an error, you can use a `do-catch` statement:
 
 ```
 void g()
 {
-    let result = try f();
-    printf("Success: %d\n", result);
+    do
+    {
+        let result = try f();
+        printf("Success: %d\n", result);
+    }
     catch(err: MyError)
     {
         printf("Not good!\n");
@@ -815,9 +818,7 @@ void g()
 }
 ```
 
-`catch` statements must always appear at the end of a block; no other type of
-statement can occur after a `catch`. You can have multiple catch statements for
-different types of errors.
+You can chain multiple catch statements for different types of errors.
 
 Special Scoping Syntax
 -------------------

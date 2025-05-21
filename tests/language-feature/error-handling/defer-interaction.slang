@@ -27,8 +27,11 @@ void testFunc(int n, inout int i)
 
     defer
     {
-        let m = try maybeThrowingFunc(n);
-        value += m;
+        do
+        {
+            let m = try maybeThrowingFunc(n);
+            value += m;
+        }
         catch(err: MyError)
         {
             defer

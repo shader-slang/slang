@@ -16,9 +16,12 @@ enum MyError
 
 T func<T: __BuiltinFloatingPointType>(T val) throws MyError
 {
-    if (val >= T(3))
-        throw MyError.Fail;
-    return val * T(2);
+    do
+    {
+        if (val >= T(3))
+            throw MyError.Fail;
+        return val * T(2);
+    }
     catch(err: MyError)
     {
         // Just rethrow to test catching inside a generic as well.
@@ -30,15 +33,15 @@ T func<T: __BuiltinFloatingPointType>(T val) throws MyError
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     int i = 0;
+    do
     {
         outputBuffer[i] = int(try func(2.5f));
         i+=1;
         outputBuffer[i] = int(try func(3.5f));
         i+=1;
-
-        catch(err: MyError)
-        {
-            outputBuffer[i] = reinterpret<int>(err);
-        }
+    }
+    catch(err: MyError)
+    {
+        outputBuffer[i] = reinterpret<int>(err);
     }
 }

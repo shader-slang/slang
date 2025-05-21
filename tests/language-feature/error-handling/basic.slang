@@ -42,9 +42,12 @@ int maybeBadFunc2(int n) throws MyError2
 
 int multiCatchFunc(int n)
 {
-    let a = try maybeBadFunc1(n);
-    let b = try maybeBadFunc2(n);
-    return a+b;
+    do
+    {
+        let a = try maybeBadFunc1(n);
+        let b = try maybeBadFunc2(n);
+        return a+b;
+    }
     catch(err: MyError1)
     {
         return 0x11;
@@ -57,7 +60,10 @@ int multiCatchFunc(int n)
 
 int containedThrow()
 {
-    throw MyError1.Fail;
+    do
+    {
+        throw MyError1.Fail;
+    }
     catch(err: MyError1)
     {
         return 1;
@@ -67,13 +73,14 @@ int containedThrow()
 [numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
+    do
     {
         try throwingFunc();
         outputBuffer[0] = 1;
-        catch(err: MyError1)
-        {
-            outputBuffer[0] = 2;
-        }
+    }
+    catch(err: MyError1)
+    {
+        outputBuffer[0] = 2;
     }
 
     outputBuffer[1] = multiCatchFunc(0);
