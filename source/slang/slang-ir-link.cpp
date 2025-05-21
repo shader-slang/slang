@@ -2158,14 +2158,17 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // In the long run we do not want to *ever* iterate over all the
     // instructions in all the input modules.
     //
+    // Need to list all source files in the debug source file list,
+    // regardless if the source files participate in the line table or not.
 
     for (IRModule* irModule : userModules)
     {
         for (auto inst : irModule->getGlobalInsts())
         {
-            if (auto bindInst = as<IRBindGlobalGenericParam>(inst))
+            if (as<IRBindGlobalGenericParam>(inst) ||
+                as<IRDebugSource>(inst))
             {
-                cloneValue(context, bindInst);
+                cloneValue(context, inst);
             }
         }
     }
