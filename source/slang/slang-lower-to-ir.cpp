@@ -557,6 +557,7 @@ struct AstOrIRType
 
 struct CatchHandler
 {
+    // 'nullptr' implies catch-all.
     IRType* errorType = nullptr;
 
     // Block of the handler statement. Takes a value of errorType as parameter.
@@ -772,7 +773,7 @@ static CatchHandler findErrorHandler(IRGenContext* context, IRType* type)
     for (auto handler = context->catchHandler; handler != nullptr;
          handler = context->catchHandler->prev)
     {
-        if (handler->errorType == type)
+        if (!handler->errorType || handler->errorType == type)
         {
             return *handler;
         }
@@ -841,14 +842,14 @@ LoweredValInfo emitCallToVal(
 
                 auto handler = findErrorHandler(context, throwAttr->getErrorType());
                 auto succBlock = builder->createBlock();
-                auto failBlock = handler.errorType ? handler.errorHandler : builder->createBlock();
+                auto failBlock = handler.errorHandler ? handler.errorHandler : builder->createBlock();
 
                 auto voidType = builder->getVoidType();
                 builder->emitTryCallInst(voidType, succBlock, failBlock, callee, argCount, args);
                 builder->insertBlock(succBlock);
                 auto value = builder->emitParam(type);
 
-                if (!handler.errorType)
+                if (!handler.errorHandler)
                 {
                     // We have to create a default fail block, which just re-throws.
                     builder->insertBlock(failBlock);
@@ -6706,7 +6707,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             handler = findErrorHandler(context, throwType);
         }
 
-        if (handler.errorType)
+        if (handler.errorHandler)
         {
             builder->emitBranch(handler.errorHandler, 1, &loweredVal);
         }
@@ -6767,7 +6768,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         insertBlock(bodyLoopHead);
 
         CatchHandler catchHandler;
-        catchHandler.errorType = lowerType(context, stmt->errorVar->getType());
+        catchHandler.errorType =
+            stmt->errorVar ? lowerType(context, stmt->errorVar->getType()) : nullptr;
         catchHandler.errorHandler = bodyBreakLabel;
         catchHandler.prev = context->catchHandler;
         context->catchHandler = &catchHandler;
@@ -6785,9 +6787,12 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
         insertBlock(bodyBreakLabel);
 
-        auto irParam = builder->emitParam(catchHandler.errorType);
-        auto paramVal = LoweredValInfo::simple(irParam);
-        context->setGlobalValue(stmt->errorVar, paramVal);
+        if (catchHandler.errorType)
+        {
+            auto irParam = builder->emitParam(catchHandler.errorType);
+            auto paramVal = LoweredValInfo::simple(irParam);
+            context->setGlobalValue(stmt->errorVar, paramVal);
+        }
 
         IRBlock* prevScopeEndBlock = pushScopeBlock(handlerBreakLabel);
         lowerStmt(context, stmt->handleBody);

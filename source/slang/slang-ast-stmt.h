@@ -305,7 +305,7 @@ FIDDLE()
 class CatchStmt : public Stmt
 {
     FIDDLE(...)
-    FIDDLE() ParamDecl* errorVar = nullptr;
+    FIDDLE() ParamDecl* errorVar = nullptr; // null => catch-all
     FIDDLE() Stmt* tryBody = nullptr;
     FIDDLE() Stmt* handleBody = nullptr;
 };

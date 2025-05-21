@@ -103,19 +103,27 @@ struct ErrorHandlingLoweringContext
         auto failBlock = tryCall->getFailureBlock();
         auto successBlock = tryCall->getSuccessBlock();
 
-        // The isFail branch could otherwise just jump to the handler, but
-        // there's unfortunately the error parameter that needs to be passed as
-        // well, and it can't be done in IfElse. So there's an extra block in
-        // between to do that.
-        auto handlerJumpBlock = builder.createBlock();
-        auto branch = builder.emitIf(isFail, handlerJumpBlock, successBlock);
+        if (failBlock->getFirstParam())
+        {
+            // The isFail branch could otherwise just jump to the handler, but
+            // there's unfortunately the error parameter that needs to be passed as
+            // well, and it can't be done in IfElse. So there's an extra block in
+            // between to do that.
+            auto handlerJumpBlock = builder.createBlock();
+            auto branch = builder.emitIf(isFail, handlerJumpBlock, successBlock);
 
-        builder.setInsertAfter(branch->getParent());
-        builder.addInst(handlerJumpBlock);
-        builder.setInsertInto(handlerJumpBlock);
+            builder.setInsertAfter(branch->getParent());
+            builder.addInst(handlerJumpBlock);
+            builder.setInsertInto(handlerJumpBlock);
 
-        auto errVal = builder.emitGetResultError(call);
-        builder.emitBranch(failBlock, 1, &errVal);
+            auto errVal = builder.emitGetResultError(call);
+            builder.emitBranch(failBlock, 1, &errVal);
+        }
+        else
+        {
+            // Catch-all with no parameter, so we can just jump to it directly.
+            builder.emitIf(isFail, failBlock, successBlock);
+        }
 
         // Replace the params in successBlock to `getResultValue(call)`.
         builder.setInsertBefore(successBlock->getFirstOrdinaryInst());

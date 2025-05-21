@@ -446,7 +446,8 @@ struct ASTIterator
 
         void visitCatchStmt(CatchStmt* stmt)
         {
-            iterator->visitDecl(stmt->errorVar);
+            if (stmt->errorVar)
+                iterator->visitDecl(stmt->errorVar);
             dispatchIfNotNull(stmt->tryBody);
             dispatchIfNotNull(stmt->handleBody);
         }

@@ -649,7 +649,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitCatchStmt(CatchStmt* stmt)
     {
-        if (_findAstNodeImpl(*context, stmt->errorVar))
+        if (stmt->errorVar && _findAstNodeImpl(*context, stmt->errorVar))
             return true;
         if (dispatchIfNotNull(stmt->tryBody))
             return true;

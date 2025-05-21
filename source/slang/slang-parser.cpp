@@ -6288,13 +6288,17 @@ CatchStmt* Parser::ParseDoCatchStatement(Stmt* body)
         CatchStmt* catchStatement = astBuilder->create<CatchStmt>();
         FillPosition(catchStatement);
         ReadToken("catch");
-        ReadToken(TokenType::LParent);
 
-        ParamDecl* errorVar = parseModernParamDecl(this);
-        catchStatement->errorVar = errorVar;
-        AddMember(scopeDecl, errorVar);
+        // Optional error parameter. If not given, the catch catches all error
+        // types.
+        if (AdvanceIf(this, TokenType::LParent))
+        {
+            ParamDecl* errorVar = parseModernParamDecl(this);
+            catchStatement->errorVar = errorVar;
+            AddMember(scopeDecl, errorVar);
+            ReadToken(TokenType::RParent);
+        }
 
-        ReadToken(TokenType::RParent);
         catchStatement->tryBody = body;
         catchStatement->handleBody = ParseStatement();
 

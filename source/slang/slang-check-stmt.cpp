@@ -47,7 +47,7 @@ CatchStmt* SemanticsVisitor::findMatchingCatchStmt(Type* errorType)
     {
         if (auto catchStmt = as<CatchStmt>(outerStmtInfo->stmt))
         {
-            if (catchStmt->errorVar->getType()->equals(errorType))
+            if (!catchStmt->errorVar || catchStmt->errorVar->getType()->equals(errorType))
                 return catchStmt;
         }
     }
@@ -653,8 +653,11 @@ void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
 
 void SemanticsStmtVisitor::visitCatchStmt(CatchStmt* stmt)
 {
-    ensureDeclBase(stmt->errorVar, DeclCheckState::DefinitionChecked, this);
-    stmt->errorVar->hiddenFromLookup = false;
+    if (stmt->errorVar)
+    {
+        ensureDeclBase(stmt->errorVar, DeclCheckState::DefinitionChecked, this);
+        stmt->errorVar->hiddenFromLookup = false;
+    }
 
     WithOuterStmt subContext(this, stmt);
     subContext.checkStmt(stmt->tryBody);
