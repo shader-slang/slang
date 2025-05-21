@@ -2790,11 +2790,12 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             auto elementType =
                 as<IRHLSLStructuredBufferTypeBase>(inst->getOperand(0)->getDataType())
                     ->getElementType();
-            IRIntegerValue stride = 0;
-            if (auto sizeDecor = elementType->findDecoration<IRSizeAndAlignmentDecoration>())
-            {
-                stride = align(sizeDecor->getSize(), (int)sizeDecor->getAlignment());
-            }
+
+            // The element type should have a `SizeAndAlignment` decoration created during lowering.
+            auto sizeDecor = elementType->findDecoration<IRSizeAndAlignmentDecoration>();
+            SLANG_ASSERT(sizeDecor);
+            const auto stride = align(sizeDecor->getSize(), (int)sizeDecor->getAlignment());
+
             m_writer->emit(stride);
             m_writer->emit(");\n");
             return true;
