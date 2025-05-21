@@ -842,7 +842,8 @@ LoweredValInfo emitCallToVal(
 
                 auto handler = findErrorHandler(context, throwAttr->getErrorType());
                 auto succBlock = builder->createBlock();
-                auto failBlock = handler.errorHandler ? handler.errorHandler : builder->createBlock();
+                auto failBlock =
+                    handler.errorHandler ? handler.errorHandler : builder->createBlock();
 
                 auto voidType = builder->getVoidType();
                 builder->emitTryCallInst(voidType, succBlock, failBlock, callee, argCount, args);

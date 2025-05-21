@@ -6280,7 +6280,7 @@ DoWhileStmt* Parser::ParseDoWhileStatement(Stmt* body)
 
 CatchStmt* Parser::ParseDoCatchStatement(Stmt* body)
 {
-    for(;;)
+    for (;;)
     {
         ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
         pushScopeAndSetParent(scopeDecl);
