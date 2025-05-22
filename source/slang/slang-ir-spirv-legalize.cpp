@@ -1524,6 +1524,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             paramTypes.add(targetFunc->getParamType(i));
         }
 
+        SLANG_ASSERT(paramTypes.getCount() >= 4);
+
         IRType* tempTypes[4];
         tempTypes[3] = builder.getPtrType(paramTypes[0]);
         tempTypes[0] = paramTypes[1];
@@ -1570,8 +1572,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(mapElementIFunc);
 
         auto ifuncCall = mapElementIFunc->getIFuncCall();
-        auto funcSynth = createWrapperFunctionForPerElement(builder, ifuncCall);
-        mapElementIFunc->setIFuncCall(funcSynth);
+
+        // `this` of the functor is optional.
+        // Skip the synthesis if `this` is not passed.
+        if (ifuncCall->getParamCount() > 3)
+        {
+            auto funcSynth = createWrapperFunctionForPerElement(builder, ifuncCall);
+            mapElementIFunc->setIFuncCall(funcSynth);
+        }
     }
 
     void legalizeSPIRVEntryPoint(IRFunc* func, IREntryPointDecoration* entryPointDecor)

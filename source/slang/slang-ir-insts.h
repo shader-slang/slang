@@ -3143,13 +3143,6 @@ struct IRTupleCoopMatMapElementIFunc : IRCoopMatMapElementIFuncBase
     IRInst* getTuple() { return getOperand(0); }
 };
 
-struct IRTupleCoopMatMapElementFunc : IRInst
-{
-    IR_LEAF_ISA(TupleCoopMatMapElementFunc)
-    IRInst* getTuple() { return getOperand(0); }
-    IRFunc* getFuncCall() { return as<IRFunc>(getOperand(1)); }
-};
-
 // An Instruction that creates a differential pair value from a
 // primal and differential.
 
@@ -4266,6 +4259,8 @@ public:
 
     IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, UInt element);
     IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, IRInst* element);
+
+    IRInst* emitCoopMatMapElementFunc(IRType* type, IROp op, IRInst* tuple, IRInst* func);
 
     IRInst* emitGetElement(IRType* type, IRInst* arrayLikeType, IRIntegerValue element);
     IRInst* emitGetElementPtr(IRType* type, IRInst* arrayLikeType, IRIntegerValue element);

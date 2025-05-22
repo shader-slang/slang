@@ -4279,11 +4279,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_CoopMatMapElementIFunc:
             result = emitCoopMatMapElementWithIFunc(parent, as<IRCoopMatMapElementIFunc>(inst));
             break;
-        case kIROp_TupleCoopMatMapElementFunc:
-            result = emitTupleCoopMatMapElementWithFunc(
-                parent,
-                as<IRTupleCoopMatMapElementFunc>(inst));
-            break;
         case kIROp_TupleCoopMatMapElementIFunc:
             result = emitTupleCoopMatMapElementWithIFunc(
                 parent,
@@ -7719,9 +7714,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         requireSPIRVCapability(SpvCapabilityCooperativeMatrixPerElementOperationsNV);
 
         auto mat0 = mapElementIFunc->getCoopMat();
+        auto funcCall = mapElementIFunc->getIFuncCall();
 
-        IRInst* ifuncThis = mapElementIFunc->getIFuncThis();
-        auto funcSynth = mapElementIFunc->getIFuncCall();
+        IRInst* ifuncThis = nullptr;
+        if (mapElementIFunc->getOperandCount() > 2)
+            ifuncThis = mapElementIFunc->getIFuncThis();
 
         return emitInstCustomOperandFunc(
             parent,
@@ -7731,42 +7728,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 emitOperand(mat0->getDataType());
                 emitOperand(kResultID);
+
                 emitOperand(mat0);
+                emitOperand(funcCall);
 
-                emitOperand(funcSynth);
-                emitOperand(ifuncThis);
-            });
-    }
-
-    SpvInst* emitTupleCoopMatMapElementWithFunc(
-        SpvInstParent* parent,
-        IRTupleCoopMatMapElementFunc* mapElementFunc)
-    {
-        ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_cooperative_matrix2"));
-        requireSPIRVCapability(SpvCapabilityCooperativeMatrixPerElementOperationsNV);
-
-        auto funcSynth = mapElementFunc->getFuncCall();
-
-        auto tuple = mapElementFunc->getTuple();
-        UInt tupleCount = tuple->getOperandCount();
-        SLANG_ASSERT(tupleCount > 0);
-
-        IRInst* mat0 = tuple->getOperand(0);
-
-        return emitInstCustomOperandFunc(
-            parent,
-            mapElementFunc,
-            SpvOpCooperativeMatrixPerElementOpNV,
-            [&]()
-            {
-                emitOperand(mat0->getDataType());
-                emitOperand(kResultID);
-                emitOperand(mat0);
-
-                emitOperand(funcSynth);
-
-                for (UInt i = 1; i < tupleCount; i++)
-                    emitOperand(tuple->getOperand(i));
+                if (ifuncThis)
+                    emitOperand(ifuncThis);
             });
     }
 
@@ -7777,14 +7744,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_cooperative_matrix2"));
         requireSPIRVCapability(SpvCapabilityCooperativeMatrixPerElementOperationsNV);
 
-        IRInst* ifuncThis = mapElementIFunc->getIFuncThis();
-        auto funcSynth = mapElementIFunc->getIFuncCall();
-
         auto tuple = mapElementIFunc->getTuple();
         UInt tupleCount = tuple->getOperandCount();
-        SLANG_ASSERT(tupleCount > 0);
 
         IRInst* mat0 = tuple->getOperand(0);
+        auto funcCall = mapElementIFunc->getIFuncCall();
+
+        IRInst* ifuncThis = nullptr;
+        if (mapElementIFunc->getOperandCount() > 2)
+            ifuncThis = mapElementIFunc->getIFuncThis();
 
         return emitInstCustomOperandFunc(
             parent,
@@ -7794,10 +7762,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 emitOperand(mat0->getDataType());
                 emitOperand(kResultID);
-                emitOperand(mat0);
 
-                emitOperand(funcSynth);
-                emitOperand(ifuncThis);
+                emitOperand(mat0);
+                emitOperand(funcCall);
+
+                if (ifuncThis)
+                    emitOperand(ifuncThis);
 
                 for (UInt i = 1; i < tupleCount; i++)
                     emitOperand(tuple->getOperand(i));
