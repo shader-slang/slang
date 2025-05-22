@@ -32,10 +32,6 @@ void ShardBuilder::_writeTo(Stream* stream, Size inSelfOffset)
             auto targetOffset = intptr_t(targetChunk->_getCachedOffset());
 
             intptr_t relativeOffset = targetOffset - selfOffset;
-            if (relativeOffset == -49)
-            {
-                relativeOffset = relativeOffset;
-            }
 
             switch (_size)
             {

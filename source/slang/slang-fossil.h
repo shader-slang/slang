@@ -190,7 +190,11 @@ public:
     using Layout = FossilizedValLayout;
 
     /// Determine if a value with the given `kind` should be allowed to cast to this type.
-    static bool _isMatchingKind(Kind kind) { return true; }
+    static bool _isMatchingKind(Kind kind)
+    {
+        SLANG_UNUSED(kind);
+        return true;
+    }
 
 protected:
     FossilizedVal() = default;
