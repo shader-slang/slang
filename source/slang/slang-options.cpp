@@ -446,6 +446,10 @@ void initCommandOptions(CommandOptions& options)
          "Display the build version. This is the contents of git describe --tags.\n"
          "It is typically only set from automated builds(such as distros available on github).A "
          "user build will by default be 'unknown'."},
+        {OptionKind::StdRevision,
+        "-std",
+        "-std <revision>",
+        "Specifies the language standard that should be used."},
         {OptionKind::WarningsAsErrors,
          "-warnings-as-errors",
          "-warnings-as-errors all or -warnings-as-errors <id>[,<id>...]",
@@ -2541,6 +2545,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     addCapabilityAtom(getCurrentTarget(), atom);
                 }
                 break;
+            }
+        case OptionKind::StdRevision:
+            {
+                //
             }
         case OptionKind::Stage:
             {

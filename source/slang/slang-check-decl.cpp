@@ -38,9 +38,8 @@ static bool isSlang2026(CompilerOptionSet& optionSet)
 {
     if (!optionSet.hasOption(CompilerOptionName::Language))
         return false;
-    return SLANG_SOURCE_LANGUAGE_SLANG_2026 ==
-           SlangSourceLanguage(
-               optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language));
+    return SLANG_SOURCE_LANGUAGE_SLANG_2026 == SlangSourceLanguage(optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language))
+               ;
 }
 
 static bool allowExperimentalDynamicDispatch(CompilerOptionSet& optionSet)
@@ -55,16 +54,15 @@ static void validateDynInterfaceUsage(
     CompilerOptionSet& optionSet,
     InterfaceDecl* decl)
 {
+    if (allowExperimentalDynamicDispatch(optionSet))
+        return;
+
     if (!decl->hasModifier<DynModifier>())
         return;
 
-    // validate use of `dyn interface`
+    // validate members inside `dyn interface`
     for (auto m : decl->members)
-    {
-        if (allowExperimentalDynamicDispatch(optionSet))
-            continue;
-        visitor->ensureDecl(m, DeclCheckState::ScopesWired);
-
+    {        
         if (isAssociatedTypeDecl(m))
         {
             sink->diagnose(m, Diagnostics::cannotHaveAssociatedTypeInDynInterface);
@@ -80,6 +78,7 @@ static void validateDynInterfaceUsage(
         }
         else if (auto funcDecl = as<FuncDecl>(m))
         {
+            visitor->ensureDecl(m, DeclCheckState::ModifiersChecked);
             for (auto modifier : funcDecl->modifiers)
             {
                 if (as<MutatingAttribute>(modifier))
@@ -95,146 +94,101 @@ static void validateDynInterfaceUsage(
         }
         else if (auto inheritanceDecl = as<InheritanceDecl>(m))
         {
-            auto inheritedInterfaceDeclRefType = as<DeclRefType>(inheritanceDecl->base.type);
+            visitor->ensureDecl(m, DeclCheckState::ReadyForLookup);
+            auto inheritedInterfaceDeclRefType = isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type);
             if (!inheritedInterfaceDeclRefType)
                 continue;
 
-            auto inheritedInterfaceDecl =
-                as<InterfaceDecl>(inheritedInterfaceDeclRefType->getDeclRef().getDecl());
-            if (!inheritedInterfaceDecl)
-                continue;
-
+            auto inheritedInterfaceDecl = inheritedInterfaceDeclRefType.getDecl();
             if (!inheritedInterfaceDecl->hasModifier<DynModifier>())
-            {
                 sink->diagnose(
                     m,
-                    Diagnostics::cannotConformDynInterfaceToNonDynInterface,
+                    Diagnostics::DynInterfaceCannotInheritNonDynInterface,
                     decl,
                     inheritedInterfaceDecl);
-            }
-            continue;
         }
     }
-}
 
-static InterfaceDecl* findDynInheritance(SemanticsDeclVisitorBase* visitor, AggTypeDeclBase* decl)
-{
-    for (auto m : decl->members)
+    // dyn interface cannot be generic
+    if (auto outerGeneric = visitor->GetOuterGeneric(decl))
     {
-        auto inheritanceDecl = as<InheritanceDecl>(m);
-        if (!inheritanceDecl)
-            continue;
-        visitor->ensureDecl(inheritanceDecl, DeclCheckState::ReadyForLookup);
-        auto inheritedInterfaceDeclRefType = as<DeclRefType>(inheritanceDecl->base.type);
-        if (!inheritedInterfaceDeclRefType)
-            continue;
-
-        auto inheritedInterfaceDecl =
-            as<InterfaceDecl>(inheritedInterfaceDeclRefType->getDeclRef().getDecl());
-        if (!inheritedInterfaceDecl)
-            continue;
-
-        if (!inheritedInterfaceDecl->hasModifier<DynModifier>())
-            continue;
-
-        return inheritedInterfaceDecl;
+        sink->diagnose(
+            decl,
+            Diagnostics::cannotHaveGenericDynInterface,
+            decl);
     }
-    return nullptr;
 }
-static void validateDynUsage(
+
+static void validateDynInterfaceUseWithInheritanceDecl(
     SemanticsDeclVisitorBase* visitor,
     DiagnosticSink* sink,
     CompilerOptionSet& optionSet,
-    Decl* decl)
+    InheritanceDecl* decl)
 {
-    if (auto aggTypeDecl = as<AggTypeDecl>(decl))
+    auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(decl->base.type);
+    if (!interfaceDeclRef)
+        return;
+    auto interfaceDecl = interfaceDeclRef.getDecl();
+    bool interfaceDeclIsDyn = interfaceDecl->hasModifier<DynModifier>();
+    if (!interfaceDeclIsDyn)
+        return;
+    
+    if (!allowExperimentalDynamicDispatch(optionSet))
     {
-        // Ensure if we inherit from a `dyn interface` that we do not have: opaque types, unsized
-        // types, non-copyable types
-        auto inheritedDynInterface = findDynInheritance(visitor, aggTypeDecl);
-        if (inheritedDynInterface)
+        if (auto extensionDeclParent = as<ExtensionDecl>(decl->parentDecl))
         {
-            for (auto m : aggTypeDecl->members)
-            {
-                auto varDecl = as<VarDecl>(m);
-                if (!varDecl)
-                    continue;
-
-                visitor->ensureDecl(varDecl, DeclCheckState::ReadyForLookup);
-
-                if (isNonCopyableType(varDecl->getType()))
-                {
-                    sink->diagnose(
-                        m,
-                        Diagnostics::cannotHaveNonCopyableMemberWhenInheritingDynInterface,
-                        m,
-                        inheritedDynInterface);
-                }
-
-                int varTypeTags = (int)visitor->getTypeTags(varDecl->getType());
-                bool isUnsized = varTypeTags & (int)TypeTag::Unsized;
-                bool isOpaque = varTypeTags & (int)TypeTag::Opaque;
-                if (isUnsized)
-                    sink->diagnose(
-                        m,
-                        Diagnostics::cannotHaveUnsizedMemberWhenInheritingDynInterface,
-                        m,
-                        inheritedDynInterface);
-                if (isOpaque)
-                    sink->diagnose(
-                        m,
-                        Diagnostics::cannotHaveOpaqueMemberWhenInheritingDynInterface,
-                        m,
-                        inheritedDynInterface);
-            }
-        }
-
-        // validate simple `dyn interface` rules
-        auto interfaceDecl = as<InterfaceDecl>(decl);
-        if (!interfaceDecl)
-            return;
-        validateDynInterfaceUsage(visitor, sink, optionSet, interfaceDecl);
-    }
-    else if (auto extensionDecl = as<ExtensionDecl>(decl))
-    {
-        // if 2026 and not experiemental flag check
-        if (allowExperimentalDynamicDispatch(optionSet))
-            return;
-
-        // cannot have extension provide conformance to dyn interface
-        auto inheritedInterfaceDecl = findDynInheritance(visitor, extensionDecl);
-        if (inheritedInterfaceDecl)
+            // not allowed to extend to conform to a 'dyn interface'
             sink->diagnose(
-                extensionDecl,
+                extensionDeclParent,
                 Diagnostics::cannotUseExtensionToMakeTypeConformToDynInterface,
-                inheritedInterfaceDecl);
-    }
-    else if (auto genericDecl = as<GenericDecl>(decl))
-    {
-        // if 2026 and not experiemental flag check
-        if (allowExperimentalDynamicDispatch(optionSet))
-            return;
-
-        auto innerAggTypeDecl = as<AggTypeDecl>(genericDecl->inner);
-        if (!innerAggTypeDecl)
-            return;
-
-        // Ensure not inheriting from `dyn` interface
-        auto inheritedInterfaceDecl = findDynInheritance(visitor, innerAggTypeDecl);
-        if (inheritedInterfaceDecl)
+                interfaceDecl);
+        }
+        else if (visitor->GetOuterGeneric(decl->parentDecl))
+        {
             sink->diagnose(
-                genericDecl->inner,
+                decl,
                 Diagnostics::cannotConformGenericToDynInterface,
-                genericDecl->inner,
-                inheritedInterfaceDecl);
+                decl->parentDecl,
+                interfaceDecl);
+        }
+    }
+    if (auto aggTypeDeclParent = as<AggTypeDecl>(decl->parentDecl))
+    {
+        // Ensure if we inherit from a `dyn interface` that the parent does not have: opaque
+        // types, unsized types, non-copyable types
+        for (auto m : aggTypeDeclParent->members)
+        {
+            auto varDecl = as<VarDecl>(m);
+            if (!varDecl)
+                continue;
 
-        // `dyn interface` cannot be a generic
-        auto innerInterfaceDecl = as<InterfaceDecl>(genericDecl->inner);
-        if (innerInterfaceDecl && innerInterfaceDecl->hasModifier<DynModifier>())
-            sink->diagnose(
-                genericDecl->inner,
-                Diagnostics::cannotHaveGenericDynInterface,
-                genericDecl->inner);
+            visitor->ensureDecl(varDecl, DeclCheckState::ReadyForLookup);
+
+            if (isNonCopyableType(varDecl->getType()))
+            {
+                sink->diagnose(
+                    m,
+                    Diagnostics::cannotHaveNonCopyableMemberWhenInheritingDynInterface,
+                    m,
+                    interfaceDecl);
+            }
+
+            int varTypeTags = (int)visitor->getTypeTags(varDecl->getType());
+            bool isUnsized = varTypeTags & (int)TypeTag::Unsized;
+            bool isOpaque = varTypeTags & (int)TypeTag::Opaque;
+            if (isUnsized)
+                sink->diagnose(
+                    m,
+                    Diagnostics::cannotHaveUnsizedMemberWhenInheritingDynInterface,
+                    m,
+                    interfaceDecl);
+            if (isOpaque)
+                sink->diagnose(
+                    m,
+                    Diagnostics::cannotHaveOpaqueMemberWhenInheritingDynInterface,
+                    m,
+                    interfaceDecl);
+        }
     }
 }
 
@@ -1708,6 +1662,8 @@ void SemanticsDeclModifiersVisitor::visitInterfaceDecl(InterfaceDecl* interfaceD
 
     if (interfaceDecl->hasModifier<AnyValueSizeAttribute>())
         addModifier(interfaceDecl, m_astBuilder->create<DynModifier>());
+
+    validateDynInterfaceUsage(this, getSink(), getOptionSet(), interfaceDecl);
 }
 
 void SemanticsDeclModifiersVisitor::visitStructDecl(StructDecl* structDecl)
@@ -3258,8 +3214,6 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
             ensureDecl(constraint, DeclCheckState::ReadyForReference);
         }
     }
-
-    validateDynUsage(this, getSink(), getOptionSet(), genericDecl);
 }
 
 void SemanticsDeclBasesVisitor::visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
@@ -3341,6 +3295,12 @@ struct SemanticsDeclDifferentialConformanceVisitor
 
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
+        validateDynInterfaceUseWithInheritanceDecl(
+            this,
+            getSink(),
+            getOptionSet(),
+            inheritanceDecl);
+
         if (as<InterfaceDecl>(inheritanceDecl->parentDecl))
             return;
 
@@ -9736,8 +9696,6 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
         getSink()->diagnose(aggTypeDecl->loc, Diagnostics::cannotExportIncompleteType, aggTypeDecl);
     }
 
-    validateDynUsage(this, getSink(), getOptionSet(), aggTypeDecl);
-
     auto structDecl = as<StructDecl>(aggTypeDecl);
     if (!structDecl)
         return;
@@ -10276,8 +10234,6 @@ void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
 
         _validateCrossModuleInheritance(decl, inheritanceDecl);
     }
-
-    validateDynUsage(this, getSink(), getOptionSet(), decl);
 }
 
 Type* SemanticsVisitor::calcThisType(DeclRef<Decl> declRef)

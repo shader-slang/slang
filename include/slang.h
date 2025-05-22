@@ -1024,6 +1024,7 @@ typedef uint32_t SlangSizeT;
         DumpModule,
 
         EnableExperimentalDynamicDispatch, // bool, experimental
+        StdRevision,
         CountOf,
     };
 
