@@ -24302,10 +24302,10 @@ extension<
     each Ts : __BuiltinArithmeticType
 > Tuple<linalg.CoopMat<T, S, M, N, R>, expand linalg.CoopMat<each Ts, S, M, N, R>>
 {
-    __intrinsic_op($(kIROp_TupleCoopMatMapElementIFunc))
+    __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
     CoopMat<T, S, M, N, R> MapElement(functype(uint32_t, uint32_t, T, expand each Ts)->T mapOp);
 
-    __intrinsic_op($(kIROp_TupleCoopMatMapElementIFunc))
+    __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
     static CoopMat<T, S, M, N, R> __MapElement<
         TOperator,
         TFunc : IFunc<T, uint32_t, uint32_t, T, expand each Ts>

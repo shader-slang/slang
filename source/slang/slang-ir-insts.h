@@ -3124,23 +3124,16 @@ struct IRMakeCoopVector : IRInst
     IR_LEAF_ISA(MakeCoopVector)
 };
 
-struct IRCoopMatMapElementIFuncBase : IRInst
-{
-    IRFunc* getIFuncCall() { return as<IRFunc>(getOperand(1)); }
-    IRInst* getIFuncThis() { return getOperand(2); }
-    void setIFuncCall(IRFunc* func) { setOperand(1, func); }
-};
-
-struct IRCoopMatMapElementIFunc : IRCoopMatMapElementIFuncBase
+struct IRCoopMatMapElementIFunc : IRInst
 {
     IR_LEAF_ISA(CoopMatMapElementIFunc)
     IRInst* getCoopMat() { return getOperand(0); }
-};
-
-struct IRTupleCoopMatMapElementIFunc : IRCoopMatMapElementIFuncBase
-{
-    IR_LEAF_ISA(TupleCoopMatMapElementIFunc)
     IRInst* getTuple() { return getOperand(0); }
+    IRFunc* getIFuncCall() { return as<IRFunc>(getOperand(1)); }
+    IRInst* getIFuncThis() { return getOperand(2); }
+
+    bool hasIFuncThis() { return getOperandCount() > 2; }
+    void setIFuncCall(IRFunc* func) { setOperand(1, func); }
 };
 
 // An Instruction that creates a differential pair value from a
@@ -4260,7 +4253,7 @@ public:
     IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, UInt element);
     IRInst* emitGetTupleElement(IRType* type, IRInst* tuple, IRInst* element);
 
-    IRInst* emitCoopMatMapElementFunc(IRType* type, IROp op, IRInst* tuple, IRInst* func);
+    IRInst* emitCoopMatMapElementFunc(IRType* type, IRInst* tuple, IRInst* func);
 
     IRInst* emitGetElement(IRType* type, IRInst* arrayLikeType, IRIntegerValue element);
     IRInst* emitGetElementPtr(IRType* type, IRInst* arrayLikeType, IRIntegerValue element);

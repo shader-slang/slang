@@ -790,7 +790,6 @@ INST(TorchGetCudaStream, TorchGetCudaStream, 0, 0)
 INST(TorchTensorGetView, TorchTensorGetView, 0, 0)
 
 INST(CoopMatMapElementIFunc, CoopMatMapElementIFunc, 2, 0)
-INST(TupleCoopMatMapElementIFunc, TupleCoopMatMapElementIFunc, 2, 0)
 
 INST(AllocateOpaqueHandle, allocateOpaqueHandle, 0, 0)
 
