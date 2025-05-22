@@ -38,9 +38,11 @@ static bool isSlang2026(CompilerOptionSet& optionSet)
 {
     if (!optionSet.hasOption(CompilerOptionName::Language))
         return false;
-    return SLANG_SOURCE_LANGUAGE_SLANG == SlangSourceLanguage(optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language))
-            && SLANG_STD_REVISION_2026 == optionSet.getEnumOption<SlangStdRevision>(CompilerOptionName::StdRevision)
-               ;
+    return SLANG_SOURCE_LANGUAGE_SLANG ==
+               SlangSourceLanguage(
+                   optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language)) &&
+           SLANG_STD_REVISION_2026 ==
+               optionSet.getEnumOption<SlangStdRevision>(CompilerOptionName::StdRevision);
 }
 
 static bool allowExperimentalDynamicDispatch(CompilerOptionSet& optionSet)
@@ -63,7 +65,7 @@ static void validateDynInterfaceUsage(
 
     // validate members inside `dyn interface`
     for (auto m : decl->members)
-    {        
+    {
         if (isAssociatedTypeDecl(m))
         {
             sink->diagnose(m, Diagnostics::cannotHaveAssociatedTypeInDynInterface);
@@ -96,7 +98,8 @@ static void validateDynInterfaceUsage(
         else if (auto inheritanceDecl = as<InheritanceDecl>(m))
         {
             visitor->ensureDecl(m, DeclCheckState::ReadyForLookup);
-            auto inheritedInterfaceDeclRefType = isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type);
+            auto inheritedInterfaceDeclRefType =
+                isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type);
             if (!inheritedInterfaceDeclRefType)
                 continue;
 
@@ -113,10 +116,7 @@ static void validateDynInterfaceUsage(
     // dyn interface cannot be generic
     if (visitor->GetOuterGeneric(decl))
     {
-        sink->diagnose(
-            decl,
-            Diagnostics::cannotHaveGenericDynInterface,
-            decl);
+        sink->diagnose(decl, Diagnostics::cannotHaveGenericDynInterface, decl);
     }
 }
 
@@ -133,7 +133,7 @@ static void validateDynInterfaceUseWithInheritanceDecl(
     bool interfaceDeclIsDyn = interfaceDecl->hasModifier<DynModifier>();
     if (!interfaceDeclIsDyn)
         return;
-    
+
     if (!allowExperimentalDynamicDispatch(optionSet))
     {
         if (auto extensionDeclParent = as<ExtensionDecl>(decl->parentDecl))
