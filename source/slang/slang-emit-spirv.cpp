@@ -2078,8 +2078,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     }
                     else
                     {
-                        // Unsized arrays are lowered to IR before target specific passes and do not
-                        // have a stride operand, hence `stride` is zero. Calculate stride here.
+                        // Stride may not have been calculated for basic element types. Calculate it
+                        // here.
                         IRSizeAndAlignment sizeAndAlignment;
                         getNaturalSizeAndAlignment(
                             m_targetProgram->getOptionSet(),
