@@ -23422,15 +23422,14 @@ struct CoopMat
     >(
         This coopMat,
         TOperator mapOp,
-        Ptr<TFunc> pMapOp
+        TFunc mapObj
     );
 
     This MapElement<
         TFunc : IFunc<T, uint32_t, uint32_t, T>
     >(TFunc mapOp)
     {
-        Ptr<TFunc> pMapOp = &mapOp;
-        return __MapElement(this, mapOp.operator(), pMapOp);
+        return __MapElement(this, mapOp.operator(), mapOp);
     }
 
     //
@@ -24310,15 +24309,14 @@ extension<
     static CoopMat<T, S, M, N, R> __MapElement<
         TOperator,
         TFunc : IFunc<T, uint32_t, uint32_t, T, expand each Ts>
-    >(This tuple, TOperator mapOp, Ptr<TFunc> pMapOp);
+    >(This tuple, TOperator mapOp, TFunc mapObj);
 
     [ForceInline]
     CoopMat<T, S, M, N, R> MapElement<
         TFunc : IFunc<T, uint32_t, uint32_t, T, expand each Ts>
     >(TFunc mapOp)
     {
-        Ptr<TFunc> pMapOp = &mapOp;
-        return __MapElement(this, mapOp.operator(), pMapOp);
+        return __MapElement(this, mapOp.operator(), mapOp);
     }
 };
 

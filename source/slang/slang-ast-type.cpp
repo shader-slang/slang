@@ -786,7 +786,18 @@ Val* ConcreteTypePack::_substituteImplOverride(
     for (Index i = 0; i < getTypeCount(); i++)
     {
         auto substType = as<Type>(getElementType(i)->substituteImpl(astBuilder, subst, &diff));
-        substElementTypes.add(substType);
+        if (auto typePack = as<ConcreteTypePack>(substType))
+        {
+            // Unwrap the ConcreteTypePack and add each element as a parameter
+            for (Index j = 0; j < typePack->getTypeCount(); ++j)
+            {
+                substElementTypes.add(typePack->getElementType(j));
+            }
+        }
+        else
+        {
+            substElementTypes.add(substType);
+        }
     }
     if (!diff)
         return this;
