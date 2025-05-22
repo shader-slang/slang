@@ -330,7 +330,6 @@ static Slang::String SlangSourceLanguageToString(const SlangSourceLanguage langu
     {
         CASE(SLANG_SOURCE_LANGUAGE_UNKNOWN);
         CASE(SLANG_SOURCE_LANGUAGE_SLANG);
-        CASE(SLANG_SOURCE_LANGUAGE_SLANG_2026);
         CASE(SLANG_SOURCE_LANGUAGE_HLSL);
         CASE(SLANG_SOURCE_LANGUAGE_GLSL);
         CASE(SLANG_SOURCE_LANGUAGE_C);

@@ -94,10 +94,15 @@ static const NamesDescriptionValue s_languageInfos[] = {
     {SLANG_SOURCE_LANGUAGE_C, "c,C", "C language"},
     {SLANG_SOURCE_LANGUAGE_CPP, "cpp,c++,C++,cxx", "C++ language"},
     {SLANG_SOURCE_LANGUAGE_SLANG, "slang", "Slang language"},
-    {SLANG_SOURCE_LANGUAGE_SLANG_2026, "2026", "2026 Slang language"},
     {SLANG_SOURCE_LANGUAGE_GLSL, "glsl", "GLSL language"},
     {SLANG_SOURCE_LANGUAGE_HLSL, "hlsl", "HLSL language"},
     {SLANG_SOURCE_LANGUAGE_CUDA, "cu,cuda", "CUDA"},
+};
+
+static const NamesDescriptionValue s_stdRevisionInfos[] = {
+    {SLANG_STD_REVISION_UNKNOWN, "unknown", "Unknown"},
+    {SLANG_STD_REVISION_2025, "2025,default", "Slang language rules for 2025 and older"},
+    {SLANG_STD_REVISION_2026, "2026", "Slang language rules for 2026 and newer"},
 };
 
 static const NamesDescriptionValue s_compilerInfos[] = {
@@ -218,6 +223,11 @@ static const NamesDescriptionValue s_fileSystemTypes[] = {
     return makeConstArrayView(s_languageInfos);
 }
 
+/* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getStdRevisionInfos()
+{
+    return makeConstArrayView(s_stdRevisionInfos);
+}
+
 /* static */ ConstArrayView<NamesDescriptionValue> TypeTextUtil::getCompilerInfos()
 {
     return makeConstArrayView(s_compilerInfos);
@@ -316,6 +326,11 @@ static const NamesDescriptionValue s_fileSystemTypes[] = {
 /* static */ SlangSourceLanguage TypeTextUtil::findSourceLanguage(const UnownedStringSlice& text)
 {
     return NameValueUtil::findValue(getLanguageInfos(), text, SLANG_SOURCE_LANGUAGE_UNKNOWN);
+}
+
+/* static */ SlangStdRevision TypeTextUtil::findStdRevision(const UnownedStringSlice& text)
+{
+    return NameValueUtil::findValue(getStdRevisionInfos(), text, SLANG_STD_REVISION_UNKNOWN);
 }
 
 /* static */ SlangPassThrough TypeTextUtil::findPassThrough(const UnownedStringSlice& slice)
