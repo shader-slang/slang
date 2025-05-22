@@ -243,14 +243,9 @@ jobs:
           $SITE_PACKAGES = python -c "import slangpy; print(slangpy.__file__.rsplit('\\', 2)[0])"
           Write-Host "Site packages directory: $SITE_PACKAGES"
           Write-Host "Copying library files..."
-          $result = Copy-Item -Path "$bin_dir\*" -Include "*.dll","*.so","*.dylib" -Destination "$SITE_PACKAGES\slangpy\" -ErrorAction Continue -ErrorVariable copyErrors -PassThru
-          if ($copyErrors) { Write-Host "Copy errors: $copyErrors" }
-          if ($result) { 
-              $groupedFiles = $result | Group-Object Extension
-              foreach ($group in $groupedFiles) {
-                  Write-Host "Copied $($group.Name.TrimStart('.').ToUpper()) files: $($group.Group.Name -join ', ')"
-              }
-          }
+          Copy-Item -Path "$bin_dir\*" -Include "*.dll","*.so","*.dylib" -Destination "$SITE_PACKAGES\slangpy\" -Force -ErrorAction Continue
+          Write-Host "Listing files in slangpy directory..."
+          Get-ChildItem -Path "$SITE_PACKAGES\slangpy" | Write-Host
           Write-Host "Running pytest on slangpy tests..."
           $env:PYTHONPATH = "$SITE_PACKAGES"
           python -m pytest "$SITE_PACKAGES\slangpy\tests" -v
