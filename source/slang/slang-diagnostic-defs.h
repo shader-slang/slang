@@ -146,6 +146,9 @@ DIAGNOSTIC(
     entryPointsNeedToBeAssociatedWithTranslationUnits,
     "when using multiple source files, entry points must be specified after their corresponding "
     "source file(s)")
+
+DIAGNOSTIC(21, Error, unknownStdRevision, "unknown language standard revision '$0'")
+
 DIAGNOSTIC(22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
 
 DIAGNOSTIC(26, Error, unknownOptimiziationLevel, "unknown optimization level '$0'")

@@ -38,7 +38,8 @@ static bool isSlang2026(CompilerOptionSet& optionSet)
 {
     if (!optionSet.hasOption(CompilerOptionName::Language))
         return false;
-    return SLANG_SOURCE_LANGUAGE_SLANG_2026 == SlangSourceLanguage(optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language))
+    return SLANG_SOURCE_LANGUAGE_SLANG == SlangSourceLanguage(optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language))
+            && SLANG_STD_REVISION_2026 == optionSet.getEnumOption<SlangStdRevision>(CompilerOptionName::StdRevision)
                ;
 }
 
@@ -110,7 +111,7 @@ static void validateDynInterfaceUsage(
     }
 
     // dyn interface cannot be generic
-    if (auto outerGeneric = visitor->GetOuterGeneric(decl))
+    if (visitor->GetOuterGeneric(decl))
     {
         sink->diagnose(
             decl,

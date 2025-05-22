@@ -63,6 +63,7 @@ enum class ValueCategory
     FileSystemType,
     VulkanShift,
     SourceEmbedStyle,
+    StdRevision,
 
     CountOf,
 };
@@ -146,6 +147,14 @@ void initCommandOptions(CommandOptions& options)
             "Language",
             UserValue(ValueCategory::Language));
         options.addValues(TypeTextUtil::getLanguageInfos());
+
+        options.addCategory(
+            CategoryKind::Value,
+            "std-revision",
+            "Std Revision",
+            UserValue(ValueCategory::StdRevision));
+        options.addValues(TypeTextUtil::getStdRevisionInfos());
+        
 
         options.addCategory(
             CategoryKind::Value,
@@ -448,7 +457,7 @@ void initCommandOptions(CommandOptions& options)
          "user build will by default be 'unknown'."},
         {OptionKind::StdRevision,
         "-std",
-        "-std <revision>",
+        "-std <std-revision>",
         "Specifies the language standard that should be used."},
         {OptionKind::WarningsAsErrors,
          "-warnings-as-errors",
@@ -2548,7 +2557,20 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         case OptionKind::StdRevision:
             {
-                //
+                CommandLineArg name;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(name));
+
+                SlangStdRevision stdRevision = TypeTextUtil::findStdRevision(name.value.getUnownedSlice());
+                if (stdRevision == SLANG_STD_REVISION_UNKNOWN)
+                {
+                    m_sink->diagnose(name.loc, Diagnostics::unknownStdRevision, name.value);
+                    return SLANG_FAIL;
+                }
+                else
+                {
+                    linkage->m_optionSet.add(OptionKind::StdRevision, stdRevision);
+                }
+                break; 
             }
         case OptionKind::Stage:
             {

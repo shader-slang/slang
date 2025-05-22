@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK_2026): -target spirv -stage compute -entry computeMain -lang 2026
+//TEST:SIMPLE(filecheck=CHECK_2026): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 //TEST:SIMPLE(filecheck=CHECK_2025_OR_EXP): -target spirv -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK_2025_OR_EXP): -target spirv -stage compute -entry computeMain -lang 2026 -enable-experimental-dynamic-dispatch
+//TEST:SIMPLE(filecheck=CHECK_2025_OR_EXP): -target spirv -stage compute -entry computeMain -lang slang -std 2026 -enable-experimental-dynamic-dispatch
 
 // Validate AST side of `dyn` keyword use-cases
 
