@@ -3231,7 +3231,7 @@ __forceinline__ __device__ void* optixTraverse(
     uint32_t MissShaderIndex,
     RayDesc Ray,
     T* Payload,
-    OptixTraversableHandle *hitObj)
+    OptixTraversableHandle* hitObj)
 {
     uint32_t r0, r1;
     packOptiXRayPayloadPointer((void*)Payload, r0, r1);
@@ -3262,7 +3262,7 @@ __forceinline__ __device__ void* optixTraverse(
     RayDesc Ray,
     float RayTime,
     T* Payload,
-    OptixTraversableHandle *hitObj)
+    OptixTraversableHandle* hitObj)
 {
     uint32_t r0, r1;
     packOptiXRayPayloadPointer((void*)Payload, r0, r1);
@@ -3282,26 +3282,22 @@ __forceinline__ __device__ void* optixTraverse(
         r1);
 }
 
-static __forceinline__ __device__ bool optixHitObjectIsHit(
-    OptixTraversableHandle *hitObj)
+static __forceinline__ __device__ bool optixHitObjectIsHit(OptixTraversableHandle* hitObj)
 {
     return optixHitObjectIsHit();
 }
 
-static __forceinline__ __device__ bool optixHitObjectIsMiss(
-    OptixTraversableHandle *hitObj)
+static __forceinline__ __device__ bool optixHitObjectIsMiss(OptixTraversableHandle* hitObj)
 {
     return optixHitObjectIsMiss();
 }
 
-static __forceinline__ __device__ bool optixHitObjectIsNop(
-    OptixTraversableHandle *hitObj)
+static __forceinline__ __device__ bool optixHitObjectIsNop(OptixTraversableHandle* hitObj)
 {
     return optixHitObjectIsNop();
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetClusterId(
-    OptixTraversableHandle *hitObj)
+static __forceinline__ __device__ uint optixHitObjectGetClusterId(OptixTraversableHandle* hitObj)
 {
     return optixHitObjectGetClusterId();
 }
@@ -3309,7 +3305,8 @@ static __forceinline__ __device__ uint optixHitObjectGetClusterId(
 static __forceinline__ __device__ void optixMakeMissHitObject(
     uint MissShaderIndex,
     RayDesc Ray,
-    OptixTraversableHandle *missObj) {
+    OptixTraversableHandle* missObj)
+{
 
     optixMakeMissHitObject(
         MissShaderIndex,
@@ -3317,15 +3314,16 @@ static __forceinline__ __device__ void optixMakeMissHitObject(
         Ray.Direction,
         Ray.TMin,
         Ray.TMax,
-        0.f,/* rayTime */
-        OPTIX_RAY_FLAG_NONE/* rayFlags*/);
+        0.f, /* rayTime */
+        OPTIX_RAY_FLAG_NONE /* rayFlags*/);
 }
 
 static __forceinline__ __device__ void optixMakeMissHitObject(
     uint MissShaderIndex,
     RayDesc Ray,
     float CurrentTime,
-    OptixTraversableHandle *missObj) {
+    OptixTraversableHandle* missObj)
+{
 
     optixMakeMissHitObject(
         MissShaderIndex,
@@ -3334,7 +3332,7 @@ static __forceinline__ __device__ void optixMakeMissHitObject(
         Ray.TMin,
         Ray.TMax,
         CurrentTime,
-        OPTIX_RAY_FLAG_NONE/* rayFlags*/);
+        OPTIX_RAY_FLAG_NONE /* rayFlags*/);
 }
 
 template<typename T>
@@ -3348,9 +3346,10 @@ static __forceinline__ __device__ void optixMakeHitObject(
     uint MultiplierForGeometryContributionToHitGroupIndex,
     RayDesc Ray,
     T attr,
-    OptixTraversableHandle *handle) {
+    OptixTraversableHandle* handle)
+{
 
-    OptixTraverseData data {};
+    OptixTraverseData data{};
     optixHitObjectGetTraverseData(&data);
     optixMakeHitObject(
         AccelerationStructure,
@@ -3358,7 +3357,7 @@ static __forceinline__ __device__ void optixMakeHitObject(
         Ray.Direction,
         Ray.TMin,
         0.f,
-        OPTIX_RAY_FLAG_NONE,/* rayFlags*/
+        OPTIX_RAY_FLAG_NONE, /* rayFlags*/
         data,
         nullptr, /*OptixTraversableHandle* transforms*/
         0 /*numTransforms */);
@@ -3374,9 +3373,10 @@ static __forceinline__ __device__ void optixMakeHitObject(
     uint HitKind,
     RayDesc Ray,
     T attr,
-    OptixTraversableHandle *handle) {
+    OptixTraversableHandle* handle)
+{
 
-    OptixTraverseData data {};
+    OptixTraverseData data{};
     optixHitObjectGetTraverseData(&data);
     optixMakeHitObject(
         AccelerationStructure,
@@ -3384,7 +3384,7 @@ static __forceinline__ __device__ void optixMakeHitObject(
         Ray.Direction,
         Ray.TMin,
         0.f,
-        OPTIX_RAY_FLAG_NONE,/* rayFlags*/
+        OPTIX_RAY_FLAG_NONE, /* rayFlags*/
         data,
         nullptr, /*OptixTraversableHandle* transforms*/
         0 /*numTransforms */);
@@ -3402,9 +3402,10 @@ static __forceinline__ __device__ void optixMakeHitObject(
     RayDesc Ray,
     float CurrentTime,
     T attr,
-    OptixTraversableHandle *handle) {
+    OptixTraversableHandle* handle)
+{
 
-    OptixTraverseData data {};
+    OptixTraverseData data{};
     optixHitObjectGetTraverseData(&data);
     optixMakeHitObject(
         AccelerationStructure,
@@ -3412,7 +3413,7 @@ static __forceinline__ __device__ void optixMakeHitObject(
         Ray.Direction,
         Ray.TMin,
         CurrentTime,
-        OPTIX_RAY_FLAG_NONE,/* rayFlags*/
+        OPTIX_RAY_FLAG_NONE, /* rayFlags*/
         data,
         nullptr, /*OptixTraversableHandle* transforms*/
         0 /*numTransforms */);
@@ -3429,9 +3430,10 @@ static __forceinline__ __device__ void optixMakeHitObject(
     RayDesc Ray,
     float CurrentTime,
     T attr,
-    OptixTraversableHandle *handle) {
+    OptixTraversableHandle* handle)
+{
 
-    OptixTraverseData data {};
+    OptixTraverseData data{};
     optixHitObjectGetTraverseData(&data);
     optixMakeHitObject(
         AccelerationStructure,
@@ -3439,14 +3441,13 @@ static __forceinline__ __device__ void optixMakeHitObject(
         Ray.Direction,
         Ray.TMin,
         CurrentTime,
-        OPTIX_RAY_FLAG_NONE,/* rayFlags*/
+        OPTIX_RAY_FLAG_NONE, /* rayFlags*/
         data,
         nullptr, /*OptixTraversableHandle* transforms*/
         0 /*numTransforms */);
 }
 
-static __forceinline__ __device__ void optixMakeNopHitObject(
-    OptixTraversableHandle *Obj)
+static __forceinline__ __device__ void optixMakeNopHitObject(OptixTraversableHandle* Obj)
 {
     optixMakeNopHitObject();
 }
@@ -3454,90 +3455,92 @@ static __forceinline__ __device__ void optixMakeNopHitObject(
 template<typename T>
 static __forceinline__ __device__ void optixInvoke(
     OptixTraversableHandle AccelerationStructure,
-    OptixTraversableHandle *HitOrMiss,
+    OptixTraversableHandle* HitOrMiss,
     T Payload)
 {
     uint32_t r0, r1;
     packOptiXRayPayloadPointer((void*)Payload, r0, r1);
-    optixInvoke(
-        r0,
-        r1);
+    optixInvoke(r0, r1);
 }
-static __forceinline__ __device__ RayDesc optixHitObjectGetRayDesc(
-    OptixTraversableHandle *obj)
+static __forceinline__ __device__ RayDesc optixHitObjectGetRayDesc(OptixTraversableHandle* obj)
 {
-    RayDesc ray = { optixHitObjectGetWorldRayOrigin(), optixHitObjectGetRayTmin(), optixHitObjectGetWorldRayDirection(), optixHitObjectGetRayTmax() };
+    RayDesc ray = {
+        optixHitObjectGetWorldRayOrigin(),
+        optixHitObjectGetRayTmin(),
+        optixHitObjectGetWorldRayDirection(),
+        optixHitObjectGetRayTmax()};
     return ray;
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetInstanceIndex(
-    OptixTraversableHandle *Obj)
+static __forceinline__ __device__ uint optixHitObjectGetInstanceIndex(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetInstanceIndex();
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetInstanceId(
-    OptixTraversableHandle *Obj)
+static __forceinline__ __device__ uint optixHitObjectGetInstanceId(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetInstanceId();
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetSbtGASIndex(
-    OptixTraversableHandle *Obj)
+static __forceinline__ __device__ uint optixHitObjectGetSbtGASIndex(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetSbtGASIndex();
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetPrimitiveIndex(
-    OptixTraversableHandle *Obj)
+static __forceinline__ __device__ uint optixHitObjectGetPrimitiveIndex(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetPrimitiveIndex();
 }
 
 template<typename T>
-static __forceinline__ __device__ T optixHitObjectGetAttribute(
-    OptixTraversableHandle *Obj)
+static __forceinline__ __device__ T optixHitObjectGetAttribute(OptixTraversableHandle* Obj)
 {
-      constexpr size_t numInts = (sizeof(T) + sizeof(uint32_t) - 1) / sizeof(uint32_t); // Number of 32-bit values, rounded up
-      static_assert(numInts <= 8, "Attribute type is too large");
+    constexpr size_t numInts = (sizeof(T) + sizeof(uint32_t) - 1) /
+                               sizeof(uint32_t); // Number of 32-bit values, rounded up
+    static_assert(numInts <= 8, "Attribute type is too large");
 
-      // Create an array to hold the attribute values
-      uint32_t values[numInts == 0 ? 1 : numInts] = {0}; // Ensure we have at least one element
+    // Create an array to hold the attribute values
+    uint32_t values[numInts == 0 ? 1 : numInts] = {0}; // Ensure we have at least one element
 
-      // Read the appropriate number of attribute registers
-      if constexpr (numInts > 0) values[0] = optixHitObjectGetAttribute_0();
-      if constexpr (numInts > 1) values[1] = optixHitObjectGetAttribute_1();
-      if constexpr (numInts > 2) values[2] = optixHitObjectGetAttribute_2();
-      if constexpr (numInts > 3) values[3] = optixHitObjectGetAttribute_3();
-      if constexpr (numInts > 4) values[4] = optixHitObjectGetAttribute_4();
-      if constexpr (numInts > 5) values[5] = optixHitObjectGetAttribute_5();
-      if constexpr (numInts > 6) values[6] = optixHitObjectGetAttribute_6();
-      if constexpr (numInts > 7) values[7] = optixHitObjectGetAttribute_7();
+    // Read the appropriate number of attribute registers
+    if constexpr (numInts > 0)
+        values[0] = optixHitObjectGetAttribute_0();
+    if constexpr (numInts > 1)
+        values[1] = optixHitObjectGetAttribute_1();
+    if constexpr (numInts > 2)
+        values[2] = optixHitObjectGetAttribute_2();
+    if constexpr (numInts > 3)
+        values[3] = optixHitObjectGetAttribute_3();
+    if constexpr (numInts > 4)
+        values[4] = optixHitObjectGetAttribute_4();
+    if constexpr (numInts > 5)
+        values[5] = optixHitObjectGetAttribute_5();
+    if constexpr (numInts > 6)
+        values[6] = optixHitObjectGetAttribute_6();
+    if constexpr (numInts > 7)
+        values[7] = optixHitObjectGetAttribute_7();
 
-      // Reinterpret the array as the desired type
-      T result;
-      memcpy(&result, values, sizeof(T));
-      return result;
+    // Reinterpret the array as the desired type
+    T result;
+    memcpy(&result, values, sizeof(T));
+    return result;
 }
 
-static __forceinline__ __device__ uint optixHitObjectGetSbtRecordIndex(
-    OptixTraversableHandle *Obj)
+static __forceinline__ __device__ uint optixHitObjectGetSbtRecordIndex(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetSbtRecordIndex();
 }
 
-static __forceinline__ __device__ uint optixHitObjectSetSbtRecordIndex(
-    OptixTraversableHandle *Obj,
-    uint sbtRecordIndex)
+static __forceinline__ __device__ uint
+optixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecordIndex)
 {
     optixHitObjectSetSbtRecordIndex(sbtRecordIndex); // returns void
     return 0;
 }
-static __forceinline__ __device__ uint optixHitObjectGetSbtDataPointer(
-    OptixTraversableHandle *Obj,
-    uint sbtRecordIndex )
+static __forceinline__ __device__ uint
+optixHitObjectGetSbtDataPointer(OptixTraversableHandle* Obj, uint sbtRecordIndex)
 {
-    optixHitObjectGetSbtDataPointer();// returns void
+    optixHitObjectGetSbtDataPointer(); // returns void
     return 0;
 }
 #endif
