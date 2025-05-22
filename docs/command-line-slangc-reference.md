@@ -22,6 +22,7 @@ slangc -help-style markdown -h
 * [Deprecated](#Deprecated)
 * [compiler](#compiler)
 * [language](#language)
+* [std-revision](#std-revision)
 * [archive-type](#archive-type)
 * [line-directive-mode](#line-directive-mode)
 * [debug-info-format](#debug-info-format)
@@ -221,6 +222,14 @@ Specifies the format in which code should be generated.
 Display the build version. This is the contents of git describe --tags. 
 
 It is typically only set from automated builds(such as distros available on github).A user build will by default be 'unknown'. 
+
+
+<a id="std"></a>
+### -std
+
+**-std &lt;[std-revision](#std-revision)&gt;**
+
+Specifies the language standard that should be used. 
 
 
 <a id="warnings-as-errors"></a>
@@ -742,6 +751,11 @@ Enable GLSL as an input language.
 Enable experimental compiler passes 
 
 
+<a id="enable-experimental-dynamic-dispatch"></a>
+### -enable-experimental-dynamic-dispatch
+Enable experimental dynamic dispatch features 
+
+
 <a id="embed-downstream-ir"></a>
 ### -embed-downstream-ir
 Embed downstream IR into emitted slang IR 
@@ -883,6 +897,15 @@ Language
 * `glsl` : GLSL language 
 * `hlsl` : HLSL language 
 * `cu`, `cuda` : CUDA 
+
+<a id="std-revision"></a>
+## std-revision
+
+Std Revision 
+
+* `unknown` : Unknown 
+* `2025`, `default` : Slang language rules for 2025 and older 
+* `2026` : Slang language rules for 2026 and newer 
 
 <a id="archive-type"></a>
 ## archive-type

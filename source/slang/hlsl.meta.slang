@@ -6452,6 +6452,18 @@ vector<T,N> acosh(vector<T,N> x)
     }
 }
 
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+matrix<T, N, M> acosh(matrix<T, N, M> x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "acosh";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, acosh, x);
+    }
+}
 
 // Test if all components are non-zero.
 __generic<T : __BuiltinType>
@@ -6952,6 +6964,19 @@ vector<T,N> asinh(vector<T,N> x)
     case wgsl: __intrinsic_asm "asinh";
     default:
         VECTOR_MAP_UNARY(T, N, asinh, x);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+matrix<T, N, M> asinh(matrix<T, N, M> x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "asinh";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, asinh, x);
     }
 }
 
@@ -7574,6 +7599,19 @@ vector<T,N> atanh(vector<T,N> x)
     case wgsl: __intrinsic_asm "atanh";
     default:
         VECTOR_MAP_UNARY(T, N, atanh, x);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+matrix<T, N, M> atanh(matrix<T, N, M> x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "atanh";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, atanh, x);
     }
 }
 
@@ -24865,16 +24903,16 @@ for(auto buffer : kByteAddressBufferCases) {
         __target_switch
         {
         case hlsl:
-            if (T is __BuiltinSignedArithmeticType)
+            if (__isFloat<T>() || __isSignedInt<T>())
             {
-                if (U is __BuiltinSignedArithmeticType)
+                if (__isFloat<U>() || __isSignedInt<U>())
                     __intrinsic_asm "__builtin_MatVecMul($0, false,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
                 else
                     __intrinsic_asm "__builtin_MatVecMul($0, false,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
             }
             else
             {
-                if (U is __BuiltinSignedArithmeticType)
+                if (__isFloat<U>() || __isSignedInt<U>())
                     __intrinsic_asm "__builtin_MatVecMul($0, true,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
                 else
                     __intrinsic_asm "__builtin_MatVecMul($0, true,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
@@ -24897,16 +24935,16 @@ for(auto buffer : kByteAddressBufferCases) {
         __target_switch
         {
         case hlsl:
-            if (T is __BuiltinSignedArithmeticType)
+            if (__isFloat<T>() || __isSignedInt<T>())
             {
-                if (U is __BuiltinSignedArithmeticType)
+                if (__isFloat<U>() || __isSignedInt<U>())
                     __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
                 else
                     __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
             }
             else
             {
-                if (U is __BuiltinSignedArithmeticType)
+                if (__isFloat<U>() || __isSignedInt<U>())
                     __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
                 else
                     __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
