@@ -1564,7 +1564,7 @@ FIDDLE() namespace Slang
 
         Flavor m_flavor;
         DeclRef<Decl> m_declRef;
-        RefPtr<RefObject> m_obj;
+        RefPtr<WitnessTable> m_obj;
         Val* m_val = nullptr;
     };
 

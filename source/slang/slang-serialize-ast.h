@@ -11,8 +11,10 @@
 
 namespace Slang
 {
+class Linkage;
+
 void writeSerializedModuleAST(
-    Encoder* encoder,
+    RIFF::BuildCursor& cursor,
     ModuleDecl* moduleDecl,
     SerialSourceLocWriter* sourceLocWriter);
 
