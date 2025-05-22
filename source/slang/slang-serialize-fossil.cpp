@@ -45,7 +45,9 @@ void SerialWriter::_initialize(ChunkBuilder* chunk)
     header.flags = 0;
 
     headerChunk->writeData(&header.magic, sizeof(header.magic));
-    headerChunk->writeData(&header.totalSizeIncludingHeader, sizeof(header.totalSizeIncludingHeader));
+    headerChunk->writeData(
+        &header.totalSizeIncludingHeader,
+        sizeof(header.totalSizeIncludingHeader));
     headerChunk->writeData(&header.flags, sizeof(header.flags));
 
     // The main reason we are writing the fields manually is
@@ -148,7 +150,8 @@ void SerialWriter::handleString(String& value)
         {
             auto existingChunk = *found;
 
-            auto ptrLayout = (ContainerLayoutObj*) _reserveDestinationForWrite(FossilizedValKind::Ptr);
+            auto ptrLayout =
+                (ContainerLayoutObj*)_reserveDestinationForWrite(FossilizedValKind::Ptr);
             LayoutObj::_merge(ptrLayout->baseLayout, FossilizedValKind::String);
 
             _commitWrite(ValInfo::relativePtrTo(existingChunk));
@@ -159,7 +162,7 @@ void SerialWriter::handleString(String& value)
     _pushPotentiallyIndirectValueScope(FossilizedValKind::String);
 
     auto data = value.getBuffer();
-    _writeValueRaw(ValInfo::rawData(data, size+1, 1));
+    _writeValueRaw(ValInfo::rawData(data, size + 1, 1));
 
     auto chunk = _popPotentiallyIndirectValueScope();
 
@@ -338,7 +341,11 @@ SerialWriter::LayoutObj* SerialWriter::LayoutObj::_create(FossilizedValKind kind
         return new ContainerLayoutObj(kind, nullptr);
 
     case FossilizedValKind::Ptr:
-        return new ContainerLayoutObj(kind, nullptr, sizeof(Fossil::RelativePtrOffset), sizeof(Fossil::RelativePtrOffset));
+        return new ContainerLayoutObj(
+            kind,
+            nullptr,
+            sizeof(Fossil::RelativePtrOffset),
+            sizeof(Fossil::RelativePtrOffset));
 
     case FossilizedValKind::Variant:
         // A variant is being treated like a container at this point,
@@ -422,12 +429,12 @@ void SerialWriter::LayoutObj::_merge(LayoutObj*& dst, LayoutObj* src)
     case FossilizedValKind::Optional:
     case FossilizedValKind::Dictionary:
     case FossilizedValKind::Ptr:
-    {
-        auto dstContainer = (ContainerLayoutObj*)dst;
-        auto srcContainer = (ContainerLayoutObj*)src;
-        _merge(dstContainer->baseLayout, srcContainer->baseLayout);
-    }
-    break;
+        {
+            auto dstContainer = (ContainerLayoutObj*)dst;
+            auto srcContainer = (ContainerLayoutObj*)src;
+            _merge(dstContainer->baseLayout, srcContainer->baseLayout);
+        }
+        break;
 
     case FossilizedValKind::String:
         break;
@@ -575,7 +582,7 @@ void SerialWriter::_popVariantScope()
 {
     SLANG_ASSERT(_state.layout);
     SLANG_ASSERT(_state.layout->kind == FossilizedValKind::Variant);
-    auto variantLayout = (ContainerLayoutObj*) _state.layout;
+    auto variantLayout = (ContainerLayoutObj*)_state.layout;
     auto valueLayout = variantLayout->baseLayout;
     SLANG_ASSERT(valueLayout);
 
@@ -792,25 +799,25 @@ SerialWriter::LayoutObj*& SerialWriter::_reserveDestinationForWrite()
     {
     case FossilizedValKind::Struct:
     case FossilizedValKind::Tuple:
-    {
-        auto tupleLayout = (TupleLayoutObj*)_state.layout;
-        auto elementIndex = _state.elementCount;
-        auto& elementLayout = tupleLayout->_getField(elementIndex).layout;
-        return elementLayout;
-    }
-    break;
+        {
+            auto tupleLayout = (TupleLayoutObj*)_state.layout;
+            auto elementIndex = _state.elementCount;
+            auto& elementLayout = tupleLayout->_getField(elementIndex).layout;
+            return elementLayout;
+        }
+        break;
 
     case FossilizedValKind::Ptr:
     case FossilizedValKind::Optional:
     case FossilizedValKind::Array:
     case FossilizedValKind::Dictionary:
     case FossilizedValKind::Variant:
-    {
-        auto containerLayout = (ContainerLayoutObj*)_state.layout;
-        auto& elementLayout = containerLayout->baseLayout;
-        return elementLayout;
-    }
-    break;
+        {
+            auto containerLayout = (ContainerLayoutObj*)_state.layout;
+            auto& elementLayout = containerLayout->baseLayout;
+            return elementLayout;
+        }
+        break;
 
     default:
         SLANG_UNEXPECTED("implement me!");
@@ -837,53 +844,53 @@ void SerialWriter::_commitWrite(ValInfo const& val)
     {
     case FossilizedValKind::Struct:
     case FossilizedValKind::Tuple:
-    {
-        auto tupleLayout = (TupleLayoutObj*)_state.layout;
-        auto elementIndex = _state.elementCount++;
-        auto& fieldInfo = tupleLayout->_getField(elementIndex);
-
-        Size fieldOffset = 0;
-        if (elementIndex != 0)
         {
-            auto chunk = _state.chunk;
-            chunk->writePaddingToAlignTo(val.getAlignment());
+            auto tupleLayout = (TupleLayoutObj*)_state.layout;
+            auto elementIndex = _state.elementCount++;
+            auto& fieldInfo = tupleLayout->_getField(elementIndex);
 
-            fieldOffset = chunk->getContentSize();
+            Size fieldOffset = 0;
+            if (elementIndex != 0)
+            {
+                auto chunk = _state.chunk;
+                chunk->writePaddingToAlignTo(val.getAlignment());
+
+                fieldOffset = chunk->getContentSize();
+            }
+            fieldInfo.offset = fieldOffset;
+
+            _writeValueRaw(val);
         }
-        fieldInfo.offset = fieldOffset;
-
-        _writeValueRaw(val);
-    }
-    break;
+        break;
 
     case FossilizedValKind::Optional:
     case FossilizedValKind::Ptr:
     case FossilizedValKind::Array:
     case FossilizedValKind::Dictionary:
     case FossilizedValKind::Variant:
-    {
-        auto elementIndex = _state.elementCount++;
-
-        switch (outerKind)
         {
-        case FossilizedValKind::Optional:
-        case FossilizedValKind::Ptr:
-            if (elementIndex > 0)
+            auto elementIndex = _state.elementCount++;
+
+            switch (outerKind)
             {
-                SLANG_UNEXPECTED(
-                    "error during serialization: optional with more than one value inside!!");
+            case FossilizedValKind::Optional:
+            case FossilizedValKind::Ptr:
+                if (elementIndex > 0)
+                {
+                    SLANG_UNEXPECTED(
+                        "error during serialization: optional with more than one value inside!!");
+                }
+                break;
+
+            default:
+                break;
             }
-            break;
 
-        default:
-            break;
+            _writeValueRaw(val);
         }
+        break;
 
-        _writeValueRaw(val);
-    }
-    break;
-
-    #if 0
+#if 0
     case FossilizedValKind::Variant:
         {
             auto elementIndex = _state.elementCount++;
@@ -896,7 +903,7 @@ void SerialWriter::_commitWrite(ValInfo const& val)
             _writeValueRaw(layout, val);
         }
         break;
-        #endif
+#endif
 
     default:
         SLANG_UNEXPECTED("implement me!");
@@ -904,7 +911,11 @@ void SerialWriter::_commitWrite(ValInfo const& val)
     }
 }
 
-void SerialWriter::_writeSimpleValue(FossilizedValKind kind, void const* data, size_t size, size_t alignment)
+void SerialWriter::_writeSimpleValue(
+    FossilizedValKind kind,
+    void const* data,
+    size_t size,
+    size_t alignment)
 {
     auto layout = _reserveDestinationForWrite(kind);
     SLANG_ASSERT(layout->size == size);
@@ -995,57 +1006,58 @@ ChunkBuilder* SerialWriter::_getOrCreateChunkForLayout(LayoutObj* layout)
 
     case FossilizedValKind::Ptr:
     case FossilizedValKind::Optional:
-    {
-        auto containerLayout = (ContainerLayoutObj*)layout;
-        auto elementLayout = containerLayout->baseLayout;
-        auto elementLayoutChunk = _getOrCreateChunkForLayout(elementLayout);
-        chunk->writeRelativePtr<Fossil::RelativePtrOffset>(elementLayoutChunk);
-    }
-    break;
+        {
+            auto containerLayout = (ContainerLayoutObj*)layout;
+            auto elementLayout = containerLayout->baseLayout;
+            auto elementLayoutChunk = _getOrCreateChunkForLayout(elementLayout);
+            chunk->writeRelativePtr<Fossil::RelativePtrOffset>(elementLayoutChunk);
+        }
+        break;
 
     case FossilizedValKind::Array:
     case FossilizedValKind::Dictionary:
-    {
-        auto containerLayout = (ContainerLayoutObj*)layout;
-        auto elementLayout = containerLayout->baseLayout;
-        auto elementLayoutChunk = _getOrCreateChunkForLayout(elementLayout);
-        chunk->writeRelativePtr<Fossil::RelativePtrOffset>(elementLayoutChunk);
-
-        UInt32 elementStride = 0;
-        if (elementLayout)
         {
-            elementStride = UInt32(roundUpToAlignment(elementLayout->size, elementLayout->alignment));
-            SLANG_ASSERT(elementStride != 0);
+            auto containerLayout = (ContainerLayoutObj*)layout;
+            auto elementLayout = containerLayout->baseLayout;
+            auto elementLayoutChunk = _getOrCreateChunkForLayout(elementLayout);
+            chunk->writeRelativePtr<Fossil::RelativePtrOffset>(elementLayoutChunk);
+
+            UInt32 elementStride = 0;
+            if (elementLayout)
+            {
+                elementStride =
+                    UInt32(roundUpToAlignment(elementLayout->size, elementLayout->alignment));
+                SLANG_ASSERT(elementStride != 0);
+            }
+            chunk->writeData(&elementStride, sizeof(elementStride));
         }
-        chunk->writeData(&elementStride, sizeof(elementStride));
-    }
-    break;
+        break;
 
     case FossilizedValKind::Struct:
     case FossilizedValKind::Tuple:
-    {
-        auto recordLayout = (RecordLayoutObj*)layout;
-
-        auto fieldCount = UInt32(recordLayout->fields.getCount());
-        chunk->writeData(&fieldCount, sizeof(fieldCount));
-
-        bool first = true;
-        for (auto field : recordLayout->fields)
         {
-            auto fieldLayoutChunk = _getOrCreateChunkForLayout(field.layout);
-            chunk->writeRelativePtr<Fossil::RelativePtrOffset>(fieldLayoutChunk);
+            auto recordLayout = (RecordLayoutObj*)layout;
 
-            auto fieldOffset = UInt32(field.offset);
-            chunk->writeData(&fieldOffset, sizeof(fieldOffset));
+            auto fieldCount = UInt32(recordLayout->fields.getCount());
+            chunk->writeData(&fieldCount, sizeof(fieldCount));
 
-            if (!first)
+            bool first = true;
+            for (auto field : recordLayout->fields)
             {
-                SLANG_ASSERT(fieldOffset != 0);
+                auto fieldLayoutChunk = _getOrCreateChunkForLayout(field.layout);
+                chunk->writeRelativePtr<Fossil::RelativePtrOffset>(fieldLayoutChunk);
+
+                auto fieldOffset = UInt32(field.offset);
+                chunk->writeData(&fieldOffset, sizeof(fieldOffset));
+
+                if (!first)
+                {
+                    SLANG_ASSERT(fieldOffset != 0);
+                }
+                first = false;
             }
-            first = false;
         }
-    }
-    break;
+        break;
     }
 
     return chunk;
@@ -1073,45 +1085,44 @@ bool SerialWriter::LayoutObjKey::operator==(LayoutObjKey const& that) const
     case FossilizedValKind::Dictionary:
     case FossilizedValKind::Optional:
     case FossilizedValKind::Ptr:
-    {
-        auto thisContainer = (ContainerLayoutObj*)obj;
-        auto thatContainer = (ContainerLayoutObj*)that.obj;
+        {
+            auto thisContainer = (ContainerLayoutObj*)obj;
+            auto thatContainer = (ContainerLayoutObj*)that.obj;
 
-        LayoutObjKey thisElement = thisContainer->baseLayout;
-        LayoutObjKey thatElement = thatContainer->baseLayout;
+            LayoutObjKey thisElement = thisContainer->baseLayout;
+            LayoutObjKey thatElement = thatContainer->baseLayout;
 
-        if (thisElement != thatElement)
-            return false;
-
-    }
-    break;
+            if (thisElement != thatElement)
+                return false;
+        }
+        break;
 
     case FossilizedValKind::Tuple:
     case FossilizedValKind::Struct:
-    {
-        auto thisRecord = (RecordLayoutObj*)obj;
-        auto thatRecord = (RecordLayoutObj*)that.obj;
-
-        if (thisRecord->fields.getCount() != thatRecord->fields.getCount())
-            return false;
-
-        auto fieldCount = thisRecord->fields.getCount();
-        for (Index i = 0; i < fieldCount; ++i)
         {
-            auto thisField = thisRecord->fields[i];
-            auto thatField = thatRecord->fields[i];
+            auto thisRecord = (RecordLayoutObj*)obj;
+            auto thatRecord = (RecordLayoutObj*)that.obj;
 
-            if (thisField.offset != thatField.offset)
+            if (thisRecord->fields.getCount() != thatRecord->fields.getCount())
                 return false;
 
-            LayoutObjKey thisFieldLayout = thisField.layout;
-            LayoutObjKey thatFieldLayout = thatField.layout;
+            auto fieldCount = thisRecord->fields.getCount();
+            for (Index i = 0; i < fieldCount; ++i)
+            {
+                auto thisField = thisRecord->fields[i];
+                auto thatField = thatRecord->fields[i];
 
-            if (thisFieldLayout != thatFieldLayout)
-                return false;
+                if (thisField.offset != thatField.offset)
+                    return false;
+
+                LayoutObjKey thisFieldLayout = thisField.layout;
+                LayoutObjKey thatFieldLayout = thatField.layout;
+
+                if (thisFieldLayout != thatFieldLayout)
+                    return false;
+            }
         }
-    }
-    break;
+        break;
     }
 
     return true;
@@ -1148,27 +1159,27 @@ void SerialWriter::LayoutObjKey::hashInto(Hasher& hasher) const
     case FossilizedValKind::Dictionary:
     case FossilizedValKind::Optional:
     case FossilizedValKind::Ptr:
-    {
-        auto container = (ContainerLayoutObj*)obj;
+        {
+            auto container = (ContainerLayoutObj*)obj;
 
-        LayoutObjKey(container->baseLayout).hashInto(hasher);
-    }
-    break;
+            LayoutObjKey(container->baseLayout).hashInto(hasher);
+        }
+        break;
 
     case FossilizedValKind::Tuple:
     case FossilizedValKind::Struct:
-    {
-        auto record = (RecordLayoutObj*)obj;
-
-        hasher.hashValue(record->fields.getCount());
-
-        for (auto field : record->fields)
         {
-            hasher.hashValue(field.offset);
-            LayoutObjKey(field.layout).hashInto(hasher);
+            auto record = (RecordLayoutObj*)obj;
+
+            hasher.hashValue(record->fields.getCount());
+
+            for (auto field : record->fields)
+            {
+                hasher.hashValue(field.offset);
+                LayoutObjKey(field.layout).hashInto(hasher);
+            }
         }
-    }
-    break;
+        break;
     }
 }
 
@@ -1532,10 +1543,7 @@ void SerialReader::handleUniquePtr(void*& value, Callback callback, void* userDa
     handleSharedPtr(value, callback, userData);
 }
 
-void SerialReader::handleDeferredObjectContents(
-    void* valuePtr,
-    Callback callback,
-    void* userData)
+void SerialReader::handleDeferredObjectContents(void* valuePtr, Callback callback, void* userData)
 {
     // Unlike the case in `SerialWriter::handleDeferredObjectContents()`,
     // we very much *do* want to delay invoking the callback until later.
@@ -1594,32 +1602,32 @@ FossilizedValRef SerialReader::_readValRef()
 
     case State::Type::Struct:
     case State::Type::Tuple:
-    {
-        SLANG_ASSERT(_state.elementIndex < _state.elementCount);
-        auto index = _state.elementIndex++;
+        {
+            SLANG_ASSERT(_state.elementIndex < _state.elementCount);
+            auto index = _state.elementIndex++;
 
-        auto recordRef = as<FossilizedRecordVal>(_state.baseValue);
-        return getField(recordRef, index);
-    }
+            auto recordRef = as<FossilizedRecordVal>(_state.baseValue);
+            return getField(recordRef, index);
+        }
 
     case State::Type::Optional:
-    {
-        SLANG_ASSERT(_state.elementCount == 1);
-        SLANG_ASSERT(_state.elementIndex == 0);
+        {
+            SLANG_ASSERT(_state.elementCount == 1);
+            SLANG_ASSERT(_state.elementIndex == 0);
 
-        auto optionalRef = as<FossilizedOptionalObj>(_state.baseValue);
-        return getValue(optionalRef);
-    }
+            auto optionalRef = as<FossilizedOptionalObj>(_state.baseValue);
+            return getValue(optionalRef);
+        }
 
     case State::Type::Array:
     case State::Type::Dictionary:
-    {
-        SLANG_ASSERT(_state.elementIndex < _state.elementCount);
-        auto index = _state.elementIndex++;
+        {
+            SLANG_ASSERT(_state.elementIndex < _state.elementCount);
+            auto index = _state.elementIndex++;
 
-        auto containerRef = as<FossilizedContainerObj>(_state.baseValue);
-        return getElement(containerRef, index);
-    }
+            auto containerRef = as<FossilizedContainerObj>(_state.baseValue);
+            return getElement(containerRef, index);
+        }
 
     default:
         SLANG_UNEXPECTED("implement me!");

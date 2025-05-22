@@ -16,86 +16,77 @@
 
 namespace Slang
 {
-    namespace detail
-    {
-        struct RelativePtr32Traits
-        {
-            using Offset = Int32;
-            using UOffset = UInt32;
-        };
+namespace detail
+{
+struct RelativePtr32Traits
+{
+    using Offset = Int32;
+    using UOffset = UInt32;
+};
 
-        struct RelativePtr64Traits
+struct RelativePtr64Traits
+{
+    using Offset = Int64;
+    using UOffset = UInt64;
+};
+} // namespace detail
+
+template<typename T, typename Traits>
+struct RelativePtr
+{
+public:
+    using This = RelativePtr<T, Traits>;
+    using Value = T;
+    using RawPtr = T*;
+    using Offset = typename Traits::Offset;
+    using UOffset = typename Traits::UOffset;
+
+    RelativePtr() = default;
+    RelativePtr(RelativePtr const& ptr) { set(ptr); }
+    RelativePtr(RelativePtr&& ptr) { set(ptr); }
+    RelativePtr(T* ptr) { set(ptr); }
+
+    T* get() const
+    {
+        if (_offset == 0)
         {
-            using Offset = Int64;
-            using UOffset = UInt64;
-        };
+            return nullptr;
+        }
+
+        intptr_t thisAddr = intptr_t(this);
+        intptr_t targetAddr = thisAddr + intptr_t(_offset);
+
+        return (T*)(targetAddr);
     }
 
-    template<typename T, typename Traits>
-    struct RelativePtr
+    operator T*() const { return get(); }
+    T* operator->() const { return get(); }
+
+    void set(T* ptr)
     {
-    public:
-        using This = RelativePtr<T,Traits>;
-        using Value = T;
-        using RawPtr = T*;
-        using Offset = typename Traits::Offset;
-        using UOffset = typename Traits::UOffset;
-
-        RelativePtr() = default;
-        RelativePtr(RelativePtr const& ptr)
+        if (ptr == nullptr)
         {
-            set(ptr);
-        }
-        RelativePtr(RelativePtr&& ptr)
-        {
-            set(ptr);
-        }
-        RelativePtr(T* ptr)
-        {
-            set(ptr);
+            _offset = 0;
+            return;
         }
 
-        T* get() const
-        {
-            if (_offset == 0)
-            {
-                return nullptr;
-            }
+        intptr_t thisAddr = intptr_t(this);
+        intptr_t targetAddr = intptr_t(ptr);
+        intptr_t offsetVal = targetAddr - thisAddr;
 
-            intptr_t thisAddr = intptr_t(this);
-            intptr_t targetAddr = thisAddr + intptr_t(_offset);
+        _offset = Offset(offsetVal);
+        SLANG_ASSERT(intptr_t(_offset) == offsetVal);
+    }
 
-            return (T*)(targetAddr);
-        }
+private:
+    Offset _offset = 0;
+};
 
-        operator T*() const { return get(); }
-        T* operator->() const { return get(); }
+template<typename T>
+using RelativePtr32 = RelativePtr<T, detail::RelativePtr32Traits>;
 
-        void set(T* ptr)
-        {
-            if (ptr == nullptr)
-            {
-                _offset = 0;
-                return;
-            }
-
-            intptr_t thisAddr = intptr_t(this);
-            intptr_t targetAddr = intptr_t(ptr);
-            intptr_t offsetVal = targetAddr - thisAddr;
-
-            _offset = Offset(offsetVal);
-            SLANG_ASSERT(intptr_t(_offset) == offsetVal);
-        }
-
-    private:
-        Offset _offset = 0;
-    };
-
-    template<typename T>
-    using RelativePtr32 = RelativePtr<T, detail::RelativePtr32Traits>;
-
-    template<typename T>
-    using RelativePtr64 = RelativePtr<T, detail::RelativePtr64Traits>;
+template<typename T>
+using RelativePtr64 = RelativePtr<T, detail::RelativePtr64Traits>;
 
 } // namespace Slang
 

@@ -77,7 +77,7 @@ FossilizedValRef getRootValue(void const* data, Size size)
         rootValueVariant->getContentLayout());
 }
 
-}
+} // namespace Fossil
 
 Size FossilizedStringObj::getSize() const
 {
@@ -156,7 +156,7 @@ FossilizedRecordElementLayout* FossilizedRecordLayout::getField(Index index) con
     SLANG_ASSERT(index >= 0);
     SLANG_ASSERT(index < fieldCount);
 
-    auto fieldsPtr = (FossilizedRecordElementLayout*) (this + 1);
+    auto fieldsPtr = (FossilizedRecordElementLayout*)(this + 1);
     return fieldsPtr + index;
 }
 

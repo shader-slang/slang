@@ -5,9 +5,8 @@
 #include "slang-compiler.h"
 #include "slang-diagnostics.h"
 #include "slang-mangle.h"
-#include "slang-serialize-riff.h"
-
 #include "slang-serialize-fossil.h"
+#include "slang-serialize-riff.h"
 
 namespace Slang
 {
@@ -910,7 +909,7 @@ void writeSerializedModuleAST(
     SlabBuilder slabBuilder;
     {
         Fossil::SerialWriter writer(slabBuilder);
-    //    RIFFSerialWriter writer(cursor.getCurrentChunk());
+        //    RIFFSerialWriter writer(cursor.getCurrentChunk());
 
         ASTEncodingContext context(&writer, moduleDecl, sourceLocWriter);
         serialize(ASTSerializer(&context), moduleDecl);
@@ -925,12 +924,12 @@ void writeSerializedModuleAST(
     size_t size = blob->getBufferSize();
 
 
-    #if 0
+#if 0
     {
         auto rootVal = FossilizedVal::Ref::getFromBlob(data, size);
         dump(rootVal);
     }
-    #endif
+#endif
 
 
     cursor.addDataChunk(PropertyKeys<Module>::ASTModule, data, size);
@@ -950,7 +949,7 @@ ModuleDecl* readSerializedModuleAST(
 
     Fossil::SerialReader reader(rootVal);
 
-//    RIFFSerialReader reader(chunk);
+    //    RIFFSerialReader reader(chunk);
     ASTDecodingContext
         context(linkage, astBuilder, sink, &reader, sourceLocReader, requestingSourceLoc);
 

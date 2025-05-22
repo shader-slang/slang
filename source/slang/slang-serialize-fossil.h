@@ -13,14 +13,13 @@
 // but that can still be inspected and dug through.
 //
 
-#include "slang-serialize.h"
-#include "slang-fossil.h"
-
 #include "../core/slang-blob-builder.h"
 #include "../core/slang-internally-linked-list.h"
 #include "../core/slang-io.h"
 #include "../core/slang-memory-arena.h"
 #include "../core/slang-relative-ptr.h"
+#include "slang-fossil.h"
+#include "slang-serialize.h"
 
 namespace Slang
 {
@@ -53,10 +52,7 @@ private:
 
         virtual ~LayoutObj() {}
 
-        FossilizedValKind getKind() const
-        {
-            return kind;
-        }
+        FossilizedValKind getKind() const { return kind; }
 
         Size getSize() const { return size; }
         Size getAlignment() const { return alignment; }
@@ -90,7 +86,11 @@ private:
     class ContainerLayoutObj : public LayoutObj
     {
     public:
-        ContainerLayoutObj(FossilizedValKind kind, LayoutObj* baseLayout, Size size = 0, Size alignment = 1)
+        ContainerLayoutObj(
+            FossilizedValKind kind,
+            LayoutObj* baseLayout,
+            Size size = 0,
+            Size alignment = 1)
             : LayoutObj(kind, size, alignment), baseLayout(baseLayout)
         {
         }
@@ -103,7 +103,8 @@ private:
     public:
         PtrLayoutObj(LayoutObj* baseLayout)
             : ContainerLayoutObj(FossilizedValKind::Ptr, baseLayout)
-        {}
+        {
+        }
     };
 
     class RecordLayoutObj : public LayoutObj
@@ -135,7 +136,8 @@ private:
     };
 
     class TupleLayoutObj : public RecordLayoutObj
-    {};
+    {
+    };
 
     struct FossilizedObjectInfo
     {
@@ -229,12 +231,12 @@ private:
     /// the object definition list chunk.
     ///
 
-    #if 0
+#if 0
     LayoutObj* _createUnknownLayout();
     LayoutObj* _getContainerLayout(FossilizedValKind kind, LayoutObj* elementLayout);
     LayoutObj* _getPtrLayout(LayoutObj* valLayout);
     LayoutObj* _getLayout(FossilizedValKind kind, Size size, Size alignment);
-    #endif
+#endif
 
     // An inline value will never be indirected.
     //
@@ -268,7 +270,7 @@ private:
         _writeSimpleValue(kind, &value, sizeof(value), sizeof(value));
     }
 
-//    bool _trySkipValue();
+    //    bool _trySkipValue();
     void _writeNull();
 
 
@@ -284,7 +286,7 @@ private:
 
     void _flush();
     ChunkBuilder* _getOrCreateChunkForLayout(LayoutObj* layout);
-//    ChunkBuilder* _createChunkForLayout(LayoutObj* layout);
+    //    ChunkBuilder* _createChunkForLayout(LayoutObj* layout);
 
     struct LayoutObjKey
     {
@@ -292,7 +294,8 @@ private:
 
         LayoutObjKey(LayoutObj* obj)
             : obj(obj)
-        {}
+        {
+        }
 
         LayoutObj* obj = nullptr;
 
@@ -420,7 +423,7 @@ private:
     FossilizedValRef _readValRef();
     FossilizedValRef _readIndirectValRef();
     FossilizedValRef _readPotentiallyIndirectValRef();
-        //    void _advanceCursor();
+    //    void _advanceCursor();
 
     void _pushState();
     void _popState();

@@ -23,8 +23,8 @@
 // known until everything *before* it has been fully built.
 
 #include "slang-basic.h"
-#include "slang-io.h"
 #include "slang-internally-linked-list.h"
+#include "slang-io.h"
 #include "slang-memory-arena.h"
 
 namespace Slang
@@ -32,8 +32,7 @@ namespace Slang
 
 inline constexpr bool isPowerOfTwo(Size value)
 {
-    return value > 0
-        && (value - 1 & value) == 0;
+    return value > 0 && (value - 1 & value) == 0;
 }
 
 inline constexpr Size roundUpToAlignment(Size size, Size alignment)
@@ -158,7 +157,6 @@ private:
     void _writeTo(Stream* stream);
 
     void _addPrefixRelativePtr(ChunkBuilder* targetChunk, Size ptrSize);
-
 };
 
 struct SlabBuilder
