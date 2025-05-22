@@ -17230,7 +17230,7 @@ void TraceRay(
             Ray,
             __forceVarIntoRayPayloadStructTemporarily(Payload));
         return;
-    case cuda: __intrinsic_asm "traceOptiXRay";
+    case cuda: __intrinsic_asm "optixTrace";
     case glsl:
     {
         [__vulkanRayPayload]
@@ -19556,7 +19556,7 @@ struct HitObject
         /// Executes ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject TraceRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
@@ -19609,6 +19609,7 @@ struct HitObject
                 // Write the payload out
                 Payload = p;
             }
+        case cuda: __intrinsic_asm "optixTraverse";
         case spirv:
             {
                 [__vulkanRayPayload]
@@ -19649,7 +19650,7 @@ struct HitObject
         /// Executes motion ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject TraceMotionRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint RayFlags, 
@@ -19700,6 +19701,7 @@ struct HitObject
                 // Write the payload out
                 Payload = p;
             }
+        case cuda: __intrinsic_asm "optixTraverse";
         case spirv:
             {
                 [__vulkanRayPayload]
@@ -19748,7 +19750,7 @@ struct HitObject
         /// Attributes parameter must either be an attribute struct, such as
         /// BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
@@ -19796,6 +19798,7 @@ struct HitObject
                     Ray.TMax,
                     __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
             }
+        case cuda: __intrinsic_asm "optixMakeHitObject";
         case spirv:
             {
                 // Save the attributes
@@ -19833,7 +19836,7 @@ struct HitObject
         /// See MakeHit but handles Motion 
         /// Currently only supported on VK
     [ForceInline]    
-    [require(glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint InstanceIndex, 
@@ -19870,6 +19873,7 @@ struct HitObject
                 CurrentTime,
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
+        case cuda: __intrinsic_asm "optixMakeHitObject";
         case spirv:
         {
             // Save the attributes
@@ -19915,7 +19919,7 @@ struct HitObject
         /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
         /// attributes from.
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -19960,6 +19964,7 @@ struct HitObject
                 Ray.TMax,
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
+        case cuda: __intrinsic_asm "optixMakeHitObject";
         case spirv:
         {
             // Save the attributes
@@ -19993,7 +19998,7 @@ struct HitObject
         /// See MakeHit but handles Motion 
         /// Currently only supported on VK
     [ForceInline]
-    [require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>( 
         uint HitGroupRecordIndex, 
         RaytracingAccelerationStructure AccelerationStructure, 
@@ -20027,6 +20032,7 @@ struct HitObject
                 CurrentTime,
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
+        case cuda: __intrinsic_asm "optixMakeHitObject";
         case spirv:
         {
             // Save the attributes
@@ -20064,7 +20070,7 @@ struct HitObject
         /// table.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeMiss( 
         uint MissShaderIndex, 
         RayDesc Ray)
@@ -20074,6 +20080,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
         case glsl:
             __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+        case cuda: __intrinsic_asm "optixMakeMissHitObject";
         case spirv:
             {
                 let origin = Ray.Origin;
@@ -20099,7 +20106,7 @@ struct HitObject
         /// See MakeMiss but handles Motion 
         /// Currently only supported on VK
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionMiss( 
         uint MissShaderIndex, 
         RayDesc Ray,
@@ -20110,6 +20117,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "($3=NvMakeMotionMiss($0,$1,$2))";
         case glsl:
             __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
+        case cuda: __intrinsic_asm "optixMakeMissHitObject";
         case spirv:
             {
                 let origin = Ray.Origin;
@@ -20142,7 +20150,7 @@ struct HitObject
         /// miss.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeNop()
     {
         __target_switch
@@ -20151,6 +20159,7 @@ struct HitObject
             __intrinsic_asm "($0 = NvMakeNop())";
         case glsl:
             __glslMakeNop(__return_val);
+        case cuda: __intrinsic_asm "optixMakeNopHitObject";
         case spirv:
             spirv_asm 
             {
@@ -20179,7 +20188,7 @@ struct HitObject
         /// shader is invoked.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
@@ -20205,6 +20214,7 @@ struct HitObject
                 // Write payload result
                 Payload = p;
             }
+        case cuda: __intrinsic_asm "optixInvoke";
         case spirv:
             {
                 [__vulkanRayPayload]
@@ -20231,13 +20241,14 @@ struct HitObject
         /// Returns true if the HitObject encodes a miss, otherwise returns false.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsMiss()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsMiss";
         case glsl: __intrinsic_asm "hitObjectIsMissNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectIsMiss";
         case spirv:
             return spirv_asm 
             {
@@ -20251,13 +20262,14 @@ struct HitObject
         /// Returns true if the HitObject encodes a hit, otherwise returns false.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsHit()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsHit";
         case glsl: __intrinsic_asm "hitObjectIsHitNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectIsHit";
         case spirv: 
             return spirv_asm 
             {
@@ -20271,13 +20283,14 @@ struct HitObject
         /// Returns true if the HitObject encodes a nop, otherwise returns false.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsNop()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsNop";
         case glsl: __intrinsic_asm "hitObjectIsEmptyNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectIsNop";
         case spirv: 
             return spirv_asm 
             {
@@ -20291,7 +20304,7 @@ struct HitObject
         /// Queries ray properties from HitObject. Valid if the hit object represents a hit or a miss.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     RayDesc GetRayDesc()
     {
         __target_switch
@@ -20303,6 +20316,7 @@ struct HitObject
                 RayDesc ray = { __glslGetRayWorldOrigin(), __glslGetTMin(), __glslGetRayWorldDirection(), __glslGetTMax() };
                 return ray;
             }
+        case cuda: __intrinsic_asm "optixHitObjectGetRayDesc";
         case spirv:
             return spirv_asm 
             {
@@ -20321,13 +20335,14 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetShaderTableIndex()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetShaderTableIndex";
         case glsl: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetSbtRecordIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20338,17 +20353,41 @@ struct HitObject
         }
     }
 
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_tracing)
+    [ForceInline]
+    [require(cuda_hlsl, ser_raygen_closesthit_miss)]
+    uint SetShaderTableIndex(uint RecordIndex)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".SetShaderTableIndex";
+        case cuda: __intrinsic_asm "optixHitObjectSetSbtRecordIndex";
+        }
+    }
+
+    // TODO -  Add other targets [__requiresNVAPI] __glsl_extension(GL_EXT_ray_tracing)
+    [ForceInline]
+    [require(cuda, ser_raygen_closesthit_miss)]
+    uint LoadLocalRootArgumentsConstant(uint RootConstantOffsetInBytes)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "optixHitObjectGetSbtDataPointer";
+        }
+    }
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetInstanceIndex()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetInstanceIndex";
         case glsl: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetInstanceIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20363,13 +20402,14 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetInstanceID()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetInstanceID";
         case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetInstanceId";
         case spirv:
             return spirv_asm 
             {
@@ -20384,13 +20424,14 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetGeometryIndex()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetGeometryIndex";
         case glsl: __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetSbtGASIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20405,13 +20446,14 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetPrimitiveIndex()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetPrimitiveIndex";
         case glsl: __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetPrimitiveIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20576,7 +20618,7 @@ struct HitObject
 
     /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     attr_t GetAttributes<attr_t>()
     {
         __target_switch
@@ -20598,6 +20640,7 @@ struct HitObject
                 // Return the attributes
                 return __hitObjectAttributes<attr_t>();
             }
+        case cuda: __intrinsic_asm "optixHitObjectGetAttribute<$TR>($0)";
         case spirv:
             {
                 __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
@@ -20988,13 +21031,14 @@ struct HitObject
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
-[require(glsl_hlsl_spirv, ser_raygen)]
+[require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "NvReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
+    case cuda: __intrinsic_asm "optixReorder";
     case spirv:
         spirv_asm 
         {
@@ -21025,13 +21069,14 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
-[require(glsl_hlsl_spirv, ser_raygen)]
+[require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "NvReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
+    case cuda: __intrinsic_asm "optixReorder($1, $2)";
     case spirv:
         spirv_asm 
         {
@@ -21052,13 +21097,14 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
-[require(glsl_hlsl_spirv, ser_raygen)]
+[require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss )
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "NvReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
+    case cuda: __intrinsic_asm "optixReorder()";
     case spirv:
         spirv_asm 
         {
