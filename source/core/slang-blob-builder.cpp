@@ -18,48 +18,47 @@ void ShardBuilder::_writeTo(Stream* stream, Size inSelfOffset)
     switch (_kind)
     {
     case Kind::Data:
-    {
-        stream->write(_data.ptr, _size);
-    }
-    break;
+        {
+            stream->write(_data.ptr, _size);
+        }
+        break;
 
     case Kind::RelativePtr:
-    {
-        auto targetChunk = _relativePtr.targetChunk;
-        SLANG_ASSERT(targetChunk);
-
-        auto selfOffset = intptr_t(inSelfOffset);
-        auto targetOffset = intptr_t(targetChunk->_getCachedOffset());
-
-        intptr_t relativeOffset = targetOffset - selfOffset;
-        if (relativeOffset == -49)
         {
-            relativeOffset = relativeOffset;
-        }
+            auto targetChunk = _relativePtr.targetChunk;
+            SLANG_ASSERT(targetChunk);
 
-        switch (_size)
-        {
-        case sizeof(Int32) :
-        {
-            auto value = Int32(relativeOffset);
-            stream->write(&value, sizeof(value));
+            auto selfOffset = intptr_t(inSelfOffset);
+            auto targetOffset = intptr_t(targetChunk->_getCachedOffset());
+
+            intptr_t relativeOffset = targetOffset - selfOffset;
+            if (relativeOffset == -49)
+            {
+                relativeOffset = relativeOffset;
+            }
+
+            switch (_size)
+            {
+            case sizeof(Int32):
+                {
+                    auto value = Int32(relativeOffset);
+                    stream->write(&value, sizeof(value));
+                }
+                break;
+
+            case sizeof(Int64):
+                {
+                    auto value = Int64(relativeOffset);
+                    stream->write(&value, sizeof(value));
+                }
+                break;
+
+            default:
+                SLANG_UNEXPECTED("unsupported relative pointer size");
+                break;
+            }
         }
         break;
-
-        case sizeof(Int64):
-        {
-            auto value = Int64(relativeOffset);
-            stream->write(&value, sizeof(value));
-        }
-        break;
-
-        default:
-            SLANG_UNEXPECTED("unsupported relative pointer size");
-            break;
-        }
-
-    }
-    break;
 
     default:
         SLANG_UNEXPECTED("unknown Fossil::ShardBuilder::Kind");
@@ -133,12 +132,12 @@ void ChunkBuilder::writeData(void const* data, Size size)
 
 void ChunkBuilder::addContentsOf(ChunkBuilder* otherChunk)
 {
-//    auto otherPrefixShard = otherChunk->_prefixShard;
+    //    auto otherPrefixShard = otherChunk->_prefixShard;
     auto otherChunkSize = otherChunk->getContentSize();
     auto otherChunkAlignment = otherChunk->getAlignment();
     auto otherChunkShards = otherChunk->_childShards;
 
-//    otherChunk->_prefixShard = nullptr;
+    //    otherChunk->_prefixShard = nullptr;
     otherChunk->_contentSize = 0;
     otherChunk->_contentAlignment = 1;
     otherChunk->_childShards = InternallyLinkedList<ShardBuilder>();
@@ -212,7 +211,7 @@ void ChunkBuilder::addPrefixData(void const* data, Size size)
 ShardBuilder* ChunkBuilder::_createDataShard(void const* data, Size size)
 {
     auto& arena = getParentSlab()->_getArena();
-    auto shard = new(arena) ShardBuilder(ShardBuilder::Kind::Data);
+    auto shard = new (arena) ShardBuilder(ShardBuilder::Kind::Data);
 
     auto shardData = arena.allocateUnaligned(size);
     ::memcpy(shardData, data, size);
@@ -226,7 +225,7 @@ ShardBuilder* ChunkBuilder::_createDataShard(void const* data, Size size)
 ShardBuilder* ChunkBuilder::_createRelativePtrShard(ChunkBuilder* targetChunk, Size ptrSize)
 {
     auto& arena = getParentSlab()->_getArena();
-    auto shard = new(arena) ShardBuilder(ShardBuilder::Kind::RelativePtr);
+    auto shard = new (arena) ShardBuilder(ShardBuilder::Kind::RelativePtr);
 
     shard->_relativePtr.targetChunk = targetChunk;
     shard->_size = ptrSize;
@@ -308,7 +307,8 @@ Size SlabBuilder::_writeChunksTo(Stream* stream)
         auto chunkContentSize = chunk->getContentSize();
         auto chunkOffset = chunk->_getCachedOffset();
 
-        SLANG_ASSERT(chunkOffset == roundUpToAlignment(totalSize + chunkPrefixSize, chunk->getAlignment()));
+        SLANG_ASSERT(
+            chunkOffset == roundUpToAlignment(totalSize + chunkPrefixSize, chunk->getAlignment()));
 
         auto paddingSize = chunkOffset - totalSize;
 
@@ -368,4 +368,4 @@ ChunkBuilder* SlabBuilder::addChunkAfter(ChunkBuilder* existingChunk)
     return newChunk;
 }
 
-}
+} // namespace Slang

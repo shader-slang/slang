@@ -46,7 +46,7 @@ using FossilUInt = FossilizedPtr<void>::UOffset;
 // If all you have is a `FossilizedVal*`, then there is no way to access
 // its contents without assuming it is of some particular type and casting
 // it.
-// 
+//
 // A `FossilizedVariantObj` is a fossilized value that is self-describing;
 // it stores a (relative) pointer to a layout, which can be used to inspect
 // its own data/state.
@@ -159,27 +159,15 @@ public:
 
     /// Get the layout of the value being referenced.
     ///
-    Layout* getLayout()
-    {
-        return _layout;
-    }
+    Layout* getLayout() { return _layout; }
 
     /// Get a pointer to the value being referenced.
     ///
-    T* getData()
-    {
-        return _data;
-    }
+    T* getData() { return _data; }
 
-    operator T* () const
-    {
-        return _data;
-    }
+    operator T*() const { return _data; }
 
-    T* operator->()
-    {
-        return _data;
-    }
+    T* operator->() { return _data; }
 
 private:
     T* _data = nullptr;
@@ -207,7 +195,7 @@ public:
 protected:
     FossilizedVal() = default;
     FossilizedVal(FossilizedVal const&) = default;
-    FossilizedVal(FossilizedVal &&) = default;
+    FossilizedVal(FossilizedVal&&) = default;
     ~FossilizedVal() = default;
 };
 
@@ -215,10 +203,7 @@ template<typename T, FossilizedValKind kKind>
 struct FossilizedSimpleVal : FossilizedVal
 {
 public:
-    T getValue() const
-    {
-        return _value;
-    }
+    T getValue() const { return _value; }
 
     /// Determine if a value with the given `kind` should be allowed to cast to this type.
     static bool _isMatchingKind(Kind kind) { return kind == kKind; }
@@ -243,10 +228,7 @@ using FossilizedFloat64Val = FossilizedSimpleVal<double, FossilizedValKind::Floa
 struct FossilizedBoolVal : FossilizedVal
 {
 public:
-    bool getValue() const
-    {
-        return _value != 0;
-    }
+    bool getValue() const { return _value != 0; }
 
     /// Determine if a value with the given `kind` should be allowed to cast to this type.
     static bool _isMatchingKind(Kind kind) { return kind == Kind::Bool; }
@@ -260,10 +242,7 @@ struct FossilizedPtrVal : FossilizedVal
 public:
     using Layout = FossilizedPtrLikeLayout;
 
-    FossilizedVal* getTargetData() const
-    {
-        return _value.get();
-    }
+    FossilizedVal* getTargetData() const { return _value.get(); }
 
     /// Determine if a value with the given `kind` should be allowed to cast to this type.
     static bool _isMatchingKind(Kind kind) { return kind == Kind::Ptr; }
@@ -298,7 +277,7 @@ public:
 // named as `Fossilized*Obj` rather than `Fossilized*Val`,
 // to indicate that they will only ever be located on the
 // other side of a pointer indirection.
-// 
+//
 // E.g., a field of a fossilized struct value should never
 // have a layout claiming it to be of kind `String`; instead
 // it should show as a field of kind `Ptr`, where the
@@ -336,15 +315,9 @@ public:
     /// Determine if a value with the given `kind` should be allowed to cast to this type.
     static bool _isMatchingKind(Kind kind) { return kind == Kind::Optional; }
 
-    FossilizedVal* getValue()
-    {
-        return this;
-    }
+    FossilizedVal* getValue() { return this; }
 
-    FossilizedVal const* getValue() const
-    {
-        return this;
-    }
+    FossilizedVal const* getValue() const { return this; }
 
 private:
     // An absent optional is encoded as a null pointer
@@ -390,14 +363,8 @@ public:
     FossilizedValLayout* getContentLayout() const;
 
 
-    FossilizedVal* getContentData()
-    {
-        return this;
-    }
-    FossilizedVal const* getContentData() const
-    {
-        return this;
-    }
+    FossilizedVal* getContentData() { return this; }
+    FossilizedVal const* getContentData() const { return this; }
 
     static bool _isMatchingKind(Kind kind) { return kind == Kind::Variant; }
 
@@ -457,55 +424,55 @@ FossilizedValRef getVariantContent(FossilizedVariantObj* variantPtr);
 
 namespace Fossil
 {
-    using RelativePtrOffset = FossilizedPtr<void>::Offset;
+using RelativePtrOffset = FossilizedPtr<void>::Offset;
 
-    /// Header for a fossil-format file or blob.
+/// Header for a fossil-format file or blob.
+///
+/// A blob of fossilized data must start with a `Header`
+/// that is properly formatted.
+///
+struct Header
+{
+    /// The "magic" bytes used to identify this is a fossil-format blob.
+    char magic[16];
+
+    /// The expected bytes that should appear in `magic`
     ///
-    /// A blob of fossilized data must start with a `Header`
-    /// that is properly formatted.
+    static const char kMagic[16];
+
+    /// The total size of the fossil-format blob, including this header.
+    UInt64 totalSizeIncludingHeader;
+
+    /// Flags; reserved for future use.
+    UInt32 flags;
+
+    /// A relative pointer to the root value of the object graph.
     ///
-    struct Header
-    {
-        /// The "magic" bytes used to identify this is a fossil-format blob.
-        char magic[16];
-
-        /// The expected bytes that should appear in `magic`
-        ///
-        static const char kMagic[16];
-
-        /// The total size of the fossil-format blob, including this header.
-        UInt64 totalSizeIncludingHeader;
-
-        /// Flags; reserved for future use.
-        UInt32 flags;
-
-        /// A relative pointer to the root value of the object graph.
-        ///
-        /// A fossil-format blob may only have one root value, and that
-        /// value *must* be a variant (so that it can reference the
-        /// layout information that describes itself). The *content*
-        /// of the root object can be arbitrary, so applications may
-        /// store multiple values using an array, struct, etc.
-        /// 
-        FossilizedPtr<FossilizedVariantObj> rootValue;
-    };
-
-    /// Get the root object from a fossilized blob.
+    /// A fossil-format blob may only have one root value, and that
+    /// value *must* be a variant (so that it can reference the
+    /// layout information that describes itself). The *content*
+    /// of the root object can be arbitrary, so applications may
+    /// store multiple values using an array, struct, etc.
     ///
-    /// This operation performs some basic validation on the blob to
-    /// ensure that it doesn't seem incorrectly sized or otherwise
-    /// corrupted/malformed.
-    ///
-    FossilizedValRef getRootValue(ISlangBlob* blob);
+    FossilizedPtr<FossilizedVariantObj> rootValue;
+};
 
-    /// Get the root object from a fossilized blob.
-    ///
-    /// This operation performs some basic validation on the blob to
-    /// ensure that it doesn't seem incorrectly sized or otherwise
-    /// corrupted/malformed.
-    ///
-    FossilizedValRef getRootValue(void const* data, Size size);
-}
+/// Get the root object from a fossilized blob.
+///
+/// This operation performs some basic validation on the blob to
+/// ensure that it doesn't seem incorrectly sized or otherwise
+/// corrupted/malformed.
+///
+FossilizedValRef getRootValue(ISlangBlob* blob);
+
+/// Get the root object from a fossilized blob.
+///
+/// This operation performs some basic validation on the blob to
+/// ensure that it doesn't seem incorrectly sized or otherwise
+/// corrupted/malformed.
+///
+FossilizedValRef getRootValue(void const* data, Size size);
+} // namespace Fossil
 
 } // namespace Slang
 
