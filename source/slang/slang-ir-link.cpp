@@ -2155,7 +2155,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
             switch (inst->getOp())
             {
             default:
-                continue;
+                break;
             case kIROp_BindGlobalGenericParam:
                 // Bindings for global generic parameters are currently represented
                 // as stand-alone global-scope instructions in the IR module for
@@ -2168,6 +2168,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
                 // to the relevant parameters and cloned via `cloneExtraDecorations`.
                 // In the long run we do not want to *ever* iterate over all the
                 // instructions in all the input modules.
+                [[fallthrough]];
             case kIROp_DebugSource:
                 // Need to list all source files in the debug source file list,
                 // regardless if the source files participate in the line table or not.
