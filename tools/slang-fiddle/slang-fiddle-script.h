@@ -1,8 +1,8 @@
 // slang-fiddle-script.h
 #pragma once
 
-#include "lapi.h"
-#include "lauxlib.h"
+#include "../lua/lapi.h"
+#include "../lua/lauxlib.h"
 #include "compiler-core/slang-source-loc.h"
 #include "core/slang-list.h"
 #include "core/slang-string.h"
