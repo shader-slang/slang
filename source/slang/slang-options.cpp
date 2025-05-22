@@ -154,7 +154,7 @@ void initCommandOptions(CommandOptions& options)
             "Std Revision",
             UserValue(ValueCategory::StdRevision));
         options.addValues(TypeTextUtil::getStdRevisionInfos());
-        
+
 
         options.addCategory(
             CategoryKind::Value,
@@ -456,9 +456,9 @@ void initCommandOptions(CommandOptions& options)
          "It is typically only set from automated builds(such as distros available on github).A "
          "user build will by default be 'unknown'."},
         {OptionKind::StdRevision,
-        "-std",
-        "-std <std-revision>",
-        "Specifies the language standard that should be used."},
+         "-std",
+         "-std <std-revision>",
+         "Specifies the language standard that should be used."},
         {OptionKind::WarningsAsErrors,
          "-warnings-as-errors",
          "-warnings-as-errors all or -warnings-as-errors <id>[,<id>...]",
@@ -2560,7 +2560,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 CommandLineArg name;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(name));
 
-                SlangStdRevision stdRevision = TypeTextUtil::findStdRevision(name.value.getUnownedSlice());
+                SlangStdRevision stdRevision =
+                    TypeTextUtil::findStdRevision(name.value.getUnownedSlice());
                 if (stdRevision == SLANG_STD_REVISION_UNKNOWN)
                 {
                     m_sink->diagnose(name.loc, Diagnostics::unknownStdRevision, name.value);
@@ -2570,7 +2571,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 {
                     linkage->m_optionSet.add(OptionKind::StdRevision, stdRevision);
                 }
-                break; 
+                break;
             }
         case OptionKind::Stage:
             {

@@ -831,11 +831,7 @@ DIAGNOSTIC(33070, Error, expectedFunction, "expected a function, got '$0'")
 DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 
 // `dyn` and `some` errors
-DIAGNOSTIC(
-    33072,
-    Error,
-    cannotHaveGenericDynInterface,
-    "dyn interfaces cannot be generic: '$0'.")
+DIAGNOSTIC(33072, Error, cannotHaveGenericDynInterface, "dyn interfaces cannot be generic: '$0'.")
 DIAGNOSTIC(
     33073,
     Error,
