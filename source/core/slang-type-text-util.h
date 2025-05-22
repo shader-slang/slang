@@ -33,6 +33,8 @@ struct TypeTextUtil
 
     /// Get the language infos
     static ConstArrayView<NamesDescriptionValue> getLanguageInfos();
+    /// Get the std revision infos
+    static ConstArrayView<NamesDescriptionValue> getStdRevisionInfos();
     /// Get the compiler infos
     static ConstArrayView<NamesDescriptionValue> getCompilerInfos();
     /// Get the archive type infos
@@ -70,6 +72,9 @@ struct TypeTextUtil
 
     /// Given a source language name returns a source language. Name here is distinct from extension
     static SlangSourceLanguage findSourceLanguage(const UnownedStringSlice& text);
+
+    /// Given a std revision returns a std revision.
+    static SlangStdRevision findStdRevision(const UnownedStringSlice& text);
 
     /// Given a name returns the pass through
     static SlangPassThrough findPassThrough(const UnownedStringSlice& slice);
