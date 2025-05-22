@@ -20,9 +20,9 @@ uniform int32_t* outputBuffer;
 void computeMain()
 {
     // First half of input.
-    let a = CoopVec<int32_t, 4>.load(inputBuffer, 0);
+    let a = coopVecLoad<4, int32_t>(inputBuffer, 0);
     // Second half of input.
-    let b = CoopVec<int32_t, 4>.load(inputBuffer + 4, 4*4);
+    let b = coopVecLoad<4, int32_t>(inputBuffer + 4, 4*4);
 
     // Store second half of input to first half of output buffer.
     b.store(outputBuffer, 0);
