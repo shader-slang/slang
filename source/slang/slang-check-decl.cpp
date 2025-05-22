@@ -720,6 +720,13 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         // Pass down the callee location
         processDeclModifiers(expr->declRef.getDecl(), expr->loc);
     }
+
+    void visitMemberExpr(MemberExpr* expr)
+    {
+        dispatchIfNotNull(expr->baseExpression);
+        visitDeclRefExpr(expr);
+    }
+
     void visitStaticMemberExpr(StaticMemberExpr* expr)
     {
         dispatchIfNotNull(expr->declRef.declRefBase);
@@ -13653,31 +13660,6 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         [this, varDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, varDecl, category); });
 
-    if (isGlobalDecl(varDecl))
-    {
-        auto declaredCaps = getDeclaredCapabilitySet(varDecl);
-        auto inferedCaps = varDecl->inferredCapabilityRequirements;
-        declaredCaps.nonDestructiveJoin(inferedCaps);
-        auto module = getModule(varDecl);
-        auto linkage = module->getLinkage();
-        for (auto target : linkage->targets)
-        {
-            auto targetCaps = target->getTargetCaps();
-
-            if (targetCaps.isIncompatibleWith(declaredCaps))
-            {
-                auto compileTarget = targetCaps.getCompileTarget();
-                maybeDiagnose(
-                    getSink(),
-                    this->getOptionSet(),
-                    DiagnosticCategory::Capability,
-                    varDecl->loc,
-                    Diagnostics::declHasDependenciesNotCompatibleOnTarget,
-                    varDecl,
-                    compileTarget);
-            }
-        }
-    }
 }
 
 CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* decl)
