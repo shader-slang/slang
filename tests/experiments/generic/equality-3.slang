@@ -4,7 +4,7 @@
 
 This style is discussed in the documentation here (on This type):
 
-https://github.com/shader-slang/slang/blob/master/docs/user-guide/04-interfaces-generics.md
+https://github.com/shader-slang/slang/blob/main/docs/user-guide/04-interfaces-generics.md
 
 Still has limitiation that it only works for an an implementation of an interface.  
  */

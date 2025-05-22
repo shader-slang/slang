@@ -2,7 +2,7 @@ Nsight Aftermath Crash Example
 ==============================
 
 * Demonstrates use of aftermath API to capture a dump with a GPU crash
-* Uses the [obfuscation feature](https://github.com/shader-slang/slang/blob/master/docs/user-guide/a1-03-obfuscation.md)
+* Uses the [obfuscation feature](https://github.com/shader-slang/slang/blob/main/docs/user-guide/a1-03-obfuscation.md)
 * Uses an `emit` source map
 * Demonstrates use of file system compile products
 * Forces a crash via time out, executing a shader that is purposefully slow
@@ -33,7 +33,7 @@ Typically D3D12 debug run produces the following files...
 * aftermath-dump-X.bin          - The Aftermath crash capture/s
 * aftermath-debug-info-X.bin    - The Aftermath debug info/s
 
-Having emit source maps, can be useful as discussed in [the documentation](https://github.com/shader-slang/slang/blob/master/docs/user-guide/a1-03-obfuscation.md#emit-source-maps), but isn't a requirement. If emit source maps are disabled the source maps `fragment-0.map`/`vertex-0.map` will *not* be produced. In this scenario the mapping to the obfuscated source file is embedded into the kernel/s directly. 
+Having emit source maps, can be useful as discussed in [the documentation](https://github.com/shader-slang/slang/blob/main/docs/user-guide/a1-03-obfuscation.md#emit-source-maps), but isn't a requirement. If emit source maps are disabled the source maps `fragment-0.map`/`vertex-0.map` will *not* be produced. In this scenario the mapping to the obfuscated source file is embedded into the kernel/s directly. 
 
 A Vulkan run will emit "spv" files, D3D12 will emit "dxil" files and D3D11 will emit "dxbc" files. 
 
@@ -42,5 +42,5 @@ The example source describes how to switch between emit source files, and differ
 ## Links
 
 * [nsight aftermath](https://developer.nvidia.com/nsight-aftermath)
-* [obfuscation](https://github.com/shader-slang/slang/blob/master/docs/user-guide/a1-03-obfuscation.md)
+* [obfuscation](https://github.com/shader-slang/slang/blob/main/docs/user-guide/a1-03-obfuscation.md)
 * [source map](https://github.com/source-map/source-map-spec)

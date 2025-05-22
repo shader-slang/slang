@@ -1,6 +1,6 @@
 Slang
 =====
-![CI Status](https://github.com/shader-slang/slang/actions/workflows/ci.yml/badge.svg?branch=master)
+![CI Status](https://github.com/shader-slang/slang/actions/workflows/ci.yml/badge.svg?branch=main)
 ![CTS Status](https://github.com/shader-slang/slang/actions/workflows/vk-gl-cts-nightly.yml/badge.svg)
 
 Slang is a shading language that makes it easier to build and maintain large shader codebases in a modular and extensible fashion, while also maintaining the highest possible performance on modern GPUs and graphics APIs.
@@ -82,7 +82,7 @@ The following guidelines should be observed by contributors:
 
 * Please follow the contributor [Code of Conduct](CODE_OF_CONDUCT.md).
 * Bugs reports and feature requests should go through the GitHub issue tracker
-* Changes should ideally come in as small pull requests on top of `master`, coming from your own personal fork of the project
+* Changes should ideally come in as small pull requests on top of `main`, coming from your own personal fork of the project
 * Large features that will involve multiple contributors or a long development time should be discussed in issues, and broken down into smaller pieces that can be implemented and checked in in stages
 
 [Contribution guide](CONTRIBUTING.md) describes the workflow for contributors at more detail.

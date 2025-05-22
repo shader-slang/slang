@@ -7,7 +7,7 @@ interface IThing<T>
 */
 
 // Docs say this should work...
-// https://github.com/shader-slang/slang/blob/master/docs/language-reference/07-declarations.md
+// https://github.com/shader-slang/slang/blob/main/docs/language-reference/07-declarations.md
 
 interface IThing<T>
 {
