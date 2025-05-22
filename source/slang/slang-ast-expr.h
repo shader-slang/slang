@@ -145,18 +145,6 @@ class MakeArrayFromElementExpr : public Expr
     FIDDLE(...)
 };
 
-FIDDLE()
-class MakeVectorFromElementExpr : public Expr
-{
-    FIDDLE(...)
-};
-
-FIDDLE()
-class MakeMatrixFromElementExpr : public Expr
-{
-    FIDDLE(...)
-};
-
 // An initializer list, e.g. `{ 1, 2, 3 }`
 FIDDLE()
 class InitializerListExpr : public Expr

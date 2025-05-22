@@ -541,12 +541,12 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 as<PolynomialIntVal>(toElementCount) || as<FuncCallIntVal>(toElementType);
             if (isLinkTimeVal)
             {
-                auto toMakeVectorFromElementExpr =
-                    m_astBuilder->create<MakeVectorFromElementExpr>();
-                toMakeVectorFromElementExpr->loc = fromInitializerListExpr->loc;
-                toMakeVectorFromElementExpr->type = QualType(toType);
+                auto defaultConstructExpr =
+                    m_astBuilder->create<DefaultConstructExpr>();
+                defaultConstructExpr->loc = fromInitializerListExpr->loc;
+                defaultConstructExpr->type = QualType(toType);
 
-                *outToExpr = toMakeVectorFromElementExpr;
+                *outToExpr = defaultConstructExpr;
                 return true;
             }
 
@@ -738,12 +738,12 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 as<PolynomialIntVal>(rowCountIntVal) || as<FuncCallIntVal>(rowCountIntVal);
             if (isLinkTimeVal)
             {
-                auto toMakeMatrixFromElementExpr =
-                    m_astBuilder->create<MakeMatrixFromElementExpr>();
-                toMakeMatrixFromElementExpr->loc = fromInitializerListExpr->loc;
-                toMakeMatrixFromElementExpr->type = QualType(toType);
+                auto defaultConstructExpr =
+                    m_astBuilder->create<DefaultConstructExpr>();
+                defaultConstructExpr->loc = fromInitializerListExpr->loc;
+                defaultConstructExpr->type = QualType(toType);
 
-                *outToExpr = toMakeMatrixFromElementExpr;
+                *outToExpr = defaultConstructExpr;
                 return true;
             }
 

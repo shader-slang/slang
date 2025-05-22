@@ -2958,8 +2958,6 @@ public:
     CASE(MakeOptionalExpr)
     CASE(PartiallyAppliedGenericExpr)
     CASE(PackExpr)
-    CASE(MakeVectorFromElementExpr)
-    CASE(MakeMatrixFromElementExpr)
 #undef CASE
 
     Expr* visitStaticMemberExpr(StaticMemberExpr* expr);

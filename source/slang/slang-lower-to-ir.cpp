@@ -4851,28 +4851,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             getBuilder()->emitMakeArrayFromElement(irType, irDefaultElement));
     }
 
-    LoweredValInfo visitMakeVectorFromElementExpr(MakeVectorFromElementExpr* expr)
-    {
-        auto irType = lowerType(context, expr->type);
-        auto irDefaultElement = getSimpleVal(
-            context,
-            getDefaultVal(as<VectorExpressionType>(expr->type)->getElementType()));
-
-        return LoweredValInfo::simple(
-            getBuilder()->emitMakeVectorFromScalar(irType, irDefaultElement));
-    }
-
-    LoweredValInfo visitMakeMatrixFromElementExpr(MakeMatrixFromElementExpr* expr)
-    {
-        auto irType = lowerType(context, expr->type);
-        auto irDefaultElement = getSimpleVal(
-            context,
-            getDefaultVal(as<MatrixExpressionType>(expr->type)->getElementType()));
-
-        return LoweredValInfo::simple(
-            getBuilder()->emitMakeMatrixFromScalar(irType, irDefaultElement));
-    }
-
     LoweredValInfo visitInitializerListExpr(InitializerListExpr* expr)
     {
         // Allocate a temporary of the given type
