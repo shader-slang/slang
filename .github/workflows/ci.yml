@@ -69,7 +69,7 @@ jobs:
             platform: x86_64
             test-category: full
             full-gpu-tests: true
-            runs-on: [Windows, self-hosted]
+            runs-on: { group: gcp, labels: [Windows, self-hosted] }
             has-gpu: true
             server-count: 8
           # Self-hosted full gpu build - debug
