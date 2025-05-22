@@ -2062,13 +2062,12 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
     if (auto sizeOfLikeExpr = expr.as<SizeOfLikeExpr>())
     {
-        auto type =
-            as<Type>(sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
+        auto type = as<Type>(
+            sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
 
         if (auto sizeOfExpr = expr.as<SizeOfExpr>())
         {
-            return as<IntVal>(
-                SizeOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+            return as<IntVal>(SizeOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
         }
         else if (auto alignOfExpr = expr.as<AlignOfExpr>())
         {
