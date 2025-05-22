@@ -112,12 +112,6 @@ static void registerLegalizedValue(
     IRInst* irValue,
     LegalVal const& legalVal)
 {
-    if (legalVal.flavor == LegalFlavor::none)
-    {
-        // TODO: Not sure what needs to happen.
-        int a = 0;
-        ++a;
-    }
     context->mapValToLegalVal[irValue] = legalVal;
 }
 
@@ -2288,6 +2282,33 @@ static LegalVal legalizeGlobalParam(
     IRTypeLegalizationContext* context,
     IRGlobalParam* irGlobalParam);
 
+static LegalVal legalizeCoopMatMapElementIFunc(IRTypeLegalizationContext* context, IRInst* inst)
+{
+    // When the functor object is a lambda with no captures,
+    // it will be removed as a part of the legalization process,
+    // because it is a zero-sized struct.
+    // We need to explicitly remove it from its useser.
+    if (inst->getOperandCount() > 2)
+    {
+        auto legalArg = legalizeOperand(context, inst->getOperand(2));
+        if (legalArg.flavor == LegalVal::Flavor::none)
+        {
+            IRBuilder builder{inst};
+            builder.setInsertBefore(inst);
+            auto newInst = builder.emitCoopMatMapElementFunc(
+                inst->getFullType(),
+                inst->getOp(),
+                inst->getOperand(0),
+                inst->getOperand(1));
+
+            inst->replaceUsesWith(newInst);
+            inst->removeAndDeallocate();
+            return LegalVal::simple(newInst);
+        }
+    }
+    return LegalVal::simple(inst);
+}
+
 static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
 {
     // Any additional instructions we need to emit
@@ -2299,6 +2320,10 @@ static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)
     // Special-case certain operations
     switch (inst->getOp())
     {
+    case kIROp_CoopMatMapElementIFunc:
+    case kIROp_TupleCoopMatMapElementIFunc:
+        return legalizeCoopMatMapElementIFunc(context, inst);
+
     case kIROp_Var:
         return legalizeLocalVar(context, cast<IRVar>(inst));
 

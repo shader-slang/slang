@@ -24303,7 +24303,7 @@ extension<
     each Ts : __BuiltinArithmeticType
 > Tuple<linalg.CoopMat<T, S, M, N, R>, expand linalg.CoopMat<each Ts, S, M, N, R>>
 {
-    __intrinsic_op($(kIROp_TupleCoopMatMapElementFunc))
+    __intrinsic_op($(kIROp_TupleCoopMatMapElementIFunc))
     CoopMat<T, S, M, N, R> MapElement(functype(uint32_t, uint32_t, T, expand each Ts)->T mapOp);
 
     __intrinsic_op($(kIROp_TupleCoopMatMapElementIFunc))
