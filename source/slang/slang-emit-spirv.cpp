@@ -4279,11 +4279,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_CoopMatMapElementIFunc:
             result = emitCoopMatMapElementWithIFunc(parent, as<IRCoopMatMapElementIFunc>(inst));
             break;
-        case kIROp_TupleCoopMatMapElementIFunc:
-            result = emitTupleCoopMatMapElementWithIFunc(
-                parent,
-                as<IRTupleCoopMatMapElementIFunc>(inst));
-            break;
         case kIROp_MakeTensorAddressingTensorLayout:
             result = emitOpCreateTensorLayout(parent, inst, getID(ensureInst(inst->getDataType())));
             break;
@@ -7708,55 +7703,36 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitCoopMatMapElementWithIFunc(
         SpvInstParent* parent,
-        IRCoopMatMapElementIFunc* mapElementIFunc)
+        IRCoopMatMapElementIFunc* inst)
     {
         ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_cooperative_matrix2"));
         requireSPIRVCapability(SpvCapabilityCooperativeMatrixPerElementOperationsNV);
 
-        auto mat0 = mapElementIFunc->getCoopMat();
-        auto funcCall = mapElementIFunc->getIFuncCall();
+        IRInst* matOrTuple = inst->getCoopMat();
+
+        IRInst* mat0 = nullptr;
+
+        UInt tupleCount = 0;
+        IRInst* tuple = tuple = as<IRMakeStruct>(matOrTuple);
+        if (tuple)
+        {
+            mat0 = tuple->getOperand(0);
+            tupleCount = tuple->getOperandCount();
+        }
+        else
+        {
+            mat0 = matOrTuple;
+        }
+
+        auto funcCall = inst->getIFuncCall();
 
         IRInst* ifuncThis = nullptr;
-        if (mapElementIFunc->getOperandCount() > 2)
-            ifuncThis = mapElementIFunc->getIFuncThis();
+        if (inst->getOperandCount() > 2)
+            ifuncThis = inst->getIFuncThis();
 
         return emitInstCustomOperandFunc(
             parent,
-            mapElementIFunc,
-            SpvOpCooperativeMatrixPerElementOpNV,
-            [&]()
-            {
-                emitOperand(mat0->getDataType());
-                emitOperand(kResultID);
-
-                emitOperand(mat0);
-                emitOperand(funcCall);
-
-                if (ifuncThis)
-                    emitOperand(ifuncThis);
-            });
-    }
-
-    SpvInst* emitTupleCoopMatMapElementWithIFunc(
-        SpvInstParent* parent,
-        IRTupleCoopMatMapElementIFunc* mapElementIFunc)
-    {
-        ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_cooperative_matrix2"));
-        requireSPIRVCapability(SpvCapabilityCooperativeMatrixPerElementOperationsNV);
-
-        auto tuple = mapElementIFunc->getTuple();
-        UInt tupleCount = tuple->getOperandCount();
-
-        IRInst* mat0 = tuple->getOperand(0);
-        auto funcCall = mapElementIFunc->getIFuncCall();
-
-        IRInst* ifuncThis = nullptr;
-        if (mapElementIFunc->getOperandCount() > 2)
-            ifuncThis = mapElementIFunc->getIFuncThis();
-
-        return emitInstCustomOperandFunc(
-            parent,
-            mapElementIFunc,
+            inst,
             SpvOpCooperativeMatrixPerElementOpNV,
             [&]()
             {

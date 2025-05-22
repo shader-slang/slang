@@ -1566,19 +1566,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return wrapperFunc;
     }
 
-    void processCoopMatMapElementIFunc(IRCoopMatMapElementIFuncBase* mapElementIFunc)
+    void processCoopMatMapElementIFunc(IRCoopMatMapElementIFunc* inst)
     {
-        IRBuilder builder{mapElementIFunc};
-        builder.setInsertBefore(mapElementIFunc);
+        IRBuilder builder{inst};
+        builder.setInsertBefore(inst);
 
-        auto ifuncCall = mapElementIFunc->getIFuncCall();
+        auto ifuncCall = inst->getIFuncCall();
 
         // `this` of the functor is optional.
         // Skip the synthesis if `this` is not passed.
         if (ifuncCall->getParamCount() > 3)
         {
             auto funcSynth = createWrapperFunctionForPerElement(builder, ifuncCall);
-            mapElementIFunc->setIFuncCall(funcSynth);
+            inst->setIFuncCall(funcSynth);
         }
     }
 
@@ -1820,10 +1820,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 processBitFieldOp(inst);
                 break;
             case kIROp_CoopMatMapElementIFunc:
-                processCoopMatMapElementIFunc(as<IRCoopMatMapElementIFuncBase>(inst));
-                break;
-            case kIROp_TupleCoopMatMapElementIFunc:
-                processCoopMatMapElementIFunc(as<IRCoopMatMapElementIFuncBase>(inst));
+                processCoopMatMapElementIFunc(as<IRCoopMatMapElementIFunc>(inst));
                 break;
 
             case kIROp_DebugValue:
