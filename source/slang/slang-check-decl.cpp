@@ -2332,8 +2332,8 @@ static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type*
 
     // At the last, we will check if the type is a C-style type, if it is, we will use empty
     // initializer list to construct the default constructor.
-    HashSet<Type*> isVisit;
-    if (visitor->isCStyleType(type, isVisit))
+    HashSet<Type*> visitSet;
+    if (visitor->isCStyleType(type, visitSet))
     {
         auto initListExpr = visitor->getASTBuilder()->create<InitializerListExpr>();
         initListExpr->type = visitor->getASTBuilder()->getInitializerListType();
