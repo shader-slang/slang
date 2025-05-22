@@ -17,15 +17,15 @@ SerialWriter::SerialWriter(ChunkBuilder* chunk)
     _initialize(chunk);
 }
 
-SerialWriter::SerialWriter(SlabBuilder& slab)
+SerialWriter::SerialWriter(BlobBuilder& blobBuilder)
 {
-    auto chunk = slab.addChunk();
+    auto chunk = blobBuilder.addChunk();
     _initialize(chunk);
 }
 
 void SerialWriter::_initialize(ChunkBuilder* chunk)
 {
-    _slab = chunk->getParentSlab();
+    _blobBuilder = chunk->getParentBlob();
 
     // The top-level structure consists of a header,
     // and a root value. We will allocate a distinct
@@ -296,7 +296,7 @@ void SerialWriter::handleSharedPtr(void*& value, Callback callback, void* userDa
     }
 
     auto ptrLayout = _reserveDestinationForWrite(FossilizedValKind::Ptr);
-    auto chunk = _slab->addChunk();
+    auto chunk = _blobBuilder->addChunk();
 
     auto fossilizedObject = new FossilizedObjectInfo();
     fossilizedObject->chunk = chunk;
@@ -685,7 +685,7 @@ ChunkBuilder* SerialWriter::_writeKnownIndirectValueSharedLogic(ChunkBuilder* va
         return nullptr;
     }
 
-    _slab->addChunk(valueChunk);
+    _blobBuilder->addChunk(valueChunk);
 
     _commitWrite(ValInfo::relativePtrTo(valueChunk));
     return valueChunk;
@@ -710,7 +710,7 @@ void SerialWriter::_ensureChunkExists()
     if (_state.chunk != nullptr)
         return;
 
-    _state.chunk = _slab->createUnparentedChunk();
+    _state.chunk = _blobBuilder->createUnparentedChunk();
 }
 
 void SerialWriter::_writeValueRaw(ValInfo const& val)
@@ -991,7 +991,7 @@ ChunkBuilder* SerialWriter::_getOrCreateChunkForLayout(LayoutObj* layout)
 
     // If no existing layout has been created, then we'll create one.
     //
-    auto chunk = _slab->addChunk();
+    auto chunk = _blobBuilder->addChunk();
     layout->chunk = chunk;
     _mapLayoutObjToChunk.add(key, chunk);
 

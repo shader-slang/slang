@@ -906,31 +906,19 @@ void writeSerializedModuleAST(
     // TODO: we might want to have a more careful pass here,
     // where we only encode the public declarations.
 
-    SlabBuilder slabBuilder;
+    BlobBuilder blobBuilder;
     {
-        Fossil::SerialWriter writer(slabBuilder);
-        //    RIFFSerialWriter writer(cursor.getCurrentChunk());
+        Fossil::SerialWriter writer(blobBuilder);
 
         ASTEncodingContext context(&writer, moduleDecl, sourceLocWriter);
         serialize(ASTSerializer(&context), moduleDecl);
     }
 
-    // TODO: add data to the chunk...
-
     ComPtr<ISlangBlob> blob;
-    slabBuilder.writeToBlob(blob.writeRef());
+    blobBuilder.writeToBlob(blob.writeRef());
 
     void const* data = blob->getBufferPointer();
     size_t size = blob->getBufferSize();
-
-
-#if 0
-    {
-        auto rootVal = FossilizedVal::Ref::getFromBlob(data, size);
-        dump(rootVal);
-    }
-#endif
-
 
     cursor.addDataChunk(PropertyKeys<Module>::ASTModule, data, size);
 }
@@ -949,7 +937,6 @@ ModuleDecl* readSerializedModuleAST(
 
     Fossil::SerialReader reader(rootVal);
 
-    //    RIFFSerialReader reader(chunk);
     ASTDecodingContext
         context(linkage, astBuilder, sink, &reader, sourceLocReader, requestingSourceLoc);
 

@@ -46,6 +46,10 @@ public:
     RelativePtr(RelativePtr&& ptr) { set(ptr); }
     RelativePtr(T* ptr) { set(ptr); }
 
+    void operator=(RelativePtr const& ptr) { set(ptr); }
+    void operator=(RelativePtr&& ptr) { set(ptr); }
+    void operator=(T* ptr) { set(ptr); }
+
     T* get() const
     {
         if (_offset == 0)
@@ -58,9 +62,6 @@ public:
 
         return (T*)(targetAddr);
     }
-
-    operator T*() const { return get(); }
-    T* operator->() const { return get(); }
 
     void set(T* ptr)
     {
@@ -77,6 +78,9 @@ public:
         _offset = Offset(offsetVal);
         SLANG_ASSERT(intptr_t(_offset) == offsetVal);
     }
+
+    operator T*() const { return get(); }
+    T* operator->() const { return get(); }
 
 private:
     Offset _offset = 0;

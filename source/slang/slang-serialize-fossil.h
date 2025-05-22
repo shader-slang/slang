@@ -27,13 +27,12 @@ namespace Slang
 namespace Fossil
 {
 
-
 /// Serializer implementation for writing objects to a fossil-format blob.
 struct SerialWriter : ISerializerImpl
 {
 public:
     SerialWriter(ChunkBuilder* chunk);
-    SerialWriter(SlabBuilder& slab);
+    SerialWriter(BlobBuilder& blobBuilder);
 
     ~SerialWriter();
 
@@ -185,7 +184,7 @@ private:
     State _state;
     List<State> _stack;
 
-    SlabBuilder* _slab = nullptr;
+    BlobBuilder* _blobBuilder = nullptr;
 
     struct ValInfo
     {
@@ -224,19 +223,6 @@ private:
         {
         }
     };
-
-
-    /// Information on the objects that have been referenced,
-    /// and which need their definitions to be serialized into
-    /// the object definition list chunk.
-    ///
-
-#if 0
-    LayoutObj* _createUnknownLayout();
-    LayoutObj* _getContainerLayout(FossilizedValKind kind, LayoutObj* elementLayout);
-    LayoutObj* _getPtrLayout(LayoutObj* valLayout);
-    LayoutObj* _getLayout(FossilizedValKind kind, Size size, Size alignment);
-#endif
 
     // An inline value will never be indirected.
     //
