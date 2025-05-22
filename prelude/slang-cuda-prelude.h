@@ -3236,33 +3236,18 @@ __forceinline__ __device__ float4 optixHitObjectGetSpherePositionAndRadius()
     return data;
 }
 
-
-typedef struct
-{
-    float4 row0;
-    float4 row1;
-} float2x4;
-
-__forceinline__ __device__ make_float2x4(float4 r0, float4 r1)
-{
-    float2x4 mat;
-    mat.row0 = r0;
-    mat.row1 = r1;
-    return mat;
-}
-
-__forceinline__ __device__ float2x4 optixGetSpherePositionAndRadius()
+__forceinline__ __device__ Matrix<float, 2, 4> optixGetSpherePositionAndRadius()
 {
     float4 data[2];
     optixGetLinearCurveVertexData(data);
-    return make_float2x4(data[0], data[1]);
+    return Matrix<float, 2, 4>(data[0], data[1]);
 }
 
 __forceinline__ __device__ float2x4 optixHitObjectGetSpherePositionAndRadius()
 {
     float4 data[2];
     optixHitObjectGetLinearCurveVertexData(data);
-    return make_float2x4(data[0], data[1]);
+    return Matrix<float, 2, 4>(data[0], data[1]);
 }
 
 __forceinline__ __device__ bool optixIsSphereHit()
