@@ -255,21 +255,56 @@ class FuncCallIntVal : public IntVal
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 };
 
-FIDDLE()
-class CountOfIntVal : public IntVal
+FIDDLE(abstract)
+class SizeOfLikeIntVal : public IntVal
 {
     FIDDLE(...)
-    CountOfIntVal(Type* inType, Type* typeArg) { setOperands(inType, typeArg); }
+    SizeOfLikeIntVal(Type* inType, Type* typeArg) { setOperands(inType, typeArg); }
 
     Val* getTypeArg() { return getOperand(1); }
+
+    bool _isLinkTimeValOverride() { return false; }
+};
+
+FIDDLE()
+class SizeOfIntVal : public SizeOfLikeIntVal
+{
+    FIDDLE(...)
+    SizeOfIntVal(Type* inType, Type* typeArg): SizeOfLikeIntVal(inType, typeArg) { }
 
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride();
-    bool _isLinkTimeValOverride() { return false; }
 
     static Val* tryFoldOrNull(ASTBuilder* astBuilder, Type* intType, Type* newType);
+    static Val* tryFold(ASTBuilder* astBuilder, Type* intType, Type* newType);
+};
 
+FIDDLE()
+class AlignOfIntVal : public SizeOfLikeIntVal
+{
+    FIDDLE(...)
+    AlignOfIntVal(Type* inType, Type* typeArg): SizeOfLikeIntVal(inType, typeArg) { }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+
+    static Val* tryFoldOrNull(ASTBuilder* astBuilder, Type* intType, Type* newType);
+    static Val* tryFold(ASTBuilder* astBuilder, Type* intType, Type* newType);
+};
+
+FIDDLE()
+class CountOfIntVal : public SizeOfLikeIntVal
+{
+    FIDDLE(...)
+    CountOfIntVal(Type* inType, Type* typeArg): SizeOfLikeIntVal(inType, typeArg) { }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+
+    static Val* tryFoldOrNull(ASTBuilder* astBuilder, Type* intType, Type* newType);
     static Val* tryFold(ASTBuilder* astBuilder, Type* intType, Type* newType);
 };
 

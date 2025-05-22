@@ -2060,13 +2060,26 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         }
     }
 
-    if (auto countOfExpr = expr.as<CountOfExpr>())
+    if (auto sizeOfLikeExpr = expr.as<SizeOfLikeExpr>())
     {
         auto type =
-            as<Type>(countOfExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
-        if (type)
+            as<Type>(sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
+
+        if (auto sizeOfExpr = expr.as<SizeOfExpr>())
+        {
+            return as<IntVal>(
+                SizeOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+        }
+        else if (auto alignOfExpr = expr.as<AlignOfExpr>())
+        {
+            return as<IntVal>(
+                AlignOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+        }
+        else if (auto countOfExpr = expr.as<CountOfExpr>())
+        {
             return as<IntVal>(
                 CountOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+        }
     }
 
     // it is possible that we are referring to a generic value param
@@ -2158,20 +2171,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         auto val = tryConstantFoldExpr(invokeExpr, kind, circularityInfo);
         if (val)
             return val;
-    }
-    else if (auto sizeOfLikeExpr = as<SizeOfLikeExpr>(expr.getExpr()))
-    {
-        ASTNaturalLayoutContext context(getASTBuilder(), nullptr);
-        const auto size = context.calcSize(sizeOfLikeExpr->sizedType);
-        if (!size)
-        {
-            return nullptr;
-        }
-
-        auto value = as<AlignOfExpr>(sizeOfLikeExpr) ? size.alignment : size.size;
-
-        // We can return as an IntVal
-        return getASTBuilder()->getIntVal(expr.getExpr()->type, value);
     }
     else if (auto indexExpr = expr.as<IndexExpr>())
     {
