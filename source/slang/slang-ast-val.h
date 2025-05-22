@@ -270,7 +270,10 @@ FIDDLE()
 class SizeOfIntVal : public SizeOfLikeIntVal
 {
     FIDDLE(...)
-    SizeOfIntVal(Type* inType, Type* typeArg): SizeOfLikeIntVal(inType, typeArg) { }
+    SizeOfIntVal(Type* inType, Type* typeArg)
+        : SizeOfLikeIntVal(inType, typeArg)
+    {
+    }
 
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -284,7 +287,10 @@ FIDDLE()
 class AlignOfIntVal : public SizeOfLikeIntVal
 {
     FIDDLE(...)
-    AlignOfIntVal(Type* inType, Type* typeArg): SizeOfLikeIntVal(inType, typeArg) { }
+    AlignOfIntVal(Type* inType, Type* typeArg)
+        : SizeOfLikeIntVal(inType, typeArg)
+    {
+    }
 
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -298,7 +304,10 @@ FIDDLE()
 class CountOfIntVal : public SizeOfLikeIntVal
 {
     FIDDLE(...)
-    CountOfIntVal(Type* inType, Type* typeArg): SizeOfLikeIntVal(inType, typeArg) { }
+    CountOfIntVal(Type* inType, Type* typeArg)
+        : SizeOfLikeIntVal(inType, typeArg)
+    {
+    }
 
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
