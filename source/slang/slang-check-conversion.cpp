@@ -541,8 +541,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 as<PolynomialIntVal>(toElementCount) || as<FuncCallIntVal>(toElementType);
             if (isLinkTimeVal)
             {
-                auto defaultConstructExpr =
-                    m_astBuilder->create<DefaultConstructExpr>();
+                auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
                 defaultConstructExpr->loc = fromInitializerListExpr->loc;
                 defaultConstructExpr->type = QualType(toType);
 
@@ -738,8 +737,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 as<PolynomialIntVal>(rowCountIntVal) || as<FuncCallIntVal>(rowCountIntVal);
             if (isLinkTimeVal)
             {
-                auto defaultConstructExpr =
-                    m_astBuilder->create<DefaultConstructExpr>();
+                auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
                 defaultConstructExpr->loc = fromInitializerListExpr->loc;
                 defaultConstructExpr->type = QualType(toType);
 
