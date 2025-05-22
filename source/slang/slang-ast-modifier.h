@@ -85,6 +85,12 @@ class ExternModifier : public Modifier
 };
 
 FIDDLE()
+class DynModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
 class HLSLExportModifier : public Modifier
 {
     FIDDLE(...)
@@ -154,6 +160,14 @@ class ToBeSynthesizedModifier : public Modifier
 // Marks that the definition of a decl is synthesized.
 FIDDLE()
 class SynthesizedModifier : public Modifier
+{
+    FIDDLE(...)
+};
+
+// Marks that the definition of a func decl is synthesized static invoke func for
+// a lambda that doesn't capture anything.
+FIDDLE()
+class SynthesizedStaticLambdaFuncModifier : public Modifier
 {
     FIDDLE(...)
 };

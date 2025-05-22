@@ -83,6 +83,7 @@ void existingDeviceHandleTestImpl(IDevice* device, UnitTestContext* context)
 
 void existingDeviceHandleTestAPI(UnitTestContext* context, Slang::RenderApiFlag::Enum api)
 {
+    gfxEnableDebugLayer(context->enableDebugLayers);
     if ((api & context->enabledApis) == 0)
     {
         SLANG_IGNORE_TEST;

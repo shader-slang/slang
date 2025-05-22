@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -emit-spirv-directly
 
 // CHECK: %[[C0:[0-9A-Za-z_]+]] = OpSpecConstant %int 32
 // CHECK: %[[C1:[0-9A-Za-z_]+]] = OpSpecConstant %int 2
