@@ -627,6 +627,17 @@ typedef uint32_t SlangSizeT;
         SLANG_TARGET_COUNT_OF,
     };
 
+    typedef int SlangStdRevisionIntegral;
+    enum SlangStdRevision : SlangStdRevisionIntegral
+    {
+        SLANG_STD_REVISION_UNKNOWN,
+        SLANG_STD_REVISION_2025,
+        SLANG_STD_REVISION_2026,
+        SLANG_STD_REVISION_COUNT_OF,
+
+        SLANG_STD_REVISION_DEFAULT = SLANG_STD_REVISION_2025,
+    };
+
     /* A "container format" describes the way that the outputs
     for multiple files, entry points, targets, etc. should be
     combined into a single artifact for output. */
@@ -1021,6 +1032,9 @@ typedef uint32_t SlangSizeT;
 
         SkipDownstreamLinking, // bool, experimental
         DumpModule,
+
+        EnableExperimentalDynamicDispatch, // bool, experimental
+        StdRevision,                       // intValue0: SlangStdRevision
         CountOf,
     };
 
