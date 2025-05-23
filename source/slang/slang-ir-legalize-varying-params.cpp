@@ -1891,6 +1891,8 @@ private:
                 structTypeLayout = as<IRStructTypeLayout>(varLayout->getTypeLayout());
             Index fieldIndex = 0;
             List<IRInst*> fieldParams;
+            // TODO: We currently lose some decorations from the struct that should possibly be transfered
+            //       to the new params here, like kIROp_GlobalVariableShadowingGlobalParameterDecoration.
             for (auto field : structType->getFields())
             {
                 auto fieldParam = builder.emitParam(field->getFieldType());

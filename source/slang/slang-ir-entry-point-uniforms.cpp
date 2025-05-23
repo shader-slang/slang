@@ -101,43 +101,75 @@ namespace Slang
 // whether a parameter represents a varying input rather than
 // a uniform parameter.
 
-
-// In order to determine whether a parameter is varying based on its
-// layout, we need to know which resource kinds represent varying
-// shader parameters.
+// Setup some flags that will be used below to check for varying
+// resource kinds. Ordinary varying input/output + Ray-tracing shader
+// input/output kinds will be considered varying.
 //
-bool isVaryingResourceKind(LayoutResourceKind kind)
+// Note: The set of cases that are considered
+// varying here would need to be extended if we
+// add more fine-grained resource kinds (e.g.,
+// if we ever add an explicit resource kind
+// for geometry shader output streams).
+static const LayoutResourceKindFlags flags = LayoutResourceKindFlag::make(LayoutResourceKind::VaryingInput) |
+                                             LayoutResourceKindFlag::make(LayoutResourceKind::VaryingOutput) |
+                                             LayoutResourceKindFlag::make(LayoutResourceKind::CallablePayload) |
+                                             LayoutResourceKindFlag::make(LayoutResourceKind::HitAttributes) |
+                                             LayoutResourceKindFlag::make(LayoutResourceKind::RayPayload);
+
+bool isVaryingParameter(IRTypeLayout* typeLayout)
 {
-    switch (kind)
-    {
-    default:
+    if (!typeLayout)
         return false;
 
-        // Note: The set of cases that are considered
-        // varying here would need to be extended if we
-        // add more fine-grained resource kinds (e.g.,
-        // if we ever add an explicit resource kind
-        // for geometry shader output streams).
-        //
-        // Ordinary varying input/output:
-    case LayoutResourceKind::VaryingInput:
-    case LayoutResourceKind::VaryingOutput:
-        //
-        // Ray-tracing shader input/output:
-    case LayoutResourceKind::CallablePayload:
-    case LayoutResourceKind::HitAttributes:
-    case LayoutResourceKind::RayPayload:
+    // If we're looking at a struct type layout, we need to check each of the fields.
+    // If any of the fields is not a varying resource kind, then we consider the
+    // whole struct to be uniform (and thus not varying).
+    if (auto structTypeLayout = as<IRStructTypeLayout>(typeLayout))
+    {
+        for (auto fieldAttr : structTypeLayout->getFieldLayoutAttrs())
+        {
+            if(!isVaryingParameter(fieldAttr->getLayout()))
+                return false;
+        }
+        // If we made it here, all struct fields were varying.
+        return true;
+    }
+
+    // If we're looking at a parameter group type layout, we should return false
+    // as these should always be associtated with LayoutResourceKind::Uniform.
+    else if (as<IRParameterGroupTypeLayout>(typeLayout))
+    {
+        return false;
+    }
+
+    // If we're looking at an array type layout, we need to check the element's
+    // type layout.
+    else if (auto arrayTypeLayout = as<IRArrayTypeLayout>(typeLayout))
+    {
+        return isVaryingParameter(arrayTypeLayout->getElementTypeLayout());
+    }
+
+    // If we didn't match a type layout above, try finding a kind from sizeAttrs.
+    else
+    {
+        // If all the element type's sizeAttrs have a varying kind matching our
+        // flags above, return true.
+        for (auto sizeAttr : typeLayout->getSizeAttrs())
+        {
+            if ((flags & LayoutResourceKindFlag::make(sizeAttr->getResourceKind())) == 0)
+                return false;
+        }
         return true;
     }
 }
 
-bool isVaryingParameter(IRTypeLayout* typeLayout)
+bool isVaryingParameter(IRVarLayout* varLayout)
 {
     // If *any* of the resources consumed by the parameter type
     // is *not* a varying resource kind, then we consider the
     // whole parameter to be uniform (and thus not varying).
     //
-    // Note that this means that an empty type will always
+    // Note that this means that some empty types will always
     // be considered varying, even if it had been explicitly
     // marked `uniform`.
     //
@@ -149,19 +181,24 @@ bool isVaryingParameter(IRTypeLayout* typeLayout)
     // reosurce kind, so they show up as empty. Simply
     // adding `LayoutResourceKind`s for system-value inputs
     // and outputs would allow for simpler logic here.
-    //
-    for (auto sizeAttr : typeLayout->getSizeAttrs())
-    {
-        if (!isVaryingResourceKind(sizeAttr->getResourceKind()))
-            return false;
-    }
-    return true;
-}
 
-bool isVaryingParameter(IRVarLayout* varLayout)
-{
     if (!varLayout)
         return false;
+
+    // System-value parameters currently do not have kinds setup.
+    // As a WAR, if we see a system-value attr just assume varying
+    // for now.
+    if (varLayout->findAttr<IRSystemValueSemanticAttr>())
+    {
+        return true;
+    }
+
+    if (varLayout->usesResourceFromKinds(flags)) {
+        return true;
+    }
+
+    // If the base cases above failed, we need to check if we are dealing with
+    // an IRVarLayout that could have "nested" IRVarLayouts, such as an IRStructTypeLayout.
     return isVaryingParameter(varLayout->getTypeLayout());
 }
 
