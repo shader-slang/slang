@@ -97,7 +97,17 @@ bool SemanticsVisitor::shouldUseInitializerDirectly(Type* toType, Expr* fromExpr
     // we want to check for is whether a direct initialization
     // is possible (a type conversion exists).
     //
-    return canCoerce(toType, fromExpr->type, fromExpr);
+    ConversionCost cost;
+    if (canCoerce(toType, fromExpr->type, fromExpr, &cost))
+    {
+        if (cost >= kConversionCost_Explicit)
+        {
+            return false;
+        }
+        return true;
+    }
+
+    return false;
 }
 
 bool SemanticsVisitor::_readValueFromInitializerList(
@@ -526,6 +536,19 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         }
         else
         {
+            auto isLinkTimeVal =
+                as<TypeCastIntVal>(toElementCount) || as<DeclRefIntVal>(toElementCount) ||
+                as<PolynomialIntVal>(toElementCount) || as<FuncCallIntVal>(toElementType);
+            if (isLinkTimeVal)
+            {
+                auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
+                defaultConstructExpr->loc = fromInitializerListExpr->loc;
+                defaultConstructExpr->type = QualType(toType);
+
+                *outToExpr = defaultConstructExpr;
+                return true;
+            }
+
             // We don't know the element count statically,
             // so what are we supposed to be doing?
             //
@@ -702,12 +725,26 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         auto toRowType =
             createVectorType(toMatrixType->getElementType(), toMatrixType->getColumnCount());
 
-        if (auto constRowCount = as<ConstantIntVal>(toMatrixType->getRowCount()))
+        auto rowCountIntVal = toMatrixType->getRowCount();
+        if (auto constRowCount = as<ConstantIntVal>(rowCountIntVal))
         {
             rowCount = (UInt)constRowCount->getValue();
         }
         else
         {
+            auto isLinkTimeVal =
+                as<TypeCastIntVal>(rowCountIntVal) || as<DeclRefIntVal>(rowCountIntVal) ||
+                as<PolynomialIntVal>(rowCountIntVal) || as<FuncCallIntVal>(rowCountIntVal);
+            if (isLinkTimeVal)
+            {
+                auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
+                defaultConstructExpr->loc = fromInitializerListExpr->loc;
+                defaultConstructExpr->type = QualType(toType);
+
+                *outToExpr = defaultConstructExpr;
+                return true;
+            }
+
             // We don't know the element count statically,
             // so what are we supposed to be doing?
             //
@@ -1544,7 +1581,6 @@ bool SemanticsVisitor::_coerce(
             *outCost = subCost + kConversionCost_ImplicitDereference;
         return true;
     }
-
 
     // The main general-purpose approach for conversion is
     // using suitable marked initializer ("constructor")
