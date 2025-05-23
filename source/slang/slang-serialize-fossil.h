@@ -113,7 +113,7 @@ private:
     /// and has the right kind.
     ///
     /// If `dst` is null, it will be initialized via `_createLayout`.
-    /// 
+    ///
     /// If `dst` is non-null, it will be checked against `kind`.
     ///
     LayoutObj* _mergeLayout(LayoutObj*& dst, FossilizedValKind kind);
@@ -147,7 +147,7 @@ private:
     /// Layouts for objects that have one conceptual type parameter.
     ///
     /// The obvious cases include pointers, arrays, and optionals.
-    /// 
+    ///
     /// This is also used for dictionaries (the element type is
     /// a pair).
     ///
@@ -331,7 +331,7 @@ private:
     /// The `ContentsOfChunk` case is used when the conceptual
     /// value is some kind of aggregate that is stored inline
     /// rather than indirectly.
-    /// 
+    ///
     struct ValInfo
     {
     public:
@@ -421,7 +421,7 @@ private:
     }
 
     /// Write a null (relative) pointer.
-    /// 
+    ///
     /// Use this case when there is no more refined type information
     /// available about what the layout of the pointed-to data *would*
     /// be if the pointer were non-null.
@@ -454,7 +454,7 @@ private:
     // be stored as a (relative) pointer to its content. However,
     // if there happens to be an *optional* string, then there is
     // no need for a second indirection.
-    // 
+    //
     // Arrays, dictionaries, strings, and variants are all
     // potentially-indirect values.
     //
@@ -502,7 +502,6 @@ private:
     void _popState();
 
 private:
-
     //
     // The following declarations are the requirements
     // of the `ISerializerImpl` interface:
@@ -683,7 +682,6 @@ private:
     FossilizedValRef _readPotentiallyIndirectValRef();
 
 private:
-
     //
     // The following declarations are the requirements
     // of the `ISerializerImpl` interface:

@@ -55,7 +55,7 @@ struct BlobBuilder;
 ///
 /// Chunks can contain (relative) pointers to one another, with the correct
 /// relative offsets being computed as part of writing the entire blob out.
-/// 
+///
 struct BlobBuilder
 {
 public:
@@ -108,11 +108,11 @@ private:
 /// lifetime of the parent `BlobBuilder`.
 ///
 /// Conceptually, a `ChunkBuilder` has the following:
-/// 
+///
 /// * A minimum *alignment* in bytes (initially 1)
-/// 
+///
 /// * Zero or more bytes of *content* data (initially empty)
-/// 
+///
 /// * An optional *prefix* consisting of zero or more bytes (initially absent)
 ///
 /// The content may be a mix of raw data (e.g., added via `writeData()`),
@@ -124,13 +124,13 @@ private:
 ///
 /// When the parent blob written out as a flat buffer of bytes, the
 /// following are guaranteed:
-/// 
+///
 /// * The content of the chunk will be a contiguous range of bytes
 ///   starting at some offset, and will not overlap any other chunks.
-/// 
+///
 /// * The byte offset where the chunk contents start will be a multiple
 ///   of the chunk's minimum alignment.
-/// 
+///
 /// * The bytes of the prefix (if any) will immediately precede the
 ///   bytes of the content.
 ///
@@ -161,7 +161,7 @@ public:
     ///
     /// Note that the size is not necessarily a multiple of the
     /// alignment of the chunk.
-    /// 
+    ///
     Size getContentSize() const;
 
     /// Write data into the chunk.
@@ -177,7 +177,7 @@ public:
     /// bit-for-bit, and that do not depend on addresses
     /// in meory. In particular no pointers (absolute or
     /// relative) should be written.
-    /// 
+    ///
     void writeData(void const* data, Size size);
 
     /// Append padding bytes to this chunk until its content size
@@ -185,7 +185,7 @@ public:
     ///
     /// May also increase the alignment of the chunk, as if
     /// calling `setAlignmentToAtLeast(alignment)`.
-    /// 
+    ///
     /// The padding bytes will all be zero.
     ///
     void writePaddingToAlignTo(Size alignment);
@@ -198,7 +198,7 @@ public:
     /// The bytes that eventually get written will contain
     /// the computed offset of `targetChunk` minus the computed
     /// offset of the first byte of the relative pointer itself.
-    /// 
+    ///
     /// Acts as is `writePaddingToAlignTo(sizeof(T))` were
     /// called immediately before.
     ///
@@ -242,7 +242,7 @@ public:
     ///
     /// Updates the alignment of the chunk as if making a call to
     /// `setAlignmentToAtLeast(sizeof(T))`.
-    /// 
+    ///
     template<typename T>
     void addPrefixRelativePtr(ChunkBuilder* targetChunk)
     {
@@ -287,7 +287,7 @@ private:
 
 /// A shard is a unit of contiguously-allocated data that makes
 /// up part of a chunk.
-/// 
+///
 /// Shards are *not* meant to be directly manipulated by users;
 /// they are an implementation detail of `ChunkBuilder`.
 ///
@@ -298,7 +298,6 @@ private:
 class ShardBuilder : public InternallyLinkedList<ShardBuilder>::Node
 {
 public:
-
     // There are two kinds of shards that may appear in a chunk:
     //
     // * Shards that hold plain data that will be part of the
