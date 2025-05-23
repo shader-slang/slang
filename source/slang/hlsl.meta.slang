@@ -22520,7 +22520,7 @@ public enum BindlessDescriptorOptions
 /// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
 /// to a descriptor object.
 [ForceInline]
-T defaultGetDescriptorFromHandle<T : IOpaqueDescriptor>( DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
+T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
 {
     __target_switch
     {
