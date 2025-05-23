@@ -13,11 +13,13 @@ namespace Fossil
 //
 
 SerialWriter::SerialWriter(ChunkBuilder* chunk)
+    : _arena(4096)
 {
     _initialize(chunk);
 }
 
 SerialWriter::SerialWriter(BlobBuilder& blobBuilder)
+    : _arena(4096)
 {
     auto chunk = blobBuilder.addChunk();
     _initialize(chunk);
@@ -59,7 +61,7 @@ void SerialWriter::_initialize(ChunkBuilder* chunk)
     // The root value should always be a variant, and we want to
     // set up to write into it in a reasonable way.
     //
-    auto rootPtrLayout = new PtrLayoutObj(nullptr);
+    auto rootPtrLayout = _createLayout(FossilizedValKind::Ptr);
     _state = State(rootPtrLayout, rootValueChunk);
 
     _pushVariantScope();
@@ -152,7 +154,7 @@ void SerialWriter::handleString(String& value)
 
             auto ptrLayout =
                 (ContainerLayoutObj*)_reserveDestinationForWrite(FossilizedValKind::Ptr);
-            LayoutObj::_merge(ptrLayout->baseLayout, FossilizedValKind::String);
+            _mergeLayout(ptrLayout->baseLayout, FossilizedValKind::String);
 
             _commitWrite(ValInfo::relativePtrTo(existingChunk));
             return;
@@ -298,7 +300,7 @@ void SerialWriter::handleSharedPtr(void*& value, Callback callback, void* userDa
     auto ptrLayout = _reserveDestinationForWrite(FossilizedValKind::Ptr);
     auto chunk = _blobBuilder->addChunk();
 
-    auto fossilizedObject = new FossilizedObjectInfo();
+    auto fossilizedObject = new(_arena) FossilizedObjectInfo();
     fossilizedObject->chunk = chunk;
     fossilizedObject->ptrLayout = ptrLayout;
     fossilizedObject->liveObjectPtr = liveObjectPtr;
@@ -331,62 +333,98 @@ void SerialWriter::handleDeferredObjectContents(void* valuePtr, Callback callbac
     callback(valuePtr, userData);
 }
 
-SerialWriter::LayoutObj* SerialWriter::LayoutObj::_create(FossilizedValKind kind)
+SerialWriter::LayoutObj* SerialWriter::_createSimpleLayout(FossilizedValKind kind)
+{
+    switch (kind)
+    {
+    case FossilizedValKind::Bool:
+    case FossilizedValKind::Int8:
+    case FossilizedValKind::UInt8:
+        return new(_arena) SimpleLayoutObj(kind, 1);
+
+    case FossilizedValKind::Int16:
+    case FossilizedValKind::UInt16:
+        return new(_arena) SimpleLayoutObj(kind, 2);
+
+    case FossilizedValKind::Int32:
+    case FossilizedValKind::UInt32:
+    case FossilizedValKind::Float32:
+        return new(_arena) SimpleLayoutObj(kind, 4);
+
+    case FossilizedValKind::Int64:
+    case FossilizedValKind::UInt64:
+    case FossilizedValKind::Float64:
+        return new(_arena) SimpleLayoutObj(kind, 8);
+
+    case FossilizedValKind::String:
+        return new(_arena) SimpleLayoutObj(kind);
+
+    default:
+        SLANG_UNEXPECTED("unhandled case");
+        UNREACHABLE_RETURN(nullptr);
+    }
+
+}
+
+SerialWriter::LayoutObj* SerialWriter::_createLayout(FossilizedValKind kind)
 {
     switch (kind)
     {
     case FossilizedValKind::Array:
     case FossilizedValKind::Optional:
     case FossilizedValKind::Dictionary:
-        return new ContainerLayoutObj(kind, nullptr);
+        return new(_arena) ContainerLayoutObj(kind, nullptr);
 
     case FossilizedValKind::Ptr:
-        return new ContainerLayoutObj(
+        return new(_arena) ContainerLayoutObj(
             kind,
             nullptr,
             sizeof(Fossil::RelativePtrOffset),
             sizeof(Fossil::RelativePtrOffset));
 
+    case FossilizedValKind::Struct:
+    case FossilizedValKind::Tuple:
+        return new(_arena) RecordLayoutObj(kind);
+
     case FossilizedValKind::Variant:
-        // A variant is being treated like a container at this point,
+        // A variant is being treated like a container in this context,
         // because it wants to be able to track the layout of what it
         // ended up holding...
         //
-        return new ContainerLayoutObj(kind, nullptr);
+        return new(_arena) ContainerLayoutObj(kind, nullptr);
 
     case FossilizedValKind::Bool:
     case FossilizedValKind::Int8:
-    case FossilizedValKind::UInt8:
-        return new SimpleLayoutObj(kind, 1);
-
+    case FossilizedValKind::Int16:
     case FossilizedValKind::Int32:
-    case FossilizedValKind::UInt32:
-    case FossilizedValKind::Float32:
-        return new SimpleLayoutObj(kind, 4);
-
     case FossilizedValKind::Int64:
+    case FossilizedValKind::UInt8:
+    case FossilizedValKind::UInt16:
+    case FossilizedValKind::UInt32:
     case FossilizedValKind::UInt64:
+    case FossilizedValKind::Float32:
     case FossilizedValKind::Float64:
-        return new SimpleLayoutObj(kind, 8);
-
     case FossilizedValKind::String:
-        return new SimpleLayoutObj(kind);
+    {
+        if (auto found = _simpleLayouts.tryGetValue(kind))
+            return *found;
 
-    case FossilizedValKind::Struct:
-    case FossilizedValKind::Tuple:
-        return new RecordLayoutObj(kind);
+        auto layout = _createSimpleLayout(kind);
+        _simpleLayouts.add(kind, layout);
+        return layout;
+    }
 
     default:
-        SLANG_UNEXPECTED("implement me!");
+        SLANG_UNEXPECTED("unhandled case");
         UNREACHABLE_RETURN(nullptr);
     }
 }
 
-SerialWriter::LayoutObj* SerialWriter::LayoutObj::_merge(LayoutObj*& dst, FossilizedValKind kind)
+SerialWriter::LayoutObj* SerialWriter::_mergeLayout(LayoutObj*& dst, FossilizedValKind kind)
 {
     if (!dst)
     {
-        dst = _create(kind);
+        dst = _createLayout(kind);
     }
 
     if (dst->kind != kind)
@@ -400,14 +438,14 @@ SerialWriter::LayoutObj* SerialWriter::LayoutObj::_merge(LayoutObj*& dst, Fossil
     //
     if (kind == FossilizedValKind::Variant)
     {
-        auto src = _create(kind);
+        auto src = _createLayout(kind);
         return src;
     }
 
     return dst;
 }
 
-void SerialWriter::LayoutObj::_merge(LayoutObj*& dst, LayoutObj* src)
+void SerialWriter::_mergeLayout(LayoutObj*& dst, LayoutObj* src)
 {
     if (dst == src)
         return;
@@ -421,7 +459,7 @@ void SerialWriter::LayoutObj::_merge(LayoutObj*& dst, LayoutObj* src)
         return;
     }
 
-    _merge(dst, src->getKind());
+    _mergeLayout(dst, src->getKind());
 
     switch (src->getKind())
     {
@@ -432,7 +470,7 @@ void SerialWriter::LayoutObj::_merge(LayoutObj*& dst, LayoutObj* src)
         {
             auto dstContainer = (ContainerLayoutObj*)dst;
             auto srcContainer = (ContainerLayoutObj*)src;
-            _merge(dstContainer->baseLayout, srcContainer->baseLayout);
+            _mergeLayout(dstContainer->baseLayout, srcContainer->baseLayout);
         }
         break;
 
@@ -440,12 +478,54 @@ void SerialWriter::LayoutObj::_merge(LayoutObj*& dst, LayoutObj* src)
         break;
 
     case FossilizedValKind::Variant:
+        // Recursive merging should not be applied to variants;
+        // each variant is unique until later deduplication.
         break;
 
     default:
-        SLANG_UNEXPECTED("implement me!");
+        SLANG_UNEXPECTED("unhandled case");
         break;
     }
+}
+
+SerialWriter::RecordLayoutObj::FieldInfo& SerialWriter::_getOrAddField(RecordLayoutObj* recordLayout, Index index)
+{
+    // Note: we are doing all the allocation for `LayoutObj`s from
+    // an arena, so that we don't have to worry about managing
+    // their lifetimes carefully.
+    //
+    // One place where that is a bit tedious is handling the storage
+    // for the array of fields for a record.
+    //
+    // TODO(tfoley): see if there's allocator support on `List<T>`
+    // or similar, so that it can be made to just use the arena.
+
+    SLANG_ASSERT(recordLayout);
+    SLANG_ASSERT(index >= 0);
+
+    if (index < recordLayout->fieldCount)
+        return recordLayout->fields[index];
+
+    SLANG_ASSERT(index == recordLayout->fieldCount);
+
+    if (index >= recordLayout->fieldCapacity)
+    {
+        if (recordLayout->fieldCapacity == 0)
+            recordLayout->fieldCapacity = 16;
+
+        while (index >= recordLayout->fieldCapacity)
+        {
+            recordLayout->fieldCapacity = (recordLayout->fieldCapacity * 3) >> 1;
+        }
+
+        auto newFields = new (_arena) RecordLayoutObj::FieldInfo[recordLayout->fieldCapacity];
+        for (Index i = 0; i < recordLayout->fieldCount; ++i)
+            newFields[i] = recordLayout->fields[i];
+        recordLayout->fields = newFields;
+    }
+
+    recordLayout->fields[recordLayout->fieldCount++] = RecordLayoutObj::FieldInfo();
+    return recordLayout->fields[index];
 }
 
 SerialWriter::ValInfo SerialWriter::ValInfo::rawData(void const* data, Size size, Size alignment)
@@ -490,72 +570,14 @@ Size SerialWriter::ValInfo::getAlignment() const
     }
 }
 
-#if 0
-SerialWriter::LayoutObj* SerialWriter::_createUnknownLayout()
-{
-    auto layoutObj = new ContainerLayoutObj(FossilizedValKind(-1), nullptr);
-    return layoutObj;
-}
-
-SerialWriter::LayoutObj* SerialWriter::_getContainerLayout(FossilizedValKind kind, LayoutObj* elementLayout)
-{
-    // TODO: caching!
-    auto layoutObj = new ContainerLayoutObj(FossilizedValKind::Ptr, elementLayout);
-    return layoutObj;
-}
-
-SerialWriter::LayoutObj* SerialWriter::_getPtrLayout(LayoutObj* valLayout)
-{
-    // TODO: caching!
-
-    auto ptrSize = sizeof(Fossil::RelativePtrOffset);
-    auto layoutObj = new ContainerLayoutObj(FossilizedValKind::Ptr, valLayout, ptrSize, ptrSize);
-    return layoutObj;
-}
-
-SerialWriter::LayoutObj* SerialWriter::_getLayout(FossilizedValKind kind, Size size, Size alignment)
-{
-    // TODO: caching!
-    // TODO: validate that the size/alignment makes sense for the kind...
-
-    auto layoutObj = new LayoutObj(kind, size, alignment);
-    return layoutObj;
-}
-#endif
-
-#define ENABLE_DUMP 0
-
-#if ENABLE_DUMP
-
-static int gDebugIndent = 0;
-
-static void _dumpIndent()
-{
-    for (int i = 0; i < gDebugIndent; ++i)
-        fprintf(stderr, "  ");
-}
-#endif
-
 void SerialWriter::_pushInlineValueScope(FossilizedValKind kind)
 {
-#if ENABLE_DUMP
-    _dumpIndent();
-    fprintf(stderr, "beginInlineValue %d\n", int(kind));
-    gDebugIndent++;
-#endif
-
     auto layout = _reserveDestinationForWrite(kind);
     _pushState(layout);
 }
 
 void SerialWriter::_popInlineValueScope()
 {
-#if ENABLE_DUMP
-    gDebugIndent--;
-    _dumpIndent();
-    fprintf(stderr, "endInlineValue\n");
-#endif
-
     auto layout = _state.layout;
     auto chunk = _state.chunk;
 
@@ -608,30 +630,21 @@ void SerialWriter::_popVariantScope()
 
 void SerialWriter::_pushPotentiallyIndirectValueScope(FossilizedValKind kind)
 {
-#if ENABLE_DUMP
-    _dumpIndent();
-    fprintf(stderr, "_beginIndirectValue %d\n", int(kind));
-    gDebugIndent++;
-#endif
-
     if (_shouldEmitWithPointerIndirection(kind))
     {
         _pushIndirectValueScope(kind);
     }
     else
     {
-        auto valueLayout = _reserveDestinationForWrite(kind);
-        _pushState(valueLayout);
+        _pushInlineValueScope(kind);
     }
 }
 
 ChunkBuilder* SerialWriter::_popPotentiallyIndirectValueScope()
 {
-#if ENABLE_DUMP
-    gDebugIndent--;
-    _dumpIndent();
-    fprintf(stderr, "_endContainer\n");
-#endif
+    // TODO(tfoley): Try to make this function just be a simple
+    // conditional to select between the functions for the
+    // indirect and inline cases.
 
     auto valueLayout = _state.layout;
     auto valueChunk = _state.chunk;
@@ -651,26 +664,14 @@ ChunkBuilder* SerialWriter::_popPotentiallyIndirectValueScope()
 
 void SerialWriter::_pushIndirectValueScope(FossilizedValKind kind)
 {
-#if ENABLE_DUMP
-    _dumpIndent();
-    fprintf(stderr, "_beginKnownIndirectValue %d\n", int(kind));
-    gDebugIndent++;
-#endif
-
-    auto ptrLayout = (PtrLayoutObj*)_reserveDestinationForWrite(FossilizedValKind::Ptr);
-    auto valueLayout = LayoutObj::_merge(ptrLayout->baseLayout, kind);
+    auto ptrLayout = (ContainerLayoutObj*)_reserveDestinationForWrite(FossilizedValKind::Ptr);
+    auto valueLayout = _mergeLayout(ptrLayout->baseLayout, kind);
 
     _pushState(valueLayout);
 }
 
 void SerialWriter::_popIndirectValueScope()
 {
-#if ENABLE_DUMP
-    gDebugIndent--;
-    _dumpIndent();
-    fprintf(stderr, "_endContainer\n");
-#endif
-
     auto valueChunk = _state.chunk;
     _popState();
 
@@ -749,22 +750,6 @@ void SerialWriter::_writeValueRaw(ValInfo const& val)
     }
 }
 
-#if 0
-void SerialWriter::_writeValueRaw(LayoutObj* layout, ValInfo const& val)
-{
-    SLANG_ASSERT(layout);
-    if (_state.chunk)
-    {
-        _state.chunk->writePaddingToAlignTo(layout->getAlignment());
-    }
-    _writeValueRaw(val);
-    if (_state.chunk)
-    {
-        _state.chunk->setAlignmentToAtLeast(layout->getAlignment());
-    }
-}
-#endif
-
 bool SerialWriter::_shouldEmitWithPointerIndirection(FossilizedValKind kind)
 {
     switch (kind)
@@ -800,9 +785,9 @@ SerialWriter::LayoutObj*& SerialWriter::_reserveDestinationForWrite()
     case FossilizedValKind::Struct:
     case FossilizedValKind::Tuple:
         {
-            auto tupleLayout = (TupleLayoutObj*)_state.layout;
+            auto recordLayout = (RecordLayoutObj*)_state.layout;
             auto elementIndex = _state.elementCount;
-            auto& elementLayout = tupleLayout->_getField(elementIndex).layout;
+            auto& elementLayout = _getOrAddField(recordLayout, elementIndex).layout;
             return elementLayout;
         }
         break;
@@ -820,20 +805,20 @@ SerialWriter::LayoutObj*& SerialWriter::_reserveDestinationForWrite()
         break;
 
     default:
-        SLANG_UNEXPECTED("implement me!");
+        SLANG_UNEXPECTED("unhandled case");
         break;
     }
 }
 
 SerialWriter::LayoutObj* SerialWriter::_reserveDestinationForWrite(FossilizedValKind srcKind)
 {
-    return LayoutObj::_merge(_reserveDestinationForWrite(), srcKind);
+    return _mergeLayout(_reserveDestinationForWrite(), srcKind);
 }
 
 SerialWriter::LayoutObj* SerialWriter::_reserveDestinationForWrite(LayoutObj* srcLayout)
 {
     SLANG_ASSERT(srcLayout != nullptr);
-    LayoutObj::_merge(_reserveDestinationForWrite(), srcLayout);
+    _mergeLayout(_reserveDestinationForWrite(), srcLayout);
     return srcLayout;
 }
 
@@ -845,9 +830,9 @@ void SerialWriter::_commitWrite(ValInfo const& val)
     case FossilizedValKind::Struct:
     case FossilizedValKind::Tuple:
         {
-            auto tupleLayout = (TupleLayoutObj*)_state.layout;
+            auto recordLayout = (RecordLayoutObj*)_state.layout;
             auto elementIndex = _state.elementCount++;
-            auto& fieldInfo = tupleLayout->_getField(elementIndex);
+            auto& fieldInfo = _getOrAddField(recordLayout, elementIndex);
 
             Size fieldOffset = 0;
             if (elementIndex != 0)
@@ -890,23 +875,8 @@ void SerialWriter::_commitWrite(ValInfo const& val)
         }
         break;
 
-#if 0
-    case FossilizedValKind::Variant:
-        {
-            auto elementIndex = _state.elementCount++;
-            if (elementIndex > 0)
-            {
-                SLANG_UNEXPECTED(
-                    "error during serialization: variant with more than one value inside!!");
-            }
-
-            _writeValueRaw(layout, val);
-        }
-        break;
-#endif
-
     default:
-        SLANG_UNEXPECTED("implement me!");
+        SLANG_UNEXPECTED("unhandled case");
         break;
     }
 }
@@ -922,19 +892,6 @@ void SerialWriter::_writeSimpleValue(
     SLANG_ASSERT(layout->alignment = alignment);
     _commitWrite(ValInfo::rawData(data, size, alignment));
 }
-
-#if 0
-bool SerialWriter::_trySkipValue()
-{
-    // TODO: determine if we *can* skip a value in this context.
-    //
-    // If we can skip a value, then we write a zero-byte
-    // null instead.
-    //
-    _writeNull();
-    return true;
-}
-#endif
 
 void SerialWriter::_writeNull()
 {
@@ -972,9 +929,15 @@ ChunkBuilder* SerialWriter::_getOrCreateChunkForLayout(LayoutObj* layout)
     if (!layout)
         return nullptr;
 
+    // We start by looking for an existing chunk for `layout`,
+    // which would be cached on the object itself.
+    //
     if (auto existingChunk = layout->chunk)
         return existingChunk;
 
+    // Next we look for an existing chunk that matches the
+    // structure of `layout`.
+    //
     LayoutObjKey key = {layout};
     if (auto found = _mapLayoutObjToChunk.tryGetValue(key))
     {
@@ -983,13 +946,8 @@ ChunkBuilder* SerialWriter::_getOrCreateChunkForLayout(LayoutObj* layout)
         return existingChunk;
     }
 
-    // TODO: next we should try to get a cached result
-    // (so that we aren't re-creating everything from
-    // scratch every time...).
-    //
-
-
-    // If no existing layout has been created, then we'll create one.
+    // If no existing layout has been written to a chunk,
+    // then we'll create one.
     //
     auto chunk = _blobBuilder->addChunk();
     layout->chunk = chunk;
@@ -1038,23 +996,26 @@ ChunkBuilder* SerialWriter::_getOrCreateChunkForLayout(LayoutObj* layout)
         {
             auto recordLayout = (RecordLayoutObj*)layout;
 
-            auto fieldCount = UInt32(recordLayout->fields.getCount());
+            auto fieldCount = UInt32(recordLayout->fieldCount);
             chunk->writeData(&fieldCount, sizeof(fieldCount));
 
-            bool first = true;
-            for (auto field : recordLayout->fields)
+            for (Index i = 0; i < fieldCount; ++i)
             {
+                auto& field = recordLayout->fields[i];
                 auto fieldLayoutChunk = _getOrCreateChunkForLayout(field.layout);
                 chunk->writeRelativePtr<Fossil::RelativePtrOffset>(fieldLayoutChunk);
 
                 auto fieldOffset = UInt32(field.offset);
                 chunk->writeData(&fieldOffset, sizeof(fieldOffset));
 
-                if (!first)
+                if (i != 0)
                 {
+                    // Make sure that all but the first field have
+                    // a non-zero offset, to validate that offsets
+                    // are being comptued at all.
+                    //
                     SLANG_ASSERT(fieldOffset != 0);
                 }
-                first = false;
             }
         }
         break;
@@ -1103,10 +1064,10 @@ bool SerialWriter::LayoutObjKey::operator==(LayoutObjKey const& that) const
             auto thisRecord = (RecordLayoutObj*)obj;
             auto thatRecord = (RecordLayoutObj*)that.obj;
 
-            if (thisRecord->fields.getCount() != thatRecord->fields.getCount())
+            if (thisRecord->fieldCount != thatRecord->fieldCount)
                 return false;
 
-            auto fieldCount = thisRecord->fields.getCount();
+            auto fieldCount = thisRecord->fieldCount;
             for (Index i = 0; i < fieldCount; ++i)
             {
                 auto thisField = thisRecord->fields[i];
@@ -1171,10 +1132,12 @@ void SerialWriter::LayoutObjKey::hashInto(Hasher& hasher) const
         {
             auto record = (RecordLayoutObj*)obj;
 
-            hasher.hashValue(record->fields.getCount());
+            auto fieldCount = record->fieldCount;
+            hasher.hashValue(record->fieldCount);
 
-            for (auto field : record->fields)
+            for (Index i = 0; i < fieldCount; ++i)
             {
+                auto& field = record->fields[i];
                 hasher.hashValue(field.offset);
                 LayoutObjKey(field.layout).hashInto(hasher);
             }
@@ -1475,8 +1438,9 @@ void SerialReader::handleSharedPtr(void*& value, Callback callback, void* userDa
     // At this point we are reading a reference to an
     // object index that has not yet been read at all.
     //
-    auto objectInfo = new ObjectInfo();
+    auto objectInfo = RefPtr(new ObjectInfo());
     _mapFossilizedObjectPtrToObjectInfo.add(targetValRef.getData(), objectInfo);
+
     objectInfo->fossilizedObjectRef = targetValRef;
 
     // We cannot return from this function until we have
@@ -1630,7 +1594,7 @@ FossilizedValRef SerialReader::_readValRef()
         }
 
     default:
-        SLANG_UNEXPECTED("implement me!");
+        SLANG_UNEXPECTED("unhandled case");
         break;
     }
 }

@@ -10,6 +10,11 @@
 // as *fossilized* objects, and to the format as the
 // *fossil format*.
 //
+// The term "fossil" is being used here to refer to formerly
+// "live" objects that have been converted into an alternative
+// form that can no longer perform their original functions,
+// but that can still be inspected and dug through.
+//
 
 #include "../core/slang-relative-ptr.h"
 

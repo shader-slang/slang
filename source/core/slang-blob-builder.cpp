@@ -268,6 +268,7 @@ void ChunkBuilder::writeData(void const* data, Size size)
                 ::memcpy(payloadEnd, data, size);
 
                 lastShard->_size = payloadSize + size;
+                _contentSize += size;
                 return;
             }
         }
