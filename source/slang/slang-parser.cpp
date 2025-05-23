@@ -9229,6 +9229,8 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("param", getSyntaxClass<ParamModifier>()),
     _makeParseModifier("extern", getSyntaxClass<ExternModifier>()),
 
+    _makeParseModifier("dyn", getSyntaxClass<DynModifier>()),
+
     _makeParseModifier("row_major", getSyntaxClass<HLSLRowMajorLayoutModifier>()),
     _makeParseModifier("column_major", getSyntaxClass<HLSLColumnMajorLayoutModifier>()),
 
