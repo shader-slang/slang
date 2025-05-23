@@ -2,7 +2,7 @@
 #pragma once
 
 #include "core/slang-basic.h"
-#include "imgui.h"
+#include "imgui/imgui.h"
 #include "slang-com-ptr.h"
 #include "slang-gfx.h"
 #include "vector-math.h"

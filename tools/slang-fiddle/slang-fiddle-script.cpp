@@ -1,9 +1,9 @@
 // slang-fiddle-script.cpp
 #include "slang-fiddle-script.h"
 
-#include "../external/lua/lapi.h"
-#include "../external/lua/lauxlib.h"
-#include "../external/lua/lualib.h"
+#include "lua/lapi.h"
+#include "lua/lauxlib.h"
+#include "lua/lualib.h"
 
 namespace fiddle
 {
