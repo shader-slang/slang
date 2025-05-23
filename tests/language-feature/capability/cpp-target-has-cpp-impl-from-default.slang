@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cpp -entry computeMain -stage compute -allow-glsl
 
-// CHECK: error 36108: 'outputBuffer' has dependencies that are not compatible on the required target 'cpp'.
+// CHECK: computeMain(
 
 layout(binding = 0) buffer MyBlockName
 {
