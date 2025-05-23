@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <NonUserCode xmlns="http://schemas.microsoft.com/vstudio/debugger/jmc/2015">
 
+  <!-- Files -->
+  <File Name="*.h.fiddle" />
+  
   <!-- Functions -->
   <Function Name="Slang::Expr::accept" />
   <Function Name="Slang::DeclBase::accept" />
