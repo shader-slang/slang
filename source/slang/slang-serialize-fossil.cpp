@@ -300,7 +300,7 @@ void SerialWriter::handleSharedPtr(void*& value, Callback callback, void* userDa
     auto ptrLayout = _reserveDestinationForWrite(FossilizedValKind::Ptr);
     auto chunk = _blobBuilder->addChunk();
 
-    auto fossilizedObject = new(_arena) FossilizedObjectInfo();
+    auto fossilizedObject = new (_arena) FossilizedObjectInfo();
     fossilizedObject->chunk = chunk;
     fossilizedObject->ptrLayout = ptrLayout;
     fossilizedObject->liveObjectPtr = liveObjectPtr;
@@ -340,30 +340,29 @@ SerialWriter::LayoutObj* SerialWriter::_createSimpleLayout(FossilizedValKind kin
     case FossilizedValKind::Bool:
     case FossilizedValKind::Int8:
     case FossilizedValKind::UInt8:
-        return new(_arena) SimpleLayoutObj(kind, 1);
+        return new (_arena) SimpleLayoutObj(kind, 1);
 
     case FossilizedValKind::Int16:
     case FossilizedValKind::UInt16:
-        return new(_arena) SimpleLayoutObj(kind, 2);
+        return new (_arena) SimpleLayoutObj(kind, 2);
 
     case FossilizedValKind::Int32:
     case FossilizedValKind::UInt32:
     case FossilizedValKind::Float32:
-        return new(_arena) SimpleLayoutObj(kind, 4);
+        return new (_arena) SimpleLayoutObj(kind, 4);
 
     case FossilizedValKind::Int64:
     case FossilizedValKind::UInt64:
     case FossilizedValKind::Float64:
-        return new(_arena) SimpleLayoutObj(kind, 8);
+        return new (_arena) SimpleLayoutObj(kind, 8);
 
     case FossilizedValKind::String:
-        return new(_arena) SimpleLayoutObj(kind);
+        return new (_arena) SimpleLayoutObj(kind);
 
     default:
         SLANG_UNEXPECTED("unhandled case");
         UNREACHABLE_RETURN(nullptr);
     }
-
 }
 
 SerialWriter::LayoutObj* SerialWriter::_createLayout(FossilizedValKind kind)
@@ -373,10 +372,10 @@ SerialWriter::LayoutObj* SerialWriter::_createLayout(FossilizedValKind kind)
     case FossilizedValKind::Array:
     case FossilizedValKind::Optional:
     case FossilizedValKind::Dictionary:
-        return new(_arena) ContainerLayoutObj(kind, nullptr);
+        return new (_arena) ContainerLayoutObj(kind, nullptr);
 
     case FossilizedValKind::Ptr:
-        return new(_arena) ContainerLayoutObj(
+        return new (_arena) ContainerLayoutObj(
             kind,
             nullptr,
             sizeof(Fossil::RelativePtrOffset),
@@ -384,14 +383,14 @@ SerialWriter::LayoutObj* SerialWriter::_createLayout(FossilizedValKind kind)
 
     case FossilizedValKind::Struct:
     case FossilizedValKind::Tuple:
-        return new(_arena) RecordLayoutObj(kind);
+        return new (_arena) RecordLayoutObj(kind);
 
     case FossilizedValKind::Variant:
         // A variant is being treated like a container in this context,
         // because it wants to be able to track the layout of what it
         // ended up holding...
         //
-        return new(_arena) ContainerLayoutObj(kind, nullptr);
+        return new (_arena) ContainerLayoutObj(kind, nullptr);
 
     case FossilizedValKind::Bool:
     case FossilizedValKind::Int8:
@@ -405,14 +404,14 @@ SerialWriter::LayoutObj* SerialWriter::_createLayout(FossilizedValKind kind)
     case FossilizedValKind::Float32:
     case FossilizedValKind::Float64:
     case FossilizedValKind::String:
-    {
-        if (auto found = _simpleLayouts.tryGetValue(kind))
-            return *found;
+        {
+            if (auto found = _simpleLayouts.tryGetValue(kind))
+                return *found;
 
-        auto layout = _createSimpleLayout(kind);
-        _simpleLayouts.add(kind, layout);
-        return layout;
-    }
+            auto layout = _createSimpleLayout(kind);
+            _simpleLayouts.add(kind, layout);
+            return layout;
+        }
 
     default:
         SLANG_UNEXPECTED("unhandled case");
@@ -488,7 +487,9 @@ void SerialWriter::_mergeLayout(LayoutObj*& dst, LayoutObj* src)
     }
 }
 
-SerialWriter::RecordLayoutObj::FieldInfo& SerialWriter::_getOrAddField(RecordLayoutObj* recordLayout, Index index)
+SerialWriter::RecordLayoutObj::FieldInfo& SerialWriter::_getOrAddField(
+    RecordLayoutObj* recordLayout,
+    Index index)
 {
     // Note: we are doing all the allocation for `LayoutObj`s from
     // an arena, so that we don't have to worry about managing
