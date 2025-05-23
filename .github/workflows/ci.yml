@@ -33,7 +33,7 @@ jobs:
           - { os: macos, compiler: gcc }
           - { os: macos, compiler: cl }
         include:
-          - { os: linux, runs-on: ubuntu-latest }
+          - { os: linux, runs-on: ubuntu-22.04 }
           - { os: macos, runs-on: macos-latest }
           - { os: windows, runs-on: windows-latest }
           # Warnings are treated as errors by default.
@@ -132,6 +132,11 @@ jobs:
           platform: ${{matrix.platform}}
           config: ${{matrix.config}}
           build-llvm: ${{ matrix.build-llvm }}
+      - name: Setup Node.js
+        if: matrix.platform == 'wasm'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
       - name: Build Slang
         if: steps.filter.outputs.should-run == 'true'
         run: |
