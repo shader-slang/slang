@@ -146,6 +146,9 @@ DIAGNOSTIC(
     entryPointsNeedToBeAssociatedWithTranslationUnits,
     "when using multiple source files, entry points must be specified after their corresponding "
     "source file(s)")
+
+DIAGNOSTIC(21, Error, unknownStdRevision, "unknown language standard revision '$0'")
+
 DIAGNOSTIC(22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
 
 DIAGNOSTIC(26, Error, unknownOptimiziationLevel, "unknown optimization level '$0'")
@@ -827,6 +830,59 @@ DIAGNOSTIC(
 DIAGNOSTIC(33070, Error, expectedFunction, "expected a function, got '$0'")
 DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 
+// `dyn` and `some` errors
+DIAGNOSTIC(33072, Error, cannotHaveGenericDynInterface, "dyn interfaces cannot be generic: '$0'.")
+DIAGNOSTIC(
+    33073,
+    Error,
+    cannotHaveAssociatedTypeInDynInterface,
+    "dyn interfaces cannot have associatedType members.")
+DIAGNOSTIC(
+    33074,
+    Error,
+    cannotHaveGenericMethodInDynInterface,
+    "dyn interfaces cannot have generic methods.")
+DIAGNOSTIC(
+    33075,
+    Error,
+    cannotHaveMutatingMethodInDynInterface,
+    "dyn interfaces cannot have [mutating] methods.")
+DIAGNOSTIC(
+    33076,
+    Error,
+    cannotHaveDifferentiableMethodInDynInterface,
+    "dyn interfaces cannot have [Differentiable] methods.")
+DIAGNOSTIC(
+    33077,
+    Error,
+    DynInterfaceCannotInheritNonDynInterface,
+    "dyn interface '$0' may only inherit 'dyn' interfaces. '$1' is not a dyn interface.")
+DIAGNOSTIC(
+    33078,
+    Error,
+    cannotUseExtensionToMakeTypeConformToDynInterface,
+    "cannot use a extension to conform to a dyn interface '$0'.")
+DIAGNOSTIC(
+    33079,
+    Error,
+    cannotHaveUnsizedMemberWhenInheritingDynInterface,
+    "cannot have unsized member '$0' when inheriting from dyn interface '$1'.")
+DIAGNOSTIC(
+    33080,
+    Error,
+    cannotHaveOpaqueMemberWhenInheritingDynInterface,
+    "cannot have opaque member '$0' when inheriting from dyn interface '$1'.")
+DIAGNOSTIC(
+    33081,
+    Error,
+    cannotHaveNonCopyableMemberWhenInheritingDynInterface,
+    "cannot have non-copyable member '$0' when inheriting from dyn interface '$1'.")
+DIAGNOSTIC(
+    33082,
+    Error,
+    cannotConformGenericToDynInterface,
+    "cannot conform generic type '$0' to dyn interface '$1'.")
+
 DIAGNOSTIC(
     -1,
     Note,
@@ -1366,6 +1422,18 @@ DIAGNOSTIC(
     Error,
     variableCannotBePushAndSpecializationConstant,
     "'$0' cannot be a push constant and a specialization constant at the same time")
+DIAGNOSTIC(31221, Error, invalidHLSLRegisterName, "invalid HLSL register name '$0'.")
+DIAGNOSTIC(
+    31222,
+    Error,
+    invalidHLSLRegisterNameForType,
+    "invalid HLSL register name '$0' for type '$1'.")
+DIAGNOSTIC(
+    31223,
+    Error,
+    ExternAndExportVarDeclMustBeConst,
+    "extern and export variables must be static const: '$0'")
+
 // Enums
 
 DIAGNOSTIC(32000, Error, invalidEnumTagType, "invalid tag type for 'enum': '$0'")
@@ -1986,6 +2054,12 @@ DIAGNOSTIC(
     Error,
     vectorWithDisallowedElementTypeEncountered,
     "vector with disallowed element type '$0' encountered")
+
+DIAGNOSTIC(
+    38203,
+    Error,
+    vectorWithInvalidElementCountEncountered,
+    "vector has invalid element count '$0', valid values are between '$1' and '$2' inclusive")
 
 // 39xxx - Type layout and parameter binding.
 
@@ -2758,6 +2832,12 @@ DIAGNOSTIC(
     Internal,
     noBlocksOrIntrinsic,
     "no blocks found for function definition, is there a '$0' intrinsic missing?")
+
+DIAGNOSTIC(
+    40100,
+    Warning,
+    mainEntryPointRenamed,
+    "entry point '$0' is not allowed, and has been renamed to '$1'")
 
 //
 // Ray tracing

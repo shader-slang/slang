@@ -1080,9 +1080,11 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
         break;
 
     case kIROp_Int8Type:
+        _requireBaseType(cast<IRBasicType>(type)->getBaseType());
         m_writer->emit("i8");
         break;
     case kIROp_Int16Type:
+        _requireBaseType(cast<IRBasicType>(type)->getBaseType());
         m_writer->emit("i16");
         break;
     case kIROp_IntType:
@@ -1106,9 +1108,11 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
         }
 
     case kIROp_UInt8Type:
+        _requireBaseType(cast<IRBasicType>(type)->getBaseType());
         m_writer->emit("u8");
         break;
     case kIROp_UInt16Type:
+        _requireBaseType(cast<IRBasicType>(type)->getBaseType());
         m_writer->emit("u16");
         break;
     case kIROp_UIntType:
@@ -1327,8 +1331,10 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     }
                 case BaseType::Int16:
                     {
+                        emitType(type);
+                        m_writer->emit("(");
                         m_writer->emit(int16_t(litInst->value.intVal));
-                        m_writer->emit("S");
+                        m_writer->emit("S)");
                         return;
                     }
                 case BaseType::Int:
@@ -1346,8 +1352,10 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     }
                 case BaseType::UInt16:
                     {
+                        emitType(type);
+                        m_writer->emit("(");
                         m_writer->emit(UInt(uint16_t(litInst->value.intVal)));
-                        m_writer->emit("US");
+                        m_writer->emit("US)");
                         return;
                     }
                 case BaseType::UInt:
@@ -2096,7 +2104,7 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
     auto alignment = sizeAlignment.alignment;
     m_writer->emit("layout(buffer_reference, std430, buffer_reference_align = ");
     m_writer->emitInt64(alignment);
-    m_writer->emit(") readonly buffer ");
+    m_writer->emit(") buffer ");
     m_writer->emit(ptrTypeName);
     m_writer->emit("\n");
     m_writer->emit("{\n");
@@ -2288,6 +2296,12 @@ bool GLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 {
                     emitType(inst->getDataType());
                 }
+                break;
+            case BaseType::UInt8:
+                emitType(inst->getDataType());
+                break;
+            case BaseType::Int8:
+                emitType(inst->getDataType());
                 break;
             case BaseType::UInt16:
                 if (fromType == BaseType::Half)
@@ -2776,11 +2790,12 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             auto elementType =
                 as<IRHLSLStructuredBufferTypeBase>(inst->getOperand(0)->getDataType())
                     ->getElementType();
-            IRIntegerValue stride = 0;
-            if (auto sizeDecor = elementType->findDecoration<IRSizeAndAlignmentDecoration>())
-            {
-                stride = align(sizeDecor->getSize(), (int)sizeDecor->getAlignment());
-            }
+
+            // The element type should have a `SizeAndAlignment` decoration created during lowering.
+            auto sizeDecor = elementType->findDecoration<IRSizeAndAlignmentDecoration>();
+            SLANG_ASSERT(sizeDecor);
+            const auto stride = align(sizeDecor->getSize(), (int)sizeDecor->getAlignment());
+
             m_writer->emit(stride);
             m_writer->emit(");\n");
             return true;

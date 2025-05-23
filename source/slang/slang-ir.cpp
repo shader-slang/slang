@@ -314,6 +314,23 @@ IRIntegerValue getIntVal(IRInst* inst)
     }
 }
 
+IRIntegerValue getArraySizeVal(IRInst* inst)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_IntLit:
+        return static_cast<IRConstant*>(inst)->value.intVal;
+        break;
+    default:
+        // Treat specialization constant array as the unsized array here.
+        if (isSpecConstRateType(inst->getFullType()))
+            return kUnsizedArrayMagicLength;
+
+        SLANG_UNEXPECTED("needed a known integer value");
+        UNREACHABLE_RETURN(0);
+    }
+}
+
 // IRCapabilitySet
 
 CapabilitySet IRCapabilitySet::getCaps()
@@ -1804,7 +1821,7 @@ IRInst* IRBuilder::_createInst(
     m_dedupContext->getInstReplacementMap().tryGetValue(type, instReplacement);
     type = (IRType*)instReplacement;
 
-    if (getIROpInfo(op).flags & kIROpFlag_Hoistable)
+    if (isInstHoistable(op, type))
     {
         return _findOrEmitHoistableInst(
             type,
@@ -2510,7 +2527,8 @@ static void addGlobalValue(IRBuilder* builder, IRInst* value)
     //
     if (value->parent)
     {
-        SLANG_ASSERT(getIROpInfo(value->getOp()).isHoistable());
+        SLANG_ASSERT(
+            getIROpInfo(value->getOp()).isHoistable() || isSpecConstRateType(value->getFullType()));
         return;
     }
 
@@ -3193,6 +3211,10 @@ IRGroupSharedRate* IRBuilder::getGroupSharedRate()
 IRActualGlobalRate* IRBuilder::getActualGlobalRate()
 {
     return (IRActualGlobalRate*)getType(kIROp_ActualGlobalRate);
+}
+IRSpecConstRate* IRBuilder::getSpecConstRate()
+{
+    return (IRSpecConstRate*)getType(kIROp_SpecConstRate);
 }
 
 IRRateQualifiedType* IRBuilder::getRateQualifiedType(IRRate* rate, IRType* dataType)
@@ -8583,6 +8605,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetElement:
     case kIROp_GetElementPtr:
     case kIROp_GetOffsetPtr:
+    case kIROp_GetOptiXRayPayloadPtr:
     case kIROp_UpdateElement:
     case kIROp_MeshOutputRef:
     case kIROp_MakeVectorFromScalar:

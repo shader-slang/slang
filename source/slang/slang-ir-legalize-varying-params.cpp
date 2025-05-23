@@ -571,6 +571,8 @@ protected:
         builder.setInsertBefore(m_firstOrdinaryInst);
 
         auto localVar = builder.emitVar(valueType);
+        // Add TempCallArgVar decoration to mark this variable as a temporary for parameter passing
+        builder.addSimpleDecoration<IRTempCallArgVarDecoration>(localVar);
         auto localVal = LegalizedVaryingVal::makeAddress(localVar);
 
         if (const auto inOutType = as<IRInOutType>(paramPtrType))
@@ -3187,6 +3189,7 @@ protected:
                 break;
             }
         case SystemValueSemanticName::InstanceID:
+        case SystemValueSemanticName::VulkanInstanceID:
             {
                 result.systemValueName = toSlice("instance_id");
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
@@ -3250,6 +3253,7 @@ protected:
                 break;
             }
         case SystemValueSemanticName::VertexID:
+        case SystemValueSemanticName::VulkanVertexID:
             {
                 result.systemValueName = toSlice("vertex_id");
                 result.permittedTypes.add(builder.getBasicType(BaseType::UInt));
@@ -3853,6 +3857,7 @@ protected:
             break;
 
         case SystemValueSemanticName::InstanceID:
+        case SystemValueSemanticName::VulkanInstanceID:
             {
                 result.systemValueName = toSlice("instance_index");
                 result.permittedTypes.add(builder.getUIntType());
@@ -3906,6 +3911,7 @@ protected:
             }
 
         case SystemValueSemanticName::VertexID:
+        case SystemValueSemanticName::VulkanVertexID:
             {
                 result.systemValueName = toSlice("vertex_index");
                 result.permittedTypes.add(builder.getUIntType());

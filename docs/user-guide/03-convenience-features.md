@@ -604,6 +604,21 @@ When targeting SPIRV, Slang will introduce a global array of descriptors and fet
 The descriptor set ID of the global descriptor array can be configured with the `-bindless-space-index`
 (or `CompilerOptionName::BindlessSpaceIndex` when using the API) option.
 
+Default behavior assigns binding-indicies based on descriptor types:
+| Enum Value             | Vulkan Descriptor Type                    | Binding Index |
+|------------------------|-------------------------------------------|---------------|
+| Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
+| CombinedTextureSampler | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
+| Texture_Read           | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
+| Texture_ReadWrite      | VK_DESCRIPTOR_TYPE_STORAGE_IMAGE          | 3             |
+| TexelBuffer_Read       | VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER   | 4             |
+| TexelBuffer_ReadWrite  | VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER   | 5             |
+| Buffer_Read            | VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER         | 6             |
+| Buffer_ReadWrite       | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 7             |
+| Unknown                | Other                                     | 8             |
+
+> `ACCELERATION_STRUCTURE` is excluded from the list of types since Slang by default uses the handle to a `RaytracingAccelerationStructure` as a GPU address, casting the handle to a `RaytracingAccelerationStructure`. This removes the need for a binding-slot of `RaytracingAccelerationStructure`.
+
 > #### Note
 > The default implementation for SPIRV may change in the future if SPIRV is extended to provide what is
 > equivalent to D3D's `ResourceDescriptorHeap` construct.
@@ -653,8 +668,29 @@ interface IOpaqueDescriptor
 The user can call `defaultGetDescriptorFromHandle` function from their implementation of
 `getDescriptorFromHandle` to dispatch to the default behavior.
 
-The `kind` and `descriptorAccess` constants allows user code to fetch from different locations
-depending on the type and access of the resource being requested. The `DescriptorKind` and
+Additionally, `defaultGetDescriptorFromHandle()` takes an optional argument whose type is `constexpr BindlessDescriptorOptions`. This parameter allows to specify alternative standard presets for how bindless-indexes are assigned. Note that this is currently only relevant to SPIRV:
+ ```slang
+public enum BindlessDescriptorOptions
+{
+    None = 0, /// Bind assuming regular binding model rules.
+    VkMutable = 1, /// Bind assuming `VK_EXT_mutable_descriptor_type` without mutable `AccelerationStructure` binding support.
+}
+ ```
+
+`VkMutable` provides the following bindings for descriptor types:
+| Enum Value             | Vulkan Descriptor Type                    | Binding Index |
+|------------------------|-------------------------------------------|---------------|
+| Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
+| CombinedTextureSampler | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
+| Texture_Read           | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
+| Texture_ReadWrite      | VK_DESCRIPTOR_TYPE_STORAGE_IMAGE          | 2             |
+| TexelBuffer_Read       | VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER   | 2             |
+| TexelBuffer_ReadWrite  | VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER   | 2             |
+| Buffer_Read            | VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER         | 2             |
+| Buffer_ReadWrite       | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 2             |
+| Unknown                | Other                                     | 3             |
+
+The `kind` and `descriptorAccess` constants allows user code to fetch resources from different locations depending on the type and access of the resource being requested. The `DescriptorKind` and
 `DescriptorAccess` enums are defined as:
 
 ```slang
@@ -666,6 +702,7 @@ enum DescriptorKind
     Buffer, /// A buffer descriptor.
     Sampler, /// A sampler state descriptor.
     AccelerationStructure, /// A ray tracing acceleration structure descriptor.
+    TexelBuffer /// A texel buffer descriptor.
 }
 
 enum DescriptorAccess
@@ -691,6 +728,8 @@ void test(DescriptorHandle<Texture2D> t)
 
 If the resource pointer value is not uniform and `nonuniform` is not called, the result may be
 undefined.
+
+
 
 Extensions
 --------------------

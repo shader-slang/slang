@@ -819,7 +819,7 @@ bool SemanticsVisitor::TryUnifyVals(
         {
             if (const auto c = as<TypeCastIntVal>(i))
                 i = as<IntVal>(c->getBase());
-            return as<GenericParamIntVal>(i);
+            return as<DeclRefIntVal>(i);
         };
         auto fstParam = paramUnderCast(fstInt);
         auto sndParam = paramUnderCast(sndInt);
@@ -1196,7 +1196,7 @@ void SemanticsVisitor::maybeUnifyUnconstraintIntParam(
     {
         param = as<IntVal>(typeCastParam->getBase());
     }
-    auto intParam = as<GenericParamIntVal>(param);
+    auto intParam = as<DeclRefIntVal>(param);
     if (!intParam)
         return;
     for (auto c : constraints.constraints)

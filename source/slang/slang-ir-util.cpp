@@ -2250,4 +2250,86 @@ bool isFirstBlock(IRInst* inst)
     return block->getParent()->getFirstBlock() == block;
 }
 
+bool isSpecConstRateType(IRType* type)
+{
+    if (auto rateQualifiedType = as<IRRateQualifiedType>(type))
+    {
+        if (as<IRSpecConstRate>(rateQualifiedType->getRate()))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* oldType)
+{
+    if (as<IRRateQualifiedType>(oldType))
+    {
+        return oldType;
+    }
+
+    if (isSpecConstRateType(rateQulifiedType))
+    {
+        return builder->getRateQualifiedType(builder->getSpecConstRate(), oldType);
+    }
+    return oldType;
+}
+
+bool isArithmeticInst(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_Neg:
+    case kIROp_Not:
+    case kIROp_Eql:
+    case kIROp_Neq:
+    case kIROp_Leq:
+    case kIROp_Geq:
+    case kIROp_Less:
+    case kIROp_IRem:
+    case kIROp_FRem:
+    case kIROp_Greater:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_BitNot:
+    case kIROp_BitCast:
+    case kIROp_CastIntToFloat:
+    case kIROp_CastFloatToInt:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
+    case kIROp_Select:
+        return true;
+    default:
+        return false;
+    }
+}
+bool isArithmeticInst(IRInst* inst)
+{
+    return isArithmeticInst(inst->getOp());
+}
+
+bool isInstHoistable(IROp op, IRType* type)
+{
+    if ((getIROpInfo(op).flags & kIROpFlag_Hoistable))
+    {
+        return true;
+    }
+
+    if (isArithmeticInst(op))
+    {
+        if (type && isSpecConstRateType(type))
+        {
+            return true;
+        }
+    }
+    return false;
+}
 } // namespace Slang

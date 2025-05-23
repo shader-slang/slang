@@ -168,7 +168,7 @@ class ConstantIntVal : public IntVal
 
 // The logical "value" of a reference to a generic value parameter
 FIDDLE()
-class GenericParamIntVal : public IntVal
+class DeclRefIntVal : public IntVal
 {
     FIDDLE(...)
     DeclRef<VarDeclBase> getDeclRef() { return as<DeclRefBase>(getOperand(1)); }
@@ -177,10 +177,7 @@ class GenericParamIntVal : public IntVal
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 
-    GenericParamIntVal(Type* inType, DeclRef<VarDeclBase> inDeclRef)
-    {
-        setOperands(inType, inDeclRef);
-    }
+    DeclRefIntVal(Type* inType, DeclRef<VarDeclBase> inDeclRef) { setOperands(inType, inDeclRef); }
 
     bool _isLinkTimeValOverride();
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
@@ -258,21 +255,65 @@ class FuncCallIntVal : public IntVal
     Val* _linkTimeResolveOverride(Dictionary<String, IntVal*>& map);
 };
 
-FIDDLE()
-class CountOfIntVal : public IntVal
+FIDDLE(abstract)
+class SizeOfLikeIntVal : public IntVal
 {
     FIDDLE(...)
-    CountOfIntVal(Type* inType, Type* typeArg) { setOperands(inType, typeArg); }
+    SizeOfLikeIntVal(Type* inType, Type* typeArg) { setOperands(inType, typeArg); }
 
     Val* getTypeArg() { return getOperand(1); }
+
+    bool _isLinkTimeValOverride() { return false; }
+};
+
+FIDDLE()
+class SizeOfIntVal : public SizeOfLikeIntVal
+{
+    FIDDLE(...)
+    SizeOfIntVal(Type* inType, Type* typeArg)
+        : SizeOfLikeIntVal(inType, typeArg)
+    {
+    }
 
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride();
-    bool _isLinkTimeValOverride() { return false; }
 
     static Val* tryFoldOrNull(ASTBuilder* astBuilder, Type* intType, Type* newType);
+    static Val* tryFold(ASTBuilder* astBuilder, Type* intType, Type* newType);
+};
 
+FIDDLE()
+class AlignOfIntVal : public SizeOfLikeIntVal
+{
+    FIDDLE(...)
+    AlignOfIntVal(Type* inType, Type* typeArg)
+        : SizeOfLikeIntVal(inType, typeArg)
+    {
+    }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+
+    static Val* tryFoldOrNull(ASTBuilder* astBuilder, Type* intType, Type* newType);
+    static Val* tryFold(ASTBuilder* astBuilder, Type* intType, Type* newType);
+};
+
+FIDDLE()
+class CountOfIntVal : public SizeOfLikeIntVal
+{
+    FIDDLE(...)
+    CountOfIntVal(Type* inType, Type* typeArg)
+        : SizeOfLikeIntVal(inType, typeArg)
+    {
+    }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+
+    static Val* tryFoldOrNull(ASTBuilder* astBuilder, Type* intType, Type* newType);
     static Val* tryFold(ASTBuilder* astBuilder, Type* intType, Type* newType);
 };
 
@@ -319,9 +360,9 @@ public:
     // for sorting only.
     bool operator<(const PolynomialIntValFactor& other) const
     {
-        if (auto thisGenParam = as<GenericParamIntVal>(getParam()))
+        if (auto thisGenParam = as<DeclRefIntVal>(getParam()))
         {
-            if (auto thatGenParam = as<GenericParamIntVal>(other.getParam()))
+            if (auto thatGenParam = as<DeclRefIntVal>(other.getParam()))
             {
                 if (thisGenParam->equals(thatGenParam))
                     return getPower() < other.getPower();
@@ -336,7 +377,7 @@ public:
         }
         else
         {
-            if (const auto thatGenParam = as<GenericParamIntVal>(other.getParam()))
+            if (const auto thatGenParam = as<DeclRefIntVal>(other.getParam()))
             {
                 return false;
             }
@@ -347,9 +388,9 @@ public:
     // for sorting only.
     bool operator==(const PolynomialIntValFactor& other) const
     {
-        if (auto thisGenParam = as<GenericParamIntVal>(getParam()))
+        if (auto thisGenParam = as<DeclRefIntVal>(getParam()))
         {
-            if (auto thatGenParam = as<GenericParamIntVal>(other.getParam()))
+            if (auto thatGenParam = as<DeclRefIntVal>(other.getParam()))
             {
                 if (thisGenParam->equals(thatGenParam) && getPower() == other.getPower())
                     return true;

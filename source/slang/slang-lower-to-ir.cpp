@@ -492,6 +492,8 @@ struct SharedIRGenContext
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
 
+    Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
+
     void setGlobalValue(Decl* decl, LoweredValInfo value)
     {
         globalEnv.mapDeclToValue[decl] = value;
@@ -1550,9 +1552,6 @@ static bool _isTrivialLookupFromInterfaceThis(IRGenContext* context, DeclRefBase
     return context->thisTypeWitness == nullptr;
 }
 
-
-//
-
 struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, LoweredValInfo>
 {
     IRGenContext* context;
@@ -1565,7 +1564,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    LoweredValInfo visitGenericParamIntVal(GenericParamIntVal* val)
+    LoweredValInfo visitDeclRefIntVal(DeclRefIntVal* val)
     {
         return emitDeclRef(
             context,
@@ -1577,27 +1576,33 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         TryClauseEnvironment tryEnv;
         List<IRInst*> args;
+        IRType* specConstRateType = nullptr;
         for (auto arg : val->getArgs())
         {
             auto loweredArg = lowerVal(context, arg);
             args.add(loweredArg.val);
+            if (!specConstRateType && isSpecConstRateType(loweredArg.val->getFullType()))
+                specConstRateType = loweredArg.val->getFullType();
         }
         auto funcType = lowerType(context, val->getFuncType());
-        return emitCallToDeclRef(
-            context,
-            as<IRFuncType>(funcType)->getResultType(),
-            val->getFuncDeclRef(),
-            funcType,
-            args,
-            tryEnv);
+        auto funcResType = maybeAddRateType(
+            getBuilder(),
+            specConstRateType,
+            as<IRFuncType>(funcType)->getResultType());
+        auto resVal =
+            emitCallToDeclRef(context, funcResType, val->getFuncDeclRef(), funcType, args, tryEnv);
+        return resVal;
     }
 
     LoweredValInfo visitTypeCastIntVal(TypeCastIntVal* val)
     {
         auto baseVal = lowerVal(context, val->getBase());
+
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
         auto type = lowerType(context, val->getType());
-        return LoweredValInfo::simple(getBuilder()->emitCast(type, baseVal.val));
+        type = maybeAddRateType(getBuilder(), baseVal.val->getFullType(), type);
+        auto resVal = LoweredValInfo::simple(getBuilder()->emitCast(type, baseVal.val));
+        return resVal;
     }
 
     LoweredValInfo visitWitnessLookupIntVal(WitnessLookupIntVal* val)
@@ -1623,12 +1628,28 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 auto factorVal = lowerVal(context, factor->getParam()).val;
                 for (IntegerLiteralValue i = 0; i < factor->getPower(); i++)
                 {
-                    termVal = irBuilder->emitMul(factorVal->getDataType(), termVal, factorVal);
+                    termVal = irBuilder->emitMul(factorVal->getFullType(), termVal, factorVal);
                 }
             }
-            resultVal = irBuilder->emitAdd(termVal->getDataType(), resultVal, termVal);
+            resultVal = irBuilder->emitAdd(termVal->getFullType(), resultVal, termVal);
         }
         return LoweredValInfo::simple(resultVal);
+    }
+
+    LoweredValInfo visitSizeOfIntVal(SizeOfIntVal* val)
+    {
+        auto irBuilder = getBuilder();
+        auto typeArg = lowerType(context, as<Type>(val->getTypeArg()));
+        auto count = irBuilder->emitSizeOf(typeArg);
+        return LoweredValInfo::simple(count);
+    }
+
+    LoweredValInfo visitAlignOfIntVal(AlignOfIntVal* val)
+    {
+        auto irBuilder = getBuilder();
+        auto typeArg = lowerType(context, as<Type>(val->getTypeArg()));
+        auto count = irBuilder->emitAlignOf(typeArg);
+        return LoweredValInfo::simple(count);
     }
 
     LoweredValInfo visitCountOfIntVal(CountOfIntVal* val)
@@ -2056,8 +2077,9 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto elementType = lowerType(context, type->getElementType());
         if (!type->isUnsized())
         {
-            auto elementCount = lowerSimpleVal(context, type->getElementCount());
-            return getBuilder()->getArrayType(elementType, elementCount);
+            return getBuilder()->getArrayType(
+                elementType,
+                lowerSimpleVal(context, type->getElementCount()));
         }
         else
         {
@@ -2445,6 +2467,13 @@ void maybeSetRate(IRGenContext* context, IRInst* inst, Decl* decl)
     {
         inst->setFullType(
             builder->getRateQualifiedType(builder->getActualGlobalRate(), inst->getFullType()));
+    }
+    else if (
+        decl->hasModifier<SpecializationConstantAttribute>() ||
+        decl->hasModifier<VkConstantIdAttribute>())
+    {
+        inst->setFullType(
+            builder->getRateQualifiedType(builder->getSpecConstRate(), inst->getFullType()));
     }
 }
 
@@ -4520,6 +4549,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             boundMemberInfo->type = nullptr;
             boundMemberInfo->base = loweredBase;
             boundMemberInfo->declRef = callableDeclRef;
+
+            context->shared->extValues.add(boundMemberInfo);
             return LoweredValInfo::boundMember(boundMemberInfo);
         }
         else if (auto propertyDeclRef = declRef.as<PropertyDecl>())
@@ -4823,6 +4854,17 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             SLANG_ASSERT(type);
             return getDefaultVal(type);
         }
+    }
+
+    LoweredValInfo visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr)
+    {
+        auto irType = lowerType(context, expr->type);
+        auto irDefaultElement = getSimpleVal(
+            context,
+            getDefaultVal(as<ArrayExpressionType>(expr->type)->getElementType()));
+
+        return LoweredValInfo::simple(
+            getBuilder()->emitMakeArrayFromElement(irType, irDefaultElement));
     }
 
     LoweredValInfo visitInitializerListExpr(InitializerListExpr* expr)
@@ -11833,9 +11875,15 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     }
 
 #if 0
+    if (compileRequest->optionSet.shouldDumpIR())
     {
         DiagnosticSinkWriter writer(compileRequest->getSink());
-        dumpIR(module, &writer, "GENERATED");
+        dumpIR(
+            module,
+            compileRequest->m_irDumpOptions,
+            "GENERATED",
+            compileRequest->getSourceManager(),
+            &writer);
     }
 #endif
 

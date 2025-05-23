@@ -1,4 +1,4 @@
-// test-context.cpp
+// options.cpp
 #include "options.h"
 
 #include "../../source/core/slang-io.h"
@@ -88,6 +88,10 @@ static bool _isSubCommand(const char* arg)
         "  -use-test-server               Run tests using test server\n"
         "  -use-fully-isolated-test-server  Run each test in isolated server\n"
         "  -capability <name>             Compile with the given capability\n"
+#if _DEBUG
+        "  -disable-debug-layers          Disable the debug layers (default enabled in debug "
+        "build)\n"
+#endif
         "\n"
         "Output modes:\n"
         "  -appveyor                      Use AppVeyor output format\n"
@@ -406,6 +410,12 @@ static bool _isSubCommand(const char* arg)
         {
             optionsOut->skipReferenceImageGeneration = true;
         }
+#if _DEBUG
+        else if (strcmp(arg, "-disable-debug-layers") == 0)
+        {
+            optionsOut->debugLayerEnabled = false;
+        }
+#endif
         else
         {
             stdError.print("unknown option '%s'\n", arg);

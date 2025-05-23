@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -skip-spirv-validation
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
 
 // CHECK: type: float
 // CHECK-NEXT: 4.500000
@@ -12,7 +12,9 @@ ByteAddressBuffer inputBuffer;
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-typealias CoopMatType = CoopMat<float, CoopMatScope::Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
+using namespace linalg;
+
+typealias CoopMatType = CoopMat<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse::MatrixAccumulator>;
 
 [numthreads(32, 1, 1)]
 void computeMain()
@@ -20,8 +22,8 @@ void computeMain()
     let stride = 16;
     let matrixLayout = CoopMatMatrixLayout::RowMajor;
 
-    let mat = CoopMatType.load(inputBuffer, 0, stride, matrixLayout);
+    let mat = CoopMatType.Load<CoopMatMatrixLayout::RowMajor>(inputBuffer, 0, stride);
 
     let result = mat * 4.5;
-    result.store(outputBuffer, 0, 4, matrixLayout);
+    result.Store<CoopMatMatrixLayout::RowMajor>(outputBuffer, 0, 4);
 }

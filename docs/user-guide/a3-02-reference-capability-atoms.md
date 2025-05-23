@@ -155,6 +155,9 @@ Versions
 `hlsl_2018`
 > Represet HLSL compatibility support.
 
+`hlsl_coopvec_poc`
+> Represet compatibility support for the deprecated POC DXC
+
 `dxil_lib`
 > Represents capabilities required for DXIL Library compilation.
 
@@ -444,11 +447,20 @@ Extensions
 `SPV_EXT_replicated_composites`
 > Represents the SPIR-V extension for SPV_EXT_replicated_composites.
 
+`SPV_KHR_vulkan_memory_model`
+> Represents the SPIR-V extension for SPV_KHR_vulkan_memory_model.
+
 `SPV_NV_cooperative_vector`
 > Represents the SPIR-V extension for SPV_NV_cooperative_vector.
 
 `SPV_KHR_cooperative_matrix`
 > Represents the SPIR-V extension for SPV_KHR_cooperative_matrix.
+
+`SPV_NV_tensor_addressing`
+> Represents the SPIR-V extension for SPV_NV_tensor_addressing.
+
+`SPV_NV_cooperative_matrix2`
+> Represents the SPIR-V extension for SPV_NV_cooperative_matrix2.
 
 `spvAtomicFloat32AddEXT`
 > Represents the SPIR-V capability for atomic float 32 add operations.
@@ -570,11 +582,35 @@ Extensions
 `spvCooperativeMatrixKHR`
 > Represents the SPIR-V capability for cooperative matrices
 
+`spvCooperativeMatrixReductionsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixConversionsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixPerElementOperationsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixTensorAddressingNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvCooperativeMatrixBlockLoadsNV`
+> Represents the SPIR-V capability for cooperative matrix 2
+
+`spvTensorAddressingNV`
+> Represents the SPIR-V capability for tensor addressing
+
 `spvMaximalReconvergenceKHR`
 > Represents the SPIR-V capability for maximal reconvergence.
 
 `spvQuadControlKHR`
 > Represents the SPIR-V capability for quad group control.
+
+`spvVulkanMemoryModelKHR`
+> Represents the SPIR-V capability for vulkan memory model.
+
+`spvVulkanMemoryModelDeviceScopeKHR`
+> Represents the SPIR-V capability for vulkan memory model.
 
 `GL_EXT_buffer_reference`
 > Represents the GL_EXT_buffer_reference extension.
@@ -632,6 +668,9 @@ Extensions
 
 `GL_EXT_shader_atomic_int64`
 > Represents the GL_EXT_shader_atomic_int64 extension.
+
+`GL_EXT_shader_explicit_arithmetic_types`
+> Represents the GL_EXT_shader_explicit_arithmetic_types extension.
 
 `GL_EXT_shader_explicit_arithmetic_types_int64`
 > Represents the GL_EXT_shader_explicit_arithmetic_types_int64 extension.
@@ -942,6 +981,33 @@ Compound Capabilities
 `cooperative_vector_training`
 > Capabilities needed to train cooperative vectors
 
+`cooperative_matrix`
+> Capabilities needed to use cooperative matrices
+
+`cooperative_matrix_reduction`
+> Capabilities needed to use reduction operations with cooperative matrix
+
+`cooperative_matrix_conversion`
+> Capabilities needed to convert cooperative matrices
+
+`cooperative_matrix_map_element`
+> Capabilities needed to use MapElement operation with cooperative matrix
+
+`cooperative_matrix_tensor_addressing`
+> Capabilities needed to load or store with tensor_addressing extension
+
+`cooperative_matrix_block_load`
+> Capabilities needed to use decodeFunc with cooperative matrix load
+
+`tensor_addressing`
+> Capabilities needed to use tensor addressing
+
+`cooperative_matrix_2`
+> Capabilities needed to use tensor addressing
+
+`vk_mem_model`
+> Capabilities needed to use vulkan memory model
+
 `any_stage`
 > Collection of all shader stages
 
@@ -1249,9 +1315,6 @@ Compound Capabilities
 Other
 ----------------------
 *Capabilities which may be deprecated*
-
-`cooperative_matrix`
-> Capabilities needed to use cooperative matrices
 
 `SPIRV_1_0`
 > Use `spirv_1_0` instead

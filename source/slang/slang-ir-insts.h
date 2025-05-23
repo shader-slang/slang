@@ -203,8 +203,11 @@ enum class IRTargetBuiltinVarName
 {
     Unknown,
     HlslInstanceID,
+    HlslVertexID,
     SpvInstanceIndex,
     SpvBaseInstance,
+    SpvVertexIndex,
+    SpvBaseVertex,
 };
 
 struct IRInterpolationModeDecoration : IRDecoration
@@ -485,6 +488,7 @@ IR_SIMPLE_DECORATION(DownstreamModuleImportDecoration)
 IR_SIMPLE_DECORATION(MaximallyReconvergesDecoration)
 IR_SIMPLE_DECORATION(QuadDerivativesDecoration)
 IR_SIMPLE_DECORATION(RequireFullQuadsDecoration)
+IR_SIMPLE_DECORATION(TempCallArgVarDecoration)
 
 struct IRAvailableInDownstreamIRDecoration : IRDecoration
 {
@@ -3938,6 +3942,7 @@ public:
     IRConstExprRate* getConstExprRate();
     IRGroupSharedRate* getGroupSharedRate();
     IRActualGlobalRate* getActualGlobalRate();
+    IRSpecConstRate* getSpecConstRate();
 
     IRRateQualifiedType* getRateQualifiedType(IRRate* rate, IRType* dataType);
 

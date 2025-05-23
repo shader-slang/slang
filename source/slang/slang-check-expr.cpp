@@ -518,7 +518,11 @@ Expr* SemanticsVisitor::constructDerefExpr(Expr* base, QualType elementType, Sou
 {
     if (auto resPtrType = as<DescriptorHandleType>(base->type))
     {
-        return coerce(CoercionSite::ExplicitCoercion, resPtrType->getElementType(), base);
+        return coerce(
+            CoercionSite::ExplicitCoercion,
+            resPtrType->getElementType(),
+            base,
+            getSink());
     }
 
     auto derefExpr = m_astBuilder->create<DerefExpr>();
@@ -1972,9 +1976,14 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
 
     // The values of specialization constants aren't known at compile time even
     // if they're marked `const`.
-    if (decl->hasModifier<SpecializationConstantAttribute>() ||
-        decl->hasModifier<VkConstantIdAttribute>())
-        return nullptr;
+    if ((decl->hasModifier<SpecializationConstantAttribute>() ||
+         decl->hasModifier<VkConstantIdAttribute>()) &&
+        kind == ConstantFoldingKind::SpecializationConstant)
+    {
+        return m_astBuilder->getOrCreate<DeclRefIntVal>(
+            declRef.substitute(m_astBuilder, declRef.getDecl()->getType()),
+            declRef);
+    }
 
     if (decl->hasModifier<ExternModifier>())
     {
@@ -1982,7 +1991,7 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
         if (kind == ConstantFoldingKind::CompileTime)
             return nullptr;
         // But if we are OK with link-time constants, we can still fold it into a val.
-        auto rs = m_astBuilder->getOrCreate<GenericParamIntVal>(
+        auto rs = m_astBuilder->getOrCreate<DeclRefIntVal>(
             declRef.substitute(m_astBuilder, declRef.getDecl()->getType()),
             declRef);
         return rs;
@@ -2051,13 +2060,25 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         }
     }
 
-    if (auto countOfExpr = expr.as<CountOfExpr>())
+    if (auto sizeOfLikeExpr = expr.as<SizeOfLikeExpr>())
     {
-        auto type =
-            as<Type>(countOfExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
-        if (type)
+        auto type = as<Type>(
+            sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
+
+        if (auto sizeOfExpr = expr.as<SizeOfExpr>())
+        {
+            return as<IntVal>(SizeOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+        }
+        else if (auto alignOfExpr = expr.as<AlignOfExpr>())
+        {
+            return as<IntVal>(
+                AlignOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+        }
+        else if (auto countOfExpr = expr.as<CountOfExpr>())
+        {
             return as<IntVal>(
                 CountOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+        }
     }
 
     // it is possible that we are referring to a generic value param
@@ -2067,7 +2088,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
         if (auto genericValParamRef = declRef.as<GenericValueParamDecl>())
         {
-            Val* valResult = m_astBuilder->getOrCreate<GenericParamIntVal>(
+            Val* valResult = m_astBuilder->getOrCreate<DeclRefIntVal>(
                 declRef.substitute(m_astBuilder, genericValParamRef.getDecl()->getType()),
                 genericValParamRef);
             valResult = valResult->substitute(m_astBuilder, expr.getSubsts());
@@ -2149,20 +2170,6 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         auto val = tryConstantFoldExpr(invokeExpr, kind, circularityInfo);
         if (val)
             return val;
-    }
-    else if (auto sizeOfLikeExpr = as<SizeOfLikeExpr>(expr.getExpr()))
-    {
-        ASTNaturalLayoutContext context(getASTBuilder(), nullptr);
-        const auto size = context.calcSize(sizeOfLikeExpr->sizedType);
-        if (!size)
-        {
-            return nullptr;
-        }
-
-        auto value = as<AlignOfExpr>(sizeOfLikeExpr) ? size.alignment : size.size;
-
-        // We can return as an IntVal
-        return getASTBuilder()->getIntVal(expr.getExpr()->type, value);
     }
     else if (auto indexExpr = expr.as<IndexExpr>())
     {
@@ -2249,7 +2256,7 @@ IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
     switch (coercionType)
     {
     case IntegerConstantExpressionCoercionType::SpecificType:
-        expr = coerce(CoercionSite::General, expectedType, inExpr);
+        expr = coerce(CoercionSite::General, expectedType, inExpr, sink);
         break;
     case IntegerConstantExpressionCoercionType::AnyInteger:
         if (isScalarIntegerType(inExpr->type))
@@ -2257,7 +2264,7 @@ IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
         else if (isEnumType(inExpr->type))
             expr = inExpr;
         else
-            expr = coerce(CoercionSite::General, m_astBuilder->getIntType(), inExpr);
+            expr = coerce(CoercionSite::General, m_astBuilder->getIntType(), inExpr, sink);
         break;
     default:
         break;
@@ -2383,7 +2390,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                 subscriptExpr->indexExprs[0],
                 IntegerConstantExpressionCoercionType::AnyInteger,
                 nullptr,
-                ConstantFoldingKind::LinkTime);
+                ConstantFoldingKind::SpecializationConstant);
 
             // Validate that array size is greater than zero
             if (auto constElementCount = as<ConstantIntVal>(elementCount))
@@ -2522,7 +2529,7 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
         type = atomicType->getElementType();
     }
     auto right = maybeOpenRef(expr->right);
-    expr->right = coerce(CoercionSite::Assignment, type, right);
+    expr->right = coerce(CoercionSite::Assignment, type, right, getSink());
 
     if (!expr->left->type.isLeftValue)
     {
@@ -2878,6 +2885,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             }
         }
     }
+    rs->checked = true;
     return rs;
 }
 
@@ -2951,7 +2959,7 @@ Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
             // to handle if this expression doesn't support short-circuiting.
             for (auto& arg : expr->arguments)
             {
-                arg = coerce(CoercionSite::Argument, m_astBuilder->getBoolType(), arg);
+                arg = coerce(CoercionSite::Argument, m_astBuilder->getBoolType(), arg, getSink());
             }
 
             expr->functionExpr = CheckTerm(expr->functionExpr);
@@ -3915,7 +3923,11 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                         auto checkedInitListExpr = visitInitializerListExpr(initListExpr);
 
 
-                        return coerce(CoercionSite::General, typeExp.type, checkedInitListExpr);
+                        return coerce(
+                            CoercionSite::General,
+                            typeExp.type,
+                            checkedInitListExpr,
+                            getSink());
                     }
                 }
             }
@@ -4196,9 +4208,9 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     if (m_parentFunc)
     {
         nameBuilder << getText(m_parentFunc->getName());
+        nameBuilder << "_";
+        nameBuilder << m_parentFunc->members.getCount();
     }
-    nameBuilder << "_";
-    nameBuilder << m_parentFunc->members.getCount();
     auto name = getName(nameBuilder.getBuffer());
     lambdaStructDecl->nameAndLoc.name = name;
     lambdaStructDecl->nameAndLoc.loc = lambdaExpr->loc;
@@ -4270,6 +4282,7 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     auto resultLambdaObj = synthesizer.emitCtorInvokeExpr(
         synthesizer.emitStaticTypeExpr(DeclRefType::create(m_astBuilder, lambdaStructDecl)),
         _Move(args));
+    resultLambdaObj->loc = lambdaExpr->loc;
     auto checkedResultExpr = dispatchExpr(resultLambdaObj, *this);
     return checkedResultExpr;
 }
@@ -5179,6 +5192,11 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     {
         return checkGeneralMemberLookupExpr(expr, baseType);
     }
+}
+
+Expr* SemanticsExprVisitor::visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr)
+{
+    return expr;
 }
 
 Expr* SemanticsExprVisitor::visitInitializerListExpr(InitializerListExpr* expr)

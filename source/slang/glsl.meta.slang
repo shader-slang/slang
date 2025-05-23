@@ -101,6 +101,18 @@ public typealias f16mat2x2 = matrix<half, 2, 2>;
 public typealias f16mat2x3 = matrix<half, 2, 3>;
 public typealias f16mat2x4 = matrix<half, 2, 4>;
 
+public typealias f16mat3x2 = matrix<half, 3, 2>;
+public typealias f16mat3x3 = matrix<half, 3, 3>;
+public typealias f16mat3x4 = matrix<half, 3, 4>;
+
+public typealias f16mat4x2 = matrix<half, 4, 2>;
+public typealias f16mat4x3 = matrix<half, 4, 3>;
+public typealias f16mat4x4 = matrix<half, 4, 4>;
+
+// Convenience aliases for square matrices
+public typealias f16mat2 = f16mat2x2;
+public typealias f16mat3 = f16mat3x3;
+public typealias f16mat4 = f16mat4x4;
 
 public out float4 gl_Position : SV_Position;
 public out float gl_PointSize : SV_PointSize;
@@ -147,6 +159,9 @@ public property uint3 gl_WorkGroupSize
 public in int gl_InvocationID : SV_GSInstanceID;
 
 internal in int __sv_InstanceIndex : SV_InstanceID;
+internal in int __sv_VertexIndex : SV_VertexID;
+internal in int __sv_VulkanInstanceIndex : SV_VulkanInstanceID;
+internal in int __sv_VulkanVertexIndex : SV_VulkanVertexID;
 
 // SPIRV InstanceIndex builtin for vertex shader
 public property int gl_InstanceIndex
@@ -156,24 +171,42 @@ public property int gl_InstanceIndex
     {
         __target_switch
         {
+        case glsl:
+        case spirv:
+        case metal:
+        case wgsl:
+            return __sv_VulkanInstanceIndex;
         default:
             return __sv_InstanceIndex;
-        case glsl:
-            __intrinsic_asm "gl_InstanceIndex";
-        case spirv:
-            return spirv_asm {
-                result:$$int = OpLoad builtin(InstanceIndex:int);
-            };
         }
     }
 }
+
+// SPIRV VertexIndex builtin for vertex shader
+public property int gl_VertexIndex
+{
+    [require(vertex)]
+    get
+    {
+        __target_switch
+        {
+        case glsl:
+        case spirv:
+        case metal:
+        case wgsl:
+            return __sv_VulkanVertexIndex;
+        default:
+            return __sv_VertexIndex;
+        }
+    }
+}
+
 public in bool gl_FrontFacing : SV_IsFrontFace;
 
 // TODO: define overload for geometry stage.
 public in int gl_Layer : SV_RenderTargetArrayIndex;
 
 public in int gl_SampleID : SV_SampleIndex;
-public in int gl_VertexIndex : SV_VertexID;
 public in int gl_ViewIndex : SV_ViewID;
 public in int gl_ViewportIndex : SV_ViewportArrayIndex;
 public in int gl_BaseVertex : SV_StartVertexLocation;

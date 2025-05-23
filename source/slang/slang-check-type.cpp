@@ -153,7 +153,7 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(
         genericParamType ? IntegerConstantExpressionCoercionType::SpecificType
                          : IntegerConstantExpressionCoercionType::AnyInteger,
         genericParamType,
-        ConstantFoldingKind::LinkTime,
+        ConstantFoldingKind::SpecializationConstant,
         sink);
     if (val)
         return val;
@@ -331,17 +331,27 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 if (outProperType)
                     args.add(ExtractGenericArgVal(valParam->initExpr));
             }
-            else if (auto constraintParam = as<GenericTypeConstraintDecl>(member))
+        }
+
+        for (Decl* member : genericDeclRef.getDecl()->members)
+        {
+            if (auto constraintParam = as<GenericTypeConstraintDecl>(member))
             {
                 auto genericParam = as<DeclRefType>(constraintParam->sub.type)->getDeclRef();
                 if (!genericParam)
                     return false;
                 auto genericTypeParamDecl = as<GenericTypeParamDecl>(genericParam.getDecl());
                 if (!genericTypeParamDecl)
+                {
+                    diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
                     return false;
+                }
                 auto defaultType = CheckProperType(genericTypeParamDecl->initType);
                 if (!defaultType)
+                {
+                    diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
                     return false;
+                }
                 auto witness =
                     tryGetSubtypeWitness(defaultType, CheckProperType(constraintParam->sup));
                 if (!witness)
@@ -453,9 +463,9 @@ bool SemanticsVisitor::ValuesAreEqual(IntVal* left, IntVal* right)
         }
     }
 
-    if (auto leftVar = as<GenericParamIntVal>(left))
+    if (auto leftVar = as<DeclRefIntVal>(left))
     {
-        if (auto rightVar = as<GenericParamIntVal>(right))
+        if (auto rightVar = as<DeclRefIntVal>(right))
         {
             return leftVar->getDeclRef().equals(rightVar->getDeclRef());
         }

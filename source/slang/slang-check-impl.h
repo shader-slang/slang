@@ -1451,6 +1451,15 @@ public:
     ///
     void ensureDeclBase(DeclBase* decl, DeclCheckState state, SemanticsContext* baseContext);
 
+    // Check if `lambdaStruct` can be coerced to `funcType`, if so returns the coerced
+    // expression in `outExpr`. The coercion is only valid if the lambda struct
+    // does not contain any captures.
+    bool tryCoerceLambdaToFuncType(
+        DeclRef<StructDecl> lambdaStruct,
+        FuncType* funcType,
+        Expr* fromExpr,
+        Expr** outExpr);
+
     // A "proper" type is one that can be used as the type of an expression.
     // Put simply, it can be a concrete type like `int`, or a generic
     // type that is applied to arguments, like `Texture2D<float4>`.
@@ -1646,7 +1655,7 @@ public:
         InitializerListExpr* fromInitializerListExpr);
 
     /// Report that implicit type coercion is not possible.
-    bool _failedCoercion(Type* toType, Expr** outToExpr, Expr* fromExpr);
+    bool _failedCoercion(Type* toType, Expr** outToExpr, Expr* fromExpr, DiagnosticSink* sink);
 
     /// Central engine for implementing implicit coercion logic
     ///
@@ -1674,6 +1683,7 @@ public:
         Expr** outToExpr,
         QualType fromType,
         Expr* fromExpr,
+        DiagnosticSink* sink,
         ConversionCost* outCost);
 
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.
@@ -1698,7 +1708,7 @@ public:
     Expr* createCastToInterfaceExpr(Type* toType, Expr* fromExpr, Val* witness);
 
     /// Implicitly coerce `fromExpr` to `toType` and diagnose errors if it isn't possible
-    Expr* coerce(CoercionSite site, Type* toType, Expr* fromExpr);
+    Expr* coerce(CoercionSite site, Type* toType, Expr* fromExpr, DiagnosticSink* sink);
 
     // Fill in default substitutions for the 'subtype' part of a type constraint decl
     void CheckConstraintSubType(TypeExp& typeExp);
@@ -2110,6 +2120,7 @@ public:
     {
         CompileTime,
         LinkTime,
+        SpecializationConstant
     };
     Expr* checkExpressionAndExpectIntegerConstant(
         Expr* expr,
@@ -2954,6 +2965,7 @@ public:
     Expr* visitMemberExpr(MemberExpr* expr);
 
     Expr* visitInitializerListExpr(InitializerListExpr* expr);
+    Expr* visitMakeArrayFromElementExpr(MakeArrayFromElementExpr* expr);
 
     Expr* visitThisExpr(ThisExpr* expr);
     Expr* visitThisTypeExpr(ThisTypeExpr* expr);

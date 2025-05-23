@@ -95,6 +95,7 @@ INST(Nop, nop, 0, 0)
 
     /* Rate */
         INST(ConstExprRate, ConstExpr, 0, HOISTABLE)
+        INST(SpecConstRate, SpecConst, 0, HOISTABLE)
         INST(GroupSharedRate, GroupShared, 0, HOISTABLE)
         INST(ActualGlobalRate, ActualGlobalRate, 0, HOISTABLE)
     INST_RANGE(Rate, ConstExprRate, GroupSharedRate)
@@ -237,6 +238,10 @@ INST(RayQueryType, RayQuery, 1, HOISTABLE)
 INST(HitObjectType, HitObject, 0, HOISTABLE)
 INST(CoopVectorType, CoopVectorType, 2, HOISTABLE)
 INST(CoopMatrixType, CoopMatrixType, 5, HOISTABLE)
+INST(TensorAddressingTensorLayoutType, TensorAddressingTensorLayoutType, 2, HOISTABLE)
+INST(TensorAddressingTensorViewType, TensorAddressingTensorViewType, 3, HOISTABLE)
+INST(MakeTensorAddressingTensorLayout, MakeTensorAddressingTensorLayout, 0, 0)
+INST(MakeTensorAddressingTensorView, MakeTensorAddressingTensorView, 0, 0)
 
 // Opaque type that can be dynamically cast to other resource types.
 INST(DynamicResourceType, DynamicResource, 0, HOISTABLE)
@@ -747,7 +752,7 @@ INST(GpuForeach, gpuForeach, 3, 0)
 
 // Wrapper for OptiX intrinsics used to load and store ray payload data using
 // a pointer represented by two payload registers.
-INST(GetOptiXRayPayloadPtr, getOptiXRayPayloadPtr, 0, 0)
+INST(GetOptiXRayPayloadPtr, getOptiXRayPayloadPtr, 0, HOISTABLE)
 
 // Wrapper for OptiX intrinsics used to load a single hit attribute
 // Takes two arguments: the type (either float or int), and the hit 
@@ -995,6 +1000,7 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
     INST(MaximallyReconvergesDecoration, MaximallyReconverges, 0, 0)
     INST(QuadDerivativesDecoration, QuadDerivatives, 0, 0)
     INST(RequireFullQuadsDecoration, RequireFullQuads, 0, 0)
+    INST(TempCallArgVarDecoration, TempCallArgVar, 0, 0)
 
         // Marks a type to be non copyable, causing SSA pass to skip turning variables of the the type into SSA values.
     INST(NonCopyableTypeDecoration, nonCopyable, 0, 0)

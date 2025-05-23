@@ -181,6 +181,8 @@ public:
     Slang::RefPtr<Slang::JSONRPCConnection> m_languageServerConnection;
 
     bool isRetry;
+    bool enableDebugLayers;
+
     std::mutex mutexFailedTests;
     Slang::List<Slang::RefPtr<FileTestInfo>> failedFileTests;
     Slang::List<Slang::String> failedUnitTests;
