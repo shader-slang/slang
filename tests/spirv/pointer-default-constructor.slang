@@ -3,19 +3,24 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
+struct MyStruct
+{
+    int* ptr;
+}
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
 {
     float* a = {};
-    float* b = a + 32;
+    MyStruct ms = {};
 
     // CHECK: 0
     outputBuffer[0] = uint(uint64_t(a));
-    // CHECK: 128
-    outputBuffer[1] = uint(uint64_t(b));
     // CHECK: 1
-    outputBuffer[2] = uint(a == nullptr);
+    outputBuffer[1] = uint(a == nullptr);
+    // CHECK: 0
+    outputBuffer[2] = uint(uint64_t(ms.ptr));
     // CHECK: 1
-    outputBuffer[3] = uint(Ptr<int>() != Ptr<int>(0xAB64));
+    outputBuffer[3] = uint(ms.ptr == nullptr);
 }

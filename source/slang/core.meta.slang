@@ -1279,12 +1279,6 @@ struct Ptr
         [nonmutating]
         ref;
     }
-
-    [ForceInline]
-    __init()
-    {
-        return __default<Ptr<T, addrSpace>>();
-    }
 };
 
 //@hidden:

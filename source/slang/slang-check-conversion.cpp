@@ -236,7 +236,8 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
 
     // 1. It has to be basic scalar, vector or matrix type, or user-defined struct.
     if (as<VectorExpressionType>(type) || as<MatrixExpressionType>(type) ||
-        as<BasicExpressionType>(type) || isDeclRefTypeOf<EnumDecl>(type).getDecl())
+        as<BasicExpressionType>(type) || isDeclRefTypeOf<EnumDecl>(type).getDecl() ||
+        as<PtrType>(type))
         return cacheResult(true);
 
 
