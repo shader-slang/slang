@@ -1987,6 +1987,9 @@ struct DiffTransposePass
         IRInst* fwdMakeStruct,
         IRInst* revValue)
     {
+        if (fwdMakeStruct->getOperandCount() == 0)
+            return TranspositionResult();
+
         List<RevGradient> gradients;
         auto structType = cast<IRStructType>(fwdMakeStruct->getFullType());
         UInt ii = 0;
