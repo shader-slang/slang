@@ -51,7 +51,7 @@ if(NOT SLANG_OVERRIDE_LUA_PATH)
         LINK_WITH_PRIVATE
         compiler-core
         INCLUDE_DIRECTORIES_PUBLIC
-        ${slang_SOURCE_DIR}/external/lua
+        ${slang_SOURCE_DIR}/external
     )
 else()
     generator(
@@ -183,7 +183,7 @@ if(SLANG_ENABLE_GFX)
             if
             (not ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH})
         INCLUDE_DIRECTORIES_PUBLIC
-            ${slang_SOURCE_DIR}/external/spirv-tools
+            ${slang_SOURCE_DIR}/external
             else
             ()
         INCLUDE_DIRECTORIES_PUBLIC
@@ -192,14 +192,14 @@ if(SLANG_ENABLE_GFX)
             ()
             if
             (not ${SLANG_OVERRIDE_GLM_PATH})
-        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external/glm else ()
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
         INCLUDE_DIRECTORIES_PUBLIC
             ${SLANG_OVERRIDE_GLM_PATH}
             endif
             ()
             if
             (not ${SLANG_OVERRIDE_IMGUI_PATH})
-        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external/imgui else ()
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
         INCLUDE_DIRECTORIES_PUBLIC
             ${SLANG_OVERRIDE_IMGUI_PATH}
             endif
@@ -207,7 +207,7 @@ if(SLANG_ENABLE_GFX)
             if
             (not ${SLANG_OVERRIDE_TINYOBJLOADER_PATH})
         INCLUDE_DIRECTORIES_PUBLIC
-            ${slang_SOURCE_DIR}/external/tinyobjloader
+            ${slang_SOURCE_DIR}/external
             else
             ()
         INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_TINYOBJLOADER_PATH} endif ()
