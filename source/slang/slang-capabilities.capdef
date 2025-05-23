@@ -2257,6 +2257,10 @@ alias raytracing_intersection = intersection + raytracing;
 /// [Compound]
 alias raytracing_anyhit_closesthit = anyhit_closesthit + raytracing;
 
+/// Collection of capabilities for linear swept spheres.
+/// [Compound]
+alias lss_raytracing_anyhit_closesthit = raytracing_anyhit_closesthit | spvRayTracingLinearSweptSpheresGeometryNV;
+
 /// Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.
 /// [Compound]
 alias raytracing_anyhit_closesthit_intersection = anyhit_closesthit_intersection + raytracing;

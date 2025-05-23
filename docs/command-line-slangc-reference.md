@@ -1499,6 +1499,7 @@ A capability describes an optional feature that a target may or may not support.
 * `raytracing_anyhit` 
 * `raytracing_intersection` 
 * `raytracing_anyhit_closesthit` 
+* `lss_raytracing_anyhit_closesthit` 
 * `raytracing_anyhit_closesthit_intersection` 
 * `raytracing_raygen_closesthit_miss` 
 * `raytracing_anyhit_closesthit_intersection_miss` 
