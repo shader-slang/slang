@@ -174,17 +174,27 @@ void RIFFSerialWriter::beginStruct()
     _cursor.beginListChunk(RIFFSerial::kStructFourCC);
 }
 
+void RIFFSerialWriter::endStruct()
+{
+    _cursor.endChunk();
+}
+
+void RIFFSerialWriter::beginVariant()
+{
+    beginStruct();
+}
+
+void RIFFSerialWriter::endVariant()
+{
+    endStruct();
+}
+
 void RIFFSerialWriter::handleFieldKey(char const* name, Int index)
 {
     // For now we are ignoring field keys, and treating
     // structs as basically equivalent to tuples.
     SLANG_UNUSED(name);
     SLANG_UNUSED(index);
-}
-
-void RIFFSerialWriter::endStruct()
-{
-    _cursor.endChunk();
 }
 
 void RIFFSerialWriter::beginTuple()
@@ -506,17 +516,27 @@ void RIFFSerialReader::beginStruct()
     _beginListChunk(RIFFSerial::kStructFourCC);
 }
 
+void RIFFSerialReader::endStruct()
+{
+    _endListChunk();
+}
+
+void RIFFSerialReader::beginVariant()
+{
+    beginStruct();
+}
+
+void RIFFSerialReader::endVariant()
+{
+    endStruct();
+}
+
 void RIFFSerialReader::handleFieldKey(char const* name, Int index)
 {
     // For now we are ignoring field keys, and treating
     // structs as basically equivalent to tuples.
     SLANG_UNUSED(name);
     SLANG_UNUSED(index);
-}
-
-void RIFFSerialReader::endStruct()
-{
-    _endListChunk();
 }
 
 void RIFFSerialReader::beginTuple()

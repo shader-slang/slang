@@ -476,4 +476,15 @@ SLANG_FORCE_INLINE void operator delete(void* memory, Slang::MemoryArena& arena)
     SLANG_UNUSED(arena);
 }
 
+SLANG_FORCE_INLINE void* operator new[](size_t size, Slang::MemoryArena& arena)
+{
+    return arena.allocate(size);
+}
+
+SLANG_FORCE_INLINE void operator delete[](void* memory, Slang::MemoryArena& arena)
+{
+    SLANG_UNUSED(memory);
+    SLANG_UNUSED(arena);
+}
+
 #endif // SLANG_MEMORY_ARENA_H
