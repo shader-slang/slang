@@ -3575,8 +3575,6 @@ void legalizeEntryPointParameterForGLSL(
 
                 auto key = dec->getOperand(1);
                 IRInst* realGlobalVar = nullptr;
-                if (globalValue.flavor != ScalarizedVal::Flavor::tuple)
-                    continue;
                 if (auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl))
                 {
                     for (auto elem : tupleVal->elements)
@@ -3597,6 +3595,16 @@ void legalizeEntryPointParameterForGLSL(
                         }
                     }
                 }
+                // TODO: Add better comment. tupleVals only get created for structType params. Adding
+                //       one struct param for all the new global in's would go through the above
+                //       but this was changed to adding inidivual params so we needed to capture
+                //       that here. Need this for vectorType for example.
+                else if (globalValue.flavor == ScalarizedVal::Flavor::address)
+                {
+                    realGlobalVar = globalValue.irValue;
+                }
+                else
+                    continue;
                 SLANG_ASSERT(realGlobalVar);
 
                 // Remove all stores into the global var introduced during

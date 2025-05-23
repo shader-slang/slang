@@ -101,43 +101,14 @@ namespace Slang
 // whether a parameter represents a varying input rather than
 // a uniform parameter.
 
-
-// In order to determine whether a parameter is varying based on its
-// layout, we need to know which resource kinds represent varying
-// shader parameters.
-//
-bool isVaryingResourceKind(LayoutResourceKind kind)
-{
-    switch (kind)
-    {
-    default:
-        return false;
-
-        // Note: The set of cases that are considered
-        // varying here would need to be extended if we
-        // add more fine-grained resource kinds (e.g.,
-        // if we ever add an explicit resource kind
-        // for geometry shader output streams).
-        //
-        // Ordinary varying input/output:
-    case LayoutResourceKind::VaryingInput:
-    case LayoutResourceKind::VaryingOutput:
-        //
-        // Ray-tracing shader input/output:
-    case LayoutResourceKind::CallablePayload:
-    case LayoutResourceKind::HitAttributes:
-    case LayoutResourceKind::RayPayload:
-        return true;
-    }
-}
-
-bool isVaryingParameter(IRTypeLayout* typeLayout)
+// TODO: Maybe this should be more of a isUniformParameter check?
+bool isVaryingParameter(IRVarLayout* varLayout)
 {
     // If *any* of the resources consumed by the parameter type
     // is *not* a varying resource kind, then we consider the
     // whole parameter to be uniform (and thus not varying).
     //
-    // Note that this means that an empty type will always
+    // Note that this means that some empty types will always
     // be considered varying, even if it had been explicitly
     // marked `uniform`.
     //
@@ -149,20 +120,39 @@ bool isVaryingParameter(IRTypeLayout* typeLayout)
     // reosurce kind, so they show up as empty. Simply
     // adding `LayoutResourceKind`s for system-value inputs
     // and outputs would allow for simpler logic here.
-    //
-    for (auto sizeAttr : typeLayout->getSizeAttrs())
-    {
-        if (!isVaryingResourceKind(sizeAttr->getResourceKind()))
-            return false;
-    }
-    return true;
-}
 
-bool isVaryingParameter(IRVarLayout* varLayout)
-{
     if (!varLayout)
         return false;
-    return isVaryingParameter(varLayout->getTypeLayout());
+
+    // System-value parameters currently do not have kinds setup.
+    // As a WAR, if we see a system-value attr just assume varying
+    // for now.
+    if (varLayout->findAttr<IRSystemValueSemanticAttr>())
+    {
+        return true;
+    }
+
+    // Note: The set of cases that are considered
+    // varying here would need to be extended if we
+    // add more fine-grained resource kinds (e.g.,
+    // if we ever add an explicit resource kind
+    // for geometry shader output streams).
+    //
+    // Ordinary varying input/output + Ray-tracing shader input/output
+    // kinds will be considered varying.
+    LayoutResourceKindFlags flags = LayoutResourceKindFlag::make(LayoutResourceKind::VaryingInput) |
+                                    LayoutResourceKindFlag::make(LayoutResourceKind::VaryingOutput) |
+                                    LayoutResourceKindFlag::make(LayoutResourceKind::CallablePayload) |
+                                    LayoutResourceKindFlag::make(LayoutResourceKind::HitAttributes) |
+                                    LayoutResourceKindFlag::make(LayoutResourceKind::RayPayload);
+
+    if (varLayout->usesResourceFromKinds(flags)) {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
 }
 
 struct CollectEntryPointUniformParams : PerEntryPointPass
@@ -429,6 +419,10 @@ struct CollectEntryPointUniformParams : PerEntryPointPass
         // information from the entry point attached to it, so that the
         // contained parameters will end up in the right place(s).
         //
+        // TODO: This seems a bit strange. This will be the entire entry point
+        // parameter layout, rather than just the layout intended for this param.
+        // it doesn't seem to do any harm at the moment, but we should consider
+        // creating a new layout.
         builder.addLayoutDecoration(collectedParam, entryPointParamsLayout);
 
         // We add a name hint to the global parameter so that it will
