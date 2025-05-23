@@ -14,7 +14,7 @@ struct PushConstants
     bool bufferHasOnlyOneElement;
 };
 
-[[vk::push_constant]] ConstantBuffer<PushConstants> gPushConstants;
+[[vk::push_constant]] ConstantBuffer<PushConstants, ScalarDataLayout> gPushConstants;
 
 float loadDataConditionTrue()
 {
