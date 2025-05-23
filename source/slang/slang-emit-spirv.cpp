@@ -7701,9 +7701,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    SpvInst* emitCoopMatMapElementWithIFunc(
-        SpvInstParent* parent,
-        IRCoopMatMapElementIFunc* inst)
+    SpvInst* emitCoopMatMapElementWithIFunc(SpvInstParent* parent, IRCoopMatMapElementIFunc* inst)
     {
         ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_cooperative_matrix2"));
         requireSPIRVCapability(SpvCapabilityCooperativeMatrixPerElementOperationsNV);
@@ -7713,7 +7711,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRInst* mat0 = nullptr;
 
         UInt tupleCount = 0;
-        IRInst* tuple = tuple = as<IRMakeStruct>(matOrTuple);
+        IRInst* tuple = as<IRMakeStruct>(matOrTuple);
         if (tuple)
         {
             mat0 = tuple->getOperand(0);

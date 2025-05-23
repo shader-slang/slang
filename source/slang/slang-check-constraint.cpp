@@ -1210,6 +1210,58 @@ void SemanticsVisitor::maybeUnifyUnconstraintIntParam(
     constraints.constraints.add(c);
 }
 
+static GenericTypePackParamDecl* asGenericTypePackParamDecl(Type* type, GenericDecl* genericDecl)
+{
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto declRef = declRefType->getDeclRef())
+        {
+            if (auto typePackParamDecl = as<GenericTypePackParamDecl>(declRef.getDecl()))
+            {
+                if (typePackParamDecl->parentDecl == genericDecl)
+                    return typePackParamDecl;
+            }
+        }
+    }
+    return nullptr;
+}
+
+static bool isExpandableType(Type* type, GenericDecl* genericDecl)
+{
+    return as<ExpandType>(type) || asGenericTypePackParamDecl(type, genericDecl);
+}
+
+// Static helper function to unwrap a ConcreteTypePack and count how many ExpandType were in.
+static int UnwrapConcreteTypePackAndCountExpandable(
+    Type* type,
+    ShortList<Type*>& result,
+    GenericDecl* genericDecl)
+{
+    int expandCount = 0;
+    if (auto concretePack = as<ConcreteTypePack>(type))
+    {
+        for (Index i = 0; i < concretePack->getTypeCount(); ++i)
+        {
+            auto element = concretePack->getElementType(i);
+            result.add(element);
+
+            if (isExpandableType(element, genericDecl))
+                ++expandCount;
+        }
+    }
+    else if (isExpandableType(type, genericDecl))
+    {
+        result.add(type);
+        ++expandCount;
+    }
+    else
+    {
+        SLANG_RELEASE_ASSERT(!"Unexpected type in ConcreteTypePack");
+    }
+
+    return expandCount;
+}
+
 bool SemanticsVisitor::TryUnifyTypes(
     ConstraintSystem& constraints,
     ValUnificationContext unifyCtx,
@@ -1244,88 +1296,217 @@ bool SemanticsVisitor::TryUnifyTypes(
         return TryUnifyConjunctionType(constraints, unifyCtx, fst, snd);
     }
 
-    auto fstTypePack = as<ConcreteTypePack>(fst);
-    auto sndTypePack = as<ConcreteTypePack>(snd);
-    ExpandType* fstExpandType = nullptr;
-    ExpandType* sndExpandType = nullptr;
-
-    Index fstTypeCount = 0;
-    Index sndTypeCount = 0;
-    if (fstTypePack)
-        fstTypeCount = fstTypePack->getTypeCount();
-    if (sndTypePack)
-        sndTypeCount = sndTypePack->getTypeCount();
-
-    if (fstTypeCount > 0)
-        fstExpandType = as<ExpandType>(fstTypePack->getElementType(fstTypeCount - 1));
-    else
-        fstExpandType = as<ExpandType>(fst);
-
-    if (sndTypeCount > 0)
-        sndExpandType = as<ExpandType>(sndTypePack->getElementType(sndTypeCount - 1));
-    else
-        sndExpandType = as<ExpandType>(snd);
-
-    if ((fstTypePack && sndTypePack) || (fstTypePack && sndExpandType) ||
-        (fstExpandType && sndTypePack))
+    // Unwrap ConcreteTypePack and unify types with regard to ExpandType.
+    if ((as<ConcreteTypePack>(fst) && as<ConcreteTypePack>(snd)) ||
+        (as<ConcreteTypePack>(fst) && as<ExpandType>(snd)) ||
+        (as<ExpandType>(fst) && as<ConcreteTypePack>(snd)))
     {
-        if (fstExpandType && sndExpandType)
-            return false;
+        // Unwrap ConcreteTypePack to make the logic simpler
+        ShortList<Type*> flattenedFirst;
+        ShortList<Type*> flattenedSecond;
 
-        if (!fstExpandType && !sndExpandType && fstTypeCount != sndTypeCount)
-            return false;
+        int fstExpandableCount =
+            UnwrapConcreteTypePackAndCountExpandable(fst, flattenedFirst, constraints.genericDecl);
+        int sndExpandableCount =
+            UnwrapConcreteTypePackAndCountExpandable(snd, flattenedSecond, constraints.genericDecl);
 
-        Index i = 0;
-        Index iterCount = std::min(fstTypeCount, sndTypeCount);
-        for (i = 0; i < iterCount - 1; ++i)
+        int fstCount = (int)flattenedFirst.getCount();
+        int sndCount = (int)flattenedSecond.getCount();
+
+        // ExpandType can match to more than one corresponding type.
+        // We need to figure out how many types should be unified per each ExpandType.
+        //
+        // Consider this case:
+        // left = ConcreteTypePack(ExpandType, ExpandType)
+        // right = ConcreteTypePack(int, bool, float, double).
+        //
+        // In this case, we shouldn't be mapping the first ExpandType to int and the second
+        // ExpandType to bool, float, double. Instead, they should evenly divide the second type
+        // pack, so we map first ExpandType with int, bool, and second ExpandType to float, double.
+        //
+        int howManyTypesPerEachExpand = 1;
+        int countDifference = fstCount - sndCount;
+        if (countDifference > 0)
         {
-            if (!TryUnifyTypes(
-                    constraints,
-                    unifyCtx,
-                    QualType(fstTypePack->getElementType(i), fst.isLeftValue),
-                    QualType(sndTypePack->getElementType(i), snd.isLeftValue)))
+            // There are more types on "fst", and we need to expand "snd".
+            if (sndExpandableCount == 0)
+                return false; // Expand is missing
+            if (countDifference % sndExpandableCount != 0)
+                return false; // there are remaining types that cannot be expanded for.
+
+            howManyTypesPerEachExpand = 1 + countDifference / sndExpandableCount;
+        }
+        else if (countDifference < 0)
+        {
+            // There are more types on "snd", and we need to expand "fst".
+            if (fstExpandableCount == 0)
                 return false;
+            if (-countDifference % fstExpandableCount != 0)
+                return false;
+
+            howManyTypesPerEachExpand = 1 - countDifference / fstExpandableCount;
         }
 
-        Index indexInTypePack = 0;
-        if (fstExpandType)
+        // Iterate each type and try to unify them with regard to the expandable types.
+        auto iterFirst = flattenedFirst.begin();
+        auto iterSecond = flattenedSecond.begin();
+        while (iterFirst != flattenedFirst.end() && iterSecond != flattenedSecond.end())
         {
-            for (; i < sndTypeCount; ++i)
+            ValUnificationContext subUnifyCtx = unifyCtx;
+            subUnifyCtx.indexInTypePack = 0;
+
+            // Expand "fst" to match to "snd".
+            if (countDifference < 0)
             {
-                ValUnificationContext subUnifyCtx = unifyCtx;
-                subUnifyCtx.indexInTypePack = indexInTypePack;
-                ++indexInTypePack;
-                if (!TryUnifyTypes(
-                        constraints,
-                        subUnifyCtx,
-                        QualType(fstExpandType->getPatternType(), fst.isLeftValue),
-                        QualType(sndTypePack->getElementType(i), snd.isLeftValue)))
-                    return false;
+                if (auto fstExpand = as<ExpandType>(*iterFirst))
+                {
+                    for (int i = 0; i < howManyTypesPerEachExpand; ++i, ++iterSecond)
+                    {
+                        subUnifyCtx.indexInTypePack = i;
+                        if (!TryUnifyTypes(
+                                constraints,
+                                subUnifyCtx,
+                                QualType(fstExpand->getPatternType(), fst.isLeftValue),
+                                QualType(*iterSecond, snd.isLeftValue)))
+                            return false;
+                    }
+                }
+                else if (
+                    auto fstGenericTypePackParamDecl =
+                        asGenericTypePackParamDecl(*iterFirst, constraints.genericDecl))
+                {
+                    for (int i = 0; i < howManyTypesPerEachExpand; ++i, ++iterSecond)
+                    {
+                        subUnifyCtx.indexInTypePack = i;
+                        if (!TryUnifyTypeParam(
+                                constraints,
+                                subUnifyCtx,
+                                fstGenericTypePackParamDecl,
+                                QualType(*iterSecond, snd.isLeftValue)))
+                            return false;
+                    }
+                }
+                else
+                {
+                    if (!TryUnifyTypes(
+                            constraints,
+                            unifyCtx,
+                            QualType(*iterFirst, fst.isLeftValue),
+                            QualType(*iterSecond, snd.isLeftValue)))
+                    {
+                        return false;
+                    }
+                    ++iterSecond;
+                }
+                ++iterFirst;
             }
-            return true;
-        }
-        else if (sndExpandType)
-        {
-            for (; i < fstTypeCount; ++i)
+            // Expand "snd" to match to "fst".
+            else if (countDifference > 0)
             {
-                ValUnificationContext subUnifyCtx = unifyCtx;
-                subUnifyCtx.indexInTypePack = indexInTypePack;
-                ++indexInTypePack;
-                if (!TryUnifyTypes(
-                        constraints,
-                        subUnifyCtx,
-                        QualType(fstTypePack->getElementType(i), fst.isLeftValue),
-                        QualType(sndExpandType->getPatternType(), snd.isLeftValue)))
-                    return false;
+                if (auto sndExpand = as<ExpandType>(*iterSecond))
+                {
+                    for (int i = 0; i < howManyTypesPerEachExpand; ++i, ++iterFirst)
+                    {
+                        subUnifyCtx.indexInTypePack = i;
+                        if (!TryUnifyTypes(
+                                constraints,
+                                subUnifyCtx,
+                                QualType(*iterFirst, fst.isLeftValue),
+                                QualType(sndExpand->getPatternType(), snd.isLeftValue)))
+                            return false;
+                    }
+                }
+                else if (
+                    auto sndGenericTypePackParamDecl =
+                        asGenericTypePackParamDecl(*iterSecond, constraints.genericDecl))
+                {
+                    for (int i = 0; i < howManyTypesPerEachExpand; ++i, ++iterFirst)
+                    {
+                        if (!TryUnifyTypeParam(
+                                constraints,
+                                subUnifyCtx,
+                                sndGenericTypePackParamDecl,
+                                QualType(*iterFirst, fst.isLeftValue)))
+                            return false;
+                    }
+                }
+                else
+                {
+                    if (!TryUnifyTypes(
+                            constraints,
+                            unifyCtx,
+                            QualType(*iterFirst, fst.isLeftValue),
+                            QualType(*iterSecond, snd.isLeftValue)))
+                    {
+                        return false;
+                    }
+                    ++iterFirst;
+                }
+                ++iterSecond;
             }
-            return true;
+            // Otherwise, we are going to unify types without expansions.
+            else
+            {
+                if (auto fstExpand = as<ExpandType>(*iterFirst))
+                {
+                    if (!TryUnifyTypes(
+                            constraints,
+                            unifyCtx,
+                            QualType(fstExpand->getPatternType(), fst.isLeftValue),
+                            QualType(*iterSecond, snd.isLeftValue)))
+                        return false;
+                }
+                else if (auto sndExpand = as<ExpandType>(*iterSecond))
+                {
+                    if (!TryUnifyTypes(
+                            constraints,
+                            unifyCtx,
+                            QualType(*iterFirst, fst.isLeftValue),
+                            QualType(sndExpand->getPatternType(), snd.isLeftValue)))
+                        return false;
+                }
+                else if (
+                    auto fstGenericTypePackParamDecl =
+                        asGenericTypePackParamDecl(*iterFirst, constraints.genericDecl))
+                {
+                    if (!TryUnifyTypeParam(
+                            constraints,
+                            unifyCtx,
+                            fstGenericTypePackParamDecl,
+                            QualType(*iterSecond, snd.isLeftValue)))
+                        return false;
+                }
+                else if (
+                    auto sndGenericTypePackParamDecl =
+                        asGenericTypePackParamDecl(*iterSecond, constraints.genericDecl))
+                {
+                    if (!TryUnifyTypeParam(
+                            constraints,
+                            unifyCtx,
+                            sndGenericTypePackParamDecl,
+                            QualType(*iterFirst, fst.isLeftValue)))
+                        return false;
+                }
+                else
+                {
+                    if (!TryUnifyTypes(
+                            constraints,
+                            unifyCtx,
+                            QualType(*iterFirst, fst.isLeftValue),
+                            QualType(*iterSecond, snd.isLeftValue)))
+                    {
+                        return false;
+                    }
+                }
+
+                ++iterFirst;
+                ++iterSecond;
+            }
         }
 
-        return TryUnifyTypes(
-            constraints,
-            unifyCtx,
-            QualType(fstTypePack->getElementType(i), fst.isLeftValue),
-            QualType(sndTypePack->getElementType(i), snd.isLeftValue));
+        SLANG_ASSERT(iterFirst == flattenedFirst.end());
+        SLANG_ASSERT(iterSecond == flattenedSecond.end());
+        return true;
     }
 
     // A generic parameter type can unify with anything.
