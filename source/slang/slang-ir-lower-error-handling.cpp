@@ -15,6 +15,7 @@ struct ErrorHandlingLoweringContext
 
     InstWorkList workList;
     InstHashSet workListSet;
+    List<IRFuncType*> oldFuncTypes;
 
     ErrorHandlingLoweringContext(IRModule* inModule)
         : module(inModule), workList(inModule), workListSet(inModule)
@@ -37,8 +38,10 @@ struct ErrorHandlingLoweringContext
             return;
         IRBuilder builder(module);
         builder.setInsertBefore(funcType);
+
         auto resultType =
             builder.getResultType(funcType->getResultType(), throwAttr->getErrorType());
+
         List<IRType*> paramTypes;
         for (UInt i = 0; i < funcType->getParamCount(); i++)
         {
@@ -48,6 +51,7 @@ struct ErrorHandlingLoweringContext
         }
         auto newFuncType = builder.getFuncType(paramTypes, resultType);
         funcType->replaceUsesWith(newFuncType);
+        funcType->removeAndDeallocate();
     }
 
     void processTryCall(IRTryCall* tryCall)
@@ -99,14 +103,27 @@ struct ErrorHandlingLoweringContext
         auto failBlock = tryCall->getFailureBlock();
         auto successBlock = tryCall->getSuccessBlock();
 
-        builder.emitIf(isFail, failBlock, successBlock);
+        if (failBlock->getFirstParam())
+        {
+            // The isFail branch could otherwise just jump to the handler, but
+            // there's unfortunately the error parameter that needs to be passed as
+            // well, and it can't be done in IfElse. So there's an extra block in
+            // between to do that.
+            auto handlerJumpBlock = builder.createBlock();
+            auto branch = builder.emitIf(isFail, handlerJumpBlock, successBlock);
 
-        // Replace the params in failBlock to `getResultError(call)`.
-        builder.setInsertBefore(failBlock->getFirstOrdinaryInst());
-        auto errorParam = failBlock->getFirstParam();
-        auto errVal = builder.emitGetResultError(call);
-        errorParam->replaceUsesWith(errVal);
-        errorParam->removeAndDeallocate();
+            builder.setInsertAfter(branch->getParent());
+            builder.addInst(handlerJumpBlock);
+            builder.setInsertInto(handlerJumpBlock);
+
+            auto errVal = builder.emitGetResultError(call);
+            builder.emitBranch(failBlock, 1, &errVal);
+        }
+        else
+        {
+            // Catch-all with no parameter, so we can just jump to it directly.
+            builder.emitIf(isFail, failBlock, successBlock);
+        }
 
         // Replace the params in successBlock to `getResultValue(call)`.
         builder.setInsertBefore(successBlock->getFirstOrdinaryInst());
@@ -173,6 +190,9 @@ struct ErrorHandlingLoweringContext
         case kIROp_Throw:
             processThrow(cast<IRThrow>(inst));
             break;
+        case kIROp_FuncType:
+            oldFuncTypes.add(cast<IRFuncType>(inst));
+            break;
         default:
             break;
         }
@@ -206,18 +226,6 @@ struct ErrorHandlingLoweringContext
         // Lower all functypes.
         // Function types with an IRThrowTypeAttribute will be translated into a normal function
         // type that returns `Result<T,E>`.
-        List<IRFuncType*> oldFuncTypes;
-        for (auto child : module->getGlobalInsts())
-        {
-            switch (child->getOp())
-            {
-            case kIROp_FuncType:
-                oldFuncTypes.add(cast<IRFuncType>(child));
-                break;
-            default:
-                break;
-            }
-        }
         for (auto funcType : oldFuncTypes)
         {
             processFuncType(funcType);
