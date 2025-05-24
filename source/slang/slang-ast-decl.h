@@ -139,6 +139,22 @@ class LetDecl : public VarDecl
     FIDDLE(...)
 };
 
+// SomeType<IFoo>
+FIDDLE()
+class SomeTypeDecl : public Decl
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp interfaceType;
+};
+
+// UnboundSomeType<IFoo>
+FIDDLE()
+class UnboundSomeTypeDecl : public Decl
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp interfaceType;
+};
+
 // An `AggTypeDeclBase` captures the shared functionality
 // between true aggregate type declarations and extension
 // declarations:

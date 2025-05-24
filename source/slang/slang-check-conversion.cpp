@@ -951,7 +951,34 @@ bool SemanticsVisitor::_failedCoercion(
         {
             if (sink)
             {
-                sink->diagnose(fromExpr->loc, Diagnostics::typeMismatch, toType, fromExpr->type);
+                if(toType && fromExpr)
+                {
+                    // produce a clearer error given `SomeType` since otherwise users will get a confusing error of 
+                    // "some IFoo mismatched with some IFoo" or "some IFoo mismatched with dyn IFoo". This is misleading
+                    // since "dyn IFoo = some IFoo" is legal.
+                    if (isDeclRefTypeOf<SomeTypeDecl>(toType))
+                    {
+                        if (isDeclRefTypeOf<SomeTypeDecl>(fromType))
+                            sink->diagnose(
+                                fromExpr->loc,
+                                Diagnostics::
+                                    cannotAssignPotentiallyInitializedSomeTypeWithSomeType);
+                        else if (isDeclRefTypeOf<InterfaceDecl>(fromType)
+                                     .getDecl()
+                                     ->hasModifier<DynModifier>())
+                            sink->diagnose(
+                                fromExpr->loc,
+                                Diagnostics::cannotAssignSomeTypeWithDynType);
+                    }
+                }
+                else
+                {
+                    sink->diagnose(
+                        fromExpr->loc,
+                        Diagnostics::typeMismatch,
+                        toType,
+                        fromExpr->type);
+                }
             }
         }
     }
@@ -1311,6 +1338,28 @@ bool SemanticsVisitor::_coerce(
             return true;
         }
     }
+
+
+    //if (fromType_declRefSomeType = isDeclRefTypeOf<SomeTypeDecl>(fromType))
+    //{
+        // `dyn val = some IFoo` is allowed
+        //if (auto declRefType = as<DeclRefType>(toType));
+    //}
+    // you can assign `some IFoo val = SomethingIFooIsCompatibleWith`
+    // you cannot assign `some IFoo val = some IFoo();`
+    //if (auto toType_declRefSomeType = isDeclRefTypeOf<SomeTypeDecl>(toType))
+    //{
+
+    //        return false;
+    //    return _coerce(
+    //        site,
+    //        someType->getValueType(),
+    //        outToExpr,
+    //        fromType,
+    //        fromExpr,
+    //        sink,
+    //        outCost);
+    //}
 
     // nullptr_t can be cast into any pointer type.
     if (as<NullPtrType>(fromType) && as<PtrType>(toType))

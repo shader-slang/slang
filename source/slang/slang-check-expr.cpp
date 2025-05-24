@@ -936,6 +936,8 @@ Expr* SemanticsVisitor::createLookupResultExpr(
 
 DeclVisibility SemanticsVisitor::getTypeVisibility(Type* type)
 {
+    if (isDeclRefTypeOf<SomeTypeDecl>(type) || isDeclRefTypeOf<UnboundSomeTypeDecl>(type))
+        return DeclVisibility::Public;
     if (auto declRefType = as<DeclRefType>(type))
     {
         auto v = getDeclVisibility(declRefType->getDeclRef().getDecl());
@@ -5397,6 +5399,44 @@ Expr* SemanticsExprVisitor::visitPointerTypeExpr(PointerTypeExpr* expr)
         expr->type = expr->base.type;
     auto ptrType = m_astBuilder->getPtrType(expr->base.type, AddressSpace::UserPointer);
     expr->type = m_astBuilder->getTypeType(ptrType);
+    return expr;
+}
+
+static Type* createSomeTypeDeclType(ASTBuilder* astBuilder, SomeTypeExpr* expr)
+{
+    auto decl = astBuilder->create<SomeTypeDecl>();
+    decl->loc = expr->loc;
+    decl->interfaceType = expr->base;
+    return astBuilder->getTypeType(DeclRefType::create(astBuilder, decl));
+}
+
+Expr* SemanticsExprVisitor::visitSomeTypeExpr(SomeTypeExpr* expr)
+{
+    if(expr->base)
+    {
+        expr->type = createSomeTypeDeclType(m_astBuilder, expr);
+        return expr;
+    }
+
+    expr->base = CheckProperType(expr->base);
+    if (as<ErrorType>(expr->base.type))
+        expr->type = expr->base.type;
+
+    auto declRefType = as<DeclRefType>(expr->base.type);
+    if (!declRefType)
+    {
+        getSink()->diagnose(expr, Diagnostics::cannotDeclareNonInterfaceSomeType, expr->base.type);
+    }
+
+    auto interfaceType = as<InterfaceDecl>(declRefType->getDeclRefBase()->getDecl());
+    if (!interfaceType)
+    {
+        getSink()->diagnose(expr, Diagnostics::cannotDeclareNonInterfaceSomeType, expr->base.type);
+    }
+    else
+    {
+        expr->type = createSomeTypeDeclType(m_astBuilder, expr);
+    }
     return expr;
 }
 

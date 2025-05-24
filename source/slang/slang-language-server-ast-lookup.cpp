@@ -430,6 +430,18 @@ public:
         }
         return dispatchIfNotNull(expr->base.exp);
     }
+    bool visitSomeTypeExpr(SomeTypeExpr* expr)
+    {
+        if (_isLocInRange(context, expr->loc, 0))
+        {
+            ASTLookupResult result;
+            result.path = context->nodePath;
+            result.path.add(expr);
+            context->results.add(result);
+            return true;
+        }
+        return dispatchIfNotNull(expr->base.exp);
+    }
     bool visitAsTypeExpr(AsTypeExpr* expr)
     {
         if (dispatchIfNotNull(expr->value))

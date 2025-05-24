@@ -175,8 +175,32 @@ struct structWithNonCopyable2 : IBase6
 };
 
 // `dyn` interfaces cannot contain any methods that has a `some` IFoo return type, or has any `some` IFoo parameters.
-// TODO-INTERFACE-QUALIFIERS-ADDITION-OF-SOME
-//
+interface IFoo
+{
+
+}
+struct IFooStruct : IFoo
+{
+    int a;
+}
+
+dyn interface ReturnsSomeTypeAndSomeParam
+{
+// CHECK_2026-DAG: error 33086
+// CHECK_2026-DAG: error 33087
+
+// CHECK_2025_OR_EXP-NOT: error 33086
+// CHECK_2025_OR_EXP-NOT: error 33087
+
+    some IFoo getIFoo()
+	{
+		return IFooStruct();
+	}
+
+    void lookAtIFoo(some IFoo v)
+	{
+	}
+}
 
 RWStructuredBuffer<int> outputBuffer;
 [numthreads(4, 1, 1)]

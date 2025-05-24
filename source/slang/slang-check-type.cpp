@@ -31,6 +31,14 @@ Type* getPointedToTypeIfCanImplicitDeref(Type* type)
     {
         return refType->getValueType();
     }
+    else if (auto someType = isDeclRefTypeOf<SomeTypeDecl>(type))
+    {
+        return someType.getDecl()->interfaceType;
+    }
+    else if (auto unboundSomeType = isDeclRefTypeOf<UnboundSomeTypeDecl>(type))
+    {
+        return unboundSomeType.getDecl()->interfaceType;
+     }
     return nullptr;
 }
 

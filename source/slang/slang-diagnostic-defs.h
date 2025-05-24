@@ -836,52 +836,102 @@ DIAGNOSTIC(
     33073,
     Error,
     cannotHaveAssociatedTypeInDynInterface,
-    "dyn interfaces cannot have associatedType members.")
+    "'dyn interface' cannot have associatedType members.")
 DIAGNOSTIC(
     33074,
     Error,
     cannotHaveGenericMethodInDynInterface,
-    "dyn interfaces cannot have generic methods.")
+    "'dyn interface' cannot have generic methods.")
 DIAGNOSTIC(
     33075,
     Error,
     cannotHaveMutatingMethodInDynInterface,
-    "dyn interfaces cannot have [mutating] methods.")
+    "'dyn interface' cannot have [mutating] methods.")
 DIAGNOSTIC(
     33076,
     Error,
     cannotHaveDifferentiableMethodInDynInterface,
-    "dyn interfaces cannot have [Differentiable] methods.")
+    "'dyn interface' cannot have [Differentiable] methods.")
 DIAGNOSTIC(
     33077,
     Error,
     DynInterfaceCannotInheritNonDynInterface,
-    "dyn interface '$0' may only inherit 'dyn' interfaces. '$1' is not a dyn interface.")
+    "'dyn interface' '$0' may only inherit 'dyn' interfaces. '$1' is not a 'dyn interface'.")
 DIAGNOSTIC(
     33078,
     Error,
     cannotUseExtensionToMakeTypeConformToDynInterface,
-    "cannot use a extension to conform to a dyn interface '$0'.")
+    "cannot use a extension to conform to a 'dyn interface' '$0'.")
 DIAGNOSTIC(
     33079,
     Error,
     cannotHaveUnsizedMemberWhenInheritingDynInterface,
-    "cannot have unsized member '$0' when inheriting from dyn interface '$1'.")
+    "cannot have unsized member '$0' when inheriting from 'dyn interface' '$1'.")
 DIAGNOSTIC(
     33080,
     Error,
     cannotHaveOpaqueMemberWhenInheritingDynInterface,
-    "cannot have opaque member '$0' when inheriting from dyn interface '$1'.")
+    "cannot have opaque member '$0' when inheriting from 'dyn interface' '$1'.")
 DIAGNOSTIC(
     33081,
     Error,
     cannotHaveNonCopyableMemberWhenInheritingDynInterface,
-    "cannot have non-copyable member '$0' when inheriting from dyn interface '$1'.")
+    "cannot have non-copyable member '$0' when inheriting from 'dyn interface' '$1'.")
 DIAGNOSTIC(
     33082,
     Error,
     cannotConformGenericToDynInterface,
-    "cannot conform generic type '$0' to dyn interface '$1'.")
+    "cannot conform generic type '$0' to 'dyn interface' '$1'.")
+DIAGNOSTIC(
+    33083,
+    Error,
+    cannotDeclareNonInterfaceSomeType,
+    "cannot declare non-interface type '$0' with 'some'.")
+DIAGNOSTIC(
+    33084,
+    Error,
+    cannotHaveSomeTypeStructMember,
+    "cannot have 'some' type struct member.")
+DIAGNOSTIC(
+    33085,
+    Error,
+    cannotHaveSomeTypeGlobalVariable,
+    "cannot have 'some' type global variable.")
+DIAGNOSTIC(
+    33086,
+    Error,
+    cannotReturnSomeTypeInDynInterface,
+    "cannot return 'some' type from a method in a dyn interface.")
+DIAGNOSTIC(
+    33087,
+    Error,
+    cannotHaveSomeTypeParamInDynInterface,
+    "cannot have 'some' type parameter part of a method in a dyn interface.")
+DIAGNOSTIC(
+    33088,
+    Error,
+    someCannotAppearInComplexExpression,
+    "cannot use 'some' in a complex expression, must be a simple interface expression.")
+DIAGNOSTIC(
+    33089,
+    Error,
+    cannotBeSomeTypeAndDynType,
+    "cannot make a type 'some' and 'dyn'")
+DIAGNOSTIC(
+    33090,
+    Error,
+    cannotHaveDynVarDeclUnlessDynInterfaceType,
+    "cannot use 'dyn' on variable declaration unless target type is a 'dyn interface'")
+DIAGNOSTIC(
+    33091,
+    Error,
+    cannotAssignPotentiallyInitializedSomeTypeWithSomeType,
+    "cannot assign to a potentially initialized 'some' type another 'some' type")
+DIAGNOSTIC(
+    33092,
+    Error,
+    cannotAssignSomeTypeWithDynType,
+    "cannot assign to 'some' type a 'dyn' type")
 
 DIAGNOSTIC(
     -1,

@@ -2973,6 +2973,7 @@ public:
     Expr* visitReturnValExpr(ReturnValExpr* expr);
     Expr* visitAndTypeExpr(AndTypeExpr* expr);
     Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
+    Expr* visitSomeTypeExpr(SomeTypeExpr* expr);
     Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
     Expr* visitFuncTypeExpr(FuncTypeExpr* expr);
     Expr* visitTupleTypeExpr(TupleTypeExpr* expr);

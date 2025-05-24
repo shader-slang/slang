@@ -4587,8 +4587,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else
         {
-            SLANG_UNIMPLEMENTED_X("codegen for deref expression");
-            UNREACHABLE_RETURN(LoweredValInfo());
+            // this happens when Deref is a syntactic sugar ==> `SomeType<IFoo>` has implicit deref.
+            return LoweredValInfo::simple(loweredBaseVal);
         }
     }
 
@@ -5487,6 +5487,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     }
 
     LoweredValInfo visitPointerTypeExpr(PointerTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("'*' type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitSomeTypeExpr(SomeTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("'*' type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
