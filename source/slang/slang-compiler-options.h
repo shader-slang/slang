@@ -385,6 +385,15 @@ struct CompilerOptionSet
         return getEnumOption<DebugInfoLevel>(CompilerOptionName::DebugInformation);
     }
 
+    SlangLanguageVersion getLanguageVersion()
+    {
+        if (!hasOption(CompilerOptionName::LanguageVersion))
+        {
+            return SLANG_LANGAUGE_VERSION_DEFAULT;
+        }
+        return (SlangLanguageVersion)getIntOption(CompilerOptionName::LanguageVersion);
+    }
+
     List<String> getDownstreamArgs(String downstreamToolName);
 
     void serialize(SerializedOptionsData* outData);

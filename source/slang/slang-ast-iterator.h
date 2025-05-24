@@ -76,6 +76,13 @@ struct ASTIterator
             dispatchIfNotNull(expr->base);
         }
 
+        void visitTupleExpr(TupleExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            for (auto element : expr->elements)
+                dispatchIfNotNull(element);
+        }
+
         void visitAssignExpr(AssignExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);

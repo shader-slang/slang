@@ -3887,6 +3887,9 @@ bool maybeDiagnoseWarningOrError(
     }
 }
 
+bool isValidSlangLanguageVersion(SlangLanguageVersion version);
+bool isValidGLSLVersion(int version);
+
 } // namespace Slang
 
 #endif

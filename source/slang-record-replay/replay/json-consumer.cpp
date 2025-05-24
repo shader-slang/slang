@@ -631,7 +631,7 @@ void JsonConsumer::_writeGlobalSessionDescHelper(
     {
         _writePair(builder, indent, "structureSize", (uint32_t)desc.structureSize);
         _writePair(builder, indent, "apiVersion", (uint32_t)desc.apiVersion);
-        _writePair(builder, indent, "languageVersion", (uint32_t)desc.languageVersion);
+        _writePair(builder, indent, "minLanguageVersion", (uint32_t)desc.minLanguageVersion);
         _writePair(builder, indent, "enablGLSL", (uint32_t)desc.enableGLSL);
     }
 }

@@ -2920,6 +2920,8 @@ public:
 
     Expr* visitParenExpr(ParenExpr* expr);
 
+    Expr* visitTupleExpr(TupleExpr* expr);
+
     Expr* visitAssignExpr(AssignExpr* expr);
 
     Expr* visitGenericAppExpr(GenericAppExpr* genericAppExpr);
