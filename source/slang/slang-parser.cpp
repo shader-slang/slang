@@ -7358,9 +7358,16 @@ static Expr* parseAtomicExpr(Parser* parser)
                 }
                 else
                 {
+                    // When language version is 2026 or later, we no longer parse comma as a
+                    // C/C++-style comma operator when it is inside a paranthesis,
+                    // but rather as a tuple element separator.
+                    //
                     Precedence exprLevel = Precedence::Comma;
                     if (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
                     {
+                        // Setting exprLevel to Assignment here will allow the following
+                        // tryParseExpression call to parse the expression until the next `)` or
+                        // `,`, instead of consuming any ',' as a comma operator.
                         exprLevel = Precedence::Assignment;
                     }
                     auto isValidFollowToken = [=](TokenType tokenType)
@@ -7398,19 +7405,12 @@ static Expr* parseAtomicExpr(Parser* parser)
                 else
                 {
                     // Parse as an expression in parentheses
-
-                    if (AdvanceIf(parser, TokenType::RParent))
-                    {
-                        ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
-                        parenExpr->loc = openParen.loc;
-                        parenExpr->base = base;
-                        return parenExpr;
-                    }
-                    else if (parser->LookAheadToken(TokenType::Comma))
+                    if (parser->LookAheadToken(TokenType::Comma))
                     {
                         // We have a comma, so we are not done yet.
                         // If we reach here, the language version must be 2026 or later,
-                        // where we allow (a,b,c,...) syntax as a tuple.
+                        // where we allow (a,b,c,...) syntax as a tuple, otherwise we would have
+                        // parsed it into `base`.
                         //
                         List<Expr*> elementExprs;
                         elementExprs.add(base);
@@ -7429,8 +7429,10 @@ static Expr* parseAtomicExpr(Parser* parser)
                     }
                     else
                     {
-                        // Anything else would be a syntax error.
-                        parser->ReadToken(TokenType::RParent);
+                        ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
+                        parenExpr->loc = openParen.loc;
+                        parenExpr->base = base;
+                        return parenExpr;
                     }
                 }
             }
