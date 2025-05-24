@@ -121,6 +121,20 @@ SpvInst* emitOpTypeFloat(IRInst* inst, const SpvLiteralInteger& width)
         width);
 }
 
+SpvInst* emitOpTypeFloat(
+    IRInst* inst,
+    const SpvLiteralInteger& width,
+    const SpvFPEncoding& encoding)
+{
+    return emitInstMemoized(
+        getSection(SpvLogicalSectionID::ConstantsAndTypes),
+        inst,
+        SpvOpTypeFloat,
+        kResultID,
+        width,
+        encoding);
+}
+
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeVector
 template<typename T>
 SpvInst* emitOpTypeVector(
