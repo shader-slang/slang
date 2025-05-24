@@ -576,6 +576,18 @@ class ParenExpr : public Expr
     Expr* base = nullptr;
 };
 
+// An expression that constructs a tuple `(arg1, arg2, ...)`
+//
+// We keep this around explicitly to be sure we don't lose any structure
+// when we do rewriter stuff.
+FIDDLE()
+class TupleExpr : public Expr
+{
+    FIDDLE(...)
+    List<Expr*> elements;
+};
+
+
 // An object-oriented `this` expression, used to
 // refer to the current instance of an enclosing type.
 FIDDLE()

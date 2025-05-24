@@ -208,8 +208,8 @@ CompilerOptionValue Slang::CompilerOptionSet::getDefault(CompilerOptionName name
     {
     case CompilerOptionName::Optimization:
         return CompilerOptionValue::fromEnum(OptimizationLevel::Default);
-    case CompilerOptionName::StdRevision:
-        return CompilerOptionValue::fromEnum(SlangStdRevision::SLANG_STD_REVISION_DEFAULT);
+    case CompilerOptionName::LanguageVersion:
+        return CompilerOptionValue::fromEnum(SLANG_LANGAUGE_VERSION_DEFAULT);
     default:
         return CompilerOptionValue();
     }

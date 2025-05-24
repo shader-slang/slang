@@ -527,15 +527,14 @@ class ModuleDecl : public NamespaceDeclBase
     ///
     FIDDLE() OrderedDictionary<Decl*, RefPtr<DeclAssociationList>> mapDeclToAssociatedDecls;
 
-    /// Whether the module is defined in legacy language.
-    /// The legacy Slang language does not have visibility modifiers and everything is treated as
-    /// `public`. Newer version of the language introduces visibility and makes `internal` as the
-    /// default. To prevent this from breaking existing code, we need to know whether a module is
-    /// written in the legacy language. We detect this by checking whether the module has any
-    /// visibility modifiers, or if the module uses new language constructs, e.g. `module`,
-    /// `__include`,
-    /// `__implementing` etc.
-    FIDDLE() bool isInLegacyLanguage = true;
+    /// Whether Slang language version the module is defined in.
+    /// The legacy Slang language (2025) does not have visibility modifiers and everything is
+    /// treated as `public`. Newer version of the language introduces visibility and makes
+    /// `internal` as the default. To prevent this from breaking existing code, we need to know
+    /// whether a module is written in the legacy language. We detect this by checking whether the
+    /// module has any visibility modifiers, or if the module uses new language constructs, e.g.
+    /// `module`, `__include`, `__implementing` etc.
+    FIDDLE() SlangLanguageVersion languageVersion = SLANG_LANGAUGE_VERSION_DEFAULT;
 
     FIDDLE() DeclVisibility defaultVisibility = DeclVisibility::Internal;
 

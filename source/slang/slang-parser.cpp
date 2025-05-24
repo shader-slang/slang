@@ -1185,6 +1185,14 @@ bool tryParseUsingSyntaxDecl(
     return tryParseUsingSyntaxDeclImpl<T>(parser, syntaxDecl, outSyntax);
 }
 
+static void maybeUpgradeLanguageVersionFromLegacy(SlangLanguageVersion& ver)
+{
+    if (ver == SLANG_LANGUAGE_VERSION_LEGACY)
+    {
+        ver = SLANG_LANGUAGE_VERSION_2025;
+    }
+}
+
 static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = LookupMask::Default)
 {
     Modifiers modifiers;
@@ -1216,7 +1224,7 @@ static Modifiers ParseModifiers(Parser* parser, LookupMask modifierLookupMask = 
                     if (as<VisibilityModifier>(parsedModifier))
                     {
                         if (auto currentModule = parser->getCurrentModuleDecl())
-                            currentModule->isInLegacyLanguage = false;
+                            maybeUpgradeLanguageVersionFromLegacy(currentModule->languageVersion);
                     }
                     AddModifier(&modifierLink, parsedModifier);
                     continue;
@@ -1321,7 +1329,7 @@ static NodeBase* parseIncludeDecl(Parser* parser, void* /*userData*/)
     auto decl = parser->astBuilder->create<IncludeDecl>();
     parseFileReferenceDeclBase(parser, decl);
     if (auto currentModule = parser->getCurrentModuleDecl())
-        currentModule->isInLegacyLanguage = false;
+        maybeUpgradeLanguageVersionFromLegacy(currentModule->languageVersion);
     return decl;
 }
 
@@ -1361,7 +1369,7 @@ static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
     }
     parser->ReadToken(TokenType::Semicolon);
     if (auto currentModule = parser->getCurrentModuleDecl())
-        currentModule->isInLegacyLanguage = false;
+        maybeUpgradeLanguageVersionFromLegacy(currentModule->languageVersion);
     return decl;
 }
 
@@ -5153,7 +5161,20 @@ void Parser::parseSourceFile(ContainerDecl* program)
 
     currentModule = getModuleDecl(program);
 
-    // If the program already has a scope, then reuse it instead of overwriting it!
+    // Verify that the language version is valid.
+    if (sourceLanguage == SourceLanguage::Slang)
+    {
+        if (!isValidSlangLanguageVersion(currentModule->languageVersion))
+        {
+            sink->diagnose(
+                program->loc,
+                Diagnostics::unknownLanguageVersion,
+                currentModule->languageVersion);
+        }
+    }
+
+    // If the program already has a scope, then
+    // reuse it instead of overwriting it!
     if (program->ownedScope)
         PushScope(program->ownedScope);
     else
@@ -7201,17 +7222,23 @@ static bool _isCast(Parser* parser, Expr* expr)
     return false;
 }
 
-static bool tryParseExpression(Parser* parser, Expr*& outExpr, TokenType tokenTypeAfter)
+template<typename FIsValidFollowToken>
+static bool tryParseExpression(
+    Parser* parser,
+    Expr*& outExpr,
+    Precedence exprLevel,
+    const FIsValidFollowToken& isValidFollowToken)
 {
     auto cursor = parser->tokenReader.getCursor();
     auto isRecovering = parser->isRecovering;
     auto oldSink = parser->sink;
     DiagnosticSink newSink(parser->sink->getSourceManager(), nullptr);
     parser->sink = &newSink;
-    outExpr = parser->ParseExpression();
+    outExpr = parser->ParseExpression(exprLevel);
     parser->sink = oldSink;
     parser->isRecovering = isRecovering;
-    if (outExpr && newSink.getErrorCount() == 0 && parser->LookAheadToken(tokenTypeAfter))
+    if (outExpr && newSink.getErrorCount() == 0 &&
+        isValidFollowToken(parser->tokenReader.peekTokenType()))
     {
         return true;
     }
@@ -7313,20 +7340,43 @@ static Expr* parseAtomicExpr(Parser* parser)
                 Expr* base = nullptr;
                 if (parser->LookAheadToken(TokenType::RParent))
                 {
-                    // We don't support empty parentheses `()` as a valid expression.
-                    parser->diagnose(openParen, Diagnostics::invalidEmptyParenthesisExpr);
-                    base = parser->astBuilder->create<IncompleteExpr>();
-                    base->type = parser->astBuilder->getErrorType();
+                    if (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+                    {
+                        // We support empty parentheses `()` as a valid expression to construct an
+                        // empty tuple in Slang 2026.
+                        base = parser->astBuilder->create<TupleExpr>();
+                        base->loc = openParen.loc;
+                    }
+                    else
+                    {
+                        // We don't support empty parentheses `()` as a valid expression prior to
+                        // Slang 2026.
+                        parser->diagnose(openParen, Diagnostics::invalidEmptyParenthesisExpr);
+                        base = parser->astBuilder->create<IncompleteExpr>();
+                        base->type = parser->astBuilder->getErrorType();
+                    }
                 }
                 else
                 {
-                    if (!tryParseExpression(parser, base, TokenType::RParent))
+                    Precedence exprLevel = Precedence::Comma;
+                    if (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+                    {
+                        exprLevel = Precedence::Assignment;
+                    }
+                    auto isValidFollowToken = [=](TokenType tokenType)
+                    {
+                        if (tokenType == TokenType::RParent)
+                            return true;
+                        if (exprLevel == Precedence::Assignment && tokenType == TokenType::Comma)
+                            return true;
+                        return false;
+                    };
+                    if (!tryParseExpression(parser, base, exprLevel, isValidFollowToken))
                     {
                         base = parser->ParseType();
                     }
                 }
 
-                parser->ReadToken(TokenType::RParent);
 
                 // We now try and determine by what base is, if this is actually a cast or an
                 // expression in parentheses
@@ -7334,6 +7384,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                 {
                     // Parse as a cast
 
+                    parser->ReadToken(TokenType::RParent);
                     TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
                     tcexpr->loc = openParen.loc;
 
@@ -7346,12 +7397,41 @@ static Expr* parseAtomicExpr(Parser* parser)
                 }
                 else
                 {
-                    // Pass as an expression in parentheses
+                    // Parse as an expression in parentheses
 
-                    ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
-                    parenExpr->loc = openParen.loc;
-                    parenExpr->base = base;
-                    return parenExpr;
+                    if (AdvanceIf(parser, TokenType::RParent))
+                    {
+                        ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
+                        parenExpr->loc = openParen.loc;
+                        parenExpr->base = base;
+                        return parenExpr;
+                    }
+                    else if (parser->LookAheadToken(TokenType::Comma))
+                    {
+                        // We have a comma, so we are not done yet.
+                        // If we reach here, the language version must be 2026 or later,
+                        // where we allow (a,b,c,...) syntax as a tuple.
+                        //
+                        List<Expr*> elementExprs;
+                        elementExprs.add(base);
+                        while (AdvanceIf(parser, TokenType::Comma))
+                        {
+                            if (parser->LookAheadToken(TokenType::RParent))
+                                break;
+                            auto elementExpr = parser->ParseArgExpr();
+                            elementExprs.add(elementExpr);
+                        }
+                        parser->ReadToken(TokenType::RParent);
+                        TupleExpr* tupleExpr = parser->astBuilder->create<TupleExpr>();
+                        tupleExpr->loc = openParen.loc;
+                        tupleExpr->elements = _Move(elementExprs);
+                        return tupleExpr;
+                    }
+                    else
+                    {
+                        // Anything else would be a syntax error.
+                        parser->ReadToken(TokenType::RParent);
+                    }
                 }
             }
         }
@@ -8456,6 +8536,7 @@ Expr* parseTermFromSourceFile(
     ParserOptions options;
     options.allowGLSLInput = sourceLanguage == SourceLanguage::GLSL;
     options.stage = ParsingStage::Body;
+
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.currentScope = outerScope;
     parser.namePool = namePool;

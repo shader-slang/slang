@@ -1305,6 +1305,8 @@ struct Preprocessor
     /// Detected source language.
     SourceLanguage language = SourceLanguage::Unknown;
 
+    SlangLanguageVersion languageVersion = SLANG_LANGUAGE_VERSION_UNKNOWN;
+
     /// Stores macro definition and invocation info for language server.
     PreprocessorContentAssistInfo* contentAssistInfo = nullptr;
 
@@ -4360,11 +4362,39 @@ static void HandleExtensionDirective(PreprocessorDirectiveContext* context)
 
 static void HandleVersionDirective(PreprocessorDirectiveContext* context)
 {
-    [[maybe_unused]] int version;
+    int version = SLANG_LANGUAGE_VERSION_UNKNOWN;
     switch (PeekTokenType(context))
     {
     case TokenType::IntegerLiteral:
         version = stringToInt(AdvanceToken(context).getContent());
+        break;
+    case TokenType::Identifier:
+        {
+            auto token = AdvanceToken(context);
+            if (token.getContent().caseInsensitiveEquals(toSlice("slang")))
+            {
+                context->m_preprocessor->language = SourceLanguage::Slang;
+                token = AdvanceToken(context);
+            }
+            else if (token.getContent() == "glsl")
+            {
+                context->m_preprocessor->language = SourceLanguage::GLSL;
+                token = AdvanceToken(context);
+            }
+            if (token.getContent() == "latest")
+                version = SLANG_LANGUAGE_VERSION_LATEST;
+            else if (token.getContent() == "legacy")
+                version = SLANG_LANGUAGE_VERSION_LEGACY;
+            else if (token.type == TokenType::IntegerLiteral)
+                version = stringToInt(token.getContent());
+            else
+            {
+                GetSink(context)->diagnose(
+                    GetDirectiveLoc(context),
+                    Diagnostics::unknownLanguage,
+                    token);
+            }
+        }
         break;
     default:
         GetSink(context)->diagnose(
@@ -4374,8 +4404,23 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
     }
 
     SkipToEndOfLine(context);
-    context->m_preprocessor->language = SourceLanguage::GLSL;
-    // TODO, just skip the version for now
+
+    if (isValidSlangLanguageVersion((SlangLanguageVersion)version))
+    {
+        context->m_preprocessor->language = SourceLanguage::Slang;
+    }
+    else if (isValidGLSLVersion(version))
+    {
+        context->m_preprocessor->language = SourceLanguage::GLSL;
+    }
+    else
+    {
+        GetSink(context)->diagnose(
+            GetDirectiveLoc(context),
+            Diagnostics::unknownLanguageVersion,
+            version);
+    }
+    context->m_preprocessor->languageVersion = (SlangLanguageVersion)version;
 }
 
 // Handle an invalid directive
@@ -4783,6 +4828,7 @@ TokenList preprocessSource(
     Dictionary<String, String> const& defines,
     Linkage* linkage,
     SourceLanguage& outDetectedLanguage,
+    SlangLanguageVersion& outLanguageVersion,
     PreprocessorHandler* handler)
 {
     PreprocessorDesc desc;
@@ -4806,13 +4852,14 @@ TokenList preprocessSource(
         new preprocessor::WarningStateTracker(desc.sourceManager);
     desc.sink->setSourceWarningStateTracker(wst);
 
-    return preprocessSource(file, desc, outDetectedLanguage);
+    return preprocessSource(file, desc, outDetectedLanguage, outLanguageVersion);
 }
 
 TokenList preprocessSource(
     SourceFile* file,
     PreprocessorDesc const& desc,
-    SourceLanguage& outDetectedLanguage)
+    SourceLanguage& outDetectedLanguage,
+    SlangLanguageVersion& outLanguageVersion)
 {
     using namespace preprocessor;
 
@@ -4908,7 +4955,8 @@ TokenList preprocessSource(
 #endif
 
     outDetectedLanguage = preprocessor.language;
-
+    if (preprocessor.languageVersion != SLANG_LANGUAGE_VERSION_UNKNOWN)
+        outLanguageVersion = preprocessor.languageVersion;
     return tokens;
 }
 
