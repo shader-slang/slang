@@ -816,7 +816,11 @@ void initCommandOptions(CommandOptions& options)
          "-verify-debug-serial-ir",
          nullptr,
          "Verify IR in the front-end."},
-        {OptionKind::DumpModule, "-dump-module", nullptr, "Disassemble and print the module IR."}};
+        {OptionKind::DumpModule, "-dump-module", nullptr, "Disassemble and print the module IR."},
+        {OptionKind::EmitSeparateDebug,
+         "-separate-debug-info",
+         nullptr,
+         "Emit debug data to a separate file, and strip it from the main output file."}};
     _addOptions(makeConstArrayView(debuggingOpts), options);
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Experimental !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -3062,6 +3066,19 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
 
 
+                break;
+            }
+        case OptionKind::EmitSeparateDebug:
+            {
+                // This will emit a separate debug file, containing all debug info in
+                // a .dbg.spv file.
+                // This needs to override any obfuscation and debug info flags.
+                // We now want to output SPIRV with full debug info and no obfuscation.
+                // The main output SPIRV will have all debug info stripped, and obfuscation
+                // is not needed as this only changes names which will now not be present.
+                m_compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
+                linkage->m_optionSet.set(OptionKind::Obfuscate, false);
+                linkage->m_optionSet.set(OptionKind::EmitSeparateDebug, true);
                 break;
             }
         default:

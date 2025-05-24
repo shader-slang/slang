@@ -2101,21 +2101,131 @@ SlangResult emitSPIRVFromIR(
     const List<IRFunc*>& irEntryPoints,
     List<uint8_t>& spirvOut);
 
-SlangResult emitSPIRVForEntryPointsDirectly(
-    CodeGenContext* codeGenContext,
-    ComPtr<IArtifact>& outArtifact)
+// Helper function that takes an artifact populated with SPIRV instructions
+// after the spirv-opt step, and a previously created but empty
+// strippedArtifact. The artifact is unmodified, and the strippedArtifact
+// will contain all the artifact's instructions except for debug instructions.
+static SlangResult stripDbgSpirvFromArtifact(
+    ComPtr<IArtifact>& artifact,
+    ComPtr<IArtifact>& strippedArtifact)
 {
-    // Outside because we want to keep IR in scope whilst we are processing emits
-    LinkedIR linkedIR;
-    LinkingAndOptimizationOptions linkingAndOptimizationOptions;
-    SLANG_RETURN_ON_FAIL(
-        linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
+    // Standard debug opcodes to strip out:
+    // OpName, OpMemberName, OpString, OpLine, OpNoLine.
+    static const uint16_t debugOpCodeVals[] =
+        {SpvOpName, SpvOpMemberName, SpvOpString, SpvOpLine, SpvOpNoLine};
+    // If the instruction is an extended instruction, then we also need
+    // to check if the instruction number is for a debug instruction as
+    // listed in slang-emit-spirv-ops-debug-info-ext.h
+    static const uint32_t debugExtInstVals[] = {
+        NonSemanticShaderDebugInfo100DebugCompilationUnit,
+        NonSemanticShaderDebugInfo100DebugTypeBasic,
+        NonSemanticShaderDebugInfo100DebugTypePointer,
+        NonSemanticShaderDebugInfo100DebugTypeQualifier,
+        NonSemanticShaderDebugInfo100DebugTypeArray,
+        NonSemanticShaderDebugInfo100DebugTypeVector,
+        NonSemanticShaderDebugInfo100DebugTypeFunction,
+        NonSemanticShaderDebugInfo100DebugTypeComposite,
+        NonSemanticShaderDebugInfo100DebugTypeMember,
+        NonSemanticShaderDebugInfo100DebugFunction,
+        NonSemanticShaderDebugInfo100DebugScope,
+        NonSemanticShaderDebugInfo100DebugNoScope,
+        NonSemanticShaderDebugInfo100DebugInlinedAt,
+        NonSemanticShaderDebugInfo100DebugLocalVariable,
+        NonSemanticShaderDebugInfo100DebugInlinedVariable,
+        NonSemanticShaderDebugInfo100DebugDeclare,
+        NonSemanticShaderDebugInfo100DebugValue,
+        NonSemanticShaderDebugInfo100DebugExpression,
+        NonSemanticShaderDebugInfo100DebugSource,
+        NonSemanticShaderDebugInfo100DebugFunctionDefinition,
+        NonSemanticShaderDebugInfo100DebugSourceContinued,
+        NonSemanticShaderDebugInfo100DebugLine,
+        NonSemanticShaderDebugInfo100DebugEntryPoint,
+        NonSemanticShaderDebugInfo100DebugTypeMatrix,
+    };
 
-    auto irModule = linkedIR.module;
-    auto irEntryPoints = linkedIR.entryPoints;
+    // Hash sets for easier lookup.
+    HashSet<uint16_t> debugOpCodes;
+    for (auto val : debugOpCodeVals)
+        debugOpCodes.add(val);
+    HashSet<uint32_t> debugExtInstNumbers;
+    for (auto val : debugExtInstVals)
+        debugExtInstNumbers.add(val);
 
+    // Load the SPIRV instructions from the artifact into a data blob that
+    // we can read.
+    ComPtr<ISlangBlob> spirvBlob;
+    SlangResult res = artifact->loadBlob(ArtifactKeep::Yes, spirvBlob.writeRef());
+    if (SLANG_FAILED(res) || !spirvBlob)
+        return SLANG_FAIL;
+
+    const uint32_t* spirvWords = reinterpret_cast<const uint32_t*>(spirvBlob->getBufferPointer());
+    size_t wordCount = spirvBlob->getBufferSize() / sizeof(uint32_t);
+
+    // The first 5 uints are header data which does not need to be checked
+    // for debug instructions, but should still be added to the new artifact.
+    size_t firstWord = 5;
+
+    // Copy the instructions into a List<uint8_t> which can be used to populate the artifact.
+    List<uint8_t> spirvWordsList;
+    spirvWordsList.addRange(
+        reinterpret_cast<const uint8_t*>(spirvWords),
+        firstWord * sizeof(uint32_t));
+
+    // Iterate over the instructions from the artifact and add them to the list
+    // only if they are not debug instructions.
+    for (size_t i = firstWord; i < wordCount; /* increment inside loop */)
+    {
+        uint32_t word = spirvWords[i];
+        uint16_t opCode = word & 0xFFFF;
+        uint16_t wordCountForInst = (word >> 16) & 0xFFFF;
+
+        // If the opcode is for a basic debug instruction then ignore it.
+        if (debugOpCodes.contains(opCode))
+        {
+            i += wordCountForInst;
+            continue;
+        }
+
+        // Also check if the instruction is an extended instruction containing DebugInfo.
+        if (opCode == SpvOpExtInst)
+        {
+            // ignore this if the instruction contains DebugInfo.
+            uint32_t extInstInstructionNumber = spirvWords[i + 4];
+            if (debugExtInstNumbers.contains(extInstInstructionNumber))
+            {
+                i += wordCountForInst;
+                continue;
+            }
+        }
+
+        // Otherwise this is a non-debug instruction and should be included.
+        spirvWordsList.addRange(
+            reinterpret_cast<const uint8_t*>(&spirvWords[i]),
+            wordCountForInst * sizeof(uint32_t));
+
+        i += wordCountForInst;
+    }
+
+    // Create the stripped artifact using the above created instruction list.
+    strippedArtifact->addRepresentationUnknown(ListBlob::moveCreate(spirvWordsList));
+
+    return SLANG_OK;
+}
+
+// Helper function to create an artifact from IR used internally by
+// emitSPIRVForEntryPointsDirectly.
+static SlangResult createArtifactFromIR(
+    CodeGenContext* codeGenContext,
+    IRModule* irModule,
+    List<IRFunc*> irEntryPoints,
+    ComPtr<IArtifact>& artifact,
+    ComPtr<IArtifact>& dbgArtifact)
+{
     List<uint8_t> spirv, outSpirv;
     emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirv);
+
+    auto targetRequest = codeGenContext->getTargetReq();
+    auto targetCompilerOptions = targetRequest->getOptionSet();
 
 #if 0
     String optErr;
@@ -2125,8 +2235,7 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         spirv = _Move(outSpirv);
     }
 #endif
-    auto artifact =
-        ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
+
     artifact->addRepresentationUnknown(ListBlob::moveCreate(spirv));
 
     IDownstreamCompiler* compiler = codeGenContext->getSession()->getOrLoadDownstreamCompiler(
@@ -2249,7 +2358,19 @@ SlangResult emitSPIRVForEntryPointsDirectly(
         auto downstreamStartTime = std::chrono::high_resolution_clock::now();
         if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
         {
-            artifact = _Move(optimizedArtifact);
+            // Check if we need to output a separate SPIRV file containing debug info. If so
+            // then strip all debug instructions from the artifact. The dbgArtifact will still
+            // contain all instructions.
+            if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
+            {
+                auto strippedArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
+                SLANG_RETURN_ON_FAIL(
+                    stripDbgSpirvFromArtifact(optimizedArtifact, strippedArtifact));
+                artifact = _Move(strippedArtifact);
+                dbgArtifact = _Move(optimizedArtifact);
+            }
+            else
+                artifact = _Move(optimizedArtifact);
         }
         auto downstreamElapsedTime =
             (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
@@ -2259,7 +2380,39 @@ SlangResult emitSPIRVForEntryPointsDirectly(
             passthroughDownstreamDiagnostics(codeGenContext->getSink(), compiler, artifact));
     }
 
+    return SLANG_OK;
+}
+
+SlangResult emitSPIRVForEntryPointsDirectly(
+    CodeGenContext* codeGenContext,
+    ComPtr<IArtifact>& outArtifact)
+{
+    // Outside because we want to keep IR in scope whilst we are processing emits
+    LinkedIR linkedIR;
+    LinkingAndOptimizationOptions linkingAndOptimizationOptions;
+    SLANG_RETURN_ON_FAIL(
+        linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
+
+    auto irModule = linkedIR.module;
+    auto irEntryPoints = linkedIR.entryPoints;
+
+    auto targetRequest = codeGenContext->getTargetReq();
+    auto targetCompilerOptions = targetRequest->getOptionSet();
+
+    // Create the artifact containing the main SPIRV data, and the debug SPIRV
+    // data if requested by the command line arg -separate-debug-info.
+    Slang::ComPtr<Slang::IArtifact> dbgArtifact;
+    auto artifact =
+        ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
+    SLANG_RETURN_ON_FAIL(
+        createArtifactFromIR(codeGenContext, irModule, irEntryPoints, artifact, dbgArtifact));
     ArtifactUtil::addAssociated(artifact, linkedIR.metadata);
+
+    // Associate the debug artifact with the main artifact.
+    // EndToEndCompileRequest::generateOutput will read this data
+    // and produce a .dbg.spv file for this child artifact.
+    if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
+        artifact->addAssociated(dbgArtifact);
 
     outArtifact.swap(artifact);
 

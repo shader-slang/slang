@@ -1032,6 +1032,7 @@ typedef uint32_t SlangSizeT;
 
         SkipDownstreamLinking, // bool, experimental
         DumpModule,
+        EmitSeparateDebug, // bool
 
         EnableExperimentalDynamicDispatch, // bool, experimental
         StdRevision,                       // intValue0: SlangStdRevision
