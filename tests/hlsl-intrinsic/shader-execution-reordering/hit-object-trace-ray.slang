@@ -33,6 +33,10 @@ uint calcValue(HitObject hit)
         uint geometryIndex = hit.GetGeometryIndex();
         uint primitiveIndex = hit.GetPrimitiveIndex();
         int clusterID = hit.GetClusterID();
+        float4 posRadius = hit.GetSpherePositionAndRadius();
+        float2x4 positionsRadii = hit.GetLssPositionsAndRadii();
+        uint isSphereHit = uint(hit.IsSphereHit());
+        uint isLssHit = uint(hit.IsLssHit());
 
         SomeValues objSomeValues = hit.GetAttributes<SomeValues>();
         
@@ -42,6 +46,19 @@ uint calcValue(HitObject hit)
         r += primitiveIndex;
         r += objSomeValues.a;
         r += clusterID;
+
+        r += int(posRadius.x);
+        r += int(posRadius.y);
+        r += int(posRadius.z);
+        r += int(posRadius.w);
+        
+        r += int(positionsRadii[0].x);
+        r += int(positionsRadii[0].y);
+        r += int(positionsRadii[0].z);
+        r += int(positionsRadii[0].w);
+        
+        r += isSphereHit;
+        r += isLssHit;
     }
     
     return r;
