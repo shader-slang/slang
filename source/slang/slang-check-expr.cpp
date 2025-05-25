@@ -4019,6 +4019,13 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     expr->type = m_astBuilder->getBoolType();
     expr->value = originalVal;
 
+    // Check if the right-hand side type is an interface type
+    if (isInterfaceType(expr->typeExpr.type))
+    {
+        getSink()->diagnose(expr, Diagnostics::isAsOperatorCannotUseInterfaceAsRHS);
+        return expr;
+    }
+
     auto valueType = expr->value->type.type;
     if (auto typeType = as<TypeType>(valueType))
         valueType = typeType->getType();
@@ -4057,6 +4064,15 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     TypeExp typeExpr;
     typeExpr.exp = expr->typeExpr;
     typeExpr = CheckProperType(typeExpr);
+    
+    // Check if the right-hand side type is an interface type
+    if (isInterfaceType(typeExpr.type))
+    {
+        getSink()->diagnose(expr, Diagnostics::isAsOperatorCannotUseInterfaceAsRHS);
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+    
     expr->value = CheckTerm(expr->value);
     auto optType = m_astBuilder->getOptionalType(typeExpr.type);
     expr->type = optType;
