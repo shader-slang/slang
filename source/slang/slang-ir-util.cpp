@@ -4,6 +4,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -2262,26 +2263,6 @@ bool isSpecConstRateType(IRType* type)
     return false;
 }
 
-bool isArithmeticOpSpecConstHoistable(IROp op, IRType* type)
-{
-    auto rateType = as<IRRateQualifiedType>(type);
-    return isArithmeticInst(op) && rateType && as<IRSpecConstRate>(rateType->getRate()) &&
-           // On SPIRV, floating-point operations on a specialization constant declaration
-           // (`OpSpecConstantOp`) are only valid with the `Kernel` capability. When encontering
-           // floating-point operations that contain only specialization constant operands, we
-           // skip hoisting so they can be emitted as regular SPIRV variables/instructions instead
-           // of `OpSpecConstantOp` declarations.
-           //
-           // This is SPIRV specific but we enforce this regardless of the target to simplify the
-           // implementation and also because the other targets do not emit any new code for
-           // hoisted specilization constant operations, so this check in practice only affects
-           // SPIRV targets.
-           //
-           // Integer arithmetic operations do no have this limitaton and their results can be
-           // declared as specalization constants.
-           !isFloatingType(rateType->getValueType());
-}
-
 IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* oldType)
 {
     if (as<IRRateQualifiedType>(oldType))
@@ -2296,49 +2277,77 @@ IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* o
     return oldType;
 }
 
-bool isArithmeticInst(IROp op)
+bool canOperationBeSpecConst(IROp op, IRType* resultType)
 {
+    // Returns true for ops that can be declared as an operation under `OpSpecConstantOp` with the
+    // `Shader` capability in SPIRV.
     switch (op)
     {
+    // Integer arithmetic can be `OpSpecConstantOp` operations with the `Shader` capability, while
+    // floating-point arithmetic operations require the `Kernel` capability. We only support
+    // `Shader` capability for now, return false when floating-point arithmetic is encountered.
     case kIROp_Add:
     case kIROp_Sub:
     case kIROp_Mul:
     case kIROp_Div:
     case kIROp_Neg:
-    case kIROp_Not:
+        return !isFloatingType(resultType);
+
     case kIROp_Eql:
     case kIROp_Neq:
     case kIROp_Leq:
     case kIROp_Geq:
     case kIROp_Less:
-    case kIROp_IRem:
-    case kIROp_FRem:
     case kIROp_Greater:
+        return true;
+        // return !isFloatingType(IRType *t)
+        // return !isFloatingType(resultType);
+
+    case kIROp_Not:
+    case kIROp_IRem:
     case kIROp_Lsh:
     case kIROp_Rsh:
     case kIROp_BitAnd:
     case kIROp_BitOr:
     case kIROp_BitXor:
     case kIROp_BitNot:
-    case kIROp_BitCast:
-    case kIROp_CastIntToFloat:
-    case kIROp_CastFloatToInt:
     case kIROp_IntCast:
     case kIROp_FloatCast:
     case kIROp_Select:
         return true;
+
     default:
         return false;
     }
 }
-bool isArithmeticInst(IRInst* inst)
+
+bool isOpSpecConstHoistable(IROp op, IRType* type)
 {
-    return isArithmeticInst(inst->getOp());
+    auto rateType = as<IRRateQualifiedType>(type);
+    return rateType && as<IRSpecConstRate>(rateType->getRate()) &&
+           canOperationBeSpecConst(op, rateType->getValueType())
+        // &&
+        // On SPIRV, floating-point operations on a specialization constant declaration
+        // (`OpSpecConstantOp`) are only valid with the `Kernel` capability. When encontering
+        // floating-point operations that contain only specialization constant operands, we
+        // skip hoisting so they can be emitted as regular SPIRV variables/instructions instead
+        // of `OpSpecConstantOp` declarations.
+        //
+        // This is SPIRV specific but we enforce this regardless of the target to simplify the
+        // implementation and also because the other targets do not emit any new code for
+        // hoisted specilization constant operations, so this check in practice only affects
+        // SPIRV targets.
+        //
+        // Integer arithmetic operations do no have this limitaton and their results can be
+        // declared as specalization constants.
+        // !isFloatingType(rateType->getValueType())
+        ;
 }
+
 
 bool isInstHoistable(IROp op, IRType* type)
 {
-    if ((getIROpInfo(op).flags & kIROpFlag_Hoistable) || isArithmeticOpSpecConstHoistable(op, type))
+    if ((getIROpInfo(op).flags & kIROpFlag_Hoistable) || isOpSpecConstHoistable(op, type))
     {
         return true;
     }
