@@ -4064,7 +4064,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     TypeExp typeExpr;
     typeExpr.exp = expr->typeExpr;
     typeExpr = CheckProperType(typeExpr);
-    
+
     // Check if the right-hand side type is an interface type
     if (isInterfaceType(typeExpr.type))
     {
@@ -4072,7 +4072,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
         expr->type = m_astBuilder->getErrorType();
         return expr;
     }
-    
+
     expr->value = CheckTerm(expr->value);
     auto optType = m_astBuilder->getOptionalType(typeExpr.type);
     expr->type = optType;
