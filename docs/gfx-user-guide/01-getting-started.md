@@ -7,7 +7,7 @@ Getting Started with Slang Graphics Layer
 
 [//]: # (ShortTitle: Getting Started)
 
-In this article, we provide instructions on installing the graphics layer into your application, and demonstrate the basic use of the graphics layer via a simple compute shader example. We will use the same [hello-world.slang](https://github.com/shader-slang/slang/blob/master/examples/hello-world/hello-world.slang) shader from the `hello-world` example in the [Slang getting started tutorial](../user-guide/01-get-started.html).
+In this article, we provide instructions on installing the graphics layer into your application, and demonstrate the basic use of the graphics layer via a simple compute shader example. We will use the same [hello-world.slang](https://github.com/shader-slang/slang/blob/main/examples/hello-world/hello-world.slang) shader from the `hello-world` example in the [Slang getting started tutorial](../user-guide/01-get-started.html).
 
 Installation
 ------------------

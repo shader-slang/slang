@@ -2,7 +2,7 @@ name: Push MDL Benchmark Results
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths-ignore:
       - "docs/**"
       - "LICENSES/**"
