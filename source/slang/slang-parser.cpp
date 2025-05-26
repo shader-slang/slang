@@ -7429,6 +7429,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                     }
                     else
                     {
+                        parser->ReadToken(TokenType::RParent);
                         ParenExpr* parenExpr = parser->astBuilder->create<ParenExpr>();
                         parenExpr->loc = openParen.loc;
                         parenExpr->base = base;
