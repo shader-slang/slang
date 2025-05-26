@@ -2285,7 +2285,7 @@ struct TypeReflection
     // only useful if `getKind() == Kind::Array`
     size_t getElementCount(SlangReflection* reflection = nullptr)
     {
-        return spReflectionType_GetElementCount((SlangReflectionType*)this, reflection);
+        return spReflectionType_GetSpecializedElementCount((SlangReflectionType*)this, reflection);
     }
 
     size_t getTotalArrayElementCount()

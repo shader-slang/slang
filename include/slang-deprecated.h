@@ -479,12 +479,17 @@ extern "C"
     If the size of a type cannot be statically computed, perhaps because it depends on
     a generic parameter that has not been bound to a specific value, this function returns zero.
 
-    If a specialization or generic can be found from an optional specified
-    SlangReflection, that will be returned.
+    Use spReflectionType_GetSpecializedElementCount if the size is dependent on
+    a link time constant
     */
-    SLANG_API size_t spReflectionType_GetElementCount(
+    SLANG_API size_t spReflectionType_GetElementCount(SlangReflectionType* type);
+
+    /** The same as spReflectionType_GetElementCount except it takes into account specialization
+     * information from the given reflection info
+     */
+    SLANG_API size_t spReflectionType_GetSpecializedElementCount(
         SlangReflectionType* type,
-        SlangReflection* reflection = nullptr);
+        SlangReflection* reflection);
 
     SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionType* type);
 

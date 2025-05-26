@@ -4,6 +4,7 @@
 #include "slang-check-impl.h"
 #include "slang-check.h"
 #include "slang-compiler.h"
+#include "slang-deprecated.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang.h"
@@ -560,8 +561,14 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(
     return nullptr;
 }
 
-SLANG_API size_t
-spReflectionType_GetElementCount(SlangReflectionType* inType, SlangReflection* reflection)
+SLANG_API size_t spReflectionType_GetElementCount(SlangReflectionType* inType)
+{
+    return spReflectionType_GetSpecializedElementCount(inType, nullptr);
+}
+
+SLANG_API size_t spReflectionType_GetSpecializedElementCount(
+    SlangReflectionType* inType,
+    SlangReflection* reflection)
 {
     auto type = convert(inType);
     if (!type)
