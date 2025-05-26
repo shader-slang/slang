@@ -27,6 +27,7 @@ struct CompilerOptionSet;
 /// Align `value` to the next multiple of `alignment`, which must be a power of two.
 inline IRIntegerValue align(IRIntegerValue value, int alignment)
 {
+    //SLANG_ASSERT((alignment != 0U) && ((alignment - 1U) & alignment) == 0U);
     return (value + alignment - 1) & ~IRIntegerValue(alignment - 1);
 }
 
@@ -68,6 +69,12 @@ public:
     virtual IRIntegerValue adjustOffsetForNextAggregateMember(
         IRIntegerValue currentSize,
         IRIntegerValue lastElementAlignment) = 0;
+
+    /// Adjust the alignment of an element based on the offset of the struct it is a member of.
+    /// This is used to ensure that elements that cross a 16 byte boundary are realigned to 16 bytes
+    /// for D3D constant buffers. Other targets do not need this.
+    virtual void adjustAlignmentForStructOffset(IRSizeAndAlignment& element, IRIntegerValue offset) = 0;
+
     static IRTypeLayoutRules* getStd430();
     static IRTypeLayoutRules* getStd140();
     static IRTypeLayoutRules* getNatural();

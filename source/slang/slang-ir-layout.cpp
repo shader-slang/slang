@@ -171,6 +171,8 @@ static Result _calcSizeAndAlignment(
                 seenFinalUnsizedArrayField =
                     fieldTypeLayout.size == IRSizeAndAlignment::kIndeterminateSize;
 
+                rules->adjustAlignmentForStructOffset(fieldTypeLayout, offset);
+
                 structLayout.size = align(offset, fieldTypeLayout.alignment);
                 structLayout.alignment =
                     std::max(structLayout.alignment, fieldTypeLayout.alignment);
@@ -515,6 +517,11 @@ struct NaturalLayoutRules : IRTypeLayoutRules
     {
         return IRSizeAndAlignment(element.size * count, element.alignment);
     }
+    virtual void adjustAlignmentForStructOffset(IRSizeAndAlignment& element, IRIntegerValue offset)
+    {
+        SLANG_UNUSED(element);
+        SLANG_UNUSED(offset);
+    }
 };
 
 struct ConstantBufferLayoutRules : IRTypeLayoutRules
@@ -540,10 +547,20 @@ struct ConstantBufferLayoutRules : IRTypeLayoutRules
         IRSizeAndAlignment element,
         IRIntegerValue count)
     {
-        IRIntegerValue countForAlignment = count;
+        // Align to the element size, and let adjustAlignmentForStructOffset handle the
+        // break at the 16-byte boundary.
+        IRIntegerValue countForAlignment = 1;
         return IRSizeAndAlignment(
             (int)(element.size * count),
             (int)(element.size * countForAlignment));
+    }
+    virtual void adjustAlignmentForStructOffset(IRSizeAndAlignment& element, IRIntegerValue offset)
+    {
+        // Adjust the alignment if the combined size of the element crosses a 16 byte boundary.
+        if (element.size > (16 - (offset % 16)))
+        {
+            element.alignment = std::max(element.alignment, 16);
+        }
     }
 };
 
@@ -573,6 +590,11 @@ struct Std430LayoutRules : IRTypeLayoutRules
             (int)(element.size * count),
             (int)(element.size * countForAlignment));
     }
+    virtual void adjustAlignmentForStructOffset(IRSizeAndAlignment& element, IRIntegerValue offset)
+    {
+        SLANG_UNUSED(element);
+        SLANG_UNUSED(offset);
+    }
 };
 
 struct Std140LayoutRules : IRTypeLayoutRules
@@ -601,6 +623,11 @@ struct Std140LayoutRules : IRTypeLayoutRules
         return IRSizeAndAlignment(
             (int)(element.size * count),
             (int)(element.size * alignmentCount));
+    }
+    virtual void adjustAlignmentForStructOffset(IRSizeAndAlignment& element, IRIntegerValue offset)
+    {
+        SLANG_UNUSED(element);
+        SLANG_UNUSED(offset);
     }
 };
 
