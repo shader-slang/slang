@@ -8603,7 +8603,7 @@ void parseSourceFile(
 
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.namePool = translationUnit->getNamePool();
-    parser.sourceLanguage = translationUnit->sourceLanguage;
+    parser.sourceLanguage = sourceLanguage;
 
     return parser.parseSourceFile(parentDecl);
 }
