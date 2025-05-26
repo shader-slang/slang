@@ -903,8 +903,8 @@ Language
 
 Std Revision 
 
-* `unknown` : Unknown 
-* `2025`, `default` : Slang language rules for 2025 and older 
+* `legacy`, `default` : Legacy Slang language 
+* `2025` : Slang language rules for 2025 and older 
 * `2026` : Slang language rules for 2026 and newer 
 
 <a id="archive-type"></a>
