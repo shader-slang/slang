@@ -1157,11 +1157,6 @@ alias fragmentshaderbarycentric = GL_EXT_fragment_shader_barycentric | _sm_6_1;
 ///  (gfx targets) Capabilities needed to use memory barriers
 /// [Compound]
 alias shadermemorycontrol = glsl | _spirv_1_0 | _sm_5_0;
-/// Capabilities needed to use HLSL tier wave operations
-/// [Compound]
-alias wave_multi_prefix = _sm_6_5
-                 | _cuda_sm_7_0
-                 | GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_arithmetic + GL_NV_shader_subgroup_partitioned;
 /// Capabilities needed to use GLSL buffer-reference's
 /// [Compound]
 alias bufferreference = GL_EXT_buffer_reference;
@@ -2186,7 +2181,9 @@ alias subgroup_quad = GL_KHR_shader_subgroup_quad
                     ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_partitioned'
 /// [Compound]
-alias subgroup_partitioned = GL_NV_shader_subgroup_partitioned + subgroup_ballot_activemask | _sm_6_5 | _cuda_sm_7_0;
+alias subgroup_partitioned = _sm_6_5
+                           | _cuda_sm_7_0
+                           | GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_arithmetic + GL_NV_shader_subgroup_partitioned;
 
 
 /// Capabilities required to use GLSL-style subgroup rotate operations 'subgroup_rotate'

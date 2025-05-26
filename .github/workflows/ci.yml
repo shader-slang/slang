@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches: [master]
   pull_request:
@@ -68,7 +69,7 @@ jobs:
             platform: x86_64
             test-category: full
             full-gpu-tests: true
-            runs-on: [Windows, self-hosted]
+            runs-on: [Windows, self-hosted, GCP-T4]
             has-gpu: true
             server-count: 8
           # Self-hosted full gpu build - debug
@@ -80,7 +81,7 @@ jobs:
             full-gpu-tests: true
             runs-on: [Windows, self-hosted, "GCP-T4"]
             has-gpu: true
-            server-count: 8
+            server-count: 2
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
@@ -191,6 +192,7 @@ jobs:
               -category ${{ matrix.test-category }} \
               -api all-cpu \
               -expected-failure-list tests/expected-failure-github.txt \
+              -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
               ${{ matrix.config == 'debug' && '-disable-debug-layers' || '' }}
@@ -244,6 +246,25 @@ jobs:
             -expected-failure-list tests/expected-failure.txt \
             -skip-reference-image-generation \
             -show-adapter-info
+      - name: Run slangpy tests
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
+        shell: pwsh
+        run: |
+          python --version
+          Write-Host "Cleaning up existing installations..."
+          Start-Process -FilePath "python" -ArgumentList "-m pip uninstall -y slangpy" -Verb RunAs -Wait
+          Write-Host "Installing slangpy..."
+          python -m pip install --no-cache-dir --verbose slangpy --user
+          Write-Host "Getting Python site-packages directory and copying library files (DLL, SO, DYLIB)..."
+          $SITE_PACKAGES = python -c "import slangpy; print(slangpy.__file__.rsplit('\\', 2)[0])"
+          Write-Host "Site packages directory: $SITE_PACKAGES"
+          Write-Host "Copying library files..."
+          Copy-Item -Path "$bin_dir\*" -Include "*.dll","*.so","*.dylib" -Destination "$SITE_PACKAGES\slangpy\" -Force -ErrorAction Continue
+          Write-Host "Listing files in slangpy directory..."
+          Get-ChildItem -Path "$SITE_PACKAGES\slangpy" | Write-Host
+          Write-Host "Running pytest on slangpy tests..."
+          $env:PYTHONPATH = "$SITE_PACKAGES"
+          python -m pytest "$SITE_PACKAGES\slangpy\tests" -v
       - uses: actions/upload-artifact@v4
         if: steps.filter.outputs.should-run == 'true' && ! matrix.full-gpu-tests
         with:

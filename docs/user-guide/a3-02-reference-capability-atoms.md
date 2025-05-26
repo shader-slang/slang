@@ -669,6 +669,9 @@ Extensions
 `GL_EXT_shader_atomic_int64`
 > Represents the GL_EXT_shader_atomic_int64 extension.
 
+`GL_EXT_shader_explicit_arithmetic_types`
+> Represents the GL_EXT_shader_explicit_arithmetic_types extension.
+
 `GL_EXT_shader_explicit_arithmetic_types_int64`
 > Represents the GL_EXT_shader_explicit_arithmetic_types_int64 extension.
 
@@ -960,9 +963,6 @@ Compound Capabilities
 
 `shadermemorycontrol`
 > (gfx targets) Capabilities needed to use memory barriers
-
-`wave_multi_prefix`
-> Capabilities needed to use HLSL tier wave operations
 
 `bufferreference`
 > Capabilities needed to use GLSL buffer-reference's

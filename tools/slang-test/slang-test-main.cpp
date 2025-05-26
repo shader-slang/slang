@@ -4598,7 +4598,7 @@ void runTestsInDirectory(TestContext* context)
     {
         if (shouldRunTest(context, file))
         {
-            //            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
+            printf("found test: '%s'\n", file.getBuffer());
             if (SLANG_FAILED(_runTestsOnFile(context, file)))
             {
                 {
@@ -4766,15 +4766,23 @@ static SlangResult runUnitTestModule(
 
                 bool isFailed = (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail);
 
+                // If the rpc failed, output an error message
+                if (SLANG_FAILED(rpcRes))
+                {
+                    reporter->message(TestMessageType::RunError, "rpc failed");
+                }
+
                 // If the test fails, output any output - which might give information about
                 // individual tests that have failed.
-                if (isFailed)
+                if (testResult == TestResult::Fail)
                 {
                     String output = getOutput(exeRes);
                     reporter->message(TestMessageType::TestFailure, output.getBuffer());
                 }
 
-                if (isFailed && !context->isRetry &&
+                // If the test failed and it is not an expected failure, add it to the list of
+                // failed unit tests.
+                if (isFailed &&
                     !context->getTestReporter()->m_expectedFailureList.contains(test.testName))
                 {
                     std::lock_guard lock(context->mutexFailedTests);
@@ -5095,7 +5103,7 @@ SlangResult innerMain(int argc, char** argv)
         // excution or driver instability. We can try running them again. Debug build has more
         // instability at this moment, so we allow more retries.
 #if _DEBUG
-        static constexpr int kFailedTestLimitForRetry = 32;
+        static constexpr int kFailedTestLimitForRetry = 100;
 #else
         static constexpr int kFailedTestLimitForRetry = 16;
 #endif
