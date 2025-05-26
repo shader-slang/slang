@@ -214,6 +214,11 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             out << "TensorView";
             return SLANG_OK;
         }
+    case kIROp_HitObjectType:
+        {
+            out << "OptixTraversableHandle";
+            return SLANG_OK;
+        }
     default:
         {
             if (isNominalOp(type->getOp()))

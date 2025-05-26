@@ -42,8 +42,10 @@ IRFuncType* NativeCallMarshallingContext::getNativeFuncType(
     if (auto resultType = as<IRResultType>(declaredFuncType->getResultType()))
     {
         auto nativeResultType = getNativeType(builder, resultType->getValueType());
+        auto nativeErrorType = getNativeType(builder, resultType->getErrorType());
         nativeParamTypes.add(builder.getPtrType(nativeResultType));
-        returnType = resultType->getErrorType();
+        nativeParamTypes.add(builder.getPtrType(nativeErrorType));
+        returnType = builder.getIntType();
     }
     else
     {
@@ -243,10 +245,8 @@ IRFunc* NativeCallMarshallingContext::generateDLLExportWrapperFunc(
         IRBlock* trueBlock = nullptr;
         IRBlock* falseBlock = nullptr;
         IRBlock* afterBlock = nullptr;
-        builder.emitIfElseWithBlocks(isResultError, trueBlock, falseBlock, afterBlock);
 
-        builder.setInsertInto(trueBlock);
-        builder.emitReturn(builder.emitGetResultError(callInst));
+        builder.emitIfElseWithBlocks(isResultError, trueBlock, falseBlock, afterBlock);
 
         builder.setInsertInto(falseBlock);
         auto resultVal = builder.emitGetResultValue(callInst);
@@ -258,7 +258,21 @@ IRFunc* NativeCallMarshallingContext::generateDLLExportWrapperFunc(
             builder.emitStore(params[nativeParamConsumeIndex], nativeVals[i]);
             nativeParamConsumeIndex++;
         }
+        // S_OK
         builder.emitReturn(builder.getIntValue(builder.getIntType(), 0));
+
+        builder.setInsertInto(trueBlock);
+        nativeVals.clear();
+        auto errorVal = builder.emitGetResultError(callInst);
+        marshalManagedValueToNativeResultValue(builder, errorVal, nativeVals);
+        for (Index i = 0; i < nativeVals.getCount(); i++)
+        {
+            SLANG_RELEASE_ASSERT(nativeParamConsumeIndex < params.getCount());
+            builder.emitStore(params[nativeParamConsumeIndex], nativeVals[i]);
+            nativeParamConsumeIndex++;
+        }
+        // E_FAIL
+        builder.emitReturn(builder.getIntValue(builder.getIntType(), 0x80004005));
 
         builder.setInsertInto(afterBlock);
         builder.emitUnreachable();
@@ -296,10 +310,13 @@ IRInst* NativeCallMarshallingContext::marshalNativeCall(
     IRType* originalReturnType = originalFuncType->getResultType();
 
     IRVar* resultVar = nullptr;
+    IRVar* errorVar = nullptr;
     if (auto resultType = as<IRResultType>(originalReturnType))
     {
         // Declare a local variable to receive result.
         resultVar = builder.emitVar(getNativeType(builder, resultType->getValueType()));
+        errorVar = builder.emitVar(getNativeType(builder, resultType->getErrorType()));
+        args.add(resultVar);
         args.add(resultVar);
     }
 
@@ -314,16 +331,18 @@ IRInst* NativeCallMarshallingContext::marshalNativeCall(
     if (auto resultType = as<IRResultType>(originalReturnType))
     {
         auto val = builder.emitLoad(resultVar);
-        auto err = call;
+        auto err = builder.emitLoad(errorVar);
+        auto tag = call;
         val = marshalNativeValueToManagedValue(builder, val);
-        auto intErr = err;
-        if (err->getDataType()->getOp() != kIROp_IntType)
+        err = marshalNativeValueToManagedValue(builder, err);
+        auto intTag = tag;
+        if (tag->getDataType()->getOp() != kIROp_IntType)
         {
-            intErr = builder.emitCast(builder.getIntType(), err);
+            intTag = builder.emitCast(builder.getIntType(), tag);
         }
-        auto errIsError = builder.emitLess(intErr, builder.getIntValue(builder.getIntType(), 0));
+        auto tagIsError = builder.emitLess(intTag, builder.getIntValue(builder.getIntType(), 0));
         IRBlock *trueBlock, *falseBlock, *afterBlock;
-        builder.emitIfElseWithBlocks(errIsError, trueBlock, falseBlock, afterBlock);
+        builder.emitIfElseWithBlocks(tagIsError, trueBlock, falseBlock, afterBlock);
         builder.setInsertInto(trueBlock);
         returnValue = builder.emitMakeResultError(resultType, err);
         builder.emitBranch(afterBlock, 1, &returnValue);
