@@ -2414,7 +2414,7 @@ void DocMarkdownWriter::createPage(ASTMarkup::Entry& entry, Decl* decl)
         return;
     }
 
-    if (CallableDecl* callableDecl = as<CallableDecl>(decl))
+    if (as<CallableDecl>(decl))
     {
         ensureDeclPageCreated(entry);
     }
