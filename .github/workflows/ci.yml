@@ -13,10 +13,10 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [windows]
-        config: [debug]
+        os: [linux, macos, windows]
+        config: [debug, release]
         compiler: [gcc, clang, cl]
-        platform: [x86_64]
+        platform: [x86_64, aarch64, wasm]
         exclude:
           # Default to x64, but aarch64 on osx
           - { os: linux, platform: aarch64 }
@@ -33,6 +33,45 @@ jobs:
           - { os: macos, compiler: gcc }
           - { os: macos, compiler: cl }
         include:
+          - { os: linux, runs-on: ubuntu-latest }
+          - { os: macos, runs-on: macos-latest }
+          - { os: windows, runs-on: windows-latest }
+          # Warnings are treated as errors by default.
+          # But we may want to disable it temporarily.
+          - { os: linux, warnings-as-errors: true }
+          - { os: macos, warnings-as-errors: true }
+          - { os: windows, warnings-as-errors: true }
+          # Set a test category depending on the config, smoke by default,
+          # quick or full conditionally otherwise
+          - test-category: smoke
+          - { os: windows, test-category: quick }
+          - { config: release, test-category: full }
+          # default not full gpu tests
+          - full-gpu-tests: false
+          - build-llvm: true
+          - { platform: wasm, build-llvm: false }
+          # The runners don't have a GPU by default except for the self-hosted ones
+          - has-gpu: false
+          # Self-hosted aarch64 build
+          - os: linux
+            config: release
+            compiler: gcc
+            platform: aarch64
+            test-category: smoke
+            full-gpu-tests: false
+            runs-on: ubuntu-24.04-arm
+            has-gpu: false
+            build-llvm: false
+          # Self-hosted full gpu build - release
+          - os: windows
+            config: release
+            compiler: cl
+            platform: x86_64
+            test-category: full
+            full-gpu-tests: true
+            runs-on: [Windows, self-hosted, GCP-T4]
+            has-gpu: true
+            server-count: 8
           # Self-hosted full gpu build - debug
           - os: windows
             config: debug

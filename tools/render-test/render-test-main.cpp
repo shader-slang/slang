@@ -30,6 +30,10 @@
 #include <windows.h>
 #endif
 
+#if defined(__APPLE__) || defined(__linux__)
+#include <execinfo.h>
+#endif
+
 namespace renderer_test
 {
 
@@ -1545,7 +1549,34 @@ SLANG_TEST_TOOL_API SlangResult innerMain(
     }
     catch (...)
     {
-        stdWriters->getOut().put(UnownedStringSlice::fromLiteral("Unhandled exception"));
+        stdWriters->getOut().put(UnownedStringSlice::fromLiteral("Unhandled exception occurred\n"));
+        
+        #if defined(_WIN32)
+        // We can't use GetExceptionCode() here directly
+        // Print stack trace if possible
+        void* stack[64];
+        USHORT frames = CaptureStackBackTrace(0, 64, stack, NULL);
+        stdWriters->getOut().put(UnownedStringSlice::fromLiteral("Stack trace:\n"));
+        for (USHORT i = 0; i < frames; i++)
+        {
+            char addressBuf[32];
+            sprintf_s(addressBuf, "  %p\n", stack[i]);
+            stdWriters->getOut().put(UnownedStringSlice(addressBuf));
+        }
+        #elif defined(__APPLE__)
+        // Get backtrace on macOS
+        void* callstack[128];
+        int frames = backtrace(callstack, 128);
+        char** symbols = backtrace_symbols(callstack, frames);
+        
+        stdWriters->getOut().put(UnownedStringSlice::fromLiteral("Stack trace:\n"));
+        for (int i = 0; i < frames; i++) {
+            stdWriters->getOut().put(UnownedStringSlice(symbols[i]));
+            stdWriters->getOut().put(UnownedStringSlice::fromLiteral("\n"));
+        }
+        free(symbols);
+        #endif
+        
         return SLANG_FAIL;
     }
 
