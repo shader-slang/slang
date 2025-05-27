@@ -22,6 +22,7 @@ slangc -help-style markdown -h
 * [Deprecated](#Deprecated)
 * [compiler](#compiler)
 * [language](#language)
+* [std-revision](#std-revision)
 * [archive-type](#archive-type)
 * [line-directive-mode](#line-directive-mode)
 * [debug-info-format](#debug-info-format)
@@ -221,6 +222,14 @@ Specifies the format in which code should be generated.
 Display the build version. This is the contents of git describe --tags. 
 
 It is typically only set from automated builds(such as distros available on github).A user build will by default be 'unknown'. 
+
+
+<a id="std"></a>
+### -std
+
+**-std &lt;[std-revision](#std-revision)&gt;**
+
+Specifies the language standard that should be used. 
 
 
 <a id="warnings-as-errors"></a>
@@ -742,6 +751,11 @@ Enable GLSL as an input language.
 Enable experimental compiler passes 
 
 
+<a id="enable-experimental-dynamic-dispatch"></a>
+### -enable-experimental-dynamic-dispatch
+Enable experimental dynamic dispatch features 
+
+
 <a id="embed-downstream-ir"></a>
 ### -embed-downstream-ir
 Embed downstream IR into emitted slang IR 
@@ -883,6 +897,15 @@ Language
 * `glsl` : GLSL language 
 * `hlsl` : HLSL language 
 * `cu`, `cuda` : CUDA 
+
+<a id="std-revision"></a>
+## std-revision
+
+Std Revision 
+
+* `unknown` : Unknown 
+* `2025`, `default` : Slang language rules for 2025 and older 
+* `2026` : Slang language rules for 2026 and newer 
 
 <a id="archive-type"></a>
 ## archive-type
@@ -1105,6 +1128,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_NV_ray_tracing_motion_blur` : enables the SPV_NV_ray_tracing_motion_blur extension 
 * `SPV_NV_shader_invocation_reorder` : enables the SPV_NV_shader_invocation_reorder extension 
 * `SPV_NV_cluster_acceleration_structure` : enables the SPV_NV_cluster_acceleration_structure extension 
+* `SPV_NV_linear_swept_spheres` : enables the SPV_NV_linear_swept_spheres extension 
 * `SPV_NV_shader_image_footprint` : enables the SPV_NV_shader_image_footprint extension 
 * `SPV_KHR_compute_shader_derivatives` : enables the SPV_KHR_compute_shader_derivatives extension 
 * `SPV_GOOGLE_user_type` : enables the SPV_GOOGLE_user_type extension 
@@ -1145,6 +1169,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvRayQueryPositionFetchKHR` 
 * `spvShaderInvocationReorderNV` 
 * `spvRayTracingClusterAccelerationStructureNV` 
+* `spvRayTracingLinearSweptSpheresGeometryNV` 
 * `spvShaderClockKHR` 
 * `spvShaderNonUniformEXT` 
 * `spvShaderNonUniform` 
@@ -1162,6 +1187,8 @@ A capability describes an optional feature that a target may or may not support.
 * `spvTensorAddressingNV` 
 * `spvMaximalReconvergenceKHR` 
 * `spvQuadControlKHR` 
+* `spvVulkanMemoryModelKHR` 
+* `spvVulkanMemoryModelDeviceScopeKHR` 
 * `metallib_latest` 
 * `dxil_lib` 
 * `any_target` 
@@ -1281,7 +1308,6 @@ A capability describes an optional feature that a target may or may not support.
 * `atomicfloat2` 
 * `fragmentshaderbarycentric` 
 * `shadermemorycontrol` 
-* `wave_multi_prefix` 
 * `bufferreference` 
 * `bufferreference_int64` 
 * `cooperative_vector` 
@@ -1294,6 +1320,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cooperative_matrix_block_load` 
 * `tensor_addressing` 
 * `cooperative_matrix_2` 
+* `vk_mem_model` 
 * `pixel` 
 * `tesscontrol` 
 * `tesseval` 
@@ -1471,6 +1498,7 @@ A capability describes an optional feature that a target may or may not support.
 * `raytracing_anyhit` 
 * `raytracing_intersection` 
 * `raytracing_anyhit_closesthit` 
+* `raytracing_lss` 
 * `raytracing_anyhit_closesthit_intersection` 
 * `raytracing_raygen_closesthit_miss` 
 * `raytracing_anyhit_closesthit_intersection_miss` 

@@ -23,6 +23,176 @@
 
 namespace Slang
 {
+
+static bool isAssociatedTypeDecl(Decl* decl)
+{
+    auto d = decl;
+    while (auto genericDecl = as<GenericDecl>(d))
+        d = genericDecl->inner;
+    if (as<AssocTypeDecl>(d))
+        return true;
+    return false;
+}
+
+static bool isSlang2026(CompilerOptionSet& optionSet)
+{
+    if (!optionSet.hasOption(CompilerOptionName::Language))
+        return false;
+    return SLANG_SOURCE_LANGUAGE_SLANG ==
+               SlangSourceLanguage(
+                   optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language)) &&
+           SLANG_STD_REVISION_2026 ==
+               optionSet.getEnumOption<SlangStdRevision>(CompilerOptionName::StdRevision);
+}
+
+static bool allowExperimentalDynamicDispatch(CompilerOptionSet& optionSet)
+{
+    return optionSet.getBoolOption(CompilerOptionName::EnableExperimentalDynamicDispatch) ||
+           !isSlang2026(optionSet);
+}
+
+static void validateDynInterfaceUsage(
+    SemanticsDeclVisitorBase* visitor,
+    DiagnosticSink* sink,
+    CompilerOptionSet& optionSet,
+    InterfaceDecl* decl)
+{
+    if (allowExperimentalDynamicDispatch(optionSet))
+        return;
+
+    if (!decl->hasModifier<DynModifier>())
+        return;
+
+    // validate members inside `dyn interface`
+    for (auto m : decl->members)
+    {
+        if (isAssociatedTypeDecl(m))
+        {
+            sink->diagnose(m, Diagnostics::cannotHaveAssociatedTypeInDynInterface);
+            continue;
+        }
+        else if (auto genericDecl = as<GenericDecl>(m))
+        {
+            if (as<FuncDecl>(genericDecl->inner))
+            {
+                sink->diagnose(m, Diagnostics::cannotHaveGenericMethodInDynInterface);
+            }
+            continue;
+        }
+        else if (auto funcDecl = as<FuncDecl>(m))
+        {
+            visitor->ensureDecl(m, DeclCheckState::ModifiersChecked);
+            for (auto modifier : funcDecl->modifiers)
+            {
+                if (as<MutatingAttribute>(modifier))
+                {
+                    sink->diagnose(m, Diagnostics::cannotHaveMutatingMethodInDynInterface);
+                }
+                else if (as<DifferentiableAttribute>(modifier))
+                {
+                    sink->diagnose(m, Diagnostics::cannotHaveDifferentiableMethodInDynInterface);
+                }
+            }
+            continue;
+        }
+        else if (auto inheritanceDecl = as<InheritanceDecl>(m))
+        {
+            visitor->ensureDecl(m, DeclCheckState::ReadyForLookup);
+            auto inheritedInterfaceDeclRefType =
+                isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type);
+            if (!inheritedInterfaceDeclRefType)
+                continue;
+
+            auto inheritedInterfaceDecl = inheritedInterfaceDeclRefType.getDecl();
+            if (!inheritedInterfaceDecl->hasModifier<DynModifier>())
+                sink->diagnose(
+                    m,
+                    Diagnostics::DynInterfaceCannotInheritNonDynInterface,
+                    decl,
+                    inheritedInterfaceDecl);
+        }
+    }
+
+    // dyn interface cannot be generic
+    if (visitor->GetOuterGeneric(decl))
+    {
+        sink->diagnose(decl, Diagnostics::cannotHaveGenericDynInterface, decl);
+    }
+}
+
+static void validateDynInterfaceUseWithInheritanceDecl(
+    SemanticsDeclVisitorBase* visitor,
+    DiagnosticSink* sink,
+    CompilerOptionSet& optionSet,
+    InheritanceDecl* decl)
+{
+    auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(decl->base.type);
+    if (!interfaceDeclRef)
+        return;
+    auto interfaceDecl = interfaceDeclRef.getDecl();
+    bool interfaceDeclIsDyn = interfaceDecl->hasModifier<DynModifier>();
+    if (!interfaceDeclIsDyn)
+        return;
+
+    if (!allowExperimentalDynamicDispatch(optionSet))
+    {
+        if (auto extensionDeclParent = as<ExtensionDecl>(decl->parentDecl))
+        {
+            // not allowed to extend to conform to a 'dyn interface'
+            sink->diagnose(
+                extensionDeclParent,
+                Diagnostics::cannotUseExtensionToMakeTypeConformToDynInterface,
+                interfaceDecl);
+        }
+        else if (visitor->GetOuterGeneric(decl->parentDecl))
+        {
+            sink->diagnose(
+                decl,
+                Diagnostics::cannotConformGenericToDynInterface,
+                decl->parentDecl,
+                interfaceDecl);
+        }
+    }
+    if (auto aggTypeDeclParent = as<AggTypeDecl>(decl->parentDecl))
+    {
+        // Ensure if we inherit from a `dyn interface` that the parent does not have: opaque
+        // types, unsized types, non-copyable types
+        for (auto m : aggTypeDeclParent->members)
+        {
+            auto varDecl = as<VarDecl>(m);
+            if (!varDecl)
+                continue;
+
+            visitor->ensureDecl(varDecl, DeclCheckState::ReadyForLookup);
+
+            if (isNonCopyableType(varDecl->getType()))
+            {
+                sink->diagnose(
+                    m,
+                    Diagnostics::cannotHaveNonCopyableMemberWhenInheritingDynInterface,
+                    m,
+                    interfaceDecl);
+            }
+
+            int varTypeTags = (int)visitor->getTypeTags(varDecl->getType());
+            bool isUnsized = varTypeTags & (int)TypeTag::Unsized;
+            bool isOpaque = varTypeTags & (int)TypeTag::Opaque;
+            if (isUnsized)
+                sink->diagnose(
+                    m,
+                    Diagnostics::cannotHaveUnsizedMemberWhenInheritingDynInterface,
+                    m,
+                    interfaceDecl);
+            if (isOpaque)
+                sink->diagnose(
+                    m,
+                    Diagnostics::cannotHaveOpaqueMemberWhenInheritingDynInterface,
+                    m,
+                    interfaceDecl);
+        }
+    }
+}
+
 static ConstructorDecl* _getDefaultCtor(StructDecl* structDecl);
 static List<ConstructorDecl*> _getCtorList(
     ASTBuilder* m_astBuilder,
@@ -42,9 +212,36 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
 
     void visitDeclGroup(DeclGroup*) {}
 
+    void visitVarDecl(VarDecl* decl)
+    {
+        visitDecl(decl);
+
+        // Export'd/Extern'd variables must be `const`, otherwise we may have a mismatch
+        // causing errors.
+        bool hasConst = false;
+        bool hasExportOrExtern = false;
+        bool hasStatic = false;
+        for (auto m : decl->modifiers)
+        {
+            if (as<ExternModifier>(m) || as<HLSLExportModifier>(m))
+                hasExportOrExtern = true;
+            else if (as<ConstModifier>(m))
+                hasConst = true;
+            else if (as<HLSLStaticModifier>(m))
+                hasStatic = true;
+        }
+        if (hasExportOrExtern && hasConst != hasStatic)
+            getSink()->diagnose(
+                decl,
+                Diagnostics::ExternAndExportVarDeclMustBeConst,
+                decl->getName());
+    }
+
     void visitDecl(Decl* decl) { checkModifiers(decl); }
 
     void visitStructDecl(StructDecl* structDecl);
+
+    void visitInterfaceDecl(InterfaceDecl* interfaceDecl);
 };
 
 struct SemanticsDeclScopeWiringVisitor : public SemanticsDeclVisitorBase,
@@ -658,6 +855,15 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitReturnStmt(ReturnStmt* stmt) { dispatchIfNotNull(stmt->expression); }
 
     void visitDeferStmt(DeferStmt* stmt) { dispatchIfNotNull(stmt->statement); }
+
+    void visitThrowStmt(ThrowStmt* stmt) { dispatchIfNotNull(stmt->expression); }
+
+    void visitCatchStmt(CatchStmt* stmt)
+    {
+        dispatchIfNotNull(stmt->errorVar);
+        dispatchIfNotNull(stmt->tryBody);
+        dispatchIfNotNull(stmt->handleBody);
+    }
 
     void visitWhileStmt(WhileStmt* stmt)
     {
@@ -1458,6 +1664,16 @@ IntVal* SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
         DeclRef<VarDeclBase>(varDecl),
         ConstantFoldingKind::LinkTime,
         nullptr);
+}
+
+void SemanticsDeclModifiersVisitor::visitInterfaceDecl(InterfaceDecl* interfaceDecl)
+{
+    visitDecl(interfaceDecl);
+
+    if (interfaceDecl->hasModifier<AnyValueSizeAttribute>())
+        addModifier(interfaceDecl, m_astBuilder->create<DynModifier>());
+
+    validateDynInterfaceUsage(this, getSink(), getOptionSet(), interfaceDecl);
 }
 
 void SemanticsDeclModifiersVisitor::visitStructDecl(StructDecl* structDecl)
@@ -2305,6 +2521,23 @@ static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type*
         return invoke;
     }
 
+    // At the last, we will check if the type is a C-style type, if it is, we will use empty
+    // initializer list to construct the default constructor.
+    HashSet<Type*> visitSet;
+    if (visitor->isCStyleType(type, visitSet))
+    {
+        auto initListExpr = visitor->getASTBuilder()->create<InitializerListExpr>();
+        initListExpr->type = visitor->getASTBuilder()->getInitializerListType();
+        Expr* outExpr = nullptr;
+        auto fromType = type;
+        if (auto atomicType = as<AtomicType>(fromType))
+        {
+            fromType = atomicType->getElementType();
+        }
+        if (visitor->_coerceInitializerList(fromType, &outExpr, initListExpr))
+            return outExpr;
+    }
+
     return nullptr;
 }
 
@@ -3089,6 +3322,12 @@ struct SemanticsDeclDifferentialConformanceVisitor
 
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
+        validateDynInterfaceUseWithInheritanceDecl(
+            this,
+            getSink(),
+            getOptionSet(),
+            inheritanceDecl);
+
         if (as<InterfaceDecl>(inheritanceDecl->parentDecl))
             return;
 
@@ -4449,7 +4688,7 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
         auto synStaticModifier = m_astBuilder->create<HLSLStaticModifier>();
         synthesized->modifiers.first = synStaticModifier;
     }
-    else
+    else if (context)
     {
         // For a non-`static` requirement, we need a `this` parameter.
         //
@@ -6937,16 +7176,6 @@ RefPtr<WitnessTable> SemanticsVisitor::checkInterfaceConformance(
         return nullptr;
 
     return witnessTable;
-}
-
-static bool isAssociatedTypeDecl(Decl* decl)
-{
-    auto d = decl;
-    while (auto genericDecl = as<GenericDecl>(d))
-        d = genericDecl->inner;
-    if (as<AssocTypeDecl>(d))
-        return true;
-    return false;
 }
 
 bool SemanticsVisitor::checkInterfaceConformance(
@@ -10176,7 +10405,16 @@ void SemanticsDeclHeaderVisitor::visitAbstractStorageDeclCommon(ContainerDecl* d
 
 void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
 {
-    decl->returnType = CheckUsableType(decl->returnType, decl);
+    // __subscript needs to have a return type specified. Check if return type
+    // is missing (represented as IncompleteExpr) and return an error.
+    if (decl->returnType.exp && as<IncompleteExpr>(decl->returnType.exp))
+    {
+        getSink()->diagnose(decl, Diagnostics::subscriptMustHaveReturnType);
+    }
+    else if (decl->returnType.exp)
+    {
+        decl->returnType = CheckUsableType(decl->returnType, decl);
+    }
 
     visitAbstractStorageDeclCommon(decl);
 
@@ -12828,7 +13066,13 @@ static Expr* _getParamDefaultValue(SemanticsVisitor* visitor, VarDeclBase* varDe
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    return constructDefaultConstructorForType(visitor, varDecl->type.type);
+    if (auto expr = constructDefaultConstructorForType(visitor, varDecl->type.type))
+    {
+        expr->loc = varDecl->loc;
+        return expr;
+    }
+
+    return nullptr;
 }
 
 bool SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* structDecl)

@@ -1970,6 +1970,12 @@ SIMPLE_UNARY_DERIVATIVE_IMPL(asin, T(1.0) / sqrt(T(1.0) - dpx.p * dpx.p))
 SIMPLE_UNARY_DERIVATIVE_IMPL(acos, T(-1.0) / sqrt(T(1.0) - dpx.p * dpx.p))
 // Arc-tan
 SIMPLE_UNARY_DERIVATIVE_IMPL(atan, T(1.0) / (T(1.0) + dpx.p * dpx.p))
+// Arc-sinh
+SIMPLE_UNARY_DERIVATIVE_IMPL(asinh, T(1.0) / sqrt(dpx.p * dpx.p + T(1.0)))
+// Arc-cosh
+SIMPLE_UNARY_DERIVATIVE_IMPL(acosh, T(1.0) / sqrt(dpx.p * dpx.p - T(1.0)))
+// Arc-tanh
+SIMPLE_UNARY_DERIVATIVE_IMPL(atanh, T(1.0) / (T(1.0) - dpx.p * dpx.p))
 
 // Atan2
 __generic<T : __BuiltinFloatingPointType>

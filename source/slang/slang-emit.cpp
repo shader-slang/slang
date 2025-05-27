@@ -106,6 +106,7 @@
 #include "slang-ir-strip-legalization-insts.h"
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-translate-global-varying-var.h"
+#include "slang-ir-undo-param-copy.h"
 #include "slang-ir-uniformity.h"
 #include "slang-ir-user-type-hint.h"
 #include "slang-ir-validate.h"
@@ -805,10 +806,6 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    // Lower `Result<T,E>` types into ordinary struct types.
-    if (requiredLoweringPassSet.resultType)
-        lowerResultType(irModule, sink);
-
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "UNIONS DESUGARED");
 #endif
@@ -949,6 +946,12 @@ Result linkAndOptimizeIR(
         if (!changed)
             break;
     }
+
+    // Lower `Result<T,E>` types into ordinary struct types. This must happen
+    // after specialization, since otherwise incompatible copies of the lowered
+    // result structure are generated.
+    if (requiredLoweringPassSet.resultType)
+        lowerResultType(irModule, sink);
 
     // Report checkpointing information
     if (codeGenContext->shouldReportCheckpointIntermediates())
@@ -1594,6 +1597,13 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::Metal:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CUDASource:
+        // For CUDA/OptiX like targets, add our pass to replace inout parameter copies with direct
+        // pointers
+        undoParameterCopy(irModule);
+#if 0
+        dumpIRIfEnabled(codeGenContext, irModule, "PARAMETER COPIES REPLACED WITH DIRECT POINTERS");
+#endif
+        validateIRModuleIfEnabled(codeGenContext, irModule);
         moveGlobalVarInitializationToEntryPoints(irModule, targetProgram);
         introduceExplicitGlobalContext(irModule, target);
         if (target == CodeGenTarget::CPPSource)

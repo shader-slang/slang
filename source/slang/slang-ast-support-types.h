@@ -15,8 +15,6 @@
 #include <assert.h>
 #include <type_traits>
 
-#define SLANG_UNREFLECTED /* empty */
-
 FIDDLE(hidden class RefObject;)
 
 FIDDLE() namespace Slang
@@ -93,6 +91,7 @@ FIDDLE() namespace Slang
         kConversionCost_None = 0,
 
         kConversionCost_GenericParamUpcast = 1,
+        kConversionCost_LambdaToFunc = 1,
         kConversionCost_UnconstraintGenericParam = 20,
         kConversionCost_SizedArrayToUnsizedArray = 30,
 
@@ -1563,7 +1562,7 @@ FIDDLE() namespace Slang
 
         Flavor m_flavor;
         DeclRef<Decl> m_declRef;
-        RefPtr<RefObject> m_obj;
+        RefPtr<WitnessTable> m_obj;
         Val* m_val = nullptr;
     };
 

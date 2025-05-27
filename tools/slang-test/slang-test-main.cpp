@@ -3607,8 +3607,10 @@ TestResult runComputeComparisonImpl(
     // gets misinterpreted as the result from the test.
     // This is due to the limitation that Slang RPC implementation expects only
     // one time communication.
-    if (input.spawnType != SpawnType::UseTestServer)
+    if (context->options.debugLayerEnabled && input.spawnType != SpawnType::UseTestServer)
+    {
         cmdLine.addArg("-enable-debug-layers");
+    }
 #endif
 
     if (context->isExecuting())
@@ -4344,7 +4346,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             context->setTestRequirements(&requirements);
             runTest(context, filePath, filePath, filePath, testDetails.options);
 
-            //
+
             apiUsedFlags |= requirements.usedRenderApiFlags;
             explictUsedApiFlags |= (requirements.explicitRenderApi != RenderApiType::Unknown)
                                        ? (RenderApiFlags(1) << int(requirements.explicitRenderApi))
@@ -4596,7 +4598,7 @@ void runTestsInDirectory(TestContext* context)
     {
         if (shouldRunTest(context, file))
         {
-            //            fprintf(stderr, "slang-test: found '%s'\n", file.getBuffer());
+            printf("found test: '%s'\n", file.getBuffer());
             if (SLANG_FAILED(_runTestsOnFile(context, file)))
             {
                 {
@@ -4703,6 +4705,7 @@ static SlangResult runUnitTestModule(
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = context->options.enabledApis;
+    unitTestContext.enableDebugLayers = context->options.debugLayerEnabled;
     unitTestContext.executableDirectory = context->exeDirectoryPath.getBuffer();
 
     auto testCount = testModule->getTestCount();
@@ -4763,15 +4766,23 @@ static SlangResult runUnitTestModule(
 
                 bool isFailed = (SLANG_FAILED(rpcRes) || testResult == TestResult::Fail);
 
+                // If the rpc failed, output an error message
+                if (SLANG_FAILED(rpcRes))
+                {
+                    reporter->message(TestMessageType::RunError, "rpc failed");
+                }
+
                 // If the test fails, output any output - which might give information about
                 // individual tests that have failed.
-                if (isFailed)
+                if (testResult == TestResult::Fail)
                 {
                     String output = getOutput(exeRes);
                     reporter->message(TestMessageType::TestFailure, output.getBuffer());
                 }
 
-                if (isFailed && !context->isRetry &&
+                // If the test failed and it is not an expected failure, add it to the list of
+                // failed unit tests.
+                if (isFailed &&
                     !context->getTestReporter()->m_expectedFailureList.contains(test.testName))
                 {
                     std::lock_guard lock(context->mutexFailedTests);
@@ -5054,21 +5065,20 @@ SlangResult innerMain(int argc, char** argv)
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);
 
-            for (bool isRetry : {false, true})
+            // Try the unit tests up to 3 times
+            for (bool isRetry : {false, true, true})
             {
-                auto spawnType = context.getFinalSpawnType();
-
-                context.isRetry = false;
+                // Use default spawn type for unit tests as the test server one is unstable
+                auto spawnType = SpawnType::Default;
+                context.isRetry = isRetry;
                 if (isRetry)
                 {
                     if (context.failedUnitTests.getCount() == 0)
                         break;
 
-                    printf("Retrying unit tests...\n");
-                    context.isRetry = true;
+                    printf("Retrying unit tests with default spawn type...\n");
                     context.options.testPrefixes = context.failedUnitTests;
                     context.failedUnitTests.clear();
-                    spawnType = SpawnType::Default;
                 }
 
                 // Run the unit tests
@@ -5090,14 +5100,20 @@ SlangResult innerMain(int argc, char** argv)
         }
 
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
-        // excution or driver instability. We can try running them again.
+        // excution or driver instability. We can try running them again. Debug build has more
+        // instability at this moment, so we allow more retries.
+#if _DEBUG
+        static constexpr int kFailedTestLimitForRetry = 100;
+#else
         static constexpr int kFailedTestLimitForRetry = 16;
+#endif
         if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
         {
             if (context.failedFileTests.getCount() > 0)
                 printf("Retrying %d failed tests...\n", (int)context.failedFileTests.getCount());
             for (auto& test : context.failedFileTests)
             {
+                context.isRetry = true;
                 FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
                 TestReporter::SuiteScope suiteScope(&reporter, "tests");
                 TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
