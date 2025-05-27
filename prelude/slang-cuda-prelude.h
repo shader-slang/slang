@@ -31,6 +31,7 @@
 
 #ifdef SLANG_CUDA_ENABLE_OPTIX
 #include <optix.h>
+#include <optix_device.h>
 #endif
 
 // Define slang offsetof implementation
@@ -3219,6 +3220,54 @@ __forceinline__ __device__ void* optixTrace(
         MissShaderIndex,
         r0,
         r1);
+}
+
+__forceinline__ __device__ float4 optixGetSpherePositionAndRadius()
+{
+    float4 data[1];
+    optixGetSphereData(data);
+    return data;
+}
+
+__forceinline__ __device__ float4 optixHitObjectGetSpherePositionAndRadius()
+{
+    float4 data[1];
+    optixHitObjectGetSphereData(data);
+    return data;
+}
+
+__forceinline__ __device__ Matrix<float, 2, 4> optixGetSpherePositionAndRadius()
+{
+    float4 data[2];
+    optixGetLinearCurveVertexData(data);
+    return Matrix<float, 2, 4>(data[0], data[1]);
+}
+
+__forceinline__ __device__ float2x4 optixHitObjectGetSpherePositionAndRadius()
+{
+    float4 data[2];
+    optixHitObjectGetLinearCurveVertexData(data);
+    return Matrix<float, 2, 4>(data[0], data[1]);
+}
+
+__forceinline__ __device__ bool optixIsSphereHit()
+{
+    return optixGetPrimitiveType() == OPTIX_PRIMITIVE_TYPE_SPHERE;
+}
+
+__forceinline__ __device__ bool optixHitObjectIsSphereHit()
+{
+    return optixGetPrimitiveType(optixHitObjectGetHitKind()) == OPTIX_PRIMITIVE_TYPE_SPHERE;
+}
+
+__forceinline__ __device__ bool optixIsLSSHit()
+{
+    return optixGetPrimitiveType() == OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR;
+}
+
+__forceinline__ __device__ bool optixHitObjectIsLSSHit()
+{
+    return optixGetPrimitiveType(optixHitObjectGetHitKind()) == OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR;
 }
 
 template<typename T>
