@@ -11835,15 +11835,49 @@ static int _compareDeclsInCommonParentByOrderOfDeclaration(
         auto loDecl = commonParent->getDirectMemberDecl(loIndex);
         auto hiDecl = commonParent->getDirectMemberDecl(hiIndex);
 
+        // TODO(tfoley): There is a frustratingly subtle issue lurking
+        // in the Slang codebase, where operations (notably including
+        // the reflection API's `getTypeParameterConstraintType()`)
+        // assume that the a generic with N type parameters will have
+        // N constraints, with one constraint per type parameter,
+        // in a matching order.
+        //
+        // This assumption is fundamentally *not* guaranteed by the
+        // Slang compiler, but it has worked often enough in practice
+        // that code has ended up depending on this behavior.
+        //
+        // The long/short is that the ordering of the comparisons here
+        // (which cases return `-1` vs. `1`) is important for not
+        // breaking at least one Slang test, and may also have consequences
+        // for other code.
+        //
+        // We need to audit all of the code that is looking up constraints
+        // on generic declarations and trying to associate constraints
+        // with specific parameters and... well, in the ideal case *stop*
+        // them from doing so, because it isn't always a reasonable way
+        // to do things (e.g., there are constraints that would be missed
+        // if code only pays attention to constraints that have one of
+        // the generic parameters on their left-hand-side). Given that
+        // we probably can't fully deprecate things like the reflection
+        // API operations that rely on this assumption, we should instead
+        // author an as-correct-as-possible version of things that, given
+        // the index of a generic (type) parameter, collects all of the
+        // (conformance) constraints with that parameter on the left-hand-side
+        // and forms a conjunction of the interfaces on the right-hand-side.
+        //
+        // (Alternatively we could separate the storage of the original
+        // parameters/constraints as they were declared, vs. the canonicalized
+        // constraints, and only have the reflection API access the former)
+
         if (loDecl == lhs)
-            return -1;
-        if (loDecl == rhs)
             return 1;
+        if (loDecl == rhs)
+            return -1;
 
         if (hiDecl == lhs)
-            return 1;
-        if (hiDecl == rhs)
             return -1;
+        if (hiDecl == rhs)
+            return 1;
 
         loIndex++;
         hiIndex--;
