@@ -1710,6 +1710,11 @@ DIAGNOSTIC(
     Error,
     multiDimensionalArrayNotSupported,
     "multi-dimensional array is not supported.")
+DIAGNOSTIC(
+    30901,
+    Error,
+    subscriptMustHaveReturnType,
+    "__subscript declaration must have a return type specified after '->'")
 // 310xx: properties
 
 // 311xx: accessors

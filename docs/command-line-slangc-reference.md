@@ -1133,6 +1133,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_NV_ray_tracing_motion_blur` : enables the SPV_NV_ray_tracing_motion_blur extension 
 * `SPV_NV_shader_invocation_reorder` : enables the SPV_NV_shader_invocation_reorder extension 
 * `SPV_NV_cluster_acceleration_structure` : enables the SPV_NV_cluster_acceleration_structure extension 
+* `SPV_NV_linear_swept_spheres` : enables the SPV_NV_linear_swept_spheres extension 
 * `SPV_NV_shader_image_footprint` : enables the SPV_NV_shader_image_footprint extension 
 * `SPV_KHR_compute_shader_derivatives` : enables the SPV_KHR_compute_shader_derivatives extension 
 * `SPV_GOOGLE_user_type` : enables the SPV_GOOGLE_user_type extension 
@@ -1173,6 +1174,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvRayQueryPositionFetchKHR` 
 * `spvShaderInvocationReorderNV` 
 * `spvRayTracingClusterAccelerationStructureNV` 
+* `spvRayTracingLinearSweptSpheresGeometryNV` 
 * `spvShaderClockKHR` 
 * `spvShaderNonUniformEXT` 
 * `spvShaderNonUniform` 
@@ -1501,6 +1503,7 @@ A capability describes an optional feature that a target may or may not support.
 * `raytracing_anyhit` 
 * `raytracing_intersection` 
 * `raytracing_anyhit_closesthit` 
+* `raytracing_lss` 
 * `raytracing_anyhit_closesthit_intersection` 
 * `raytracing_raygen_closesthit_miss` 
 * `raytracing_anyhit_closesthit_intersection_miss` 
