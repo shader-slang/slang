@@ -1,7 +1,7 @@
 //TEST_CATEGORY(wave-mask, compute)
 //DISABLE_TEST:COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //DISABLE_TEST:COMPARE_COMPUTE_EX:-slang -compute -shaderobj
-//TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_0 -shaderobj -render-feature hardware-device
+//TEST:COMPARE_COMPUTE_EX:-slang -compute -dx12 -use-dxil -profile cs_6_5 -shaderobj -render-feature hardware-device
 //DISABLE_TEST(vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST:COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 

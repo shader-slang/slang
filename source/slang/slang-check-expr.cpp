@@ -2331,6 +2331,10 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
         return CreateErrorExpr(subscriptExpr);
     }
 
+    for (auto& expr : subscriptExpr->indexExprs)
+    {
+        expr = CheckExpr(expr);
+    }
     auto indexExpr = subscriptExpr->indexExprs[0];
 
     if (!isScalarIntegerType(indexExpr->type.type))

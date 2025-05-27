@@ -10,6 +10,7 @@
 RWStructuredBuffer<uint> outputBuffer;
 
 [numthreads(8, 1, 1)]
+[shader("compute")]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     uint index = int(dispatchThreadID.x);

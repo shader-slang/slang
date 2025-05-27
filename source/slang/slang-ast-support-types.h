@@ -15,8 +15,6 @@
 #include <assert.h>
 #include <type_traits>
 
-#define SLANG_UNREFLECTED /* empty */
-
 FIDDLE(hidden class RefObject;)
 
 FIDDLE() namespace Slang
