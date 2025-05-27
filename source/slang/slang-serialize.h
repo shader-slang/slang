@@ -370,7 +370,7 @@ struct ISerializerImpl
     virtual void handleFieldKey(char const* name, Int index) = 0;
 
     /// A callback function used to handle serialization of pointers.
-    typedef void (*Callback)(void* valuePtr, void* userData);
+    typedef void (*Callback)(void* valuePtr, void* impl, void* context);
 
     /// Handle a pointer value that is expected to be unique.
     ///
@@ -387,7 +387,7 @@ struct ISerializerImpl
     ///
     /// When writing, if the `value` is non-null, then the callback
     /// will be invoked, either immediately or at some later point,
-    /// as `callback(&ptr, userData)` where `ptr` is a variable
+    /// as `callback(&ptr, this, context)` where `ptr` is a variable
     /// holding a copy of the `value` that was passed in. The callback
     /// is expected to write the members of the pointed-to type.
     ///
@@ -396,7 +396,7 @@ struct ISerializerImpl
     /// for ensuring that its internal state has been restored to
     /// be compatible with what it was when `handleUniquePtr` was called.
     ///
-    virtual void handleUniquePtr(void*& value, Callback callback, void* userData) = 0;
+    virtual void handleUniquePtr(void*& value, Callback callback, void* context) = 0;
 
     /// Handle a pointer value that may have multiple references.
     ///
@@ -411,7 +411,7 @@ struct ISerializerImpl
     ///   the `callback` will not be invoked, and instead `value` will
     ///   be set to the pointer that was previously read.
     ///
-    virtual void handleSharedPtr(void*& value, Callback callback, void* userData) = 0;
+    virtual void handleSharedPtr(void*& value, Callback callback, void* context) = 0;
 
     /// Defer serialization of the contents of an object.
     ///
@@ -422,14 +422,14 @@ struct ISerializerImpl
     /// passed to `handleUniquePtr()` or `handleSharedPtr()`.
     ///
     /// This operation schedules the given `callback` to be called
-    /// at some later point a `callback(value, userData)`, with
+    /// at some later point a `callback(value, this, context)`, with
     /// the state of the serializer implementation restored to what
     /// it was when `handleDeferredObjectContents()` was called.
     ///
     /// Some concrete serializer implementations might implement
     /// this operation by invoking `callback` immediately.
     ///
-    virtual void handleDeferredObjectContents(void* value, Callback callback, void* userData) = 0;
+    virtual void handleDeferredObjectContents(void* value, Callback callback, void* context) = 0;
 };
 
 //
@@ -439,50 +439,68 @@ struct ISerializerImpl
 //
 // While the `ISerializerImpl` interface can cover a wide range of
 // types that need to be serialized, it is common for types to require
-// more specific context to be available in order to perform serialization.
+// more specific *context* to be available in order to perform serialization.
 // For example, code might need access to a factory object in order
 // to construct objects of a type being read.
 //
-// To support more specialized serializer implementations, we allow
-// the smart pointer used for a serializer to depend on the type
-// of the underlying implementation object.
+// To support more specialized serializer implementations, the smart
+// pointer type used for a serializer actually wraps *two* pointers:
+// one for an `ISerializerImpl`-derived type, and one for a context
+// type. The smart pointer is templated on both of these types.
 //
 
 /// Base type for serialization contexts.
 ///
-/// The type parameter `T` should be a type of object that
-/// holds the context information needed.
+/// The type parameter `Impl` should be a type that derives from
+/// `ISerializerImpl`, and the `Context` type parameter can be any
+/// type that passes along additional context information needed.
 ///
-template<typename T>
+template<typename Impl, typename Context>
 struct SerializerBase
 {
 public:
     SerializerBase() = default;
-    SerializerBase(T* ptr)
-        : _ptr(ptr)
+    SerializerBase(Impl* impl, Context* context = nullptr)
+        : _impl(impl), _context(context)
     {
     }
 
-    T* get() const { return _ptr; }
-    T* operator->() const { return get(); }
+    template<typename I, typename C>
+    SerializerBase(
+        SerializerBase<I, C> const& serializer,
+        std::enable_if_t<
+            std::is_convertible_v<I*, Impl*> && std::is_convertible_v<C*, Context*>,
+            void>* = nullptr)
+        : _impl(serializer.getImpl()), _context(serializer.getContext())
+    {
+    }
+
+    Impl* getImpl() const { return _impl; }
+    Context* getContext() const { return _context; }
+
+    Impl* get() const { return _impl; }
+    Impl* operator->() const { return get(); }
+
 
 private:
-    T* _ptr = nullptr;
+    Impl* _impl = nullptr;
+    Context* _context = nullptr;
 };
 
 /// A serialization context.
 ///
-/// The type parameter `T` should be a type of object that
-/// holds the context information needed.
+/// The type parameter `Impl` should be a type that derives from
+/// `ISerializerImpl`, and the `Context` type parameter can be any
+/// type that passes along additional context information needed.
 ///
-template<typename T>
-struct Serializer_ : SerializerBase<T>
+template<typename Impl, typename Context>
+struct Serializer_ : SerializerBase<Impl, Context>
 {
-    using SerializerBase<T>::SerializerBase;
+    using SerializerBase<Impl, Context>::SerializerBase;
 };
 
 /// Default serialization context.
-using Serializer = Serializer_<ISerializerImpl>;
+using Serializer = Serializer_<ISerializerImpl, void>;
 
 //
 // We define namespace-scope functions that mirror some
@@ -944,22 +962,22 @@ void serializeObjectContents(S const& serializer, T* value, void*)
     serialize(serializer, *value);
 }
 
-template<typename S, typename T>
-void _serializeObjectContentsCallback(void* valuePtr, void* userData)
+template<typename I, typename C, typename T>
+void _serializeObjectContentsCallback(void* valuePtr, void* impl, void* context)
 {
-    auto serializerImpl = (S*)userData;
+    Serializer_<I, C> serializer((I*)impl, (C*)context);
     auto value = (T*)valuePtr;
-    serializeObjectContents(Serializer_<S>(serializerImpl), value, (T*)nullptr);
+    serializeObjectContents(serializer, value, (T*)nullptr);
 }
 
-template<typename S, typename T>
-void deferSerializeObjectContents(Serializer_<S> const& serializer, T* value)
+template<typename I, typename C, typename T>
+void deferSerializeObjectContents(Serializer_<I, C> const& serializer, T* value)
 {
     ((Serializer)serializer)
         ->handleDeferredObjectContents(
             value,
-            _serializeObjectContentsCallback<S, T>,
-            serializer.get());
+            _serializeObjectContentsCallback<I, C, T>,
+            serializer.getContext());
 }
 
 template<typename S, typename T>
@@ -972,26 +990,32 @@ void serializeObject(S const& serializer, T*& value, void*)
     deferSerializeObjectContents(serializer, value);
 }
 
-template<typename S, typename T>
-void _serializeObjectCallback(void* valuePtr, void* userData)
+template<typename I, typename C, typename T>
+void _serializeObjectCallback(void* valuePtr, void* impl, void* context)
 {
-    auto serializerImpl = (S*)userData;
+    Serializer_<I, C> serializer((I*)impl, (C*)context);
     auto& value = *(T**)valuePtr;
-    serializeObject(Serializer_<S>(serializerImpl), value, (T*)nullptr);
+    serializeObject(serializer, value, (T*)nullptr);
 }
 
-template<typename S, typename T>
-void serializeSharedPtr(Serializer_<S> const& serializer, T*& value)
+template<typename I, typename C, typename T>
+void serializeSharedPtr(Serializer_<I, C> const& serializer, T*& value)
 {
     ((Serializer)serializer)
-        ->handleSharedPtr(*(void**)&value, _serializeObjectCallback<S, T>, serializer.get());
+        ->handleSharedPtr(
+            *(void**)&value,
+            _serializeObjectCallback<I, C, T>,
+            serializer.getContext());
 }
 
-template<typename S, typename T>
-void serializeUniquePtr(Serializer_<S> const& serializer, T*& value)
+template<typename I, typename C, typename T>
+void serializeUniquePtr(Serializer_<I, C> const& serializer, T*& value)
 {
     ((Serializer)serializer)
-        ->handleUniquePtr(*(void**)&value, _serializeObjectCallback<S, T>, serializer.get());
+        ->handleUniquePtr(
+            *(void**)&value,
+            _serializeObjectCallback<I, C, T>,
+            serializer.getContext());
 }
 
 template<typename S, typename T>
