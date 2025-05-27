@@ -3850,7 +3850,7 @@ struct ExprLoweringContext
             auto genDecl = genSubst->getGenericDecl();
 
             Index argCounter = 0;
-            for (auto memberDecl : genDecl->members)
+            for (auto memberDecl : genDecl->getDirectMemberDecls())
             {
                 if (auto typeParamDecl = as<GenericTypeParamDecl>(memberDecl))
                 {
@@ -3861,12 +3861,9 @@ struct ExprLoweringContext
                     _lowerSubstitutionArg(subContext, genSubst, valParamDecl, argCounter++);
                 }
             }
-            for (auto memberDecl : genDecl->members)
+            for (auto constraintDecl : genDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
             {
-                if (auto constraintDecl = as<GenericTypeConstraintDecl>(memberDecl))
-                {
-                    _lowerSubstitutionArg(subContext, genSubst, constraintDecl, argCounter++);
-                }
+                _lowerSubstitutionArg(subContext, genSubst, constraintDecl, argCounter++);
             }
         }
         // TODO: also need to handle this-type substitution here?
@@ -8084,7 +8081,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitExtensionDecl(ExtensionDecl* decl)
     {
-        for (auto& member : decl->members)
+        for (auto& member : decl->getDirectMemberDecls())
             ensureDecl(context, member);
         return LoweredValInfo();
     }
@@ -9179,17 +9176,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // First, compute the number of requirement entries that will be included in this
         // interface type.
         UInt operandCount = 0;
-        for (auto requirementDecl : decl->members)
+        for (auto requirementDecl : decl->getDirectMemberDecls())
         {
             if (as<GenericDecl>(requirementDecl))
                 requirementDecl = getInner(requirementDecl);
 
             if (as<SubscriptDecl>(requirementDecl) || as<PropertyDecl>(requirementDecl))
             {
-                for (auto accessorDecl : as<ContainerDecl>(requirementDecl)->members)
+                for (auto accessorDecl : as<ContainerDecl>(requirementDecl)->getDirectMemberDeclsOfType<AccessorDecl>())
                 {
-                    if (as<AccessorDecl>(accessorDecl))
-                        operandCount++;
+                    SLANG_UNUSED(accessorDecl);
+                    operandCount++;
                 }
             }
             if (!shouldDeclBeTreatedAsInterfaceRequirement(requirementDecl))
@@ -9328,7 +9325,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 context->setValue(requirementDeclRef.getDecl(), LoweredValInfo::simple(entry));
             }
         };
-        for (auto requirementDecl : decl->members)
+        for (auto requirementDecl : decl->getDirectMemberDecls())
         {
             auto requirementKey = getInterfaceRequirementKey(requirementDecl);
             if (!requirementKey)
@@ -9342,19 +9339,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 if (as<PropertyDecl>(requirementDecl) || as<SubscriptDecl>(requirementDecl))
                 {
-                    for (auto member : as<ContainerDecl>(requirementDecl)->members)
+                    for (auto accessorDecl : as<ContainerDecl>(requirementDecl)->getDirectMemberDeclsOfType<AccessorDecl>())
                     {
-                        if (auto accessorDecl = as<AccessorDecl>(member))
+                        auto accessorKey = getInterfaceRequirementKey(accessorDecl);
+                        if (accessorKey)
                         {
-                            auto accessorKey = getInterfaceRequirementKey(accessorDecl);
-                            if (accessorKey)
-                            {
-                                auto accessorDeclRef = createDefaultSpecializedDeclRef(
-                                    subContext,
-                                    nullptr,
-                                    accessorDecl);
-                                addEntry(accessorKey, accessorDeclRef);
-                            }
+                            auto accessorDeclRef = createDefaultSpecializedDeclRef(
+                                subContext,
+                                nullptr,
+                                accessorDecl);
+                            addEntry(accessorKey, accessorDeclRef);
                         }
                     }
                 }
@@ -9883,7 +9877,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         //
         // First we start with type and value parameters,
         // in the order they were declared.
-        for (auto member : genericDecl->members)
+        for (auto member : genericDecl->getDirectMemberDecls())
         {
             if (auto typeParamDecl = as<GenericTypeParamDeclBase>(member))
             {
@@ -9906,12 +9900,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         // Then we emit constraint parameters, again in
         // declaration order.
-        for (auto member : genericDecl->members)
+        for (auto constraintDecl : genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
         {
-            if (auto constraintDecl = as<GenericTypeConstraintDecl>(member))
-            {
-                emitGenericConstraintDecl(subContext, constraintDecl);
-            }
+            emitGenericConstraintDecl(subContext, constraintDecl);
         }
 
         return irGeneric;
@@ -11903,21 +11894,21 @@ static void ensureAllDeclsRec(IRGenContext* context, Decl* decl)
     //
     if (auto containerDecl = as<AggTypeDeclBase>(decl))
     {
-        for (auto memberDecl : containerDecl->members)
+        for (auto memberDecl : containerDecl->getDirectMemberDecls())
         {
             ensureAllDeclsRec(context, memberDecl);
         }
     }
     else if (auto namespaceDecl = as<NamespaceDecl>(decl))
     {
-        for (auto memberDecl : namespaceDecl->members)
+        for (auto memberDecl : namespaceDecl->getDirectMemberDecls())
         {
             ensureAllDeclsRec(context, memberDecl);
         }
     }
     else if (auto fileDecl = as<FileDecl>(decl))
     {
-        for (auto memberDecl : fileDecl->members)
+        for (auto memberDecl : fileDecl->getDirectMemberDecls())
         {
             ensureAllDeclsRec(context, memberDecl);
         }
@@ -11994,7 +11985,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     //
     // Next, ensure that all other global declarations have
     // been emitted.
-    for (auto decl : translationUnit->getModuleDecl()->members)
+    for (auto decl : translationUnit->getModuleDecl()->getDirectMemberDecls())
     {
         ensureAllDeclsRec(context, decl);
     }

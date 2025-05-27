@@ -525,7 +525,7 @@ void ASTIterator<CallbackFunc, FilterFunc>::visitDecl(DeclBase* decl)
     }
     if (auto container = as<ContainerDecl>(decl))
     {
-        for (auto member : container->members)
+        for (auto member : container->getDirectMemberDecls())
         {
             visitDecl(member);
         }

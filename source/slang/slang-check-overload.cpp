@@ -71,7 +71,7 @@ SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(
 SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(DeclRef<GenericDecl> genericRef)
 {
     ParamCounts counts = {0, 0};
-    for (auto m : genericRef.getDecl()->members)
+    for (auto m : genericRef.getDecl()->getDirectMemberDecls())
     {
         if (auto typeParam = as<GenericTypeParamDecl>(m))
         {
@@ -1169,9 +1169,9 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                 if (auto subscriptDeclRef = candidate.item.declRef.as<SubscriptDecl>())
                 {
                     const auto& decl = subscriptDeclRef.getDecl();
-                    for (auto member : decl->members)
+                    for (auto accessorDecl : decl->getDirectMemberDeclsOfType<AccessorDecl>())
                     {
-                        if (as<SetterDecl>(member) || as<RefAccessorDecl>(member))
+                        if (as<SetterDecl>(accessorDecl) || as<RefAccessorDecl>(accessorDecl))
                         {
                             // If the subscript decl has a setter,
                             // then the call is an l-value if base is l-value.
@@ -1186,7 +1186,7 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
                             // Otherwise, if the accessor is [nonmutating], we can
                             // also consider the result of the subscript call as l-value
                             // regardless of the base.
-                            if (member->findModifier<NonmutatingAttribute>())
+                            if (accessorDecl->findModifier<NonmutatingAttribute>())
                             {
                                 callExpr->type.isLeftValue = true;
                                 break;

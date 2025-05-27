@@ -213,7 +213,7 @@ Val* maybeSubstituteGenericParam(Val* paramVal, Decl* paramDecl, SubstitutionSet
     Count argCount = args.getCount();
 
     Count argIndex = 0;
-    for (auto m : outerGeneric->members)
+    for (auto m : outerGeneric->getDirectMemberDecls())
     {
         // If we have run out of arguments, then we can stop
         // iterating over the parameters, because `this`
@@ -541,17 +541,14 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(
 
         bool found = false;
         Index index = 0;
-        for (auto m : genericDecl->members)
+        for (auto constraintParam : genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
         {
-            if (auto constraintParam = as<GenericTypeConstraintDecl>(m))
+            if (constraintParam == getDeclRef().getDecl())
             {
-                if (constraintParam == getDeclRef().getDecl())
-                {
-                    found = true;
-                    break;
-                }
-                index++;
+                found = true;
+                break;
             }
+            index++;
         }
         if (found)
         {
