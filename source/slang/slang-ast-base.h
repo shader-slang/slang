@@ -44,7 +44,7 @@ class NodeBase
     ASTNodeType astNodeType = ASTNodeType(-1);
 
 #ifdef _DEBUG
-    SLANG_UNREFLECTED int32_t _debugUID = 0;
+    int32_t _debugUID = 0;
 #endif
 };
 
@@ -112,7 +112,6 @@ class Scope : public NodeBase
     // The parent of this scope (where lookup should go if nothing is found locally)
     Scope* parent = nullptr;
 
-    SLANG_UNREFLECTED
     // The next sibling of this scope (a peer for lookup)
     Scope* nextSibling = nullptr;
 };
@@ -479,7 +478,7 @@ protected:
 
 private:
     mutable Val* m_resolvedVal = nullptr;
-    SLANG_UNREFLECTED mutable Index m_resolvedValEpoch = 0;
+    mutable Index m_resolvedValEpoch = 0;
 };
 
 template<int N, typename T, typename... Ts>
@@ -585,7 +584,7 @@ protected:
     // semantic checking, since Val deduplication requires the entire semantic checking process to
     // stick with one ASTBuilder.
     // Call getCurrentASTBuilder() to obtain the right ASTBuilder for semantic checking.
-    SLANG_UNREFLECTED ASTBuilder* m_astBuilderForReflection;
+    ASTBuilder* m_astBuilderForReflection;
 };
 
 template<typename T>
@@ -772,12 +771,12 @@ public:
     bool isChildOf(Decl* other) const;
 
     // Track the decl reference that caused the requirement of a capability atom.
-    SLANG_UNREFLECTED List<ProvenenceNodeWithLoc> capabilityRequirementProvenance;
+    List<ProvenenceNodeWithLoc> capabilityRequirementProvenance;
 
-    SLANG_UNREFLECTED bool hiddenFromLookup = false;
+    bool hiddenFromLookup = false;
 
 private:
-    SLANG_UNREFLECTED DeclRefBase* m_defaultDeclRef = nullptr;
+    DeclRefBase* m_defaultDeclRef = nullptr;
 };
 
 FIDDLE(abstract)

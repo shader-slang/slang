@@ -1308,7 +1308,6 @@ A capability describes an optional feature that a target may or may not support.
 * `atomicfloat2` 
 * `fragmentshaderbarycentric` 
 * `shadermemorycontrol` 
-* `wave_multi_prefix` 
 * `bufferreference` 
 * `bufferreference_int64` 
 * `cooperative_vector` 

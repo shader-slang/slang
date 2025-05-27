@@ -970,9 +970,6 @@ Compound Capabilities
 `shadermemorycontrol`
 > (gfx targets) Capabilities needed to use memory barriers
 
-`wave_multi_prefix`
-> Capabilities needed to use HLSL tier wave operations
-
 `bufferreference`
 > Capabilities needed to use GLSL buffer-reference's
 
