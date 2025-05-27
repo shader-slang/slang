@@ -3861,7 +3861,8 @@ struct ExprLoweringContext
                     _lowerSubstitutionArg(subContext, genSubst, valParamDecl, argCounter++);
                 }
             }
-            for (auto constraintDecl : genDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+            for (auto constraintDecl :
+                 genDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
             {
                 _lowerSubstitutionArg(subContext, genSubst, constraintDecl, argCounter++);
             }
@@ -9183,7 +9184,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             if (as<SubscriptDecl>(requirementDecl) || as<PropertyDecl>(requirementDecl))
             {
-                for (auto accessorDecl : as<ContainerDecl>(requirementDecl)->getDirectMemberDeclsOfType<AccessorDecl>())
+                for (auto accessorDecl :
+                     as<ContainerDecl>(requirementDecl)->getDirectMemberDeclsOfType<AccessorDecl>())
                 {
                     SLANG_UNUSED(accessorDecl);
                     operandCount++;
@@ -9339,15 +9341,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 if (as<PropertyDecl>(requirementDecl) || as<SubscriptDecl>(requirementDecl))
                 {
-                    for (auto accessorDecl : as<ContainerDecl>(requirementDecl)->getDirectMemberDeclsOfType<AccessorDecl>())
+                    for (auto accessorDecl : as<ContainerDecl>(requirementDecl)
+                                                 ->getDirectMemberDeclsOfType<AccessorDecl>())
                     {
                         auto accessorKey = getInterfaceRequirementKey(accessorDecl);
                         if (accessorKey)
                         {
-                            auto accessorDeclRef = createDefaultSpecializedDeclRef(
-                                subContext,
-                                nullptr,
-                                accessorDecl);
+                            auto accessorDeclRef =
+                                createDefaultSpecializedDeclRef(subContext, nullptr, accessorDecl);
                             addEntry(accessorKey, accessorDeclRef);
                         }
                     }
@@ -9900,7 +9901,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         // Then we emit constraint parameters, again in
         // declaration order.
-        for (auto constraintDecl : genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+        for (auto constraintDecl :
+             genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
         {
             emitGenericConstraintDecl(subContext, constraintDecl);
         }

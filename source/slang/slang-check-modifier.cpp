@@ -1660,7 +1660,10 @@ Modifier* SemanticsVisitor::checkModifier(
             auto transparentModifier = getASTBuilder()->create<TransparentModifier>();
             if (auto parentDecl = getParentDecl(as<Decl>(syntaxNode)))
             {
-                parentDecl->_invalidateLookupAcceleratorsBecauseUnscopedEnumAttributeWillBeTurnedIntoTransparentModifier(unscopedEnumAttr, transparentModifier);
+                parentDecl
+                    ->_invalidateLookupAcceleratorsBecauseUnscopedEnumAttributeWillBeTurnedIntoTransparentModifier(
+                        unscopedEnumAttr,
+                        transparentModifier);
             }
             return transparentModifier;
         }

@@ -592,7 +592,6 @@ struct ASTDumpContext
         }
         m_writer->dedent();
         m_writer->emit("}");
-
     }
 
     void dump(ContainerDecl* decl)

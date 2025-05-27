@@ -541,7 +541,8 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(
 
         bool found = false;
         Index index = 0;
-        for (auto constraintParam : genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+        for (auto constraintParam :
+             genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
         {
             if (constraintParam == getDeclRef().getDecl())
             {

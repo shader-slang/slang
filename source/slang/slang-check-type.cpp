@@ -333,7 +333,8 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
             }
         }
 
-        for (auto constraintParam : genericDeclRef.getDecl()->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+        for (auto constraintParam :
+             genericDeclRef.getDecl()->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
         {
             auto genericParam = as<DeclRefType>(constraintParam->sub.type)->getDeclRef();
             if (!genericParam)
@@ -350,8 +351,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
                 return false;
             }
-            auto witness =
-                tryGetSubtypeWitness(defaultType, CheckProperType(constraintParam->sup));
+            auto witness = tryGetSubtypeWitness(defaultType, CheckProperType(constraintParam->sup));
             if (!witness)
             {
                 // diagnose

@@ -61,7 +61,8 @@ public:
 
     explicit DeclsOfNameList(Decl* decl)
         : _lastDecl(decl)
-    {}
+    {
+    }
 
     struct Iterator
     {
@@ -72,10 +73,7 @@ public:
         {
         }
 
-        Decl* operator*() const
-        {
-            return _decl;
-        }
+        Decl* operator*() const { return _decl; }
 
         Iterator& operator++()
         {
@@ -171,22 +169,19 @@ class ContainerDecl : public Decl
     void addDirectMemberDecl(Decl* decl);
 
     /// Get the subset of direct member declarations that are "transparent."
-    /// 
+    ///
     /// Transparent members will themselves be considered when performing
     /// looking on the parent. E.g., if `a` has a transparent member `b`,
     /// then a lookup like `a.x` will also consider `a.b.x` as a possible
     /// result.
-    ///  
+    ///
     List<Decl*> const& getTransparentDirectMemberDecls();
 
     // Note: Just an alias for `getDirectMemberDecls()`,
     // but left in place because of just how many call sites were
     // already using this name.
     //
-    List<Decl*> const& getMembers()
-    {
-        return getDirectMemberDecls();
-    }
+    List<Decl*> const& getMembers() { return getDirectMemberDecls(); }
 
     // Note: Just an alias for `getDirectMemberDeclsOfType()`,
     // but left in place because of just how many call sites were
@@ -202,10 +197,7 @@ class ContainerDecl : public Decl
     // but left in place because of just how many call sites were
     // already using this name.
     //
-    void addMember(Decl* member)
-    {
-        addDirectMemberDecl(member);
-    }
+    void addMember(Decl* member) { addDirectMemberDecl(member); }
 
     //
     // NOTE: The operations after this point are *not* considered part of
@@ -236,19 +228,22 @@ class ContainerDecl : public Decl
     /// TODO: In the even *longer* run, we should eliminate `TransparentModifier` as well,
     /// because it only exists to support legacy `cbuffer` declarations and similar syntax,
     /// and those should be deprecated over time.
-    /// 
-    void _invalidateLookupAcceleratorsBecauseUnscopedEnumAttributeWillBeTurnedIntoTransparentModifier(UnscopedEnumAttribute* unscopedEnumAttr, TransparentModifier* transparentModifier);
+    ///
+    void _invalidateLookupAcceleratorsBecauseUnscopedEnumAttributeWillBeTurnedIntoTransparentModifier(
+        UnscopedEnumAttribute* unscopedEnumAttr,
+        TransparentModifier* transparentModifier);
 
     /// Remove a constructor declaration from the direct member declarations of this container.
     ///
     /// This operation is seemingly used when a default constructor declaration has been synthesized
     /// for a type, but that type already contained a default constructor of its own.
-    /// 
-    /// TODO: Somebody should investigate why this operation is even needed; it seems like an indication
-    /// that we are doing something Deeply Wrong in the way that default constructors are being handled
-    /// and synthesized (on top of the things that we know are Wrong By Design).
     ///
-    void _removeDirectMemberConstructorDeclBecauseSynthesizedAnotherDefaultConstructorInstead(ConstructorDecl* decl);
+    /// TODO: Somebody should investigate why this operation is even needed; it seems like an
+    /// indication that we are doing something Deeply Wrong in the way that default constructors are
+    /// being handled and synthesized (on top of the things that we know are Wrong By Design).
+    ///
+    void _removeDirectMemberConstructorDeclBecauseSynthesizedAnotherDefaultConstructorInstead(
+        ConstructorDecl* decl);
 
     /// Replace the given `oldVarDecl` with the given `newPropertyDecl` in the direct member
     /// declarations of this container decl, because the variable declaration had a bit-field
@@ -265,8 +260,11 @@ class ContainerDecl : public Decl
     /// a type-based solution, should be introduced to server the same use cases, without requiring
     /// us to parse something as a variable that is semantically *not* a variable in almost any
     /// of the ways that count.
-    /// 
-    void _replaceDirectMemberBitFieldVariableDeclAtIndexWithPropertyDeclThatWasSynthesizedForIt(Index index, VarDecl* oldVarDecl, PropertyDecl* newPropertyDecl);
+    ///
+    void _replaceDirectMemberBitFieldVariableDeclAtIndexWithPropertyDeclThatWasSynthesizedForIt(
+        Index index,
+        VarDecl* oldVarDecl,
+        PropertyDecl* newPropertyDecl);
 
     /// Insert `backingVarDecl` into this container declaration at `index`, to handle the case
     /// where the backing variable has been synthesized to store the bits of one or more bitfield
@@ -277,16 +275,16 @@ class ContainerDecl : public Decl
     /// their indices in the member list are consistent and stable.
     ///
     /// The reason the code that calls this operation can't just add `backingVarDecl` to the end of
-    /// the declaration is that there is an underlying assumption made by users that any non-bitfield
-    /// members before/after a bitfield declaration will have their storage laid out before/after
-    /// the storage for that bitfield.
+    /// the declaration is that there is an underlying assumption made by users that any
+    /// non-bitfield members before/after a bitfield declaration will have their storage laid out
+    /// before/after the storage for that bitfield.
     ///
     /// TODO: A simple cleanup would be to *not* guarantee the order of storage layout for bitfield
-    /// members relative to other member variables, but the real long-term fix is to have an alternative
-    /// means for users to define bitfields that does not inherit the C-like syntax, and that can
-    /// make the storage that is introduced clear at parse time, so that the relevant declaration(s)
-    /// can already be in the correct order.
-    /// 
+    /// members relative to other member variables, but the real long-term fix is to have an
+    /// alternative means for users to define bitfields that does not inherit the C-like syntax, and
+    /// that can make the storage that is introduced clear at parse time, so that the relevant
+    /// declaration(s) can already be in the correct order.
+    ///
     void _insertDirectMemberDeclAtIndexForBitfieldPropertyBackingMember(
         Index index,
         VarDecl* backingVarDecl);
