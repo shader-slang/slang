@@ -17948,6 +17948,114 @@ int GetClusterID()
         };
     }
 }
+
+/// @category raytracing
+[__requiresNVAPI]
+[NonUniformReturn]
+[require(cuda_hlsl_spirv, raytracing_lss)]
+float4 GetSpherePositionAndRadius()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "NvRtSphereObjectPositionAndRadius";
+    case cuda:
+        {
+            __intrinsic_asm "optixGetSpherePositionAndRadius";
+        }
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
+            %pos:$$float3 = OpLoad builtin(HitSpherePositionNV:float3);
+            %rad:$$float = OpLoad builtin(HitSphereRadiusNV:float);
+            result:$$float4 = OpCompositeConstruct %pos %rad;
+        };
+    }
+}
+
+/// @category raytracing
+[__requiresNVAPI]
+[NonUniformReturn]
+[require(cuda_hlsl_spirv, raytracing_lss)]
+float2x4 GetLssPositionsAndRadii()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
+    case cuda:
+        {
+            __intrinsic_asm "optixObjectPositionsAndRadii";
+        }
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
+            %positions:$$float3[2] = OpLoad builtin(HitLSSPositionsNV:float3[2]);
+            %radii:$$float[2] = OpLoad builtin(HitLSSRadiiNV:float[2]);
+            %r0:$$float = OpCompositeExtract %radii 0;
+            %r1:$$float = OpCompositeExtract %radii 1;
+            %p0:$$float3 = OpCompositeExtract %positions 0;
+            %p1:$$float3 = OpCompositeExtract %positions 1;
+            %a:$$float4 = OpCompositeConstruct %p0 %r0;
+            %b:$$float4 = OpCompositeConstruct %p1 %r1;
+            result:$$float2x4 = OpCompositeConstruct %a %b;
+        };
+    
+    }
+}
+
+/// @category raytracing
+[__requiresNVAPI]
+[NonUniformReturn]
+[require(cuda_hlsl_spirv, raytracing_lss)]
+bool IsSphereHit()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "NvRtIsSphereHit";
+    case cuda:
+        {
+            __intrinsic_asm "optixIsSphereHit";
+        }
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
+            result:$$bool = OpLoad builtin(HitIsSphereNV:bool);
+        };
+    }
+}
+
+/// @category raytracing
+[__requiresNVAPI]
+[NonUniformReturn]
+[require(cuda_hlsl_spirv, raytracing_lss)]
+bool IsLssHit()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "NvRtIsLssHit";
+    case cuda:
+        {
+            __intrinsic_asm "optixIsLSSHit";
+        }
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
+            result:$$bool = OpLoad builtin(HitIsLSSNV:bool);
+        };
+    }
+}
+
 // Note: The provisional DXR spec included these unadorned
 // `ObjectToWorld()` and `WorldToObject()` functions, so
 // we will forward them to the new names as a convience
@@ -20524,6 +20632,106 @@ struct HitObject
                 OpExtension "SPV_NV_cluster_acceleration_structure";
                 OpCapability RayTracingClusterAccelerationStructureNV;
                 result:$$int = OpHitObjectGetClusterIdNV &this;
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [NonUniformReturn]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
+    float4 GetSpherePositionAndRadius()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtSphereObjectPositionAndRadius";
+        case cuda:
+            {
+                __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
+            }
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                OpCapability RayTracingSpheresGeometryNV;
+                %position:$$float3 = OpHitObjectGetSpherePositionNV &this;
+                %radius:$$float = OpHitObjectGetSphereRadiusNV &this;
+                result:$$float4 = OpCompositeConstruct %position %radius;
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [NonUniformReturn]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
+    float2x4 GetLssPositionsAndRadii()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
+        case cuda:
+            {
+                __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
+            }
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                OpCapability RayTracingSpheresGeometryNV;
+                %positions:$$float3[2] = OpHitObjectGetLSSPositionsNV &this;
+                %radii:$$float[2] = OpHitObjectGetLSSRadiiNV &this;
+                %r0:$$float = OpCompositeExtract %radii 0;
+                %r1:$$float = OpCompositeExtract %radii 1;
+                %p0:$$float3 = OpCompositeExtract %positions 0;
+                %p1:$$float3 = OpCompositeExtract %positions 1;
+                %a:$$float4 = OpCompositeConstruct %p0 %r0;
+                %b:$$float4 = OpCompositeConstruct %p1 %r1;
+                result:$$float2x4 = OpCompositeConstruct %a %b;
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [NonUniformReturn]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
+    bool IsSphereHit()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtIsSphereHit";
+        case cuda:
+            {
+                __intrinsic_asm "optixHitObjectIsSphereHit";
+            }
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$bool = OpHitObjectIsSphereHitNV &this;
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [NonUniformReturn]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
+    bool IsLssHit()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtIsLssHit";
+        case cuda:
+            {
+                __intrinsic_asm "optixHitObjectIsLSSHit";
+            }
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$bool = OpHitObjectIsLSSHitNV &this;
             };
         }
     }
