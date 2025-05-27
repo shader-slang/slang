@@ -856,6 +856,15 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitDeferStmt(DeferStmt* stmt) { dispatchIfNotNull(stmt->statement); }
 
+    void visitThrowStmt(ThrowStmt* stmt) { dispatchIfNotNull(stmt->expression); }
+
+    void visitCatchStmt(CatchStmt* stmt)
+    {
+        dispatchIfNotNull(stmt->errorVar);
+        dispatchIfNotNull(stmt->tryBody);
+        dispatchIfNotNull(stmt->handleBody);
+    }
+
     void visitWhileStmt(WhileStmt* stmt)
     {
         dispatchIfNotNull(stmt->predicate);
@@ -2510,6 +2519,23 @@ static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type*
             defaultCtor->loc,
             nullptr);
         return invoke;
+    }
+
+    // At the last, we will check if the type is a C-style type, if it is, we will use empty
+    // initializer list to construct the default constructor.
+    HashSet<Type*> visitSet;
+    if (visitor->isCStyleType(type, visitSet))
+    {
+        auto initListExpr = visitor->getASTBuilder()->create<InitializerListExpr>();
+        initListExpr->type = visitor->getASTBuilder()->getInitializerListType();
+        Expr* outExpr = nullptr;
+        auto fromType = type;
+        if (auto atomicType = as<AtomicType>(fromType))
+        {
+            fromType = atomicType->getElementType();
+        }
+        if (visitor->_coerceInitializerList(fromType, &outExpr, initListExpr))
+            return outExpr;
     }
 
     return nullptr;
@@ -10379,7 +10405,16 @@ void SemanticsDeclHeaderVisitor::visitAbstractStorageDeclCommon(ContainerDecl* d
 
 void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
 {
-    decl->returnType = CheckUsableType(decl->returnType, decl);
+    // __subscript needs to have a return type specified. Check if return type
+    // is missing (represented as IncompleteExpr) and return an error.
+    if (decl->returnType.exp && as<IncompleteExpr>(decl->returnType.exp))
+    {
+        getSink()->diagnose(decl, Diagnostics::subscriptMustHaveReturnType);
+    }
+    else if (decl->returnType.exp)
+    {
+        decl->returnType = CheckUsableType(decl->returnType, decl);
+    }
 
     visitAbstractStorageDeclCommon(decl);
 
@@ -13031,7 +13066,13 @@ static Expr* _getParamDefaultValue(SemanticsVisitor* visitor, VarDeclBase* varDe
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    return constructDefaultConstructorForType(visitor, varDecl->type.type);
+    if (auto expr = constructDefaultConstructorForType(visitor, varDecl->type.type))
+    {
+        expr->loc = varDecl->loc;
+        return expr;
+    }
+
+    return nullptr;
 }
 
 bool SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* structDecl)
