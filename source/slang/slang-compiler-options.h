@@ -365,6 +365,8 @@ struct CompilerOptionSet
 
     bool shouldHaveSourceMap() { return !getBoolOption(CompilerOptionName::DisableSourceMap); }
 
+    bool shouldEmitSeparateDebugInfo() { return getBoolOption(CompilerOptionName::EmitSeparateDebug); }
+
     FloatingPointMode getFloatingPointMode()
     {
         return getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);

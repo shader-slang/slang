@@ -3345,6 +3345,7 @@ private:
 
     /// Maybe write the artifact to the path (if set), or stdout (if there is no container or path)
     SlangResult _maybeWriteArtifact(const String& path, IArtifact* artifact);
+    SlangResult _maybeWriteDebugArtifact(TargetProgram* targetProgram, const String& path, IArtifact* artifact);
     SlangResult _writeArtifact(const String& path, IArtifact* artifact);
 
     /// Adds any extra settings to complete a targetRequest

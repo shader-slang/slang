@@ -2101,6 +2101,79 @@ SlangResult emitSPIRVFromIR(
     const List<IRFunc*>& irEntryPoints,
     List<uint8_t>& spirvOut);
 
+// Helper function to emit SPIRV after an optimization pass using spirv-tools.
+// If separate debug info is requested, then the dbgArtifact will contain all
+// debug info, and the artifact will have this info stripped.
+static SlangResult emitOptimizedArtifacts(
+    CodeGenContext* codeGenContext,
+    IDownstreamCompiler* compiler,
+    ComPtr<IArtifact>& artifact,
+    ComPtr<IArtifact>& dbgArtifact)
+{
+    auto targetRequest = codeGenContext->getTargetReq();
+    auto targetCompilerOptions = targetRequest->getOptionSet();
+
+    // Set options for general spirv-opt usage.
+    ComPtr<IArtifact> optimizedArtifact;
+    DownstreamCompileOptions downstreamOptions;
+    downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
+    downstreamOptions.targetType = SLANG_SPIRV;
+    downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
+    switch (codeGenContext->getTargetProgram()->getOptionSet().getEnumOption<OptimizationLevel>(
+        CompilerOptionName::Optimization))
+    {
+    case OptimizationLevel::None:
+        downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None;
+        break;
+    case OptimizationLevel::Default:
+        downstreamOptions.optimizationLevel =
+            DownstreamCompileOptions::OptimizationLevel::Default;
+        break;
+    case OptimizationLevel::High:
+        downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::High;
+        break;
+    case OptimizationLevel::Maximal:
+        downstreamOptions.optimizationLevel =
+            DownstreamCompileOptions::OptimizationLevel::Maximal;
+        break;
+    default:
+        SLANG_ASSERT(!"Unhandled optimization level");
+        break;
+    }
+
+    if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
+    {
+        // If separate debug info is requested, then this is the debug artifact.
+        if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
+            dbgArtifact = _Move(optimizedArtifact);
+        else
+            artifact = _Move(optimizedArtifact);
+    }
+    else
+        return SLANG_FAIL;
+
+    if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
+    {
+        // If separate dbg info is requested, then we need a second optimization
+        // pass to strip the debug data from the main artifact.
+        ComPtr<IArtifact> strippedArtifact;
+        DownstreamCompileOptions strippedOptions;
+        strippedOptions.sourceArtifacts = makeSlice(dbgArtifact.readRef(), 1);
+        strippedOptions.targetType = SLANG_SPIRV;
+        strippedOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
+        strippedOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::DebugStrip;
+
+        if (SLANG_SUCCEEDED(compiler->compile(strippedOptions, strippedArtifact.writeRef())))
+        {
+            artifact = _Move(strippedArtifact);
+        }
+        else
+            return SLANG_FAIL;
+    }
+
+    return SLANG_OK;
+}
+
 SlangResult emitSPIRVForEntryPointsDirectly(
     CodeGenContext* codeGenContext,
     ComPtr<IArtifact>& outArtifact)
@@ -2113,6 +2186,13 @@ SlangResult emitSPIRVForEntryPointsDirectly(
 
     auto irModule = linkedIR.module;
     auto irEntryPoints = linkedIR.entryPoints;
+
+    auto targetRequest = codeGenContext->getTargetReq();
+    auto targetCompilerOptions = targetRequest->getOptionSet();
+
+    // Create the artifact containing the main SPIRV data, and the debug SPIRV
+    // data if requested by the command line arg -separate-debug-info.
+    Slang::ComPtr<Slang::IArtifact> dbgArtifact;
 
     List<uint8_t> spirv, outSpirv;
     emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirv);
@@ -2220,37 +2300,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
             }
         }
 
-        ComPtr<IArtifact> optimizedArtifact;
-        DownstreamCompileOptions downstreamOptions;
-        downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
-        downstreamOptions.targetType = SLANG_SPIRV;
-        downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
-        switch (codeGenContext->getTargetProgram()->getOptionSet().getEnumOption<OptimizationLevel>(
-            CompilerOptionName::Optimization))
-        {
-        case OptimizationLevel::None:
-            downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None;
-            break;
-        case OptimizationLevel::Default:
-            downstreamOptions.optimizationLevel =
-                DownstreamCompileOptions::OptimizationLevel::Default;
-            break;
-        case OptimizationLevel::High:
-            downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::High;
-            break;
-        case OptimizationLevel::Maximal:
-            downstreamOptions.optimizationLevel =
-                DownstreamCompileOptions::OptimizationLevel::Maximal;
-            break;
-        default:
-            SLANG_ASSERT(!"Unhandled optimization level");
-            break;
-        }
         auto downstreamStartTime = std::chrono::high_resolution_clock::now();
-        if (SLANG_SUCCEEDED(compiler->compile(downstreamOptions, optimizedArtifact.writeRef())))
-        {
-            artifact = _Move(optimizedArtifact);
-        }
+        emitOptimizedArtifacts(codeGenContext, compiler, artifact, dbgArtifact);
         auto downstreamElapsedTime =
             (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
         codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
@@ -2260,6 +2311,12 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     }
 
     ArtifactUtil::addAssociated(artifact, linkedIR.metadata);
+
+    // Associate the debug artifact with the main artifact.
+    // EndToEndCompileRequest::generateOutput will read this data
+    // and produce a .dbg.spv file for this child artifact.
+    if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
+        artifact->addAssociated(dbgArtifact);
 
     outArtifact.swap(artifact);
 

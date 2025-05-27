@@ -501,6 +501,14 @@ static void glslang_optimizeSPIRV(
 
             break;
         }
+    // Strip debug and non-semantic info, this is intended to be done after a
+    // previous spirv-opt pass.
+    case SLANG_OPTIMIZATION_LEVEL_DEBUG_STRIP:
+        {
+            optimizer.RegisterPass(spvtools::CreateStripNonSemanticInfoPass());
+            optimizer.RegisterPass(spvtools::CreateStripDebugInfoPass());
+            break;
+        }
     }
 
     if (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE)

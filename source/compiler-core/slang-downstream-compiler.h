@@ -180,6 +180,7 @@ struct DownstreamCompileOptions
         High,    ///< Optimize aggressively.
         Maximal, ///< Include optimizations that may take a very long time, or may involve severe
                  ///< space-vs-speed tradeoffs
+        DebugStrip, ///< Stip debug and non-semantic info.
     };
 
     enum class DebugInfoType : uint8_t
