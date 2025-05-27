@@ -369,7 +369,7 @@ SLANG_VECTOR_GET_ELEMENT_PTR(__half)
     SLANG_CUDA_VECTOR_BINARY_OP(T, n, |)          \
     SLANG_CUDA_VECTOR_BINARY_OP(T, n, &&)         \
     SLANG_CUDA_VECTOR_BINARY_OP(T, n, ||)         \
-    SLANG_CUDA_VECTOR_BINARY_OP(T, n, >)         \
+    SLANG_CUDA_VECTOR_BINARY_OP(T, n, >>)         \
     SLANG_CUDA_VECTOR_BINARY_OP(T, n, <<)         \
     SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, >)  \
     SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, <)  \
