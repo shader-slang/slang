@@ -217,7 +217,7 @@ void RIFFSerialWriter::endOptional()
     _cursor.endChunk();
 }
 
-void RIFFSerialWriter::handleSharedPtr(void*& value, Callback callback, void* userData)
+void RIFFSerialWriter::handleSharedPtr(void*& value, Callback callback, void* context)
 {
     // Because we are writing, we only care about the
     // pointer that is already present in `value`.
@@ -279,22 +279,22 @@ void RIFFSerialWriter::handleSharedPtr(void*& value, Callback callback, void* us
     ObjectInfo objectInfo;
     objectInfo.ptr = ptr;
     objectInfo.callback = callback;
-    objectInfo.userData = userData;
+    objectInfo.context = context;
     _objects.add(objectInfo);
 }
 
-void RIFFSerialWriter::handleUniquePtr(void*& value, Callback callback, void* userData)
+void RIFFSerialWriter::handleUniquePtr(void*& value, Callback callback, void* context)
 {
     // We treat all pointers as shared pointers, because there isn't really
     // an optimized representation we would want to use for the unique case.
     //
-    handleSharedPtr(value, callback, userData);
+    handleSharedPtr(value, callback, context);
 }
 
 void RIFFSerialWriter::handleDeferredObjectContents(
     void* valuePtr,
     Callback callback,
-    void* userData)
+    void* context)
 {
     // Because we are already deferring writing of the *entirety* of
     // an object's members as part of how `handleSharedPtr()` works,
@@ -303,7 +303,7 @@ void RIFFSerialWriter::handleDeferredObjectContents(
     // (In practice the `handleDeferredObjectContents()` operation is
     // more for the benefit of reading than writing).
     //
-    callback(valuePtr, userData);
+    callback(valuePtr, this, context);
 }
 
 void RIFFSerialWriter::_writeObjectReference(ObjectIndex index)
@@ -363,7 +363,7 @@ void RIFFSerialWriter::_flush()
         // can set the pointed-to pointer to whatever object it
         // allocates or finds.
         //
-        objectInfo.callback(&objectInfo.ptr, objectInfo.userData);
+        objectInfo.callback(&objectInfo.ptr, this, objectInfo.context);
 
         // TODO(tfoley): There is an important invariant here that
         // the callback had better only write *one* value, but
@@ -572,7 +572,7 @@ RIFFSerialReader::ObjectIndex RIFFSerialReader::_readObjectReference()
     return objectIndex;
 }
 
-void RIFFSerialReader::handleSharedPtr(void*& value, Callback callback, void* userData)
+void RIFFSerialReader::handleSharedPtr(void*& value, Callback callback, void* context)
 {
     // The logic here largely mirrors what appears in
     // `RIFFSerialWriter::handleSharedPtr`.
@@ -686,7 +686,7 @@ void RIFFSerialReader::handleSharedPtr(void*& value, Callback callback, void* us
     // that objects and stores a pointer to it into the output
     // parameter.
     //
-    callback(&objectInfo.ptr, userData);
+    callback(&objectInfo.ptr, this, context);
 
     _popCursor();
 
@@ -706,7 +706,7 @@ void RIFFSerialReader::handleUniquePtr(void*& value, Callback callback, void* us
 void RIFFSerialReader::handleDeferredObjectContents(
     void* valuePtr,
     Callback callback,
-    void* userData)
+    void* context)
 {
     // Unlike the case in `RIFFSerialWriter::handleDeferredObjectContents()`,
     // we very much *do* want to delay invoking the callback until later.
@@ -726,7 +726,7 @@ void RIFFSerialReader::handleDeferredObjectContents(
     deferredAction.savedCursor = _cursor;
     deferredAction.valuePtr = valuePtr;
     deferredAction.callback = callback;
-    deferredAction.userData = userData;
+    deferredAction.context = context;
 
     _deferredActions.add(deferredAction);
 }
@@ -777,7 +777,7 @@ void RIFFSerialReader::_flush()
         _deferredActions.removeLast();
 
         _cursor = deferredAction.savedCursor;
-        deferredAction.callback(deferredAction.valuePtr, deferredAction.userData);
+        deferredAction.callback(deferredAction.valuePtr, this, deferredAction.context);
     }
 }
 

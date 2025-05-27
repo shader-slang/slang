@@ -25,12 +25,12 @@ const char Fossil::Header::kMagic[16] = {
     '\n'    // byte 15
 };
 
-FossilizedValRef getRootValue(ISlangBlob* blob)
+FossilizedValPtr getRootValue(ISlangBlob* blob)
 {
     return getRootValue(blob->getBufferPointer(), blob->getBufferSize());
 }
 
-FossilizedValRef getRootValue(void const* data, Size size)
+FossilizedValPtr getRootValue(void const* data, Size size)
 {
     if (!data)
     {
@@ -72,8 +72,8 @@ FossilizedValRef getRootValue(void const* data, Size size)
         SLANG_UNEXPECTED("bad format for fossil");
     }
 
-    return FossilizedValRef(
-        rootValueVariant->getContentData(),
+    return FossilizedValPtr(
+        rootValueVariant->getContentDataPtr(),
         rootValueVariant->getContentLayout());
 }
 
@@ -85,13 +85,13 @@ Size FossilizedStringObj::getSize() const
     return Size(*sizePtr);
 }
 
-UnownedTerminatedStringSlice FossilizedStringObj::getValue() const
+UnownedTerminatedStringSlice FossilizedStringObj::get() const
 {
     auto size = getSize();
     return UnownedTerminatedStringSlice((char*)this, size);
 }
 
-Count FossilizedContainerObj::getElementCount() const
+Count FossilizedContainerObjBase::getElementCount() const
 {
     auto countPtr = (FossilUInt*)this - 1;
     return Size(*countPtr);
@@ -103,6 +103,7 @@ FossilizedValLayout* FossilizedVariantObj::getContentLayout() const
     return (*layoutPtrPtr).get();
 }
 
+#if 0
 FossilizedValRef getPtrTarget(FossilizedPtrValRef ptrRef)
 {
     auto ptrLayout = ptrRef.getLayout();
@@ -130,27 +131,29 @@ Count getElementCount(FossilizedContainerObjRef containerRef)
     auto containerPtr = containerRef.getData();
     return containerPtr->getElementCount();
 }
+#endif
 
-FossilizedValRef getElement(FossilizedContainerObjRef containerRef, Index index)
+DynRef<FossilizedVal> DynRef<FossilizedContainerObjBase>::getElement(Index index) const
 {
     SLANG_ASSERT(index >= 0);
-    SLANG_ASSERT(index < getElementCount(containerRef));
+    SLANG_ASSERT(index < getElementCount());
 
-    auto containerLayout = containerRef.getLayout();
+    auto containerLayout = getLayout();
     auto elementLayout = containerLayout->elementLayout.get();
     auto elementStride = containerLayout->elementStride;
 
-    auto elementsPtr = (Byte*)containerRef.getData();
+    auto elementsPtr = (Byte*)getDataPtr();
     auto elementPtr = (FossilizedVal*)(elementsPtr + elementStride * index);
     return FossilizedValRef(elementPtr, elementLayout);
 }
 
+#if 0
 Count getFieldCount(FossilizedRecordValRef recordRef)
 {
     auto recordLayout = recordRef.getLayout();
     return recordLayout->fieldCount;
 }
-
+#endif
 FossilizedRecordElementLayout* FossilizedRecordLayout::getField(Index index) const
 {
     SLANG_ASSERT(index >= 0);
@@ -160,28 +163,34 @@ FossilizedRecordElementLayout* FossilizedRecordLayout::getField(Index index) con
     return fieldsPtr + index;
 }
 
-
-FossilizedValRef getField(FossilizedRecordValRef recordRef, Index index)
+DynRef<FossilizedVal> DynRef<FossilizedRecordVal>::getField(Index index) const
 {
     SLANG_ASSERT(index >= 0);
-    SLANG_ASSERT(index < getFieldCount(recordRef));
+    SLANG_ASSERT(index < getFieldCount());
 
-    auto recordLayout = recordRef.getLayout();
-    auto field = recordLayout->getField(index);
+    auto recordLayout = getLayout();
+    auto fieldInfo = recordLayout->getField(index);
 
-    auto fieldsPtr = (Byte*)recordRef.getData();
-    auto fieldPtr = (FossilizedVal*)(fieldsPtr + field->offset);
-    return FossilizedValRef(fieldPtr, field->layout);
+    auto fieldsPtr = (Byte*)getDataPtr();
+    auto fieldPtr = (FossilizedVal*)(fieldsPtr + fieldInfo->offset);
+    return FossilizedValRef(fieldPtr, fieldInfo->layout);
 }
 
+#if 0
 FossilizedValRef getVariantContent(FossilizedVariantObjRef variantRef)
 {
     return getVariantContent(variantRef.getData());
 }
+#endif
 
-FossilizedValRef getVariantContent(FossilizedVariantObj* variantPtr)
+FossilizedValRef getVariantContentRef(FossilizedVariantObj* variantPtr)
 {
-    return FossilizedValRef(variantPtr->getContentData(), variantPtr->getContentLayout());
+    return FossilizedValRef(variantPtr->getContentDataPtr(), variantPtr->getContentLayout());
+}
+
+FossilizedValPtr getVariantContentPtr(FossilizedVariantObj* variantPtr)
+{
+    return FossilizedValPtr(variantPtr->getContentDataPtr(), variantPtr->getContentLayout());
 }
 
 } // namespace Slang

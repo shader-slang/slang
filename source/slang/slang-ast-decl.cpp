@@ -50,80 +50,139 @@ bool isInterfaceRequirement(Decl* decl)
 }
 
 //
-// ContainerDecl
+// ContainerDeclDirectMemberDecls
 //
 
-List<Decl*> const& ContainerDecl::getDirectMemberDecls()
+void ContainerDeclDirectMemberDecls::_initForOnDemandDeserialization(
+    RefObject* deserializationContext,
+    void const* deserializationData,
+    Count declCount)
 {
-    return _directMemberDecls.decls;
+    SLANG_ASSERT(deserializationContext);
+    SLANG_ASSERT(deserializationData);
+
+    SLANG_ASSERT(!decls.getCount());
+    SLANG_ASSERT(!onDemandDeserialization.context);
+
+    onDemandDeserialization.context = deserializationContext;
+    onDemandDeserialization.data = deserializationData;
+
+    for (Index i = 0; i < declCount; ++i)
+        decls.add(nullptr);
 }
 
-Count ContainerDecl::getDirectMemberDeclCount()
+List<Decl*> const& ContainerDeclDirectMemberDecls::getDecls() const
 {
-    return _directMemberDecls.decls.getCount();
+    if (isUsingOnDemandDeserialization())
+    {
+        // If the caller needs the list of all of the direct
+        // member declarations, then we will simply query
+        // each of the declarations by index, which should
+        // trigger each of them to get deserialized (if it
+        // hasn't already been done).
+        //
+        // Once we are done with that loop, we can turn off
+        // on-demand deserialization, since everything
+        // will have already been loaded.
+        //
+        // TODO(tfoley): Validate the above claim, considering
+        // that the mangled name lookup path also uses the
+        // test being described here.
+        //
+        auto declCount = getDeclCount();
+        for (Index i = 0; i < declCount; ++i)
+        {
+            auto decl = getDecl(i);
+            SLANG_UNUSED(decl);
+        }
+    }
+
+    return decls;
 }
 
-Decl* ContainerDecl::getDirectMemberDecl(Index index)
+Count ContainerDeclDirectMemberDecls::getDeclCount() const
 {
-    return _directMemberDecls.decls[index];
+    // Note: in the case of on-demand deserialization,
+    // the number of elements in the `decls` list
+    // will be correct, although one or more of the
+    // pointers in it might be null.
+    //
+    return decls.getCount();
 }
 
-Decl* ContainerDecl::getFirstDirectMemberDecl()
+Decl* ContainerDeclDirectMemberDecls::getDecl(Index index) const
 {
-    if (getDirectMemberDeclCount() == 0)
-        return nullptr;
-    return getDirectMemberDecl(0);
+    auto decl = decls[index];
+    if (!decl && isUsingOnDemandDeserialization())
+    {
+        decl = _readSerializedDeclAtIndex(index);
+        decls[index] = decl;
+    }
+    return decl;
 }
 
-DeclsOfNameList ContainerDecl::getDirectMemberDeclsOfName(Name* name)
+Decl* ContainerDeclDirectMemberDecls::findLastDeclOfName(Name* name) const
 {
-    return DeclsOfNameList(findLastDirectMemberDeclOfName(name));
-}
+    if (isUsingOnDemandDeserialization())
+    {
+        if (auto found = accelerators.mapNameToLastDeclOfThatName.tryGetValue(name))
+            return *found;
 
-Decl* ContainerDecl::findLastDirectMemberDeclOfName(Name* name)
-{
-    _ensureLookupAcceleratorsAreValid();
-    if (auto found = _directMemberDecls.accelerators.mapNameToLastDeclOfThatName.tryGetValue(name))
-        return *found;
+        Decl* decl = _readSerializedDeclsOfName(name);
+        accelerators.mapNameToLastDeclOfThatName.add(name, decl);
+        return decl;
+    }
+    else
+    {
+        _ensureLookupAcceleratorsAreValid();
+        if (auto found = accelerators.mapNameToLastDeclOfThatName.tryGetValue(name))
+            return *found;
+    }
     return nullptr;
 }
 
-Decl* ContainerDecl::getPrevDirectMemberDeclWithSameName(Decl* decl)
+Dictionary<Name*, Decl*> ContainerDeclDirectMemberDecls::getMapFromNameToLastDeclOfThatName() const
 {
-    SLANG_ASSERT(decl);
-    SLANG_ASSERT(decl->parentDecl == this);
+    SLANG_ASSERT(!isUsingOnDemandDeserialization());
 
     _ensureLookupAcceleratorsAreValid();
-    return decl->_prevInContainerWithSameName;
+    return accelerators.mapNameToLastDeclOfThatName;
 }
 
-void ContainerDecl::addDirectMemberDecl(Decl* decl)
-{
-    if (!decl)
-        return;
 
-    decl->parentDecl = this;
-    _directMemberDecls.decls.add(decl);
+List<Decl*> const& ContainerDeclDirectMemberDecls::getTransparentDecls() const
+{
+    if (isUsingOnDemandDeserialization())
+    {
+        if (accelerators.filteredListOfTransparentDecls.getCount() == 0)
+        {
+            _readSerializedTransparentDecls();
+        }
+    }
+    else
+    {
+        _ensureLookupAcceleratorsAreValid();
+    }
+    return accelerators.filteredListOfTransparentDecls;
 }
 
-List<Decl*> const& ContainerDecl::getTransparentDirectMemberDecls()
+bool ContainerDeclDirectMemberDecls::isUsingOnDemandDeserialization() const
 {
-    _ensureLookupAcceleratorsAreValid();
-    return _directMemberDecls.accelerators.filteredListOfTransparentDecls;
+    return onDemandDeserialization.context != nullptr;
 }
 
-bool ContainerDecl::_areLookupAcceleratorsValid()
+bool ContainerDeclDirectMemberDecls::_areLookupAcceleratorsValid() const
 {
-    return _directMemberDecls.accelerators.declCountWhenLastUpdated ==
+   return _directMemberDecls.accelerators.declCountWhenLastUpdated ==
            _directMemberDecls.decls.getCount();
 }
 
-void ContainerDecl::_invalidateLookupAccelerators()
+void ContainerDeclDirectMemberDecls::_invalidateLookupAccelerators() const
 {
-    _directMemberDecls.accelerators.declCountWhenLastUpdated = -1;
+    accelerators.declCountWhenLastUpdated = -1;
 }
 
-void ContainerDecl::_ensureLookupAcceleratorsAreValid()
+void ContainerDeclDirectMemberDecls::_ensureLookupAcceleratorsAreValid() const
 {
     if (_areLookupAcceleratorsValid())
         return;
@@ -132,24 +191,28 @@ void ContainerDecl::_ensureLookupAcceleratorsAreValid()
     // the accelerators are entirely invalidated, and must be rebuilt
     // from scratch.
     //
-    if (_directMemberDecls.accelerators.declCountWhenLastUpdated < 0)
+    if (accelerators.declCountWhenLastUpdated < 0)
     {
-        _directMemberDecls.accelerators.declCountWhenLastUpdated = 0;
-        _directMemberDecls.accelerators.mapNameToLastDeclOfThatName.clear();
-        _directMemberDecls.accelerators.filteredListOfTransparentDecls.clear();
+        accelerators.declCountWhenLastUpdated = 0;
+        accelerators.mapNameToLastDeclOfThatName.clear();
+        accelerators.filteredListOfTransparentDecls.clear();
     }
 
-    // are we a generic?
-    GenericDecl* genericDecl = as<GenericDecl>(this);
-
-    Count memberCount = _directMemberDecls.decls.getCount();
-    Count memberCountWhenLastUpdated = _directMemberDecls.accelerators.declCountWhenLastUpdated;
+    Count memberCount = decls.getCount();
+    Count memberCountWhenLastUpdated = accelerators.declCountWhenLastUpdated;
 
     SLANG_ASSERT(memberCountWhenLastUpdated >= 0 && memberCountWhenLastUpdated <= memberCount);
 
+    // are we a generic?
+    GenericDecl* genericDecl = nullptr;
+    if (memberCount > 0)
+    {
+        genericDecl = as<GenericDecl>(decls[0]->parentDecl);
+    }
+
     for (Index i = memberCountWhenLastUpdated; i < memberCount; ++i)
     {
-        Decl* memberDecl = _directMemberDecls.decls[i];
+        Decl* memberDecl = decls[i];
 
         // Transparent member declarations will go into a separate list,
         // so that they can be conveniently queried later for lookup
@@ -162,7 +225,7 @@ void ContainerDecl::_ensureLookupAcceleratorsAreValid()
         //
         if (memberDecl->hasModifier<TransparentModifier>())
         {
-            _directMemberDecls.accelerators.filteredListOfTransparentDecls.add(memberDecl);
+            accelerators.filteredListOfTransparentDecls.add(memberDecl);
         }
 
         // Members that don't have a name don't go into the lookup dictionary.
@@ -189,9 +252,7 @@ void ContainerDecl::_ensureLookupAcceleratorsAreValid()
         // all of the overloaded functions with a given name.
         //
         Decl* prevMemberWithSameName = nullptr;
-        _directMemberDecls.accelerators.mapNameToLastDeclOfThatName.tryGetValue(
-            memberName,
-            prevMemberWithSameName);
+        accelerators.mapNameToLastDeclOfThatName.tryGetValue(memberName, prevMemberWithSameName);
         memberDecl->_prevInContainerWithSameName = prevMemberWithSameName;
 
         // Whether or not there was a previous declaration with this
@@ -199,11 +260,114 @@ void ContainerDecl::_ensureLookupAcceleratorsAreValid()
         // with that name encountered so far, and it is what we will
         // store in the lookup dictionary.
         //
-        _directMemberDecls.accelerators.mapNameToLastDeclOfThatName[memberName] = memberDecl;
+        accelerators.mapNameToLastDeclOfThatName[memberName] = memberDecl;
     }
 
-    _directMemberDecls.accelerators.declCountWhenLastUpdated = memberCount;
+    accelerators.declCountWhenLastUpdated = memberCount;
     SLANG_ASSERT(_areLookupAcceleratorsValid());
+}
+
+
+//
+// ContainerDecl
+//
+
+List<Decl*> const& ContainerDecl::getDirectMemberDecls()
+{
+    return _directMemberDecls.getDecls();
+}
+
+Count ContainerDecl::getDirectMemberDeclCount()
+{
+    return _directMemberDecls.getDeclCount();
+}
+
+Decl* ContainerDecl::getDirectMemberDecl(Index index)
+{
+    return _directMemberDecls.getDecl(index);
+}
+
+Decl* ContainerDecl::getFirstDirectMemberDecl()
+{
+    if (getDirectMemberDeclCount() == 0)
+        return nullptr;
+    return getDirectMemberDecl(0);
+}
+
+DeclsOfNameList ContainerDecl::getDirectMemberDeclsOfName(Name* name)
+{
+    return DeclsOfNameList(findLastDirectMemberDeclOfName(name));
+}
+
+Decl* ContainerDecl::findLastDirectMemberDeclOfName(Name* name)
+{
+    return _directMemberDecls.findLastDeclOfName(name);
+}
+
+Decl* ContainerDecl::getPrevDirectMemberDeclWithSameName(Decl* decl)
+{
+    SLANG_ASSERT(decl);
+    SLANG_ASSERT(decl->parentDecl == this);
+
+    if (isUsingOnDemandDeserialization())
+    {
+        // Note: in the case of on-demand deserialization,
+        // we trust that the caller has previously
+        // invoked `findLastDirectMemberDeclOfName()`
+        // in order to get `decl` (or an earlier
+        // entry in the same linked list), so that
+        // the list threaded through the declarations
+        // of the same name is already set up.
+        //
+        // If that is ever *not* the case, then this
+        // query would end up returning the wrong results.
+
+        return decl->_prevInContainerWithSameName;
+    }
+    else
+    {
+        _ensureLookupAcceleratorsAreValid();
+        return decl->_prevInContainerWithSameName;
+    }
+}
+
+void ContainerDecl::addDirectMemberDecl(Decl* decl)
+{
+    if (isUsingOnDemandDeserialization())
+    {
+        SLANG_UNEXPECTED("this operation shouldn't be performed on deserialized declarations");
+    }
+
+    if (!decl)
+        return;
+
+    decl->parentDecl = this;
+    _directMemberDecls.decls.add(decl);
+}
+
+List<Decl*> const& ContainerDecl::getTransparentDirectMemberDecls()
+{
+    return _directMemberDecls.getTransparentDecls();
+}
+
+bool ContainerDecl::isUsingOnDemandDeserialization()
+{
+    return _directMemberDecls.isUsingOnDemandDeserialization();
+}
+
+bool ContainerDecl::_areLookupAcceleratorsValid()
+{
+    return _directMemberDecls._areLookupAcceleratorsValid();
+}
+
+void ContainerDecl::_invalidateLookupAccelerators()
+{
+    _directMemberDecls._invalidateLookupAccelerators();
+}
+
+void ContainerDecl::_ensureLookupAcceleratorsAreValid()
+{
+    _directMemberDecls._ensureLookupAcceleratorsAreValid();
 }
 
 void ContainerDecl::
@@ -211,6 +375,11 @@ void ContainerDecl::
         UnscopedEnumAttribute* unscopedEnumAttr,
         TransparentModifier* transparentModifier)
 {
+    if (isUsingOnDemandDeserialization())
+    {
+        SLANG_UNEXPECTED("this operation shouldn't be performed on deserialized declarations");
+    }
+
     SLANG_ASSERT(unscopedEnumAttr);
     SLANG_ASSERT(transparentModifier);
 
@@ -224,6 +393,11 @@ void ContainerDecl::
     _removeDirectMemberConstructorDeclBecauseSynthesizedAnotherDefaultConstructorInstead(
         ConstructorDecl* decl)
 {
+    if (isUsingOnDemandDeserialization())
+    {
+        SLANG_UNEXPECTED("this operation shouldn't be performed on deserialized declarations");
+    }
+
     SLANG_ASSERT(decl);
 
     _invalidateLookupAccelerators();
@@ -236,6 +410,11 @@ void ContainerDecl::
         VarDecl* oldDecl,
         PropertyDecl* newDecl)
 {
+    if (isUsingOnDemandDeserialization())
+    {
+        SLANG_UNEXPECTED("this operation shouldn't be performed on deserialized declarations");
+    }
+
     SLANG_ASSERT(oldDecl);
     SLANG_ASSERT(newDecl);
     SLANG_ASSERT(index >= 0 && index < getDirectMemberDeclCount());
@@ -250,6 +429,11 @@ void ContainerDecl::_insertDirectMemberDeclAtIndexForBitfieldPropertyBackingMemb
     Index index,
     VarDecl* backingVarDecl)
 {
+    if (isUsingOnDemandDeserialization())
+    {
+        SLANG_UNEXPECTED("this operation shouldn't be performed on deserialized declarations");
+    }
+
     SLANG_ASSERT(backingVarDecl);
     SLANG_ASSERT(index >= 0 && index <= getDirectMemberDeclCount());
 

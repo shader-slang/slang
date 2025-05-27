@@ -4,6 +4,7 @@
 
 #include "slang-ast-base.h"
 #include "slang-ast-decl.h.fiddle"
+#include "slang-fossil.h"
 
 FIDDLE()
 namespace Slang
@@ -34,23 +35,51 @@ class UnresolvedDecl : public Decl
 struct ContainerDeclDirectMemberDecls
 {
 public:
-    List<Decl*> const& getDecls() const { return decls; }
+    List<Decl*> const& getDecls() const;
 
-    List<Decl*>& _refDecls() { return decls; }
+    Count getDeclCount() const;
+    Decl* getDecl(Index index) const;
+
+    Decl* findLastDeclOfName(Name* name) const;
+
+    Dictionary<Name*, Decl*> getMapFromNameToLastDeclOfThatName() const;
+
+    List<Decl*> const& getTransparentDecls() const;
+
+    bool isUsingOnDemandDeserialization() const;
+
+    void _initForOnDemandDeserialization(
+        RefObject* deserializationContext,
+        void const* deserializationData,
+        Count declCount);
 
 private:
     friend class ContainerDecl;
     friend struct ASTDumpContext;
 
-    List<Decl*> decls;
+    bool _areLookupAcceleratorsValid() const;
+    void _invalidateLookupAccelerators() const;
+    void _ensureLookupAcceleratorsAreValid() const;
 
-    struct
+    void _readSerializedTransparentDecls() const;
+    Decl* _readSerializedDeclAtIndex(Index index) const;
+    Decl* _readSerializedDeclsOfName(Name* name) const;
+
+    mutable List<Decl*> decls;
+
+    mutable struct
     {
         Count declCountWhenLastUpdated = 0;
 
         Dictionary<Name*, Decl*> mapNameToLastDeclOfThatName;
         List<Decl*> filteredListOfTransparentDecls;
     } accelerators;
+
+    struct
+    {
+        RefPtr<RefObject> context;
+        void const* data = nullptr;
+    } onDemandDeserialization;
 };
 
 /// A conceptual list of declarations of the same name, in the same container.
@@ -198,6 +227,14 @@ class ContainerDecl : public Decl
     // already using this name.
     //
     void addMember(Decl* member) { addDirectMemberDecl(member); }
+
+    /// Is this declaration using on-demand deserialization for its direct members?
+    ///
+    bool isUsingOnDemandDeserialization();
+
+    ///
+    Decl* findExportedDeclByMangledNameInSerializedModule(UnownedStringSlice const& slice);
+
 
     //
     // NOTE: The operations after this point are *not* considered part of

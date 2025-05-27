@@ -144,6 +144,7 @@ public:
             break;
 
         case TokenType::IntegerLiteral:
+        case TokenType::StringLiteral:
             {
                 auto token = read();
                 return new LiteralExpr(token);
@@ -1630,11 +1631,14 @@ int _indexVal(lua_State* L)
             push(L, classDecl->directBaseType);
             return 1;
         }
+    }
 
+    if (auto aggTypeDecl = as<AggTypeDecl>(val))
+    {
         if (strcmp(name, "directFields") == 0)
         {
             List<RefPtr<Decl>> fields;
-            for (auto m : classDecl->members)
+            for (auto m : aggTypeDecl->members)
             {
                 if (auto f = as<VarDecl>(m))
                     fields.add(f);
