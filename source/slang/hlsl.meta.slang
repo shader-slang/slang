@@ -17970,7 +17970,7 @@ int GetClusterID()
 /// @category raytracing
 [__requiresNVAPI]
 [NonUniformReturn]
-[require(cuda_hlsl_spirv, lss_raytracing_anyhit_closesthit)]
+[require(cuda_hlsl_spirv, raytracing_lss)]
 float4 GetSpherePositionAndRadius()
 {
     __target_switch
@@ -17996,7 +17996,7 @@ float4 GetSpherePositionAndRadius()
 /// @category raytracing
 [__requiresNVAPI]
 [NonUniformReturn]
-[require(cuda_hlsl_spirv, lss_raytracing_anyhit_closesthit)]
+[require(cuda_hlsl_spirv, raytracing_lss)]
 float2x4 GetLssPositionsAndRadii()
 {
     __target_switch
@@ -18029,7 +18029,7 @@ float2x4 GetLssPositionsAndRadii()
 /// @category raytracing
 [__requiresNVAPI]
 [NonUniformReturn]
-[require(cuda_hlsl_spirv, lss_raytracing_anyhit_closesthit)]
+[require(cuda_hlsl_spirv, raytracing_lss)]
 bool IsSphereHit()
 {
     __target_switch
@@ -18053,7 +18053,7 @@ bool IsSphereHit()
 /// @category raytracing
 [__requiresNVAPI]
 [NonUniformReturn]
-[require(cuda_hlsl_spirv, lss_raytracing_anyhit_closesthit)]
+[require(cuda_hlsl_spirv, raytracing_lss)]
 bool IsLssHit()
 {
     __target_switch
@@ -20614,7 +20614,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, lss_raytracing_anyhit_closesthit)]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
     float4 GetSpherePositionAndRadius()
     {
         __target_switch
@@ -20639,7 +20639,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, lss_raytracing_anyhit_closesthit)]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
     float2x4 GetLssPositionsAndRadii()
     {
         __target_switch
@@ -20670,7 +20670,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, lss_raytracing_anyhit_closesthit)]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
     bool IsSphereHit()
     {
         __target_switch
@@ -20692,7 +20692,7 @@ struct HitObject
 
     [__requiresNVAPI]
     [NonUniformReturn]
-    [require(cuda_hlsl_spirv, lss_raytracing_anyhit_closesthit)]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
     bool IsLssHit()
     {
         __target_switch
