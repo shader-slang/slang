@@ -432,6 +432,9 @@ Extensions
 `SPV_NV_cluster_acceleration_structure`
 > Represents the SPIR-V extension for cluster acceleration structure.
 
+`SPV_NV_linear_swept_spheres`
+> Represents the SPIR-V extension for linear swept spheres.
+
 `SPV_NV_shader_image_footprint`
 > Represents the SPIR-V extension for shader image footprint.
 
@@ -555,6 +558,9 @@ Extensions
 `spvRayTracingClusterAccelerationStructureNV`
 > Represents the SPIR-V capability for cluster acceleration structure.
 
+`spvRayTracingLinearSweptSpheresGeometryNV`
+> Represents the SPIR-V capability for linear swept spheres.
+
 `spvShaderClockKHR`
 > Represents the SPIR-V capability for shader clock.
 
@@ -605,6 +611,12 @@ Extensions
 
 `spvQuadControlKHR`
 > Represents the SPIR-V capability for quad group control.
+
+`spvVulkanMemoryModelKHR`
+> Represents the SPIR-V capability for vulkan memory model.
+
+`spvVulkanMemoryModelDeviceScopeKHR`
+> Represents the SPIR-V capability for vulkan memory model.
 
 `GL_EXT_buffer_reference`
 > Represents the GL_EXT_buffer_reference extension.
@@ -662,6 +674,9 @@ Extensions
 
 `GL_EXT_shader_atomic_int64`
 > Represents the GL_EXT_shader_atomic_int64 extension.
+
+`GL_EXT_shader_explicit_arithmetic_types`
+> Represents the GL_EXT_shader_explicit_arithmetic_types extension.
 
 `GL_EXT_shader_explicit_arithmetic_types_int64`
 > Represents the GL_EXT_shader_explicit_arithmetic_types_int64 extension.
@@ -955,9 +970,6 @@ Compound Capabilities
 `shadermemorycontrol`
 > (gfx targets) Capabilities needed to use memory barriers
 
-`wave_multi_prefix`
-> Capabilities needed to use HLSL tier wave operations
-
 `bufferreference`
 > Capabilities needed to use GLSL buffer-reference's
 
@@ -971,6 +983,9 @@ Compound Capabilities
 
 `cooperative_vector_training`
 > Capabilities needed to train cooperative vectors
+
+`cooperative_matrix`
+> Capabilities needed to use cooperative matrices
 
 `cooperative_matrix_reduction`
 > Capabilities needed to use reduction operations with cooperative matrix
@@ -992,6 +1007,9 @@ Compound Capabilities
 
 `cooperative_matrix_2`
 > Capabilities needed to use tensor addressing
+
+`vk_mem_model`
+> Capabilities needed to use vulkan memory model
 
 `any_stage`
 > Collection of all shader stages
@@ -1300,9 +1318,6 @@ Compound Capabilities
 Other
 ----------------------
 *Capabilities which may be deprecated*
-
-`cooperative_matrix`
-> Capabilities needed to use cooperative matrices
 
 `SPIRV_1_0`
 > Use `spirv_1_0` instead

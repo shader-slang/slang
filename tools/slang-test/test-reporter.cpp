@@ -693,7 +693,7 @@ void TestReporter::outputSummary()
             printf("\n===\n\n");
             if (m_failedTestCount)
             {
-                printf("failing tests:\n");
+                printf("%d failing tests:\n", m_failedTestCount);
                 printf("---\n");
                 for (const auto& testInfo : m_testInfos)
                 {

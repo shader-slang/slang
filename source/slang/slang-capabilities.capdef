@@ -547,6 +547,10 @@ def SPV_NV_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
 /// [EXT]
 def SPV_NV_cluster_acceleration_structure : _spirv_1_0;
 
+/// Represents the SPIR-V extension for linear swept spheres.
+/// [EXT]
+def SPV_NV_linear_swept_spheres : _spirv_1_0;
+
 /// Represents the SPIR-V extension for shader image footprint.
 /// [EXT]
 def SPV_NV_shader_image_footprint : _spirv_1_0;
@@ -586,6 +590,7 @@ def SPV_NV_tensor_addressing : _spirv_1_6;
 /// Represents the SPIR-V extension for SPV_NV_cooperative_matrix2.
 /// [EXT]
 def SPV_NV_cooperative_matrix2 : SPV_NV_tensor_addressing + SPV_KHR_cooperative_matrix;
+
 
 // SPIRV Capabilities.
 
@@ -713,6 +718,10 @@ def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder;
 /// [EXT]
 def spvRayTracingClusterAccelerationStructureNV : SPV_NV_cluster_acceleration_structure;
 
+/// Represents the SPIR-V capability for cluster acceleration structure.
+/// [EXT]
+def spvRayTracingLinearSweptSpheresGeometryNV : SPV_NV_linear_swept_spheres;
+
 /// Represents the SPIR-V capability for shader clock.
 /// [EXT]
 def spvShaderClockKHR : SPV_KHR_shader_clock;
@@ -780,6 +789,14 @@ def spvMaximalReconvergenceKHR : SPV_KHR_maximal_reconvergence;
 /// Represents the SPIR-V capability for quad group control.
 /// [EXT]
 def spvQuadControlKHR : SPV_KHR_quad_control;
+
+/// Represents the SPIR-V capability for vulkan memory model.
+/// [EXT]
+def spvVulkanMemoryModelKHR : SPV_KHR_vulkan_memory_model;
+
+/// Represents the SPIR-V capability for vulkan memory model.
+/// [EXT]
+def spvVulkanMemoryModelDeviceScopeKHR : SPV_KHR_vulkan_memory_model;
 
 // The following capabilities all pertain to how ray tracing shaders are translated
 // to GLSL, where there are two different extensions that can provide the core
@@ -1148,11 +1165,6 @@ alias fragmentshaderbarycentric = GL_EXT_fragment_shader_barycentric | _sm_6_1;
 ///  (gfx targets) Capabilities needed to use memory barriers
 /// [Compound]
 alias shadermemorycontrol = glsl | _spirv_1_0 | _sm_5_0;
-/// Capabilities needed to use HLSL tier wave operations
-/// [Compound]
-alias wave_multi_prefix = _sm_6_5
-                 | _cuda_sm_7_0
-                 | GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_arithmetic + GL_NV_shader_subgroup_partitioned;
 /// Capabilities needed to use GLSL buffer-reference's
 /// [Compound]
 alias bufferreference = GL_EXT_buffer_reference;
@@ -1169,6 +1181,7 @@ alias cooperative_vector = _sm_6_9 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV
 alias cooperative_vector_training = spvCooperativeVectorTrainingNV;
 
 /// Capabilities needed to use cooperative matrices
+/// [Compound]
 alias cooperative_matrix = spvCooperativeMatrixKHR;
 /// Capabilities needed to use reduction operations with cooperative matrix
 /// [Compound]
@@ -1191,6 +1204,10 @@ alias tensor_addressing = spvTensorAddressingNV;
 /// Capabilities needed to use tensor addressing
 /// [Compound]
 alias cooperative_matrix_2 = spvCooperativeMatrixKHR + spvCooperativeMatrixReductionsNV + spvCooperativeMatrixConversionsNV + spvCooperativeMatrixPerElementOperationsNV + spvCooperativeMatrixTensorAddressingNV + spvCooperativeMatrixBlockLoadsNV + spvTensorAddressingNV;
+
+/// Capabilities needed to use vulkan memory model
+/// [Compound]
+alias vk_mem_model = spvVulkanMemoryModelKHR + spvVulkanMemoryModelDeviceScopeKHR;
 
 // Non-internal shader stages
 //
@@ -2172,7 +2189,9 @@ alias subgroup_quad = GL_KHR_shader_subgroup_quad
                     ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_partitioned'
 /// [Compound]
-alias subgroup_partitioned = GL_NV_shader_subgroup_partitioned + subgroup_ballot_activemask | _sm_6_5 | _cuda_sm_7_0;
+alias subgroup_partitioned = _sm_6_5
+                           | _cuda_sm_7_0
+                           | GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_arithmetic + GL_NV_shader_subgroup_partitioned;
 
 
 /// Capabilities required to use GLSL-style subgroup rotate operations 'subgroup_rotate'
@@ -2234,6 +2253,10 @@ alias raytracing_intersection = intersection + raytracing;
 /// Collection of capabilities for raytracing with the shader stages of anyhit and closesthit.
 /// [Compound]
 alias raytracing_anyhit_closesthit = anyhit_closesthit + raytracing;
+
+/// Collection of capabilities for linear swept spheres.
+/// [Compound]
+alias raytracing_lss = raytracing_anyhit_closesthit | spvRayTracingLinearSweptSpheresGeometryNV;
 
 /// Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.
 /// [Compound]

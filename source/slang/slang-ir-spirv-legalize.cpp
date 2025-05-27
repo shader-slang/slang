@@ -636,6 +636,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
             case IRTargetBuiltinVarName::SpvInstanceIndex:
             case IRTargetBuiltinVarName::SpvBaseInstance:
+            case IRTargetBuiltinVarName::SpvVertexIndex:
+            case IRTargetBuiltinVarName::SpvBaseVertex:
                 return AddressSpace::BuiltinInput;
             }
         }
@@ -1810,6 +1812,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // Scan through the entry points and find the max version required.
         auto processInst = [&](IRInst* globalInst)
         {
+            switch (globalInst->getOp())
+            {
+            case kIROp_CoopVectorType:
+            case kIROp_CoopMatrixType:
+                m_sharedContext->m_memoryModel = SpvMemoryModelVulkan;
+                break;
+            }
+
             for (auto decor : globalInst->getDecorations())
             {
                 switch (decor->getOp())
@@ -1842,6 +1852,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto globalInst : m_module->getGlobalInsts())
         {
             processInst(globalInst);
+        }
+
+        if (targetCaps.implies(CapabilityAtom::SPV_KHR_vulkan_memory_model))
+        {
+            m_sharedContext->m_memoryModel = SpvMemoryModelVulkan;
         }
 
         if (m_sharedContext->m_spvVersion < 0x10300)
