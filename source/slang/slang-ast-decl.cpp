@@ -114,7 +114,8 @@ List<Decl*> const& ContainerDecl::getTransparentDirectMemberDecls()
 
 bool ContainerDecl::_areLookupAcceleratorsValid()
 {
-    return _directMemberDecls.accelerators.declCountWhenLastUpdated == _directMemberDecls.decls.getCount();
+    return _directMemberDecls.accelerators.declCountWhenLastUpdated ==
+           _directMemberDecls.decls.getCount();
 }
 
 void ContainerDecl::_invalidateLookupAccelerators()
@@ -130,7 +131,7 @@ void ContainerDecl::_ensureLookupAcceleratorsAreValid()
     // If the `declCountWhenLastUpdated` is less than zero, it means that
     // the accelerators are entirely invalidated, and must be rebuilt
     // from scratch.
-    // 
+    //
     if (_directMemberDecls.accelerators.declCountWhenLastUpdated < 0)
     {
         _directMemberDecls.accelerators.declCountWhenLastUpdated = 0;
@@ -205,7 +206,10 @@ void ContainerDecl::_ensureLookupAcceleratorsAreValid()
     SLANG_ASSERT(_areLookupAcceleratorsValid());
 }
 
-void ContainerDecl::_invalidateLookupAcceleratorsBecauseUnscopedEnumAttributeWillBeTurnedIntoTransparentModifier(UnscopedEnumAttribute* unscopedEnumAttr, TransparentModifier* transparentModifier)
+void ContainerDecl::
+    _invalidateLookupAcceleratorsBecauseUnscopedEnumAttributeWillBeTurnedIntoTransparentModifier(
+        UnscopedEnumAttribute* unscopedEnumAttr,
+        TransparentModifier* transparentModifier)
 {
     SLANG_ASSERT(unscopedEnumAttr);
     SLANG_ASSERT(transparentModifier);
@@ -216,7 +220,9 @@ void ContainerDecl::_invalidateLookupAcceleratorsBecauseUnscopedEnumAttributeWil
     _invalidateLookupAccelerators();
 }
 
-void ContainerDecl::_removeDirectMemberConstructorDeclBecauseSynthesizedAnotherDefaultConstructorInstead(ConstructorDecl* decl)
+void ContainerDecl::
+    _removeDirectMemberConstructorDeclBecauseSynthesizedAnotherDefaultConstructorInstead(
+        ConstructorDecl* decl)
 {
     SLANG_ASSERT(decl);
 
@@ -224,7 +230,11 @@ void ContainerDecl::_removeDirectMemberConstructorDeclBecauseSynthesizedAnotherD
     _directMemberDecls.decls.remove(decl);
 }
 
-void ContainerDecl::_replaceDirectMemberBitFieldVariableDeclAtIndexWithPropertyDeclThatWasSynthesizedForIt(Index index, VarDecl* oldDecl, PropertyDecl* newDecl)
+void ContainerDecl::
+    _replaceDirectMemberBitFieldVariableDeclAtIndexWithPropertyDeclThatWasSynthesizedForIt(
+        Index index,
+        VarDecl* oldDecl,
+        PropertyDecl* newDecl)
 {
     SLANG_ASSERT(oldDecl);
     SLANG_ASSERT(newDecl);
@@ -234,8 +244,6 @@ void ContainerDecl::_replaceDirectMemberBitFieldVariableDeclAtIndexWithPropertyD
     SLANG_UNUSED(oldDecl);
     _invalidateLookupAccelerators();
     _directMemberDecls.decls[index] = newDecl;
-
-
 }
 
 void ContainerDecl::_insertDirectMemberDeclAtIndexForBitfieldPropertyBackingMember(

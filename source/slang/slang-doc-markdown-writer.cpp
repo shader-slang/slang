@@ -825,7 +825,9 @@ void DocMarkdownWriter::writeExtensionConditions(
                 // `T`.
 
                 // Find constraints on the originalParamDecl.
-                for (auto typeConstraint : genericParamDecl->parentDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+                for (auto typeConstraint :
+                     genericParamDecl->parentDecl
+                         ->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
                 {
                     if (isDeclRefTypeOf<Decl>(typeConstraint->sub.type).getDecl() ==
                         genericParamDecl)
@@ -977,7 +979,8 @@ void DocMarkdownWriter::writeSignature(CallableDecl* callableDecl)
 
         if (auto genericParent = as<GenericDecl>(parentDecl->parentDecl))
         {
-            for (auto typeConstraint : genericParent->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+            for (auto typeConstraint :
+                 genericParent->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
             {
                 out << toSlice("\n    <span class='code_keyword'>where</span> ");
                 out << translateToHTMLWithLinks(
@@ -1860,7 +1863,8 @@ void DocMarkdownWriter::writeAggType(
         baseTypes = _getAsStringList(inheritanceDecls);
         for (auto entry : page->entries)
         {
-            for (auto inheritanceDecl : as<ContainerDecl>(entry->m_node)->getDirectMemberDeclsOfType<InheritanceDecl>())
+            for (auto inheritanceDecl :
+                 as<ContainerDecl>(entry->m_node)->getDirectMemberDeclsOfType<InheritanceDecl>())
             {
                 if (auto extDecl = as<ExtensionDecl>(entry->m_node))
                 {

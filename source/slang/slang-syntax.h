@@ -87,15 +87,19 @@ inline FilteredMemberRefList<T> getMembersOfType(
     // TODO: This should in principle be using:
     //
     //      declRef.getDecl()->getDirectMemberDeclsOfType<T>()
-    // 
+    //
     // instead of:
-    // 
+    //
     //      declRef.getDecl()->getDirectMemberDecls()
     //
     // and then the `FilteredMemberRefList` would only be responsible for
     // filtering, plus associated each `T*` in the list with a `DeclRef<T>`.
     //
-    return FilteredMemberRefList<T>(astBuilder, declRef.getDecl()->getDirectMemberDecls(), declRef, filterStyle);
+    return FilteredMemberRefList<T>(
+        astBuilder,
+        declRef.getDecl()->getDirectMemberDecls(),
+        declRef,
+        filterStyle);
 }
 
 void _foreachDirectOrExtensionMemberOfType(
