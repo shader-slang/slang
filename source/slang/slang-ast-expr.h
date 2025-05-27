@@ -720,6 +720,27 @@ class FwdDiffFuncTypeExpr : public Expr
     FIDDLE() TypeExp base;
 };
 
+FIDDLE()
+class ApplyForBwdFuncTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
+};
+
+FIDDLE()
+class BwdCallableFuncTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
+};
+
+FIDDLE()
+class FuncResultTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp base;
+};
+
 /// A type expression of the form `This`
 ///
 /// Refers to the type of `this` in the current context.

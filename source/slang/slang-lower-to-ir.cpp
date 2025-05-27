@@ -1829,6 +1829,30 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             getBuilder()->emitIntrinsicInst(irType, kIROp_ForwardDiffFuncType, 1, &(operand)));
     }
 
+    LoweredValInfo visitApplyForBwdFuncType(ApplyForBwdFuncType* applyForFwdFuncType)
+    {
+        IRType* irType = lowerType(context, applyForFwdFuncType->getBase());
+        IRInst* operand = (IRInst*)irType;
+        return LoweredValInfo::simple(
+            getBuilder()->emitIntrinsicInst(irType, kIROp_ApplyForBwdFuncType, 1, &(operand)));
+    }
+
+    LoweredValInfo visitBwdCallableFuncType(BwdCallableFuncType* fwdCallableFuncType)
+    {
+        IRType* irType = lowerType(context, fwdCallableFuncType->getBase());
+        IRInst* operand = (IRInst*)irType;
+        return LoweredValInfo::simple(
+            getBuilder()->emitIntrinsicInst(irType, kIROp_BwdCallableFuncType, 1, &(operand)));
+    }
+
+    LoweredValInfo visitFuncResultType(FuncResultType* funcResultType)
+    {
+        IRType* irType = lowerType(context, funcResultType->getBase());
+        IRInst* operand = (IRInst*)irType;
+        return LoweredValInfo::simple(
+            getBuilder()->emitIntrinsicInst(irType, kIROp_FuncResultType, 1, &(operand)));
+    }
+
     LoweredValInfo visitBackwardDifferentiateVal(BackwardDifferentiateVal* val)
     {
         auto funcVal = emitDeclRef(context, val->getFunc(), context->irBuilder->getTypeKind());
@@ -3567,8 +3591,8 @@ struct ExprLoweringContext
             // unless the return type is unspecified (then the callable is declared using a function
             // type)
             //
-            if (!callableDecl->returnType.type)
-                return false;
+            // if (!callableDecl->returnType.type)
+            //    return false;
         }
         else
         {
@@ -3990,13 +4014,43 @@ struct ExprLoweringContext
             // require "fixup" work on the other side.
             //
             FuncDeclBaseTypeInfo funcTypeInfo;
-            _lowerFuncDeclBaseTypeInfo(
-                context,
-                funcDeclRef.template as<FunctionDeclBase>(),
-                funcTypeInfo);
 
-            auto funcType = funcTypeInfo.type;
-            addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
+            if (as<CallableDecl>(funcDeclRef.getDecl()) &&
+                funcDeclRef.as<CallableDecl>().getDecl()->funcType.type &&
+                as<FuncType>(expr->functionExpr->type))
+            {
+                // Calculate args by func-type
+                auto resolvedFuncType = as<FuncType>(expr->functionExpr->type);
+                funcTypeInfo.type = lowerType(context, resolvedFuncType);
+                // Insert a this type to the front of the param types
+
+                if (baseExpr)
+                {
+                    auto thisType = getThisParamTypeForCallable(context, funcDeclRef);
+                    auto irThisType = lowerType(context, thisType);
+
+                    List<IRType*> paramTypes;
+                    paramTypes.add(irThisType);
+                    for (auto paramType : cast<IRFuncType>(funcTypeInfo.type)->getParamTypes())
+                        paramTypes.add(paramType);
+
+                    funcTypeInfo.type = context->irBuilder->getFuncType(
+                        paramTypes.getCount(),
+                        paramTypes.getBuffer(),
+                        cast<IRFuncType>(funcTypeInfo.type)->getResultType());
+                }
+
+                addDirectCallArgs(expr, resolvedFuncType, &irArgs, &argFixups);
+            }
+            else
+            {
+                _lowerFuncDeclBaseTypeInfo(
+                    context,
+                    funcDeclRef.template as<FunctionDeclBase>(),
+                    funcTypeInfo);
+                // Calculate args by inspecting the decl-ref.
+                addDirectCallArgs(expr, funcDeclRef, &irArgs, &argFixups);
+            }
 
             validateInvokeExprArgsWithFunctionModifiers(
                 expr,
@@ -4028,7 +4082,7 @@ struct ExprLoweringContext
             }
 
             auto callResult =
-                emitCallToDeclRef(context, type, funcDeclRef, funcType, irArgs, tryEnv);
+                emitCallToDeclRef(context, type, funcDeclRef, funcTypeInfo.type, irArgs, tryEnv);
             applyOutArgumentFixups(context, argFixups);
 
             if (funcTypeInfo.returnViaLastRefParam)
@@ -4131,9 +4185,24 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 baseVal.val));
     }
 
-    LoweredValInfo visitFwdDiffFuncTypeExpr(FwdDiffFuncTypeExpr* expr)
+    LoweredValInfo visitFwdDiffFuncTypeExpr(FwdDiffFuncTypeExpr*)
     {
         SLANG_UNEXPECTED("FwdDiffFuncTypeExpr should not be present in IR.");
+    }
+
+    LoweredValInfo visitApplyForBwdFuncTypeExpr(ApplyForBwdFuncTypeExpr*)
+    {
+        SLANG_UNEXPECTED("ApplyForFwdTypeExpr should not be present in IR.");
+    }
+
+    LoweredValInfo visitBwdCallableFuncTypeExpr(BwdCallableFuncTypeExpr*)
+    {
+        SLANG_UNEXPECTED("BwdCallableFuncTypeExpr should not be present in IR.");
+    }
+
+    LoweredValInfo visitFuncResultTypeExpr(FuncResultTypeExpr*)
+    {
+        SLANG_UNEXPECTED("FuncResultTypeExpr should not be present in IR.");
     }
 
     LoweredValInfo visitDetachExpr(DetachExpr* expr)

@@ -1945,7 +1945,16 @@ void SemanticsVisitor::AddFuncOverloadCandidate(
 
         funcExpr->type = resolvedFuncType;
 
-        AddFuncExprOverloadCandidate(resolvedFuncType, context, funcExpr, baseCost);
+        OverloadCandidate candidate;
+        candidate.flavor = OverloadCandidate::Flavor::Expr;
+        candidate.funcType = resolvedFuncType;
+        candidate.resultType = resolvedFuncType->getResultType();
+        candidate.exprVal = funcExpr;
+        candidate.item = item;
+
+        AddOverloadCandidate(context, candidate, baseCost);
+
+        // AddFuncExprOverloadCandidate(resolvedFuncType, context, funcExpr, baseCost);
     }
 }
 

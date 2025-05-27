@@ -4916,6 +4916,51 @@ Expr* SemanticsExprVisitor::visitFwdDiffFuncTypeExpr(FwdDiffFuncTypeExpr* expr)
     SLANG_UNEXPECTED("aaaaah");
 }
 
+Expr* SemanticsExprVisitor::visitApplyForBwdFuncTypeExpr(ApplyForBwdFuncTypeExpr* expr)
+{
+    // Translate type node.
+    expr->base = CheckProperType(expr->base);
+
+    if (expr->base.type && !as<ErrorType>(expr->base.type))
+    {
+        auto fwdDiffFuncType = m_astBuilder->getOrCreate<ApplyForBwdFuncType>(expr->base.type);
+        expr->type = m_astBuilder->getOrCreate<TypeType>(fwdDiffFuncType);
+        return expr;
+    }
+
+    SLANG_UNEXPECTED("aaaaah");
+}
+
+Expr* SemanticsExprVisitor::visitBwdCallableFuncTypeExpr(BwdCallableFuncTypeExpr* expr)
+{
+    // Translate type node.
+    expr->base = CheckProperType(expr->base);
+
+    if (expr->base.type && !as<ErrorType>(expr->base.type))
+    {
+        auto fwdDiffFuncType = m_astBuilder->getOrCreate<BwdCallableFuncType>(expr->base.type);
+        expr->type = m_astBuilder->getOrCreate<TypeType>(fwdDiffFuncType);
+        return expr;
+    }
+
+    SLANG_UNEXPECTED("aaaaah");
+}
+
+Expr* SemanticsExprVisitor::visitFuncResultTypeExpr(FuncResultTypeExpr* expr)
+{
+    // Translate type node.
+    expr->base = CheckProperType(expr->base);
+
+    if (expr->base.type && !as<ErrorType>(expr->base.type))
+    {
+        auto funcResultType = m_astBuilder->getOrCreate<FuncResultType>(expr->base.type);
+        expr->type = m_astBuilder->getOrCreate<TypeType>(funcResultType);
+        return expr;
+    }
+
+    SLANG_UNEXPECTED("aaaaah");
+}
+
 Expr* SemanticsVisitor::lookupMemberResultFailure(
     DeclRefExpr* expr,
     QualType const& baseType,

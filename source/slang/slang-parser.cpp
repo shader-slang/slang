@@ -2746,6 +2746,36 @@ static Expr* parseFwdDiffFuncTypeExpr(Parser* parser)
     return expr;
 }
 
+static Expr* parseApplyForBwdFuncTypeExpr(Parser* parser)
+{
+    // Parse an expr of the form `__apply_for_fwd_type(fn)`
+    ApplyForBwdFuncTypeExpr* expr = parser->astBuilder->create<ApplyForBwdFuncTypeExpr>();
+    parser->ReadToken(TokenType::LParent);
+    expr->base = parser->ParseTypeExp();
+    parser->ReadToken(TokenType::RParent);
+    return expr;
+}
+
+static Expr* parseBwdCallableFuncTypeExpr(Parser* parser)
+{
+    // Parse an expr of the form `__fwd_callable_type(fn)`
+    BwdCallableFuncTypeExpr* expr = parser->astBuilder->create<BwdCallableFuncTypeExpr>();
+    parser->ReadToken(TokenType::LParent);
+    expr->base = parser->ParseTypeExp();
+    parser->ReadToken(TokenType::RParent);
+    return expr;
+}
+
+static Expr* parseResultTypeExpr(Parser* parser)
+{
+    // Parse an expr of the form `__result_type(fn)`
+    FuncResultTypeExpr* expr = parser->astBuilder->create<FuncResultTypeExpr>();
+    parser->ReadToken(TokenType::LParent);
+    expr->base = parser->ParseTypeExp();
+    parser->ReadToken(TokenType::RParent);
+    return expr;
+}
+
 // parseFuncAsTypeExpr
 static NodeBase* parseFuncAsTypeExpr(Parser* parser, void* /* unused */)
 {
@@ -2958,7 +2988,8 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
 {
     TypeSpec typeSpec;
 
-    // We may see a `struct` (or `enum` or `class`) tag specified here, and need to act accordingly
+    // We may see a `struct` (or `enum` or `class`) tag specified here, and need to act
+    // accordingly
     //
     // TODO(tfoley): Handle the case where the user is just using `struct`
     // as a way to name an existing struct "tag" (e.g., `struct Foo foo;`)
@@ -3026,6 +3057,21 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     else if (AdvanceIf(parser, "__fwd_diff_func_type"))
     {
         typeSpec.expr = parseFwdDiffFuncTypeExpr(parser);
+        return typeSpec;
+    }
+    else if (AdvanceIf(parser, "__apply_bwd_func_type"))
+    {
+        typeSpec.expr = parseApplyForBwdFuncTypeExpr(parser);
+        return typeSpec;
+    }
+    else if (AdvanceIf(parser, "__bwd_callable_type"))
+    {
+        typeSpec.expr = parseBwdCallableFuncTypeExpr(parser);
+        return typeSpec;
+    }
+    else if (AdvanceIf(parser, "__result_type"))
+    {
+        typeSpec.expr = parseResultTypeExpr(parser);
         return typeSpec;
     }
 
@@ -3339,8 +3385,8 @@ static void parseHLSLRegisterNameAndOptionalComponentMask(
 ///
 /// The syntax matched is:
 ///
-///     register-semantic ::= 'register' '(' register-name-and-component-mask register-space? ')'
-///     register-space ::= ',' identifier
+///     register-semantic ::= 'register' '(' register-name-and-component-mask register-space?
+///     ')' register-space ::= ',' identifier
 ///
 static void parseHLSLRegisterSemantic(Parser* parser, HLSLRegisterSemantic* semantic)
 {
@@ -3756,7 +3802,8 @@ static NodeBase* parseFunctionExtensionDecl(Parser* parser, void*)
     // __function_extension<optional-generic-declaration> ReturnTypeExpr
     // functionReferenceExpr.overloadName(parameterList) { // body // }
     //
-    // Apart from the functionReferenceExpr.overloadName part, this is similar to parsing a regular
+    // Apart from the functionReferenceExpr.overloadName part, this is similar to parsing a
+regular
     // function expression
     //
     return parseOptGenericDecl(
@@ -3814,9 +3861,10 @@ static NodeBase* parseAssocFunc(Parser* parser, void*)
     auto typeExp = parser->ParseTypeExp();
     funcDecl->funcType = typeExp;
 
-    auto nameToken = parser->ReadToken(TokenType::Identifier);
+    /*auto nameToken = parser->ReadToken(TokenType::Identifier);
     funcDecl->nameAndLoc = NameLoc(nameToken);
-    funcDecl->loc = nameToken.loc;
+    funcDecl->loc = nameToken.loc;*/
+    funcDecl->nameAndLoc = ParseDeclName(parser);
 
     parser->ReadToken(TokenType::Semicolon);
     return funcDecl;
@@ -4292,8 +4340,8 @@ static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
         });
 }
 
-/// Peek in the token stream and return `true` if it looks like a modern-style variable declaration
-/// is coming up.
+/// Peek in the token stream and return `true` if it looks like a modern-style variable
+/// declaration is coming up.
 static bool _peekModernStyleVarDecl(Parser* parser)
 {
     // A modern-style variable declaration always starts with an identifier
@@ -4411,8 +4459,8 @@ static NodeBase* parseVarDecl(Parser* parser, void* /*userData*/)
     return decl;
 }
 
-/// Parse the common structured of a traditional-style parameter declaration (excluding the trailing
-/// semicolon)
+/// Parse the common structured of a traditional-style parameter declaration (excluding the
+/// trailing semicolon)
 static void _parseTraditionalParamDeclCommonBase(
     Parser* parser,
     VarDeclBase* decl,
@@ -7181,12 +7229,12 @@ static BaseType _determineNonSuffixedIntegerLiteralType(
         if (isDecimalBase)
         {
             // There is an edge case here where 9223372036854775808 or INT64_MAX + 1
-            // brings us here, but the complete literal is -9223372036854775808 or INT64_MIN and is
-            // valid. Unfortunately because the lexer handles the negative(-) part of the literal
-            // separately it is impossible to know whether the literal has a negative sign or not.
-            // We emit the warning and initially process it as a uint64 anyways, and the negative
-            // sign will be properly parsed and the value will still be properly stored as a
-            // negative INT64_MIN.
+            // brings us here, but the complete literal is -9223372036854775808 or INT64_MIN and
+            // is valid. Unfortunately because the lexer handles the negative(-) part of the
+            // literal separately it is impossible to know whether the literal has a negative
+            // sign or not. We emit the warning and initially process it as a uint64 anyways,
+            // and the negative sign will be properly parsed and the value will still be
+            // properly stored as a negative INT64_MIN.
 
             // Decimal integer is too large to be represented as signed.
             // Output warning that it is represented as unsigned instead.
@@ -7235,7 +7283,8 @@ static bool _isCast(Parser* parser, Expr* expr)
     // =========
     //
     // - : Can be unary and therefore a cast or a binary subtract, and therefore an expression
-    // + : Can be unary and therefore could be a cast, or a binary add and therefore an expression
+    // + : Can be unary and therefore could be a cast, or a binary add and therefore an
+    // expression
     //
     // Arbitrary
     // =========
@@ -7270,14 +7319,14 @@ static bool _isCast(Parser* parser, Expr* expr)
             //
             // (Some::Stuff) + 3
             // (Some::Stuff) - 3
-            // Strictly I can only tell if this is an expression or a cast if I know Some::Stuff is
-            // a type or not but we can't know here in general because we allow out-of-order
+            // Strictly I can only tell if this is an expression or a cast if I know Some::Stuff
+            // is a type or not but we can't know here in general because we allow out-of-order
             // declarations.
 
             // If we can determine it's a type, then it must be a cast, and we are done.
             //
-            // NOTE! This test can only determine if it's a type *iff* it has already been defined.
-            // A future out of order declaration, will not be correctly found here.
+            // NOTE! This test can only determine if it's a type *iff* it has already been
+            // defined. A future out of order declaration, will not be correctly found here.
             //
             // This means the semantics change depending on the order of definition (!)
             Decl* decl = _tryResolveDecl(parser, expr);
@@ -7308,8 +7357,8 @@ static bool _isCast(Parser* parser, Expr* expr)
             //
             // For now we'll assume it's not a cast if it's not a StaticMemberExpr
             // The reason for the restriction (which perhaps can be broadened), is we don't
-            // want the interpretation of something in parentheses to be determined by something as
-            // common as + or - whitespace.
+            // want the interpretation of something in parentheses to be determined by something
+            // as common as + or - whitespace.
 
             if (const auto staticMemberExpr = dynamicCast<StaticMemberExpr>(expr))
             {
@@ -7678,11 +7727,11 @@ static Expr* parseAtomicExpr(Parser* parser)
             }
 
             // TODO(JS):
-            // It is worth noting here that because of the way that the lexer works, that literals
-            // are always handled as if they are positive (a preceding - is taken as a negate on a
-            // positive value).
-            // The code here is designed to work with positive and negative values, as this behavior
-            // might change in the future, and is arguably more 'correct'.
+            // It is worth noting here that because of the way that the lexer works, that
+            // literals are always handled as if they are positive (a preceding - is taken as a
+            // negate on a positive value). The code here is designed to work with positive and
+            // negative values, as this behavior might change in the future, and is arguably
+            // more 'correct'.
 
             FloatingPointLiteralValue fixedValue = value;
             auto fixType = _fixFloatLiteralValue(suffixBaseType, value, fixedValue);
@@ -8082,8 +8131,8 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
     }
     else if (AdvanceIf(parser, "__rayPayloadFromLocation"))
     {
-        // reference a magic number to a layout(location) for late compiler resolution of rayPayload
-        // objects
+        // reference a magic number to a layout(location) for late compiler resolution of
+        // rayPayload objects
         parser->ReadToken(TokenType::LParent);
         auto operand = SPIRVAsmOperand{
             SPIRVAsmOperand::RayPayloadFromLocation,
@@ -8270,10 +8319,10 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
 
         if (opInfo && ret.operands.getCount() == opInfo->maxOperandCount)
         {
-            // The SPIRV grammar says we are providing more arguments than expected operand count.
-            // We will issue a warning if it is likely that the user missed a semicolon.
-            // This is likely the case when the next operand starts with "Op" or is an assignment
-            // in the form of %something = ....
+            // The SPIRV grammar says we are providing more arguments than expected operand
+            // count. We will issue a warning if it is likely that the user missed a semicolon.
+            // This is likely the case when the next operand starts with "Op" or is an
+            // assignment in the form of %something = ....
             //
             auto token = parser->tokenReader.peekToken();
             if (token.getContent().startsWith("Op") ||
@@ -9144,7 +9193,8 @@ static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
     {
         modifier->magicNodeType = syntaxClass;
     }
-    // TODO: print diagnostic if the magic type name doesn't correspond to an actual ASTNodeType.
+    // TODO: print diagnostic if the magic type name doesn't correspond to an actual
+    // ASTNodeType.
     parser->ReadToken(TokenType::RParent);
 
     return modifier;

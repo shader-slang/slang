@@ -301,6 +301,21 @@ void emitType(ManglingContext* context, Type* type)
         emitRaw(context, "Tfwddiff");
         emitType(context, fwdDiffFuncType->getBase());
     }
+    else if (auto fwdCallableFuncType = as<BwdCallableFuncType>(type))
+    {
+        emitRaw(context, "Tfwdcallable");
+        emitType(context, fwdCallableFuncType->getBase());
+    }
+    else if (auto applyForFwdFuncType = as<ApplyForBwdFuncType>(type))
+    {
+        emitRaw(context, "Tapplyforfwd");
+        emitType(context, applyForFwdFuncType->getBase());
+    }
+    else if (auto funcResultType = as<FuncResultType>(type))
+    {
+        emitRaw(context, "Tfuncresult");
+        emitType(context, funcResultType->getBase());
+    }
     else
     {
         SLANG_UNEXPECTED("unimplemented case in type mangling");

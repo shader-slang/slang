@@ -67,6 +67,9 @@ INST(Nop, nop, 0, 0)
     INST_RANGE(DifferentialPairTypeBase, DifferentialPairType, DifferentialPtrPairType)
 
     INST(ForwardDiffFuncType, FwdDiffFuncType, 1, HOISTABLE)
+    INST(ApplyForBwdFuncType, ApplyForBwdFuncType, 1, HOISTABLE)
+    INST(BwdCallableFuncType, BwdCallableFuncType, 1, HOISTABLE)
+    INST(FuncResultType, FuncResultType, 1, HOISTABLE)
 
     INST(BackwardDiffIntermediateContextType, BwdDiffIntermediateCtxType, 1, HOISTABLE)
 

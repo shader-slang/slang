@@ -5,6 +5,7 @@
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-lower-witness-lookup-chain.h"
 #include "slang-ir-lower-witness-lookup.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-sccp.h"
@@ -1151,7 +1152,8 @@ struct SpecializationContext
             //
             if (options.lowerWitnessLookups)
             {
-                iterChanged = lowerWitnessLookup(module, sink);
+                iterChanged = lowerWitnessLookupChains(module, sink);
+                iterChanged |= lowerWitnessLookup(module, sink);
             }
 
             if (!iterChanged || sink->getErrorCount())

@@ -218,6 +218,79 @@ void stripWrapExistential(IRModule* module)
     }
 }
 
+void removeUnusedKeys(IRBuilder* builder, IRInterfaceType* interfaceType)
+{
+    // Ignore
+    if (interfaceType->findDecoration<IRComInterfaceDecoration>())
+        return;
+
+    // Go through the interface type and record all the keys that have no uses
+    // that aren't in an InterfaceRequirementEntry or WitnessTableEntry.
+    //
+    List<IRStructKey*> unusedKeys;
+    for (Index i = 0; i < interfaceType->getRequirementCount(); i++)
+    {
+        IRInterfaceRequirementEntry* entry =
+            as<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
+        IRStructKey* key = cast<IRStructKey>(entry->getRequirementKey());
+        bool used = false;
+        for (auto use = key->firstUse; use; use = use->nextUse)
+        {
+            if (use->getUser()->getOp() == kIROp_InterfaceRequirementEntry ||
+                use->getUser()->getOp() == kIROp_WitnessTableEntry)
+            {
+                continue;
+            }
+            else
+            {
+                used = true;
+                break;
+            }
+        }
+
+        if (used)
+            continue;
+
+        unusedKeys.add(key);
+    }
+
+    List<IRWitnessTableEntry*> unusedWitnessTableEntries;
+    for (auto key : unusedKeys)
+    {
+        for (auto use = key->firstUse; use; use = use->nextUse)
+        {
+            if (use->getUser()->getOp() == kIROp_WitnessTableEntry)
+            {
+                auto witnessTableEntry = as<IRWitnessTableEntry>(use->getUser());
+                unusedWitnessTableEntries.add(witnessTableEntry);
+            }
+        }
+    }
+
+    for (auto entry : unusedWitnessTableEntries)
+    {
+        entry->removeAndDeallocate();
+    }
+
+    List<IRInterfaceRequirementEntry*> remainingEntries;
+    for (Index i = 0; i < interfaceType->getRequirementCount(); i++)
+    {
+        IRInterfaceRequirementEntry* entry =
+            as<IRInterfaceRequirementEntry>(interfaceType->getOperand(i));
+        IRStructKey* key = cast<IRStructKey>(entry->getRequirementKey());
+        if (unusedKeys.contains(key))
+            continue;
+        remainingEntries.add(entry);
+    }
+
+    IRInterfaceType* newInterfaceType = builder->createInterfaceType(
+        remainingEntries.getCount(),
+        (IRInst**)remainingEntries.getBuffer());
+    interfaceType->transferDecorationsTo(newInterfaceType);
+    newInterfaceType->sourceLoc = interfaceType->sourceLoc;
+    interfaceType->replaceUsesWith(newInterfaceType);
+}
+
 void lowerGenerics(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
 {
     SLANG_PROFILE;
@@ -225,6 +298,19 @@ void lowerGenerics(TargetProgram* targetProgram, IRModule* module, DiagnosticSin
     SharedGenericsLoweringContext sharedContext(module);
     sharedContext.targetProgram = targetProgram;
     sharedContext.sink = sink;
+
+    for (auto inst : module->getGlobalInsts())
+    {
+        if (auto interfaceType = as<IRInterfaceType>(inst))
+        {
+            IRBuilder builder(module);
+            builder.setInsertBefore(interfaceType);
+            removeUnusedKeys(&builder, interfaceType);
+        }
+    }
+
+    // TODO: make this more specific..
+    simplifyIR(targetProgram, module, IRSimplificationOptions::getFast(targetProgram));
 
     checkTypeConformanceExists(&sharedContext);
 

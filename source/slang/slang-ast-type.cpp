@@ -336,6 +336,87 @@ Val* FwdDiffFuncType::_substituteImplOverride(
     return astBuilder->getOrCreate<FwdDiffFuncType>(substBase)->getCanonicalType();
 }
 
+// --
+void ApplyForBwdFuncType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("ApplyForBwdFuncType<") << getBase() << toSlice(">");
+}
+
+Type* ApplyForBwdFuncType::_createCanonicalTypeOverride()
+{
+    auto canonicalType = getBase()->getCanonicalType();
+    if (canonicalType == this)
+        return this;
+
+    // Otherwise, create a new ApplyForBwdFuncType.
+    auto astBuilder = getCurrentASTBuilder();
+    auto newType = astBuilder->getOrCreate<ApplyForBwdFuncType>(canonicalType);
+    return newType;
+}
+
+Val* ApplyForBwdFuncType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
+    return astBuilder->getOrCreate<ApplyForBwdFuncType>(substBase)->getCanonicalType();
+}
+
+// --
+void BwdCallableFuncType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("BwdCallableFuncType<") << getBase() << toSlice(">");
+}
+
+Type* BwdCallableFuncType::_createCanonicalTypeOverride()
+{
+    auto canonicalType = getBase()->getCanonicalType();
+    if (canonicalType == this)
+        return this;
+
+    // Otherwise, create a new BwdCallableFuncType.
+    auto astBuilder = getCurrentASTBuilder();
+    auto newType = astBuilder->getOrCreate<BwdCallableFuncType>(canonicalType);
+    return newType;
+}
+
+Val* BwdCallableFuncType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
+    return astBuilder->getOrCreate<BwdCallableFuncType>(substBase)->getCanonicalType();
+}
+
+// --
+void FuncResultType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("FuncResultType<") << getBase() << toSlice(">");
+}
+
+Type* FuncResultType::_createCanonicalTypeOverride()
+{
+    auto canonicalType = getBase()->getCanonicalType();
+    if (canonicalType == this)
+        return this;
+
+    // Otherwise, create a new FuncResultType.
+    auto astBuilder = getCurrentASTBuilder();
+    auto newType = astBuilder->getOrCreate<FuncResultType>(canonicalType);
+    return newType;
+}
+
+Val* FuncResultType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
+    return astBuilder->getOrCreate<FuncResultType>(substBase)->getCanonicalType();
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TupleType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 Type* TupleType::getMember(Index i) const
 {

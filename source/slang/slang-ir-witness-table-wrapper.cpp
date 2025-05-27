@@ -230,11 +230,15 @@ struct GenerateWitnessTableWrapperContext
             auto interfaceRequirementVal = sharedContext->findInterfaceRequirementVal(
                 interfaceType,
                 entry->getRequirementKey());
-            if (auto ordinaryFunc = as<IRFunc>(entry->getSatisfyingVal()))
+
+            if (as<IRFuncType>(interfaceRequirementVal))
             {
-                auto wrapper = emitWitnessTableWrapper(ordinaryFunc, interfaceRequirementVal);
-                entry->satisfyingVal.set(wrapper);
-                sharedContext->addToWorkList(wrapper);
+                if (auto ordinaryFunc = as<IRFunc>(entry->getSatisfyingVal()))
+                {
+                    auto wrapper = emitWitnessTableWrapper(ordinaryFunc, interfaceRequirementVal);
+                    entry->satisfyingVal.set(wrapper);
+                    sharedContext->addToWorkList(wrapper);
+                }
             }
         }
     }

@@ -1291,6 +1291,139 @@ Type* SemanticsVisitor::resolveType(Type* type)
                 }
             }
         }
+        else if (auto applyForBwdFuncType = as<ApplyForBwdFuncType>(type))
+        {
+            // Construct a func type that has the same parameters as the
+            // base func, but with the result type replaced with a
+            // Tuple<ResultType, This.FwdCallable>
+            //
+            auto baseFuncType = applyForBwdFuncType->getBase()->resolve();
+            if (isDeclRefTypeOf<FunctionDeclBase>(applyForBwdFuncType->getBase()->resolve()))
+            {
+                auto funcDeclRef =
+                    as<DeclRefType>(baseFuncType)->getDeclRef().as<FunctionDeclBase>();
+                FuncType* funcType = as<FuncType>(
+                    getTypeForDeclRef(getASTBuilder(), funcDeclRef, funcDeclRef.getLoc()));
+
+                auto resultType = funcType->getResultType();
+
+                // Look up "This.FwdCallable" in the current scope.
+                //
+                // Build the right member-expr.
+                //
+                SharedTypeExpr* sharedTypeExpr = getASTBuilder()->create<SharedTypeExpr>();
+                VarExpr* varExpr = getASTBuilder()->create<VarExpr>();
+                varExpr->declRef = funcDeclRef;
+                sharedTypeExpr->base.exp = varExpr;
+                sharedTypeExpr->base.type =
+                    getASTBuilder()->getTypeType(DeclRefType::create(getASTBuilder(), funcDeclRef));
+                sharedTypeExpr->type = sharedTypeExpr->base.type;
+
+                MemberExpr* memberExpr = getASTBuilder()->create<MemberExpr>();
+                memberExpr->baseExpression = sharedTypeExpr;
+                memberExpr->name = getASTBuilder()->getNamePool()->getName("BwdCallable");
+                memberExpr->loc = funcDeclRef.getLoc();
+                memberExpr->scope = getScope(funcDeclRef.getDecl());
+
+                auto checkedExpr = CheckTerm(memberExpr);
+                checkedExpr =
+                    maybeResolveOverloadedExpr(checkedExpr, LookupMask::Default, getSink());
+
+                Type* bwdCallableType = ExtractTypeFromTypeRepr(checkedExpr);
+
+                // Build a new func type out of the parameters with the
+                // result type replaced with the tuple type.
+                //
+                auto paramTypes = funcType->getParamTypes();
+                List<Type*> paramTypesList;
+                for (auto paramType : paramTypes)
+                {
+                    paramTypesList.add(paramType);
+                }
+                auto newFuncType =
+                    getASTBuilder()->getFuncType(paramTypesList.getArrayView(), bwdCallableType);
+                return newFuncType;
+            }
+        }
+        else if (auto bwdCallableFuncType = as<BwdCallableFuncType>(type))
+        {
+            auto baseFuncType = bwdCallableFuncType->getBase()->resolve();
+            if (isDeclRefTypeOf<FunctionDeclBase>(bwdCallableFuncType->getBase()->resolve()))
+            {
+                auto funcDeclRef =
+                    as<DeclRefType>(baseFuncType)->getDeclRef().as<FunctionDeclBase>();
+                FuncType* funcType = as<FuncType>(
+                    getTypeForDeclRef(getASTBuilder(), funcDeclRef, funcDeclRef.getLoc()));
+
+                // Go through an translate all types (parameter & result) to their differential
+                // variants
+                //
+                List<Type*> paramTypes;
+
+                for (Index i = 0; i < funcType->getParamCount(); i++)
+                {
+                    auto diffType = getDifferentialType(
+                        getASTBuilder(),
+                        funcType->getParamType(i),
+                        funcDeclRef.getLoc());
+                    if (!diffType)
+                    {
+                        // For now, we'll crash (later need to replace this by NoneType)
+                        SLANG_ASSERT(!"Failed to get differential type");
+                    }
+
+                    // Flip the direction of the type..
+                    switch (funcType->getParamDirection(i))
+                    {
+                    case kParameterDirection_Out:
+                        paramTypes.add(diffType);
+                        break;
+                    case kParameterDirection_In:
+                        paramTypes.add(getASTBuilder()->getOutType(diffType));
+                        break;
+                    default:
+                        SLANG_ASSERT(!"Unknown parameter direction");
+                        break;
+                    }
+                }
+
+                auto resultType = funcType->getResultType();
+                auto diffResultType =
+                    getDifferentialType(getASTBuilder(), resultType, funcDeclRef.getLoc());
+                if (!diffResultType)
+                {
+                    // For now, we'll crash (later need to replace this by NoneType)
+                    SLANG_ASSERT(!"Failed to get differential type");
+                }
+
+                paramTypes.add(diffResultType);
+
+                // Build a new func type out of the parameters with the
+                // result type replaced with the tuple type.
+                //
+                auto newFuncType = getASTBuilder()->getFuncType(
+                    paramTypes.getArrayView(),
+                    getASTBuilder()->getVoidType());
+                return newFuncType;
+            }
+        }
+        else if (auto funcResultType = as<FuncResultType>(type))
+        {
+            auto baseFuncType = funcResultType->getBase()->resolve();
+            if (isDeclRefTypeOf<FunctionDeclBase>(funcResultType->getBase()->resolve()))
+            {
+                auto funcDeclRef =
+                    as<DeclRefType>(baseFuncType)->getDeclRef().as<FunctionDeclBase>();
+                FuncType* funcType = as<FuncType>(
+                    getTypeForDeclRef(getASTBuilder(), funcDeclRef, funcDeclRef.getLoc()));
+
+                auto newFuncType = getASTBuilder()->getFuncType(
+                    List<Type*>().getArrayView(),
+                    funcType->getResultType());
+
+                return newFuncType;
+            }
+        }
 
         return (Type*)resolveVal(type);
     }
@@ -6545,6 +6678,11 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
                     context,
                     requiredFuncDeclRef,
                     witnessTable);
+                break;
+            case BuiltinRequirementKind::BwdCallableContextType:
+            case BuiltinRequirementKind::BwdApplyFunc:
+                // Not implemented yet.
+                return false;
                 break;
             }
         }

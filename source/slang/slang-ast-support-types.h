@@ -1693,7 +1693,9 @@ FIDDLE() namespace Slang
                                    // Requirement keys for new auto-diff system
         ForwardDerivativeFuncType, ///< The "__fwd_diff_func_type" built-in associatedtype on
                                    ///< functions
-        ForwardDerivativeFunc      ///< The "fwd_diff" built-in function on functions
+        ForwardDerivativeFunc,     ///< The "fwd_diff" built-in function on functions
+        BwdCallableContextType,    ///< The "BwdCallable" built-in associatedtype on functions
+        BwdApplyFunc,              ///< The "apply_bwd" built-in function on functions
     };
 
     enum class FunctionDifferentiableLevel

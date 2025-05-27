@@ -2983,6 +2983,9 @@ public:
     Expr* visitFuncAsTypeExpr(FuncAsTypeExpr* expr);
     Expr* visitFuncTypeOfExpr(FuncTypeOfExpr* expr);
     Expr* visitFwdDiffFuncTypeExpr(FwdDiffFuncTypeExpr* expr);
+    Expr* visitApplyForBwdFuncTypeExpr(ApplyForBwdFuncTypeExpr* expr);
+    Expr* visitBwdCallableFuncTypeExpr(BwdCallableFuncTypeExpr* expr);
+    Expr* visitFuncResultTypeExpr(FuncResultTypeExpr* expr);
 
     Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
     Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
