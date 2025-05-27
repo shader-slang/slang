@@ -3269,7 +3269,6 @@ __forceinline__ __device__ bool optixHitObjectIsLSSHit()
 {
     return optixGetPrimitiveType(optixHitObjectGetHitKind()) == OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR;
 }
-#endif
 
 template<typename T>
 __forceinline__ __device__ void* optixTraverse(
