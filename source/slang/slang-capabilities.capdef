@@ -547,6 +547,10 @@ def SPV_NV_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
 /// [EXT]
 def SPV_NV_cluster_acceleration_structure : _spirv_1_0;
 
+/// Represents the SPIR-V extension for linear swept spheres.
+/// [EXT]
+def SPV_NV_linear_swept_spheres : _spirv_1_0;
+
 /// Represents the SPIR-V extension for shader image footprint.
 /// [EXT]
 def SPV_NV_shader_image_footprint : _spirv_1_0;
@@ -713,6 +717,10 @@ def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder;
 /// Represents the SPIR-V capability for cluster acceleration structure.
 /// [EXT]
 def spvRayTracingClusterAccelerationStructureNV : SPV_NV_cluster_acceleration_structure;
+
+/// Represents the SPIR-V capability for cluster acceleration structure.
+/// [EXT]
+def spvRayTracingLinearSweptSpheresGeometryNV : SPV_NV_linear_swept_spheres;
 
 /// Represents the SPIR-V capability for shader clock.
 /// [EXT]
@@ -2245,6 +2253,10 @@ alias raytracing_intersection = intersection + raytracing;
 /// Collection of capabilities for raytracing with the shader stages of anyhit and closesthit.
 /// [Compound]
 alias raytracing_anyhit_closesthit = anyhit_closesthit + raytracing;
+
+/// Collection of capabilities for linear swept spheres.
+/// [Compound]
+alias raytracing_lss = raytracing_anyhit_closesthit | spvRayTracingLinearSweptSpheresGeometryNV;
 
 /// Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.
 /// [Compound]
