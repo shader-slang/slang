@@ -856,6 +856,15 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitDeferStmt(DeferStmt* stmt) { dispatchIfNotNull(stmt->statement); }
 
+    void visitThrowStmt(ThrowStmt* stmt) { dispatchIfNotNull(stmt->expression); }
+
+    void visitCatchStmt(CatchStmt* stmt)
+    {
+        dispatchIfNotNull(stmt->errorVar);
+        dispatchIfNotNull(stmt->tryBody);
+        dispatchIfNotNull(stmt->handleBody);
+    }
+
     void visitWhileStmt(WhileStmt* stmt)
     {
         dispatchIfNotNull(stmt->predicate);
@@ -10396,7 +10405,16 @@ void SemanticsDeclHeaderVisitor::visitAbstractStorageDeclCommon(ContainerDecl* d
 
 void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
 {
-    decl->returnType = CheckUsableType(decl->returnType, decl);
+    // __subscript needs to have a return type specified. Check if return type
+    // is missing (represented as IncompleteExpr) and return an error.
+    if (decl->returnType.exp && as<IncompleteExpr>(decl->returnType.exp))
+    {
+        getSink()->diagnose(decl, Diagnostics::subscriptMustHaveReturnType);
+    }
+    else if (decl->returnType.exp)
+    {
+        decl->returnType = CheckUsableType(decl->returnType, decl);
+    }
 
     visitAbstractStorageDeclCommon(decl);
 

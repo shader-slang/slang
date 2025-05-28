@@ -1001,6 +1001,28 @@ DIAGNOSTIC(
     nonCopyableTypeCapturedInLambda,
     "cannot capture non-copyable type '$0' in a lambda expression.")
 
+DIAGNOSTIC(
+    30113,
+    Error,
+    uncaughtThrowInsideDefer,
+    "'throw' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(
+    30114,
+    Error,
+    uncaughtTryInsideDefer,
+    "'try' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(
+    30115,
+    Error,
+    uncaughtThrowInNonThrowFunc,
+    "the current function or environment is not declared to throw any errors, but contains an "
+    "uncaught 'throw' statement.")
+DIAGNOSTIC(
+    30116,
+    Error,
+    throwTypeIncompatibleWithErrorType,
+    "the type `$0` of `throw` is not compatible with function's error type `$1`.")
+
 // Include
 DIAGNOSTIC(
     30500,
@@ -1688,6 +1710,11 @@ DIAGNOSTIC(
     Error,
     multiDimensionalArrayNotSupported,
     "multi-dimensional array is not supported.")
+DIAGNOSTIC(
+    30901,
+    Error,
+    subscriptMustHaveReturnType,
+    "__subscript declaration must have a return type specified after '->'")
 // 310xx: properties
 
 // 311xx: accessors
