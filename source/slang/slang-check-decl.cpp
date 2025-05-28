@@ -47,16 +47,6 @@ static bool isSlang2025(CompilerOptionSet& optionSet)
 
     return false;
 }
-static bool isSlang2026(CompilerOptionSet& optionSet)
-{
-    if (!optionSet.hasOption(CompilerOptionName::Language))
-        return false;
-    return SLANG_SOURCE_LANGUAGE_SLANG ==
-               SlangSourceLanguage(
-                   optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language)) &&
-           SLANG_STD_REVISION_2026 ==
-               optionSet.getEnumOption<SlangStdRevision>(CompilerOptionName::StdRevision);
-}
 
 static bool allowExperimentalDynamicDispatch(CompilerOptionSet& optionSet)
 {
