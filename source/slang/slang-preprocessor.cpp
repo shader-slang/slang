@@ -4368,24 +4368,6 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
     case TokenType::IntegerLiteral:
         version = stringToInt(AdvanceToken(context).getContent());
         break;
-    case TokenType::Identifier:
-        {
-            auto token = AdvanceToken(context);
-            if (token.getContent() == "latest")
-                version = SLANG_LANGUAGE_VERSION_LATEST;
-            else if (token.getContent() == "legacy")
-                version = SLANG_LANGUAGE_VERSION_LEGACY;
-            else if (token.type == TokenType::IntegerLiteral)
-                version = stringToInt(token.getContent());
-            else
-            {
-                GetSink(context)->diagnose(
-                    GetDirectiveLoc(context),
-                    Diagnostics::unknownLanguageVersion,
-                    version);
-            }
-        }
-        break;
     default:
         GetSink(context)->diagnose(
             GetDirectiveLoc(context),
@@ -4395,11 +4377,7 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
 
     SkipToEndOfLine(context);
 
-    if (isValidSlangLanguageVersion((SlangLanguageVersion)version))
-    {
-        context->m_preprocessor->language = SourceLanguage::Slang;
-    }
-    else if (isValidGLSLVersion(version))
+    if (isValidGLSLVersion(version))
     {
         context->m_preprocessor->language = SourceLanguage::GLSL;
     }

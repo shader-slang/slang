@@ -577,8 +577,6 @@ class ParenExpr : public Expr
 
 // An expression that constructs a tuple `(arg1, arg2, ...)`
 //
-// We keep this around explicitly to be sure we don't lose any structure
-// when we do rewriter stuff.
 FIDDLE()
 class TupleExpr : public Expr
 {
