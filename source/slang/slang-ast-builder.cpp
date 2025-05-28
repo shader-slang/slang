@@ -289,6 +289,12 @@ Type* ASTBuilder::getDefaultLayoutType()
 {
     return getSpecializedBuiltinType({}, "DefaultDataLayoutType");
 }
+
+Type* ASTBuilder::getDefaultPushConstantLayoutType()
+{
+    return getSpecializedBuiltinType({}, "DefaultPushConstantDataLayoutType");
+}
+
 Type* ASTBuilder::getStd140LayoutType()
 {
     return getSpecializedBuiltinType({}, "Std140DataLayoutType");

@@ -2016,7 +2016,7 @@ void SemanticsDeclHeaderVisitor::checkPushConstantBufferType(VarDeclBase* varDec
             {
                 varDecl->type.type = getConstantBufferType(
                     cbufferType->getElementType(),
-                    m_astBuilder->getStd430LayoutType());
+                    m_astBuilder->getDefaultPushConstantLayoutType());
             }
         }
         else if (isGlobalShaderParameter(varDecl))
@@ -2024,8 +2024,9 @@ void SemanticsDeclHeaderVisitor::checkPushConstantBufferType(VarDeclBase* varDec
             // If this is a global variable with [vk::push_constant] attribute,
             // we need to make sure to wrap it in a `ConstantBuffer`.
             //
-            varDecl->type.type =
-                getConstantBufferType(varDecl->type, m_astBuilder->getStd430LayoutType());
+            varDecl->type.type = getConstantBufferType(
+                varDecl->type,
+                m_astBuilder->getDefaultPushConstantLayoutType());
         }
     }
 }
