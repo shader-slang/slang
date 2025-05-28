@@ -831,7 +831,10 @@ DIAGNOSTIC(33070, Error, expectedFunction, "expected a function, got '$0'")
 DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 
 // `dyn` and `some` errors
-DIAGNOSTIC(33072, Error, cannotHaveGenericDynInterface, "dyn interfaces cannot be generic: '$0'.")
+DIAGNOSTIC(33072,
+    Error,
+    cannotHaveGenericDynInterface,
+    "dyn interfaces cannot be generic: '$0'.")
 DIAGNOSTIC(
     33073,
     Error,
@@ -1050,6 +1053,28 @@ DIAGNOSTIC(
     Error,
     nonCopyableTypeCapturedInLambda,
     "cannot capture non-copyable type '$0' in a lambda expression.")
+
+DIAGNOSTIC(
+    30113,
+    Error,
+    uncaughtThrowInsideDefer,
+    "'throw' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(
+    30114,
+    Error,
+    uncaughtTryInsideDefer,
+    "'try' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(
+    30115,
+    Error,
+    uncaughtThrowInNonThrowFunc,
+    "the current function or environment is not declared to throw any errors, but contains an "
+    "uncaught 'throw' statement.")
+DIAGNOSTIC(
+    30116,
+    Error,
+    throwTypeIncompatibleWithErrorType,
+    "the type `$0` of `throw` is not compatible with function's error type `$1`.")
 
 // Include
 DIAGNOSTIC(
@@ -1738,6 +1763,11 @@ DIAGNOSTIC(
     Error,
     multiDimensionalArrayNotSupported,
     "multi-dimensional array is not supported.")
+DIAGNOSTIC(
+    30901,
+    Error,
+    subscriptMustHaveReturnType,
+    "__subscript declaration must have a return type specified after '->'")
 // 310xx: properties
 
 // 311xx: accessors

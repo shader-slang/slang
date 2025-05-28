@@ -97,7 +97,17 @@ bool SemanticsVisitor::shouldUseInitializerDirectly(Type* toType, Expr* fromExpr
     // we want to check for is whether a direct initialization
     // is possible (a type conversion exists).
     //
-    return canCoerce(toType, fromExpr->type, fromExpr);
+    ConversionCost cost;
+    if (canCoerce(toType, fromExpr->type, fromExpr, &cost))
+    {
+        if (cost >= kConversionCost_Explicit)
+        {
+            return false;
+        }
+        return true;
+    }
+
+    return false;
 }
 
 bool SemanticsVisitor::_readValueFromInitializerList(
@@ -236,7 +246,8 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
 
     // 1. It has to be basic scalar, vector or matrix type, or user-defined struct.
     if (as<VectorExpressionType>(type) || as<MatrixExpressionType>(type) ||
-        as<BasicExpressionType>(type) || isDeclRefTypeOf<EnumDecl>(type).getDecl())
+        as<BasicExpressionType>(type) || isDeclRefTypeOf<EnumDecl>(type).getDecl() ||
+        as<PtrType>(type))
         return cacheResult(true);
 
 
@@ -526,6 +537,19 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         }
         else
         {
+            auto isLinkTimeVal =
+                as<TypeCastIntVal>(toElementCount) || as<DeclRefIntVal>(toElementCount) ||
+                as<PolynomialIntVal>(toElementCount) || as<FuncCallIntVal>(toElementType);
+            if (isLinkTimeVal)
+            {
+                auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
+                defaultConstructExpr->loc = fromInitializerListExpr->loc;
+                defaultConstructExpr->type = QualType(toType);
+
+                *outToExpr = defaultConstructExpr;
+                return true;
+            }
+
             // We don't know the element count statically,
             // so what are we supposed to be doing?
             //
@@ -702,12 +726,26 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         auto toRowType =
             createVectorType(toMatrixType->getElementType(), toMatrixType->getColumnCount());
 
-        if (auto constRowCount = as<ConstantIntVal>(toMatrixType->getRowCount()))
+        auto rowCountIntVal = toMatrixType->getRowCount();
+        if (auto constRowCount = as<ConstantIntVal>(rowCountIntVal))
         {
             rowCount = (UInt)constRowCount->getValue();
         }
         else
         {
+            auto isLinkTimeVal =
+                as<TypeCastIntVal>(rowCountIntVal) || as<DeclRefIntVal>(rowCountIntVal) ||
+                as<PolynomialIntVal>(rowCountIntVal) || as<FuncCallIntVal>(rowCountIntVal);
+            if (isLinkTimeVal)
+            {
+                auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
+                defaultConstructExpr->loc = fromInitializerListExpr->loc;
+                defaultConstructExpr->type = QualType(toType);
+
+                *outToExpr = defaultConstructExpr;
+                return true;
+            }
+
             // We don't know the element count statically,
             // so what are we supposed to be doing?
             //

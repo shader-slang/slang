@@ -33,7 +33,6 @@ class DeclRefExpr : public Expr
     // The original expr before DeclRef resolution.
     Expr* originalExpr = nullptr;
 
-    SLANG_UNREFLECTED
     // The scope in which to perform lookup
     Scope* scope = nullptr;
 };
@@ -582,7 +581,7 @@ FIDDLE()
 class ThisExpr : public Expr
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
+
     Scope* scope = nullptr;
 };
 
@@ -592,7 +591,7 @@ FIDDLE()
 class ReturnValExpr : public Expr
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
+
     Scope* scope = nullptr;
 };
 
@@ -721,7 +720,7 @@ FIDDLE()
 class ThisTypeExpr : public Expr
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
+
     Scope* scope = nullptr;
 };
 
