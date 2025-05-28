@@ -182,10 +182,7 @@ if(SLANG_ENABLE_GFX)
             ${slang_SOURCE_DIR}/include
             if
             (not ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH})
-        INCLUDE_DIRECTORIES_PUBLIC
-            ${slang_SOURCE_DIR}/external
-            else
-            ()
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
         INCLUDE_DIRECTORIES_PUBLIC
             ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH}
             endif
@@ -206,10 +203,7 @@ if(SLANG_ENABLE_GFX)
             ()
             if
             (not ${SLANG_OVERRIDE_TINYOBJLOADER_PATH})
-        INCLUDE_DIRECTORIES_PUBLIC
-            ${slang_SOURCE_DIR}/external
-            else
-            ()
+        INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
         INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_TINYOBJLOADER_PATH} endif ()
         INCLUDE_DIRECTORIES_PRIVATE ${NVAPI_INCLUDE_DIRS}
         INSTALL
