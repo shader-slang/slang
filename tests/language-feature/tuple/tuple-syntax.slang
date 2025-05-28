@@ -1,6 +1,6 @@
 // Test tuple swizzling and element access.
 
-#version slang 2026
+#language 2026
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -use-dxil -shaderobj
@@ -15,6 +15,12 @@ void store(inout Tuple<int, float, uint> t)
     t._1_2 = (3.0, 4u);
 }
 
+struct MyType
+{
+    int x;
+    int y;
+}
+
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -24,4 +30,9 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     // CHECK: 4
     outputBuffer[0] = y._1;
+
+    // This should mean MyType.__init(1,2), not cast<MyType>(makeTuple(1,2))
+    let m = (MyType)(1,2);
+    // CHECK: 3
+    outputBuffer[1] = m.x + m.y;
 }
