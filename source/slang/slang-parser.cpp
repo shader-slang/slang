@@ -211,11 +211,14 @@ public:
     Stmt* parseIfLetStatement();
     ForStmt* ParseForStatement();
     WhileStmt* ParseWhileStatement();
-    DoWhileStmt* ParseDoWhileStatement();
+    DoWhileStmt* ParseDoWhileStatement(Stmt* body);
+    CatchStmt* ParseDoCatchStatement(Stmt* body);
+    Stmt* ParseDoStatement();
     BreakStmt* ParseBreakStatement();
     ContinueStmt* ParseContinueStatement();
     ReturnStmt* ParseReturnStatement();
     DeferStmt* ParseDeferStatement();
+    ThrowStmt* ParseThrowStatement();
     ExpressionStmt* ParseExpressionStatement();
     Expr* ParseExpression(Precedence level = Precedence::Comma);
 
@@ -2425,8 +2428,8 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
             for (auto candidate : overloadedExpr->lookupResult2)
             {
                 if (candidate.declRef.is<GenericDecl>() ||
-                    declRefExpr->declRef.is<FunctionDeclBase>() ||
-                    declRefExpr->declRef.is<AggTypeDeclBase>())
+                    candidate.declRef.is<FunctionDeclBase>() ||
+                    candidate.declRef.is<AggTypeDeclBase>())
                 {
                     baseKind = BaseGenericKind::Generic;
                     break;
@@ -5756,7 +5759,7 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
     else if (LookAheadToken("while"))
         statement = ParseWhileStatement();
     else if (LookAheadToken("do"))
-        statement = ParseDoWhileStatement();
+        statement = ParseDoStatement();
     else if (LookAheadToken("break"))
         statement = ParseBreakStatement();
     else if (LookAheadToken("continue"))
@@ -5795,6 +5798,10 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
     else if (LookAheadToken("try"))
     {
         statement = ParseExpressionStatement();
+    }
+    else if (LookAheadToken("throw"))
+    {
+        statement = ParseThrowStatement();
     }
     else if (LookAheadToken(TokenType::Identifier) || LookAheadToken(TokenType::Scope))
     {
@@ -5955,7 +5962,6 @@ Stmt* Parser::parseBlockStatement()
     pushScopeAndSetParent(scopeDecl);
 
     Stmt* body = nullptr;
-
 
     if (!tokenReader.isAtEnd())
     {
@@ -6274,18 +6280,73 @@ WhileStmt* Parser::ParseWhileStatement()
     return whileStatement;
 }
 
-DoWhileStmt* Parser::ParseDoWhileStatement()
+DoWhileStmt* Parser::ParseDoWhileStatement(Stmt* body)
 {
     DoWhileStmt* doWhileStatement = astBuilder->create<DoWhileStmt>();
     FillPosition(doWhileStatement);
-    ReadToken("do");
-    doWhileStatement->statement = ParseStatement();
+    doWhileStatement->statement = body;
     ReadToken("while");
     ReadToken(TokenType::LParent);
     doWhileStatement->predicate = ParseExpression();
     ReadToken(TokenType::RParent);
     ReadToken(TokenType::Semicolon);
     return doWhileStatement;
+}
+
+CatchStmt* Parser::ParseDoCatchStatement(Stmt* body)
+{
+    for (;;)
+    {
+        ScopeDecl* scopeDecl = astBuilder->create<ScopeDecl>();
+        pushScopeAndSetParent(scopeDecl);
+
+        CatchStmt* catchStatement = astBuilder->create<CatchStmt>();
+        FillPosition(catchStatement);
+        ReadToken("catch");
+
+        // Optional error parameter. If not given, the catch catches all error
+        // types.
+        if (AdvanceIf(this, TokenType::LParent))
+        {
+            ParamDecl* errorVar = parseModernParamDecl(this);
+            catchStatement->errorVar = errorVar;
+            AddMember(scopeDecl, errorVar);
+            ReadToken(TokenType::RParent);
+        }
+
+        catchStatement->tryBody = body;
+        catchStatement->handleBody = ParseStatement();
+
+        PopScope();
+
+        if (!LookAheadToken("catch"))
+            return catchStatement;
+
+        // Use this catch as the body for the next one, if multiple are chained.
+        body = catchStatement;
+    }
+}
+
+Stmt* Parser::ParseDoStatement()
+{
+    SourceLoc position = tokenReader.peekLoc();
+    ReadToken("do");
+    Stmt* statement = ParseStatement();
+    if (LookAheadToken("while"))
+    {
+        Stmt* whileStatement = ParseDoWhileStatement(statement);
+        whileStatement->loc = position;
+        return whileStatement;
+    }
+    else if (LookAheadToken("catch"))
+    {
+        return ParseDoCatchStatement(statement);
+    }
+    else
+    {
+        Unexpected(this, "while' or 'catch");
+        return statement;
+    }
 }
 
 BreakStmt* Parser::ParseBreakStatement()
@@ -6328,6 +6389,15 @@ DeferStmt* Parser::ParseDeferStatement()
     ReadToken("defer");
     deferStatement->statement = ParseStatement();
     return deferStatement;
+}
+
+ThrowStmt* Parser::ParseThrowStatement()
+{
+    ThrowStmt* throwStatement = astBuilder->create<ThrowStmt>();
+    FillPosition(throwStatement);
+    ReadToken("throw");
+    throwStatement->expression = ParseExpression();
+    return throwStatement;
 }
 
 ExpressionStmt* Parser::ParseExpressionStatement()

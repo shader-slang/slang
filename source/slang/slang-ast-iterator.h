@@ -443,6 +443,20 @@ struct ASTIterator
             dispatchIfNotNull(stmt->statement);
         }
 
+        void visitThrowStmt(ThrowStmt* stmt)
+        {
+            iterator->maybeDispatchCallback(stmt);
+            iterator->visitExpr(stmt->expression);
+        }
+
+        void visitCatchStmt(CatchStmt* stmt)
+        {
+            if (stmt->errorVar)
+                iterator->visitDecl(stmt->errorVar);
+            dispatchIfNotNull(stmt->tryBody);
+            dispatchIfNotNull(stmt->handleBody);
+        }
+
         void visitWhileStmt(WhileStmt* stmt)
         {
             iterator->maybeDispatchCallback(stmt);

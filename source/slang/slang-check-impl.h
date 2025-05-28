@@ -1028,6 +1028,20 @@ public:
         return result;
     }
 
+    template<typename T>
+    T* FindOuterStmt(Stmt* searchUntil = nullptr)
+    {
+        for (auto outerStmtInfo = m_outerStmts; outerStmtInfo && outerStmtInfo->stmt != searchUntil;
+             outerStmtInfo = outerStmtInfo->next)
+        {
+            auto outerStmt = outerStmtInfo->stmt;
+            auto found = as<T>(outerStmt);
+            if (found)
+                return found;
+        }
+        return nullptr;
+    }
+
     // Setup the flag to indicate disabling the short-circuiting evaluation
     // for the logical expressions associted with the subcontext
     SemanticsContext disableShortCircuitLogicalExpr()
@@ -2877,6 +2891,8 @@ public:
     void addVisibilityModifier(Decl* decl, DeclVisibility vis);
 
     void checkRayPayloadStructFields(StructDecl* structDecl);
+
+    CatchStmt* findMatchingCatchStmt(Type* errorType);
 };
 
 
@@ -3022,9 +3038,6 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void checkStmt(Stmt* stmt);
 
-    template<typename T>
-    T* FindOuterStmt(Stmt* searchUntil = nullptr);
-
     Stmt* findOuterStmtWithLabel(Name* label);
 
     void visitDeclStmt(DeclStmt* stmt);
@@ -3068,6 +3081,10 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
     void visitReturnStmt(ReturnStmt* stmt);
 
     void visitDeferStmt(DeferStmt* stmt);
+
+    void visitThrowStmt(ThrowStmt* stmt);
+
+    void visitCatchStmt(CatchStmt* stmt);
 
     void visitWhileStmt(WhileStmt* stmt);
 

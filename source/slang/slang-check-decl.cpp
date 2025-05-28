@@ -46,6 +46,16 @@ static bool isSlang2025(CompilerOptionSet& optionSet)
         return true;
 
     return false;
+
+static bool isSlang2026(CompilerOptionSet& optionSet)
+{
+    if (!optionSet.hasOption(CompilerOptionName::Language))
+        return false;
+    return SLANG_SOURCE_LANGUAGE_SLANG ==
+               SlangSourceLanguage(
+                   optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language)) &&
+           SLANG_STD_REVISION_2026 ==
+               optionSet.getEnumOption<SlangStdRevision>(CompilerOptionName::StdRevision);
 }
 
 static bool allowExperimentalDynamicDispatch(CompilerOptionSet& optionSet)
@@ -229,6 +239,10 @@ static void validateDynInterfaceUsage(
     auto sink = visitor->getSink();
     auto optionSet = visitor->getOptionSet();
 
+    DiagnosticSink* sink,
+    CompilerOptionSet& optionSet,
+    InterfaceDecl* decl)
+
     if (allowExperimentalDynamicDispatch(optionSet))
         return;
 
@@ -248,6 +262,22 @@ static void validateDynInterfaceUsage(
             if (as<FuncDecl>(genericDecl->inner))
             {
                 sink->diagnose(m, Diagnostics::cannotHaveGenericMethodInDynInterface);
+            }
+            continue;
+        }
+        else if (auto funcDecl = as<FuncDecl>(m))
+        {
+            visitor->ensureDecl(m, DeclCheckState::ModifiersChecked);
+            for (auto modifier : funcDecl->modifiers)
+            {
+                if (as<MutatingAttribute>(modifier))
+                {
+                    sink->diagnose(m, Diagnostics::cannotHaveMutatingMethodInDynInterface);
+                }
+                else if (as<DifferentiableAttribute>(modifier))
+                {
+                    sink->diagnose(m, Diagnostics::cannotHaveDifferentiableMethodInDynInterface);
+                }
             }
             continue;
         }
@@ -1057,6 +1087,15 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitReturnStmt(ReturnStmt* stmt) { dispatchIfNotNull(stmt->expression); }
 
     void visitDeferStmt(DeferStmt* stmt) { dispatchIfNotNull(stmt->statement); }
+
+    void visitThrowStmt(ThrowStmt* stmt) { dispatchIfNotNull(stmt->expression); }
+
+    void visitCatchStmt(CatchStmt* stmt)
+    {
+        dispatchIfNotNull(stmt->errorVar);
+        dispatchIfNotNull(stmt->tryBody);
+        dispatchIfNotNull(stmt->handleBody);
+    }
 
     void visitWhileStmt(WhileStmt* stmt)
     {
@@ -2712,6 +2751,23 @@ static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type*
             defaultCtor->loc,
             nullptr);
         return invoke;
+    }
+
+    // At the last, we will check if the type is a C-style type, if it is, we will use empty
+    // initializer list to construct the default constructor.
+    HashSet<Type*> visitSet;
+    if (visitor->isCStyleType(type, visitSet))
+    {
+        auto initListExpr = visitor->getASTBuilder()->create<InitializerListExpr>();
+        initListExpr->type = visitor->getASTBuilder()->getInitializerListType();
+        Expr* outExpr = nullptr;
+        auto fromType = type;
+        if (auto atomicType = as<AtomicType>(fromType))
+        {
+            fromType = atomicType->getElementType();
+        }
+        if (visitor->_coerceInitializerList(fromType, &outExpr, initListExpr))
+            return outExpr;
     }
 
     return nullptr;
@@ -10584,7 +10640,16 @@ void SemanticsDeclHeaderVisitor::visitAbstractStorageDeclCommon(ContainerDecl* d
 
 void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
 {
-    decl->returnType = CheckUsableType(decl->returnType, decl);
+    // __subscript needs to have a return type specified. Check if return type
+    // is missing (represented as IncompleteExpr) and return an error.
+    if (decl->returnType.exp && as<IncompleteExpr>(decl->returnType.exp))
+    {
+        getSink()->diagnose(decl, Diagnostics::subscriptMustHaveReturnType);
+    }
+    else if (decl->returnType.exp)
+    {
+        decl->returnType = CheckUsableType(decl->returnType, decl);
+    }
 
     visitAbstractStorageDeclCommon(decl);
 
@@ -13236,7 +13301,13 @@ static Expr* _getParamDefaultValue(SemanticsVisitor* visitor, VarDeclBase* varDe
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    return constructDefaultConstructorForType(visitor, varDecl->type.type);
+    if (auto expr = constructDefaultConstructorForType(visitor, varDecl->type.type))
+    {
+        expr->loc = varDecl->loc;
+        return expr;
+    }
+
+    return nullptr;
 }
 
 bool SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* structDecl)
