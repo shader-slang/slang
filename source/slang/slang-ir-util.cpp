@@ -2313,7 +2313,7 @@ bool canOperationBeSpecConst(IROp op, IRType* resultType, IRInst* const* fixedAr
                 operand1 = operands[0].get();
                 operand2 = operands[1].get();
             }
-            return isFloatingType(operand1->getDataType()) &&
+            return !isFloatingType(operand1->getDataType()) &&
                    !isFloatingType(operand2->getDataType());
         }
 
