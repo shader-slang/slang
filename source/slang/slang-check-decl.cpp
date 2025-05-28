@@ -46,7 +46,7 @@ static bool isSlang2025(CompilerOptionSet& optionSet)
         return true;
 
     return false;
-
+}
 static bool isSlang2026(CompilerOptionSet& optionSet)
 {
     if (!optionSet.hasOption(CompilerOptionName::Language))
