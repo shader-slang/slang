@@ -7321,7 +7321,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                 tcexpr->loc = openParen.loc;
 
                 tcexpr->functionExpr = varExpr;
-                tcexpr->arguments.add(parser->ParseArgExpr());
+                tcexpr->arguments.add(parsePrefixExpr(parser));
 
                 return tcexpr;
             }
@@ -7417,7 +7417,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                         tcexpr->loc = openParen.loc;
 
                         tcexpr->functionExpr = base;
-                        tcexpr->arguments.add(parser->ParseArgExpr());
+                        tcexpr->arguments.add(parsePrefixExpr(parser));
 
                         return tcexpr;
                     }
