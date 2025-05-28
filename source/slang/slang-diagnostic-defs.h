@@ -921,17 +921,17 @@ DIAGNOSTIC(
     33090,
     Error,
     cannotHaveDynVarDeclUnlessDynInterfaceType,
-    "cannot use 'dyn' on variable declaration unless target type is a 'dyn interface'")
+    "cannot use 'dyn' on variable declaration unless target interface type is a 'dyn interface'")
 DIAGNOSTIC(
     33091,
     Error,
-    cannotAssignPotentiallyInitializedSomeTypeWithSomeType,
-    "cannot assign to a potentially initialized 'some' type another 'some' type")
+    cannotAssignSomeTypeToPotentiallyDifferentSomeType,
+    "cannot assign a potentially different 'some' type to another 'some' type")
 DIAGNOSTIC(
     33092,
     Error,
-    cannotAssignSomeTypeWithDynType,
-    "cannot assign to 'some' type a 'dyn' type")
+    cannotAssignDynTypeToSomeType,
+    "cannot assign a 'dyn' type to a 'some' type")
 
 DIAGNOSTIC(
     -1,

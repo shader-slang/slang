@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
-//CHECK-NOT: error
+// CHECK: OpEntryPoint
+// CHECK-NOT: error
 
 interface IFoo
 {
@@ -43,6 +44,7 @@ struct IFooStruct3 : IFoo
         return a;
     }
 };
+
 // Complex Expr, so no support
 //
 // void test(Out<some IFoo> p)

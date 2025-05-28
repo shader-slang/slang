@@ -950,35 +950,12 @@ bool SemanticsVisitor::_failedCoercion(
         else
         {
             if (sink)
-            {
-                if(toType && fromExpr)
-                {
-                    // produce a clearer error given `SomeType` since otherwise users will get a confusing error of 
-                    // "some IFoo mismatched with some IFoo" or "some IFoo mismatched with dyn IFoo". This is misleading
-                    // since "dyn IFoo = some IFoo" is legal.
-                    if (isDeclRefTypeOf<SomeTypeDecl>(toType))
-                    {
-                        if (isDeclRefTypeOf<SomeTypeDecl>(fromType))
-                            sink->diagnose(
-                                fromExpr->loc,
-                                Diagnostics::
-                                    cannotAssignPotentiallyInitializedSomeTypeWithSomeType);
-                        else if (isDeclRefTypeOf<InterfaceDecl>(fromType)
-                                     .getDecl()
-                                     ->hasModifier<DynModifier>())
-                            sink->diagnose(
-                                fromExpr->loc,
-                                Diagnostics::cannotAssignSomeTypeWithDynType);
-                    }
-                }
-                else
-                {
-                    sink->diagnose(
-                        fromExpr->loc,
-                        Diagnostics::typeMismatch,
-                        toType,
-                        fromExpr->type);
-                }
+            {   
+                sink->diagnose(
+                    fromExpr->loc,
+                    Diagnostics::typeMismatch,
+                    toType,
+                    fromExpr->type);
             }
         }
     }
@@ -1339,28 +1316,6 @@ bool SemanticsVisitor::_coerce(
         }
     }
 
-
-    //if (fromType_declRefSomeType = isDeclRefTypeOf<SomeTypeDecl>(fromType))
-    //{
-        // `dyn val = some IFoo` is allowed
-        //if (auto declRefType = as<DeclRefType>(toType));
-    //}
-    // you can assign `some IFoo val = SomethingIFooIsCompatibleWith`
-    // you cannot assign `some IFoo val = some IFoo();`
-    //if (auto toType_declRefSomeType = isDeclRefTypeOf<SomeTypeDecl>(toType))
-    //{
-
-    //        return false;
-    //    return _coerce(
-    //        site,
-    //        someType->getValueType(),
-    //        outToExpr,
-    //        fromType,
-    //        fromExpr,
-    //        sink,
-    //        outCost);
-    //}
-
     // nullptr_t can be cast into any pointer type.
     if (as<NullPtrType>(fromType) && as<PtrType>(toType))
     {
@@ -1594,6 +1549,8 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
+    if (tryCoerceSomeType(site, toType, outToExpr, fromType, fromExpr, sink, outCost))
+        return true;
 
     // The main general-purpose approach for conversion is
     // using suitable marked initializer ("constructor")
@@ -1876,6 +1833,82 @@ bool SemanticsVisitor::_coerce(
         getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{});
     }
     return _failedCoercion(toType, outToExpr, fromExpr, sink);
+}
+
+// TODO make member of SemanticsVisitor
+bool SemanticsVisitor::tryCoerceSomeType(
+    CoercionSite site,
+    Type* toType,
+    Expr** outToExpr,
+    QualType fromType,
+    Expr* fromExpr,
+    DiagnosticSink* sink,
+    ConversionCost* outCost)
+{
+    // basic restrictions
+    // 
+    // Allow assignment as-if the type was a T given UnboundSomeType<T>.
+    // Somehow we must then force the type to a SomeType so it is bound by SomeType rules after?
+    if (auto unboundSomeTypeDecl = isDeclRefTypeOf<UnboundSomeTypeDecl>(toType))
+    {
+        return _coerce(
+            site,
+            unboundSomeTypeDecl.getDecl()->interfaceType.type,
+            outToExpr,
+            fromType,
+            fromExpr,
+            sink,
+            outCost);
+    }
+    else if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(toType))
+    {
+        // arguments allow `some T` to be copied to them.
+        if (site != CoercionSite::Argument)
+        {
+            // if `some T = some U` `some T = unbound_some U`
+            if (isDeclRefTypeOf<SomeTypeDecl>(fromType))
+            {
+                sink->diagnose(
+                    fromExpr->loc,
+                    Diagnostics::cannotAssignSomeTypeToPotentiallyDifferentSomeType);
+                return false;
+            }
+            // if `some T = dyn U` we have an error
+            else if (auto fromVarExpr = as<VarExpr>(fromExpr))
+            {
+                if (fromVarExpr->declRef.getDecl()->hasModifier<DynModifier>())
+                {
+                    sink->diagnose(fromExpr->loc, Diagnostics::cannotAssignDynTypeToSomeType);
+                    return false;
+                }
+            }
+        }
+        // implicit unwrap and try to assign
+        return _coerce(
+            site,
+            someTypeDeclRef.getDecl()->interfaceType.type,
+            outToExpr,
+            fromType,
+            fromExpr,
+            sink,
+            outCost);
+    }
+
+    // `T = some IFoo<T>` is allowed, need to unwrap SomeType
+    if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(fromType))
+    {
+        //`SomeType` needs implicit unwrap to be assigned to non-some-type
+        return _coerce(
+            site,
+            toType,
+            outToExpr,
+            someTypeDeclRef.getDecl()->interfaceType.type,
+            fromExpr,
+            sink,
+            outCost);
+    }
+    
+    return false;
 }
 
 bool SemanticsVisitor::tryCoerceLambdaToFuncType(

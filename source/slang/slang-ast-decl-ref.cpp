@@ -371,9 +371,6 @@ void DeclRefBase::toText(StringBuilder& out)
             out << ".";
         first = false;
 
-        if (as<InterfaceDecl>(decl) && decl->hasModifier<DynModifier>())
-            out << "dyn ";
-
         if (auto name = decl->getName())
         {
             out << name->text;
@@ -411,10 +408,6 @@ void DeclRefBase::toText(StringBuilder& out)
         else if (auto someTypeDecl = as<SomeTypeDecl>(decl))
         {
             out << "some " << someTypeDecl->interfaceType;
-        }
-        else if (auto unboundSomeTypeDecl = as<UnboundSomeTypeDecl>(decl))
-        {
-            out << "some " << unboundSomeTypeDecl->interfaceType;
         }
     }
 }

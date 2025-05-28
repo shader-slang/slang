@@ -2871,7 +2871,7 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         typeSpec.expr = parseFuncTypeExpr(parser);
         return typeSpec;
     }
-    else if (parser->LookAheadToken("some"))
+    else if (AdvanceIf(parser, "some"))
     {
         typeSpec.expr = ParseSomeExpr(parser);
         return typeSpec;
@@ -5313,7 +5313,6 @@ static SomeTypeExpr* ParseSomeExpr(Parser* parser)
 {
     SomeTypeExpr* expr = parser->astBuilder->create<SomeTypeExpr>();
     parser->FillPosition(expr);
-    auto token = parser->ReadToken("some");
     expr->base = parser->ParseTypeExp();
     return expr;
 }
@@ -8284,11 +8283,7 @@ static Expr* parsePrefixExpr(Parser* parser)
             }
             else if (AdvanceIf(parser, "some"))
             {
-                // Since we ban complex expressions, we will for-now just error when-ever doing this.
-                // This is not good code to put in a parser but it works for bootstrapping the feature.
-                parser->diagnose(
-                    tokenLoc,
-                    Diagnostics::someCannotAppearInComplexExpression);
+                return ParseSomeExpr(parser);
             }
             return parsePostfixExpr(parser);
         }

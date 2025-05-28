@@ -1123,6 +1123,9 @@ INST_RANGE(BindingQuery, GetRegisterIndex, GetRegisterSpace)
         /// Treat a function as differentiable function
     INST(TreatAsDifferentiableDecoration, treatAsDifferentiableDecoration, 0, 0)
 
+        /// Treat type as a `some` variable
+    INST(SomeTypeDecoration, someTypeDecoration, 0, 0)
+
         /// Treat a call to arbitrary function as a differentiable call.
     INST(TreatCallAsDifferentiableDecoration, treatCallAsDifferentiableDecoration, 0, 0)
 

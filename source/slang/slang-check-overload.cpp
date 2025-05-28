@@ -2955,6 +2955,11 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
         {
             return CreateErrorExpr(genericAppExpr);
         }
+        if (as<SomeTypeExpr>(argExpr))
+        {
+            this->getSink()->diagnose(argExpr, Diagnostics::someCannotAppearInComplexExpression);
+            return CreateErrorExpr(genericAppExpr);
+        }
     }
 
     // Otherwise, let's start looking at how to find an overload...

@@ -212,6 +212,10 @@ Expr* SemanticsVisitor::maybeOpenExistential(Expr* expr)
         {
             return openExistential(expr, interfaceDeclRef);
         }
+        else if (auto someTypeDeclRef = declRefType->getDeclRef().as<SomeTypeDecl>())
+        {
+            return openExistential(expr, isDeclRefTypeOf<InterfaceDecl>(someTypeDeclRef.getDecl()->interfaceType.type));
+        }
     }
 
     // Default: apply the callback to the original expression;
@@ -936,8 +940,6 @@ Expr* SemanticsVisitor::createLookupResultExpr(
 
 DeclVisibility SemanticsVisitor::getTypeVisibility(Type* type)
 {
-    if (isDeclRefTypeOf<SomeTypeDecl>(type) || isDeclRefTypeOf<UnboundSomeTypeDecl>(type))
-        return DeclVisibility::Public;
     if (auto declRefType = as<DeclRefType>(type))
     {
         auto v = getDeclVisibility(declRefType->getDeclRef().getDecl());
@@ -5421,21 +5423,29 @@ Expr* SemanticsExprVisitor::visitSomeTypeExpr(SomeTypeExpr* expr)
     expr->base = CheckProperType(expr->base);
     if (as<ErrorType>(expr->base.type))
         expr->type = expr->base.type;
-
-    auto declRefType = as<DeclRefType>(expr->base.type);
-    if (!declRefType)
-    {
-        getSink()->diagnose(expr, Diagnostics::cannotDeclareNonInterfaceSomeType, expr->base.type);
-    }
-
-    auto interfaceType = as<InterfaceDecl>(declRefType->getDeclRefBase()->getDecl());
-    if (!interfaceType)
-    {
-        getSink()->diagnose(expr, Diagnostics::cannotDeclareNonInterfaceSomeType, expr->base.type);
-    }
     else
     {
-        expr->type = createSomeTypeDeclType(m_astBuilder, expr);
+        auto declRefType = as<DeclRefType>(expr->base.type);
+        if (!declRefType)
+        {
+            getSink()->diagnose(
+                expr,
+                Diagnostics::cannotDeclareNonInterfaceSomeType,
+                expr->base.type);
+        }
+
+        auto interfaceType = as<InterfaceDecl>(declRefType->getDeclRefBase()->getDecl());
+        if (!interfaceType)
+        {
+            getSink()->diagnose(
+                expr,
+                Diagnostics::cannotDeclareNonInterfaceSomeType,
+                expr->base.type);
+        }
+        else
+        {
+            expr->type = createSomeTypeDeclType(m_astBuilder, expr);
+        }
     }
     return expr;
 }

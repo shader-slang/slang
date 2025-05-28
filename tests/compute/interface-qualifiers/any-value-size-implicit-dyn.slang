@@ -2,7 +2,8 @@
 
 // cannot have dyn interface unless `dyn`. Checks if implicit `dyn` through `anyValueSize` works
 // anyValueSize ==> `dyn`
-//CHECK-NOT: error
+// CHECK: OpEntryPoint
+// CHECK-NOT: error
 [anyValueSize(16)]
 interface DynInterface
 {

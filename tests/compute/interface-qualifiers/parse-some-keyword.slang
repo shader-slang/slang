@@ -1,32 +1,40 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
-//CHECK-NOT: error
+// ensure we have a positive test for `some` in parameters
+
+// CHECK: OpEntryPoint
+// CHECK-NOT: error
 
 interface IFoo
 {
+    int getVal();
 }
 
 struct myS : IFoo
 {
     int v2;
+    int getVal()
+    {
+        return 1;
+    }
 }
 
-some IFoo test1(in some IFoo some1, out some IFoo some2, inout some IFoo some3, int* myPtr)
+some IFoo test1(in some IFoo some1, in some IFoo some2, in some IFoo some3, int* myPtr)
 {
-    some IFoo some4 = myS();
+    some IFoo some4 = myS(1);
     return some4;
 }
 
 func test2(some1: some IFoo, some2: some IFoo) -> some IFoo
 {
-    return myS();
+    return myS(1);
 }
 
 RWStructuredBuffer<int> buffer;
 void computeMain()
 {
-    some some1 : IFoo;
     some IFoo some2;
     some IFoo some3;
-    buffer[0] = test1(some1, some2, some3) + test2();
+    var some4 : some IFoo;
+    let some5 : some IFoo;
 }

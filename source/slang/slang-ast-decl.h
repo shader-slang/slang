@@ -149,10 +149,9 @@ class SomeTypeDecl : public Decl
 
 // UnboundSomeType<IFoo>
 FIDDLE()
-class UnboundSomeTypeDecl : public Decl
+class UnboundSomeTypeDecl : public SomeTypeDecl
 {
     FIDDLE(...)
-    FIDDLE() TypeExp interfaceType;
 };
 
 // An `AggTypeDeclBase` captures the shared functionality

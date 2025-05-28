@@ -1529,10 +1529,6 @@ void ASTPrinter::addDeclKindPrefix(Decl* decl)
     {
         m_builder << "some " << someDecl->interfaceType.type;
     }
-    else if (auto unboundSomeTypeDecl = as<UnboundSomeTypeDecl>(decl))
-    {
-        m_builder << "some " << someDecl->interfaceType.type;
-    }
     else if (as<ClassDecl>(decl))
     {
         m_builder << "class ";

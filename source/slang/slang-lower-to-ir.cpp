@@ -4587,8 +4587,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else
         {
-            // this happens when Deref is a syntactic sugar ==> `SomeType<IFoo>` has implicit deref.
-            return LoweredValInfo::simple(loweredBaseVal);
+            SLANG_UNIMPLEMENTED_X("codegen for deref expression");
+            UNREACHABLE_RETURN(LoweredValInfo());
         }
     }
 
@@ -5494,7 +5494,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitSomeTypeExpr(SomeTypeExpr* /*expr*/)
     {
-        SLANG_UNIMPLEMENTED_X("'*' type expression during code generation");
+        SLANG_UNIMPLEMENTED_X("'some' type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
@@ -8068,6 +8068,15 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visitGenericTypeParamDecl(GenericTypeParamDecl* /*decl*/)
     {
         return LoweredValInfo();
+    }
+    
+    LoweredValInfo visitSomeTypeDecl(SomeTypeDecl* decl)
+    { 
+        auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(decl->interfaceType.type);
+        SLANG_ASSERT(interfaceDeclRef);
+        auto visitedInterfaceDecl = visitInterfaceDecl(interfaceDeclRef.getDecl());
+        context->irBuilder->addDecoration(visitedInterfaceDecl.val, kIROp_SomeTypeDecoration);
+        return visitedInterfaceDecl;
     }
 
     LoweredValInfo visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)

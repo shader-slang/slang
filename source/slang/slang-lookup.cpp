@@ -643,12 +643,22 @@ static void _lookUpMembersInSuperTypeImpl(
         }
     }
 
+    // Unwrap SomeTypeDecl
+    if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(superType))
+    {
+        _lookUpMembersInType(
+            astBuilder,
+            name,
+            someTypeDecl.getDecl()->interfaceType,
+            request,
+            ioResult,
+            inBreadcrumbs);
+    }
     // Default case: no dereference needed
-
-    if (auto declRefType = as<DeclRefType>(superType))
+    else if (auto declRefType = as<DeclRefType>(superType))
     {
         auto declRef = declRefType->getDeclRef();
-
+        
         _lookUpMembersInSuperTypeDeclImpl(
             astBuilder,
             name,
