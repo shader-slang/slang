@@ -17986,7 +17986,7 @@ float2x4 GetLssPositionsAndRadii()
     case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
     case cuda:
         {
-            __intrinsic_asm "optixObjectPositionsAndRadii";
+            __intrinsic_asm "optixGetLssPositionsAndRadii";
         }
     case spirv:
         return spirv_asm
@@ -20671,7 +20671,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
         case cuda:
             {
-                __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
+                __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii";
             }
         case spirv:
             return spirv_asm
