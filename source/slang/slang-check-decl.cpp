@@ -239,10 +239,6 @@ static void validateDynInterfaceUsage(
     auto sink = visitor->getSink();
     auto optionSet = visitor->getOptionSet();
 
-    DiagnosticSink* sink,
-    CompilerOptionSet& optionSet,
-    InterfaceDecl* decl)
-
     if (allowExperimentalDynamicDispatch(optionSet))
         return;
 
