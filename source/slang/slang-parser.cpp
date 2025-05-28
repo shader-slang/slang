@@ -7273,36 +7273,6 @@ static Expr* parseLambdaExpr(Parser* parser)
     return lambdaExpr;
 }
 
-static void parseArgList(Parser* parser, InvokeExpr* invokeExpr)
-{
-    // Parse either (a, b, c) as an argument list,
-    // or expr as a single argument expr.
-    Token delimToken;
-    if (AdvanceIf(parser, TokenType::LParent, &delimToken))
-    {
-        invokeExpr->argumentDelimeterLocs.add(delimToken.loc);
-        while (!parser->LookAheadToken(TokenType::RParent))
-        {
-            invokeExpr->arguments.add(parser->ParseArgExpr());
-
-            if (AdvanceIf(parser, TokenType::Comma, &delimToken))
-            {
-                invokeExpr->argumentDelimeterLocs.add(delimToken.loc);
-            }
-            else
-            {
-                break;
-            }
-        }
-        delimToken = parser->ReadToken(TokenType::RParent);
-        invokeExpr->argumentDelimeterLocs.add(delimToken.loc);
-    }
-    else
-    {
-        invokeExpr->arguments.add(parser->ParseArgExpr());
-    }
-}
-
 static Expr* parseAtomicExpr(Parser* parser)
 {
     switch (peekTokenType(parser))
@@ -7351,7 +7321,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                 tcexpr->loc = openParen.loc;
 
                 tcexpr->functionExpr = varExpr;
-                parseArgList(parser, tcexpr);
+                tcexpr->arguments.add(parser->ParseArgExpr());
 
                 return tcexpr;
             }
@@ -7447,8 +7417,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                         tcexpr->loc = openParen.loc;
 
                         tcexpr->functionExpr = base;
-
-                        parseArgList(parser, tcexpr);
+                        tcexpr->arguments.add(parser->ParseArgExpr());
 
                         return tcexpr;
                     }
