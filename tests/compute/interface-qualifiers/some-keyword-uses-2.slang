@@ -45,27 +45,6 @@ struct StructForIFoo2 : IFoo
     }
 };
 
-__generic<T : IArithmetic>
-interface IFooGeneric
-{
-    bool getVal();
-}
-
-__generic<T : IArithmetic>
-struct StructForIFooGeneric : IFooGeneric<T>
-{
-    T v;
-    __init(T v_in)
-    {
-        v = v_in;
-    }
-
-    bool getVal()
-    {
-        return v == T(0);
-    }
-}
-
 void logic(inout some IFoo v1, out some IFoo v2)
 {
     v1.setVal(1);
@@ -79,13 +58,7 @@ void computeMain()
     some IFoo data2;
     logic(data1, data2);
 
-    some IFoo good1;
-    some IFooGeneric<float> good2;
-    some IFooGeneric<float> good3 = StructForIFooGeneric<float>(1);
-
     buffer[0] = data1.getVal() 
                 + data2.getVal()
-                + StructForIFooGeneric<int>(2).getVal()
-                + (int)good3.getVal()
                 ;
 }

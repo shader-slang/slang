@@ -321,7 +321,8 @@
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::AttributeDecl">(Slang::AttributeDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::VarDeclBase">(Slang::VarDeclBase*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::VarDecl">(Slang::VarDecl*)&amp;astNodeType</ExpandedItem>
-            <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::LetDecl">(Slang::LetDecl*)&amp;astNodeType</ExpandedItem>
+			<ExpandedItem Condition="astNodeType == Slang::ASTNodeType::SomeTypeDecl">(Slang::SomeTypeDecl*)&amp;astNodeType</ExpandedItem>
+			<ExpandedItem Condition="astNodeType == Slang::ASTNodeType::LetDecl">(Slang::LetDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::GlobalGenericValueParamDecl">(Slang::GlobalGenericValueParamDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ParamDecl">(Slang::ParamDecl*)&amp;astNodeType</ExpandedItem>
             <ExpandedItem Condition="astNodeType == Slang::ASTNodeType::ModernParamDecl">(Slang::ModernParamDecl*)&amp;astNodeType</ExpandedItem>

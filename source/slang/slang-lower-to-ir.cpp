@@ -3338,7 +3338,6 @@ void _lowerFuncDeclBaseTypeInfo(
     auto& parameterLists = outInfo.parameterLists;
     collectParameterLists(
         context,
-
         declRef,
         &parameterLists,
         kParameterListCollectMode_Default,
@@ -8072,11 +8071,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     
     LoweredValInfo visitSomeTypeDecl(SomeTypeDecl* decl)
     { 
-        auto interfaceDeclRef = isDeclRefTypeOf<InterfaceDecl>(decl->interfaceType.type);
-        SLANG_ASSERT(interfaceDeclRef);
-        auto visitedInterfaceDecl = visitInterfaceDecl(interfaceDeclRef.getDecl());
-        context->irBuilder->addDecoration(visitedInterfaceDecl.val, kIROp_SomeTypeDecoration);
-        return visitedInterfaceDecl;
+        auto declRefType = as<DeclRefType>(decl->interfaceType.type);
+        SLANG_ASSERT(declRefType);
+        auto loweredType = lowerType(this->context, declRefType);
+        if (!loweredType->findDecoration<IRSomeTypeDecoration>())
+            context->irBuilder->addDecoration(loweredType, kIROp_SomeTypeDecoration);
+        return loweredType;
     }
 
     LoweredValInfo visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
