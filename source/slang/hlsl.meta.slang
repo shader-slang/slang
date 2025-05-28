@@ -3806,7 +3806,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,isCombined,format>
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load";
+        case hlsl:
+            static_assert(isCombined == 0, "Load operations on combined texture samplers are not supported in HLSL");
+            __intrinsic_asm ".Load";
         case spirv:
              const int lodLoc = Shape.dimensions+isArray;
              let coord = __vectorReshape<Shape.dimensions+isArray>(location);
@@ -3910,7 +3912,9 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
         __target_switch
         {
             case cpp:
+                __intrinsic_asm ".Load";
             case hlsl:
+                static_assert(isCombined == 0, "Load operations on combined texture samplers are not supported in HLSL");
                 __intrinsic_asm ".Load";
             case metal:
                 switch (Shape.flavor)
@@ -3988,7 +3992,9 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
         __target_switch
         {
             case cpp:
+                __intrinsic_asm ".Load";
             case hlsl:
+                static_assert(isCombined == 0, "Load operations on combined texture samplers are not supported in HLSL");
                 __intrinsic_asm ".Load";
             case glsl:
                 if (isCombined == 0)
@@ -4022,7 +4028,9 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".Load";
+        case hlsl:
+            static_assert(isCombined == 0, "Load operations on combined texture samplers are not supported in HLSL");
+            __intrinsic_asm ".Load";
         case spirv:
              if (isCombined != 0)
              {
