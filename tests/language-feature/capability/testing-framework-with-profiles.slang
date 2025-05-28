@@ -17,5 +17,5 @@ RWStructuredBuffer<uint> outputBuffer;
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     // BUF: 1
-    outputBuffer[0] = WaveMaskSum(0xFF, 1);
+    outputBuffer[0] = WaveActiveSum(1);
 }

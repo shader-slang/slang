@@ -2434,8 +2434,8 @@ static Expr* tryParseGenericApp(Parser* parser, Expr* base)
             for (auto candidate : overloadedExpr->lookupResult2)
             {
                 if (candidate.declRef.is<GenericDecl>() ||
-                    declRefExpr->declRef.is<FunctionDeclBase>() ||
-                    declRefExpr->declRef.is<AggTypeDeclBase>())
+                    candidate.declRef.is<FunctionDeclBase>() ||
+                    candidate.declRef.is<AggTypeDeclBase>())
                 {
                     baseKind = BaseGenericKind::Generic;
                     break;
