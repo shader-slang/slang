@@ -1,4 +1,4 @@
-// Test tuple swizzling and element access.
+// Test tuple construction syntax.
 
 #language 2026
 
