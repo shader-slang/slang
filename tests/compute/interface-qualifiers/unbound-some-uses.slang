@@ -8,7 +8,7 @@ interface IFoo
     int getVal();
 }
 
-struct IFooStruct1 : IFoo
+struct StructForIFoo1 : IFoo
 {
     __init(int v)
     {
@@ -20,7 +20,7 @@ struct IFooStruct1 : IFoo
         return a;
     }
 };
-struct IFooStruct2 : IFoo
+struct StructForIFoo2 : IFoo
 {
     __init(int v)
     {
@@ -32,7 +32,7 @@ struct IFooStruct2 : IFoo
         return a;
     }
 };
-struct IFooStruct3 : IFoo
+struct StructForIFoo3 : IFoo
 {
     __init(int v)
     {
@@ -54,8 +54,8 @@ struct IFooStruct3 : IFoo
 
 void outParam(out some IFoo v1, out some IFoo v2)
 {
-    v1 = IFooStruct1(1);
-    v2 = IFooStruct2(1);
+    v1 = StructForIFoo1(1);
+    v2 = StructForIFoo2(1);
 }
 
 some IFoo outReturn()

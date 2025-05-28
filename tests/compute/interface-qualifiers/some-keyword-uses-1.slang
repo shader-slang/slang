@@ -7,7 +7,7 @@ dyn interface IFoo
     int getVal();
 }
 
-struct IFooStruct1 : IFoo
+struct StructForIFoo1 : IFoo
 {
     __init(int v)
     {
@@ -19,7 +19,7 @@ struct IFooStruct1 : IFoo
         return a;
     }
 };
-struct IFooStruct2 : IFoo
+struct StructForIFoo2 : IFoo
 {
     __init(int v)
     {
@@ -42,9 +42,9 @@ void logic(inout some IFoo v1, in some IFoo v2)
 RWStructuredBuffer<int> buffer;
 void computeMain()
 {
-    some IFoo data1 = IFooStruct1(1);
-    some IFoo data2 = IFooStruct1(1);
-    dyn IFoo data3 = IFooStruct1(1);
+    some IFoo data1 = StructForIFoo1(1);
+    some IFoo data2 = StructForIFoo1(1);
+    dyn IFoo data3 = StructForIFoo1(1);
 
     // cannot assign `dyn` to `some`
     // CHECK_2026: error 33092

@@ -10,7 +10,7 @@ interface IFoo
     void setVal(int v);
 }
 
-struct IFooStruct1 : IFoo
+struct StructForIFoo1 : IFoo
 {
     __init(int v)
     {
@@ -27,7 +27,7 @@ struct IFooStruct1 : IFoo
         a = v;
     }
 };
-struct IFooStruct2 : IFoo
+struct StructForIFoo2 : IFoo
 {
     __init(int v)
     {
@@ -52,7 +52,7 @@ interface IFooGeneric
 }
 
 __generic<T : IArithmetic>
-struct IFooGenericStruct : IFooGeneric<T>
+struct StructForIFooGeneric : IFooGeneric<T>
 {
     T v;
     __init(T v_in)
@@ -69,23 +69,23 @@ struct IFooGenericStruct : IFooGeneric<T>
 void logic(inout some IFoo v1, out some IFoo v2)
 {
     v1.setVal(1);
-    v2 = IFooStruct2(1);
+    v2 = StructForIFoo2(1);
 }
 
 RWStructuredBuffer<int> buffer;
 void computeMain()
 {
-    some IFoo data1 = IFooStruct1(1);
+    some IFoo data1 = StructForIFoo1(1);
     some IFoo data2;
     logic(data1, data2);
 
     some IFoo good1;
     some IFooGeneric<float> good2;
-    some IFooGeneric<float> good3 = IFooGenericStruct<float>(1);
+    some IFooGeneric<float> good3 = StructForIFooGeneric<float>(1);
 
     buffer[0] = data1.getVal() 
                 + data2.getVal()
-                + IFooGenericStruct<int>(2).getVal()
+                + StructForIFooGeneric<int>(2).getVal()
                 + (int)good3.getVal()
                 ;
 }

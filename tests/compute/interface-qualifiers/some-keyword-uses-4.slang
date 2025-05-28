@@ -9,7 +9,7 @@ interface IFoo
     void setVal(int v);
 }
 
-struct IFooStruct1 : IFoo
+struct StructForIFoo1 : IFoo
 {
     __init(int v)
     {
@@ -26,7 +26,7 @@ struct IFooStruct1 : IFoo
         a = v;
     }
 };
-struct IFooStruct2 : IFoo
+struct StructForIFoo2 : IFoo
 {
     __init(int v)
     {
@@ -60,8 +60,8 @@ some IFoo returnIFoo(in some data1, in some data2)
 RWStructuredBuffer<int> buffer;
 void computeMain()
 {
-    some IFoo data1 = IFooStruct1();
-    some IFoo data2 = IFooStruct1();
+    some IFoo data1 = StructForIFoo1();
+    some IFoo data2 = StructForIFoo1();
     returnIFoo(data1, data2);
     buffer[0] = data1.getVal();
 }

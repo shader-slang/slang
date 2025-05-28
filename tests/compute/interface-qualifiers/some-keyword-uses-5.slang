@@ -9,7 +9,7 @@ interface IFoo
     void setVal(int v);
 }
 
-struct IFooStruct1 : IFoo
+struct StructForIFoo1 : IFoo
 {
     __init(int v)
     {
@@ -26,7 +26,7 @@ struct IFooStruct1 : IFoo
         a = v;
     }
 };
-struct IFooStruct2 : IFoo
+struct StructForIFoo2 : IFoo
 {
     __init(int v)
     {
@@ -48,8 +48,8 @@ void logic(out some IFoo v1)
 {
     // TODO -- error in IR, not allowed to assign different types to `some`
     // TODO -- error in IR, cannot assign `some` twice
-    v1 = IFooStruct2(1);
-    v1 = IFooStruct1(1);
+    v1 = StructForIFoo2(1);
+    v1 = StructForIFoo1(1);
 }
 
 RWStructuredBuffer<int> buffer;

@@ -17,7 +17,7 @@ dyn interface ReturnsSomeTypeAndSomeParam
 
     some IFoo getIFoo()
 	{
-		return IFooStruct(1);
+		return StructForIFoo(1);
 	}
 
     void lookAtIFoo(some IFoo v)
