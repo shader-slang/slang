@@ -150,8 +150,8 @@ void initCommandOptions(CommandOptions& options)
 
         options.addCategory(
             CategoryKind::Value,
-            "std-revision",
-            "Std Revision",
+            "language-version",
+            "Language Version",
             UserValue(ValueCategory::LanguageVersion));
         options.addValues(TypeTextUtil::getLanguageVersionInfos());
 
@@ -457,7 +457,7 @@ void initCommandOptions(CommandOptions& options)
          "user build will by default be 'unknown'."},
         {OptionKind::LanguageVersion,
          "-std",
-         "-std <std-revision>",
+         "-std <language-version>",
          "Specifies the language standard that should be used."},
         {OptionKind::WarningsAsErrors,
          "-warnings-as-errors",
