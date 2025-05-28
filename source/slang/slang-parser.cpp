@@ -7363,7 +7363,8 @@ static Expr* parseAtomicExpr(Parser* parser)
                     // but rather as a tuple element separator.
                     //
                     Precedence exprLevel = Precedence::Comma;
-                    if (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+                    if (parser->sourceLanguage == SourceLanguage::Slang &&
+                        parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
                     {
                         // Setting exprLevel to Assignment here will allow the following
                         // tryParseExpression call to parse the expression until the next `)` or
@@ -7384,48 +7385,48 @@ static Expr* parseAtomicExpr(Parser* parser)
                     }
                 }
 
-
-                // We now try and determine by what base is, if this is actually a cast or an
-                // expression in parentheses
-                if (_isCast(parser, base))
+                if (parser->LookAheadToken(TokenType::Comma))
                 {
-                    // Parse as a cast
-
+                    // We have a comma, so we are not done yet.
+                    // If we reach here, the language version must be 2026 or later,
+                    // where we allow (a,b,c,...) syntax as a tuple, otherwise we would have
+                    // parsed it into `base`.
+                    //
+                    List<Expr*> elementExprs;
+                    elementExprs.add(base);
+                    while (AdvanceIf(parser, TokenType::Comma))
+                    {
+                        if (parser->LookAheadToken(TokenType::RParent))
+                            break;
+                        auto elementExpr = parser->ParseArgExpr();
+                        elementExprs.add(elementExpr);
+                    }
                     parser->ReadToken(TokenType::RParent);
-                    TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
-                    tcexpr->loc = openParen.loc;
-
-                    tcexpr->functionExpr = base;
-
-                    auto arg = parsePrefixExpr(parser);
-                    tcexpr->arguments.add(arg);
-
-                    return tcexpr;
+                    TupleExpr* tupleExpr = parser->astBuilder->create<TupleExpr>();
+                    tupleExpr->loc = openParen.loc;
+                    tupleExpr->elements = _Move(elementExprs);
+                    return tupleExpr;
                 }
                 else
                 {
-                    // Parse as an expression in parentheses
-                    if (parser->LookAheadToken(TokenType::Comma))
+                    // We parsed an expression in the form of (expr), without
+                    // any commas in `expr`.
+                    // We now try and determine by what base is, if this is actually a cast or an
+                    // expression in parentheses.
+                    //
+                    parser->ReadToken(TokenType::RParent);
+                    if (_isCast(parser, base))
                     {
-                        // We have a comma, so we are not done yet.
-                        // If we reach here, the language version must be 2026 or later,
-                        // where we allow (a,b,c,...) syntax as a tuple, otherwise we would have
-                        // parsed it into `base`.
-                        //
-                        List<Expr*> elementExprs;
-                        elementExprs.add(base);
-                        while (AdvanceIf(parser, TokenType::Comma))
-                        {
-                            if (parser->LookAheadToken(TokenType::RParent))
-                                break;
-                            auto elementExpr = parser->ParseArgExpr();
-                            elementExprs.add(elementExpr);
-                        }
-                        parser->ReadToken(TokenType::RParent);
-                        TupleExpr* tupleExpr = parser->astBuilder->create<TupleExpr>();
-                        tupleExpr->loc = openParen.loc;
-                        tupleExpr->elements = _Move(elementExprs);
-                        return tupleExpr;
+                        // Parse as a cast
+                        TypeCastExpr* tcexpr = parser->astBuilder->create<ExplicitCastExpr>();
+                        tcexpr->loc = openParen.loc;
+
+                        tcexpr->functionExpr = base;
+
+                        auto arg = parsePrefixExpr(parser);
+                        tcexpr->arguments.add(arg);
+
+                        return tcexpr;
                     }
                     else
                     {
@@ -8538,7 +8539,6 @@ Expr* parseTermFromSourceFile(
     ParserOptions options;
     options.allowGLSLInput = sourceLanguage == SourceLanguage::GLSL;
     options.stage = ParsingStage::Body;
-
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.currentScope = outerScope;
     parser.namePool = namePool;
@@ -8602,7 +8602,7 @@ void parseSourceFile(
 
     Parser parser(astBuilder, tokens, sink, outerScope, options);
     parser.namePool = translationUnit->getNamePool();
-    parser.sourceLanguage = translationUnit->sourceLanguage;
+    parser.sourceLanguage = sourceLanguage;
 
     return parser.parseSourceFile(parentDecl);
 }

@@ -1198,6 +1198,8 @@ bool isValidGLSLVersion(int version)
     case 130:
     case 140:
     case 150:
+    case 300:
+    case 310:
     case 320:
     case 330:
     case 400:

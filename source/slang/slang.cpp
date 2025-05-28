@@ -4922,6 +4922,7 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
     // Create a transparent FileDecl to hold all children from the included file.
     auto fileDecl = module->getASTBuilder()->create<FileDecl>();
     fileDecl->nameAndLoc.name = name;
+    fileDecl->parentDecl = module->getModuleDecl();
     module->getIncludedSourceFileMap().add(sourceFile, fileDecl);
 
     FrontEndPreprocessorHandler preprocessorHandler(module, module->getASTBuilder(), sink);
