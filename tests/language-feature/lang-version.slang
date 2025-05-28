@@ -10,34 +10,34 @@
 //TEST:SIMPLE(filecheck=ILLEGAL_LANG): -target spirv -DLANG_ILLEGAL
 
 #ifdef VER_2026
-#version slang 2026
+#language slang 2026
 #endif
 
 #ifdef VER_2026_2
-#version 2026
+#language 2026
 #endif
 
 #ifdef VER_LATEST1
-#version slang latest
+#lang slang latest
 #endif
 
 #ifdef VER_LATEST2
-#version latest
+#lang latest
 #endif
 
 #ifdef VER_ILLEGAL
 // ILLEGAL_SLANG_VER: ([[# @LINE+1]]): error 15207
-#version slang illegal
+#lang slang illegal
 #endif
 
 #ifdef VER_ILLEGAL2
 // ILLEGAL_SLANG_VER2: ([[# @LINE+1]]): error 15207
-#version 9987
+#lang 9987
 #endif
 
 #ifdef LANG_ILLEGAL
 // ILLEGAL_LANG: ([[# @LINE+1]]): error 15207
-#version illegal
+#lang illegal
 #endif
 
 // CHECK_2026: OpEntryPoint

@@ -4371,6 +4371,59 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
     case TokenType::Identifier:
         {
             auto token = AdvanceToken(context);
+            if (token.getContent() == "latest")
+                version = SLANG_LANGUAGE_VERSION_LATEST;
+            else if (token.getContent() == "legacy")
+                version = SLANG_LANGUAGE_VERSION_LEGACY;
+            else if (token.type == TokenType::IntegerLiteral)
+                version = stringToInt(token.getContent());
+            else
+            {
+                GetSink(context)->diagnose(
+                    GetDirectiveLoc(context),
+                    Diagnostics::unknownLanguageVersion,
+                    version);
+            }
+        }
+        break;
+    default:
+        GetSink(context)->diagnose(
+            GetDirectiveLoc(context),
+            Diagnostics::expectedIntegralVersionNumber);
+        break;
+    }
+
+    SkipToEndOfLine(context);
+
+    if (isValidSlangLanguageVersion((SlangLanguageVersion)version))
+    {
+        context->m_preprocessor->language = SourceLanguage::Slang;
+    }
+    else if (isValidGLSLVersion(version))
+    {
+        context->m_preprocessor->language = SourceLanguage::GLSL;
+    }
+    else
+    {
+        GetSink(context)->diagnose(
+            GetDirectiveLoc(context),
+            Diagnostics::unknownLanguageVersion,
+            version);
+    }
+    context->m_preprocessor->languageVersion = (SlangLanguageVersion)version;
+}
+
+static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
+{
+    int version = SLANG_LANGUAGE_VERSION_UNKNOWN;
+    switch (PeekTokenType(context))
+    {
+    case TokenType::IntegerLiteral:
+        version = stringToInt(AdvanceToken(context).getContent());
+        break;
+    case TokenType::Identifier:
+        {
+            auto token = AdvanceToken(context);
             if (token.getContent().caseInsensitiveEquals(toSlice("slang")))
             {
                 context->m_preprocessor->language = SourceLanguage::Slang;
@@ -4408,10 +4461,6 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
     if (isValidSlangLanguageVersion((SlangLanguageVersion)version))
     {
         context->m_preprocessor->language = SourceLanguage::Slang;
-    }
-    else if (isValidGLSLVersion(version))
-    {
-        context->m_preprocessor->language = SourceLanguage::GLSL;
     }
     else
     {
@@ -4478,6 +4527,9 @@ static const PreprocessorDirective kDirectives[] = {
     {"error", &HandleErrorDirective, DontConsumeDirectiveAutomatically},
     {"line", &HandleLineDirective, 0},
     {"pragma", &HandlePragmaDirective, 0},
+
+    {"language", &HandleLanguageDirective, 0},
+    {"lang", &HandleLanguageDirective, 0},
 
     // GLSL
     {"version", &HandleVersionDirective, 0},
