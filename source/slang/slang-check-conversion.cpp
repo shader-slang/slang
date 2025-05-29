@@ -250,10 +250,13 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
         as<PtrType>(type))
         return cacheResult(true);
 
-    // An interface type is not C-style.
-    // TODO: some/dyn types are also not C-style.
-    if (isDeclRefTypeOf<InterfaceDecl>(type))
-        return cacheResult(false);
+    // Slang 2026 language fix: an interface type is not C-style.
+    if (isSlang2026OrLater(this))
+    {
+        // TODO: some/dyn types are also not C-style.
+        if (isDeclRefTypeOf<InterfaceDecl>(type))
+            return cacheResult(false);
+    }
 
     // A tuple type is C-style if all of its members are C-style.
     if (auto tupleType = as<TupleType>(type))
