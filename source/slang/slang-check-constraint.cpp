@@ -1282,15 +1282,21 @@ static bool matchTypeArgMapping(
     // We need to figure out which side should be expanding.
     // Consider the following cases,
     //
-    //   first = [ expand, expand ]
-    //   second = [ int, float, expand ]
+    //   left = [ expand, expand ]
+    //   right = [ int, float, expand ]
     // when one side has more non-expandable types, the other side should expand to match it.
-    // in this case, "first" should expand to cover "int".
+    // in this case, "left" should expand to cover "int" and "float".
     //
-    //   first = [ int, float, expand, expand ]
-    //   second = [ int, float, expand ]
+    //   left = [ int, float, expand, expand ]
+    //   right = [ int, float, expand ]
     // when the number of the non-expandable types are same, we want to expand side that has
-    // fewer expandable types. In this case, "second" should expand to cover the first.
+    // fewer expandable types. In this case, "right" should expand to cover the first "expand".
+    //
+    //   left = ConcreteTypePack(ExpandType, ExpandType)
+    //   right = ConcreteTypePack(int, bool, float, double).
+    // In this case, we shouldn't be mapping the first ExpandType to int and the second
+    // ExpandType to bool, float, double. Instead, they should evenly divide the second type
+    // pack, so we map first ExpandType with int, bool, and second ExpandType to float, double.
     //
     int firstCount = (int)firstTypes.getCount();
     int secondCount = (int)secondTypes.getCount();
@@ -1423,42 +1429,27 @@ bool SemanticsVisitor::TryUnifyTypes(
         return TryUnifyConjunctionType(constraints, unifyCtx, fst, snd);
     }
 
-    // Unwrap ConcreteTypePack and unify types with regard to ExpandType.
-    //
-    // Consider this case:
-    // left = ConcreteTypePack(ExpandType, ExpandType)
-    // right = ConcreteTypePack(int, bool, float, double).
-    //
-    // In this case, we shouldn't be mapping the first ExpandType to int and the second
-    // ExpandType to bool, float, double. Instead, they should evenly divide the second type
-    // pack, so we map first ExpandType with int, bool, and second ExpandType to float, double.
-    //
-    if ((as<ConcreteTypePack>(fst) && as<ConcreteTypePack>(snd)) ||
-        (as<ConcreteTypePack>(fst) && as<ExpandType>(snd)) ||
-        (as<ExpandType>(fst) && as<ConcreteTypePack>(snd)))
+    // Unwrap ConcreteTypePack and call TryUnifyTypes recursively.
+    ShortList<IndexSpanPair> typeMapping;
+    ShortList<Type*> flattenedFirst;
+    ShortList<Type*> flattenedSecond;
+    if (matchTypeArgMapping(fst, snd, flattenedFirst, flattenedSecond, typeMapping) &&
+        typeMapping.getCount() > 1)
     {
-        // Generate mapping between the two type lists
-        ShortList<IndexSpanPair> typeMapping;
-        ShortList<Type*> flattenedFirst;
-        ShortList<Type*> flattenedSecond;
-        if (!matchTypeArgMapping(fst, snd, flattenedFirst, flattenedSecond, typeMapping))
-            return false;
-
         // Apply unification based on the mapping
         for (const auto& mapping : typeMapping)
         {
+            // Make sure it is one of three cases: 1:1, 1:N or N:1
             SLANG_ASSERT(mapping.first.count > 0 && mapping.second.count > 0);
             SLANG_ASSERT(mapping.first.count == 1 || mapping.second.count == 1);
 
-            // There will be three possible cases: 1:1, 1:N and N:1.
             // Determine which side is single and which is multiple
             bool firstIsSingle = (mapping.first.count == 1);
 
             // Get the single type and the range for multiple types
             Type* singleType;
-            Index multipleStartIndex;
             Index multipleCount;
-            ShortList<Type*>* multipleSideList;
+            Type** multipleTypes; // Direct pointer to the start of the slice
             bool singleSideIsLeftValue;
             bool multipleSideIsLeftValue;
 
@@ -1467,9 +1458,8 @@ bool SemanticsVisitor::TryUnifyTypes(
                 singleType = flattenedFirst[mapping.first.index];
                 singleSideIsLeftValue = fst.isLeftValue;
 
-                multipleStartIndex = mapping.second.index;
                 multipleCount = mapping.second.count;
-                multipleSideList = &flattenedSecond;
+                multipleTypes = &flattenedSecond[mapping.second.index];
                 multipleSideIsLeftValue = snd.isLeftValue;
             }
             else
@@ -1477,98 +1467,101 @@ bool SemanticsVisitor::TryUnifyTypes(
                 singleType = flattenedSecond[mapping.second.index];
                 singleSideIsLeftValue = snd.isLeftValue;
 
-                multipleStartIndex = mapping.first.index;
                 multipleCount = mapping.first.count;
-                multipleSideList = &flattenedFirst;
+                multipleTypes = &flattenedFirst[mapping.first.index];
                 multipleSideIsLeftValue = fst.isLeftValue;
             }
 
-            // Handle the unification
-            // Each branch will populate this list with pairs of types to unify
-            struct UnifyPair
+            // First argument is always the single type
+            QualType unifyFirstArg = QualType(singleType, singleSideIsLeftValue);
+
+            // Determine the second argument based on the case
+            QualType unifySecondArg;
+
+            if (isDeclRefTypeOf<GenericTypePackParamDecl>(singleType) || as<ExpandType>(singleType))
             {
-                QualType first;
-                QualType second;
-                ValUnificationContext context;
-            };
-            ShortList<UnifyPair> unifyPairs;
-            bool allowSwap = true;
-
-            if (auto expandType = as<ExpandType>(singleType))
-            {
-                // Single ExpandType unifies with multiple types - one pair per type
-                for (Index i = 0; i < multipleCount; ++i)
-                {
-                    ValUnificationContext subUnifyCtx = unifyCtx;
-                    subUnifyCtx.indexInTypePack = i;
-                    Type* multipleType = (*multipleSideList)[multipleStartIndex + i];
-
-                    UnifyPair pair;
-                    pair.context = subUnifyCtx;
-                    pair.first = QualType(expandType->getPatternType(), singleSideIsLeftValue);
-                    pair.second = QualType(multipleType, multipleSideIsLeftValue);
-                    unifyPairs.add(pair);
-                }
-            }
-            else if (isDeclRefTypeOf<GenericTypePackParamDecl>(singleType))
-            {
-                // Single GenericTypePackParamDecl unifies with multiple types as a pack - one pair
-                // total For GenericTypePackParamDecl, singleType always goes to first argument (no
-                // swapping)
-                allowSwap = false;
-
-                ShortList<Type*> multipleTypes;
-                for (Index i = 0; i < multipleCount; ++i)
-                {
-                    multipleTypes.add((*multipleSideList)[multipleStartIndex + i]);
-                }
-                auto multipleTypePack =
-                    m_astBuilder->getTypePack(multipleTypes.getArrayView().arrayView);
-
-                UnifyPair pair;
-                pair.context = unifyCtx;
-                pair.first = QualType(singleType, singleSideIsLeftValue);
-                pair.second = QualType(multipleTypePack, multipleSideIsLeftValue);
-                unifyPairs.add(pair);
-            }
-            else if (multipleCount == 1)
-            {
-                // Regular 1:1 unification - one pair total
-                Type* multipleType = (*multipleSideList)[multipleStartIndex];
-
-                UnifyPair pair;
-                pair.context = unifyCtx;
-                pair.first = QualType(singleType, singleSideIsLeftValue);
-                pair.second = QualType(multipleType, multipleSideIsLeftValue);
-                unifyPairs.add(pair);
+                // Create a temporary ConcreteTypePack for multiple types and rely on the recursive
+                // call
+                auto multipleTypesView = makeArrayView(multipleTypes, multipleCount);
+                auto multipleTypePack = m_astBuilder->getTypePack(multipleTypesView);
+                unifySecondArg = QualType(multipleTypePack, multipleSideIsLeftValue);
             }
             else
             {
-                // This shouldn't happen according to our mapping logic
-                SLANG_RELEASE_ASSERT(!"Unexpected case in type mapping");
+                // Regular 1:1 unification
+                SLANG_ASSERT(multipleCount == 1);
+                Type* multipleType = multipleTypes[0];
+                unifySecondArg = QualType(multipleType, multipleSideIsLeftValue);
             }
 
-            // Apply swapping logic if allowed and needed
-            if (allowSwap && !firstIsSingle)
+            // Apply swapping logic if needed (except for GenericTypePackParamDecl)
+            if (!isDeclRefTypeOf<GenericTypePackParamDecl>(singleType) && !firstIsSingle)
             {
-                for (auto& pair : unifyPairs)
-                {
-                    // Swap first and second
-                    QualType temp = pair.first;
-                    pair.first = pair.second;
-                    pair.second = temp;
-                }
+                // Swap first and second
+                QualType temp = unifyFirstArg;
+                unifyFirstArg = unifySecondArg;
+                unifySecondArg = temp;
             }
 
-            // Shared unification loop
-            for (const auto& pair : unifyPairs)
-            {
-                if (!TryUnifyTypes(constraints, pair.context, pair.first, pair.second))
-                    return false;
-            }
+            // Perform the unification
+            if (!TryUnifyTypes(constraints, unifyCtx, unifyFirstArg, unifySecondArg))
+                return false;
         }
 
         return true;
+    }
+
+    if (auto fstTypePack = as<ConcreteTypePack>(fst))
+    {
+        if (auto sndTypePack = as<ConcreteTypePack>(snd))
+        {
+            if (fstTypePack->getTypeCount() != sndTypePack->getTypeCount())
+                return false;
+            for (Index i = 0; i < fstTypePack->getTypeCount(); ++i)
+            {
+                if (!TryUnifyTypes(
+                        constraints,
+                        unifyCtx,
+                        QualType(fstTypePack->getElementType(i), fst.isLeftValue),
+                        QualType(sndTypePack->getElementType(i), snd.isLeftValue)))
+                    return false;
+            }
+            return true;
+        }
+        else if (auto sndExpandType = as<ExpandType>(snd))
+        {
+            for (Index i = 0; i < fstTypePack->getTypeCount(); ++i)
+            {
+                ValUnificationContext subUnifyCtx = unifyCtx;
+                subUnifyCtx.indexInTypePack = i;
+                if (!TryUnifyTypes(
+                        constraints,
+                        subUnifyCtx,
+                        QualType(fstTypePack->getElementType(i), fst.isLeftValue),
+                        QualType(sndExpandType->getPatternType(), snd.isLeftValue)))
+                    return false;
+            }
+            return true;
+        }
+    }
+
+    if (auto sndTypePack = as<ConcreteTypePack>(snd))
+    {
+        if (auto fstExpandType = as<ExpandType>(fst))
+        {
+            for (Index i = 0; i < sndTypePack->getTypeCount(); ++i)
+            {
+                ValUnificationContext subUnifyCtx = unifyCtx;
+                subUnifyCtx.indexInTypePack = i;
+                if (!TryUnifyTypes(
+                        constraints,
+                        subUnifyCtx,
+                        QualType(fstExpandType->getPatternType(), fst.isLeftValue),
+                        QualType(sndTypePack->getElementType(i), snd.isLeftValue)))
+                    return false;
+            }
+            return true;
+        }
     }
 
     // A generic parameter type can unify with anything.
