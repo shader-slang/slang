@@ -100,6 +100,11 @@ void serialize(Serializer const& serializer, SPIRVAsmOperand::Flavor& value)
     serializeEnum(serializer, value);
 }
 
+void serialize(Serializer const& serializer, SlangLanguageVersion version)
+{
+    serializeEnum(serializer, version);
+}
+
 void serialize(Serializer const& serializer, MatrixCoord& value)
 {
     SLANG_SCOPED_SERIALIZER_TUPLE(serializer);

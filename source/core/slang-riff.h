@@ -304,7 +304,7 @@ public:
     BoundsCheckedChunkPtr() {}
 
     /// Initialize a null pointer
-    BoundsCheckedChunkPtr(nullptr_t) {}
+    BoundsCheckedChunkPtr(std::nullptr_t) {}
 
 
     /// Initialize a pointer to a chunk, with a size limit.

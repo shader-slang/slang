@@ -246,6 +246,31 @@ jobs:
             -expected-failure-list tests/expected-failure.txt \
             -skip-reference-image-generation \
             -show-adapter-info
+      - name: slang-rhi tests
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
+        shell: pwsh
+        run: |
+          if (!(Test-Path -Path "external/slang-rhi/build")) {
+            Write-Host "Building slang-rhi if it doesn't exist"
+            Push-Location external/slang-rhi
+            cmake --preset msvc -S . -B build
+            cmake --build build --config ${{matrix.config}}
+            Write-Host "Copying DLLs from bin directory to slang-rhi build location..."
+            Copy-Item -Path "$bin_dir\*.dll" -Destination "build\${{matrix.config}}" -Force
+            Pop-Location
+          }
+          $testExe = Get-ChildItem -Path "external/slang-rhi/build" -Recurse -Filter "slang-rhi-tests.exe" | Select-Object -First 1
+          if ($testExe) {
+              Write-Host "Found slang-rhi tests executable at: $($testExe.FullName)"
+              $testDir = $testExe.Directory.FullName
+              Push-Location $testDir
+              Write-Host "Running slang-rhi tests..."
+              .\slang-rhi-tests.exe
+              Pop-Location
+          } else {
+              Write-Error "Could not find slang-rhi-tests.exe"
+              exit 1
+          }
       - name: Run slangpy tests
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         shell: pwsh

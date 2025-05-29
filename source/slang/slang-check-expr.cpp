@@ -2331,6 +2331,10 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
         return CreateErrorExpr(subscriptExpr);
     }
 
+    for (auto& expr : subscriptExpr->indexExprs)
+    {
+        expr = CheckExpr(expr);
+    }
     auto indexExpr = subscriptExpr->indexExprs[0];
 
     if (!isScalarIntegerType(indexExpr->type.type))
@@ -2477,6 +2481,30 @@ Expr* SemanticsExprVisitor::visitParenExpr(ParenExpr* expr)
 
     expr->base = base;
     expr->type = base->type;
+    return expr;
+}
+
+Expr* SemanticsExprVisitor::visitTupleExpr(TupleExpr* expr)
+{
+    List<Type*> elementTypes;
+    for (auto& element : expr->elements)
+    {
+        element = CheckTerm(element);
+        auto elementType = element->type.type;
+        if (auto concreteTypePack = as<ConcreteTypePack>(elementType))
+        {
+            // We need to flatten the type pack into a tuple type
+            for (Index i = 0; i < concreteTypePack->getTypeCount(); i++)
+            {
+                elementTypes.add(concreteTypePack->getElementType(i));
+            }
+        }
+        else
+        {
+            elementTypes.add(element->type.type);
+        }
+    }
+    expr->type = m_astBuilder->getTupleType(elementTypes.getArrayView());
     return expr;
 }
 
