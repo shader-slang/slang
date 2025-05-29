@@ -11094,7 +11094,7 @@ void SemanticsDeclScopeWiringVisitor::visitNamespaceDecl(NamespaceDecl* decl)
             auto nsDecl = container->findLastDirectMemberDeclOfName(decl->getName());
             if (!nsDecl)
                 continue;
-            for (auto ns = nsDecl; ns; ns = container->getPrevDirectMemberDeclWithSameName(nsDecl))
+            for (auto ns = nsDecl; ns; ns = container->getPrevDirectMemberDeclWithSameName(ns))
             {
                 if (ns == decl)
                     continue;
