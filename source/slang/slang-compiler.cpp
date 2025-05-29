@@ -2097,8 +2097,9 @@ static IArtifact* _getSeparateDbgArtifact(IArtifact* artifact)
     if (!artifact)
         return nullptr;
 
-    // The first associated artifact of kind ObjectCode and SPIRV payload should be the debug artifact.
-    for (auto *associated : artifact->getAssociated())
+    // The first associated artifact of kind ObjectCode and SPIRV payload should be the debug
+    // artifact.
+    for (auto* associated : artifact->getAssociated())
     {
         auto desc = associated->getDesc();
         if (desc.kind == ArtifactKind::ObjectCode && desc.payload == ArtifactPayload::SPIRV)
@@ -2113,8 +2114,7 @@ SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
     const String& path,
     IArtifact* artifact)
 {
-    if (targetProgram->getOptionSet().getBoolOption(
-        CompilerOptionName::EmitSeparateDebug))
+    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmitSeparateDebug))
     {
         const auto dbgPath = _getDebugSpvPath(path);
         const auto dbgArtifact = _getSeparateDbgArtifact(artifact);
