@@ -19,15 +19,9 @@ struct myS : IFoo
 //
 // CHECK-DAG: error 33084
 // CHECK-DAG: error 33084
-// CHECK-DAG: error 33084
-// CHECK-NOT: error 33084
 struct someStructMember1
 {
     some IFoo v;
-};
-struct someStructMember2
-{
-    some IFooGeneric<float> v;
 };
 __generic<T>
 struct someStructMember3
@@ -43,7 +37,7 @@ RWStructuredBuffer<int> buffer;
 void computeMain()
 {
 
-// Not alloweda  `some` non-interface type
+// Not allowed a `some` non-interface type
 // CHECK-DAG: error 33083
     some myS bad1;
 

@@ -1201,6 +1201,10 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
+    // unwrap SomeTypeDecl's
+    if (tryCoerceSomeType(site, toType, outToExpr, fromType, fromExpr, sink, outCost))
+        return true;
+
     // Assume string literals are convertible to any string type.
     if (as<StringLiteralExpr>(fromExpr) && as<StringTypeBase>(toType))
     {
@@ -1587,9 +1591,6 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
-    if (tryCoerceSomeType(site, toType, outToExpr, fromType, fromExpr, sink, outCost))
-        return true;
-
     // The main general-purpose approach for conversion is
     // using suitable marked initializer ("constructor")
     // declarations on the target type.
@@ -1884,47 +1885,30 @@ bool SemanticsVisitor::tryCoerceSomeType(
     ConversionCost* outCost)
 {
     // basic restrictions
-    // 
-    // Allow assignment as-if the type was a T given UnboundSomeType<T>.
-    // Somehow we must then force the type to a SomeType so it is bound by SomeType rules after?
-    if (auto unboundSomeTypeDecl = isDeclRefTypeOf<UnboundSomeTypeDecl>(toType))
+
+    if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(toType))
     {
-        return _coerce(
-            site,
-            unboundSomeTypeDecl.getDecl()->interfaceType.type,
-            outToExpr,
-            fromType,
-            fromExpr,
-            sink,
-            outCost);
-    }
-    else if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(toType))
-    {
-        // arguments allow `some T` to be copied to them.
-        if (site != CoercionSite::Argument)
+        // if `some T = some U` `some T = unbound_some U`
+        if (site != CoercionSite::Argument && isDeclRefTypeOf<SomeTypeDecl>(fromType))
         {
-            // if `some T = some U` `some T = unbound_some U`
-            if (isDeclRefTypeOf<SomeTypeDecl>(fromType))
+            if (!isDeclRefTypeOf<UnboundSomeTypeDecl>(toType))
             {
                 sink->diagnose(
                     fromExpr->loc,
                     Diagnostics::cannotAssignSomeTypeToPotentiallyDifferentSomeType);
                 return false;
             }
-            // if `some T = dyn U` we have an error
-            else if (auto fromVarExpr = as<VarExpr>(fromExpr))
-            {
-                if (fromVarExpr->declRef.getDecl()->hasModifier<DynModifier>())
-                {
-                    sink->diagnose(fromExpr->loc, Diagnostics::cannotAssignDynTypeToSomeType);
-                    return false;
-                }
-            }
         }
-        // implicit unwrap and try to assign
+        // not allowed to assign 'dyn' to 'unboundSomeType'
+        else if (!isDeclRefTypeOf<SomeTypeDecl>(fromType) && isDeclRefTypeOf<InterfaceDecl>(fromType))
+        {
+            sink->diagnose(fromExpr->loc, Diagnostics::cannotAssignDynTypeToSomeType);
+            return false;
+        }
+        // implicit unwrap
         return _coerce(
             site,
-            someTypeDeclRef.getDecl()->interfaceType.type,
+            someTypeDecl.getDecl()->interfaceType.type,
             outToExpr,
             fromType,
             fromExpr,

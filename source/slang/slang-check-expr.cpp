@@ -5445,7 +5445,7 @@ static Type* createSomeTypeDeclType(ASTBuilder* astBuilder, SomeTypeExpr* expr)
 
 Expr* SemanticsExprVisitor::visitSomeTypeExpr(SomeTypeExpr* expr)
 {
-    if(expr->base)
+    if(expr->base.type)
     {
         expr->type = createSomeTypeDeclType(m_astBuilder, expr);
         return expr;

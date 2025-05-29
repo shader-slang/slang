@@ -45,13 +45,6 @@ struct StructForIFoo3 : IFoo
     }
 };
 
-// Complex Expr, so no support
-//
-// void test(Out<some IFoo> p)
-// {
-
-// }
-
 void outParam(out some IFoo v1, out some IFoo v2)
 {
     v1 = StructForIFoo1(1);
@@ -60,7 +53,7 @@ void outParam(out some IFoo v1, out some IFoo v2)
 
 some IFoo outReturn()
 {
-    return IFooStruct3(1);
+    return StructForIFoo3(1);
 }
 
 RWStructuredBuffer<int> buffer;

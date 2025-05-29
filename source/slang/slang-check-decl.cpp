@@ -100,9 +100,9 @@ static void maybeCreateUnboundSomeTypeDeclFromReturnType(
 static void maybeCreateUnboundSomeTypeDeclFromVarDecl(VarDeclBase* varDecl, ASTBuilder* astBuilder)
 {
     // If type is `out` or uninitialized we
-    // make an UnboundSomeType given a SomeType
+    // make an UnboundSomeType
     auto someType = isDeclRefTypeOf<SomeTypeDecl>(varDecl->type.type);
-    if (someType && (as<VarDecl>(varDecl) && !varDecl->initExpr ||
+    if (someType && (as<VarDecl>(varDecl) ||
                      as<ParamDecl>(varDecl) && !varDecl->hasModifier<InOutModifier>() &&
                          varDecl->hasModifier<OutModifier>()))
     {

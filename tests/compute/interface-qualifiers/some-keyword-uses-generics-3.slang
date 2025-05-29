@@ -31,25 +31,26 @@ struct StructForIFooGeneric : IFooGeneric<T>
     }
 }
 
-RWStructuredBuffer<int> buffer;
-
 __generic<T : IArithmetic>
-void logicInner1(out some IFooGeneric<T> dataIn1)
+void logic1(out some IFooGeneric<T> dataIn1)
 {
     dataIn1 = StructForIFooGeneric<T>(0);
 }
 
 __generic<T : IArithmetic>
-void logic1(out some IFooGeneric<T> dataIn1)
+void logic2(inout some IFooGeneric<T> dataIn1, some IFooGeneric<T> dataIn2)
 {
-    logicInner1<T>(dataIn1);
+    dataIn1.setVal(dataIn2.getVal());
 }
+
+RWStructuredBuffer<int> buffer;
 
 void computeMain()
 {
     some IFooGeneric<float> data1;
     some IFooGeneric<float> data2 = StructForIFooGeneric<float>(1);
     logic1<float>(data1);
+    logic2<float>(data1, data2);
     buffer[0] = int(data1.getVal() == 
                 + data2.getVal());
 }

@@ -37,6 +37,7 @@ void logic(inout some IFoo v1, in some IFoo v2)
     // cannot assign `some` to `some`
     // CHECK_2026: error 33091
     v1 = v2;
+    some IFoo data4 = v2;
 }
 
 RWStructuredBuffer<int> buffer;
