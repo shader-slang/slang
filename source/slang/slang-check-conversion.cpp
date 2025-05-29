@@ -988,12 +988,8 @@ bool SemanticsVisitor::_failedCoercion(
         else
         {
             if (sink)
-            {   
-                sink->diagnose(
-                    fromExpr->loc,
-                    Diagnostics::typeMismatch,
-                    toType,
-                    fromExpr->type);
+            {
+                sink->diagnose(fromExpr->loc, Diagnostics::typeMismatch, toType, fromExpr->type);
             }
         }
     }
@@ -1899,7 +1895,8 @@ bool SemanticsVisitor::tryCoerceSomeType(
             }
         }
         // not allowed to assign 'dyn' to 'unboundSomeType'
-        else if (!isDeclRefTypeOf<SomeTypeDecl>(fromType) && isDeclRefTypeOf<InterfaceDecl>(fromType))
+        else if (
+            !isDeclRefTypeOf<SomeTypeDecl>(fromType) && isDeclRefTypeOf<InterfaceDecl>(fromType))
         {
             sink->diagnose(fromExpr->loc, Diagnostics::cannotAssignDynTypeToSomeType);
             return false;
@@ -1928,7 +1925,7 @@ bool SemanticsVisitor::tryCoerceSomeType(
             sink,
             outCost);
     }
-    
+
     return false;
 }
 

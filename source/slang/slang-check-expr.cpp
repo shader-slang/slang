@@ -166,8 +166,8 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
         expr,
         [&](DeclRef<VarDeclBase> varDeclRef)
         {
-            // Must remove all thin-wrapper types since otherwise it will "block" the type system from correctly resolving LookupDeclRef.
-            // This causes unresolved generics.
+            // Must remove all thin-wrapper types since otherwise it will "block" the type system
+            // from correctly resolving LookupDeclRef. This causes unresolved generics.
             auto unwrappedType = getWrappedType(expr->type.type);
             ExtractExistentialType* openedType = m_astBuilder->getOrCreate<ExtractExistentialType>(
                 varDeclRef,
@@ -224,7 +224,9 @@ Expr* SemanticsVisitor::maybeOpenExistential(Expr* expr)
         }
         else if (auto someTypeDeclRef = declRefType->getDeclRef().as<SomeTypeDecl>())
         {
-            return openExistential(expr, isDeclRefTypeOf<InterfaceDecl>(someTypeDeclRef.getDecl()->interfaceType.type));
+            return openExistential(
+                expr,
+                isDeclRefTypeOf<InterfaceDecl>(someTypeDeclRef.getDecl()->interfaceType.type));
         }
     }
 
@@ -5469,7 +5471,7 @@ static Type* createSomeTypeDeclType(ASTBuilder* astBuilder, SomeTypeExpr* expr)
 
 Expr* SemanticsExprVisitor::visitSomeTypeExpr(SomeTypeExpr* expr)
 {
-    if(expr->base.type)
+    if (expr->base.type)
     {
         expr->type = createSomeTypeDeclType(m_astBuilder, expr);
         return expr;
