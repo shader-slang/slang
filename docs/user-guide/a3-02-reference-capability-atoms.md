@@ -559,7 +559,7 @@ Extensions
 > Represents the SPIR-V capability for cluster acceleration structure.
 
 `spvRayTracingLinearSweptSpheresGeometryNV`
-> Represents the SPIR-V capability for linear swept spheres.
+> Represents the SPIR-V capability for cluster acceleration structure.
 
 `spvShaderClockKHR`
 > Represents the SPIR-V capability for shader clock.
@@ -1269,6 +1269,9 @@ Compound Capabilities
 
 `raytracing_anyhit_closesthit`
 > Collection of capabilities for raytracing with the shader stages of anyhit and closesthit.
+
+`raytracing_lss`
+> Collection of capabilities for linear swept spheres.
 
 `raytracing_anyhit_closesthit_intersection`
 > Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.
