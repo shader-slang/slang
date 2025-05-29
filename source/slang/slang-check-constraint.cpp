@@ -1443,68 +1443,43 @@ bool SemanticsVisitor::TryUnifyTypes(
             SLANG_ASSERT(mapping.first.count > 0 && mapping.second.count > 0);
             SLANG_ASSERT(mapping.first.count == 1 || mapping.second.count == 1);
 
-            // Determine which side is single and which is multiple
-            bool firstIsSingle = (mapping.first.count == 1);
-
-            // Get the single type and the range for multiple types
-            Type* singleType;
-            Index multipleCount;
-            Type** multipleTypes; // Direct pointer to the start of the slice
-            bool singleSideIsLeftValue;
-            bool multipleSideIsLeftValue;
-
-            if (firstIsSingle)
+            // Helper function to create QualType from mapping span
+            auto mayPackAndGetQualType = [this](
+                                             const IndexSpan& span,
+                                             ShortList<Type*>& typeList,
+                                             bool isLeftValue,
+                                             Type* otherType) -> QualType
             {
-                singleType = flattenedFirst[mapping.first.index];
-                singleSideIsLeftValue = fst.isLeftValue;
+                // When the `otherType` is GenericTypePackParamDecl or ExpandType,
+                // we need to create a ConcreteTypePack so that we can handle them
+                // recursively.
+                if (isDeclRefTypeOf<GenericTypePackParamDecl>(otherType) ||
+                    as<ExpandType>(otherType))
+                {
+                    // Multiple types: create ConcreteTypePack
+                    auto typesView = makeArrayView(&typeList[span.index], span.count);
+                    auto typePack = m_astBuilder->getTypePack(typesView);
+                    return QualType(typePack, isLeftValue);
+                }
 
-                multipleCount = mapping.second.count;
-                multipleTypes = &flattenedSecond[mapping.second.index];
-                multipleSideIsLeftValue = snd.isLeftValue;
-            }
-            else
-            {
-                singleType = flattenedSecond[mapping.second.index];
-                singleSideIsLeftValue = snd.isLeftValue;
+                SLANG_ASSERT(span.count == 1);
+                return QualType(typeList[span.index], isLeftValue);
+            };
 
-                multipleCount = mapping.first.count;
-                multipleTypes = &flattenedFirst[mapping.first.index];
-                multipleSideIsLeftValue = fst.isLeftValue;
-            }
-
-            // First argument is always the single type
-            QualType unifyFirstArg = QualType(singleType, singleSideIsLeftValue);
-
-            // Determine the second argument based on the case
-            QualType unifySecondArg;
-
-            if (isDeclRefTypeOf<GenericTypePackParamDecl>(singleType) || as<ExpandType>(singleType))
-            {
-                // Create a temporary ConcreteTypePack for multiple types and rely on the recursive
-                // call
-                auto multipleTypesView = makeArrayView(multipleTypes, multipleCount);
-                auto multipleTypePack = m_astBuilder->getTypePack(multipleTypesView);
-                unifySecondArg = QualType(multipleTypePack, multipleSideIsLeftValue);
-            }
-            else
-            {
-                // Regular 1:1 unification
-                SLANG_ASSERT(multipleCount == 1);
-                Type* multipleType = multipleTypes[0];
-                unifySecondArg = QualType(multipleType, multipleSideIsLeftValue);
-            }
-
-            // Apply swapping logic if needed (except for GenericTypePackParamDecl)
-            if (!isDeclRefTypeOf<GenericTypePackParamDecl>(singleType) && !firstIsSingle)
-            {
-                // Swap first and second
-                QualType temp = unifyFirstArg;
-                unifyFirstArg = unifySecondArg;
-                unifySecondArg = temp;
-            }
+            // Get the types directly from the mapping
+            QualType firstArg = mayPackAndGetQualType(
+                mapping.first,
+                flattenedFirst,
+                fst.isLeftValue,
+                flattenedSecond[mapping.second.index]);
+            QualType secondArg = mayPackAndGetQualType(
+                mapping.second,
+                flattenedSecond,
+                snd.isLeftValue,
+                flattenedFirst[mapping.first.index]);
 
             // Perform the unification
-            if (!TryUnifyTypes(constraints, unifyCtx, unifyFirstArg, unifySecondArg))
+            if (!TryUnifyTypes(constraints, unifyCtx, firstArg, secondArg))
                 return false;
         }
 
