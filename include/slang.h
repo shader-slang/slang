@@ -627,17 +627,6 @@ typedef uint32_t SlangSizeT;
         SLANG_TARGET_COUNT_OF,
     };
 
-    typedef int SlangStdRevisionIntegral;
-    enum SlangStdRevision : SlangStdRevisionIntegral
-    {
-        SLANG_STD_REVISION_UNKNOWN,
-        SLANG_STD_REVISION_2025,
-        SLANG_STD_REVISION_2026,
-        SLANG_STD_REVISION_COUNT_OF,
-
-        SLANG_STD_REVISION_DEFAULT = SLANG_STD_REVISION_2025,
-    };
-
     /* A "container format" describes the way that the outputs
     for multiple files, entry points, targets, etc. should be
     combined into a single artifact for output. */
@@ -1034,7 +1023,7 @@ typedef uint32_t SlangSizeT;
         DumpModule,
 
         EnableExperimentalDynamicDispatch, // bool, experimental
-        StdRevision,                       // intValue0: SlangStdRevision
+        LanguageVersion,                   // intValue0: SlangLanguageVersion
         CountOf,
     };
 
@@ -4550,7 +4539,12 @@ struct SpecializationArg
 
 enum SlangLanguageVersion
 {
-    SLANG_LANGUAGE_VERSION_2025 = 2025
+    SLANG_LANGUAGE_VERSION_UNKNOWN = 0,
+    SLANG_LANGUAGE_VERSION_LEGACY = 2018,
+    SLANG_LANGUAGE_VERSION_2025 = 2025,
+    SLANG_LANGUAGE_VERSION_2026 = 2026,
+    SLANG_LANGAUGE_VERSION_DEFAULT = SLANG_LANGUAGE_VERSION_LEGACY,
+    SLANG_LANGUAGE_VERSION_LATEST = SLANG_LANGUAGE_VERSION_2026,
 };
 
 
@@ -4564,8 +4558,8 @@ struct SlangGlobalSessionDesc
     /// Slang API version.
     uint32_t apiVersion = SLANG_API_VERSION;
 
-    /// Slang language version.
-    uint32_t languageVersion = SLANG_LANGUAGE_VERSION_2025;
+    /// Specify the oldest Slang language version that any sessions will use.
+    uint32_t minLanguageVersion = SLANG_LANGUAGE_VERSION_2025;
 
     /// Whether to enable GLSL support.
     bool enableGLSL = false;
