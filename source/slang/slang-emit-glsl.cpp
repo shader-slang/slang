@@ -9,6 +9,7 @@
 #include "slang-ir-util.h"
 #include "slang-legalize-types.h"
 #include "slang-mangled-lexer.h"
+#include "slang-type-system-shared.h"
 #include "slang/slang-ir.h"
 
 #include <assert.h>
@@ -504,6 +505,64 @@ void GLSLSourceEmitter::emitGlobalParamDefaultVal(IRGlobalParam* param)
     }
 }
 
+static bool checkStructRequiresScalarLayout(IRStructType* structType)
+{
+    for (auto field : structType->getFields())
+    {
+        // Look for offset decoration
+        auto offsetDecor = field->findDecoration<IROffsetDecoration>();
+        if (!offsetDecor)
+            continue;
+
+        // Get the offset value
+        auto offset = offsetDecor->getOffset();
+
+        // Get field type info
+        IRType* fieldType = field->getFieldType();
+        size_t expectedAlign = 4; // default to scalar
+        if (auto vectorType = as<IRVectorType>(fieldType))
+        {
+            auto elementCount = (int)getVectorSize(vectorType);
+            if (elementCount == 2)
+            {
+                expectedAlign = 8;
+            }
+            else
+            {
+                expectedAlign = 16;
+            }
+        }
+        else if (as<IRMatrixType>(fieldType) || as<IRArrayType>(fieldType) || as<IRStructType>(fieldType))
+        {
+            expectedAlign = 16;
+        }
+
+        // If offset is not aligned according to std140 rules,
+        // we need scalar layout
+        if (offset % expectedAlign != 0)
+        {
+            return true;
+        }
+
+        // Recursively check embedded structs
+        if (auto embeddedStruct = as<IRStructType>(fieldType))
+        {
+            if (checkStructRequiresScalarLayout(embeddedStruct))
+                return true;
+        }
+    }
+    return false;
+}
+
+static bool checkConstantBufferRequiresScalarLayout(IRType* type)
+{
+    if (auto structType = as<IRStructType>(type))
+    {
+        return checkStructRequiresScalarLayout(structType);
+    }
+    return false;
+}
+
 void GLSLSourceEmitter::_emitGLSLParameterGroup(
     IRGlobalParam* varDecl,
     IRUniformParameterGroupType* type)
@@ -546,6 +605,7 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(
     _emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
     _emitGLSLLayoutQualifier(LayoutResourceKind::SpecializationConstant, &containerChain);
 
+    bool constantBufferRequiresScalarLayout = false;
     bool isShaderRecord =
         _emitGLSLLayoutQualifier(LayoutResourceKind::ShaderRecord, &containerChain);
 
@@ -567,8 +627,10 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(
     else
     {
         // uniform is implicitly read only
+        constantBufferRequiresScalarLayout = checkConstantBufferRequiresScalarLayout(type);
+
         m_writer->emit("layout(");
-        if (getTargetProgram()->getOptionSet().shouldUseScalarLayout())
+        if (constantBufferRequiresScalarLayout || getTargetProgram()->getOptionSet().shouldUseScalarLayout())
             m_writer->emit("scalar");
         else if (auto cbufferType = as<IRConstantBufferType>(type))
         {
