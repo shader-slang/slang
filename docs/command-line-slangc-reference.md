@@ -22,7 +22,7 @@ slangc -help-style markdown -h
 * [Deprecated](#Deprecated)
 * [compiler](#compiler)
 * [language](#language)
-* [std-revision](#std-revision)
+* [language-version](#language-version)
 * [archive-type](#archive-type)
 * [line-directive-mode](#line-directive-mode)
 * [debug-info-format](#debug-info-format)
@@ -227,7 +227,7 @@ It is typically only set from automated builds(such as distros available on gith
 <a id="std"></a>
 ### -std
 
-**-std &lt;[std-revision](#std-revision)&gt;**
+**-std &lt;[language-version](#language-version)&gt;**
 
 Specifies the language standard that should be used. 
 
@@ -898,14 +898,14 @@ Language
 * `hlsl` : HLSL language 
 * `cu`, `cuda` : CUDA 
 
-<a id="std-revision"></a>
-## std-revision
+<a id="language-version"></a>
+## language-version
 
-Std Revision 
+Language Version 
 
-* `legacy`, `default` : Legacy Slang language 
+* `legacy`, `default`, `2018` : Legacy Slang language 
 * `2025` : Slang language rules for 2025 and older 
-* `2026` : Slang language rules for 2026 and newer 
+* `2026`, `latest` : Slang language rules for 2026 and newer 
 
 <a id="archive-type"></a>
 ## archive-type
