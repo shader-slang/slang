@@ -7,11 +7,11 @@
 // cannot have interface varDecl unless `dyn interface`. Checks if implicit `dyn` is assigned
 // CHECK_SOME_IMPLICIT: error
 // CHECK_DYN_IMPLICIT-NOT: error 
-interface MaybeDynInterface
+interface NotDynInterface
 {
 }
 
 void computeMain()
 {
-    dyn MaybeDynInterface dynInterfaceVar;
+    NotDynInterface dynInterfaceVar;
 }

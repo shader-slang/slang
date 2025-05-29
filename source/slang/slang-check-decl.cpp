@@ -34,13 +34,13 @@ static bool isAssociatedTypeDecl(Decl* decl)
     return false;
 }
 
-static bool isSlang2025(SemanticsVisitor* visitor)
+static bool isSlang2025OrOlder(SemanticsVisitor* visitor)
 {
-    return visitor->getShared()->m_module->getModuleDecl()->languageVersion ==
+    return visitor->getShared()->m_module->getModuleDecl()->languageVersion <=
            SLANG_LANGUAGE_VERSION_2025;
 }
 
-static bool isSlang2026OrOlder(SemanticsVisitor* visitor)
+static bool isSlang2026OrNewer(SemanticsVisitor* visitor)
 {
     return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
            SLANG_LANGUAGE_VERSION_2026;
@@ -52,17 +52,22 @@ static bool allowExperimentalDynamicDispatch(
     CompilerOptionSet& optionSet)
 {
     return optionSet.getBoolOption(CompilerOptionName::EnableExperimentalDynamicDispatch) ||
-           isSlang2025(visitor);
+           isSlang2025OrOlder(visitor);
 }
 
 bool isImplicitDyn(SemanticsVisitor* visitor)
 {
-    return isSlang2025(visitor);
+    return isSlang2025OrOlder(visitor);
+}
+
+bool validateVarDeclDyn(SemanticsVisitor* visitor)
+{
+    return isSlang2026OrNewer(visitor);
 }
 
 bool isImplicitSome(SemanticsVisitor* visitor)
 {
-    return isSlang2026OrOlder(visitor);
+    return isSlang2026OrNewer(visitor);
 }
 
 static Type* createSomeTypeDeclType(ASTBuilder* astBuilder, TypeExp type, SourceLoc loc)
@@ -203,6 +208,10 @@ static void validateSomeAndDynVarDeclUsage(
             return;
         }
 
+        // stop validation here as per spec `proposals/024-any-dyn-types.md`
+        if (!validateVarDeclDyn(visitor))
+            return;
+
         // interface type must have `dyn` modifier
         if (!declRefInterface.getDecl()->hasModifier<DynModifier>())
         {
@@ -324,7 +333,7 @@ static void validateSomeAndDynFuncDeclUsage(
             sink->diagnose(funcDecl, Diagnostics::cannotHaveSomeTypeParamInDynInterface);
 }
 
-static void validateDynInterfaceUseWithInheritanceDecl(
+static void validateDynInterfaceWithInheritanceDeclUsage(
     SemanticsDeclVisitorBase* visitor,
     DiagnosticSink* sink,
     CompilerOptionSet& optionSet,
@@ -3536,7 +3545,7 @@ struct SemanticsDeclDifferentialConformanceVisitor
 
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
-        validateDynInterfaceUseWithInheritanceDecl(
+        validateDynInterfaceWithInheritanceDeclUsage(
             this,
             getSink(),
             getOptionSet(),

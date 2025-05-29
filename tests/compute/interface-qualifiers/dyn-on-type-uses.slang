@@ -54,7 +54,6 @@ dyn interface interface4
 
 // `dyn` interfaces cannot inherit from any interfaces that are not dyn.
 // CHECK_2026-DAG: error 33077
-
 interface IBase2
 {
 };
