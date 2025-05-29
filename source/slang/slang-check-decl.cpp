@@ -37,7 +37,7 @@ static bool isAssociatedTypeDecl(Decl* decl)
 static bool isSlang2025OrOlder(SemanticsVisitor* visitor)
 {
     return visitor->getShared()->m_module->getModuleDecl()->languageVersion <=
-           SLANG_LANGUAGE_VERSION_2025
+           SLANG_LANGUAGE_VERSION_2025;
 }
 
 static bool allowExperimentalDynamicDispatch(
@@ -48,17 +48,9 @@ static bool allowExperimentalDynamicDispatch(
            isSlang2025OrOlder(visitor);
 }
 
-bool isImplicitDyn(CompilerOptionSet& optionSet)
+bool isImplicitDyn(SemanticsVisitor* visitor)
 {
-    // if no language, be safe and pretend slang 2025
-    if (!optionSet.hasOption(CompilerOptionName::Language))
-        return true;
-    // if no revision, be safe and pretend slang 2025
-    auto stdRevision = optionSet.getEnumOption<SlangStdRevision>(CompilerOptionName::StdRevision);
-    if (stdRevision == SLANG_STD_REVISION_2025 || stdRevision == SLANG_STD_REVISION_UNKNOWN)
-        return true;
-    
-    return false;
+    return isSlang2025OrOlder(visitor);
 }
 
 static Type* createSomeTypeDeclType(ASTBuilder* astBuilder, TypeExp type, SourceLoc loc)
@@ -108,17 +100,17 @@ static void maybeCreateUnboundSomeTypeDeclFromVarDecl(VarDeclBase* varDecl, ASTB
 static void forceInterfaceQualifierToType(
     Decl* decl,
     TypeExp& type,
-    ASTBuilder* astBuilder,
-    DiagnosticSink* sink,
-    CompilerOptionSet& optionSet)
+    SemanticsVisitor* visitor)
 {
+    ASTBuilder* astBuilder = visitor->getASTBuilder();
+
     auto declType = type.type;
     auto explicitSome = isDeclRefTypeOf<SomeTypeDecl>(declType);
     auto explicitDyn = decl->hasModifier<DynModifier>();
 
     if (explicitSome && explicitDyn)
     {
-        sink->diagnose(decl, Diagnostics::cannotBeSomeTypeAndDynType);
+        visitor->getSink()->diagnose(decl, Diagnostics::cannotBeSomeTypeAndDynType);
         return;
     }
     
@@ -129,7 +121,7 @@ static void forceInterfaceQualifierToType(
         if (!interfaceTypeDeclRef)
             return;
 
-        if (isImplicitDyn(optionSet))
+        if (isImplicitDyn(visitor))
             addModifier(decl, astBuilder->create<DynModifier>());
         else
             type.type = createSomeTypeDeclType(
@@ -185,7 +177,7 @@ static void validateSomeAndDynVarDeclUsage(
     auto sink = visitor->getSink();
     auto optionSet = visitor->getOptionSet();
 
-    forceInterfaceQualifierToType(decl, decl->type, visitor->getASTBuilder(), sink, optionSet);
+    forceInterfaceQualifierToType(decl, decl->type, visitor);
 
     if (isVarDeclBaseSomeType(decl))
     {
@@ -293,13 +285,11 @@ static void validateSomeAndDynFuncDeclUsage(
     forceInterfaceQualifierToType(
         funcDecl,
         funcDecl->returnType,
-        visitor->getASTBuilder(),
-        visitor->getSink(),
-        visitor->getOptionSet());
+        visitor);
     maybeCreateUnboundSomeTypeDeclFromReturnType(funcDecl, visitor->getASTBuilder());
 
     CompilerOptionSet& optionSet = visitor->getOptionSet();
-    if (allowExperimentalDynamicDispatch(optionSet))
+    if (allowExperimentalDynamicDispatch(visitor, optionSet))
         return;
 
     if (!funcDecl->parentDecl->hasModifier<DynModifier>())
