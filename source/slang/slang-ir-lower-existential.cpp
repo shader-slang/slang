@@ -275,9 +275,9 @@ struct ExistentialLoweringContext
         {
             processExtractExistentialWitnessTable(extractExistentialWitnessTable);
         }
-        else if (auto extractExistentialWitnessTable = as<IRIsNullExistential>(inst))
+        else if (auto isNullExistential = as<IRIsNullExistential>(inst))
         {
-            processIsNullExistential(extractExistentialWitnessTable);
+            processIsNullExistential(isNullExistential);
         }
     }
 
