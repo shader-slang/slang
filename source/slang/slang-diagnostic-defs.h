@@ -147,8 +147,6 @@ DIAGNOSTIC(
     "when using multiple source files, entry points must be specified after their corresponding "
     "source file(s)")
 
-DIAGNOSTIC(21, Error, unknownStdRevision, "unknown language standard revision '$0'")
-
 DIAGNOSTIC(22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
 
 DIAGNOSTIC(26, Error, unknownOptimiziationLevel, "unknown optimization level '$0'")
@@ -371,7 +369,13 @@ DIAGNOSTIC(
     undefinedIdentifierInPreprocessorExpression,
     "undefined identifier '$0' in preprocessor expression will evaluate to zero")
 DIAGNOSTIC(15206, Error, expectedIntegralVersionNumber, "Expected integer for #version number")
-
+DIAGNOSTIC(15207, Error, unknownLanguageVersion, "unknown language version '$0'.")
+DIAGNOSTIC(15208, Error, unknownLanguage, "unknown language '$0'.")
+DIAGNOSTIC(
+    15208,
+    Error,
+    languageVersionDiffersFromIncludingModule,
+    "the source file declares a different language version than the including module.")
 DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 
 // 153xx - #include

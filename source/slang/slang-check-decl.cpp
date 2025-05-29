@@ -34,24 +34,18 @@ static bool isAssociatedTypeDecl(Decl* decl)
     return false;
 }
 
-static bool isSlang2025(CompilerOptionSet& optionSet)
+static bool isSlang2025OrOlder(SemanticsVisitor* visitor)
 {
-    if (!optionSet.hasOption(CompilerOptionName::Language))
-        return true;
-    if (optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language) != SLANG_SOURCE_LANGUAGE_SLANG)
-        return true;
-    
-    auto revision = optionSet.getEnumOption<SlangStdRevision>(CompilerOptionName::StdRevision);
-    if (revision == SLANG_STD_REVISION_2025)
-        return true;
-
-    return false;
+    return visitor->getShared()->m_module->getModuleDecl()->languageVersion <=
+           SLANG_LANGUAGE_VERSION_2025
 }
 
-static bool allowExperimentalDynamicDispatch(CompilerOptionSet& optionSet)
+static bool allowExperimentalDynamicDispatch(
+    SemanticsVisitor* visitor,
+    CompilerOptionSet& optionSet)
 {
     return optionSet.getBoolOption(CompilerOptionName::EnableExperimentalDynamicDispatch) ||
-           isSlang2025(optionSet);
+           isSlang2025OrOlder(visitor);
 }
 
 bool isImplicitDyn(CompilerOptionSet& optionSet)
@@ -159,7 +153,7 @@ static void assignInterfaceDefinitionDynModifier(SemanticsDeclVisitorBase* visit
 
     // If legacy, always add `dyn` modifier since it doesn't matter interfaces should always be able
     // to dynamic dispatch by default.
-    if (isSlang2025(visitor->getOptionSet()))
+    if (isSlang2025OrOlder(visitor))
     {
         addModifier(interfaceDecl, visitor->getASTBuilder()->create<DynModifier>());
         return;
@@ -229,7 +223,7 @@ static void validateDynInterfaceUsage(
     auto sink = visitor->getSink();
     auto optionSet = visitor->getOptionSet();
 
-    if (allowExperimentalDynamicDispatch(optionSet))
+    if (allowExperimentalDynamicDispatch(visitor, optionSet))
         return;
 
     if (!decl->hasModifier<DynModifier>())
@@ -349,7 +343,7 @@ static void validateDynInterfaceUseWithInheritanceDecl(
     if (!interfaceDeclIsDyn)
         return;
 
-    if (!allowExperimentalDynamicDispatch(optionSet))
+    if (!allowExperimentalDynamicDispatch(visitor, optionSet))
     {
         if (auto extensionDeclParent = as<ExtensionDecl>(decl->parentDecl))
         {
@@ -879,6 +873,13 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     }
 
     void visitParenExpr(ParenExpr* expr) { dispatchIfNotNull(expr->base); }
+
+    void visitTupleExpr(TupleExpr* expr)
+    {
+        for (auto element : expr->elements)
+            dispatchIfNotNull(element);
+    }
+
 
     void visitAssignExpr(AssignExpr* expr)
     {
@@ -14038,7 +14039,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
             if (!implDecl)
                 continue;
 
-            if (getModuleDecl(implDecl.getDecl())->isInLegacyLanguage)
+            if (getModuleDecl(implDecl.getDecl())->languageVersion == SLANG_LANGUAGE_VERSION_LEGACY)
                 break;
 
             ensureDecl(requirementDecl, DeclCheckState::CapabilityChecked);
@@ -14105,8 +14106,9 @@ DeclVisibility SemanticsVisitor::getDeclVisibility(Decl* decl)
     auto defaultVis = DeclVisibility::Default;
     if (auto parentModule = getModuleDecl(decl))
     {
-        defaultVis = parentModule->isInLegacyLanguage ? DeclVisibility::Public
-                                                      : parentModule->defaultVisibility;
+        defaultVis = parentModule->languageVersion == SLANG_LANGUAGE_VERSION_LEGACY
+                         ? DeclVisibility::Public
+                         : parentModule->defaultVisibility;
     }
 
     // Members of other agg type decls will have their default visibility capped to the
