@@ -2006,7 +2006,6 @@ struct DiffTransposePass
         IRInst* revValue)
     {
         List<RevGradient> gradients;
-        auto type = as<IROptionalType>(fwdMakeOptionalValue->getDataType());
 
         auto gradAtField = builder->emitGetOptionalValue(revValue);
         auto diffZero = diffTypeContext.emitDZeroOfDiffInstType(
