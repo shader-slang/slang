@@ -175,11 +175,11 @@ struct DownstreamCompileOptions
 
     enum class OptimizationLevel : uint8_t
     {
-        None,    ///< Don't optimize at all.
-        Default, ///< Default optimization level: balance code quality and compilation time.
-        High,    ///< Optimize aggressively.
-        Maximal, ///< Include optimizations that may take a very long time, or may involve severe
-                 ///< space-vs-speed tradeoffs
+        None,       ///< Don't optimize at all.
+        Default,    ///< Default optimization level: balance code quality and compilation time.
+        High,       ///< Optimize aggressively.
+        Maximal,    ///< Include optimizations that may take a very long time, or may involve severe
+                    ///< space-vs-speed tradeoffs
         DebugStrip, ///< Stip debug and non-semantic info.
     };
 

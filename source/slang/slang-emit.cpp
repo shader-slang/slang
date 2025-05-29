@@ -2126,15 +2126,13 @@ static SlangResult emitOptimizedArtifacts(
         downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None;
         break;
     case OptimizationLevel::Default:
-        downstreamOptions.optimizationLevel =
-            DownstreamCompileOptions::OptimizationLevel::Default;
+        downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Default;
         break;
     case OptimizationLevel::High:
         downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::High;
         break;
     case OptimizationLevel::Maximal:
-        downstreamOptions.optimizationLevel =
-            DownstreamCompileOptions::OptimizationLevel::Maximal;
+        downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::Maximal;
         break;
     default:
         SLANG_ASSERT(!"Unhandled optimization level");
