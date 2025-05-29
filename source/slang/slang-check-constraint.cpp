@@ -1210,22 +1210,6 @@ void SemanticsVisitor::maybeUnifyUnconstraintIntParam(
     constraints.constraints.add(c);
 }
 
-static GenericTypePackParamDecl* asGenericTypePackParamDecl(Type* type, GenericDecl* genericDecl)
-{
-    if (auto declRefType = as<DeclRefType>(type))
-    {
-        if (auto declRef = declRefType->getDeclRef())
-        {
-            if (auto typePackParamDecl = as<GenericTypePackParamDecl>(declRef.getDecl()))
-            {
-                if (typePackParamDecl->parentDecl == genericDecl)
-                    return typePackParamDecl;
-            }
-        }
-    }
-    return nullptr;
-}
-
 struct IndexSpan
 {
     Index index;
@@ -1526,9 +1510,7 @@ bool SemanticsVisitor::TryUnifyTypes(
                     unifyPairs.add(pair);
                 }
             }
-            else if (
-                auto genericTypePackParamDecl =
-                    asGenericTypePackParamDecl(singleType, constraints.genericDecl))
+            else if (isDeclRefTypeOf<GenericTypePackParamDecl>(singleType))
             {
                 // Single GenericTypePackParamDecl unifies with multiple types as a pack - one pair
                 // total For GenericTypePackParamDecl, singleType always goes to first argument (no
