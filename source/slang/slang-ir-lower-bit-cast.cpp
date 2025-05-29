@@ -167,6 +167,7 @@ struct BitCastLoweringContext
             }
             break;
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
         case kIROp_Int16Type:
         case kIROp_UInt16Type:
             {

@@ -117,6 +117,8 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
         case BaseType::Double:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+        case BaseType::BFloat16:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
 
         default:
             SLANG_UNEXPECTED("uhandled scalar type");
