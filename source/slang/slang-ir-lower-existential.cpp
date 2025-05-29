@@ -133,14 +133,13 @@ struct ExistentialLoweringContext
 
     void processIsNullExistential(IRIsNullExistential* inst)
     {
-        IRBuilder builderStorage(sharedContext->module);
-        auto builder = &builderStorage;
-        builder->setInsertBefore(inst);
+        IRBuilder builder(sharedContext->module);
+        builder.setInsertBefore(inst);
 
-        auto rttiElement = extractTupleElement(builder, inst->getOperand(0), 0);
-        auto isNull = builder->emitNeq(
-            builder->emitGetElement(builder->getUIntType(), rttiElement, 0),
-            builder->getIntValue(builder->getUIntType(), 0));
+        auto rttiElement = extractTupleElement(&builder, inst->getOperand(0), 0);
+        auto isNull = builder.emitNeq(
+            builder.emitGetElement(builder.getUIntType(), rttiElement, 0),
+            builder.getIntValue(builder.getUIntType(), 0));
         inst->replaceUsesWith(isNull);
         inst->removeAndDeallocate();
     }
