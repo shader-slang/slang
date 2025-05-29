@@ -61,11 +61,14 @@ struct PreprocessorDesc
     PreprocessorContentAssistInfo* contentAssistInfo = nullptr;
 };
 
+class TranslationUnitRequest;
+
 /// Take a source `file` and preprocess it into a list of tokens.
 TokenList preprocessSource(
     SourceFile* file,
     PreprocessorDesc const& desc,
-    SourceLanguage& outDetectedLanguage);
+    SourceLanguage& outDetectedLanguage,
+    TranslationUnitRequest* translationUnit);
 
 /// Convenience wrapper for `preprocessSource` when a `Linkage` is available
 TokenList preprocessSource(
@@ -75,7 +78,8 @@ TokenList preprocessSource(
     Dictionary<String, String> const& defines,
     Linkage* linkage,
     SourceLanguage& outDetectedLanguage,
-    PreprocessorHandler* handler = nullptr);
+    PreprocessorHandler* handler = nullptr,
+    TranslationUnitRequest* translationUnit = nullptr);
 
 // The following functions are intended to be used inside of implementations
 // of the `PreprocessorHandler` interface, in order to query the current

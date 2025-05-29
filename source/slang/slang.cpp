@@ -2515,6 +2515,11 @@ void TranslationUnitRequest::addSource(IArtifact* sourceArtifact, SourceFile* so
     _addSourceFile(sourceFile);
 }
 
+void TranslationUnitRequest::addSource(SourceFile* sourceFile)
+{
+    _addSourceFile(sourceFile);
+}
+
 PathInfo TranslationUnitRequest::_findSourcePathInfo(IArtifact* artifact)
 {
     auto pathRep = findRepresentation<IPathArtifactRepresentation>(artifact);
@@ -2627,7 +2632,6 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
 
 List<SourceFile*> const& TranslationUnitRequest::getSourceFiles()
 {
-    SLANG_ASSERT(m_sourceArtifacts.getCount() == m_sourceFiles.getCount());
     return m_sourceFiles;
 }
 
@@ -3419,7 +3423,8 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
             combinedPreprocessorDefinitions,
             getLinkage(),
             sourceLanguage,
-            &preprocessorHandler);
+            &preprocessorHandler,
+            translationUnit);
 
         if (sourceLanguage == SourceLanguage::Unknown)
             sourceLanguage = translationUnit->sourceLanguage;
@@ -4927,7 +4932,8 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
         combinedPreprocessorDefinitions,
         this,
         sourceLanguage,
-        &preprocessorHandler);
+        &preprocessorHandler,
+        translationUnit);
 
     if (sourceLanguage == SourceLanguage::Unknown)
         sourceLanguage = translationUnit->sourceLanguage;
