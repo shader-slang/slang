@@ -131,6 +131,20 @@ struct ExistentialLoweringContext
         processExtractExistentialElement(inst, 2);
     }
 
+    void processIsNullExistential(IRIsNullExistential* inst)
+    {
+        IRBuilder builderStorage(sharedContext->module);
+        auto builder = &builderStorage;
+        builder->setInsertBefore(inst);
+
+        auto rttiElement = extractTupleElement(builder, inst->getOperand(0), 0);
+        auto isNull = builder->emitNeq(
+            builder->emitGetElement(builder->getUIntType(), rttiElement, 0),
+            builder->getIntValue(builder->getUIntType(), 0));
+        inst->replaceUsesWith(isNull);
+        inst->removeAndDeallocate();
+    }
+
     void processExtractExistentialWitnessTable(IRExtractExistentialWitnessTable* inst)
     {
         processExtractExistentialElement(inst, 1);
@@ -260,6 +274,10 @@ struct ExistentialLoweringContext
         else if (auto extractExistentialWitnessTable = as<IRExtractExistentialWitnessTable>(inst))
         {
             processExtractExistentialWitnessTable(extractExistentialWitnessTable);
+        }
+        else if (auto extractExistentialWitnessTable = as<IRIsNullExistential>(inst))
+        {
+            processIsNullExistential(extractExistentialWitnessTable);
         }
     }
 

@@ -8,6 +8,13 @@
 
 namespace Slang
 {
+enum LoweredOptionalTypeKind
+{
+    Struct,
+    PtrValue,
+    ExistentialValue,
+};
+
 struct OptionalTypeLoweringContext
 {
     IRModule* module;
@@ -15,10 +22,6 @@ struct OptionalTypeLoweringContext
 
     InstWorkList workList;
     InstHashSet workListSet;
-
-    IRGeneric* genericOptionalStructType = nullptr;
-    IRStructKey* valueKey = nullptr;
-    IRStructKey* hasValueKey = nullptr;
 
     OptionalTypeLoweringContext(IRModule* inModule)
         : module(inModule), workList(inModule), workListSet(inModule)
@@ -30,6 +33,9 @@ struct OptionalTypeLoweringContext
         IRType* optionalType = nullptr;
         IRType* valueType = nullptr;
         IRType* loweredType = nullptr;
+        IRStructKey* hasValueKey = nullptr;
+        IRStructKey* valueKey = nullptr;
+        LoweredOptionalTypeKind kind = LoweredOptionalTypeKind::Struct;
     };
     Dictionary<IRInst*, RefPtr<LoweredOptionalTypeInfo>> mapLoweredTypeToOptionalTypeInfo;
     Dictionary<IRInst*, RefPtr<LoweredOptionalTypeInfo>> loweredOptionalTypes;
@@ -42,37 +48,29 @@ struct OptionalTypeLoweringContext
             return type;
     }
 
-    IRInst* getOrCreateGenericOptionalStruct()
+    IRInst* createOptionalStruct(IRType* type, LoweredOptionalTypeInfo* info)
     {
-        if (genericOptionalStructType)
-            return genericOptionalStructType;
         IRBuilder builder(module);
         builder.setInsertInto(module->getModuleInst());
 
-        valueKey = builder.createStructKey();
-        builder.addNameHintDecoration(valueKey, UnownedStringSlice("value"));
-        hasValueKey = builder.createStructKey();
-        builder.addNameHintDecoration(hasValueKey, UnownedStringSlice("hasValue"));
+        info->valueKey = builder.createStructKey();
+        builder.addNameHintDecoration(info->valueKey, UnownedStringSlice("value"));
+        info->hasValueKey = builder.createStructKey();
+        builder.addNameHintDecoration(info->hasValueKey, UnownedStringSlice("hasValue"));
 
-        genericOptionalStructType = builder.emitGeneric();
-        builder.addNameHintDecoration(
-            genericOptionalStructType,
-            UnownedStringSlice("_slang_Optional"));
-
-        builder.setInsertInto(genericOptionalStructType);
-        auto block = builder.emitBlock();
-        auto typeParam = builder.emitParam(builder.getTypeKind());
         auto structType = builder.createStructType();
-        builder.addNameHintDecoration(structType, UnownedStringSlice("_slang_Optional"));
-        builder.createStructField(structType, valueKey, (IRType*)typeParam);
-        builder.createStructField(structType, hasValueKey, builder.getBoolType());
-        builder.setInsertInto(block);
-        builder.emitReturn(structType);
-        genericOptionalStructType->setFullType(builder.getTypeKind());
-        return genericOptionalStructType;
+        StringBuilder sb;
+        sb << "_slang_Optional_";
+        getTypeNameHint(sb, type);
+        builder.addNameHintDecoration(structType, sb.getUnownedSlice());
+        builder.createStructField(structType, info->valueKey, type);
+        builder.createStructField(structType, info->hasValueKey, builder.getBoolType());
+
+        info->kind = LoweredOptionalTypeKind::Struct;
+        return structType;
     }
 
-    bool typeHasNullValue(IRInst* type)
+    bool typeHasNullValue(IRInst* type, LoweredOptionalTypeKind& outKind)
     {
         switch (type->getOp())
         {
@@ -81,15 +79,17 @@ struct OptionalTypeLoweringContext
         case kIROp_NativeStringType:
         case kIROp_PtrType:
         case kIROp_ClassType:
+            outKind = LoweredOptionalTypeKind::PtrValue;
             return true;
         case kIROp_InterfaceType:
-            return isComInterfaceType((IRType*)type);
+            outKind = LoweredOptionalTypeKind::ExistentialValue;
+            return true;
         default:
             return false;
         }
     }
 
-    LoweredOptionalTypeInfo* getLoweredOptionalType(IRBuilder* builder, IRInst* type)
+    LoweredOptionalTypeInfo* getLoweredOptionalType(IRBuilder*, IRInst* type)
     {
         if (auto loweredInfo = loweredOptionalTypes.tryGetValue(type))
             return loweredInfo->Ptr();
@@ -106,17 +106,13 @@ struct OptionalTypeLoweringContext
         auto valueType = optionalType->getValueType();
         info->optionalType = (IRType*)type;
         info->valueType = valueType;
-        if (typeHasNullValue(valueType))
+        if (typeHasNullValue(valueType, info->kind))
         {
             info->loweredType = valueType;
         }
         else
         {
-            auto genericType = getOrCreateGenericOptionalStruct();
-            IRInst* args[] = {valueType};
-            auto specializedType =
-                builder->emitSpecializeInst(builder->getTypeKind(), genericType, 1, args);
-            info->loweredType = (IRType*)specializedType;
+            info->loweredType = (IRType*)createOptionalStruct(valueType, info);
         }
         mapLoweredTypeToOptionalTypeInfo[info->loweredType] = info;
         loweredOptionalTypes[type] = info;
@@ -171,6 +167,12 @@ struct OptionalTypeLoweringContext
             inst->replaceUsesWith(makeStruct);
             inst->removeAndDeallocate();
         }
+        else if (info->kind == LoweredOptionalTypeKind::ExistentialValue)
+        {
+            auto zero = builder->emitDefaultConstruct(info->loweredType);
+            inst->replaceUsesWith(zero);
+            inst->removeAndDeallocate();
+        }
         else
         {
             inst->replaceUsesWith(builder->getNullPtrValue(info->valueType));
@@ -183,13 +185,20 @@ struct OptionalTypeLoweringContext
         auto loweredOptionalTypeInfo = getLoweredOptionalType(builder, optionalInst->getDataType());
         SLANG_ASSERT(loweredOptionalTypeInfo);
         IRInst* result = nullptr;
-        if (loweredOptionalTypeInfo->loweredType != loweredOptionalTypeInfo->valueType)
+        switch (loweredOptionalTypeInfo->kind)
         {
-            result = builder->emitFieldExtract(builder->getBoolType(), optionalInst, hasValueKey);
-        }
-        else
-        {
+        case LoweredOptionalTypeKind::Struct:
+            result = builder->emitFieldExtract(
+                builder->getBoolType(),
+                optionalInst,
+                loweredOptionalTypeInfo->hasValueKey);
+            break;
+        case LoweredOptionalTypeKind::PtrValue:
             result = builder->emitCastPtrToBool(optionalInst);
+            break;
+        case LoweredOptionalTypeKind::ExistentialValue:
+            result = builder->emitIsNullExistential(optionalInst);
+            break;
         }
         return result;
     }
@@ -214,11 +223,13 @@ struct OptionalTypeLoweringContext
 
         auto base = inst->getOptionalOperand();
         auto loweredOptionalTypeInfo = getLoweredOptionalType(builder, base->getDataType());
-        if (loweredOptionalTypeInfo->loweredType != loweredOptionalTypeInfo->valueType)
+        if (loweredOptionalTypeInfo->kind == LoweredOptionalTypeKind::Struct)
         {
             SLANG_ASSERT(loweredOptionalTypeInfo);
-            auto getElement =
-                builder->emitFieldExtract(loweredOptionalTypeInfo->valueType, base, valueKey);
+            auto getElement = builder->emitFieldExtract(
+                loweredOptionalTypeInfo->valueType,
+                base,
+                loweredOptionalTypeInfo->valueKey);
             inst->replaceUsesWith(getElement);
         }
         else

@@ -3331,6 +3331,12 @@ struct IRExtractExistentialWitnessTable : IRInst
     IR_LEAF_ISA(ExtractExistentialWitnessTable);
 };
 
+struct IRIsNullExistential : IRInst
+{
+    IR_LEAF_ISA(IsNullExistential);
+};
+
+
 /* Base class for instructions that track liveness */
 struct IRLiveRangeMarker : IRInst
 {
@@ -4046,6 +4052,9 @@ public:
 
     /// Given an existential value, extract the underlying "real" type
     IRType* emitExtractExistentialType(IRInst* existentialValue);
+
+    /// Given an existential value, return if it is empty/null.
+    IRInst* emitIsNullExistential(IRInst* existentialValue);
 
     /// Given an existential value, extract the witness table showing how the value conforms to the
     /// existential type.

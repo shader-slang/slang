@@ -4063,6 +4063,7 @@ struct ISession : public ISlangUnknown
         ISlangBlob** outNameBlob) = 0;
 
     /** Get the sequential ID used to identify a type witness in a dynamic object.
+        The sequential ID is part of the RTTI bytes returned by `getDynamicObjectRTTIBytes`.
      */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessSequentialID(
         slang::TypeReflection* type,
@@ -4124,6 +4125,37 @@ struct ISession : public ISlangUnknown
         const char* path,
         const char* string,
         slang::IBlob** outDiagnostics = nullptr) = 0;
+
+
+    /** Get the 16-byte RTTI header to fill into a dynamic object.
+        This header is used to identify the type of the object for dynamic dispatch purpose.
+        For example, given the following shader:
+
+        ```slang
+        [anyValueSize(32)] dyn interface IFoo { int eval(); }
+        struct Impl : IFoo { int eval() { return 1; } }
+
+        ConstantBuffer<dyn IFoo> cb0;
+
+        [numthreads(1,1,1)
+        void main()
+        {
+            cb0.eval();
+        }
+        ```
+
+        The constant buffer `cb0` should be filled with 16+32=48 bytes of data, where the first
+        16 bytes should be the RTTI bytes returned by calling `getDynamicObjectRTTIBytes(type_Impl,
+        type_IFoo)`, and the rest 32 bytes should hold the actual data of the dynamic object (in
+        this case, fields in the `Impl` type).
+
+        `bufferSizeInBytes` must be greater than 16.
+     */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDynamicObjectRTTIBytes(
+        slang::TypeReflection* type,
+        slang::TypeReflection* interfaceType,
+        uint32_t* outRTTIDataBuffer,
+        uint32_t bufferSizeInBytes) = 0;
 };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()

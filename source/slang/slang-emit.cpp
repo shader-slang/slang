@@ -778,9 +778,6 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    if (requiredLoweringPassSet.optionalType)
-        lowerOptionalType(irModule, sink);
-
     switch (target)
     {
     case CodeGenTarget::CUDASource:
@@ -952,6 +949,9 @@ Result linkAndOptimizeIR(
     // result structure are generated.
     if (requiredLoweringPassSet.resultType)
         lowerResultType(irModule, sink);
+
+    if (requiredLoweringPassSet.optionalType)
+        lowerOptionalType(irModule, sink);
 
     // Report checkpointing information
     if (codeGenContext->shouldReportCheckpointIntermediates())

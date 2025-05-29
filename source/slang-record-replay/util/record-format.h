@@ -111,7 +111,7 @@ enum ApiCallId : uint32_t
     ISession_getLoadedModuleCount = makeApiCallId(Class_ISession, 0x0011),
     ISession_getLoadedModule = makeApiCallId(Class_ISession, 0x0012),
     ISession_isBinaryModuleUpToDate = makeApiCallId(Class_ISession, 0x0013),
-
+    ISession_getDynamicObjectRTTIBytes = makeApiCallId(Class_ISession, 0x0014),
 
     IModule_findEntryPointByName = makeApiCallId(Class_IModule, 0x0001),
     IModule_getDefinedEntryPointCount = makeApiCallId(Class_IModule, 0x0002),

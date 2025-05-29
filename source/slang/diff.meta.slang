@@ -1396,6 +1396,45 @@ extension Array<T, N> : IDifferentiablePtrType
     typedef Array<T.Differential, N> Differential;
 }
 
+__generic<T:IDifferentiable>
+extension Optional<T> : IDifferentiable
+{
+    typedef Optional<T.Differential> Differential;
+
+    [__unsafeForceInlineEarly]
+    static Differential dzero()
+    {
+        return Optional<T.Differential>(T.dzero());
+    }
+
+    [__unsafeForceInlineEarly]
+    static Differential dadd(Differential a, Differential b)
+    {
+        if (!a.hasValue)
+            return b;
+        if (b.hasValue)
+            return T.dadd(a.value, b.value);
+        else
+            return a;
+    }
+
+    __generic<U : __BuiltinRealType>
+    [__unsafeForceInlineEarly]
+    static Differential dmul(U a, Differential b)
+    {
+        if (b.hasValue)
+            return Optional<T.Differential>(T.dmul<U>(a, b.value));
+        else
+            return b;
+    }
+}
+
+__generic<T : IDifferentiablePtrType>
+extension Optional<T> : IDifferentiablePtrType
+{
+    typedef Optional<T.Differential> Differential;
+}
+
 __generic<each T : IDifferentiable>
 extension Tuple<T> : IDifferentiable
 {
