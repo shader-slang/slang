@@ -604,7 +604,7 @@ void static_assert(constexpr bool condition, NativeString errorMessage);
 /// 
 __magic_type(DifferentiableType)
 [KnownBuiltin("IDifferentiable")]
-interface IDifferentiable
+dyn interface IDifferentiable
 {
     // Note: the compiler implementation requires the `Differential` associated type to be defined
     // before anything else.

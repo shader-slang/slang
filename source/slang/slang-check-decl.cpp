@@ -34,23 +34,35 @@ static bool isAssociatedTypeDecl(Decl* decl)
     return false;
 }
 
-static bool isSlang2025OrOlder(SemanticsVisitor* visitor)
+static bool isSlang2025(SemanticsVisitor* visitor)
 {
-    return visitor->getShared()->m_module->getModuleDecl()->languageVersion <=
+    return visitor->getShared()->m_module->getModuleDecl()->languageVersion ==
            SLANG_LANGUAGE_VERSION_2025;
 }
 
+static bool isSlang2026OrOlder(SemanticsVisitor* visitor)
+{
+    return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
+           SLANG_LANGUAGE_VERSION_2026;
+}
+    // Not 2025 **or older** since spec does not specify this.
+// This works fine since older slang revisions do not have `dyn` on vardecl's by default.
 static bool allowExperimentalDynamicDispatch(
     SemanticsVisitor* visitor,
     CompilerOptionSet& optionSet)
 {
     return optionSet.getBoolOption(CompilerOptionName::EnableExperimentalDynamicDispatch) ||
-           isSlang2025OrOlder(visitor);
+           isSlang2025(visitor);
 }
 
 bool isImplicitDyn(SemanticsVisitor* visitor)
 {
-    return isSlang2025OrOlder(visitor);
+    return isSlang2025(visitor);
+}
+
+bool isImplicitSome(SemanticsVisitor* visitor)
+{
+    return isSlang2026OrOlder(visitor);
 }
 
 static Type* createSomeTypeDeclType(ASTBuilder* astBuilder, TypeExp type, SourceLoc loc)
@@ -123,7 +135,7 @@ static void forceInterfaceQualifierToType(
 
         if (isImplicitDyn(visitor))
             addModifier(decl, astBuilder->create<DynModifier>());
-        else
+        else if (isImplicitSome(visitor))
             type.type = createSomeTypeDeclType(
                 astBuilder,
                 type,
@@ -138,14 +150,6 @@ static void assignInterfaceDefinitionDynModifier(SemanticsDeclVisitorBase* visit
 
     // AnyValueSize means we are dyn
     if (interfaceDecl->hasModifier<AnyValueSizeAttribute>())
-    {
-        addModifier(interfaceDecl, visitor->getASTBuilder()->create<DynModifier>());
-        return;
-    }
-
-    // If legacy, always add `dyn` modifier since it doesn't matter interfaces should always be able
-    // to dynamic dispatch by default.
-    if (isSlang2025OrOlder(visitor))
     {
         addModifier(interfaceDecl, visitor->getASTBuilder()->create<DynModifier>());
         return;
@@ -297,6 +301,7 @@ static void validateSomeAndDynFuncDeclUsage(
 
     DiagnosticSink* sink = visitor->getSink();
     
+    // given 'dyn':
     // not allowed mutating attribute
     // not allowed differentiable attribute
     for (auto modifier : funcDecl->modifiers)
