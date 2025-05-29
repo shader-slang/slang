@@ -6,7 +6,7 @@ void ParameterRecorder::recordStruct(SlangGlobalSessionDesc const& desc)
 {
     recordUint32(desc.structureSize);
     recordUint32(desc.apiVersion);
-    recordUint32(desc.languageVersion);
+    recordUint32(desc.minLanguageVersion);
     recordUint32(desc.enableGLSL);
 }
 

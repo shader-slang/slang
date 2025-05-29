@@ -22749,14 +22749,14 @@ T __castDescriptorHandleToResource<T:IOpaqueDescriptor>(DescriptorHandle<T> ptr)
 
 public enum BindlessDescriptorOptions
 {
-    None = 0, /// Bind assuming regular binding model rules.
-    VkMutable = 1, /// Bind assuming `VK_EXT_mutable_descriptor_type` without mutable `AccelerationStructure` binding support.
+    None = 0,      /// Bind assuming regular binding model rules.
+    VkMutable = 1, /// **Current Default** Bind assuming `VK_EXT_mutable_descriptor_type`
 }
 
 /// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
 /// to a descriptor object.
 [ForceInline]
-T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.None)
+T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
 {
     __target_switch
     {

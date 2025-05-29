@@ -4668,6 +4668,29 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitParenExpr(ParenExpr* expr) { return lowerSubExpr(expr->base); }
 
+    LoweredValInfo visitTupleExpr(TupleExpr* expr)
+    {
+        List<IRInst*> elements;
+        for (auto element : expr->elements)
+        {
+            auto elementVal = getSimpleVal(context, lowerSubExpr(element));
+            if (auto makeValPack = as<IRMakeValuePack>(elementVal))
+            {
+                // If the element is a value pack, we need to flatten it out
+                // into the tuple.
+                for (UInt i = 0; i < makeValPack->getOperandCount(); ++i)
+                {
+                    elements.add(makeValPack->getOperand(i));
+                }
+                continue;
+            }
+            elements.add(elementVal);
+        }
+        auto irMakeTuple =
+            getBuilder()->emitMakeTuple((UInt)elements.getCount(), elements.getBuffer());
+        return LoweredValInfo::simple(irMakeTuple);
+    }
+
     LoweredValInfo visitPackExpr(PackExpr* expr)
     {
         List<IRInst*> irArgs;

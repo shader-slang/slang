@@ -148,6 +148,14 @@ public:
 
     bool visitParenExpr(ParenExpr* expr) { return dispatchIfNotNull(expr->base); }
 
+    bool visitTupleExpr(TupleExpr* expr)
+    {
+        for (auto element : expr->elements)
+            if (dispatchIfNotNull(element))
+                return true;
+        return false;
+    }
+
     bool visitBuiltinCastExpr(BuiltinCastExpr* expr) { return dispatchIfNotNull(expr->base); }
 
     bool visitAssignExpr(AssignExpr* expr)
