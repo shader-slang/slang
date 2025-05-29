@@ -3,6 +3,7 @@
 
 #include "../external/lua/lapi.h"
 #include "../external/lua/lauxlib.h"
+#undef ispow2
 #include "compiler-core/slang-source-loc.h"
 #include "core/slang-list.h"
 #include "core/slang-string.h"
