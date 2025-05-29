@@ -1885,7 +1885,6 @@ bool SemanticsVisitor::tryCoerceSomeType(
     ConversionCost* outCost)
 {
     // basic restrictions
-
     if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(toType))
     {
         // if `some T = some U` `some T = unbound_some U`

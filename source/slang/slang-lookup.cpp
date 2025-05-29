@@ -644,9 +644,11 @@ static void _lookUpMembersInSuperTypeImpl(
     }
 
     // Default case: no dereference needed
+
     if (auto declRefType = as<DeclRefType>(superType))
     {
         auto declRef = declRefType->getDeclRef();
+    
         _lookUpMembersInSuperTypeDeclImpl(
             astBuilder,
             name,
