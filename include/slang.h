@@ -1021,6 +1021,9 @@ typedef uint32_t SlangSizeT;
 
         SkipDownstreamLinking, // bool, experimental
         DumpModule,
+
+        EnableExperimentalDynamicDispatch, // bool, experimental
+        LanguageVersion,                   // intValue0: SlangLanguageVersion
         CountOf,
     };
 
@@ -4504,7 +4507,12 @@ struct SpecializationArg
 
 enum SlangLanguageVersion
 {
-    SLANG_LANGUAGE_VERSION_2025 = 2025
+    SLANG_LANGUAGE_VERSION_UNKNOWN = 0,
+    SLANG_LANGUAGE_VERSION_LEGACY = 2018,
+    SLANG_LANGUAGE_VERSION_2025 = 2025,
+    SLANG_LANGUAGE_VERSION_2026 = 2026,
+    SLANG_LANGAUGE_VERSION_DEFAULT = SLANG_LANGUAGE_VERSION_LEGACY,
+    SLANG_LANGUAGE_VERSION_LATEST = SLANG_LANGUAGE_VERSION_2026,
 };
 
 
@@ -4518,8 +4526,8 @@ struct SlangGlobalSessionDesc
     /// Slang API version.
     uint32_t apiVersion = SLANG_API_VERSION;
 
-    /// Slang language version.
-    uint32_t languageVersion = SLANG_LANGUAGE_VERSION_2025;
+    /// Specify the oldest Slang language version that any sessions will use.
+    uint32_t minLanguageVersion = SLANG_LANGUAGE_VERSION_2025;
 
     /// Whether to enable GLSL support.
     bool enableGLSL = false;

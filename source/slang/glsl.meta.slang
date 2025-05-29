@@ -159,6 +159,9 @@ public property uint3 gl_WorkGroupSize
 public in int gl_InvocationID : SV_GSInstanceID;
 
 internal in int __sv_InstanceIndex : SV_InstanceID;
+internal in int __sv_VertexIndex : SV_VertexID;
+internal in int __sv_VulkanInstanceIndex : SV_VulkanInstanceID;
+internal in int __sv_VulkanVertexIndex : SV_VulkanVertexID;
 
 // SPIRV InstanceIndex builtin for vertex shader
 public property int gl_InstanceIndex
@@ -168,24 +171,42 @@ public property int gl_InstanceIndex
     {
         __target_switch
         {
+        case glsl:
+        case spirv:
+        case metal:
+        case wgsl:
+            return __sv_VulkanInstanceIndex;
         default:
             return __sv_InstanceIndex;
-        case glsl:
-            __intrinsic_asm "gl_InstanceIndex";
-        case spirv:
-            return spirv_asm {
-                result:$$int = OpLoad builtin(InstanceIndex:int);
-            };
         }
     }
 }
+
+// SPIRV VertexIndex builtin for vertex shader
+public property int gl_VertexIndex
+{
+    [require(vertex)]
+    get
+    {
+        __target_switch
+        {
+        case glsl:
+        case spirv:
+        case metal:
+        case wgsl:
+            return __sv_VulkanVertexIndex;
+        default:
+            return __sv_VertexIndex;
+        }
+    }
+}
+
 public in bool gl_FrontFacing : SV_IsFrontFace;
 
 // TODO: define overload for geometry stage.
 public in int gl_Layer : SV_RenderTargetArrayIndex;
 
 public in int gl_SampleID : SV_SampleIndex;
-public in int gl_VertexIndex : SV_VertexID;
 public in int gl_ViewIndex : SV_ViewID;
 public in int gl_ViewportIndex : SV_ViewportArrayIndex;
 public in int gl_BaseVertex : SV_StartVertexLocation;
@@ -8259,6 +8280,7 @@ public vector<T,N> subgroupQuadSwapDiagonal(vector<T,N> value)
 // GL_KHR_shader_subgroup_rotate
 
 __generic<T : __BuiltinType>
+[ForceInline]
 [require(glsl_metal_spirv, subgroup_rotate)]
 public T subgroupRotate(T value, uint delta)
 {
@@ -8266,6 +8288,7 @@ public T subgroupRotate(T value, uint delta)
 }
 
 __generic<T : __BuiltinType, let N : int>
+[ForceInline]
 [require(glsl_metal_spirv, subgroup_rotate)]
 public vector<T, N> subgroupRotate(vector<T, N> value, uint delta)
 {
@@ -8273,6 +8296,7 @@ public vector<T, N> subgroupRotate(vector<T, N> value, uint delta)
 }
 
 __generic<T : __BuiltinType>
+[ForceInline]
 [require(glsl_spirv, subgroup_rotate)]
 public T subgroupClusteredRotate(T value, uint delta, constexpr uint clusterSize)
 {
@@ -8281,11 +8305,359 @@ public T subgroupClusteredRotate(T value, uint delta, constexpr uint clusterSize
 }
 
 __generic<T : __BuiltinType, let N : int>
+[ForceInline]
 [require(glsl_spirv, subgroup_rotate)]
 public vector<T, N> subgroupClusteredRotate(vector<T, N> value, uint delta, constexpr uint clusterSize)
 {
     return WaveClusteredRotate(value, delta, clusterSize);
 }
+
+
+// GL_NV_shader_subgroup_partitioned
+
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedAddNV(T value, uvec4 ballot)
+{
+    return WaveMultiSum(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedAddNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiSum(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedMulNV(T value, uvec4 ballot)
+{
+    return WaveMultiProduct(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedMulNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiProduct(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedMinNV(T value, uvec4 ballot)
+{
+    return WaveMultiMin(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType, let N: int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedMinNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiMin(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedMaxNV(T value, uvec4 ballot)
+{
+    return WaveMultiMax(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedMaxNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiMax(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedAndNV(T value, uvec4 ballot)
+{
+    return WaveMultiBitAnd(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedAndNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiBitAnd(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedOrNV(T value, uvec4 ballot)
+{
+    return WaveMultiBitOr(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedOrNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiBitOr(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedXorNV(T value, uvec4 ballot)
+{
+    return WaveMultiBitXor(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedXorNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiBitXor(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedInclusiveAddNV(T value, uvec4 ballot)
+{
+    return WaveMultiPrefixInclusiveSum(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedInclusiveAddNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiPrefixInclusiveSum(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedInclusiveMulNV(T value, uvec4 ballot)
+{
+    return WaveMultiPrefixInclusiveProduct(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedInclusiveMulNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiPrefixInclusiveProduct(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedInclusiveMinNV(T value, uvec4 ballot)
+{
+    return WaveMultiPrefixInclusiveMin(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedInclusiveMinNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiPrefixInclusiveMin(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedInclusiveMaxNV(T value, uvec4 ballot)
+{
+    return WaveMultiPrefixInclusiveMax(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedInclusiveMaxNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiPrefixInclusiveMax(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedInclusiveAndNV(T value, uvec4 ballot)
+{
+    return WaveMultiPrefixInclusiveBitAnd(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedInclusiveAndNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiPrefixInclusiveBitAnd(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedInclusiveOrNV(T value, uvec4 ballot)
+{
+    return WaveMultiPrefixInclusiveBitOr(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedInclusiveOrNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiPrefixInclusiveBitOr(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedInclusiveXorNV(T value, uvec4 ballot)
+{
+    return WaveMultiPrefixInclusiveBitXor(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedInclusiveXorNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiPrefixInclusiveBitXor(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedExclusiveAddNV(T value, uvec4 ballot)
+{
+    return WaveMultiPrefixExclusiveSum(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedExclusiveAddNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiPrefixExclusiveSum(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedExclusiveMulNV(T value, uvec4 ballot)
+{
+    return WaveMultiPrefixExclusiveProduct(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedExclusiveMulNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiPrefixExclusiveProduct(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedExclusiveMinNV(T value, uvec4 ballot)
+{
+    return WaveMultiPrefixExclusiveMin(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedExclusiveMinNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiPrefixExclusiveMin(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedExclusiveMaxNV(T value, uvec4 ballot)
+{
+    return WaveMultiPrefixExclusiveMax(value, ballot);
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedExclusiveMaxNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiPrefixExclusiveMax(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedExclusiveAndNV(T value, uvec4 ballot)
+{
+    return WaveMultiPrefixExclusiveBitAnd(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedExclusiveAndNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiPrefixExclusiveBitAnd(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedExclusiveOrNV(T value, uvec4 ballot)
+{
+    return WaveMultiPrefixExclusiveBitOr(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedExclusiveOrNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiPrefixExclusiveBitOr(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public T subgroupPartitionedExclusiveXorNV(T value, uvec4 ballot)
+{
+    return WaveMultiPrefixExclusiveBitXor(value, ballot);
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public vector<T, N> subgroupPartitionedExclusiveXorNV(vector<T, N> value, uvec4 ballot)
+{
+    return WaveMultiPrefixExclusiveBitXor(value, ballot);
+}
+
+__generic<T : __BuiltinType>
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+public uvec4 subgroupPartitionNV(T value)
+{
+    return WaveMatch(value);
+}
+
 
 //// GLSL atomic
 

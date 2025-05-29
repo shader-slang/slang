@@ -1028,6 +1028,20 @@ public:
         return result;
     }
 
+    template<typename T>
+    T* FindOuterStmt(Stmt* searchUntil = nullptr)
+    {
+        for (auto outerStmtInfo = m_outerStmts; outerStmtInfo && outerStmtInfo->stmt != searchUntil;
+             outerStmtInfo = outerStmtInfo->next)
+        {
+            auto outerStmt = outerStmtInfo->stmt;
+            auto found = as<T>(outerStmt);
+            if (found)
+                return found;
+        }
+        return nullptr;
+    }
+
     // Setup the flag to indicate disabling the short-circuiting evaluation
     // for the logical expressions associted with the subcontext
     SemanticsContext disableShortCircuitLogicalExpr()
@@ -1450,6 +1464,15 @@ public:
     /// on each declaration in the group.
     ///
     void ensureDeclBase(DeclBase* decl, DeclCheckState state, SemanticsContext* baseContext);
+
+    // Check if `lambdaStruct` can be coerced to `funcType`, if so returns the coerced
+    // expression in `outExpr`. The coercion is only valid if the lambda struct
+    // does not contain any captures.
+    bool tryCoerceLambdaToFuncType(
+        DeclRef<StructDecl> lambdaStruct,
+        FuncType* funcType,
+        Expr* fromExpr,
+        Expr** outExpr);
 
     // A "proper" type is one that can be used as the type of an expression.
     // Put simply, it can be a concrete type like `int`, or a generic
@@ -2858,6 +2881,8 @@ public:
     void addVisibilityModifier(Decl* decl, DeclVisibility vis);
 
     void checkRayPayloadStructFields(StructDecl* structDecl);
+
+    CatchStmt* findMatchingCatchStmt(Type* errorType);
 };
 
 
@@ -2894,6 +2919,8 @@ public:
     Expr* visitIndexExpr(IndexExpr* subscriptExpr);
 
     Expr* visitParenExpr(ParenExpr* expr);
+
+    Expr* visitTupleExpr(TupleExpr* expr);
 
     Expr* visitAssignExpr(AssignExpr* expr);
 
@@ -3002,9 +3029,6 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
 
     void checkStmt(Stmt* stmt);
 
-    template<typename T>
-    T* FindOuterStmt(Stmt* searchUntil = nullptr);
-
     Stmt* findOuterStmtWithLabel(Name* label);
 
     void visitDeclStmt(DeclStmt* stmt);
@@ -3048,6 +3072,10 @@ struct SemanticsStmtVisitor : public SemanticsVisitor, StmtVisitor<SemanticsStmt
     void visitReturnStmt(ReturnStmt* stmt);
 
     void visitDeferStmt(DeferStmt* stmt);
+
+    void visitThrowStmt(ThrowStmt* stmt);
+
+    void visitCatchStmt(CatchStmt* stmt);
 
     void visitWhileStmt(WhileStmt* stmt);
 

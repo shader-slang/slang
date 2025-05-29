@@ -939,11 +939,25 @@ struct LoweredElementTypeContext
                 }
             }
             if (auto structBuffer = as<IRHLSLStructuredBufferTypeBase>(globalInst))
+            {
                 elementType = structBuffer->getElementType();
+                auto config = getTypeLoweringConfigForBuffer(target, structBuffer);
+
+                // Create size and alignment decoration for potential use
+                // in`StructuredBufferGetDimensions`.
+                IRSizeAndAlignment sizeAlignment;
+                getSizeAndAlignment(
+                    target->getOptionSet(),
+                    config.layoutRule,
+                    elementType,
+                    &sizeAlignment);
+                SLANG_UNUSED(sizeAlignment);
+            }
             else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
                 elementType = constBuffer->getElementType();
             else if (auto storageBuffer = as<IRGLSLShaderStorageBufferType>(globalInst))
                 elementType = storageBuffer->getElementType();
+
             if (as<IRTextureBufferType>(globalInst))
                 continue;
             if (!as<IRStructType>(elementType) && !as<IRMatrixType>(elementType) &&

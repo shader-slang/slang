@@ -1,4 +1,5 @@
 // slang-check-conversion.cpp
+#include "slang-ast-synthesis.h"
 #include "slang-check-impl.h"
 
 // This file contains semantic-checking logic for dealing
@@ -96,7 +97,17 @@ bool SemanticsVisitor::shouldUseInitializerDirectly(Type* toType, Expr* fromExpr
     // we want to check for is whether a direct initialization
     // is possible (a type conversion exists).
     //
-    return canCoerce(toType, fromExpr->type, fromExpr);
+    ConversionCost cost;
+    if (canCoerce(toType, fromExpr->type, fromExpr, &cost))
+    {
+        if (cost >= kConversionCost_Explicit)
+        {
+            return false;
+        }
+        return true;
+    }
+
+    return false;
 }
 
 bool SemanticsVisitor::_readValueFromInitializerList(
@@ -235,7 +246,8 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
 
     // 1. It has to be basic scalar, vector or matrix type, or user-defined struct.
     if (as<VectorExpressionType>(type) || as<MatrixExpressionType>(type) ||
-        as<BasicExpressionType>(type) || isDeclRefTypeOf<EnumDecl>(type).getDecl())
+        as<BasicExpressionType>(type) || isDeclRefTypeOf<EnumDecl>(type).getDecl() ||
+        as<PtrType>(type))
         return cacheResult(true);
 
 
@@ -525,6 +537,19 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         }
         else
         {
+            auto isLinkTimeVal =
+                as<TypeCastIntVal>(toElementCount) || as<DeclRefIntVal>(toElementCount) ||
+                as<PolynomialIntVal>(toElementCount) || as<FuncCallIntVal>(toElementType);
+            if (isLinkTimeVal)
+            {
+                auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
+                defaultConstructExpr->loc = fromInitializerListExpr->loc;
+                defaultConstructExpr->type = QualType(toType);
+
+                *outToExpr = defaultConstructExpr;
+                return true;
+            }
+
             // We don't know the element count statically,
             // so what are we supposed to be doing?
             //
@@ -701,12 +726,26 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         auto toRowType =
             createVectorType(toMatrixType->getElementType(), toMatrixType->getColumnCount());
 
-        if (auto constRowCount = as<ConstantIntVal>(toMatrixType->getRowCount()))
+        auto rowCountIntVal = toMatrixType->getRowCount();
+        if (auto constRowCount = as<ConstantIntVal>(rowCountIntVal))
         {
             rowCount = (UInt)constRowCount->getValue();
         }
         else
         {
+            auto isLinkTimeVal =
+                as<TypeCastIntVal>(rowCountIntVal) || as<DeclRefIntVal>(rowCountIntVal) ||
+                as<PolynomialIntVal>(rowCountIntVal) || as<FuncCallIntVal>(rowCountIntVal);
+            if (isLinkTimeVal)
+            {
+                auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
+                defaultConstructExpr->loc = fromInitializerListExpr->loc;
+                defaultConstructExpr->type = QualType(toType);
+
+                *outToExpr = defaultConstructExpr;
+                return true;
+            }
+
             // We don't know the element count statically,
             // so what are we supposed to be doing?
             //
@@ -1388,6 +1427,21 @@ bool SemanticsVisitor::_coerce(
         }
     }
 
+    if (auto toFuncType = as<FuncType>(toType))
+    {
+        if (auto fromLambdaType = isDeclRefTypeOf<StructDecl>(fromType))
+        {
+            if (tryCoerceLambdaToFuncType(fromLambdaType, toFuncType, fromExpr, outToExpr))
+            {
+                if (outCost)
+                {
+                    *outCost = kConversionCost_LambdaToFunc;
+                }
+                return true;
+            }
+        }
+    }
+
     // A type is always convertible to any of its supertypes.
     //
     if (auto witness = tryGetSubtypeWitness(fromType, toType))
@@ -1528,7 +1582,6 @@ bool SemanticsVisitor::_coerce(
             *outCost = subCost + kConversionCost_ImplicitDereference;
         return true;
     }
-
 
     // The main general-purpose approach for conversion is
     // using suitable marked initializer ("constructor")
@@ -1811,6 +1864,137 @@ bool SemanticsVisitor::_coerce(
         getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{});
     }
     return _failedCoercion(toType, outToExpr, fromExpr, sink);
+}
+
+bool SemanticsVisitor::tryCoerceLambdaToFuncType(
+    DeclRef<StructDecl> lambdaStruct,
+    FuncType* toFuncType,
+    Expr* fromExpr,
+    Expr** outToExpr)
+{
+    FuncDecl* synStaticFunc = nullptr;
+    FuncDecl* invokeFunc = nullptr;
+
+    // First, check if `lambdaStruct` contains any fields.
+    // If it does, we can't convert it to a function type.
+    auto operatorName = getName("()");
+
+    for (auto member : lambdaStruct.getDecl()->members)
+    {
+        if (auto field = as<VarDecl>(member))
+        {
+            if (!isEffectivelyStatic(field))
+                return false;
+        }
+        else if (auto inheritanceDecl = as<InheritanceDecl>(member))
+        {
+            // If the struct inherits from anything that is not an interface,
+            // we will consider it to be non-empty and not convertible to a function type.
+            if (!isDeclRefTypeOf<InterfaceDecl>(inheritanceDecl->base.type))
+                return false;
+        }
+        else if (auto funcDecl = as<FuncDecl>(member))
+        {
+            // If the struct already contains a synthesized static invoke member, use it.
+            if (isEffectivelyStatic(funcDecl) &&
+                funcDecl->findModifier<SynthesizedStaticLambdaFuncModifier>() &&
+                funcDecl->returnType.type == toFuncType->getResultType())
+                synStaticFunc = funcDecl;
+            if (funcDecl->getName() == operatorName)
+            {
+                // If we found operator(), keep it for later.
+                invokeFunc = funcDecl;
+            }
+        }
+    }
+
+    if (!invokeFunc)
+    {
+        return false;
+    }
+
+    auto invokeFuncDeclRef = m_astBuilder->getMemberDeclRef(lambdaStruct, invokeFunc);
+
+    // Verify that the function parameter types are exactly the same as toFuncType.
+    if (invokeFunc->getParameters().getCount() != toFuncType->getParamCount())
+    {
+        return false;
+    }
+    Index paramId = 0;
+    for (auto param : invokeFunc->getParameters())
+    {
+        auto paramType = getParamTypeWithDirectionWrapper(m_astBuilder, param);
+        auto toParamType = toFuncType->getParamType(paramId);
+        if (!paramType->equals(toParamType))
+        {
+            return false;
+        }
+        paramId++;
+    }
+
+    // Verify that the return type of the function is convertible to the function type.
+    if (!canCoerce(toFuncType->getResultType(), invokeFunc->returnType.type, nullptr))
+    {
+        return false;
+    }
+
+    if (!synStaticFunc)
+    {
+        // If the struct doesn't contain a static method for operator(), we try to synthesize one.
+        synStaticFunc = m_astBuilder->create<FuncDecl>();
+        synStaticFunc->nameAndLoc.name = getName("__syn_static_invoke");
+        addModifier(synStaticFunc, m_astBuilder->create<SynthesizedStaticLambdaFuncModifier>());
+        addModifier(synStaticFunc, m_astBuilder->create<HLSLStaticModifier>());
+        addModifier(synStaticFunc, m_astBuilder->create<SynthesizedModifier>());
+
+        synStaticFunc->ownedScope = m_astBuilder->create<Scope>();
+        synStaticFunc->ownedScope->containerDecl = synStaticFunc;
+        synStaticFunc->ownedScope->parent = getScope(lambdaStruct.getDecl());
+        synStaticFunc->parentDecl = lambdaStruct.getDecl();
+        synStaticFunc->returnType.type = toFuncType->getResultType();
+
+        List<Expr*> synArgs;
+        addRequiredParamsToSynthesizedDecl(invokeFuncDeclRef, synStaticFunc, synArgs);
+        ThisExpr* synThis = nullptr;
+        addModifiersToSynthesizedDecl(nullptr, invokeFuncDeclRef, synStaticFunc, synThis);
+
+        ASTSynthesizer synth(m_astBuilder, getNamePool());
+        synth.pushContainerScope(synStaticFunc);
+        auto blockStmt = m_astBuilder->create<BlockStmt>();
+        synStaticFunc->body = blockStmt;
+        auto seqStmt = synth.pushSeqStmtScope();
+        blockStmt->body = seqStmt;
+
+        synth.pushVarScope();
+
+        // emit `return LambdaStructType().operator()(args...)`.
+        auto tempThis = synth.emitInvokeExpr(
+            synth.emitStaticTypeExpr(DeclRefType::create(m_astBuilder, lambdaStruct)),
+            List<Expr*>());
+        tempThis = dispatchExpr(tempThis, *this);
+
+        Expr* operatorRefExpr = synth.emitMemberExpr(toFuncType, tempThis, invokeFuncDeclRef);
+
+        auto invokeExpr = synth.emitInvokeExpr(operatorRefExpr, _Move(synArgs));
+        invokeExpr = dispatchExpr(invokeExpr, *this);
+        auto resultValue =
+            coerce(CoercionSite::Return, toFuncType->getResultType(), invokeExpr, getSink());
+        synth.emitReturnStmt(resultValue);
+
+        lambdaStruct.getDecl()->addMember(synStaticFunc);
+    }
+
+    // If we have a static method for operator(), we can convert the lambda to a function type.
+    if (outToExpr)
+    {
+        VarExpr* expr = m_astBuilder->create<VarExpr>();
+        expr->loc = fromExpr->loc;
+        expr->declRef = m_astBuilder->getMemberDeclRef(lambdaStruct, synStaticFunc);
+        expr->type = QualType(toFuncType);
+        expr->checked = true;
+        *outToExpr = expr;
+    }
+    return true;
 }
 
 bool SemanticsVisitor::canCoerce(

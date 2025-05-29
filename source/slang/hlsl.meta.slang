@@ -180,7 +180,7 @@ struct ByteAddressBuffer
         {
         case hlsl: __intrinsic_asm ".Load";
         default:
-            return __byteAddressBufferLoad<uint>(this, location, 0);
+            return __byteAddressBufferLoad<uint>(this, uint(location), 0);
         }
     }
 
@@ -213,7 +213,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint2 Load2(int location)
+    uint2 Load2(uint location)
     {
         __target_switch
         {
@@ -226,7 +226,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint2 Load2(int location, int alignment)
+    uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -239,7 +239,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
-    uint2 Load2(int location, out uint status)
+    uint2 Load2(uint location, out uint status)
     {
         __target_switch
         {
@@ -255,7 +255,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint2 Load2Aligned(int location)
+    uint2 Load2Aligned(uint location)
     {
         __target_switch
         {
@@ -282,7 +282,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint3 Load3(int location)
+    uint3 Load3(uint location)
     {
         __target_switch
         {
@@ -295,7 +295,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint3 Load3(int location, int alignment)
+    uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -308,7 +308,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
-    uint3 Load3(int location, out uint status)
+    uint3 Load3(uint location, out uint status)
     {
         __target_switch
         {
@@ -323,7 +323,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint3 Load3Aligned(int location)
+    uint3 Load3Aligned(uint location)
     {
         __target_switch
         {
@@ -349,7 +349,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint4 Load4(int location)
+    uint4 Load4(uint location)
     {
         __target_switch
         {
@@ -362,7 +362,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint4 Load4(int location, int alignment)
+    uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -375,7 +375,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
-    uint4 Load4(int location, out uint status)
+    uint4 Load4(uint location, out uint status)
     {
         __target_switch
         {
@@ -390,7 +390,7 @@ struct ByteAddressBuffer
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
-    uint4 Load4Aligned(int location)
+    uint4 Load4Aligned(uint location)
     {
         __target_switch
         {
@@ -402,14 +402,14 @@ struct ByteAddressBuffer
 
     [__readNone]
     [ForceInline]
-    T Load<T>(int location)
+    T Load<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
     }
 
     [__readNone]
     [ForceInline]
-    T Load<T>(int location, int alignment)
+    T LoadAligned<T>(uint location, uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
@@ -421,7 +421,7 @@ struct ByteAddressBuffer
     ///Currently, this function only supports when `T` is scalar, vector or matrix type.
     [__readNone]
     [ForceInline]
-    T LoadAligned<T>(int location)
+    T LoadAligned<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
     }
@@ -4785,23 +4785,23 @@ uint64_t __asuint64(uint2 i)
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer)]
-T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, int offset, int alignment);
+T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, uint offset, uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, int offset, int alignment);
+T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, uint offset, uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
-T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, int alignment);
+T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, int offset, int alignment, T value);
+void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, uint offset, uint alignment, T value);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
 [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, int offset, int alignment, T value);
+void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment, T value);
 
 __intrinsic_op($(kIROp_GetUntypedBufferPtr))
 [require(spirv, byteaddressbuffer)]
@@ -5053,7 +5053,7 @@ struct $(item.name)
         {
         case hlsl: __intrinsic_asm ".Load";
         default:
-            return __byteAddressBufferLoad<uint>(this, location, 0);
+            return __byteAddressBufferLoad<uint>(this, uint(location), 0);
         }
     }
 
@@ -5086,7 +5086,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint2 Load2(int location)
+    uint2 Load2(uint location)
     {
         __target_switch
         {
@@ -5099,7 +5099,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint2 Load2(int location, int alignment)
+    uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -5116,7 +5116,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint2 Load2Aligned(int location)
+    uint2 Load2Aligned(uint location)
     {
         __target_switch
         {
@@ -5129,7 +5129,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
-    uint2 Load2(int location, out uint status)
+    uint2 Load2(uint location, out uint status)
     {
         __target_switch
         {
@@ -5154,7 +5154,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint3 Load3(int location)
+    uint3 Load3(uint location)
     {
         __target_switch
         {
@@ -5167,7 +5167,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint3 Load3(int location, int alignment)
+    uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -5184,7 +5184,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint3 Load3Aligned(int location)
+    uint3 Load3Aligned(uint location)
     {
         __target_switch
         {
@@ -5197,7 +5197,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
-    uint3 Load3(int location, out uint status)
+    uint3 Load3(uint location, out uint status)
     {
         __target_switch
         {
@@ -5221,7 +5221,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint4 Load4(int location)
+    uint4 Load4(uint location)
     {
         __target_switch
         {
@@ -5234,7 +5234,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint4 Load4(int location, int alignment)
+    uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
         {
@@ -5251,7 +5251,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    uint4 Load4Aligned(int location)
+    uint4 Load4Aligned(uint location)
     {
         __target_switch
         {
@@ -5264,7 +5264,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
-    uint4 Load4(int location, out uint status)
+    uint4 Load4(uint location, out uint status)
     {
         __target_switch
         {
@@ -5275,7 +5275,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    T Load<T>(int location)
+    T Load<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
     }
@@ -5283,7 +5283,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    T Load<T>(int location, int alignment)
+    T LoadAligned<T>(uint location, uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
     }
@@ -5296,7 +5296,7 @@ struct $(item.name)
     [__NoSideEffect]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer_rw)]
-    T LoadAligned<T>(int location)
+    T LoadAligned<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
     }
@@ -6452,6 +6452,18 @@ vector<T,N> acosh(vector<T,N> x)
     }
 }
 
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+matrix<T, N, M> acosh(matrix<T, N, M> x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "acosh";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, acosh, x);
+    }
+}
 
 // Test if all components are non-zero.
 __generic<T : __BuiltinType>
@@ -6952,6 +6964,19 @@ vector<T,N> asinh(vector<T,N> x)
     case wgsl: __intrinsic_asm "asinh";
     default:
         VECTOR_MAP_UNARY(T, N, asinh, x);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+matrix<T, N, M> asinh(matrix<T, N, M> x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "asinh";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, asinh, x);
     }
 }
 
@@ -7574,6 +7599,19 @@ vector<T,N> atanh(vector<T,N> x)
     case wgsl: __intrinsic_asm "atanh";
     default:
         VECTOR_MAP_UNARY(T, N, atanh, x);
+    }
+}
+
+__generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+matrix<T, N, M> atanh(matrix<T, N, M> x)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "atanh";
+    default:
+        MATRIX_MAP_UNARY(T, N, M, atanh, x);
     }
 }
 
@@ -14100,382 +14138,294 @@ uint WaveMaskPrefixCountBits(WaveMask mask, bool value)
 
 // Across lane ops
 
-__generic<T : __BuiltinIntegerType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskBitAnd(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupAnd($1)";
-    case cuda: __intrinsic_asm "_waveAnd($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitAnd($1)";
-    case spirv:
-        return spirv_asm {
-            OpCapability GroupNonUniformArithmetic;
-            OpGroupNonUniformBitwiseAnd $$T result Subgroup 0 $expr
-        };
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitAnd($1)";
+    default:
+        return WaveMultiBitAnd(expr, uint4(mask, 0, 0, 0));
     }
 }
 
-__generic<T : __BuiltinIntegerType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskBitAnd(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupAnd($1)";
-    case cuda: __intrinsic_asm "_waveAndMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitAnd($1)";
-    case spirv:
-        return spirv_asm {
-            OpCapability GroupNonUniformArithmetic;
-            OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup 0 $expr
-        };
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitAnd($1)";
+    default:
+        return WaveMultiBitAnd(expr, uint4(mask, 0, 0, 0));
     }
 }
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskBitAnd(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveAndMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitAnd($1)";
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitAnd($1)";
+    default:
+        return WaveMultiBitAnd(expr, uint4(mask, 0, 0, 0));
     }
 }
 
-__generic<T : __BuiltinIntegerType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskBitOr(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupOr($1)";
-    case cuda: __intrinsic_asm "_waveOr($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitOr($1)";
-    case spirv:
-        return spirv_asm {
-            OpCapability GroupNonUniformArithmetic;
-            OpGroupNonUniformBitwiseOr $$T result Subgroup 0 $expr
-        };
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitOr($1)";
+    default:
+        return WaveMultiBitOr(expr, uint4(mask, 0, 0, 0));
     }
 }
-__generic<T : __BuiltinIntegerType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int>
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+[ForceInline]
 vector<T,N> WaveMaskBitOr(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupOr($1)";
-    case cuda: __intrinsic_asm "_waveOrMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitOr($1)";
-    case spirv:
-        return spirv_asm {
-            OpCapability GroupNonUniformArithmetic;
-            OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup 0 $expr
-        };
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitOr($1)";
+    default:
+        return WaveMultiBitOr(expr, uint4(mask, 0, 0, 0));
     }
 }
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskBitOr(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveOrMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitOr($1)";
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitOr($1)";
+    default:
+        return WaveMultiBitOr(expr, uint4(mask, 0, 0, 0));
     }
 }
 
-__generic<T : __BuiltinIntegerType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskBitXor(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupXor($1)";
-    case cuda: __intrinsic_asm "_waveXor($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitXor($1)";
-    case spirv:
-        return spirv_asm {
-            OpCapability GroupNonUniformArithmetic;
-            OpGroupNonUniformBitwiseXor $$T result Subgroup 0 $expr
-        };
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitXor($1)";
+    default:
+        return WaveMultiBitXor(expr, uint4(mask, 0, 0, 0));
     }
 }
-__generic<T : __BuiltinIntegerType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskBitXor(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupXor($1)";
-    case cuda: __intrinsic_asm "_waveXorMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitXor($1)";
-    case spirv:
-        return spirv_asm {
-            OpCapability GroupNonUniformArithmetic;
-            OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup 0 $expr
-        };
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitXor($1)";
+    default:
+        return WaveMultiBitXor(expr, uint4(mask, 0, 0, 0));
     }
 }
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskBitXor(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveXorMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveBitXor($1)";
+    case hlsl:
+        __intrinsic_asm "WaveActiveBitXor($1)";
+    default:
+        return WaveMultiBitXor(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskMax(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupMax($1)";
-    case cuda: __intrinsic_asm "_waveMax($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveMax($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$T result Subgroup 0 $expr};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$T result Subgroup 0 $expr};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$T result Subgroup 0 $expr};
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveMax($1)";
+    default:
+        return WaveMultiMax(expr, uint4(mask, 0, 0, 0));
     }
 }
+
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskMax(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupMax($1)";
-    case cuda: __intrinsic_asm "_waveMaxMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveMax($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$vector<T,N> result Subgroup 0 $expr};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$vector<T,N> result Subgroup 0 $expr};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$vector<T,N> result Subgroup 0 $expr};
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveMax($1)";
+    default:
+        return WaveMultiMax(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskMax(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveMaxMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveMax($1)";
+    case hlsl:
+        __intrinsic_asm "WaveActiveMax($1)";
+    default:
+        return WaveMultiMax(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskMin(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupMin($1)";
-    case cuda: __intrinsic_asm "_waveMin($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveMin($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$T result Subgroup 0 $expr};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$T result Subgroup 0 $expr};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$T result Subgroup 0 $expr};
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveMin($1)";
+    default:
+        return WaveMultiMin(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskMin(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupMin($1)";
-    case cuda: __intrinsic_asm "_waveMinMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveMin($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$vector<T,N>  result Subgroup 0 $expr};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$vector<T,N>  result Subgroup 0 $expr};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$vector<T,N>  result Subgroup 0 $expr};
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveMin($1)";
+    default:
+        return WaveMultiMin(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskMin(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveMinMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveMin($1)";
+    case hlsl:
+        __intrinsic_asm "WaveActiveMin($1)";
+    default:
+        return WaveMultiMin(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskProduct(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupMul($1)";
-    case cuda: __intrinsic_asm "_waveProduct($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveProduct($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$T result Subgroup 0 $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformIMul $$T result Subgroup 0 $expr;
-            };
-        }
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveProduct($1)";
+    default:
+        return WaveMultiProduct(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskProduct(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "subgroupMul($1)";
-    case cuda: __intrinsic_asm "_waveProductMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveProduct($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$vector<T,N> result Subgroup 0 $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformIMul $$vector<T,N> result Subgroup 0 $expr;
-            };
-        }
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveProduct($1)";
+    default:
+        return WaveMultiProduct(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskProduct(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveProductMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveProduct($1)";
+    case hlsl:
+        __intrinsic_asm "WaveActiveProduct($1)";
+    default:
+        return WaveMultiProduct(expr, uint4(mask, 0, 0, 0));
     }
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskSum(WaveMask mask, T expr)
 {
     __target_switch
     {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupAdd($1)";
-    case cuda: __intrinsic_asm "_waveSum($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveSum($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$T result Subgroup 0 $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformIAdd $$T result Subgroup 0 $expr;
-            };
-        }
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveSum($1)";
+    default:
+        return WaveMultiSum(expr, uint4(mask, 0, 0, 0));
     }
 }
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskSum(WaveMask mask, vector<T,N> expr)
 {
     __target_switch
     {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupAdd($1)";
-    case cuda: __intrinsic_asm "_waveSumMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveSum($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$vector<T,N> result Subgroup 0 $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic; 
-                OpGroupNonUniformIAdd $$vector<T,N> result Subgroup 0 $expr;
-            };
-        }
-        else return expr;
+    case hlsl:
+        __intrinsic_asm "WaveActiveSum($1)";
+    default:
+        return WaveMultiSum(expr, uint4(mask, 0, 0, 0));
     }
 }
+
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskSum(WaveMask mask, matrix<T,N,M> expr)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "_waveSumMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveActiveSum($1)";
+    case hlsl:
+        __intrinsic_asm "WaveActiveSum($1)";
+    default:
+        return WaveMultiSum(expr, uint4(mask, 0, 0, 0));
     }
 }
 
@@ -14542,134 +14492,48 @@ bool WaveMaskAllEqual(WaveMask mask, matrix<T,N,M> value)
 // Prefix
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixProduct(WaveMask mask, T expr)
 {
-    __target_switch
-    {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupExclusiveMul($1)";
-    case cuda: __intrinsic_asm "_wavePrefixProduct($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$T result Subgroup ExclusiveScan $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformIMul $$T result Subgroup ExclusiveScan $expr;
-            };
-        }
-        else return expr;
-    }
+    return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
 }
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixProduct(WaveMask mask, vector<T,N> expr)
 {
-    __target_switch
-    {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupExclusiveMul($1)";
-    case cuda: __intrinsic_asm "_wavePrefixProductMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMul $$vector<T,N> result Subgroup ExclusiveScan $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                OpGroupNonUniformIMul $$vector<T,N> result Subgroup ExclusiveScan $expr;
-            };
-        }
-        else return expr;
-    }
+    return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
 }
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixProduct(WaveMask mask, matrix<T,N,M> expr)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixProductMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixProduct($1)";
-    }
+    return WaveMultiPrefixProduct(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixSum(WaveMask mask, T expr)
 {
-    __target_switch
-    {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupExclusiveAdd($1)";
-    case cuda: __intrinsic_asm "_wavePrefixSum($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixSum($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$T result Subgroup ExclusiveScan $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                result:$$T = OpGroupNonUniformIAdd Subgroup ExclusiveScan $expr;
-            };
-        }
-        else return expr;
-    }
+    return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixSum(WaveMask mask, vector<T,N> expr)
 {
-    __target_switch
-    {
-    case glsl:
-        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
-        __intrinsic_asm "subgroupExclusiveAdd($1)";
-    case cuda: __intrinsic_asm "_wavePrefixSumMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixSum($1)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFAdd $$vector<T,N> result Subgroup ExclusiveScan $expr};
-        else if (__isInt<T>())
-        {
-            return spirv_asm
-            {
-                OpCapability GroupNonUniformArithmetic;
-                result:$$vector<T,N> = OpGroupNonUniformIAdd Subgroup ExclusiveScan $expr;
-            };
-        }
-        else return expr;
-    }
+    return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
 }
 __generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixSum(WaveMask mask, matrix<T,N,M> expr)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixSumMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WavePrefixSum($1)";
-    }
+    return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
 }
 
 __generic<T : __BuiltinType>
@@ -14775,133 +14639,76 @@ WaveMask WaveMaskMatch(WaveMask mask, matrix<T,N,M> value)
     }
 }
 
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixBitAnd(WaveMask mask, T expr)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveAnd($1)";
-    case cuda: __intrinsic_asm "_wavePrefixAnd($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup ExclusiveScan $expr};
-    }
+    return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitAnd(WaveMask mask, vector<T,N> expr)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveAnd($1)";
-    case cuda: __intrinsic_asm "_wavePrefixAndMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ExclusiveScan $expr};
-    }
+    return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_hlsl, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitAnd(WaveMask mask, matrix<T,N,M> expr)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixAndMultiple(_getMultiPrefixMask($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd($1, uint4($0, 0, 0, 0))";
-    }
+    return WaveMultiPrefixBitAnd(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixBitOr(WaveMask mask, T expr)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveOr($1)";
-    case cuda: __intrinsic_asm "_wavePrefixOr($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup ExclusiveScan $expr};
-    }
+    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitOr(WaveMask mask, vector<T,N> expr)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveOr($1)";
-    case cuda: __intrinsic_asm "_wavePrefixOrMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ExclusiveScan $expr};
-    }
+    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitOr(WaveMask mask, matrix<T,N,M> expr)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixOrMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr($1, uint4($0, 0, 0, 0))";
-    }
+    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 T WaveMaskPrefixBitXor(WaveMask mask, T expr)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveXor($1)";
-    case cuda: __intrinsic_asm "_wavePrefixXor($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$T result Subgroup ExclusiveScan $expr};
-    }
+    return WaveMultiPrefixBitXor(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 vector<T,N> WaveMaskPrefixBitXor(WaveMask mask, vector<T,N> expr)
 {
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveXor($1)";
-    case cuda: __intrinsic_asm "_wavePrefixXorMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor($1, uint4($0, 0, 0, 0))";
-    case spirv:
-        return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ExclusiveScan $expr};
-    }
+    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_hlsl, subgroup_arithmetic)]
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
 matrix<T,N,M> WaveMaskPrefixBitXor(WaveMask mask, matrix<T,N,M> expr)
 {
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixXorMultiple($0, $1)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor($1, uint4($0, 0, 0, 0))";
-    }
+    return WaveMultiPrefixBitOr(expr, uint4(mask, 0, 0, 0));
 }
 
 //@public:
@@ -15118,7 +14925,7 @@ const WaveActiveBitOpEntry kWaveActiveBitOpEntries[] = {{"BitAnd", "And", "Bitwi
 for (auto opName : kWaveActiveBitOpEntries) {
 }}}}
 /// @category wave Wave and quad functions
-__generic<T : __BuiltinIntegerType>
+__generic<T : __BuiltinLogicalType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
@@ -15141,7 +14948,7 @@ T WaveActive$(opName.hlslName)(T expr)
     }
 }
 
-__generic<T : __BuiltinIntegerType, let N : int>
+__generic<T : __BuiltinLogicalType, let N : int>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 __spirv_version(1.3)
 __wgsl_extension(subgroups)
@@ -15164,7 +14971,7 @@ vector<T, N> WaveActive$(opName.hlslName)(vector<T, N> expr)
     }
 }
 
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_arithmetic)]
 matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
 {
@@ -16200,377 +16007,13 @@ uint4 WaveMatch(matrix<T,N,M> value)
 }
 
 /// @category wave
-[require(cuda_hlsl, wave_multi_prefix)]
+[require(cuda_hlsl, subgroup_partitioned)]
 uint WaveMultiPrefixCountBits(bool value, uint4 mask)
 {
     __target_switch
     {
     case cuda: __intrinsic_asm "_popc(__ballot_sync(($1).x, $0) & _getLaneLtMask())";
     case hlsl: __intrinsic_asm "WaveMultiPrefixCountBits";
-    }
-}
-
-/// @category wave
-__generic<T : __BuiltinIntegerType>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-T WaveMultiPrefixBitAnd(T expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixAnd(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveAndNV";
-    case spirv:
-        return spirv_asm
-        {
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
-            OpCapability GroupNonUniformPartitionedNV;
-            result:$$T = OpGroupNonUniformBitwiseAnd Subgroup PartitionedExclusiveScanNV $expr $mask
-        };
-    }
-}
-
-__generic<T : __BuiltinIntegerType, let N : int>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-vector<T,N> WaveMultiPrefixBitAnd(vector<T,N> expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixAndMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveAndNV";
-    case spirv:
-        return spirv_asm
-        {
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
-            OpCapability GroupNonUniformPartitionedNV;
-            result:$$vector<T,N> = OpGroupNonUniformBitwiseAnd Subgroup PartitionedExclusiveScanNV $expr $mask
-        };
-    }
-}
-
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-matrix<T,N,M> WaveMultiPrefixBitAnd(matrix<T,N,M> expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixAndMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitAnd";
-    case glsl:
-    case spirv:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WaveMultiPrefixBitAnd(expr[i], mask);
-        return result;
-    }
-}
-
-/// @category wave
-__generic<T : __BuiltinIntegerType>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-T WaveMultiPrefixBitOr(T expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixOr(, _getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveOrNV";
-    case spirv:
-        return spirv_asm
-        {
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
-            OpCapability GroupNonUniformPartitionedNV;
-            result:$$T = OpGroupNonUniformBitwiseOr Subgroup PartitionedExclusiveScanNV $expr $mask
-        };
-    }
-}
-
-__generic<T : __BuiltinIntegerType, let N : int>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-vector<T,N> WaveMultiPrefixBitOr(vector<T,N> expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixOrMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveOrNV";
-    case spirv:
-        return spirv_asm
-        {
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
-            OpCapability GroupNonUniformPartitionedNV;
-            result:$$vector<T,N> = OpGroupNonUniformBitwiseOr Subgroup PartitionedExclusiveScanNV $expr $mask
-        };
-    }
-}
-
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-matrix<T,N,M> WaveMultiPrefixBitOr(matrix<T,N,M> expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixOrMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitOr";
-    case glsl:
-    case spirv:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WaveMultiPrefixBitOr(expr[i], mask);
-        return result;
-    }
-}
-
-/// @category wave
-__generic<T : __BuiltinIntegerType>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-T WaveMultiPrefixBitXor(T expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixXor(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveXorNV";
-    case spirv:
-        return spirv_asm
-        {
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
-            OpCapability GroupNonUniformPartitionedNV;
-            result:$$T = OpGroupNonUniformBitwiseXor Subgroup PartitionedExclusiveScanNV $expr $mask
-        };
-    }
-}
-
-__generic<T : __BuiltinIntegerType, let N : int>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-vector<T,N> WaveMultiPrefixBitXor(vector<T,N> expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixXorMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveXorNV";
-    case spirv:
-        return spirv_asm
-        {
-            OpExtension "SPV_NV_shader_subgroup_partitioned";
-            OpCapability GroupNonUniformPartitionedNV;
-            result:$$vector<T,N> = OpGroupNonUniformBitwiseXor Subgroup PartitionedExclusiveScanNV $expr $mask
-        };
-    }
-}
-
-__generic<T : __BuiltinIntegerType, let N : int, let M : int>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-matrix<T,N,M> WaveMultiPrefixBitXor(matrix<T,N,M> expr, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixXorMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixBitXor";
-    case glsl:
-    case spirv:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WaveMultiPrefixBitXor(expr[i], mask);
-        return result;
-    }
-}
-
-/// @category wave
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-T WaveMultiPrefixProduct(T value, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixProduct(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixProduct";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveMulNV";
-    case spirv:
-        {
-            spirv_asm
-            {
-                OpExtension "SPV_NV_shader_subgroup_partitioned";
-                OpCapability GroupNonUniformPartitionedNV;
-            };
-
-            if (__isFloat<T>())
-            {
-                return spirv_asm
-                {
-                    result:$$T = OpGroupNonUniformFMul Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-            else
-            {
-                return spirv_asm
-                {
-                    result:$$T = OpGroupNonUniformIMul Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-        }
-    }
-}
-
-__generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-vector<T,N> WaveMultiPrefixProduct(vector<T,N> value, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixProductMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixProduct";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveMulNV";
-    case spirv:
-        {
-            spirv_asm
-            {
-                OpExtension "SPV_NV_shader_subgroup_partitioned";
-                OpCapability GroupNonUniformPartitionedNV;
-            };
-
-            if (__isFloat<T>())
-            {
-                return spirv_asm
-                {
-                    result:$$vector<T,N> = OpGroupNonUniformFMul Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-            else
-            {
-                return spirv_asm
-                {
-                    result:$$vector<T,N> = OpGroupNonUniformIMul Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-        }
-    }
-}
-
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-matrix<T,N,M> WaveMultiPrefixProduct(matrix<T,N,M> value, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixProductMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixProduct";
-    case glsl:
-    case spirv:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WaveMultiPrefixProduct(value[i], mask);
-        return result;
-    }
-}
-
-/// @category wave
-__generic<T : __BuiltinArithmeticType>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-__spirv_version(1.3)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-T WaveMultiPrefixSum(T value, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixSum(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixSum";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveAddNV";
-    case spirv:
-        {
-            spirv_asm
-            {
-                OpExtension "SPV_NV_shader_subgroup_partitioned";
-                OpCapability GroupNonUniformPartitionedNV;
-            };
-
-            if (__isFloat<T>())
-            {
-                return spirv_asm
-                {
-                    result:$$T = OpGroupNonUniformFAdd Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-            else
-            {
-                return spirv_asm
-                {
-                    result:$$T = OpGroupNonUniformIAdd Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-        }
-    }
-}
-
-__generic<T : __BuiltinArithmeticType, let N : int>
-__glsl_extension(GL_NV_shader_subgroup_partitioned)
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-__spirv_version(1.3)
-vector<T,N> WaveMultiPrefixSum(vector<T,N> value, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixSumMultiple(_getMultiPrefixMask(($1).x), $0 )";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixSum";
-    case glsl: __intrinsic_asm "subgroupPartitionedExclusiveAddNV";
-    case spirv:
-        {
-            spirv_asm
-            {
-                OpExtension "SPV_NV_shader_subgroup_partitioned";
-                OpCapability GroupNonUniformPartitionedNV;
-            };
-
-            if (__isFloat<T>())
-            {
-                return spirv_asm
-                {
-                    result:$$vector<T,N> = OpGroupNonUniformFAdd Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-            else
-            {
-                return spirv_asm
-                {
-                    result:$$vector<T,N> = OpGroupNonUniformIAdd Subgroup PartitionedExclusiveScanNV $value $mask
-                };
-            }
-        }
-    }
-}
-
-__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
-[require(cuda_glsl_hlsl_spirv, wave_multi_prefix)]
-matrix<T,N,M> WaveMultiPrefixSum(matrix<T,N,M> value, uint4 mask)
-{
-    __target_switch
-    {
-    case cuda: __intrinsic_asm "_wavePrefixSumMultiple(_getMultiPrefixMask(($1).x), $0)";
-    case hlsl: __intrinsic_asm "WaveMultiPrefixSum";
-    case glsl:
-    case spirv:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WaveMultiPrefixSum(value[i], mask);
-        return result;
     }
 }
 
@@ -16634,6 +16077,7 @@ void __checkMetalShaderSubgroupType()
 }
 
 __generic<T : __BuiltinType>
+[ForceInline]
 void shader_subgroup_preamble()
 {
     // checks needed for shader_subgroup functions; __requireTargetExtension does not work
@@ -16740,6 +16184,582 @@ vector<T, N> WaveClusteredRotate(vector<T, N> value, uint delta, constexpr uint 
         };
     }
 }
+
+
+//
+// WaveMulti intrinsics are subgroup operations that operate on a 128-bit `uint4` mask.
+// They are equivalent to SPIRV/GLSL's subgroup partitioned operation and HLSL's `WaveMultiPrefix*` operations.
+//
+// SPIRV/GLSL natively supports masked subgroup operations for both reductions and exclusive/inclusive scans.
+// HLSL only natively supports exclusive scans(prefix operations) on arithmetic operations. Inclusve scans
+// are emulated by performing an additional operation to the inclusive scan result. Reductions are not supported.
+//
+
+__generic<T : __BuiltinType>
+[ForceInline]
+void __shaderSubgroupPartitionedPreamble()
+{
+    shader_subgroup_preamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __requireTargetExtension("GL_NV_shader_subgroup_partitioned");
+    case spirv:
+        spirv_asm
+        {
+            OpExtension "SPV_NV_shader_subgroup_partitioned";
+            OpCapability GroupNonUniformPartitionedNV;
+        };
+    default:
+        return;
+    }
+}
+
+//
+// WaveMultiSum/WaveMultiProduct.
+//
+${{{{
+struct WaveMultiSumProductEntry { const char* name; const char* spirvName; };
+const WaveMultiSumProductEntry kWaveMultiSumProductNames[] = { {"Sum", "Add"}, {"Product", "Mul"} };
+for (auto opName : kWaveMultiSumProductNames) {
+}}}}
+
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+T WaveMulti$(opName.name)(T value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)($1.x, $0)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.spirvName)NV";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformF$(opName.spirvName) Subgroup PartitionedReduceNV $value $mask };
+            else
+                return spirv_asm { result:$$T = OpGroupNonUniformI$(opName.spirvName) Subgroup PartitionedReduceNV $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+vector<T, N> WaveMulti$(opName.name)(vector<T, N> value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.spirvName)NV";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformF$(opName.spirvName) Subgroup PartitionedReduceNV $value $mask };
+            else
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformI$(opName.spirvName) Subgroup PartitionedReduceNV $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+matrix<T,N,M> WaveMulti$(opName.name)(matrix<T,N,M> value, uint4 mask)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
+    default:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMulti$(opName.name)(value[i], mask);
+        return result;
+    }
+}
+
+${{{{
+} // WaveMultiSum/WaveMultiProduct.
+}}}}
+
+
+//
+// WaveMultiPrefixInclusiveSum/WaveMultiPrefixInclusiveProduct.
+// WaveMultiPrefixExclusiveSum/WaveMultiPrefixExclusiveProduct.
+// WaveMultiPrefixSum/WaveMultiPrefixProduct.
+//
+${{{{
+struct WaveMultiPrefixSumProductEntry
+{
+    const char* name;
+    const char* spirvName;
+    const char* spirvGroupOperation;
+    const char* glslName;
+    const char* hlslName;
+    const char* cudaName;
+    const char* cudaExtraOperation;
+
+    // Inclusive operations are not implemented by the CUDA prelude functions.
+    // They are implemented here by calling the exclusive implementation and performing an additional operations
+    // with the current invocation's value. This works for all cases except for element-wise matrix multiplication.
+    bool cudaMatrixVariantSupport;
+};
+
+const WaveMultiPrefixSumProductEntry kWaveMultiPrefixSumProductNames[] =
+{
+    // name               spirvName  spirvGroupOperation         glslName        hlslName                         cudaName     cudaExtraOperation   cudaMatrixVariantSupport
+    { "InclusiveSum",     "Add",     "PartitionedInclusiveScanNV", "InclusiveAdd", "Sum($0, $1) + $0",              "Sum",       "+ $0",            false },
+    { "InclusiveProduct", "Mul",     "PartitionedInclusiveScanNV", "InclusiveMul", "Product($0, $1) * $0",          "Product",   "* $0",            false },
+    { "ExclusiveSum",     "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                true  },
+    { "ExclusiveProduct", "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                true  },
+
+    // These are HLSL SM 6.5 intrinsics and are equal to the exclusive variants.
+    { "Sum",              "Add",     "PartitionedExclusiveScanNV", "ExclusiveAdd", "Sum($0, $1)",                   "Sum",       "",                true  },
+    { "Product",          "Mul",     "PartitionedExclusiveScanNV", "ExclusiveMul", "Product($0, $1)",               "Product",   "",                true  },
+};
+
+for (auto opName : kWaveMultiPrefixSumProductNames) {
+}}}}
+
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.cudaName)($1.x, $0) $(opName.cudaExtraOperation)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case hlsl:
+        __intrinsic_asm "WaveMultiPrefix$(opName.hlslName)";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformF$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+            else
+                return spirv_asm { result:$$T = OpGroupNonUniformI$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case hlsl:
+        __intrinsic_asm "WaveMultiPrefix$(opName.hlslName)";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformF$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+            else
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformI$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+matrix<T,N,M> WaveMultiPrefix$(opName.name)(matrix<T,N,M> value, uint4 mask)
+{
+    __target_switch
+    {
+    ${{{{ if(opName.cudaMatrixVariantSupport) { }}}}
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
+    ${{{{ } }}}}
+    default:
+        matrix<T, N, M> result;
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiPrefix$(opName.name)(value[i], mask);
+        return result;
+    }
+}
+
+${{{{
+}
+// WaveMultiPrefixInclusiveSum/WaveMultiPrefixInclusiveProduct.
+// WaveMultiPrefixExclusiveSum/WaveMultiPrefixExclusiveProduct.
+// WaveMultiPrefixSum/WaveMultiPrefixProduct.
+}}}}
+
+
+//
+// WaveMultiMin/WaveMultiMax.
+//
+${{{{
+struct WaveMultiMinMaxEntry { const char* name; };
+const WaveMultiMinMaxEntry kWaveMultiMinMaxNames[] = { {"Min"}, {"Max"} };
+for (auto opName : kWaveMultiMinMaxNames) {
+}}}}
+
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+T WaveMulti$(opName.name)(T value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)($1.x, $0)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformF$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+            else if (__isUnsignedInt<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformU$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+            else
+                return spirv_asm { result:$$T = OpGroupNonUniformS$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+vector<T, N> WaveMulti$(opName.name)(vector<T, N> value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformF$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+            else if (__isUnsignedInt<T>())
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformU$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+            else
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformS$(opName.name) Subgroup PartitionedReduceNV $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+matrix<T, N, M> WaveMulti$(opName.name)(matrix<T, N, M> value, uint4 mask)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
+    default:
+        matrix<T, N, M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMulti$(opName.name)(value[i], mask);
+        return result;
+    }
+}
+
+${{{{
+} // WaveMultiMin/WaveMultiMax.
+}}}}
+
+
+//
+// WaveMultiPrefixInclusiveMin/WaveMultiPrefixInclusiveMax.
+// WaveMultiPrefixExclusiveMin/WaveMultiPrefixExclusiveMax.
+//
+${{{{
+struct WaveMultiPrefixMinMaxEntry
+{
+    const char* name;
+    const char* spirvName;
+    const char* spirvGroupOperation;
+    const char* glslName;
+};
+
+const WaveMultiPrefixMinMaxEntry kWaveMultiPrefixMinMaxNames[] =
+{
+    // name             spirvName  spirvGroupOperation              glslName
+    { "InclusiveMin",   "Min",     "PartitionedInclusiveScanNV",    "InclusiveMin" },
+    { "InclusiveMax",   "Max",     "PartitionedInclusiveScanNV",    "InclusiveMax" },
+    { "ExclusiveMin",   "Min",     "PartitionedExclusiveScanNV",    "ExclusiveMin" },
+    { "ExclusiveMax",   "Max",     "PartitionedExclusiveScanNV",    "ExclusiveMax" },
+};
+
+for (auto opName : kWaveMultiPrefixMinMaxNames) {
+}}}}
+
+__generic<T : __BuiltinArithmeticType>
+__spirv_version(1.3)
+[ForceInline]
+[require(glsl_spirv, subgroup_partitioned)]
+T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformF$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+            else if (__isUnsignedInt<T>())
+                return spirv_asm { result:$$T = OpGroupNonUniformU$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+            else
+                return spirv_asm { result:$$T = OpGroupNonUniformS$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__spirv_version(1.3)
+[ForceInline]
+[require(glsl_spirv, subgroup_partitioned)]
+vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case spirv:
+        {
+            if (__isFloat<T>())
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformF$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+            else if (__isUnsignedInt<T>())
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformU$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+            else
+                return spirv_asm { result:$$vector<T,N> = OpGroupNonUniformS$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask };
+        }
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[require(glsl_spirv, subgroup_partitioned)]
+matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
+{
+    matrix<T, N, M> result;
+    [ForceUnroll]
+    for (int i = 0; i < N; ++i)
+        result[i] = WaveMultiPrefix$(opName.name)(value[i], mask);
+    return result;
+}
+
+${{{{
+}
+// WaveMultiPrefixInclusiveMin/WaveMultiPrefixInclusiveMax.
+// WaveMultiPrefixExclusiveMin/WaveMultiPrefixExclusiveMax.
+}}}}
+
+
+//
+// WaveMultiBitAnd/WaveMultiBitOr/WaveMultiBitXor.
+//
+${{{{
+struct WaveMultiBitsEntry { const char* name; };
+const WaveMultiBitsEntry kWaveMultiBitsNames[] = { {"And"}, {"Or"} , {"Xor"} };
+for (auto opName : kWaveMultiBitsNames) {
+}}}}
+
+__generic<T : __BuiltinLogicalType>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+T WaveMultiBit$(opName.name)(T value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)($1.x, $0)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$T = OpGroupNonUniformBitwise$(opName.name) Subgroup PartitionedReduceNV $value $mask;
+        };
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+vector<T, N> WaveMultiBit$(opName.name)(vector<T, N> value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.name)NV";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$vector<T,N> = OpGroupNonUniformBitwise$(opName.name) Subgroup PartitionedReduceNV $value $mask;
+        };
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+matrix<T, N, M> WaveMultiBit$(opName.name)(matrix<T, N, M> value, uint4 mask)
+{
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wave$(opName.name)Multiple($1.x, $0)";
+    default:
+        matrix<T,N,M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiBit$(opName.name)(value[i], mask);
+        return result;
+    }
+}
+
+${{{{
+} // WaveMultiBitAnd/WaveMultiBitOr/WaveMultiBitXor.
+}}}}
+
+
+//
+// WaveMultiPrefixInclusiveBitAnd/WaveMultiPrefixInclusiveBitOr/WaveMultiInclusiveBitXor.
+// WaveMultiPrefixExclusiveBitAnd/WaveMultiPrefixExclusiveBitXor/WaveMultiExclusiveBitXor.
+// WaveMultiPrefixBitAnd/WaveMultiPrefixBitOr/WaveMultiBitXor.
+//
+${{{{
+struct WaveMultiPrefixBitwiseEntry
+{
+    const char* name;
+    const char* spirvName;
+    const char* spirvGroupOperation;
+    const char* glslName;
+    const char* hlslName;
+    const char* cudaExtraOperation;
+
+    bool cudaMatrixVariantSupport;
+};
+
+const WaveMultiPrefixBitwiseEntry kWaveMultiPrefixBitwiseNames[] =
+{
+    // name           spirvName     spirvGroupOperation            glslName       hlslName              cudaExtraOperation  cudaMatrixVariantSupport
+    { "InclusiveBitAnd", "And",     "PartitionedInclusiveScanNV", "InclusiveAnd", "And($0, $1) & $0",      "& $0",          false },
+    { "InclusiveBitOr",  "Or",      "PartitionedInclusiveScanNV", "InclusiveOr",  "Or($0, $1) | $0",       "| $0",          false },
+    { "InclusiveBitXor", "Xor",     "PartitionedInclusiveScanNV", "InclusiveXor", "Xor($0, $1) ^ $0",      "^ $0",          false },
+    { "ExclusiveBitAnd", "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",               true  },
+    { "ExclusiveBitOr",  "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",               true  },
+    { "ExclusiveBitXor", "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",               true  },
+
+    // These are HLSL SM 6.5 intrinsics and are equal to the exclusive variants.
+    { "BitAnd",          "And",     "PartitionedExclusiveScanNV", "ExclusiveAnd", "And",                  "",               true  },
+    { "BitOr",           "Or",      "PartitionedExclusiveScanNV", "ExclusiveOr",  "Or",                   "",               true  },
+    { "BitXor",          "Xor",     "PartitionedExclusiveScanNV", "ExclusiveXor", "Xor",                  "",               true  },
+};
+
+for (auto opName : kWaveMultiPrefixBitwiseNames) {
+}}}}
+
+__generic<T : __BuiltinLogicalType>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+T WaveMultiPrefix$(opName.name)(T value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.spirvName)($1.x, $0) $(opName.cudaExtraOperation)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case hlsl:
+        __intrinsic_asm "WaveMultiPrefixBit$(opName.hlslName)";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$T = OpGroupNonUniformBitwise$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
+        };
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+vector<T, N> WaveMultiPrefix$(opName.name)(vector<T, N> value, uint4 mask)
+{
+    __shaderSubgroupPartitionedPreamble<T>();
+    __target_switch
+    {
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.spirvName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
+    case glsl:
+        __intrinsic_asm "subgroupPartitioned$(opName.glslName)NV";
+    case hlsl:
+        __intrinsic_asm "WaveMultiPrefixBit$(opName.hlslName)";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$vector<T,N> = OpGroupNonUniformBitwise$(opName.spirvName) Subgroup $(opName.spirvGroupOperation) $value $mask;
+        };
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[require(cuda_glsl_hlsl_spirv, subgroup_partitioned)]
+matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
+{
+    __target_switch
+    {
+${{{{
+    if (opName.cudaMatrixVariantSupport) {
+}}}}
+    case cuda:
+        __intrinsic_asm "_wavePrefix$(opName.spirvName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
+${{{{
+    }
+}}}}
+    default:
+        matrix<T,N,M> result;
+        [ForceUnroll]
+        for (int i = 0; i < N; ++i)
+            result[i] = WaveMultiPrefix$(opName.name)(value[i], mask);
+        return result;
+    }
+}
+${{{{
+}
+// WaveMultiPrefixInclusiveBitAnd/WaveMultiPrefixInclusiveBitOr/WaveMultiInclusiveBitXor.
+// WaveMultiPrefixExclusiveBitAnd/WaveMultiPrefixExclusiveBitXor/WaveMultiExclusiveBitXor.
+// WaveMultiPrefixBitAnd/WaveMultiPrefixBitOr/WaveMultiBitXor.
+}}}}
+
 
 //
 // Quad Control intrinsics
@@ -17230,7 +17250,7 @@ void TraceRay(
             Ray,
             __forceVarIntoRayPayloadStructTemporarily(Payload));
         return;
-    case cuda: __intrinsic_asm "traceOptiXRay";
+    case cuda: __intrinsic_asm "optixTrace";
     case glsl:
     {
         [__vulkanRayPayload]
@@ -17928,6 +17948,114 @@ int GetClusterID()
         };
     }
 }
+
+/// @category raytracing
+[__requiresNVAPI]
+[NonUniformReturn]
+[require(cuda_hlsl_spirv, raytracing_lss)]
+float4 GetSpherePositionAndRadius()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "NvRtSphereObjectPositionAndRadius";
+    case cuda:
+        {
+            __intrinsic_asm "optixGetSpherePositionAndRadius";
+        }
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
+            %pos:$$float3 = OpLoad builtin(HitSpherePositionNV:float3);
+            %rad:$$float = OpLoad builtin(HitSphereRadiusNV:float);
+            result:$$float4 = OpCompositeConstruct %pos %rad;
+        };
+    }
+}
+
+/// @category raytracing
+[__requiresNVAPI]
+[NonUniformReturn]
+[require(cuda_hlsl_spirv, raytracing_lss)]
+float2x4 GetLssPositionsAndRadii()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
+    case cuda:
+        {
+            __intrinsic_asm "optixObjectPositionsAndRadii";
+        }
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
+            %positions:$$float3[2] = OpLoad builtin(HitLSSPositionsNV:float3[2]);
+            %radii:$$float[2] = OpLoad builtin(HitLSSRadiiNV:float[2]);
+            %r0:$$float = OpCompositeExtract %radii 0;
+            %r1:$$float = OpCompositeExtract %radii 1;
+            %p0:$$float3 = OpCompositeExtract %positions 0;
+            %p1:$$float3 = OpCompositeExtract %positions 1;
+            %a:$$float4 = OpCompositeConstruct %p0 %r0;
+            %b:$$float4 = OpCompositeConstruct %p1 %r1;
+            result:$$float2x4 = OpCompositeConstruct %a %b;
+        };
+    
+    }
+}
+
+/// @category raytracing
+[__requiresNVAPI]
+[NonUniformReturn]
+[require(cuda_hlsl_spirv, raytracing_lss)]
+bool IsSphereHit()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "NvRtIsSphereHit";
+    case cuda:
+        {
+            __intrinsic_asm "optixIsSphereHit";
+        }
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
+            result:$$bool = OpLoad builtin(HitIsSphereNV:bool);
+        };
+    }
+}
+
+/// @category raytracing
+[__requiresNVAPI]
+[NonUniformReturn]
+[require(cuda_hlsl_spirv, raytracing_lss)]
+bool IsLssHit()
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "NvRtIsLssHit";
+    case cuda:
+        {
+            __intrinsic_asm "optixIsLSSHit";
+        }
+    case spirv:
+        return spirv_asm
+        {
+            OpExtension "SPV_NV_linear_swept_spheres";
+            OpCapability RayTracingLinearSweptSpheresGeometryNV;
+            OpCapability RayTracingSpheresGeometryNV;
+            result:$$bool = OpLoad builtin(HitIsLSSNV:bool);
+        };
+    }
+}
+
 // Note: The provisional DXR spec included these unadorned
 // `ObjectToWorld()` and `WorldToObject()` functions, so
 // we will forward them to the new names as a convience
@@ -19556,7 +19684,7 @@ struct HitObject
         /// Executes ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject TraceRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
@@ -19609,6 +19737,7 @@ struct HitObject
                 // Write the payload out
                 Payload = p;
             }
+        case cuda: __intrinsic_asm "optixTraverse";
         case spirv:
             {
                 [__vulkanRayPayload]
@@ -19649,7 +19778,7 @@ struct HitObject
         /// Executes motion ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject TraceMotionRay<payload_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint RayFlags, 
@@ -19700,6 +19829,7 @@ struct HitObject
                 // Write the payload out
                 Payload = p;
             }
+        case cuda: __intrinsic_asm "optixTraverse";
         case spirv:
             {
                 [__vulkanRayPayload]
@@ -19748,7 +19878,7 @@ struct HitObject
         /// Attributes parameter must either be an attribute struct, such as
         /// BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
@@ -19796,6 +19926,7 @@ struct HitObject
                     Ray.TMax,
                     __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
             }
+        case cuda: __intrinsic_asm "optixMakeHitObject";
         case spirv:
             {
                 // Save the attributes
@@ -19833,7 +19964,7 @@ struct HitObject
         /// See MakeHit but handles Motion 
         /// Currently only supported on VK
     [ForceInline]    
-    [require(glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>( 
         RaytracingAccelerationStructure AccelerationStructure, 
         uint InstanceIndex, 
@@ -19870,6 +20001,7 @@ struct HitObject
                 CurrentTime,
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
+        case cuda: __intrinsic_asm "optixMakeHitObject";
         case spirv:
         {
             // Save the attributes
@@ -19915,7 +20047,7 @@ struct HitObject
         /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
         /// attributes from.
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -19960,6 +20092,7 @@ struct HitObject
                 Ray.TMax,
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
+        case cuda: __intrinsic_asm "optixMakeHitObject";
         case spirv:
         {
             // Save the attributes
@@ -19993,7 +20126,7 @@ struct HitObject
         /// See MakeHit but handles Motion 
         /// Currently only supported on VK
     [ForceInline]
-    [require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>( 
         uint HitGroupRecordIndex, 
         RaytracingAccelerationStructure AccelerationStructure, 
@@ -20027,6 +20160,7 @@ struct HitObject
                 CurrentTime,
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
+        case cuda: __intrinsic_asm "optixMakeHitObject";
         case spirv:
         {
             // Save the attributes
@@ -20064,7 +20198,7 @@ struct HitObject
         /// table.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeMiss( 
         uint MissShaderIndex, 
         RayDesc Ray)
@@ -20074,6 +20208,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
         case glsl:
             __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+        case cuda: __intrinsic_asm "optixMakeMissHitObject";
         case spirv:
             {
                 let origin = Ray.Origin;
@@ -20099,7 +20234,7 @@ struct HitObject
         /// See MakeMiss but handles Motion 
         /// Currently only supported on VK
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionMiss( 
         uint MissShaderIndex, 
         RayDesc Ray,
@@ -20110,6 +20245,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "($3=NvMakeMotionMiss($0,$1,$2))";
         case glsl:
             __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
+        case cuda: __intrinsic_asm "optixMakeMissHitObject";
         case spirv:
             {
                 let origin = Ray.Origin;
@@ -20142,7 +20278,7 @@ struct HitObject
         /// miss.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeNop()
     {
         __target_switch
@@ -20151,6 +20287,7 @@ struct HitObject
             __intrinsic_asm "($0 = NvMakeNop())";
         case glsl:
             __glslMakeNop(__return_val);
+        case cuda: __intrinsic_asm "optixMakeNopHitObject";
         case spirv:
             spirv_asm 
             {
@@ -20179,7 +20316,7 @@ struct HitObject
         /// shader is invoked.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
@@ -20205,6 +20342,7 @@ struct HitObject
                 // Write payload result
                 Payload = p;
             }
+        case cuda: __intrinsic_asm "optixInvoke";
         case spirv:
             {
                 [__vulkanRayPayload]
@@ -20231,13 +20369,14 @@ struct HitObject
         /// Returns true if the HitObject encodes a miss, otherwise returns false.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsMiss()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsMiss";
         case glsl: __intrinsic_asm "hitObjectIsMissNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectIsMiss";
         case spirv:
             return spirv_asm 
             {
@@ -20251,13 +20390,14 @@ struct HitObject
         /// Returns true if the HitObject encodes a hit, otherwise returns false.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsHit()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsHit";
         case glsl: __intrinsic_asm "hitObjectIsHitNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectIsHit";
         case spirv: 
             return spirv_asm 
             {
@@ -20271,13 +20411,14 @@ struct HitObject
         /// Returns true if the HitObject encodes a nop, otherwise returns false.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsNop()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsNop";
         case glsl: __intrinsic_asm "hitObjectIsEmptyNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectIsNop";
         case spirv: 
             return spirv_asm 
             {
@@ -20291,7 +20432,7 @@ struct HitObject
         /// Queries ray properties from HitObject. Valid if the hit object represents a hit or a miss.
     [__requiresNVAPI]
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     RayDesc GetRayDesc()
     {
         __target_switch
@@ -20303,6 +20444,7 @@ struct HitObject
                 RayDesc ray = { __glslGetRayWorldOrigin(), __glslGetTMin(), __glslGetRayWorldDirection(), __glslGetTMax() };
                 return ray;
             }
+        case cuda: __intrinsic_asm "optixHitObjectGetRayDesc";
         case spirv:
             return spirv_asm 
             {
@@ -20321,13 +20463,14 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetShaderTableIndex()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetShaderTableIndex";
         case glsl: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetSbtRecordIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20338,17 +20481,41 @@ struct HitObject
         }
     }
 
+    [__requiresNVAPI]
+    __glsl_extension(GL_EXT_ray_tracing)
+    [ForceInline]
+    [require(cuda_hlsl, ser_raygen_closesthit_miss)]
+    uint SetShaderTableIndex(uint RecordIndex)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".SetShaderTableIndex";
+        case cuda: __intrinsic_asm "optixHitObjectSetSbtRecordIndex";
+        }
+    }
+
+    // TODO -  Add other targets [__requiresNVAPI] __glsl_extension(GL_EXT_ray_tracing)
+    [ForceInline]
+    [require(cuda, ser_raygen_closesthit_miss)]
+    uint LoadLocalRootArgumentsConstant(uint RootConstantOffsetInBytes)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "optixHitObjectGetSbtDataPointer";
+        }
+    }
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetInstanceIndex()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetInstanceIndex";
         case glsl: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetInstanceIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20363,13 +20530,14 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetInstanceID()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetInstanceID";
         case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetInstanceId";
         case spirv:
             return spirv_asm 
             {
@@ -20384,13 +20552,14 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetGeometryIndex()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetGeometryIndex";
         case glsl: __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetSbtGASIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20405,13 +20574,14 @@ struct HitObject
     [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetPrimitiveIndex()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetPrimitiveIndex";
         case glsl: __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetPrimitiveIndex";
         case spirv: 
             return spirv_asm 
             {
@@ -20462,6 +20632,106 @@ struct HitObject
                 OpExtension "SPV_NV_cluster_acceleration_structure";
                 OpCapability RayTracingClusterAccelerationStructureNV;
                 result:$$int = OpHitObjectGetClusterIdNV &this;
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [NonUniformReturn]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
+    float4 GetSpherePositionAndRadius()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtSphereObjectPositionAndRadius";
+        case cuda:
+            {
+                __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
+            }
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                OpCapability RayTracingSpheresGeometryNV;
+                %position:$$float3 = OpHitObjectGetSpherePositionNV &this;
+                %radius:$$float = OpHitObjectGetSphereRadiusNV &this;
+                result:$$float4 = OpCompositeConstruct %position %radius;
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [NonUniformReturn]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
+    float2x4 GetLssPositionsAndRadii()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
+        case cuda:
+            {
+                __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
+            }
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                OpCapability RayTracingSpheresGeometryNV;
+                %positions:$$float3[2] = OpHitObjectGetLSSPositionsNV &this;
+                %radii:$$float[2] = OpHitObjectGetLSSRadiiNV &this;
+                %r0:$$float = OpCompositeExtract %radii 0;
+                %r1:$$float = OpCompositeExtract %radii 1;
+                %p0:$$float3 = OpCompositeExtract %positions 0;
+                %p1:$$float3 = OpCompositeExtract %positions 1;
+                %a:$$float4 = OpCompositeConstruct %p0 %r0;
+                %b:$$float4 = OpCompositeConstruct %p1 %r1;
+                result:$$float2x4 = OpCompositeConstruct %a %b;
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [NonUniformReturn]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
+    bool IsSphereHit()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtIsSphereHit";
+        case cuda:
+            {
+                __intrinsic_asm "optixHitObjectIsSphereHit";
+            }
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$bool = OpHitObjectIsSphereHitNV &this;
+            };
+        }
+    }
+
+    [__requiresNVAPI]
+    [NonUniformReturn]
+    [require(cuda_hlsl_spirv, raytracing_lss)]
+    bool IsLssHit()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "NvRtIsLssHit";
+        case cuda:
+            {
+                __intrinsic_asm "optixHitObjectIsLSSHit";
+            }
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_linear_swept_spheres";
+                OpCapability RayTracingLinearSweptSpheresGeometryNV;
+                result:$$bool = OpHitObjectIsLSSHitNV &this;
             };
         }
     }
@@ -20576,7 +20846,7 @@ struct HitObject
 
     /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     attr_t GetAttributes<attr_t>()
     {
         __target_switch
@@ -20598,6 +20868,7 @@ struct HitObject
                 // Return the attributes
                 return __hitObjectAttributes<attr_t>();
             }
+        case cuda: __intrinsic_asm "optixHitObjectGetAttribute<$TR>($0)";
         case spirv:
             {
                 __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
@@ -20988,13 +21259,14 @@ struct HitObject
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
-[require(glsl_hlsl_spirv, ser_raygen)]
+[require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "NvReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
+    case cuda: __intrinsic_asm "optixReorder";
     case spirv:
         spirv_asm 
         {
@@ -21025,13 +21297,14 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
-[require(glsl_hlsl_spirv, ser_raygen)]
+[require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "NvReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
+    case cuda: __intrinsic_asm "optixReorder($1, $2)";
     case spirv:
         spirv_asm 
         {
@@ -21052,13 +21325,14 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
-[require(glsl_hlsl_spirv, ser_raygen)]
+[require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss )
 {
     __target_switch
     {
     case hlsl: __intrinsic_asm "NvReorderThread";
     case glsl: __intrinsic_asm "reorderThreadNV";
+    case cuda: __intrinsic_asm "optixReorder()";
     case spirv:
         spirv_asm 
         {
@@ -22251,6 +22525,7 @@ enum DescriptorKind
     Buffer, /// A buffer descriptor.
     Sampler, /// A sampler state descriptor.
     AccelerationStructure, /// A ray tracing acceleration structure descriptor.
+    TexelBuffer /// A texel buffer descriptor.
 }
 
 enum DescriptorAccess
@@ -22303,7 +22578,9 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
 
     typealias Handle = DescriptorHandle<This>;
 
-    static const DescriptorKind kind = isCombined != 0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture;
+    static const DescriptorKind kind = (Shape.flavor == __ShapeBuffer.flavor ?
+        DescriptorKind.TexelBuffer : (isCombined != 0 ? DescriptorKind.CombinedTextureSampler : DescriptorKind.Texture)
+);
     static const DescriptorAccess descriptorAccess = (DescriptorAccess)access;
 
     __implicit_conversion($(kConversionCost_ImplicitDereference))
@@ -22422,8 +22699,36 @@ __prefix T operator*(DescriptorHandle<T> value)
     return getDescriptorFromHandle(value);
 }
 
+// https://registry.khronos.org/vulkan/specs/latest/man/html/VkDescriptorType.html
+enum DefaultVkBindlessBindings : uint
+{
+    Sampler = 0, /// SAMPLER
+    CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
+    Texture_Read = 2, /// SAMPLED_IMAGE
+    Texture_ReadWrite = 3, /// STORAGE_IMAGE
+    TexelBuffer_Read = 4, /// UNIFORM_TEXEL_BUFFER
+    TexelBuffer_ReadWrite = 5, /// STORAGE_TEXEL_BUFFER
+    Buffer_Read = 6, /// UNIFORM_BUFFER
+    Buffer_ReadWrite = 7, /// STORAGE_BUFFER
+    Unknown = 8, /// Other
+}
+
+// https://github.com/KhronosGroup/Vulkan-Docs/blob/main/proposals/VK_EXT_mutable_descriptor_type.adoc
+enum VkMutableBindlessBindings : uint
+{
+    Sampler = 0, /// SAMPLER
+    CombinedTextureSampler = 1, /// COMBINED_IMAGE_SAMPLER
+    Texture_Read = 2, /// SAMPLED_IMAGE
+    Texture_ReadWrite = 2, /// STORAGE_IMAGE
+    TexelBuffer_Read = 2, /// UNIFORM_TEXEL_BUFFER
+    TexelBuffer_ReadWrite = 2, /// STORAGE_TEXEL_BUFFER
+    Buffer_Read = 2, /// UNIFORM_BUFFER
+    Buffer_ReadWrite = 2, /// STORAGE_BUFFER,
+    Unknown = 3, /// Other
+}
+
 __intrinsic_op($(kIROp_GetDynamicResourceHeap))
-T[] __getDynamicResourceHeap<T:IOpaqueDescriptor>();
+T[] __getDynamicResourceHeap<T:IOpaqueDescriptor>(constexpr uint bindingIndex = 0);
 
 
 // Used by the HLSL backend only, load a sampler state handle from SamplerDescriptorHeap.
@@ -22442,10 +22747,16 @@ T __makeCombinedTextureSamplerFromHandle<T, U>(U handle);
 __intrinsic_op($(kIROp_CastDescriptorHandleToResource))
 T __castDescriptorHandleToResource<T:IOpaqueDescriptor>(DescriptorHandle<T> ptr);
 
+public enum BindlessDescriptorOptions
+{
+    None = 0,      /// Bind assuming regular binding model rules.
+    VkMutable = 1, /// **Current Default** Bind assuming `VK_EXT_mutable_descriptor_type`
+}
+
 /// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
 /// to a descriptor object.
 [ForceInline]
-T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue)
+T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
 {
     __target_switch
     {
@@ -22458,6 +22769,73 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
             return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
     case spirv:
     case glsl:
+
+        switch(bindlessOptions)
+        {
+${{{{
+{
+    static const struct 
+    {
+        char const* option;
+        char const* enumType;
+    }kBindlessOptions[] =
+    {
+        {"None", "DefaultVkBindlessBindings"},
+        {"VkMutable", "VkMutableBindlessBindings"},
+    };
+
+    for(auto bindlessOption : kBindlessOptions)
+    {
+        StringBuilder bindlessOptionIfElsePre;
+        StringBuilder bindlessOptionIfElsePost;
+
+        bindlessOptionIfElsePre << "case BindlessDescriptorOptions." << bindlessOption.option <<":\n{\n";
+        bindlessOptionIfElsePost << "}\n";
+}}}}
+    $(bindlessOptionIfElsePre.toString())
+    switch(T.kind)
+    {
+    case DescriptorKind.Sampler:
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Sampler)[((uint2)handleValue).x];
+    case DescriptorKind.CombinedTextureSampler:
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).CombinedTextureSampler)[((uint2)handleValue).x];
+    case DescriptorKind.Texture:
+    {
+        if(DescriptorAccess.Read == T.descriptorAccess)
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Texture_Read)[((uint2)handleValue).x];
+        else
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Texture_ReadWrite)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.TexelBuffer:
+    {
+        if(DescriptorAccess.Read == T.descriptorAccess)
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).TexelBuffer_Read)[((uint2)handleValue).x];
+        else
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).TexelBuffer_ReadWrite)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.Buffer:
+    {
+        if(DescriptorAccess.Read == T.descriptorAccess)
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Buffer_Read)[((uint2)handleValue).x];
+        else
+            return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Buffer_ReadWrite)[((uint2)handleValue).x];
+    }
+    case DescriptorKind.AccelerationStructure:
+        return __slang_noop_cast<T>(RaytracingAccelerationStructure(__asuint64((uint2)handleValue)));
+    default:
+        return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Unknown)[((uint2)handleValue).x];
+    }
+    $(bindlessOptionIfElsePost.toString())
+${{{{
+    }
+}
+}}}}
+    default:
+    {
+        static_assert(false, "Impossible to end up here unless something went very wrong");
+        return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
+    }
+    }
     case wgsl:
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
     default:
@@ -24028,6 +24406,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     //
 
     /// Store all elements of this CoopVec into a buffer at a specified offset.
+    /// Pointer accesses are 16-byte aligned.
     /// @param buffer The destination buffer to store the values into.
     /// @param byteOffset16ByteAligned The byte offset from the start of the buffer where the data will be stored. Must be 16-byte aligned.
     [require(cooperative_vector)]
@@ -24072,6 +24451,18 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             for(int i = 0; i < N; ++i)
                 buffer[i + __byteToElemOffset<T>(byteOffset16ByteAligned)] = this[i];
         }
+    }
+
+    [ForceInline]
+    [require(spirv, cooperative_vector)]
+    void store(T* buffer, int32_t byteOffset16ByteAligned = 0)
+    {
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16;
+        return spirv_asm
+        {
+            OpCooperativeVectorStoreNV $pointer $byteOffset16ByteAligned $this Aligned !alignment;
+        };
     }
 
     [ForceInline]
@@ -24127,6 +24518,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     }
 
     /// Load values from a byte-addressable buffer into a cooperative vector.
+    /// Pointer accesses are 16-byte aligned.
     /// @param buffer The source buffer to load data from.
     /// @param byteOffset16ByteAligned The byte offset from the start of the buffer. Must be 16-byte aligned.
     /// @return A new cooperative vector containing the loaded values.
@@ -24224,6 +24616,19 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 vec[i] = buffer[__byteToElemOffset<T>(byteOffset16ByteAligned) + i];
             return vec;
         }
+    }
+
+    [ForceInline]
+    [__NoSideEffect]
+    [require(spirv, cooperative_vector)]
+    static CoopVec<T, N> load(T* buffer, int32_t byteOffset16ByteAligned = 0)
+    {
+        let pointer = Ptr<T[]>(buffer);
+        let alignment = 16;
+        return spirv_asm
+        {
+            result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $pointer $byteOffset16ByteAligned Aligned !alignment;
+        };
     }
 
     // Groupshared
@@ -24779,16 +25184,16 @@ for(auto buffer : kByteAddressBufferCases) {
         __target_switch
         {
         case hlsl:
-            if (T is __BuiltinSignedArithmeticType)
+            if (__isFloat<T>() || __isSignedInt<T>())
             {
-                if (U is __BuiltinSignedArithmeticType)
+                if (__isFloat<U>() || __isSignedInt<U>())
                     __intrinsic_asm "__builtin_MatVecMul($0, false,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
                 else
                     __intrinsic_asm "__builtin_MatVecMul($0, false,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
             }
             else
             {
-                if (U is __BuiltinSignedArithmeticType)
+                if (__isFloat<U>() || __isSignedInt<U>())
                     __intrinsic_asm "__builtin_MatVecMul($0, true,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
                 else
                     __intrinsic_asm "__builtin_MatVecMul($0, true,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
@@ -24811,16 +25216,16 @@ for(auto buffer : kByteAddressBufferCases) {
         __target_switch
         {
         case hlsl:
-            if (T is __BuiltinSignedArithmeticType)
+            if (__isFloat<T>() || __isSignedInt<T>())
             {
-                if (U is __BuiltinSignedArithmeticType)
+                if (__isFloat<U>() || __isSignedInt<U>())
                     __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
                 else
                     __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
             }
             else
             {
-                if (U is __BuiltinSignedArithmeticType)
+                if (__isFloat<U>() || __isSignedInt<U>())
                     __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
                 else
                     __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
@@ -25590,6 +25995,13 @@ CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(StructuredBu
 [ForceInline]
 [require(cooperative_vector)]
 CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(RWStructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
+{
+    return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
+}
+
+[ForceInline]
+[require(spirv, cooperative_vector)]
+CoopVec<T, N> coopVecLoad<let N : int, T : __BuiltinArithmeticType>(T* buffer, int32_t byteOffset16ByteAligned = 0)
 {
     return CoopVec<T, N>.load(buffer, byteOffset16ByteAligned);
 }

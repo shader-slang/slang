@@ -86,15 +86,13 @@ class ContainerDecl : public Decl
 
     Index getDeclIndex(Decl* d);
 
-    SLANG_UNREFLECTED // We don't want to reflect the following fields
-
-        private :
-        // Denotes how much of Members has been placed into the dictionary/transparentMembers.
-        // If this value equals the Members.getCount(), the dictionary is completely full and valid.
-        // If it's >= 0, then the Members after dictionaryLastCount are all that need to be added.
-        // If it < 0 it means that the dictionary/transparentMembers is invalid and needs to be
-        // recreated.
-        Index dictionaryLastCount = 0;
+private:
+    // Denotes how much of Members has been placed into the dictionary/transparentMembers.
+    // If this value equals the Members.getCount(), the dictionary is completely full and valid.
+    // If it's >= 0, then the Members after dictionaryLastCount are all that need to be added.
+    // If it < 0 it means that the dictionary/transparentMembers is invalid and needs to be
+    // recreated.
+    Index dictionaryLastCount = 0;
 
     // Dictionary for looking up members by name.
     // This is built on demand before performing lookup.
@@ -192,7 +190,7 @@ FIDDLE()
 class StructDecl : public AggTypeDecl
 {
     FIDDLE(...)
-    SLANG_UNREFLECTED
+
     // We will use these auxiliary to help in synthesizing the member initialize constructor.
     Slang::HashSet<VarDeclBase*> m_membersVisibleInCtor;
 };
@@ -527,19 +525,16 @@ class ModuleDecl : public NamespaceDeclBase
     ///
     FIDDLE() OrderedDictionary<Decl*, RefPtr<DeclAssociationList>> mapDeclToAssociatedDecls;
 
-    /// Whether the module is defined in legacy language.
-    /// The legacy Slang language does not have visibility modifiers and everything is treated as
-    /// `public`. Newer version of the language introduces visibility and makes `internal` as the
-    /// default. To prevent this from breaking existing code, we need to know whether a module is
-    /// written in the legacy language. We detect this by checking whether the module has any
-    /// visibility modifiers, or if the module uses new language constructs, e.g. `module`,
-    /// `__include`,
-    /// `__implementing` etc.
-    FIDDLE() bool isInLegacyLanguage = true;
+    /// Whether Slang language version the module is defined in.
+    /// The legacy Slang language (2025) does not have visibility modifiers and everything is
+    /// treated as `public`. Newer version of the language introduces visibility and makes
+    /// `internal` as the default. To prevent this from breaking existing code, we need to know
+    /// whether a module is written in the legacy language. We detect this by checking whether the
+    /// module has any visibility modifiers, or if the module uses new language constructs, e.g.
+    /// `module`, `__include`, `__implementing` etc.
+    FIDDLE() SlangLanguageVersion languageVersion = SLANG_LANGAUGE_VERSION_DEFAULT;
 
     FIDDLE() DeclVisibility defaultVisibility = DeclVisibility::Internal;
-
-    SLANG_UNREFLECTED
 
     /// Map a type to the list of extensions of that type (if any) declared in this module
     ///
@@ -564,7 +559,6 @@ class UsingDecl : public Decl
     /// An expression that identifies the entity (e.g., a namespace) to be brought into `scope`
     Expr* arg = nullptr;
 
-    SLANG_UNREFLECTED
     /// The scope that the entity named by `arg` will be brought into
     Scope* scope = nullptr;
 };
@@ -580,7 +574,6 @@ class FileReferenceDeclBase : public Decl
     SourceLoc startLoc;
     SourceLoc endLoc;
 
-    SLANG_UNREFLECTED
     // The scope that we want to import into
     Scope* scope = nullptr;
 };
@@ -723,8 +716,6 @@ class SyntaxDecl : public Decl
     // What type of syntax node will be produced when parsing with this keyword?
     FIDDLE() SyntaxClass<NodeBase> syntaxClass;
 
-    SLANG_UNREFLECTED
-
     // Callback to invoke in order to parse syntax with this keyword.
     SyntaxParseCallback parseCallback = nullptr;
     void* parseUserData = nullptr;
@@ -758,7 +749,7 @@ class DerivativeRequirementDecl : public FunctionDeclBase
 // A reference to a synthesized decl representing a differentiable function requirement, this decl
 // will be a child in the orignal function.
 FIDDLE()
-class DerivativeRequirementReferenceDecl : public FunctionDeclBase
+class DerivativeRequirementReferenceDecl : public Decl
 {
     FIDDLE(...)
     FIDDLE() DerivativeRequirementDecl* referencedDecl;
