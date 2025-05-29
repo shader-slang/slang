@@ -3228,7 +3228,8 @@ __forceinline__ __device__ float4 optixGetSpherePositionAndRadius()
     return data[0];
 }
 
-__forceinline__ __device__ float4 optixHitObjectGetSpherePositionAndRadius(OptixTraversableHandle* Obj)
+__forceinline__ __device__ float4
+optixHitObjectGetSpherePositionAndRadius(OptixTraversableHandle* Obj)
 {
     float4 data[1];
     optixHitObjectGetSphereData(data);
@@ -3239,14 +3240,15 @@ __forceinline__ __device__ Matrix<float, 2, 4> optixGetLssPositionsAndRadii()
 {
     float4 data[2];
     optixGetLinearCurveVertexData(data);
-    return  makeMatrix<float, 2, 4>(data[0], data[1]);
+    return makeMatrix<float, 2, 4>(data[0], data[1]);
 }
 
-__forceinline__ __device__ Matrix<float, 2, 4> optixHitObjectGetLssPositionsAndRadii(OptixTraversableHandle* Obj)
+__forceinline__ __device__ Matrix<float, 2, 4> optixHitObjectGetLssPositionsAndRadii(
+    OptixTraversableHandle* Obj)
 {
     float4 data[2];
     optixHitObjectGetLinearCurveVertexData(data);
-    return  makeMatrix<float, 2, 4>(data[0], data[1]);
+    return makeMatrix<float, 2, 4>(data[0], data[1]);
 }
 
 __forceinline__ __device__ bool optixIsSphereHit()
