@@ -45,7 +45,7 @@ static bool isSlang2026OrNewer(SemanticsVisitor* visitor)
     return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
            SLANG_LANGUAGE_VERSION_2026;
 }
-    // Not 2025 **or older** since spec does not specify this.
+// Not 2025 **or older** since spec does not specify this.
 // This works fine since older slang revisions do not have `dyn` on vardecl's by default.
 static bool allowExperimentalDynamicDispatch(
     SemanticsVisitor* visitor,
@@ -78,7 +78,10 @@ static Type* createSomeTypeDeclType(ASTBuilder* astBuilder, TypeExp type, Source
     return DeclRefType::create(astBuilder, decl);
 }
 
-static Type* createUnboundSomeTypeDeclType(ASTBuilder* astBuilder, SomeTypeDecl* someType, SourceLoc loc)
+static Type* createUnboundSomeTypeDeclType(
+    ASTBuilder* astBuilder,
+    SomeTypeDecl* someType,
+    SourceLoc loc)
 {
     SLANG_ASSERT(someType);
 
@@ -88,11 +91,10 @@ static Type* createUnboundSomeTypeDeclType(ASTBuilder* astBuilder, SomeTypeDecl*
     return DeclRefType::create(astBuilder, decl);
 }
 
-static void maybeCreateUnboundSomeTypeDeclFromReturnType(
-    FuncDecl* funcDecl,
-    ASTBuilder* astBuilder)
+static void maybeCreateUnboundSomeTypeDeclFromReturnType(FuncDecl* funcDecl, ASTBuilder* astBuilder)
 {
-    // If type is `out` (not implementing complex-expression `Out<>`) or uninitialized VarDecl we make an UnboundSomeType given a SomeType
+    // If type is `out` (not implementing complex-expression `Out<>`) or uninitialized VarDecl we
+    // make an UnboundSomeType given a SomeType
     auto someType = isDeclRefTypeOf<SomeTypeDecl>(funcDecl->returnType.type);
     if (!someType)
         return;
@@ -105,19 +107,16 @@ static void maybeCreateUnboundSomeTypeDeclFromVarDecl(VarDeclBase* varDecl, ASTB
     // If type is `out` or uninitialized we
     // make an UnboundSomeType
     auto someType = isDeclRefTypeOf<SomeTypeDecl>(varDecl->type.type);
-    if (someType && (as<VarDecl>(varDecl) ||
-                     as<ParamDecl>(varDecl) && !varDecl->hasModifier<InOutModifier>() &&
-                         varDecl->hasModifier<OutModifier>()))
+    if (someType &&
+        (as<VarDecl>(varDecl) || as<ParamDecl>(varDecl) && !varDecl->hasModifier<InOutModifier>() &&
+                                     varDecl->hasModifier<OutModifier>()))
     {
         varDecl->type.type =
             createUnboundSomeTypeDeclType(astBuilder, someType.getDecl(), varDecl->loc);
     }
 }
 
-static void forceInterfaceQualifierToType(
-    Decl* decl,
-    TypeExp& type,
-    SemanticsVisitor* visitor)
+static void forceInterfaceQualifierToType(Decl* decl, TypeExp& type, SemanticsVisitor* visitor)
 {
     ASTBuilder* astBuilder = visitor->getASTBuilder();
 
@@ -130,7 +129,7 @@ static void forceInterfaceQualifierToType(
         visitor->getSink()->diagnose(decl, Diagnostics::cannotBeSomeTypeAndDynType);
         return;
     }
-    
+
     // Add implicit qualifers
     if (!explicitSome && !explicitDyn)
     {
@@ -141,14 +140,13 @@ static void forceInterfaceQualifierToType(
         if (isImplicitDyn(visitor))
             addModifier(decl, astBuilder->create<DynModifier>());
         else if (isImplicitSome(visitor))
-            type.type = createSomeTypeDeclType(
-                astBuilder,
-                type,
-                decl->loc);
+            type.type = createSomeTypeDeclType(astBuilder, type, decl->loc);
     }
 }
 
-static void assignInterfaceDefinitionDynModifier(SemanticsDeclVisitorBase* visitor, InterfaceDecl* interfaceDecl)
+static void assignInterfaceDefinitionDynModifier(
+    SemanticsDeclVisitorBase* visitor,
+    InterfaceDecl* interfaceDecl)
 {
     if (interfaceDecl->hasModifier<DynModifier>())
         return;
@@ -178,10 +176,9 @@ static bool isVarDeclBaseDynType(VarDeclBase* varDeclBase)
     return true;
 }
 
-// This is called during the same pass types are resolved for VarDecl/ParamDecl. Otherwise we may change types after getFuncType() which would break things
-static void validateSomeAndDynVarDeclUsage(
-    SemanticsDeclVisitorBase* visitor,
-    VarDeclBase* decl)
+// This is called during the same pass types are resolved for VarDecl/ParamDecl. Otherwise we may
+// change types after getFuncType() which would break things
+static void validateSomeAndDynVarDeclUsage(SemanticsDeclVisitorBase* visitor, VarDeclBase* decl)
 {
     auto sink = visitor->getSink();
     auto optionSet = visitor->getOptionSet();
@@ -200,7 +197,7 @@ static void validateSomeAndDynVarDeclUsage(
     else if (isVarDeclBaseDynType(decl))
     {
         auto declRefInterface = isDeclRefTypeOf<InterfaceDecl>(decl->getType());
-        
+
         // must be interfaceType decl
         if (!declRefInterface)
         {
@@ -221,9 +218,7 @@ static void validateSomeAndDynVarDeclUsage(
     }
 }
 
-static void validateDynInterfaceUsage(
-    SemanticsDeclVisitorBase* visitor,
-    InterfaceDecl* decl)
+static void validateDynInterfaceUsage(SemanticsDeclVisitorBase* visitor, InterfaceDecl* decl)
 {
     auto sink = visitor->getSink();
     auto optionSet = visitor->getOptionSet();
@@ -291,14 +286,9 @@ static void validateDynInterfaceUsage(
     }
 }
 
-static void validateSomeAndDynFuncDeclUsage(
-    SemanticsDeclVisitorBase* visitor,
-    FuncDecl* funcDecl)
+static void validateSomeAndDynFuncDeclUsage(SemanticsDeclVisitorBase* visitor, FuncDecl* funcDecl)
 {
-    forceInterfaceQualifierToType(
-        funcDecl,
-        funcDecl->returnType,
-        visitor);
+    forceInterfaceQualifierToType(funcDecl, funcDecl->returnType, visitor);
     maybeCreateUnboundSomeTypeDeclFromReturnType(funcDecl, visitor->getASTBuilder());
 
     CompilerOptionSet& optionSet = visitor->getOptionSet();
@@ -309,7 +299,7 @@ static void validateSomeAndDynFuncDeclUsage(
         return;
 
     DiagnosticSink* sink = visitor->getSink();
-    
+
     // given 'dyn':
     // not allowed mutating attribute
     // not allowed differentiable attribute

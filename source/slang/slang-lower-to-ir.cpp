@@ -8256,9 +8256,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     {
         return LoweredValInfo();
     }
-    
+
     LoweredValInfo visitSomeTypeDecl(SomeTypeDecl* decl)
-    { 
+    {
         auto declRefType = as<DeclRefType>(decl->interfaceType.type);
         SLANG_ASSERT(declRefType);
         auto loweredType = lowerType(this->context, declRefType);

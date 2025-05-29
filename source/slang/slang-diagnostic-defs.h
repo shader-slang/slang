@@ -835,10 +835,7 @@ DIAGNOSTIC(33070, Error, expectedFunction, "expected a function, got '$0'")
 DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 
 // `dyn` and `some` errors
-DIAGNOSTIC(33072,
-    Error,
-    cannotHaveGenericDynInterface,
-    "dyn interfaces cannot be generic: '$0'.")
+DIAGNOSTIC(33072, Error, cannotHaveGenericDynInterface, "dyn interfaces cannot be generic: '$0'.")
 DIAGNOSTIC(
     33073,
     Error,
@@ -894,11 +891,7 @@ DIAGNOSTIC(
     Error,
     cannotDeclareNonInterfaceSomeType,
     "cannot declare non-interface type '$0' with 'some'.")
-DIAGNOSTIC(
-    33084,
-    Error,
-    cannotHaveSomeTypeStructMember,
-    "cannot have 'some' type struct member.")
+DIAGNOSTIC(33084, Error, cannotHaveSomeTypeStructMember, "cannot have 'some' type struct member.")
 DIAGNOSTIC(
     33085,
     Error,
@@ -919,11 +912,7 @@ DIAGNOSTIC(
     Error,
     someCannotAppearInComplexExpression,
     "cannot use 'some' in a complex expression, must be a simple interface expression.")
-DIAGNOSTIC(
-    33089,
-    Error,
-    cannotBeSomeTypeAndDynType,
-    "cannot make a type 'some' and 'dyn'")
+DIAGNOSTIC(33089, Error, cannotBeSomeTypeAndDynType, "cannot make a type 'some' and 'dyn'")
 DIAGNOSTIC(
     33090,
     Error,
