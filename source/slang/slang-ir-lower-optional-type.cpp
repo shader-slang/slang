@@ -82,7 +82,10 @@ struct OptionalTypeLoweringContext
             outKind = LoweredOptionalTypeKind::PtrValue;
             return true;
         case kIROp_InterfaceType:
-            outKind = LoweredOptionalTypeKind::ExistentialValue;
+            if (isComInterfaceType((IRType*)type))
+                outKind = LoweredOptionalTypeKind::PtrValue;
+            else
+                outKind = LoweredOptionalTypeKind::ExistentialValue;
             return true;
         default:
             return false;

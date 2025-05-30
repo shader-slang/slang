@@ -789,20 +789,6 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    switch (target)
-    {
-    case CodeGenTarget::CPPSource:
-    case CodeGenTarget::HostCPPSource:
-        {
-            lowerComInterfaces(irModule, artifactDesc.style, sink);
-            generateDllImportFuncs(codeGenContext->getTargetProgram(), irModule, sink);
-            generateDllExportFuncs(irModule, sink);
-            break;
-        }
-    default:
-        break;
-    }
-
 #if 0
     dumpIRIfEnabled(codeGenContext, irModule, "UNIONS DESUGARED");
 #endif
@@ -977,6 +963,20 @@ Result linkAndOptimizeIR(
 
     if (requiredLoweringPassSet.optionalType)
         lowerOptionalType(irModule, sink);
+
+    switch (target)
+    {
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::HostCPPSource:
+        {
+            lowerComInterfaces(irModule, artifactDesc.style, sink);
+            generateDllImportFuncs(codeGenContext->getTargetProgram(), irModule, sink);
+            generateDllExportFuncs(irModule, sink);
+            break;
+        }
+    default:
+        break;
+    }
 
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());

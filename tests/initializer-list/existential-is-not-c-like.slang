@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
+#lang 2026
 interface IBSDF
 {
     float3 eval(float3 wi, float3 wo);
