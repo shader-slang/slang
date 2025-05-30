@@ -1,14 +1,8 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -render-feature cooperative-vector -dx12-experimental -use-dxil -output-using-type -profile cs_6_8 -Xslang... -Xdxc -Vd -X. -capability hlsl_coopvec_poc
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST:SIMPLE(filecheck=CHECK): -target cuda
 
-// Hilariously low precision because the different APIs don't agree (they're
-// not specced to of course, so it's ok)
-// CHECK: type: float
-// CHECK-NEXT: 0.761
-// CHECK-NEXT: 0.964
-// CHECK-NEXT: 0.995
-// CHECK-NEXT: 0.999
+// CHECK: OptixCoopVec
+// CHECK: optixCoopVecTanh
+
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -16,8 +10,18 @@ RWStructuredBuffer<float> outputBuffer;
 //TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0], stride=4),name=input
 ByteAddressBuffer input;
 
+struct RayPayload
+{
+    float4 color;
+    float2x4 lssData;
+    bool isSphere;
+    bool isLss;
+};
+
+
 [numthreads(1, 1, 1)]
-void computeMain()
+[shader("closesthit")]
+void closestHitShaderLss(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr)
 {
     CoopVec<float, 4> vec = coopVecLoad<4, float>(input);
 

@@ -29,6 +29,8 @@
 #include <cuda_fp16.h>
 #endif
 
+#define SLANG_CUDA_ENABLE_OPTIX
+
 #ifdef SLANG_CUDA_ENABLE_OPTIX
 #include <optix.h>
 #endif
