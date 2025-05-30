@@ -1021,6 +1021,7 @@ typedef uint32_t SlangSizeT;
 
         SkipDownstreamLinking, // bool, experimental
         DumpModule,
+        EmitSeparateDebug, // bool
 
         EnableExperimentalDynamicDispatch, // bool, experimental
         LanguageVersion,                   // intValue0: SlangLanguageVersion
