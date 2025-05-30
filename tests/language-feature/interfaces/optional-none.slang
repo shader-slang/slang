@@ -1,6 +1,6 @@
 // Test that the size of an optional interface type is the same as the existential box.
 
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -profile cs_6_0
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -conformance "Impl1:IFoo=1" -entry computeMain -profile cs_6_0
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER): -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUFFER): -vk -shaderobj -output-using-type
 

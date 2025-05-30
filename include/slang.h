@@ -906,7 +906,9 @@ typedef uint32_t SlangSizeT;
         DisableSourceMap,               // bool
         UnscopedEnum,                   // bool
         PreserveParameters, // bool: preserve all resource parameters in the output code.
-
+        TypeConformance,    // stringValue0: additional type conformance to link, in the format of
+                            // "<TypeName>:<IInterfaceName>[=<sequentialId>]", for example
+                            // "Impl:IFoo=3" or "Impl:IFoo".
         // Target
 
         Capability,                // intValue0: CapabilityName
@@ -998,8 +1000,8 @@ typedef uint32_t SlangSizeT;
         TrackLiveness,
         LoopInversion, // bool, enable loop inversion optimization
 
-        // Deprecated
-        ParameterBlocksUseRegisterSpaces,
+        ParameterBlocksUseRegisterSpaces, // Deprecated
+        LanguageVersion,                  // intValue0: SlangLanguageVersion
 
         CountOfParsableOptions,
 
@@ -1023,7 +1025,6 @@ typedef uint32_t SlangSizeT;
         DumpModule,
 
         EnableExperimentalDynamicDispatch, // bool, experimental
-        LanguageVersion,                   // intValue0: SlangLanguageVersion
         CountOf,
     };
 
