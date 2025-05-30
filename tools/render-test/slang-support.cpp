@@ -251,11 +251,13 @@ static SlangResult _compileProgramImpl(
 
     String source(request.source.dataBegin, request.source.dataEnd);
     ComPtr<slang::IBlob> diagnostics;
-    ComPtr<slang::IModule> module(slangSession->loadModuleFromSourceString(
-        "main",
-        request.source.path,
-        source.getBuffer(),
-        diagnostics.writeRef()));
+    ComPtr<slang::IModule> module(
+        InitAttach::INIT_ATTACH,
+        slangSession->loadModuleFromSourceString(
+            "main",
+            request.source.path,
+            source.getBuffer(),
+            diagnostics.writeRef()));
     if (!module)
     {
         fprintf(

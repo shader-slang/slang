@@ -4383,7 +4383,7 @@ RefPtr<Module> Linkage::loadSourceModuleImpl(
 
     frontEndReq->addTranslationUnit(translationUnit);
 
-    auto module = translationUnit->getModule();
+    RefPtr<Module> module = translationUnit->getModule();
 
     ModuleBeingImportedRAII moduleBeingImported(this, module, name, srcLoc);
 
