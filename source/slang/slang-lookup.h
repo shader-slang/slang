@@ -22,7 +22,8 @@ LookupResult lookUp(
     LookupMask mask = LookupMask::Default,
     bool considerAllLocalNamesInScope = false,
     Decl* declToExclude = nullptr,
-    bool ignoreTransparentMembers = false);
+    bool ignoreTransparentMembers = false,
+    bool checkBlockName = false);
 
 // Perform member lookup in the context of a type
 LookupResult lookUpMember(

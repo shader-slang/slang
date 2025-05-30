@@ -253,6 +253,21 @@ static void _lookUpDirectAndTransparentMembers(
         // path as we used in referring to its parent.
         DeclRef<Decl> transparentMemberDeclRef =
             astBuilder->getMemberDeclRef(parentDeclRef, transparentInfo.decl);
+
+        // Search the block name
+        if ((((int32_t)request.options & (int32_t)LookupOptions::CheckBlockName) != 0)
+            && transparentInfo.decl) {
+            char blockName[50];
+            snprintf(blockName, sizeof(blockName), "SLANG_parameterGroup_%s", name->text.begin());
+            if (strcmp(transparentInfo.decl->getName()->text.begin(), blockName) == 0)
+            {
+                AddToLookupResult(
+                    result,
+                    CreateLookupResultItem(
+                        astBuilder->getMemberDeclRef<Decl>(parentDeclRef, transparentInfo.decl),
+                        inBreadcrumbs));
+            }
+        }
         if (transparentMemberDeclRef.getDecl() == request.declToExclude)
             continue;
 
@@ -1082,15 +1097,21 @@ LookupResult lookUp(
     LookupMask mask,
     bool considerAllLocalNamesInScope,
     Decl* declToExclude,
-    bool ignoreTransparentMembers)
+    bool ignoreTransparentMembers,
+    bool checkBlockName)
 {
     LookupResult result;
     const auto options =
         (LookupOptions)((int)(considerAllLocalNamesInScope
                                   ? LookupOptions::ConsiderAllLocalNamesInScope
                                   : LookupOptions::None) |
-                        (int)(ignoreTransparentMembers ? LookupOptions::IgnoreTransparentMembers
-                                                       : LookupOptions::None));
+                        (int)(ignoreTransparentMembers
+                                  ? LookupOptions::IgnoreTransparentMembers
+                                  : LookupOptions::None) |
+                        (int)(checkBlockName
+                                  ? LookupOptions::CheckBlockName
+                                  : LookupOptions::None));
+
     LookupRequest request = initLookupRequest(semantics, name, mask, options, scope, declToExclude);
     _lookUpInScopes(astBuilder, name, request, result);
     return result;
