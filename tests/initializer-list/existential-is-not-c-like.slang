@@ -1,5 +1,7 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+// Test that in Slang 2026, it is no longer valid to default initialize an existential value.
 #lang 2026
+
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
 interface IBSDF
 {
     float3 eval(float3 wi, float3 wo);
