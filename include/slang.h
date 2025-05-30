@@ -2272,9 +2272,9 @@ struct TypeReflection
     }
 
     // only useful if `getKind() == Kind::Array`
-    size_t getElementCount()
+    size_t getElementCount(SlangReflection* reflection = nullptr)
     {
-        return spReflectionType_GetElementCount((SlangReflectionType*)this);
+        return spReflectionType_GetSpecializedElementCount((SlangReflectionType*)this, reflection);
     }
 
     size_t getTotalArrayElementCount()
@@ -2435,6 +2435,8 @@ enum class BindingType : SlangBindingTypeIntegral
     ExtMask = SLANG_BINDING_TYPE_EXT_MASK,
 };
 
+struct ShaderReflection;
+
 struct TypeLayoutReflection
 {
     TypeReflection* getType()
@@ -2524,7 +2526,10 @@ struct TypeLayoutReflection
     }
 
     // only useful if `getKind() == Kind::Array`
-    size_t getElementCount() { return getType()->getElementCount(); }
+    size_t getElementCount(ShaderReflection* reflection = nullptr)
+    {
+        return getType()->getElementCount((SlangReflection*)reflection);
+    }
 
     size_t getTotalArrayElementCount() { return getType()->getTotalArrayElementCount(); }
 
