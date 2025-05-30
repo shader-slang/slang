@@ -1191,6 +1191,13 @@ top:
                 lowered = extractField(context, boundMemberInfo->type, base, fieldDeclRef);
                 goto top;
             }
+            else if (auto methodDeclRef = declRef.as<CallableDecl>())
+            {
+                auto funcVal = emitDeclRef(context, declRef, boundMemberInfo->type);
+                SLANG_RELEASE_ASSERT(funcVal.flavor == LoweredValInfo::Flavor::Simple);
+                lowered = funcVal;
+                goto top;
+            }
             else
             {
 
@@ -4583,7 +4590,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         else if (auto callableDeclRef = declRef.as<CallableDecl>())
         {
             RefPtr<BoundMemberInfo> boundMemberInfo = new BoundMemberInfo();
-            boundMemberInfo->type = nullptr;
+            boundMemberInfo->type =
+                lowerType(context, getResultType(context->astBuilder, callableDeclRef));
             boundMemberInfo->base = loweredBase;
             boundMemberInfo->declRef = callableDeclRef;
 

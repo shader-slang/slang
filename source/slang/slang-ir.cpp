@@ -1827,7 +1827,7 @@ IRInst* IRBuilder::_createInst(
     m_dedupContext->getInstReplacementMap().tryGetValue(type, instReplacement);
     type = (IRType*)instReplacement;
 
-    if (isInstHoistable(op, type))
+    if (isInstHoistable(op, type, fixedArgs))
     {
         return _findOrEmitHoistableInst(
             type,
@@ -4465,6 +4465,12 @@ IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, UInt element
         break;
     }
     return emitGetTupleElement(type, tuple, getIntValue(getIntType(), element));
+}
+
+IRInst* IRBuilder::emitCoopMatMapElementFunc(IRType* type, IRInst* tuple, IRInst* func)
+{
+    IRInst* args[] = {tuple, func};
+    return emitIntrinsicInst(type, kIROp_CoopMatMapElementIFunc, 2, args);
 }
 
 IRInst* IRBuilder::emitMakeResultError(IRType* resultType, IRInst* errorVal)

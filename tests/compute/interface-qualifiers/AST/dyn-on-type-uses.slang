@@ -173,10 +173,6 @@ struct structWithNonCopyable2 : IBase6
     NonCopyableStruct2<int> v;
 };
 
-// `dyn` interfaces cannot contain any methods that has a `some` IFoo return type, or has any `some` IFoo parameters.
-// TODO-INTERFACE-QUALIFIERS-ADDITION-OF-SOME
-//
-
 RWStructuredBuffer<int> outputBuffer;
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
