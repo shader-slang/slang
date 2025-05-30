@@ -17986,7 +17986,7 @@ float2x4 GetLssPositionsAndRadii()
     case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
     case cuda:
         {
-            __intrinsic_asm "optixObjectPositionsAndRadii";
+            __intrinsic_asm "optixGetLssPositionsAndRadii";
         }
     case spirv:
         return spirv_asm
@@ -20671,7 +20671,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
         case cuda:
             {
-                __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
+                __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii";
             }
         case spirv:
             return spirv_asm
@@ -23415,6 +23415,23 @@ struct CoopMat
         };
     }
 
+    __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
+    internal static This __MapElement<
+        TOperator,
+        TFunc : IFunc<T, uint32_t, uint32_t, T>
+    >(
+        This coopMat,
+        TOperator mapOp,
+        TFunc mapObj
+    );
+
+    This MapElement<
+        TFunc : IFunc<T, uint32_t, uint32_t, T>
+    >(TFunc mapOp)
+    {
+        return __MapElement(this, mapOp.operator(), mapOp);
+    }
+
     //
     // Store
     //
@@ -24276,7 +24293,35 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     };
 }
 
+extension<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : linalg.CoopMatMatrixUse,
+    each Ts : __BuiltinArithmeticType
+> Tuple<linalg.CoopMat<T, S, M, N, R>, expand linalg.CoopMat<each Ts, S, M, N, R>>
+{
+    __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
+    CoopMat<T, S, M, N, R> MapElement(functype(uint32_t, uint32_t, T, expand each Ts)->T mapOp);
+
+    __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
+    static CoopMat<T, S, M, N, R> __MapElement<
+        TOperator,
+        TFunc : IFunc<T, uint32_t, uint32_t, T, expand each Ts>
+    >(This tuple, TOperator mapOp, TFunc mapObj);
+
+    [ForceInline]
+    CoopMat<T, S, M, N, R> MapElement<
+        TFunc : IFunc<T, uint32_t, uint32_t, T, expand each Ts>
+    >(TFunc mapOp)
+    {
+        return __MapElement(this, mapOp.operator(), mapOp);
+    }
+};
+
 } // namespace linalg
+
 
 //
 // Cooperative Vector
