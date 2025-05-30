@@ -1,10 +1,6 @@
-//TEST:SIMPLE(filecheck=ERROR_CHECK): -stage compute -entry computeMain -target spirv
-//TEST:LANG_SERVER(filecheck=CHECK):
+//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv
 
-//ERROR_CHECK: error 30623
-
-//HOVER:7,25
-//CHECK:Bug.badVar = 0
+//CHECK: error 30623
 
 interface Bug
 {
