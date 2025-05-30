@@ -33,7 +33,7 @@ jobs:
           - { os: macos, compiler: gcc }
           - { os: macos, compiler: cl }
         include:
-          - { os: linux, runs-on: ubuntu-latest }
+          - { os: linux, runs-on: ubuntu-22.04 }
           - { os: macos, runs-on: macos-latest }
           - { os: windows, runs-on: windows-latest }
           # Warnings are treated as errors by default.
@@ -123,6 +123,11 @@ jobs:
               sudo apt-get update
               sudo apt-get install -y libx11-dev
           fi
+      - name: Setup Node.js
+        if: matrix.os == 'linux'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
       - name: Setup
         if: steps.filter.outputs.should-run == 'true'
         uses: ./.github/actions/common-setup
@@ -246,6 +251,31 @@ jobs:
             -expected-failure-list tests/expected-failure.txt \
             -skip-reference-image-generation \
             -show-adapter-info
+      - name: slang-rhi tests
+        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
+        shell: pwsh
+        run: |
+          if (!(Test-Path -Path "external/slang-rhi/build")) {
+            Write-Host "Building slang-rhi if it doesn't exist"
+            Push-Location external/slang-rhi
+            cmake --preset msvc -S . -B build
+            cmake --build build --config ${{matrix.config}}
+            Write-Host "Copying DLLs from bin directory to slang-rhi build location..."
+            Copy-Item -Path "$bin_dir\*.dll" -Destination "build\${{matrix.config}}" -Force
+            Pop-Location
+          }
+          $testExe = Get-ChildItem -Path "external/slang-rhi/build" -Recurse -Filter "slang-rhi-tests.exe" | Select-Object -First 1
+          if ($testExe) {
+              Write-Host "Found slang-rhi tests executable at: $($testExe.FullName)"
+              $testDir = $testExe.Directory.FullName
+              Push-Location $testDir
+              Write-Host "Running slang-rhi tests..."
+              .\slang-rhi-tests.exe
+              Pop-Location
+          } else {
+              Write-Error "Could not find slang-rhi-tests.exe"
+              exit 1
+          }
       - name: Run slangpy tests
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         shell: pwsh

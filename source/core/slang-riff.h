@@ -16,6 +16,7 @@
 //
 
 #include "slang-basic.h"
+#include "slang-internally-linked-list.h"
 #include "slang-memory-arena.h"
 #include "slang-stream.h"
 #include "slang-writer.h"
@@ -303,7 +304,7 @@ public:
     BoundsCheckedChunkPtr() {}
 
     /// Initialize a null pointer
-    BoundsCheckedChunkPtr(nullptr_t) {}
+    BoundsCheckedChunkPtr(std::nullptr_t) {}
 
 
     /// Initialize a pointer to a chunk, with a size limit.
@@ -563,73 +564,6 @@ T const* as(Chunk const* chunk)
         return nullptr;
     return static_cast<T const*>(chunk);
 }
-
-/// A linked list where the elements are themselves the nodes.
-///
-template<typename T>
-struct InternallyLinkedList
-{
-public:
-    struct Node
-    {
-    public:
-        Node() {}
-
-    private:
-        friend struct InternallyLinkedList<T>;
-        T* _next = nullptr;
-    };
-
-    struct Iterator
-    {
-    public:
-        Iterator() {}
-
-        Iterator(T* node)
-            : _node(node)
-        {
-        }
-
-        T* operator*() const { return _node; }
-
-        void operator++() { _node = static_cast<Node const*>(_node)->_next; }
-
-        bool operator!=(Iterator const& that) const { return _node != that._node; }
-
-    private:
-        T* _node = nullptr;
-    };
-
-    Iterator begin() { return Iterator(_first); }
-
-    Iterator end() { return Iterator(); }
-
-    T* getFirst() const { return _first; }
-
-    T* getLast() const { return _last; }
-
-    void add(T* element)
-    {
-        if (!_last)
-        {
-            SLANG_ASSERT(_first == nullptr);
-
-            _first = element;
-            _last = element;
-        }
-        else
-        {
-            SLANG_ASSERT(_first != nullptr);
-
-            _last->_next = element;
-            _last = element;
-        }
-    }
-
-private:
-    T* _first = nullptr;
-    T* _last = nullptr;
-};
 
 /// A builder for a chunk in a RIFF.
 class ChunkBuilder : public InternallyLinkedList<ChunkBuilder>::Node
