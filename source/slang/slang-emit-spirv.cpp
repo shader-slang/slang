@@ -784,18 +784,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             switch (irOpCode)
             {
             case kIROp_IntCast:
-                {
-                    auto typeStyle = getTypeStyle(basicType->getBaseType());
-                    if (typeStyle == kIROp_FloatType)
-                    {
-                        return SpvOpConvertFToU;
-                    }
-                    else if (typeStyle == kIROp_IntType)
-                    {
-                        return SpvOpUConvert;
-                    }
-                    break;
-                }
+                return SpvOpUConvert;
+            case kIROp_FloatCast:
+                return SpvOpFConvert;
             default:
                 break;
             }
