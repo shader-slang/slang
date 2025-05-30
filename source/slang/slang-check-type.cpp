@@ -447,11 +447,6 @@ TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)
 
 TypeExp SemanticsVisitor::CheckUsableType(TypeExp typeExp, Decl* decl)
 {
-    auto callableDecl = as<CallableDecl>(decl);
-    if (callableDecl && as<IncompleteExpr>(callableDecl->returnType.exp))
-    {
-        getSink()->diagnose(decl, Diagnostics::subscriptMustHaveReturnType);
-    }
     return CoerceToUsableType(TranslateTypeNode(typeExp), decl);
 }
 
