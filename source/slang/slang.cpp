@@ -2729,7 +2729,8 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
     // We need to temporarily replace the SourceManager for this CompileRequest
     ScopeReplaceSourceManager scopeReplaceSourceManager(this, &localSourceManager);
 
-    SourceLanguage sourceLanguage;
+    SourceLanguage sourceLanguage = SourceLanguage::Slang;
+    SlangLanguageVersion languageVersion = m_optionSet.getLanguageVersion();
 
     auto tokens = preprocessSource(
         srcFile,
@@ -2737,7 +2738,8 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
         nullptr,
         Dictionary<String, String>(),
         this,
-        sourceLanguage);
+        sourceLanguage,
+        languageVersion);
 
     if (sourceLanguage == SourceLanguage::Unknown)
         sourceLanguage = SourceLanguage::Slang;
@@ -3415,7 +3417,9 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
-        SourceLanguage sourceLanguage = SourceLanguage::Unknown;
+        SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
+        SlangLanguageVersion languageVersion =
+            translationUnit->compileRequest->optionSet.getLanguageVersion();
         auto tokens = preprocessSource(
             sourceFile,
             getSink(),
@@ -3423,7 +3427,10 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
             combinedPreprocessorDefinitions,
             getLinkage(),
             sourceLanguage,
+            languageVersion,
             &preprocessorHandler);
+
+        translationUnitSyntax->languageVersion = languageVersion;
 
         if (sourceLanguage == SourceLanguage::Unknown)
             sourceLanguage = translationUnit->sourceLanguage;
@@ -4919,11 +4926,13 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
     // Create a transparent FileDecl to hold all children from the included file.
     auto fileDecl = module->getASTBuilder()->create<FileDecl>();
     fileDecl->nameAndLoc.name = name;
+    fileDecl->parentDecl = module->getModuleDecl();
     module->getIncludedSourceFileMap().add(sourceFile, fileDecl);
 
     FrontEndPreprocessorHandler preprocessorHandler(module, module->getASTBuilder(), sink, translationUnit);
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
-    SourceLanguage sourceLanguage = SourceLanguage::Unknown;
+    SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
+    SlangLanguageVersion slangLanguageVersion = module->getModuleDecl()->languageVersion;
     auto tokens = preprocessSource(
         sourceFile,
         sink,
@@ -4931,10 +4940,18 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
         combinedPreprocessorDefinitions,
         this,
         sourceLanguage,
+        slangLanguageVersion,
         &preprocessorHandler);
 
     if (sourceLanguage == SourceLanguage::Unknown)
         sourceLanguage = translationUnit->sourceLanguage;
+
+    if (slangLanguageVersion != module->getModuleDecl()->languageVersion)
+    {
+        sink->diagnose(
+            tokens.begin()->getLoc(),
+            Diagnostics::languageVersionDiffersFromIncludingModule);
+    }
 
     auto outerScope = module->getModuleDecl()->ownedScope;
     parseSourceFile(

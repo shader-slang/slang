@@ -146,6 +146,7 @@ DIAGNOSTIC(
     entryPointsNeedToBeAssociatedWithTranslationUnits,
     "when using multiple source files, entry points must be specified after their corresponding "
     "source file(s)")
+
 DIAGNOSTIC(22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
 
 DIAGNOSTIC(26, Error, unknownOptimiziationLevel, "unknown optimization level '$0'")
@@ -368,7 +369,13 @@ DIAGNOSTIC(
     undefinedIdentifierInPreprocessorExpression,
     "undefined identifier '$0' in preprocessor expression will evaluate to zero")
 DIAGNOSTIC(15206, Error, expectedIntegralVersionNumber, "Expected integer for #version number")
-
+DIAGNOSTIC(15207, Error, unknownLanguageVersion, "unknown language version '$0'.")
+DIAGNOSTIC(15208, Error, unknownLanguage, "unknown language '$0'.")
+DIAGNOSTIC(
+    15208,
+    Error,
+    languageVersionDiffersFromIncludingModule,
+    "the source file declares a different language version than the including module.")
 DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
 
 // 153xx - #include
@@ -827,6 +834,59 @@ DIAGNOSTIC(
 DIAGNOSTIC(33070, Error, expectedFunction, "expected a function, got '$0'")
 DIAGNOSTIC(33071, Error, expectedAStringLiteral, "expected a string literal")
 
+// `dyn` and `some` errors
+DIAGNOSTIC(33072, Error, cannotHaveGenericDynInterface, "dyn interfaces cannot be generic: '$0'.")
+DIAGNOSTIC(
+    33073,
+    Error,
+    cannotHaveAssociatedTypeInDynInterface,
+    "dyn interfaces cannot have associatedType members.")
+DIAGNOSTIC(
+    33074,
+    Error,
+    cannotHaveGenericMethodInDynInterface,
+    "dyn interfaces cannot have generic methods.")
+DIAGNOSTIC(
+    33075,
+    Error,
+    cannotHaveMutatingMethodInDynInterface,
+    "dyn interfaces cannot have [mutating] methods.")
+DIAGNOSTIC(
+    33076,
+    Error,
+    cannotHaveDifferentiableMethodInDynInterface,
+    "dyn interfaces cannot have [Differentiable] methods.")
+DIAGNOSTIC(
+    33077,
+    Error,
+    DynInterfaceCannotInheritNonDynInterface,
+    "dyn interface '$0' may only inherit 'dyn' interfaces. '$1' is not a dyn interface.")
+DIAGNOSTIC(
+    33078,
+    Error,
+    cannotUseExtensionToMakeTypeConformToDynInterface,
+    "cannot use a extension to conform to a dyn interface '$0'.")
+DIAGNOSTIC(
+    33079,
+    Error,
+    cannotHaveUnsizedMemberWhenInheritingDynInterface,
+    "cannot have unsized member '$0' when inheriting from dyn interface '$1'.")
+DIAGNOSTIC(
+    33080,
+    Error,
+    cannotHaveOpaqueMemberWhenInheritingDynInterface,
+    "cannot have opaque member '$0' when inheriting from dyn interface '$1'.")
+DIAGNOSTIC(
+    33081,
+    Error,
+    cannotHaveNonCopyableMemberWhenInheritingDynInterface,
+    "cannot have non-copyable member '$0' when inheriting from dyn interface '$1'.")
+DIAGNOSTIC(
+    33082,
+    Error,
+    cannotConformGenericToDynInterface,
+    "cannot conform generic type '$0' to dyn interface '$1'.")
+
 DIAGNOSTIC(
     -1,
     Note,
@@ -944,6 +1004,28 @@ DIAGNOSTIC(
     Error,
     nonCopyableTypeCapturedInLambda,
     "cannot capture non-copyable type '$0' in a lambda expression.")
+
+DIAGNOSTIC(
+    30113,
+    Error,
+    uncaughtThrowInsideDefer,
+    "'throw' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(
+    30114,
+    Error,
+    uncaughtTryInsideDefer,
+    "'try' expressions require a matching 'catch' inside a defer statement.")
+DIAGNOSTIC(
+    30115,
+    Error,
+    uncaughtThrowInNonThrowFunc,
+    "the current function or environment is not declared to throw any errors, but contains an "
+    "uncaught 'throw' statement.")
+DIAGNOSTIC(
+    30116,
+    Error,
+    throwTypeIncompatibleWithErrorType,
+    "the type `$0` of `throw` is not compatible with function's error type `$1`.")
 
 // Include
 DIAGNOSTIC(
@@ -1632,6 +1714,11 @@ DIAGNOSTIC(
     Error,
     multiDimensionalArrayNotSupported,
     "multi-dimensional array is not supported.")
+DIAGNOSTIC(
+    30901,
+    Error,
+    subscriptMustHaveReturnType,
+    "__subscript declaration must have a return type specified after '->'")
 // 310xx: properties
 
 // 311xx: accessors

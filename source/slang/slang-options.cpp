@@ -63,6 +63,7 @@ enum class ValueCategory
     FileSystemType,
     VulkanShift,
     SourceEmbedStyle,
+    LanguageVersion,
 
     CountOf,
 };
@@ -146,6 +147,14 @@ void initCommandOptions(CommandOptions& options)
             "Language",
             UserValue(ValueCategory::Language));
         options.addValues(TypeTextUtil::getLanguageInfos());
+
+        options.addCategory(
+            CategoryKind::Value,
+            "language-version",
+            "Language Version",
+            UserValue(ValueCategory::LanguageVersion));
+        options.addValues(TypeTextUtil::getLanguageVersionInfos());
+
 
         options.addCategory(
             CategoryKind::Value,
@@ -446,6 +455,10 @@ void initCommandOptions(CommandOptions& options)
          "Display the build version. This is the contents of git describe --tags.\n"
          "It is typically only set from automated builds(such as distros available on github).A "
          "user build will by default be 'unknown'."},
+        {OptionKind::LanguageVersion,
+         "-std",
+         "-std <language-version>",
+         "Specifies the language standard that should be used."},
         {OptionKind::WarningsAsErrors,
          "-warnings-as-errors",
          "-warnings-as-errors all or -warnings-as-errors <id>[,<id>...]",
@@ -841,6 +854,10 @@ void initCommandOptions(CommandOptions& options)
          "-enable-experimental-passes",
          nullptr,
          "Enable experimental compiler passes"},
+        {OptionKind::EnableExperimentalDynamicDispatch,
+         "-enable-experimental-dynamic-dispatch",
+         nullptr,
+         "Enable experimental dynamic dispatch features"},
         {OptionKind::EmbedDownstreamIR,
          "-embed-downstream-ir",
          nullptr,
@@ -2146,6 +2163,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ValidateUniformity:
         case OptionKind::AllowGLSL:
         case OptionKind::EnableExperimentalPasses:
+        case OptionKind::EnableExperimentalDynamicDispatch:
         case OptionKind::EmitIr:
         case OptionKind::DumpIntermediates:
         case OptionKind::DumpReproOnError:
@@ -2534,6 +2552,24 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     }
 
                     addCapabilityAtom(getCurrentTarget(), atom);
+                }
+                break;
+            }
+        case OptionKind::LanguageVersion:
+            {
+                CommandLineArg name;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(name));
+
+                SlangLanguageVersion stdRevision =
+                    TypeTextUtil::findLanguageVersion(name.value.getUnownedSlice());
+                if (stdRevision == SLANG_LANGUAGE_VERSION_UNKNOWN)
+                {
+                    m_sink->diagnose(name.loc, Diagnostics::unknownLanguageVersion, name.value);
+                    return SLANG_FAIL;
+                }
+                else
+                {
+                    linkage->m_optionSet.add(OptionKind::LanguageVersion, stdRevision);
                 }
                 break;
             }

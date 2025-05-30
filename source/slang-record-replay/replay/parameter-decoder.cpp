@@ -84,7 +84,7 @@ size_t ParameterDecoder::decodeStruct(
     SlangGlobalSessionDesc& desc = sessionDesc.getValue();
     readByte = decodeUint32(buffer, bufferSize, desc.structureSize);
     readByte += decodeUint32(buffer + readByte, bufferSize - readByte, desc.apiVersion);
-    readByte += decodeUint32(buffer + readByte, bufferSize - readByte, desc.languageVersion);
+    readByte += decodeUint32(buffer + readByte, bufferSize - readByte, desc.minLanguageVersion);
     uint32_t val = 0;
     readByte += decodeUint32(buffer + readByte, bufferSize - readByte, val);
     desc.enableGLSL = (val != 0);
