@@ -2464,10 +2464,14 @@ bool DiagnoseIsAllowedInitExpr(VarDeclBase* varDecl, DiagnosticSink* sink)
         return false;
     }
 
-    if(as<InterfaceDecl>(varDecl->parentDecl))
+    if (as<InterfaceDecl>(varDecl->parentDecl))
     {
         if (sink && varDecl->initExpr)
-            sink->diagnose(varDecl, Diagnostics::cannotHaveInitializer, varDecl, "an interface requirement");
+            sink->diagnose(
+                varDecl,
+                Diagnostics::cannotHaveInitializer,
+                varDecl,
+                "an interface requirement");
         return false;
     }
 
