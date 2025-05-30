@@ -4136,6 +4136,9 @@ void Linkage::loadParsedModule(
         if (errorCountAfter != errorCountBefore)
         {
             // There must have been an error in the loaded module.
+            // Remove from maps if there were errors during semantic checking
+            mapPathToLoadedModule.remove(mostUniqueIdentity);
+            mapNameToLoadedModules.remove(name);
         }
         else
         {
