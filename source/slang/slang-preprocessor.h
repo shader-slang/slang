@@ -11,7 +11,6 @@ namespace Slang
 
 class DiagnosticSink;
 class Linkage;
-class TranslationUnitRequest;
 struct PreprocessorContentAssistInfo;
 
 enum class SourceLanguage : SlangSourceLanguageIntegral;
@@ -30,14 +29,8 @@ using preprocessor::Preprocessor;
 ///
 struct PreprocessorHandler
 {
-    PreprocessorHandler(TranslationUnitRequest* translationUnit)
-        : m_translationUnit(translationUnit)
-    {
-    }
     virtual void handleEndOfTranslationUnit(Preprocessor* preprocessor);
     virtual void handleFileDependency(SourceFile* sourceFile);
-
-    TranslationUnitRequest* m_translationUnit = nullptr;
 };
 
 /// Description of a preprocessor options/dependencies

@@ -3045,10 +3045,10 @@ struct FrontEndPreprocessorHandler : PreprocessorHandler
 {
 public:
     FrontEndPreprocessorHandler(Module* module, ASTBuilder* astBuilder, DiagnosticSink* sink, TranslationUnitRequest* translationUnit)
-        : PreprocessorHandler(translationUnit)
-        , m_module(module)
+        : m_module(module)
         , m_astBuilder(astBuilder)
         , m_sink(sink)
+        , m_translationUnit(translationUnit)
     {
     }
 
@@ -3056,6 +3056,7 @@ protected:
     Module* m_module;
     ASTBuilder* m_astBuilder;
     DiagnosticSink* m_sink;
+    TranslationUnitRequest* m_translationUnit = nullptr;
 
     // The first task that this handler tries to deal with is
     // capturing all the files on which a module is dependent.
