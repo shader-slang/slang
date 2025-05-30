@@ -890,7 +890,7 @@ void SerialWriter::_writeSimpleValue(
 {
     auto layout = _reserveDestinationForWrite(kind);
     SLANG_ASSERT(layout->size == size);
-    SLANG_ASSERT(layout->alignment = alignment);
+    SLANG_ASSERT(layout->alignment == alignment);
     _commitWrite(ValInfo::rawData(data, size, alignment));
 }
 
