@@ -34,21 +34,18 @@ static bool isAssociatedTypeDecl(Decl* decl)
     return false;
 }
 
-static bool isSlang2026(CompilerOptionSet& optionSet)
+static bool isSlang2026OrLater(SemanticsVisitor* visitor)
 {
-    if (!optionSet.hasOption(CompilerOptionName::Language))
-        return false;
-    return SLANG_SOURCE_LANGUAGE_SLANG ==
-               SlangSourceLanguage(
-                   optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language)) &&
-           SLANG_STD_REVISION_2026 ==
-               optionSet.getEnumOption<SlangStdRevision>(CompilerOptionName::StdRevision);
+    return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
+           SLANG_LANGUAGE_VERSION_2026;
 }
 
-static bool allowExperimentalDynamicDispatch(CompilerOptionSet& optionSet)
+static bool allowExperimentalDynamicDispatch(
+    SemanticsVisitor* visitor,
+    CompilerOptionSet& optionSet)
 {
     return optionSet.getBoolOption(CompilerOptionName::EnableExperimentalDynamicDispatch) ||
-           !isSlang2026(optionSet);
+           !isSlang2026OrLater(visitor);
 }
 
 static void validateDynInterfaceUsage(
@@ -57,7 +54,7 @@ static void validateDynInterfaceUsage(
     CompilerOptionSet& optionSet,
     InterfaceDecl* decl)
 {
-    if (allowExperimentalDynamicDispatch(optionSet))
+    if (allowExperimentalDynamicDispatch(visitor, optionSet))
         return;
 
     if (!decl->hasModifier<DynModifier>())
@@ -134,7 +131,7 @@ static void validateDynInterfaceUseWithInheritanceDecl(
     if (!interfaceDeclIsDyn)
         return;
 
-    if (!allowExperimentalDynamicDispatch(optionSet))
+    if (!allowExperimentalDynamicDispatch(visitor, optionSet))
     {
         if (auto extensionDeclParent = as<ExtensionDecl>(decl->parentDecl))
         {
@@ -665,6 +662,13 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitParenExpr(ParenExpr* expr) { dispatchIfNotNull(expr->base); }
 
+    void visitTupleExpr(TupleExpr* expr)
+    {
+        for (auto element : expr->elements)
+            dispatchIfNotNull(element);
+    }
+
+
     void visitAssignExpr(AssignExpr* expr)
     {
         dispatchIfNotNull(expr->left);
@@ -855,6 +859,15 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitReturnStmt(ReturnStmt* stmt) { dispatchIfNotNull(stmt->expression); }
 
     void visitDeferStmt(DeferStmt* stmt) { dispatchIfNotNull(stmt->statement); }
+
+    void visitThrowStmt(ThrowStmt* stmt) { dispatchIfNotNull(stmt->expression); }
+
+    void visitCatchStmt(CatchStmt* stmt)
+    {
+        dispatchIfNotNull(stmt->errorVar);
+        dispatchIfNotNull(stmt->tryBody);
+        dispatchIfNotNull(stmt->handleBody);
+    }
 
     void visitWhileStmt(WhileStmt* stmt)
     {
@@ -2451,6 +2464,17 @@ bool DiagnoseIsAllowedInitExpr(VarDeclBase* varDecl, DiagnosticSink* sink)
         return false;
     }
 
+    if (as<InterfaceDecl>(varDecl->parentDecl))
+    {
+        if (sink && varDecl->initExpr)
+            sink->diagnose(
+                varDecl,
+                Diagnostics::cannotHaveInitializer,
+                varDecl,
+                "an interface requirement");
+        return false;
+    }
+
     return true;
 }
 
@@ -2510,6 +2534,23 @@ static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type*
             defaultCtor->loc,
             nullptr);
         return invoke;
+    }
+
+    // At the last, we will check if the type is a C-style type, if it is, we will use empty
+    // initializer list to construct the default constructor.
+    HashSet<Type*> visitSet;
+    if (visitor->isCStyleType(type, visitSet))
+    {
+        auto initListExpr = visitor->getASTBuilder()->create<InitializerListExpr>();
+        initListExpr->type = visitor->getASTBuilder()->getInitializerListType();
+        Expr* outExpr = nullptr;
+        auto fromType = type;
+        if (auto atomicType = as<AtomicType>(fromType))
+        {
+            fromType = atomicType->getElementType();
+        }
+        if (visitor->_coerceInitializerList(fromType, &outExpr, initListExpr))
+            return outExpr;
     }
 
     return nullptr;
@@ -10379,7 +10420,16 @@ void SemanticsDeclHeaderVisitor::visitAbstractStorageDeclCommon(ContainerDecl* d
 
 void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
 {
-    decl->returnType = CheckUsableType(decl->returnType, decl);
+    // __subscript needs to have a return type specified. Check if return type
+    // is missing (represented as IncompleteExpr) and return an error.
+    if (decl->returnType.exp && as<IncompleteExpr>(decl->returnType.exp))
+    {
+        getSink()->diagnose(decl, Diagnostics::subscriptMustHaveReturnType);
+    }
+    else if (decl->returnType.exp)
+    {
+        decl->returnType = CheckUsableType(decl->returnType, decl);
+    }
 
     visitAbstractStorageDeclCommon(decl);
 
@@ -13031,7 +13081,13 @@ static Expr* _getParamDefaultValue(SemanticsVisitor* visitor, VarDeclBase* varDe
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    return constructDefaultConstructorForType(visitor, varDecl->type.type);
+    if (auto expr = constructDefaultConstructorForType(visitor, varDecl->type.type))
+    {
+        expr->loc = varDecl->loc;
+        return expr;
+    }
+
+    return nullptr;
 }
 
 bool SemanticsDeclAttributesVisitor::_synthesizeCtorSignature(StructDecl* structDecl)
@@ -13776,7 +13832,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
             if (!implDecl)
                 continue;
 
-            if (getModuleDecl(implDecl.getDecl())->isInLegacyLanguage)
+            if (getModuleDecl(implDecl.getDecl())->languageVersion == SLANG_LANGUAGE_VERSION_LEGACY)
                 break;
 
             ensureDecl(requirementDecl, DeclCheckState::CapabilityChecked);
@@ -13839,8 +13895,9 @@ DeclVisibility getDeclVisibility(Decl* decl)
     auto defaultVis = DeclVisibility::Default;
     if (auto parentModule = getModuleDecl(decl))
     {
-        defaultVis = parentModule->isInLegacyLanguage ? DeclVisibility::Public
-                                                      : parentModule->defaultVisibility;
+        defaultVis = parentModule->languageVersion == SLANG_LANGUAGE_VERSION_LEGACY
+                         ? DeclVisibility::Public
+                         : parentModule->defaultVisibility;
     }
 
     // Members of other agg type decls will have their default visibility capped to the

@@ -521,7 +521,7 @@ int invalidTest()
 }
 ```
 
-Pointer types can also be specified using the generic syntax: `Ptr<MyType>` is equivalent to `MyType*`.
+Pointer types can also be specified using the generic syntax `Ptr<MyType>`. `Ptr<MyType>` is equivalent to `MyType*`.
 
 ### Limitations
 
@@ -605,17 +605,18 @@ The descriptor set ID of the global descriptor array can be configured with the 
 (or `CompilerOptionName::BindlessSpaceIndex` when using the API) option.
 
 Default behavior assigns binding-indicies based on descriptor types:
+
 | Enum Value             | Vulkan Descriptor Type                    | Binding Index |
 |------------------------|-------------------------------------------|---------------|
 | Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
 | CombinedTextureSampler | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
 | Texture_Read           | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
-| Texture_ReadWrite      | VK_DESCRIPTOR_TYPE_STORAGE_IMAGE          | 3             |
-| TexelBuffer_Read       | VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER   | 4             |
-| TexelBuffer_ReadWrite  | VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER   | 5             |
-| Buffer_Read            | VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER         | 6             |
-| Buffer_ReadWrite       | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 7             |
-| Unknown                | Other                                     | 8             |
+| Texture_ReadWrite      | VK_DESCRIPTOR_TYPE_STORAGE_IMAGE          | 2             |
+| TexelBuffer_Read       | VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER   | 2             |
+| TexelBuffer_ReadWrite  | VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER   | 2             |
+| Buffer_Read            | VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER         | 2             |
+| Buffer_ReadWrite       | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 2             |
+| Unknown                | Other                                     | 3             |
 
 > `ACCELERATION_STRUCTURE` is excluded from the list of types since Slang by default uses the handle to a `RaytracingAccelerationStructure` as a GPU address, casting the handle to a `RaytracingAccelerationStructure`. This removes the need for a binding-slot of `RaytracingAccelerationStructure`.
 
@@ -672,12 +673,27 @@ Additionally, `defaultGetDescriptorFromHandle()` takes an optional argument whos
  ```slang
 public enum BindlessDescriptorOptions
 {
-    None = 0, /// Bind assuming regular binding model rules.
-    VkMutable = 1, /// Bind assuming `VK_EXT_mutable_descriptor_type` without mutable `AccelerationStructure` binding support.
+    None = 0,      /// Bind assuming regular binding model rules.
+    VkMutable = 1, /// **Current Default** Bind assuming `VK_EXT_mutable_descriptor_type`
 }
  ```
 
+`None` provides the following bindings for descriptor types:
+
+| Enum Value             | Vulkan Descriptor Type                    | Binding Index |
+|------------------------|-------------------------------------------|---------------|
+| Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
+| CombinedTextureSampler | VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER | 1             |
+| Texture_Read           | VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE          | 2             |
+| Texture_ReadWrite      | VK_DESCRIPTOR_TYPE_STORAGE_IMAGE          | 3             |
+| TexelBuffer_Read       | VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER   | 4             |
+| TexelBuffer_ReadWrite  | VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER   | 5             |
+| Buffer_Read            | VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER         | 6             |
+| Buffer_ReadWrite       | VK_DESCRIPTOR_TYPE_STORAGE_BUFFER         | 7             |
+| Unknown                | Other                                     | 8             |
+
 `VkMutable` provides the following bindings for descriptor types:
+
 | Enum Value             | Vulkan Descriptor Type                    | Binding Index |
 |------------------------|-------------------------------------------|---------------|
 | Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
@@ -793,6 +809,71 @@ by using the `[ForceInline]` decoration:
 int f(int x) { return x + 1; }
 ```
 
+Error handling
+-----------------
+
+Slang supports an error handling mechanism that is superficially similar to
+exceptions in many other languages, but has some unique characteristics.
+
+In contrast to C++ exceptions, this mechanism makes the control flow of errors
+more explicit, and the performance charasteristics are similar to adding an
+if-statement after every potentially throwing function call to check and handle
+the error.
+
+In order to be able to throw an error, a function must declare the type of that
+error with `throws`:
+```
+enum MyError
+{
+    Failure,
+    CatastrophicFailure
+}
+
+int f() throws MyError
+{
+    if (computerIsBroken())
+        throw MyError.CatastrophicFailure;
+    return 42;
+}
+```
+Currently, functions may only throw a single type of error.
+
+To call a function that may throw, you must prepend it with `try`:
+
+```
+let result = try f();
+```
+
+If you don't catch the `try`, related errors are re-thrown and the calling
+function must declare that it `throws` that error type:
+
+```
+void g() throws MyError
+{
+    // This would not compile if `g()` wasn't declared to throw MyError as well.
+    let result = try f();
+    printf("Success: %d\n", result);
+}
+```
+
+To catch an error, you can use a `do-catch` statement:
+
+```
+void g()
+{
+    do
+    {
+        let result = try f();
+        printf("Success: %d\n", result);
+    }
+    catch(err: MyError)
+    {
+        printf("Not good!\n");
+    }
+}
+```
+
+You can chain multiple catch statements for different types of errors.
 
 Special Scoping Syntax
 -------------------

@@ -620,6 +620,12 @@ static IRBlock::SuccessorList getSuccessors(IRInst* terminator)
         end = begin + 1;
         break;
 
+    case kIROp_TryCall:
+        // tryCall <successBlock> <failBlock> <callee> <args>...
+        begin = operands + 0;
+        end = begin + 2;
+        break;
+
     default:
         SLANG_UNEXPECTED("unhandled terminator instruction");
         UNREACHABLE_RETURN(IRBlock::SuccessorList(nullptr, nullptr));
@@ -1821,7 +1827,7 @@ IRInst* IRBuilder::_createInst(
     m_dedupContext->getInstReplacementMap().tryGetValue(type, instReplacement);
     type = (IRType*)instReplacement;
 
-    if (isInstHoistable(op, type))
+    if (isInstHoistable(op, type, fixedArgs))
     {
         return _findOrEmitHoistableInst(
             type,
@@ -4459,6 +4465,12 @@ IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, UInt element
         break;
     }
     return emitGetTupleElement(type, tuple, getIntValue(getIntType(), element));
+}
+
+IRInst* IRBuilder::emitCoopMatMapElementFunc(IRType* type, IRInst* tuple, IRInst* func)
+{
+    IRInst* args[] = {tuple, func};
+    return emitIntrinsicInst(type, kIROp_CoopMatMapElementIFunc, 2, args);
 }
 
 IRInst* IRBuilder::emitMakeResultError(IRType* resultType, IRInst* errorVal)

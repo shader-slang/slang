@@ -65,7 +65,8 @@ struct PreprocessorDesc
 TokenList preprocessSource(
     SourceFile* file,
     PreprocessorDesc const& desc,
-    SourceLanguage& outDetectedLanguage);
+    SourceLanguage& outDetectedLanguage,
+    SlangLanguageVersion& outLanguageVersion);
 
 /// Convenience wrapper for `preprocessSource` when a `Linkage` is available
 TokenList preprocessSource(
@@ -75,6 +76,7 @@ TokenList preprocessSource(
     Dictionary<String, String> const& defines,
     Linkage* linkage,
     SourceLanguage& outDetectedLanguage,
+    SlangLanguageVersion& outLanguageVersion,
     PreprocessorHandler* handler = nullptr);
 
 // The following functions are intended to be used inside of implementations
