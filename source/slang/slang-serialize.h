@@ -335,6 +335,30 @@ struct ISerializerImpl
     /// End serializing a struct value.
     virtual void endStruct() = 0;
 
+    /// Begin serializing a variant value.
+    ///
+    /// A variant should be used to serialize any type
+    /// that behaves like a "tagged union," where different
+    /// instances may have different sequences of members,
+    /// of different types.
+    ///
+    /// User code reading from a variant must be able to
+    /// use the members read so far to determine what
+    /// members it should read next (e.g., by serializing
+    /// a tag enumerant first, followed by the tag-dependent
+    /// members).
+    ///
+    /// A variant is otherwise like a struct. Some serializer
+    /// implementations may treat variants just like structs,
+    /// while others may rely on any type serialized as a
+    /// struct always including the same members in the same
+    /// order.
+    ///
+    virtual void beginVariant() = 0;
+
+    /// End serializing a variant value.
+    virtual void endVariant() = 0;
+
     /// Set the key for the next struct field to be serialized.
     ///
     /// If no name is available for the field, `name` may be `nullptr`.
@@ -623,6 +647,21 @@ private:
     Serializer _serializer;
 };
 
+struct ScopedSerializerVariant
+{
+public:
+    ScopedSerializerVariant(Serializer const& serializer)
+        : _serializer(serializer)
+    {
+        serializer->beginVariant();
+    }
+
+    ~ScopedSerializerVariant() { _serializer->endVariant(); }
+
+private:
+    Serializer _serializer;
+};
+
 struct ScopedSerializerTuple
 {
 public:
@@ -667,8 +706,8 @@ private:
 #define SLANG_SCOPED_SERIALIZER_STRUCT(SERIALIZER) \
     ::Slang::ScopedSerializerStruct SLANG_CONCAT(_scopedSerializerStruct, __LINE__)(SERIALIZER)
 
-#define SLANG_SCOPED_SERIALIZER_TAGGED_UNION(SERIALIZER) \
-    ::Slang::ScopedSerializerStruct SLANG_CONCAT(_scopedSerializerStruct, __LINE__)(SERIALIZER)
+#define SLANG_SCOPED_SERIALIZER_VARIANT(SERIALIZER) \
+    ::Slang::ScopedSerializerVariant SLANG_CONCAT(_scopedSerializerVariant, __LINE__)(SERIALIZER)
 
 #define SLANG_SCOPED_SERIALIZER_TUPLE(SERIALIZER) \
     ::Slang::ScopedSerializerTuple SLANG_CONCAT(_scopedSerializerTuple, __LINE__)(SERIALIZER)

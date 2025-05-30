@@ -1,9 +1,14 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda
 //CHECK_: __global__ void __closesthit__closestHitShaderLss
 //CHECK: optixGetSpherePositionAndRadius
-//CHECK: optixObjectPositionsAndRadii
+//CHECK: optixGetLssPositionsAndRadii
 //CHECK: optixIsSphereHit
 //CHECK: optixIsLSSHit
+
+//CHECK: optixHitObjectGetSpherePositionAndRadius
+//CHECK: optixHitObjectGetLssPositionsAndRadii
+//CHECK: optixHitObjectIsSphereHit
+//CHECK: optixHitObjectIsLSSHit
 
 struct RayPayload
 {
@@ -22,13 +27,10 @@ void closestHitShaderLss(inout RayPayload payload, in BuiltInTriangleIntersectio
     payload.isSphere = IsSphereHit();
     payload.isLss = IsLssHit();
     
-// TODO: This will be enabled once issue #6647 is completed.
-#if 0
     // Test HitObject API functions
     HitObject hitObj;
-    float4 sphereData = hitObj.GetSphereObjectPositionAndRadius();
-    float2x4 lssData = hitObj.GetLssObjectPositionsAndRadii();
+    float4 sphereData = hitObj.GetSpherePositionAndRadius();
+    float2x4 lssData = hitObj.GetLssPositionsAndRadii();
     bool isSphereHit = hitObj.IsSphereHit();
     bool isLssHit = hitObj.IsLssHit();
-#endif
 }
