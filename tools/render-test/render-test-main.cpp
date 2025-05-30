@@ -920,7 +920,37 @@ void RenderTestApp::setProjectionMatrix(IShaderObject* rootObject)
 
 void RenderTestApp::finalize()
 {
+    // Wait for any pending GPU operations to complete
+    if (m_queue)
+    {
+        m_queue->waitOnHost();
+    }
+
+    // Clear output plan and resource context
+    m_outputPlan.items.clear();
+    m_resourceContext.resources.clear();
+
+    // Reset all ComPtr member variables to ensure proper cleanup
+    m_queue.setNull();
+    m_inputLayout.setNull();
+    m_vertexBuffer.setNull();
+    m_shaderProgram.setNull();
+    m_pipeline.setNull();
+    m_shaderTable.setNull();
+    m_depthBuffer.setNull();
+    m_depthBufferView.setNull();
+    m_colorBuffer.setNull();
+    m_colorBufferView.setNull();
+    m_blasBuffer.setNull();
+    m_bottomLevelAccelerationStructure.setNull();
+    m_tlasBuffer.setNull();
+    m_topLevelAccelerationStructure.setNull();
+
+    // Reset compilation output
     m_compilationOutput.output.reset();
+
+    // Clear device reference (don't reset as it's not owned by this class)
+    m_device = nullptr;
 }
 
 Result RenderTestApp::writeBindingOutput(const String& fileName)
