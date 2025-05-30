@@ -744,6 +744,8 @@ protected:
 
     // Indicates if we are emiting for DXC cooperative vector POC.
     bool isCoopvecPoc = false;
+
+    bool isOptixCoopVec = false;
 };
 
 } // namespace Slang
