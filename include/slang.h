@@ -853,6 +853,7 @@ typedef uint32_t SlangSizeT;
         SLANG_OPTIMIZATION_LEVEL_HIGH,     /**< Optimize aggressively. */
         SLANG_OPTIMIZATION_LEVEL_MAXIMAL, /**< Include optimizations that may take a very long time,
                                              or may involve severe space-vs-speed tradeoffs */
+        SLANG_OPTIMIZATION_LEVEL_DEBUG_STRIP, /**< Stip debug and non-semantic info. */
     };
 
     enum SlangEmitSpirvMethod
@@ -1021,6 +1022,7 @@ typedef uint32_t SlangSizeT;
 
         SkipDownstreamLinking, // bool, experimental
         DumpModule,
+        EmitSeparateDebug, // bool
 
         EnableExperimentalDynamicDispatch, // bool, experimental
         LanguageVersion,                   // intValue0: SlangLanguageVersion

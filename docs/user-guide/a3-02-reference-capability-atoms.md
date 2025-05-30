@@ -559,7 +559,7 @@ Extensions
 > Represents the SPIR-V capability for cluster acceleration structure.
 
 `spvRayTracingLinearSweptSpheresGeometryNV`
-> Represents the SPIR-V capability for linear swept spheres.
+> Represents the SPIR-V capability for cluster acceleration structure.
 
 `spvShaderClockKHR`
 > Represents the SPIR-V capability for shader clock.
