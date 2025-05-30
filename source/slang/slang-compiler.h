@@ -1851,6 +1851,7 @@ typedef Module LoadedModule;
 /// A request for the front-end to compile a translation unit.
 class TranslationUnitRequest : public RefObject
 {
+    friend struct FrontEndPreprocessorHandler;
 public:
     TranslationUnitRequest(FrontEndCompileRequest* compileRequest);
     TranslationUnitRequest(FrontEndCompileRequest* compileRequest, Module* m);
@@ -1887,9 +1888,6 @@ public:
 
     /// Add both the artifact and the sourceFile.
     void addSource(IArtifact* sourceArtifact, SourceFile* sourceFile);
-
-    /// Add the sourceFile
-    void addSource(SourceFile* sourceFile);
 
     // The entry points associated with this translation unit
     List<RefPtr<EntryPoint>> const& getEntryPoints() { return module->getEntryPoints(); }

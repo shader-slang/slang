@@ -2515,11 +2515,6 @@ void TranslationUnitRequest::addSource(IArtifact* sourceArtifact, SourceFile* so
     _addSourceFile(sourceFile);
 }
 
-void TranslationUnitRequest::addSource(SourceFile* sourceFile)
-{
-    _addSourceFile(sourceFile);
-}
-
 PathInfo TranslationUnitRequest::_findSourcePathInfo(IArtifact* artifact)
 {
     auto pathRep = findRepresentation<IPathArtifactRepresentation>(artifact);
@@ -3049,8 +3044,11 @@ FrontEndCompileRequest::FrontEndCompileRequest(
 struct FrontEndPreprocessorHandler : PreprocessorHandler
 {
 public:
-    FrontEndPreprocessorHandler(Module* module, ASTBuilder* astBuilder, DiagnosticSink* sink)
-        : m_module(module), m_astBuilder(astBuilder), m_sink(sink)
+    FrontEndPreprocessorHandler(Module* module, ASTBuilder* astBuilder, DiagnosticSink* sink, TranslationUnitRequest* translationUnit)
+        : PreprocessorHandler(translationUnit)
+        , m_module(module)
+        , m_astBuilder(astBuilder)
+        , m_sink(sink)
     {
     }
 
@@ -3069,6 +3067,7 @@ protected:
     void handleFileDependency(SourceFile* sourceFile) SLANG_OVERRIDE
     {
         m_module->addFileDependency(sourceFile);
+        m_translationUnit->_addSourceFile(sourceFile);
     }
 
     // The second task that this handler deals with is detecting
@@ -3406,7 +3405,7 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
     // preprocessoing can be communicated to later phases of
     // compilation.
     //
-    FrontEndPreprocessorHandler preprocessorHandler(module, astBuilder, getSink());
+    FrontEndPreprocessorHandler preprocessorHandler(module, astBuilder, getSink(), translationUnit);
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
@@ -3423,8 +3422,7 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
             combinedPreprocessorDefinitions,
             getLinkage(),
             sourceLanguage,
-            &preprocessorHandler,
-            translationUnit);
+            &preprocessorHandler);
 
         if (sourceLanguage == SourceLanguage::Unknown)
             sourceLanguage = translationUnit->sourceLanguage;
@@ -4922,7 +4920,7 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
     fileDecl->nameAndLoc.name = name;
     module->getIncludedSourceFileMap().add(sourceFile, fileDecl);
 
-    FrontEndPreprocessorHandler preprocessorHandler(module, module->getASTBuilder(), sink);
+    FrontEndPreprocessorHandler preprocessorHandler(module, module->getASTBuilder(), sink, translationUnit);
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
     SourceLanguage sourceLanguage = SourceLanguage::Unknown;
     auto tokens = preprocessSource(
@@ -4932,8 +4930,7 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
         combinedPreprocessorDefinitions,
         this,
         sourceLanguage,
-        &preprocessorHandler,
-        translationUnit);
+        &preprocessorHandler);
 
     if (sourceLanguage == SourceLanguage::Unknown)
         sourceLanguage = translationUnit->sourceLanguage;

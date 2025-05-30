@@ -1308,8 +1308,6 @@ struct Preprocessor
     /// Stores macro definition and invocation info for language server.
     PreprocessorContentAssistInfo* contentAssistInfo = nullptr;
 
-    TranslationUnitRequest* translationUnit = nullptr;
-
     NamePool* getNamePool() { return namePool; }
     SourceManager* getSourceManager() { return sourceManager; }
 
@@ -3598,7 +3596,6 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
 
         sourceFile = sourceManager->createSourceFileWithBlob(filePathInfo, foundSourceBlob);
         sourceManager->addSourceFile(filePathInfo.uniqueIdentity, sourceFile);
-        context->m_preprocessor->translationUnit->addSource(sourceFile);
     }
 
     // If we are running the preprocessor as part of compiling a
@@ -4786,8 +4783,7 @@ TokenList preprocessSource(
     Dictionary<String, String> const& defines,
     Linkage* linkage,
     SourceLanguage& outDetectedLanguage,
-    PreprocessorHandler* handler,
-    TranslationUnitRequest* translationUnit)
+    PreprocessorHandler* handler)
 {
     PreprocessorDesc desc;
 
@@ -4810,14 +4806,13 @@ TokenList preprocessSource(
         new preprocessor::WarningStateTracker(desc.sourceManager);
     desc.sink->setSourceWarningStateTracker(wst);
 
-    return preprocessSource(file, desc, outDetectedLanguage, translationUnit);
+    return preprocessSource(file, desc, outDetectedLanguage);
 }
 
 TokenList preprocessSource(
     SourceFile* file,
     PreprocessorDesc const& desc,
-    SourceLanguage& outDetectedLanguage,
-    TranslationUnitRequest* translationUnit)
+    SourceLanguage& outDetectedLanguage)
 {
     using namespace preprocessor;
 
@@ -4834,8 +4829,6 @@ TokenList preprocessSource(
 
     preprocessor.warningStateTracker =
         dynamicCast<preprocessor::WarningStateTracker>(desc.sink->getSourceWarningStateTracker());
-
-    preprocessor.translationUnit = translationUnit;
 
     // Add builtin macros
     {

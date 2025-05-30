@@ -11,6 +11,7 @@ namespace Slang
 
 class DiagnosticSink;
 class Linkage;
+class TranslationUnitRequest;
 struct PreprocessorContentAssistInfo;
 
 enum class SourceLanguage : SlangSourceLanguageIntegral;
@@ -29,8 +30,14 @@ using preprocessor::Preprocessor;
 ///
 struct PreprocessorHandler
 {
+    PreprocessorHandler(TranslationUnitRequest* translationUnit)
+        : m_translationUnit(translationUnit)
+    {
+    }
     virtual void handleEndOfTranslationUnit(Preprocessor* preprocessor);
     virtual void handleFileDependency(SourceFile* sourceFile);
+
+    TranslationUnitRequest* m_translationUnit = nullptr;
 };
 
 /// Description of a preprocessor options/dependencies
@@ -61,14 +68,11 @@ struct PreprocessorDesc
     PreprocessorContentAssistInfo* contentAssistInfo = nullptr;
 };
 
-class TranslationUnitRequest;
-
 /// Take a source `file` and preprocess it into a list of tokens.
 TokenList preprocessSource(
     SourceFile* file,
     PreprocessorDesc const& desc,
-    SourceLanguage& outDetectedLanguage,
-    TranslationUnitRequest* translationUnit);
+    SourceLanguage& outDetectedLanguage);
 
 /// Convenience wrapper for `preprocessSource` when a `Linkage` is available
 TokenList preprocessSource(
@@ -78,8 +82,7 @@ TokenList preprocessSource(
     Dictionary<String, String> const& defines,
     Linkage* linkage,
     SourceLanguage& outDetectedLanguage,
-    PreprocessorHandler* handler = nullptr,
-    TranslationUnitRequest* translationUnit = nullptr);
+    PreprocessorHandler* handler = nullptr);
 
 // The following functions are intended to be used inside of implementations
 // of the `PreprocessorHandler` interface, in order to query the current
