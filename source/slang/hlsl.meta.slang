@@ -25840,6 +25840,7 @@ CoopVec<T, N> tanh<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
         {
             result:$$CoopVec<T, N> = OpExtInst glsl450 Tanh $x;
         };
+    case cuda: __intrinsic_asm "optixCoopVecTanh($0)";
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
