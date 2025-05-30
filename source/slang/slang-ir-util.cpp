@@ -4,7 +4,6 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
-#include "slang-ir.h"
 
 namespace Slang
 {
@@ -2345,13 +2344,8 @@ bool isSpecConstOpHoistable(IROp op, IRType* type, IRInst* const* fixedArgs)
 
 bool isInstHoistable(IROp op, IRType* type, IRInst* const* fixedArgs)
 {
-    if ((getIROpInfo(op).flags & kIROpFlag_Hoistable) ||
-        isSpecConstOpHoistable(op, type, fixedArgs))
-    {
-        return true;
-    }
-
-    return false;
+    return (getIROpInfo(op).flags & kIROpFlag_Hoistable) ||
+           isSpecConstOpHoistable(op, type, fixedArgs);
 }
 
 } // namespace Slang
