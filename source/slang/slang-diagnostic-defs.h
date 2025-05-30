@@ -2100,6 +2100,12 @@ DIAGNOSTIC(
     nonUniformEntryPointParameterTreatedAsUniform,
     "parameter '$0' is treated as 'uniform' because it does not have a system-value semantic.")
 
+DIAGNOSTIC(
+    38041,
+    Error,
+    intValFromNonIntSpecConstEncountered,
+    "cannot cast non-integer specialization constant to compile-time integer")
+
 
 DIAGNOSTIC(38200, Error, recursiveModuleImport, "module `$0` recursively imports itself")
 DIAGNOSTIC(
