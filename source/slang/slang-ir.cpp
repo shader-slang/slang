@@ -1827,7 +1827,7 @@ IRInst* IRBuilder::_createInst(
     m_dedupContext->getInstReplacementMap().tryGetValue(type, instReplacement);
     type = (IRType*)instReplacement;
 
-    if (isInstHoistable(op, type))
+    if (isInstHoistable(op, type, fixedArgs))
     {
         return _findOrEmitHoistableInst(
             type,
