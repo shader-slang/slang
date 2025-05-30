@@ -63,7 +63,7 @@ enum class ValueCategory
     FileSystemType,
     VulkanShift,
     SourceEmbedStyle,
-    StdRevision,
+    LanguageVersion,
 
     CountOf,
 };
@@ -150,10 +150,10 @@ void initCommandOptions(CommandOptions& options)
 
         options.addCategory(
             CategoryKind::Value,
-            "std-revision",
-            "Std Revision",
-            UserValue(ValueCategory::StdRevision));
-        options.addValues(TypeTextUtil::getStdRevisionInfos());
+            "language-version",
+            "Language Version",
+            UserValue(ValueCategory::LanguageVersion));
+        options.addValues(TypeTextUtil::getLanguageVersionInfos());
 
 
         options.addCategory(
@@ -455,9 +455,9 @@ void initCommandOptions(CommandOptions& options)
          "Display the build version. This is the contents of git describe --tags.\n"
          "It is typically only set from automated builds(such as distros available on github).A "
          "user build will by default be 'unknown'."},
-        {OptionKind::StdRevision,
+        {OptionKind::LanguageVersion,
          "-std",
-         "-std <std-revision>",
+         "-std <language-version>",
          "Specifies the language standard that should be used."},
         {OptionKind::WarningsAsErrors,
          "-warnings-as-errors",
@@ -2555,21 +2555,21 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
                 break;
             }
-        case OptionKind::StdRevision:
+        case OptionKind::LanguageVersion:
             {
                 CommandLineArg name;
                 SLANG_RETURN_ON_FAIL(m_reader.expectArg(name));
 
-                SlangStdRevision stdRevision =
-                    TypeTextUtil::findStdRevision(name.value.getUnownedSlice());
-                if (stdRevision == SLANG_STD_REVISION_UNKNOWN)
+                SlangLanguageVersion stdRevision =
+                    TypeTextUtil::findLanguageVersion(name.value.getUnownedSlice());
+                if (stdRevision == SLANG_LANGUAGE_VERSION_UNKNOWN)
                 {
-                    m_sink->diagnose(name.loc, Diagnostics::unknownStdRevision, name.value);
+                    m_sink->diagnose(name.loc, Diagnostics::unknownLanguageVersion, name.value);
                     return SLANG_FAIL;
                 }
                 else
                 {
-                    linkage->m_optionSet.add(OptionKind::StdRevision, stdRevision);
+                    linkage->m_optionSet.add(OptionKind::LanguageVersion, stdRevision);
                 }
                 break;
             }

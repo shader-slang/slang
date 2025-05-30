@@ -2497,6 +2497,30 @@ Expr* SemanticsExprVisitor::visitParenExpr(ParenExpr* expr)
     return expr;
 }
 
+Expr* SemanticsExprVisitor::visitTupleExpr(TupleExpr* expr)
+{
+    List<Type*> elementTypes;
+    for (auto& element : expr->elements)
+    {
+        element = CheckTerm(element);
+        auto elementType = element->type.type;
+        if (auto concreteTypePack = as<ConcreteTypePack>(elementType))
+        {
+            // We need to flatten the type pack into a tuple type
+            for (Index i = 0; i < concreteTypePack->getTypeCount(); i++)
+            {
+                elementTypes.add(concreteTypePack->getElementType(i));
+            }
+        }
+        else
+        {
+            elementTypes.add(element->type.type);
+        }
+    }
+    expr->type = m_astBuilder->getTupleType(elementTypes.getArrayView());
+    return expr;
+}
+
 void SemanticsVisitor::maybeDiagnoseThisNotLValue(Expr* expr)
 {
     // We will try to handle expressions of the form:

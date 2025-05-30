@@ -521,7 +521,7 @@ int invalidTest()
 }
 ```
 
-Pointer types can also be specified using the generic syntax: `Ptr<MyType>` is equivalent to `MyType*`.
+Pointer types can also be specified using the generic syntax `Ptr<MyType>`. `Ptr<MyType>` is equivalent to `MyType*`.
 
 ### Limitations
 
@@ -605,6 +605,7 @@ The descriptor set ID of the global descriptor array can be configured with the 
 (or `CompilerOptionName::BindlessSpaceIndex` when using the API) option.
 
 Default behavior assigns binding-indicies based on descriptor types:
+
 | Enum Value             | Vulkan Descriptor Type                    | Binding Index |
 |------------------------|-------------------------------------------|---------------|
 | Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
@@ -678,6 +679,7 @@ public enum BindlessDescriptorOptions
  ```
 
 `None` provides the following bindings for descriptor types:
+
 | Enum Value             | Vulkan Descriptor Type                    | Binding Index |
 |------------------------|-------------------------------------------|---------------|
 | Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
@@ -691,6 +693,7 @@ public enum BindlessDescriptorOptions
 | Unknown                | Other                                     | 8             |
 
 `VkMutable` provides the following bindings for descriptor types:
+
 | Enum Value             | Vulkan Descriptor Type                    | Binding Index |
 |------------------------|-------------------------------------------|---------------|
 | Sampler                | VK_DESCRIPTOR_TYPE_SAMPLER                | 0             |
