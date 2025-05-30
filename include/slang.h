@@ -906,9 +906,6 @@ typedef uint32_t SlangSizeT;
         DisableSourceMap,               // bool
         UnscopedEnum,                   // bool
         PreserveParameters, // bool: preserve all resource parameters in the output code.
-        TypeConformance,    // stringValue0: additional type conformance to link, in the format of
-                            // "<TypeName>:<IInterfaceName>[=<sequentialId>]", for example
-                            // "Impl:IFoo=3" or "Impl:IFoo".
         // Target
 
         Capability,                // intValue0: CapabilityName
@@ -1002,6 +999,11 @@ typedef uint32_t SlangSizeT;
 
         ParameterBlocksUseRegisterSpaces, // Deprecated
         LanguageVersion,                  // intValue0: SlangLanguageVersion
+        TypeConformance, // stringValue0: additional type conformance to link, in the format of
+                         // "<TypeName>:<IInterfaceName>[=<sequentialId>]", for example
+                         // "Impl:IFoo=3" or "Impl:IFoo".
+        EnableExperimentalDynamicDispatch, // bool, experimental
+        EmitReflectionJSON,                // bool
 
         CountOfParsableOptions,
 
@@ -1018,13 +1020,11 @@ typedef uint32_t SlangSizeT;
         // Setting of EmitSpirvDirectly or EmitSpirvViaGLSL will turn into this option internally.
         EmitSpirvMethod, // enum SlangEmitSpirvMethod
 
-        EmitReflectionJSON, // bool
         SaveGLSLModuleBinSource,
 
         SkipDownstreamLinking, // bool, experimental
         DumpModule,
 
-        EnableExperimentalDynamicDispatch, // bool, experimental
         CountOf,
     };
 
