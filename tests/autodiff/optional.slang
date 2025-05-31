@@ -22,7 +22,7 @@ Optional<float> sumSquare(Optional<float> a, Optional<float> b)
     return none;
 }
 
-//TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1,1,1)]
@@ -47,4 +47,13 @@ void computeMain()
     {
         outputBuffer[1] = 1.0f;
     }
+
+     // CHECK: 100.0
+     dpa = diffPair<Optional<float>>(none, none);
+     dpb = diffPair<Optional<float>>(4.0f, none);
+     bwd_diff(sumSquare)(dpa, dpb, 1.0);
+     if (dpa.d == none)
+     {
+         outputBuffer[2] = 100.0f;
+     }
 }

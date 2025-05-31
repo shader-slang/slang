@@ -1483,8 +1483,8 @@ struct Optional : IDefaultInitializable
     __intrinsic_op($(kIROp_MakeOptionalValue))
     __init(T val);
 
-    __intrinsic_op($(kIROp_MakeOptionalNone))
-    __init();
+    [__unsafeForceInlineEarly]
+    __init() { this = none; }
 };
 
 //@hidden:

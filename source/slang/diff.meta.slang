@@ -1404,7 +1404,7 @@ extension Optional<T> : IDifferentiable
     [__unsafeForceInlineEarly]
     static Differential dzero()
     {
-        return Optional<T.Differential>(T.dzero());
+        return Optional<T.Differential>();
     }
 
     [__unsafeForceInlineEarly]
