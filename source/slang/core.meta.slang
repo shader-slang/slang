@@ -1463,7 +1463,7 @@ typealias __Addr<T> = Ptr<T, $( (uint64_t)AddressSpace::Generic)ULL>;
 __generic<T>
 __magic_type(OptionalType)
 __intrinsic_type($(kIROp_OptionalType))
-struct Optional
+struct Optional : IDefaultInitializable
 {
     /// Return `true` iff this `Optional` contains a value of type `T`
     property bool hasValue
@@ -1482,6 +1482,9 @@ struct Optional
     __implicit_conversion($(kConversionCost_ValToOptional))
     __intrinsic_op($(kIROp_MakeOptionalValue))
     __init(T val);
+
+    [__unsafeForceInlineEarly]
+    __init() { this = none; }
 };
 
 //@hidden:

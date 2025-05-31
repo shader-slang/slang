@@ -72,6 +72,8 @@ struct ForwardDiffTranscriber : AutoDiffTranscriberBase
 
     InstPair transcribeGetTupleElement(IRBuilder* builder, IRInst* origInst);
 
+    InstPair transcribeGetOptionalValue(IRBuilder* builder, IRInst* originalInst);
+
     InstPair transcribeUpdateElement(IRBuilder* builder, IRInst* originalInst);
 
     InstPair transcribeIfElse(IRBuilder* builder, IRIfElse* origIfElse);

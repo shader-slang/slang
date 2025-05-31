@@ -530,6 +530,10 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Preserve all resource parameters in the output code, even if they are not used by the "
          "shader."},
+        {OptionKind::TypeConformance,
+         "-conformance",
+         "-conformance <typeName>:<interfaceName>[=<sequentialID>]",
+         "Include additional type conformance during linking for dynamic dispatch."},
         {OptionKind::EmitReflectionJSON,
          "-reflection-json",
          "reflection-json <path>",
@@ -2734,6 +2738,17 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
 
                 m_compileRequest->addSearchPath(String(slice).getBuffer());
+                break;
+            }
+        case OptionKind::TypeConformance:
+            {
+                if (!m_reader.hasArg())
+                    break;
+                CommandLineArg operand;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(operand));
+                auto unquoted =
+                    StringEscapeUtil::maybeUnquoteCommandLineArg(operand.value.getUnownedSlice());
+                linkage->m_optionSet.add(OptionKind::TypeConformance, unquoted);
                 break;
             }
         case OptionKind::Output:

@@ -369,6 +369,34 @@ SLANG_NO_THROW SlangResult SessionRecorder::getTypeConformanceWitnessMangledName
     return result;
 }
 
+SLANG_NO_THROW SlangResult SessionRecorder::getDynamicObjectRTTIBytes(
+    slang::TypeReflection* type,
+    slang::TypeReflection* interfaceType,
+    uint32_t* outRTTIDataBuffer,
+    uint32_t bufferSizeInBytes)
+{
+    slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+    ParameterRecorder* recorder{};
+    {
+        recorder = m_recordManager->beginMethodRecord(
+            ApiCallId::ISession_getDynamicObjectRTTIBytes,
+            m_sessionHandle);
+        recorder->recordAddress(type);
+        recorder->recordAddress(interfaceType);
+        recorder = m_recordManager->endMethodRecord();
+    }
+
+    SlangResult result = m_actualSession->getDynamicObjectRTTIBytes(
+        type,
+        interfaceType,
+        outRTTIDataBuffer,
+        bufferSizeInBytes);
+
+    // No need to record outId, it's not slang allocation
+    return result;
+}
+
 SLANG_NO_THROW SlangResult SessionRecorder::getTypeConformanceWitnessSequentialID(
     slang::TypeReflection* type,
     slang::TypeReflection* interfaceType,

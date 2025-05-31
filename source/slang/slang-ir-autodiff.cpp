@@ -1754,7 +1754,19 @@ IRType* DifferentiableTypeConformanceContext::differentiateType(
                     (UInt)diffTypeList.getCount(),
                     diffTypeList.getBuffer());
         }
-
+    case kIROp_OptionalType:
+        {
+            auto primalOptionalType = as<IROptionalType>(primalType);
+            if (auto diffElementType =
+                    differentiateType(builder, primalOptionalType->getValueType()))
+            {
+                return builder->getOptionalType(diffElementType);
+            }
+            else
+            {
+                return nullptr;
+            }
+        }
     default:
         return (IRType*)getDifferentialForType(builder, (IRType*)primalType);
     }

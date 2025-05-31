@@ -34,7 +34,7 @@ static bool isAssociatedTypeDecl(Decl* decl)
     return false;
 }
 
-static bool isSlang2026OrLater(SemanticsVisitor* visitor)
+bool isSlang2026OrLater(SemanticsVisitor* visitor)
 {
     return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
            SLANG_LANGUAGE_VERSION_2026;

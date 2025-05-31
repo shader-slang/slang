@@ -42,6 +42,8 @@ bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
 
 bool isUniformParameterType(Type* type);
 
+bool isSlang2026OrLater(SemanticsVisitor* visitor);
+
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 

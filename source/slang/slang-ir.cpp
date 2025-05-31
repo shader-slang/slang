@@ -3515,6 +3515,14 @@ IRInst* IRBuilder::emitExtractExistentialValue(IRType* type, IRInst* existential
     return inst;
 }
 
+IRInst* IRBuilder::emitIsNullExistential(IRInst* existentialValue)
+{
+    auto inst =
+        createInst<IRInst>(this, kIROp_IsNullExistential, getBoolType(), 1, &existentialValue);
+    addInst(inst);
+    return inst;
+}
+
 IRType* IRBuilder::emitExtractExistentialType(IRInst* existentialValue)
 {
     auto type = getTypeKind();
@@ -8648,6 +8656,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:
+    case kIROp_IsNullExistential:
     case kIROp_WrapExistential:
     case kIROp_BuiltinCast:
     case kIROp_BitCast:
