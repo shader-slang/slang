@@ -1851,6 +1851,7 @@ typedef Module LoadedModule;
 /// A request for the front-end to compile a translation unit.
 class TranslationUnitRequest : public RefObject
 {
+    friend struct FrontEndPreprocessorHandler;
 public:
     TranslationUnitRequest(FrontEndCompileRequest* compileRequest);
     TranslationUnitRequest(FrontEndCompileRequest* compileRequest, Module* m);
