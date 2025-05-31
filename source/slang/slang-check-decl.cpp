@@ -34,26 +34,195 @@ static bool isAssociatedTypeDecl(Decl* decl)
     return false;
 }
 
-static bool isSlang2026OrLater(SemanticsVisitor* visitor)
+static bool isSlang2025OrOlder(SemanticsVisitor* visitor)
+{
+    return visitor->getShared()->m_module->getModuleDecl()->languageVersion <=
+           SLANG_LANGUAGE_VERSION_2025;
+}
+
+static bool isSlang2026OrNewer(SemanticsVisitor* visitor)
 {
     return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
            SLANG_LANGUAGE_VERSION_2026;
 }
-
+// Not 2025 **or older** since spec does not specify this.
+// This works fine since older slang revisions do not have `dyn` on vardecl's by default.
 static bool allowExperimentalDynamicDispatch(
     SemanticsVisitor* visitor,
     CompilerOptionSet& optionSet)
 {
     return optionSet.getBoolOption(CompilerOptionName::EnableExperimentalDynamicDispatch) ||
-           !isSlang2026OrLater(visitor);
+           isSlang2025OrOlder(visitor);
 }
 
-static void validateDynInterfaceUsage(
-    SemanticsDeclVisitorBase* visitor,
-    DiagnosticSink* sink,
-    CompilerOptionSet& optionSet,
-    InterfaceDecl* decl)
+bool isImplicitDyn(SemanticsVisitor* visitor)
 {
+    return isSlang2025OrOlder(visitor);
+}
+
+bool validateVarDeclDyn(SemanticsVisitor* visitor)
+{
+    return isSlang2026OrNewer(visitor);
+}
+
+bool isImplicitSome(SemanticsVisitor* visitor)
+{
+    return isSlang2026OrNewer(visitor);
+}
+
+static Type* createSomeTypeDeclType(ASTBuilder* astBuilder, TypeExp type, SourceLoc loc)
+{
+    auto decl = astBuilder->create<SomeTypeDecl>();
+    decl->loc = loc;
+    decl->interfaceType = type;
+    return DeclRefType::create(astBuilder, decl);
+}
+
+static Type* createUnboundSomeTypeDeclType(
+    ASTBuilder* astBuilder,
+    SomeTypeDecl* someType,
+    SourceLoc loc)
+{
+    SLANG_ASSERT(someType);
+
+    auto decl = astBuilder->create<UnboundSomeTypeDecl>();
+    decl->loc = loc;
+    decl->interfaceType = someType->interfaceType;
+    return DeclRefType::create(astBuilder, decl);
+}
+
+static void maybeCreateUnboundSomeTypeDeclFromReturnType(FuncDecl* funcDecl, ASTBuilder* astBuilder)
+{
+    // If type is `out` (not implementing complex-expression `Out<>`) or uninitialized VarDecl we
+    // make an UnboundSomeType given a SomeType
+    auto someType = isDeclRefTypeOf<SomeTypeDecl>(funcDecl->returnType.type);
+    if (!someType)
+        return;
+    funcDecl->returnType.type =
+        createUnboundSomeTypeDeclType(astBuilder, someType.getDecl(), funcDecl->loc);
+}
+
+static void maybeCreateUnboundSomeTypeDeclFromVarDecl(VarDeclBase* varDecl, ASTBuilder* astBuilder)
+{
+    // If type is `out` or uninitialized we
+    // make an UnboundSomeType
+    auto someType = isDeclRefTypeOf<SomeTypeDecl>(varDecl->type.type);
+    if (someType &&
+        (as<VarDecl>(varDecl) || as<ParamDecl>(varDecl) && !varDecl->hasModifier<InOutModifier>() &&
+                                     varDecl->hasModifier<OutModifier>()))
+    {
+        varDecl->type.type =
+            createUnboundSomeTypeDeclType(astBuilder, someType.getDecl(), varDecl->loc);
+    }
+}
+
+static void forceInterfaceQualifierToType(Decl* decl, TypeExp& type, SemanticsVisitor* visitor)
+{
+    ASTBuilder* astBuilder = visitor->getASTBuilder();
+
+    auto declType = type.type;
+    auto explicitSome = isDeclRefTypeOf<SomeTypeDecl>(declType);
+    auto explicitDyn = decl->hasModifier<DynModifier>();
+
+    if (explicitSome && explicitDyn)
+    {
+        visitor->getSink()->diagnose(decl, Diagnostics::cannotBeSomeTypeAndDynType);
+        return;
+    }
+
+    // Add implicit qualifers
+    if (!explicitSome && !explicitDyn)
+    {
+        auto interfaceTypeDeclRef = isDeclRefTypeOf<InterfaceDecl>(type.type);
+        if (!interfaceTypeDeclRef)
+            return;
+
+        if (isImplicitDyn(visitor))
+            addModifier(decl, astBuilder->create<DynModifier>());
+        else if (isImplicitSome(visitor))
+            type.type = createSomeTypeDeclType(astBuilder, type, decl->loc);
+    }
+}
+
+static void assignInterfaceDefinitionDynModifier(
+    SemanticsDeclVisitorBase* visitor,
+    InterfaceDecl* interfaceDecl)
+{
+    if (interfaceDecl->hasModifier<DynModifier>())
+        return;
+
+    // AnyValueSize means we are dyn
+    if (interfaceDecl->hasModifier<AnyValueSizeAttribute>())
+    {
+        addModifier(interfaceDecl, visitor->getASTBuilder()->create<DynModifier>());
+        return;
+    }
+}
+
+static bool isVarDeclBaseSomeType(VarDeclBase* varDeclBase)
+{
+    if (!varDeclBase)
+        return false;
+    if (!isDeclRefTypeOf<SomeTypeDecl>(varDeclBase->getType()))
+        return false;
+    return true;
+}
+static bool isVarDeclBaseDynType(VarDeclBase* varDeclBase)
+{
+    if (!varDeclBase)
+        return false;
+    if (!varDeclBase->hasModifier<DynModifier>())
+        return false;
+    return true;
+}
+
+// This is called during the same pass types are resolved for VarDecl/ParamDecl. Otherwise we may
+// change types after getFuncType() which would break things
+static void validateSomeAndDynVarDeclUsage(SemanticsDeclVisitorBase* visitor, VarDeclBase* decl)
+{
+    auto sink = visitor->getSink();
+    auto optionSet = visitor->getOptionSet();
+
+    forceInterfaceQualifierToType(decl, decl->type, visitor);
+
+    if (isVarDeclBaseSomeType(decl))
+    {
+        if (as<StructDecl>(decl->parentDecl))
+            sink->diagnose(decl, Diagnostics::cannotHaveSomeTypeStructMember);
+        if (isGlobalDecl(decl))
+            sink->diagnose(decl, Diagnostics::cannotHaveSomeTypeGlobalVariable);
+
+        maybeCreateUnboundSomeTypeDeclFromVarDecl(decl, visitor->getASTBuilder());
+    }
+    else if (isVarDeclBaseDynType(decl))
+    {
+        auto declRefInterface = isDeclRefTypeOf<InterfaceDecl>(decl->getType());
+
+        // must be interfaceType decl
+        if (!declRefInterface)
+        {
+            sink->diagnose(decl, Diagnostics::cannotHaveDynVarDeclUnlessDynInterfaceType);
+            return;
+        }
+
+        // stop validation here as per spec `proposals/024-any-dyn-types.md`
+        if (!validateVarDeclDyn(visitor))
+            return;
+
+        // interface type must have `dyn` modifier
+        if (!declRefInterface.getDecl()->hasModifier<DynModifier>())
+        {
+            sink->diagnose(decl, Diagnostics::cannotHaveDynVarDeclUnlessDynInterfaceType);
+            return;
+        }
+    }
+}
+
+static void validateDynInterfaceUsage(SemanticsDeclVisitorBase* visitor, InterfaceDecl* decl)
+{
+    auto sink = visitor->getSink();
+    auto optionSet = visitor->getOptionSet();
+
     if (allowExperimentalDynamicDispatch(visitor, optionSet))
         return;
 
@@ -117,7 +286,44 @@ static void validateDynInterfaceUsage(
     }
 }
 
-static void validateDynInterfaceUseWithInheritanceDecl(
+static void validateSomeAndDynFuncDeclUsage(SemanticsDeclVisitorBase* visitor, FuncDecl* funcDecl)
+{
+    forceInterfaceQualifierToType(funcDecl, funcDecl->returnType, visitor);
+    maybeCreateUnboundSomeTypeDeclFromReturnType(funcDecl, visitor->getASTBuilder());
+
+    CompilerOptionSet& optionSet = visitor->getOptionSet();
+    if (allowExperimentalDynamicDispatch(visitor, optionSet))
+        return;
+
+    if (!funcDecl->parentDecl->hasModifier<DynModifier>())
+        return;
+
+    DiagnosticSink* sink = visitor->getSink();
+
+    // given 'dyn':
+    // not allowed mutating attribute
+    // not allowed differentiable attribute
+    for (auto modifier : funcDecl->modifiers)
+    {
+        if (as<MutatingAttribute>(modifier))
+        {
+            sink->diagnose(funcDecl, Diagnostics::cannotHaveMutatingMethodInDynInterface);
+        }
+        else if (as<DifferentiableAttribute>(modifier))
+        {
+            sink->diagnose(funcDecl, Diagnostics::cannotHaveDifferentiableMethodInDynInterface);
+        }
+    }
+
+    // not allowed `some` for return-type and paramDecl-type
+    if (funcDecl->returnType && isDeclRefTypeOf<SomeTypeDecl>(funcDecl->returnType.type))
+        sink->diagnose(funcDecl, Diagnostics::cannotReturnSomeTypeInDynInterface);
+    for (auto param : funcDecl->getParameters())
+        if (isVarDeclBaseSomeType(param))
+            sink->diagnose(funcDecl, Diagnostics::cannotHaveSomeTypeParamInDynInterface);
+}
+
+static void validateDynInterfaceWithInheritanceDeclUsage(
     SemanticsDeclVisitorBase* visitor,
     DiagnosticSink* sink,
     CompilerOptionSet& optionSet,
@@ -748,6 +954,9 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         dispatchIfNotNull(expr->right.type);
     }
     void visitPointerTypeExpr(PointerTypeExpr* expr) { dispatchIfNotNull(expr->base.type); }
+
+    void visitSomeTypeExpr(SomeTypeExpr* expr) { dispatchIfNotNull(expr->base.type); }
+
     void visitAsTypeExpr(AsTypeExpr* expr)
     {
         dispatchIfNotNull(expr->value);
@@ -1681,10 +1890,8 @@ void SemanticsDeclModifiersVisitor::visitInterfaceDecl(InterfaceDecl* interfaceD
 {
     visitDecl(interfaceDecl);
 
-    if (interfaceDecl->hasModifier<AnyValueSizeAttribute>())
-        addModifier(interfaceDecl, m_astBuilder->create<DynModifier>());
-
-    validateDynInterfaceUsage(this, getSink(), getOptionSet(), interfaceDecl);
+    assignInterfaceDefinitionDynModifier(this, interfaceDecl);
+    validateDynInterfaceUsage(this, interfaceDecl);
 }
 
 void SemanticsDeclModifiersVisitor::visitStructDecl(StructDecl* structDecl)
@@ -2289,6 +2496,8 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         addModifier(varDecl, m_astBuilder->create<ExternCppModifier>());
     }
     checkVisibility(varDecl);
+
+    validateSomeAndDynVarDeclUsage(this, varDecl);
 }
 
 static void addAutoDiffModifiersToFunc(
@@ -3345,7 +3554,7 @@ struct SemanticsDeclDifferentialConformanceVisitor
 
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
-        validateDynInterfaceUseWithInheritanceDecl(
+        validateDynInterfaceWithInheritanceDeclUsage(
             this,
             getSink(),
             getOptionSet(),
@@ -9308,6 +9517,8 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 
     maybeApplyLayoutModifier(paramDecl);
 
+    validateSomeAndDynVarDeclUsage(this, paramDecl);
+
     // Only texture types are allowed to have memory qualifiers on parameters
     if (!paramDecl->type || paramDecl->type->astNodeType != ASTNodeType::TextureType)
     {
@@ -10039,6 +10250,7 @@ void SemanticsDeclHeaderVisitor::visitFuncDecl(FuncDecl* funcDecl)
     funcDecl->returnType = resultType;
 
     checkCallableDeclCommon(funcDecl);
+    validateSomeAndDynFuncDeclUsage(this, funcDecl);
 }
 
 IntegerLiteralValue SemanticsVisitor::GetMinBound(IntVal* val)
@@ -13865,8 +14077,12 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
     }
 }
 
-DeclVisibility getDeclVisibility(Decl* decl)
+DeclVisibility SemanticsVisitor::getDeclVisibility(Decl* decl)
 {
+    if (auto someType = as<SomeTypeDecl>(decl))
+    {
+        return getTypeVisibility(someType->interfaceType.type);
+    }
     if (as<GenericTypeParamDeclBase>(decl) || as<GenericValueParamDecl>(decl) ||
         as<GenericTypeConstraintDecl>(decl))
     {

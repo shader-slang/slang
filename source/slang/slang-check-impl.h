@@ -1362,6 +1362,7 @@ public:
         SourceLoc loc,
         Expr* originalExpr);
 
+    DeclVisibility getDeclVisibility(Decl* decl);
     DeclVisibility getTypeVisibility(Type* type);
     bool isDeclVisibleFromScope(DeclRef<Decl> declRef, Scope* scope);
     LookupResult filterLookupResultByVisibility(const LookupResult& lookupResult);
@@ -1473,6 +1474,15 @@ public:
         FuncType* funcType,
         Expr* fromExpr,
         Expr** outExpr);
+
+    bool tryCoerceSomeType(
+        CoercionSite site,
+        Type* toType,
+        Expr** outToExpr,
+        QualType fromType,
+        Expr* fromExpr,
+        DiagnosticSink* sink,
+        ConversionCost* outCost);
 
     // A "proper" type is one that can be used as the type of an expression.
     // Put simply, it can be a concrete type like `int`, or a generic
@@ -2991,6 +3001,7 @@ public:
     Expr* visitReturnValExpr(ReturnValExpr* expr);
     Expr* visitAndTypeExpr(AndTypeExpr* expr);
     Expr* visitPointerTypeExpr(PointerTypeExpr* expr);
+    Expr* visitSomeTypeExpr(SomeTypeExpr* expr);
     Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
     Expr* visitFuncTypeExpr(FuncTypeExpr* expr);
     Expr* visitTupleTypeExpr(TupleTypeExpr* expr);
@@ -3116,8 +3127,6 @@ bool isUnsizedArrayType(Type* type);
 bool isInterfaceType(Type* type);
 
 EnumDecl* isEnumType(Type* type);
-
-DeclVisibility getDeclVisibility(Decl* decl);
 
 // If `type` is unsized, return the trailing unsized array field that makes it so.
 VarDeclBase* getTrailingUnsizedArrayElement(

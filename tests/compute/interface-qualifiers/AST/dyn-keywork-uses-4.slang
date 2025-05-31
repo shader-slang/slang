@@ -1,11 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK_2026): -target spirv -stage compute -entry computeMain -lang slang -std 2026
-//TEST:SIMPLE(filecheck=CHECK_2025_OR_EXP): -target spirv -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_2025_OR_EXP): -target spirv -stage compute -entry computeMain -std 2025
 //TEST:SIMPLE(filecheck=CHECK_2025_OR_EXP): -target spirv -stage compute -entry computeMain -lang slang -std 2026 -enable-experimental-dynamic-dispatch
 
-// Validate AST side of `dyn` keyword use-cases
+// Validate AST side of `dyn` keyword use-cases.
 
-// `experimental-dynamic-dispatch` and `-lang 2025` have fewer restrictions
-//
 // CHECK_2025_OR_EXP-NOT: error 33072
 // CHECK_2025_OR_EXP-NOT: error 33073
 // CHECK_2025_OR_EXP-NOT: error 33074
@@ -14,8 +12,6 @@
 // CHECK_2025_OR_EXP-NOT: error 33077
 // CHECK_2025_OR_EXP-NOT: error 33078
 // CHECK_2025_OR_EXP-NOT: error 33082
-
-/////////////////////////////////////////////////////
 
 // `dyn` interfaces are not allowed to be generics
 // CHECK_2026-DAG: error 33072
@@ -173,10 +169,6 @@ struct structWithNonCopyable2 : IBase6
 {
     NonCopyableStruct2<int> v;
 };
-
-// `dyn` interfaces cannot contain any methods that has a `some` IFoo return type, or has any `some` IFoo parameters.
-// TODO-INTERFACE-QUALIFIERS-ADDITION-OF-SOME
-//
 
 RWStructuredBuffer<int> outputBuffer;
 [numthreads(4, 1, 1)]

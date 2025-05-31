@@ -128,6 +128,13 @@ Expr* SemanticsVisitor::maybeMoveTemp(Expr* const& expr, F const& func)
     return moveTemp(expr, func);
 }
 
+static Type* getWrappedType(Type* type)
+{
+    if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(type))
+        return someTypeDeclRef.getDecl()->interfaceType;
+    return type;
+}
+
 /// Return an expression that represents "opening" the existential `expr`.
 ///
 /// The type of `expr` must be an interface type, matching `interfaceDeclRef`.
@@ -159,9 +166,12 @@ Expr* SemanticsVisitor::openExistential(Expr* expr, DeclRef<InterfaceDecl> inter
         expr,
         [&](DeclRef<VarDeclBase> varDeclRef)
         {
+            // Must remove all thin-wrapper types since otherwise it will "block" the type system
+            // from correctly resolving LookupDeclRef. This causes unresolved generics.
+            auto unwrappedType = getWrappedType(expr->type.type);
             ExtractExistentialType* openedType = m_astBuilder->getOrCreate<ExtractExistentialType>(
                 varDeclRef,
-                expr->type.type,
+                unwrappedType,
                 interfaceDeclRef);
 
             ExtractExistentialValueExpr* openedValue =
@@ -211,6 +221,12 @@ Expr* SemanticsVisitor::maybeOpenExistential(Expr* expr)
         if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
         {
             return openExistential(expr, interfaceDeclRef);
+        }
+        else if (auto someTypeDeclRef = declRefType->getDeclRef().as<SomeTypeDecl>())
+        {
+            return openExistential(
+                expr,
+                isDeclRefTypeOf<InterfaceDecl>(someTypeDeclRef.getDecl()->interfaceType.type));
         }
     }
 
@@ -5455,6 +5471,52 @@ Expr* SemanticsExprVisitor::visitPointerTypeExpr(PointerTypeExpr* expr)
         expr->type = expr->base.type;
     auto ptrType = m_astBuilder->getPtrType(expr->base.type, AddressSpace::UserPointer);
     expr->type = m_astBuilder->getTypeType(ptrType);
+    return expr;
+}
+
+static Type* createSomeTypeDeclType(ASTBuilder* astBuilder, SomeTypeExpr* expr)
+{
+    auto decl = astBuilder->create<SomeTypeDecl>();
+    decl->loc = expr->loc;
+    decl->interfaceType = expr->base;
+    return astBuilder->getTypeType(DeclRefType::create(astBuilder, decl));
+}
+
+Expr* SemanticsExprVisitor::visitSomeTypeExpr(SomeTypeExpr* expr)
+{
+    if (expr->base.type)
+    {
+        expr->type = createSomeTypeDeclType(m_astBuilder, expr);
+        return expr;
+    }
+
+    expr->base = CheckProperType(expr->base);
+    if (as<ErrorType>(expr->base.type))
+        expr->type = expr->base.type;
+    else
+    {
+        auto declRefType = as<DeclRefType>(expr->base.type);
+        if (!declRefType)
+        {
+            getSink()->diagnose(
+                expr,
+                Diagnostics::cannotDeclareNonInterfaceSomeType,
+                expr->base.type);
+        }
+
+        auto interfaceType = as<InterfaceDecl>(declRefType->getDeclRefBase()->getDecl());
+        if (!interfaceType)
+        {
+            getSink()->diagnose(
+                expr,
+                Diagnostics::cannotDeclareNonInterfaceSomeType,
+                expr->base.type);
+        }
+        else
+        {
+            expr->type = createSomeTypeDeclType(m_astBuilder, expr);
+        }
+    }
     return expr;
 }
 

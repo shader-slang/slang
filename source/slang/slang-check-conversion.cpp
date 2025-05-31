@@ -1197,6 +1197,10 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
+    // unwrap SomeTypeDecl's
+    if (tryCoerceSomeType(site, toType, outToExpr, fromType, fromExpr, sink, outCost))
+        return true;
+
     // Assume string literals are convertible to any string type.
     if (as<StringLiteralExpr>(fromExpr) && as<StringTypeBase>(toType))
     {
@@ -1864,6 +1868,65 @@ bool SemanticsVisitor::_coerce(
         getShared()->cacheImplicitCastMethod(implicitCastKey, ImplicitCastMethod{});
     }
     return _failedCoercion(toType, outToExpr, fromExpr, sink);
+}
+
+// TODO make member of SemanticsVisitor
+bool SemanticsVisitor::tryCoerceSomeType(
+    CoercionSite site,
+    Type* toType,
+    Expr** outToExpr,
+    QualType fromType,
+    Expr* fromExpr,
+    DiagnosticSink* sink,
+    ConversionCost* outCost)
+{
+    // basic restrictions
+    if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(toType))
+    {
+        // if `some T = some U` `some T = unbound_some U`
+        if (site != CoercionSite::Argument && isDeclRefTypeOf<SomeTypeDecl>(fromType))
+        {
+            if (!isDeclRefTypeOf<UnboundSomeTypeDecl>(toType))
+            {
+                sink->diagnose(
+                    fromExpr->loc,
+                    Diagnostics::cannotAssignSomeTypeToPotentiallyDifferentSomeType);
+                return false;
+            }
+        }
+        // not allowed to assign 'dyn' to 'unboundSomeType'
+        else if (
+            !isDeclRefTypeOf<SomeTypeDecl>(fromType) && isDeclRefTypeOf<InterfaceDecl>(fromType))
+        {
+            sink->diagnose(fromExpr->loc, Diagnostics::cannotAssignDynTypeToSomeType);
+            return false;
+        }
+        // implicit unwrap
+        return _coerce(
+            site,
+            someTypeDecl.getDecl()->interfaceType.type,
+            outToExpr,
+            fromType,
+            fromExpr,
+            sink,
+            outCost);
+    }
+
+    // `T = some IFoo<T>` is allowed, need to unwrap SomeType
+    if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(fromType))
+    {
+        //`SomeType` needs implicit unwrap to be assigned to non-some-type
+        return _coerce(
+            site,
+            toType,
+            outToExpr,
+            someTypeDeclRef.getDecl()->interfaceType.type,
+            fromExpr,
+            sink,
+            outCost);
+    }
+
+    return false;
 }
 
 bool SemanticsVisitor::tryCoerceLambdaToFuncType(
