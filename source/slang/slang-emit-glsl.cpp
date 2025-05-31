@@ -9,6 +9,7 @@
 #include "slang-ir-util.h"
 #include "slang-legalize-types.h"
 #include "slang-mangled-lexer.h"
+#include "slang-type-system-shared.h"
 #include "slang/slang-ir.h"
 
 #include <assert.h>
@@ -238,12 +239,28 @@ void GLSLSourceEmitter::emitMemoryQualifiers(IRInst* varDecl)
 void GLSLSourceEmitter::emitStructFieldAttributes(
     IRStructType* structType,
     IRStructField* field,
-    bool allowOffsetLayout)
+    bool allowOffsetLayout,
+    bool forceScalarOffsets)
 {
     SLANG_UNUSED(structType);
     auto structKey = field->getKey();
 
-    if (allowOffsetLayout)
+    if (forceScalarOffsets)
+    {
+        // Get the offset using the getOffset function
+        IRIntegerValue offset = 0;
+        if (SLANG_SUCCEEDED(getOffset(
+            getTargetProgram()->getOptionSet(),
+            IRTypeLayoutRules::getNatural(),
+            field,
+            &offset)))
+        {
+            m_writer->emit("layout(offset = ");
+            m_writer->emit(offset);
+            m_writer->emit(") ");
+        }
+    }
+    else if (allowOffsetLayout)
     {
         if (auto offsetDecoration = structKey->findDecoration<IRVkStructOffsetDecoration>())
         {
@@ -487,7 +504,7 @@ void GLSLSourceEmitter::_emitGLSLSSBO(
     const auto structType = cast<IRStructType>(ssboType->getOperand(0));
     m_writer->emit(getName(structType));
     m_writer->emit("_Block");
-    emitStructDeclarationsBlock(structType, true);
+    emitStructDeclarationsBlock(structType, true, false);
 
     m_writer->emit(getName(varDecl));
     emitArrayBrackets(varDecl->getDataType());
@@ -502,6 +519,78 @@ void GLSLSourceEmitter::emitGlobalParamDefaultVal(IRGlobalParam* param)
         m_writer->emit(" = ");
         emitInstExpr(defaultValDecor->getOperand(0), EmitOpInfo());
     }
+}
+
+static bool checkStructRequiresScalarLayout(IRStructType* structType)
+{
+    for (auto field : structType->getFields())
+    {
+        // Look for offset decoration
+        auto offsetDecor = field->findDecoration<IROffsetDecoration>();
+        if (!offsetDecor)
+            continue;
+
+        // Get the offset value
+        auto offset = offsetDecor->getOffset();
+
+        // Get field type info
+        IRType* fieldType = field->getFieldType();
+        size_t expectedAlign = 4; // default to scalar
+        if (auto vectorType = as<IRVectorType>(fieldType))
+        {
+            auto elementCount = int(getIntVal(vectorType->getElementCount()));
+            if (elementCount == 2)
+            {
+                expectedAlign = 8;
+            }
+            else
+            {
+                expectedAlign = 16;
+            }
+        }
+        else if (as<IRMatrixType>(fieldType) || as<IRArrayType>(fieldType) || as<IRStructType>(fieldType))
+        {
+            expectedAlign = 16;
+        }
+
+        // If offset is not aligned according to std140 rules,
+        // we need scalar layout
+        if (offset % expectedAlign != 0)
+        {
+            return true;
+        }
+
+        // Recursively check embedded structs
+        if (auto embeddedStruct = as<IRStructType>(fieldType))
+        {
+            if (checkStructRequiresScalarLayout(embeddedStruct))
+                return true;
+        }
+    }
+    return false;
+}
+
+static bool checkConstantBufferRequiresScalarLayout(IRType* type)
+{
+    // FIXME jhelferty
+    // The intent of this function is determine if the constant buffer
+    // uses offsets that require the scalar layout. It might be a better
+    // idea to tag the struct somehow during slang-ir-layout.cpp iteration,
+    // around the code that calls adjustAlignmentForStructOffset(),
+    // since we already need to evaluate this sort of thing over there.
+    //
+    // Worse, this function doesn't work at the moment, so I need to force
+    // it true with the line below.
+
+    if (true) {
+        return true;
+    }
+
+    if (auto structType = as<IRStructType>(type))
+    {
+        return checkStructRequiresScalarLayout(structType);
+    }
+    return false;
 }
 
 void GLSLSourceEmitter::_emitGLSLParameterGroup(
@@ -546,6 +635,7 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(
     _emitGLSLLayoutQualifier(LayoutResourceKind::PushConstantBuffer, &containerChain);
     _emitGLSLLayoutQualifier(LayoutResourceKind::SpecializationConstant, &containerChain);
 
+    bool constantBufferRequiresScalarLayout = false;
     bool isShaderRecord =
         _emitGLSLLayoutQualifier(LayoutResourceKind::ShaderRecord, &containerChain);
 
@@ -567,8 +657,10 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(
     else
     {
         // uniform is implicitly read only
+        constantBufferRequiresScalarLayout = checkConstantBufferRequiresScalarLayout(type);
+
         m_writer->emit("layout(");
-        if (getTargetProgram()->getOptionSet().shouldUseScalarLayout())
+        if (constantBufferRequiresScalarLayout || getTargetProgram()->getOptionSet().shouldUseScalarLayout())
             m_writer->emit("scalar");
         else if (auto cbufferType = as<IRConstantBufferType>(type))
         {
@@ -608,7 +700,7 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(
         // We need to emit the fields of the struct as individual variables
         // in the constant buffer.
         //
-        emitStructDeclarationsBlock(structType, true);
+        emitStructDeclarationsBlock(structType, true, constantBufferRequiresScalarLayout);
     }
     else
     {
@@ -1205,7 +1297,7 @@ void GLSLSourceEmitter::_maybeEmitGLSLBuiltin(IRGlobalParam* var, UnownedStringS
         m_writer->emit("out");
         m_writer->emit(" ");
         m_writer->emit(elementTypeName);
-        emitStructDeclarationsBlock(elementType, false);
+        emitStructDeclarationsBlock(elementType, false, false);
         m_writer->emit(" ");
         m_writer->emit(name);
         emitArrayBrackets(arrayType);

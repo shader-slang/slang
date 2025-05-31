@@ -283,9 +283,11 @@ void WGSLSourceEmitter::emitSemanticsPrefixImpl(IRInst* inst)
 void WGSLSourceEmitter::emitStructFieldAttributes(
     IRStructType* structType,
     IRStructField* field,
-    bool allowOffsetLayout)
+    bool allowOffsetLayout,
+    bool forceScalarOffsets)
 {
     SLANG_UNUSED(allowOffsetLayout);
+    SLANG_UNUSED(forceScalarOffsets);
 
     // Tint emits errors unless we explicitly spell out the layout in some cases, so emit
     // offset and align attribtues for all fields.
