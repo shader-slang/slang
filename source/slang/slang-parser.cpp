@@ -4976,8 +4976,9 @@ static DeclBase* ParseDeclWithModifiers(
                 };
                 if (AdvanceIf(parser, "buffer"))
                 {
-                    decl = as<Decl>(
-                        parseGLSLShaderStorageBufferDecl(parser, getLayoutArg("Std430DataLayout")));
+                    decl = as<Decl>(parseGLSLShaderStorageBufferDecl(
+                        parser,
+                        getLayoutArg("DefaultDataLayout")));
                     break;
                 }
                 else if (auto mod = findPotentialGLSLInterfaceBlockModifier(parser, modifiers))
