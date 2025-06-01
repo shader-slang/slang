@@ -4755,6 +4755,9 @@ static SlangResult runUnitTestModule(
             {
                 TestReporter::TestScope scopeTest(reporter, options.command);
                 ExecuteResult exeRes;
+                // Initialize the ExecuteResult, otherwise we can get bogus
+                // error results.
+                exeRes.init();
 
                 SlangResult rpcRes = _executeRPC(
                     context,
@@ -5068,15 +5071,14 @@ SlangResult innerMain(int argc, char** argv)
             // Try the unit tests up to 3 times
             for (bool isRetry : {false, true, true})
             {
-                // Use default spawn type for unit tests as the test server one is unstable
-                auto spawnType = SpawnType::Default;
+                auto spawnType = context.getFinalSpawnType();
                 context.isRetry = isRetry;
                 if (isRetry)
                 {
                     if (context.failedUnitTests.getCount() == 0)
                         break;
 
-                    printf("Retrying unit tests with default spawn type...\n");
+                    printf("Retrying unit tests...\n");
                     context.options.testPrefixes = context.failedUnitTests;
                     context.failedUnitTests.clear();
                 }
