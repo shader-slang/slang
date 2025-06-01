@@ -247,16 +247,10 @@ void GLSLSourceEmitter::emitStructFieldAttributes(
 
     if (forceScalarOffsets)
     {
-        // Get the offset using the getOffset function
-        IRIntegerValue offset = 0;
-        if (SLANG_SUCCEEDED(getOffset(
-            getTargetProgram()->getOptionSet(),
-            IRTypeLayoutRules::getNatural(),
-            field,
-            &offset)))
+        if (auto offsetDecoration = structKey->findDecoration<IROffsetDecoration>())
         {
             m_writer->emit("layout(offset = ");
-            m_writer->emit(offset);
+            m_writer->emit(offsetDecoration->getOffset());
             m_writer->emit(") ");
         }
     }

@@ -66,14 +66,16 @@ public:
     virtual IRSizeAndAlignment getVectorSizeAndAlignment(
         IRSizeAndAlignment element,
         IRIntegerValue count) = 0;
-    virtual IRIntegerValue adjustOffsetForNextAggregateMember(
-        IRIntegerValue currentSize,
-        IRIntegerValue lastElementAlignment) = 0;
 
-    /// Adjust the alignment of an element based on the offset of the struct it is a member of.
-    /// This is used to ensure that elements that cross a 16 byte boundary are realigned to 16 bytes
-    /// for D3D constant buffers. Other targets do not need this.
-    virtual void adjustAlignmentForStructOffset(IRSizeAndAlignment& element, IRIntegerValue offset) = 0;
+    /// Adjust the offset of an element. Handles two cases; alignmment when
+    /// the previous field was a composite, and the D3D constant buffer case
+    /// where an element is aligned to the next 16-byte boundary if it doesn't
+    /// fit entirely within the current one.
+    virtual IRIntegerValue adjustOffset(
+        IRIntegerValue offset,
+        IRIntegerValue elementSize,
+        IRType* lastFieldType,
+        IRIntegerValue lastFieldAlignment) = 0;
 
     static IRTypeLayoutRules* getStd430();
     static IRTypeLayoutRules* getStd140();
