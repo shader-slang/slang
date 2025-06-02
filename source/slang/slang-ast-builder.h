@@ -486,6 +486,7 @@ public:
     Type* getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const char* magicTypeName);
 
     Type* getDefaultLayoutType();
+    Type* getDefaultPushConstantLayoutType();
     Type* getStd140LayoutType();
     Type* getStd430LayoutType();
     Type* getScalarLayoutType();
