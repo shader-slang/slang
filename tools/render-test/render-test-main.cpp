@@ -1396,10 +1396,8 @@ static SlangResult _innerMain(
         DeviceDesc desc = {};
         desc.deviceType = options.deviceType;
 
-#if _DEBUG
-        desc.enableValidation = true;
+        desc.enableValidation = options.enableDebugLayers;
         desc.debugCallback = &debugCallback;
-#endif
 
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)
