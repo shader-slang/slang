@@ -88,6 +88,8 @@ static bool _isSubCommand(const char* arg)
         "  -use-test-server               Run tests using test server\n"
         "  -use-fully-isolated-test-server  Run each test in isolated server\n"
         "  -capability <name>             Compile with the given capability\n"
+        "  -enable-debug-layers [true|false] Enable or disable Validation Layer for Vulkan\n"
+        "                                 and Debug Device for DX\n"
 #if _DEBUG
         "  -disable-debug-layers          Disable the debug layers (default enabled in debug "
         "build)\n"
