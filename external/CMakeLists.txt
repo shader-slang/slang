@@ -31,7 +31,7 @@ if(NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})
         add_subdirectory(unordered_dense EXCLUDE_FROM_ALL ${system})
     else()
         add_subdirectory(
-            ${SLANG_OVERRIDE_UNORDERED_DENSE_PATH}
+            ${SLANG_OVERRIDE_UNORDERED_DENSE_PATH}/unordered_dense
             unordered_dense
             EXCLUDE_FROM_ALL
             ${system}
@@ -45,7 +45,7 @@ if(NOT ${SLANG_USE_SYSTEM_MINIZ})
         add_subdirectory(miniz EXCLUDE_FROM_ALL ${system})
     else()
         add_subdirectory(
-            ${SLANG_OVERRIDE_MINIZ_PATH}
+            ${SLANG_OVERRIDE_MINIZ_PATH}/miniz
             miniz
             EXCLUDE_FROM_ALL
             ${system}
@@ -67,7 +67,7 @@ if(NOT ${SLANG_USE_SYSTEM_LZ4})
         add_subdirectory(lz4/build/cmake EXCLUDE_FROM_ALL ${system})
     else()
         add_subdirectory(
-            ${SLANG_OVERRIDE_LZ4_PATH}/build/cmake
+            ${SLANG_OVERRIDE_LZ4_PATH}/lz4/build/cmake
             lz4/build/cmake
             EXCLUDE_FROM_ALL
             ${system}
@@ -87,7 +87,7 @@ if(NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
         add_subdirectory(vulkan EXCLUDE_FROM_ALL ${system})
     else()
         add_subdirectory(
-            ${SLANG_OVERRIDE_VULKAN_HEADERS_PATH}
+            ${SLANG_OVERRIDE_VULKAN_HEADERS_PATH}/vulkan
             vulkan
             EXCLUDE_FROM_ALL
             ${system}
@@ -108,7 +108,7 @@ if(NOT ${SLANG_USE_SYSTEM_SPIRV_HEADERS})
         add_subdirectory(spirv-headers EXCLUDE_FROM_ALL ${system})
     else()
         add_subdirectory(
-            ${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}
+            ${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/spirv-headers
             spirv-headers
             EXCLUDE_FROM_ALL
             ${system}
@@ -124,7 +124,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
     if(NOT SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
         set(SPIRV_HEADER_DIR "${CMAKE_CURRENT_LIST_DIR}/spirv-headers/")
     else()
-        set(SPIRV_HEADER_DIR ${SLANG_OVERRIDE_SPIRV_HEADERS_PATH})
+        set(SPIRV_HEADER_DIR ${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/spirv-headers)
     endif()
     set(SPIRV_SKIP_TESTS ON)
     # Tools
@@ -132,7 +132,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         add_subdirectory(spirv-tools EXCLUDE_FROM_ALL ${system})
     else()
         add_subdirectory(
-            ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH}
+            ${SLANG_OVERRIDE_SPIRV_TOOLS_PATH}/spirv-tools
             spirv-tools
             EXCLUDE_FROM_ALL
             ${system}
@@ -147,7 +147,7 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
         add_subdirectory(glslang EXCLUDE_FROM_ALL ${system})
     else()
         add_subdirectory(
-            ${SLANG_OVERRIDE_GLSLANG_PATH}
+            ${SLANG_OVERRIDE_GLSLANG_PATH}/glslang
             glslang
             EXCLUDE_FROM_ALL
             ${system}
@@ -167,7 +167,7 @@ else()
     target_include_directories(
         imgui
         ${system}
-        INTERFACE "${SLANG_OVERRIDE_IMGUI_PATH}"
+        INTERFACE "${SLANG_OVERRIDE_IMGUI_PATH}/imgui"
     )
 endif()
 
@@ -204,7 +204,7 @@ if(SLANG_ENABLE_SLANG_RHI)
         add_subdirectory(slang-rhi)
     else()
         add_subdirectory(
-            ${SLANG_OVERRIDE_SLANG_RHI_PATH}
+            ${SLANG_OVERRIDE_SLANG_RHI_PATH}/slang-rhi
             slang-rhi
             EXCLUDE_FROM_ALL
             ${system}

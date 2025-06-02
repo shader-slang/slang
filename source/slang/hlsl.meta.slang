@@ -30,6 +30,12 @@ struct DefaultDataLayout : IBufferDataLayout
 {};
 
 /// @category misc_types
+__intrinsic_type($(kIROp_Std430BufferLayoutType))
+__magic_type(DefaultPushConstantDataLayoutType)
+struct DefaultPushConstantDataLayout : IBufferDataLayout
+{};
+
+/// @category misc_types
 __intrinsic_type($(kIROp_Std140BufferLayoutType))
 [require(spirv)]
 [require(glsl)]
@@ -503,6 +509,7 @@ struct __ShapeCube : __ITextureShape
 /// @category misc_types
 __magic_type(TextureShapeBufferType)
 __intrinsic_type($(kIROp_TextureShapeBufferType))
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
 struct __ShapeBuffer : __ITextureShape
 {
     static const int flavor = $(SLANG_TEXTURE_BUFFER);
@@ -17986,7 +17993,7 @@ float2x4 GetLssPositionsAndRadii()
     case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
     case cuda:
         {
-            __intrinsic_asm "optixObjectPositionsAndRadii";
+            __intrinsic_asm "optixGetLssPositionsAndRadii";
         }
     case spirv:
         return spirv_asm
@@ -20671,7 +20678,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
         case cuda:
             {
-                __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
+                __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii";
             }
         case spirv:
             return spirv_asm
