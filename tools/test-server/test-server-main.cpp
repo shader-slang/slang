@@ -446,6 +446,12 @@ SlangResult TestServer::_executeUnitTest(const JSONRPCCall& call)
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = RenderApiFlags(args.enabledApis);
     unitTestContext.executableDirectory = m_exeDirectory.getBuffer();
+    // When using test server, any validation warning printed from the backend
+    // gets misinterpreted as the result from the test.
+    // This is due to the limitation that Slang RPC implementation expects only
+    // one time communication. Set enableDebugLayers to false to avoid Vulkan
+    // test failures when running on debug using test server.
+    unitTestContext.enableDebugLayers = false;
 
     auto testCount = testModule->getTestCount();
     SLANG_ASSERT(testIndex >= 0 && testIndex < testCount);
