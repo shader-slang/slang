@@ -947,6 +947,10 @@ Result linkAndOptimizeIR(
             break;
     }
 
+    // Validate dyn and some type usage. Must happen after loop-unrolling,
+    // else simple loops will not compile if assigning to an interface
+    validateDynAndSomeUsage(irModule, sink);
+
     // Lower `Result<T,E>` types into ordinary struct types. This must happen
     // after specialization, since otherwise incompatible copies of the lowered
     // result structure are generated.

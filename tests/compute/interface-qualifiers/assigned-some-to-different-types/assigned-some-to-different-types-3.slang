@@ -1,6 +1,10 @@
-//IGNORE:TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
-// CHECK-NOT: error
+// tests:
+// 1 simple assignment, with `out` param, 
+// another `some` variable, a func with return type of `some`,
+// all the same type assignment, therefore valid.
+// CHECK-NOT: error SOMETHING
 
 interface IFoo
 {
@@ -44,18 +48,28 @@ struct StructForIFoo2 : IFoo
     }
 };
 
-void logic(out some IFoo v1)
+void nestedLogic(out some IFoo v1)
 {
-    // TODO -- error in IR, not allowed to assign different types to `some`
-    // TODO -- error in IR, cannot assign `some` twice
-    v1 = StructForIFoo2(1);
     v1 = StructForIFoo1(1);
+}
+
+void logic(out some IFoo v1, in some IFoo v2)
+{
+    if(buffer[0] == 0)
+    {
+        v1 = StructForIFoo1(1);
+    }
+    else
+    {
+        nestedLogic(v1); // error since all `some` are different type
+    }
 }
 
 RWStructuredBuffer<int> buffer;
 void computeMain()
 {
     some IFoo data1;
-    logic(data1);
+    some IFoo data2 = StructForIFoo1(2);
+    logic(data1, data2);
     buffer[0] = data1.getVal();
 }

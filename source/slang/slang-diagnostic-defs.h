@@ -51,6 +51,7 @@ DIAGNOSTIC(-1, Note, seeInclusionOf, "see inclusion of '$0'")
 DIAGNOSTIC(-1, Note, seeModuleBeingUsedIn, "see module '$0' being used in '$1'")
 DIAGNOSTIC(-1, Note, seeCallOfFunc, "see call to '$0'")
 DIAGNOSTIC(-1, Note, seePipelineRequirementDefinition, "see pipeline requirement definition")
+DIAGNOSTIC(-1, Note, seeUseSite, "see use site")
 DIAGNOSTIC(
     -1,
     Note,
@@ -2557,6 +2558,12 @@ DIAGNOSTIC(
     invalidAtomicDestinationPointer,
     "cannot perform atomic operation because destination is neither groupshared nor from a device "
     "buffer.")
+
+DIAGNOSTIC(
+    41404,
+    Error,
+    localSomeVarWrittenMoreThanOnce,
+    "'some' type interface variable '$0' may be written to more than once")
 
 //
 // 5xxxx - Target code generation.

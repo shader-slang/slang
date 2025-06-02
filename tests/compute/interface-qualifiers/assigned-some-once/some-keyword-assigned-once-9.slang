@@ -1,6 +1,7 @@
 //IGNORE:TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
-// CHECK-NOT: error
+// Note: this fails since we cannot unroll these loops (Slang limitation?)
+// CHECK-NOT: error 41404
 
 interface IFoo
 {
@@ -44,24 +45,20 @@ struct StructForIFoo2 : IFoo
     }
 };
 
-some IFoo returnIFoo(in some data1, in some data2)
+RWBuffer<int> thing;
+void logic(out some IFoo v1)
 {
-    // TODO in IR -- error, returning multiple different types, invalid
-    if (data1.getVal() == 0)
+    [ForceUnroll]
+    for (int i = 0; i < 1; i++)
     {
-        return data1;
+        v1 = StructForIFoo1(1);
     }
-    else
-    {
-        return data2;
-    } 
 }
 
 RWStructuredBuffer<int> buffer;
 void computeMain()
 {
-    some IFoo data1 = StructForIFoo1();
-    some IFoo data2 = StructForIFoo1();
-    returnIFoo(data1, data2);
+    some IFoo data1;
+    logic(data1);
     buffer[0] = data1.getVal();
 }

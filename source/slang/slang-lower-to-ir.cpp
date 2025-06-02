@@ -2495,6 +2495,13 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         }
         builder->addMeshOutputDecoration(op, inst, t->getMaxElementCount());
     }
+
+    if (auto vardeclBase = as<VarDeclBase>(decl))
+    {
+        // SomeType var's must be tagged accordingly
+        if (isDeclRefTypeOf<SomeTypeDecl>(vardeclBase->getType()))
+            builder->addDecoration(inst, kIROp_SomeTypeDecoration);
+    }
 }
 
 /// If `decl` has a modifier that should turn into a
@@ -9113,7 +9120,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         LoweredValInfo varVal = createVar(context, varType, decl);
         maybeAddDebugLocationDecoration(context, varVal.val);
-
+        
         if (auto initExpr = decl->initExpr)
         {
             assignExpr(context, varVal, initExpr, decl->loc);
