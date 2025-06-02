@@ -49,7 +49,7 @@ some IFoo nestedReturnLogic()
     return StructForIFoo1(1);
 }
 
-void logic(in some IFoo v2)
+some IFoo logic(in some IFoo v2)
 {
     if(buffer[0] == 0)
     {
