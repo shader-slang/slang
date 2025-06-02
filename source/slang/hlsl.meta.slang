@@ -24441,9 +24441,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 result:$$CoopVec<T, N> = OpCompositeConstructReplicateEXT $t;
             };
         case hlsl:
-            for(int i = 0; i < N; ++i)
-                this[i] = t;
-            return;
+             __intrinsic_asm "$0 = $1";
         case hlsl_coopvec_poc:
             __intrinsic_asm ".Fill";
         default:
