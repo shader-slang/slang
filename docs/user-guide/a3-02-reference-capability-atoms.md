@@ -1270,6 +1270,9 @@ Compound Capabilities
 `raytracing_anyhit_closesthit`
 > Collection of capabilities for raytracing with the shader stages of anyhit and closesthit.
 
+`raytracing_lss`
+> Collection of capabilities for linear swept spheres.
+
 `raytracing_anyhit_closesthit_intersection`
 > Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.
 

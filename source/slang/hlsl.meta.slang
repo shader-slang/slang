@@ -30,6 +30,12 @@ struct DefaultDataLayout : IBufferDataLayout
 {};
 
 /// @category misc_types
+__intrinsic_type($(kIROp_Std430BufferLayoutType))
+__magic_type(DefaultPushConstantDataLayoutType)
+struct DefaultPushConstantDataLayout : IBufferDataLayout
+{};
+
+/// @category misc_types
 __intrinsic_type($(kIROp_Std140BufferLayoutType))
 [require(spirv)]
 [require(glsl)]
@@ -503,6 +509,7 @@ struct __ShapeCube : __ITextureShape
 /// @category misc_types
 __magic_type(TextureShapeBufferType)
 __intrinsic_type($(kIROp_TextureShapeBufferType))
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
 struct __ShapeBuffer : __ITextureShape
 {
     static const int flavor = $(SLANG_TEXTURE_BUFFER);
@@ -17986,7 +17993,7 @@ float2x4 GetLssPositionsAndRadii()
     case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
     case cuda:
         {
-            __intrinsic_asm "optixObjectPositionsAndRadii";
+            __intrinsic_asm "optixGetLssPositionsAndRadii";
         }
     case spirv:
         return spirv_asm
@@ -20671,7 +20678,7 @@ struct HitObject
         case hlsl: __intrinsic_asm "NvRtLssObjectPositionsAndRadii";
         case cuda:
             {
-                __intrinsic_asm "optixHitObjectGetSpherePositionAndRadius";
+                __intrinsic_asm "optixHitObjectGetLssPositionsAndRadii";
             }
         case spirv:
             return spirv_asm
@@ -22749,14 +22756,14 @@ T __castDescriptorHandleToResource<T:IOpaqueDescriptor>(DescriptorHandle<T> ptr)
 
 public enum BindlessDescriptorOptions
 {
-    None = 0, /// Bind assuming regular binding model rules.
-    VkMutable = 1, /// Bind assuming `VK_EXT_mutable_descriptor_type` without mutable `AccelerationStructure` binding support.
+    None = 0,      /// Bind assuming regular binding model rules.
+    VkMutable = 1, /// **Current Default** Bind assuming `VK_EXT_mutable_descriptor_type`
 }
 
 /// The default implementation of `getDescriptorFromHandle`, which converts from a descriptor handle
 /// to a descriptor object.
 [ForceInline]
-T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.None)
+T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handleValue, constexpr BindlessDescriptorOptions bindlessOptions = BindlessDescriptorOptions.VkMutable)
 {
     __target_switch
     {
@@ -23413,6 +23420,23 @@ struct CoopMat
             OpExtension "SPV_NV_cooperative_matrix2";
             result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixPerElementOpNV $this $mapOp;
         };
+    }
+
+    __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
+    internal static This __MapElement<
+        TOperator,
+        TFunc : IFunc<T, uint32_t, uint32_t, T>
+    >(
+        This coopMat,
+        TOperator mapOp,
+        TFunc mapObj
+    );
+
+    This MapElement<
+        TFunc : IFunc<T, uint32_t, uint32_t, T>
+    >(TFunc mapOp)
+    {
+        return __MapElement(this, mapOp.operator(), mapOp);
     }
 
     //
@@ -24276,7 +24300,35 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     };
 }
 
+extension<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : linalg.CoopMatMatrixUse,
+    each Ts : __BuiltinArithmeticType
+> Tuple<linalg.CoopMat<T, S, M, N, R>, expand linalg.CoopMat<each Ts, S, M, N, R>>
+{
+    __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
+    CoopMat<T, S, M, N, R> MapElement(functype(uint32_t, uint32_t, T, expand each Ts)->T mapOp);
+
+    __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
+    static CoopMat<T, S, M, N, R> __MapElement<
+        TOperator,
+        TFunc : IFunc<T, uint32_t, uint32_t, T, expand each Ts>
+    >(This tuple, TOperator mapOp, TFunc mapObj);
+
+    [ForceInline]
+    CoopMat<T, S, M, N, R> MapElement<
+        TFunc : IFunc<T, uint32_t, uint32_t, T, expand each Ts>
+    >(TFunc mapOp)
+    {
+        return __MapElement(this, mapOp.operator(), mapOp);
+    }
+};
+
 } // namespace linalg
+
 
 //
 // Cooperative Vector

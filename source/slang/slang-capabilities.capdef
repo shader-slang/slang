@@ -718,7 +718,7 @@ def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder;
 /// [EXT]
 def spvRayTracingClusterAccelerationStructureNV : SPV_NV_cluster_acceleration_structure;
 
-/// Represents the SPIR-V capability for cluster acceleration structure.
+/// Represents the SPIR-V capability for linear swept spheres.
 /// [EXT]
 def spvRayTracingLinearSweptSpheresGeometryNV : SPV_NV_linear_swept_spheres;
 
