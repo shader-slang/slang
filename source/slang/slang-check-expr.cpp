@@ -1980,8 +1980,21 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
          decl->hasModifier<VkConstantIdAttribute>()) &&
         kind == ConstantFoldingKind::SpecializationConstant)
     {
+        // Float-to-inst casts cannot be`OpSpecConstOp` operations in SPIR-V,
+        // which means they need to be local instructions can cannot be hoisted to the
+        // global scope. Deduplication logic is run for `IntVal`s however and without hoisting
+        // instructions using this `IntVal` will trigger error. Hence we emit error here
+        // to not allow such cases.
+        //
+        // Note that float-to-inst casts for non-`IntVal`s are allowed.
+        if (!isScalarIntegerType(decl->getType()))
+        {
+            getSink()->diagnose(declRef, Diagnostics::intValFromNonIntSpecConstEncountered);
+            return nullptr;
+        }
+
         return m_astBuilder->getOrCreate<DeclRefIntVal>(
-            declRef.substitute(m_astBuilder, declRef.getDecl()->getType()),
+            declRef.substitute(m_astBuilder, decl->getType()),
             declRef);
     }
 
@@ -2331,6 +2344,10 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
         return CreateErrorExpr(subscriptExpr);
     }
 
+    for (auto& expr : subscriptExpr->indexExprs)
+    {
+        expr = CheckExpr(expr);
+    }
     auto indexExpr = subscriptExpr->indexExprs[0];
 
     if (!isScalarIntegerType(indexExpr->type.type))
@@ -2477,6 +2494,30 @@ Expr* SemanticsExprVisitor::visitParenExpr(ParenExpr* expr)
 
     expr->base = base;
     expr->type = base->type;
+    return expr;
+}
+
+Expr* SemanticsExprVisitor::visitTupleExpr(TupleExpr* expr)
+{
+    List<Type*> elementTypes;
+    for (auto& element : expr->elements)
+    {
+        element = CheckTerm(element);
+        auto elementType = element->type.type;
+        if (auto concreteTypePack = as<ConcreteTypePack>(elementType))
+        {
+            // We need to flatten the type pack into a tuple type
+            for (Index i = 0; i < concreteTypePack->getTypeCount(); i++)
+            {
+                elementTypes.add(concreteTypePack->getElementType(i));
+            }
+        }
+        else
+        {
+            elementTypes.add(element->type.type);
+        }
+    }
+    expr->type = m_astBuilder->getTupleType(elementTypes.getArrayView());
     return expr;
 }
 

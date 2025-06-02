@@ -5,6 +5,7 @@
 #include "slang-compiler.h"
 #include "slang-diagnostics.h"
 #include "slang-mangle.h"
+#include "slang-serialize-fossil.h"
 #include "slang-serialize-riff.h"
 
 namespace Slang
@@ -97,6 +98,11 @@ void serialize(Serializer const& serializer, ValNodeOperandKind& value)
 void serialize(Serializer const& serializer, SPIRVAsmOperand::Flavor& value)
 {
     serializeEnum(serializer, value);
+}
+
+void serialize(Serializer const& serializer, SlangLanguageVersion version)
+{
+    serializeEnum(serializer, version);
 }
 
 void serialize(Serializer const& serializer, MatrixCoord& value)
@@ -197,7 +203,7 @@ using ASTSerializer = Serializer_<ASTSerializerImpl>;
 template<typename T>
 void serializeObject(ASTSerializer const& serializer, T*& value, NodeBase*)
 {
-    SLANG_SCOPED_SERIALIZER_STRUCT(serializer);
+    SLANG_SCOPED_SERIALIZER_VARIANT(serializer);
     serializer->handleASTNode(*(NodeBase**)&value);
 }
 
@@ -219,7 +225,7 @@ void serialize(ASTSerializer const& serializer, SourceLoc& value)
 
 void serialize(ASTSerializer const& serializer, RequirementWitness& value)
 {
-    SLANG_SCOPED_SERIALIZER_TAGGED_UNION(serializer);
+    SLANG_SCOPED_SERIALIZER_VARIANT(serializer);
     serialize(serializer, value.m_flavor);
     switch (value.m_flavor)
     {
@@ -401,7 +407,7 @@ void serialize(ASTSerializer const& serializer, SPIRVAsmInst& value)
 
 void serialize(ASTSerializer const& serializer, ValNodeOperand& value)
 {
-    SLANG_SCOPED_SERIALIZER_TAGGED_UNION(serializer);
+    SLANG_SCOPED_SERIALIZER_VARIANT(serializer);
     serialize(serializer, value.kind);
     switch (value.kind)
     {
@@ -475,19 +481,19 @@ struct ASTEncodingContext : ASTSerializerImpl
 {
 public:
     ASTEncodingContext(
-        RIFF::BuildCursor& cursor,
+        ISerializerImpl* writer,
         ModuleDecl* module,
         SerialSourceLocWriter* sourceLocWriter)
-        : _writer(cursor.getCurrentChunk()), _module(module), _sourceLocWriter(sourceLocWriter)
+        : _writer(writer), _module(module), _sourceLocWriter(sourceLocWriter)
     {
     }
 
 private:
-    RIFFSerialWriter _writer;
+    ISerializerImpl* _writer = nullptr;
     ModuleDecl* _module = nullptr;
     SerialSourceLocWriter* _sourceLocWriter = nullptr;
 
-    virtual ISerializerImpl* getBaseSerializer() override { return &_writer; }
+    virtual ISerializerImpl* getBaseSerializer() override { return _writer; }
 
     virtual void handleName(Name*& value) override;
     virtual void handleSourceLoc(SourceLoc& value) override;
@@ -526,7 +532,7 @@ public:
         Linkage* linkage,
         ASTBuilder* astBuilder,
         DiagnosticSink* sink,
-        RIFF::Chunk const* baseChunk,
+        ISerializerImpl* reader,
         SerialSourceLocReader* sourceLocReader,
         SourceLoc requestingSourceLoc)
         : _linkage(linkage)
@@ -534,7 +540,7 @@ public:
         , _sink(sink)
         , _sourceLocReader(sourceLocReader)
         , _requestingSourceLoc(requestingSourceLoc)
-        , _riffReader(baseChunk)
+        , _reader(reader)
     {
     }
 
@@ -544,9 +550,9 @@ private:
     DiagnosticSink* _sink = nullptr;
     SerialSourceLocReader* _sourceLocReader = nullptr;
     SourceLoc _requestingSourceLoc;
-    RIFFSerialReader _riffReader;
+    ISerializerImpl* _reader = nullptr;
 
-    virtual ISerializerImpl* getBaseSerializer() override { return &_riffReader; }
+    virtual ISerializerImpl* getBaseSerializer() override { return _reader; }
 
     virtual void handleName(Name*& value) override;
     virtual void handleSourceLoc(SourceLoc& value) override;
@@ -905,8 +911,21 @@ void writeSerializedModuleAST(
     // TODO: we might want to have a more careful pass here,
     // where we only encode the public declarations.
 
-    ASTEncodingContext context(cursor, moduleDecl, sourceLocWriter);
-    serialize(ASTSerializer(&context), moduleDecl);
+    BlobBuilder blobBuilder;
+    {
+        Fossil::SerialWriter writer(blobBuilder);
+
+        ASTEncodingContext context(&writer, moduleDecl, sourceLocWriter);
+        serialize(ASTSerializer(&context), moduleDecl);
+    }
+
+    ComPtr<ISlangBlob> blob;
+    blobBuilder.writeToBlob(blob.writeRef());
+
+    void const* data = blob->getBufferPointer();
+    size_t size = blob->getBufferSize();
+
+    cursor.addDataChunk(PropertyKeys<Module>::ASTModule, data, size);
 }
 
 ModuleDecl* readSerializedModuleAST(
@@ -917,8 +936,14 @@ ModuleDecl* readSerializedModuleAST(
     SerialSourceLocReader* sourceLocReader,
     SourceLoc requestingSourceLoc)
 {
+    auto dataChunk = as<RIFF::DataChunk>(chunk);
+
+    auto rootVal = Fossil::getRootValue(dataChunk->getPayload(), dataChunk->getPayloadSize());
+
+    Fossil::SerialReader reader(rootVal);
+
     ASTDecodingContext
-        context(linkage, astBuilder, sink, chunk, sourceLocReader, requestingSourceLoc);
+        context(linkage, astBuilder, sink, &reader, sourceLocReader, requestingSourceLoc);
 
     ModuleDecl* moduleDecl = nullptr;
     serialize(ASTSerializer(&context), moduleDecl);

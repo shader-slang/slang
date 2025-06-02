@@ -789,6 +789,8 @@ INST(AllocateTorchTensor, allocTorchTensor, 0, 0)
 INST(TorchGetCudaStream, TorchGetCudaStream, 0, 0)
 INST(TorchTensorGetView, TorchTensorGetView, 0, 0)
 
+INST(CoopMatMapElementIFunc, CoopMatMapElementIFunc, 2, 0)
+
 INST(AllocateOpaqueHandle, allocateOpaqueHandle, 0, 0)
 
     // Return the register index thtat a resource is bound to.
