@@ -123,7 +123,7 @@ static bool _isSubCommand(const char* arg)
 #if _DEBUG
     // Enabling debug layers by default in debug builds.
     // For DX12 it will use the debug layer, for Vulkan it will enable validation layers.
-    // 
+    //
     // CI/CD will explicitly disable this until we address all of VUID errors.
     // https://github.com/shader-slang/slang/issues/4798
     //
