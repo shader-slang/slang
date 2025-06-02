@@ -10428,16 +10428,7 @@ void SemanticsDeclHeaderVisitor::visitAbstractStorageDeclCommon(ContainerDecl* d
 
 void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
 {
-    // __subscript needs to have a return type specified. Check if return type
-    // is missing (represented as IncompleteExpr) and return an error.
-    if (decl->returnType.exp && as<IncompleteExpr>(decl->returnType.exp))
-    {
-        getSink()->diagnose(decl, Diagnostics::subscriptMustHaveReturnType);
-    }
-    else if (decl->returnType.exp)
-    {
-        decl->returnType = CheckUsableType(decl->returnType, decl);
-    }
+    decl->returnType = CheckUsableType(decl->returnType, decl);
 
     visitAbstractStorageDeclCommon(decl);
 
