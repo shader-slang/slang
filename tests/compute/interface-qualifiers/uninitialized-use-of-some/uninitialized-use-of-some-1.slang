@@ -1,6 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
-// CHECK: error SOME_ID
+// tests:
+// uninitialized `out` assigned to `out`
+
+// CHECK: error SOMETHING
 
 interface IFoo
 {
@@ -30,7 +33,7 @@ struct StructForIFoo2 : IFoo
 {
     __init(int v)
     {
-        a = v+10;
+        a = v*10;
     }
     int a = 0;
     int getVal()
@@ -44,35 +47,16 @@ struct StructForIFoo2 : IFoo
     }
 };
 
-// different returns, error
-
-some IFoo returnIFooNested()
+void logic(out some IFoo v1, out some IFoo v2)
 {
-    if (output[0] == 0)
-    {
-        return StructForIFoo1(1);
-    }
-    else
-    {
-        return StructForIFoo2(2);
-    }
+    v1 = v2;
 }
 
-some IFoo returnIFoo()
-{
-    if (output[1] == 0)
-    {
-        return StructForIFoo1(1);
-    }
-    else
-    {
-        return returnIFooNested();
-    } 
-}
-
-RWStructuredBuffer<int> output;
+RWStructuredBuffer<int> buffer;
 void computeMain()
 {
-    some IFoo data3 = returnIFoo();
-    output[0] = data3.getVal();
+    some IFoo data1;
+    some IFoo data2;
+    logic(data1, data2);
+    buffer[0] = data1.getVal();
 }

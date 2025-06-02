@@ -1,9 +1,7 @@
-//TEST:SIMPLE(filecheck=CHECK1): -target spirv -stage compute -entry computeMain -lang slang -std 2026 -DMISMATCH
-//TEST:SIMPLE(filecheck=CHECK2): -target spirv -stage compute -entry computeMain -lang slang -std 2026
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
-// TODO: check if this should error for both cases??
-// CHECK1: error
-// CHECK2: no idea
+// CHECK-NOT: error SOMETHING
+
 interface IFoo
 {
     int getVal();
@@ -46,24 +44,20 @@ struct StructForIFoo2 : IFoo
     }
 };
 
-some IFoo nestedLogic()
+some IFoo nestedReturnLogic()
 {
-#ifdef MISMATCH
-    return StructForIFoo2(1);
-#else
     return StructForIFoo1(1);
-#endif
 }
-void logic(out some IFoo v1)
+
+void logic(out some IFoo v1, in some IFoo v2)
 {
-    // Not allowed to assign different types to `some` param
-    if (buffer[0] == 0)
+    if(buffer[0] == 0)
     {
         v1 = StructForIFoo1(1);
     }
     else
     {
-        v1 = nestedLogic();
+        v1 = StructForIFoo1(2); 
     }
 }
 
@@ -71,6 +65,7 @@ RWStructuredBuffer<int> buffer;
 void computeMain()
 {
     some IFoo data1;
-    logic(data1);
+    some IFoo data2 = StructForIFoo1(2);
+    logic(data1, data2);
     buffer[0] = data1.getVal();
 }

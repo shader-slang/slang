@@ -1,6 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
-// CHECK: error
+// tests:
+// returning uninitialized val
+
+// CHECK: error SOMETHING
 
 interface IFoo
 {
@@ -44,23 +47,15 @@ struct StructForIFoo2 : IFoo
     }
 };
 
-void logic(out some IFoo v1)
+some IFoo logic()
 {
-    // Not allowed to assign different types to `some` param
-    if (buffer[0] == 0)
-    {
-        v1 = StructForIFoo1(1);
-    }
-    else
-    {
-        v1 = StructForIFoo2(1);
-    }
+    some IFoo v1;
+    return v1;
 }
 
 RWStructuredBuffer<int> buffer;
 void computeMain()
 {
-    some IFoo data1;
-    logic(data1);
+    some IFoo data1 = logic();
     buffer[0] = data1.getVal();
 }

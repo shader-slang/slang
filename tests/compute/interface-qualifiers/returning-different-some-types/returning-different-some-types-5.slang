@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
-// CHECK: error SOMETHING
+// CHECK-NOT: error SOMETHING
 
 interface IFoo
 {
@@ -44,28 +44,21 @@ struct StructForIFoo2 : IFoo
     }
 };
 
-void nestedLogic(out some IFoo v1)
-{
-    v1 = StructForIFoo1(1);
-}
-
-void logic(out some IFoo v1, in some IFoo v2)
+some IFoo logic()
 {
     if(buffer[0] == 0)
     {
-        v1 = StructForIFoo1(1);
+        return StructForIFoo1(1);
     }
     else
     {
-        nestedLogic(v1); // error since all `some` are different type
+        return StructForIFoo1(2); 
     }
 }
 
 RWStructuredBuffer<int> buffer;
 void computeMain()
 {
-    some IFoo data1;
-    some IFoo data2 = StructForIFoo1(2);
-    logic(data1, data2);
+    some IFoo data1 = logic();
     buffer[0] = data1.getVal();
 }

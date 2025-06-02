@@ -1,10 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
-// tests:
-// 1 simple assignment, with `out` param, 
-// another `some` variable, a func with return type of `some`,
-// all the same type assignment, therefore valid.
-// CHECK-NOT: error SOMETHING
+// CHECK: error SOMETHING
 
 interface IFoo
 {

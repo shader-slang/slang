@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
-// CHECK: error SOME_ID
+// CHECK-NOT: error SOMETHING
 
 interface IFoo
 {
@@ -30,7 +30,7 @@ struct StructForIFoo2 : IFoo
 {
     __init(int v)
     {
-        a = v+10;
+        a = v*10;
     }
     int a = 0;
     int getVal()
@@ -44,35 +44,27 @@ struct StructForIFoo2 : IFoo
     }
 };
 
-// same returns, no error
-
-some IFoo returnIFooNested()
+some IFoo nestedReturnLogic()
 {
-    if (output[0] == 0)
+    return StructForIFoo1(1);
+}
+
+void logic(in some IFoo v2)
+{
+    if(buffer[0] == 0)
     {
-        return StructForIFoo1(1);
+        return v2;
     }
     else
     {
-        return StructForIFoo1(2);
+        return v2; 
     }
 }
 
-some IFoo returnIFoo()
-{
-    if (output[1] == 0)
-    {
-        return StructForIFoo1(1);
-    }
-    else
-    {
-        return returnIFooNested();
-    } 
-}
-
-RWStructuredBuffer<int> output;
+RWStructuredBuffer<int> buffer;
 void computeMain()
 {
-    some IFoo data3 = returnIFoo();
-    output[0] = data3.getVal();
+    some IFoo data2 = StructForIFoo1(2);
+    some IFoo data1 = logic(data2);
+    buffer[0] = data1.getVal();
 }
