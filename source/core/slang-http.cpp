@@ -60,6 +60,17 @@ void HTTPHeader::reset()
     return (index >= 0) ? (index + g_headerEnd.getLength()) : index;
 }
 
+/* static */ Index HTTPHeader::findContentLength(BufferedReadStream* stream)
+{
+    // Search for Content-Length in the current buffer
+    auto bytes = stream->getView();
+    UnownedStringSlice input((const char*)bytes.begin(), (const char*)bytes.end());
+
+    // Find the position of "Content-Length"
+    const Index index = input.indexOf(g_contentLength);
+    return index;
+}
+
 /* static */ SlangResult HTTPHeader::parse(const UnownedStringSlice& inSlice, HTTPHeader& out)
 {
     out.reset();
@@ -213,10 +224,20 @@ SlangResult HTTPPacketConnection::_handleHeader()
 {
     SLANG_ASSERT(m_readState == ReadState::Header);
 
+    // An empty new line is where the header part of HTTP ends.
     const Index index = HTTPHeader::findHeaderEnd(m_readStream);
     if (index < 0)
     {
         // Don't have the full header yet
+        return SLANG_OK;
+    }
+
+    Index indexContentLength = HTTPHeader::findContentLength(m_readStream);
+    if (indexContentLength < 0 || indexContentLength >= index)
+    {
+        // We didn't get the content length, and it was probably error/noise.
+        // We will ignore the messages until we get a valid header.
+        m_readStream->consume(index);
         return SLANG_OK;
     }
 

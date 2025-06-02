@@ -46,6 +46,9 @@ struct HTTPHeader
     /// doesn't have an end
     static Index findHeaderEnd(BufferedReadStream* stream);
 
+    /// Returns the index of the first "Content-Length" header in the stream, or < 0 if not found
+    static Index findContentLength(BufferedReadStream* stream);
+
     /// Parse the slice (holding a header) into out.
     /// Will allocate the slice on the array and store in m_header.
     /// Slices will reference sections of m_header, that may be useful in some scenarios.
