@@ -3117,6 +3117,10 @@ bool isUnsizedArrayType(Type* type);
 
 bool isInterfaceType(Type* type);
 
+// Check if `type` is nullable. An `Optional<T>` will occupy the same space as `T`, if `T`
+// is nullable.
+bool isNullableType(Type* type);
+
 EnumDecl* isEnumType(Type* type);
 
 DeclVisibility getDeclVisibility(Decl* decl);

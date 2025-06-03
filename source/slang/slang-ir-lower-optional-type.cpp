@@ -98,7 +98,6 @@ struct OptionalTypeLoweringContext
             return loweredInfo->Ptr();
         if (auto loweredInfo = mapLoweredTypeToOptionalTypeInfo.tryGetValue(type))
             return loweredInfo->Ptr();
-
         if (!type)
             return nullptr;
         if (type->getOp() != kIROp_OptionalType)
@@ -107,6 +106,12 @@ struct OptionalTypeLoweringContext
         RefPtr<LoweredOptionalTypeInfo> info = new LoweredOptionalTypeInfo();
         auto optionalType = cast<IROptionalType>(type);
         auto valueType = optionalType->getValueType();
+        while (auto valueOptionalType = as<IROptionalType>(valueType))
+        {
+            // If the value type is also an Optional, we need to keep lowering it.
+            valueType = valueOptionalType->getValueType();
+        }
+
         info->optionalType = (IRType*)type;
         info->valueType = valueType;
         if (typeHasNullValue(valueType, info->kind))

@@ -1597,6 +1597,23 @@ EnumDecl* isEnumType(Type* type)
     return nullptr;
 }
 
+bool isNullableType(Type* type)
+{
+    if (as<PtrTypeBase>(type))
+        return true;
+    if (isDeclRefTypeOf<InterfaceDecl>(type))
+        return true;
+    if (isDeclRefTypeOf<ClassDecl>(type))
+        return true;
+    if (as<OptionalType>(type))
+        return true;
+    if (as<RefTypeBase>(type))
+        return true;
+    if (as<NativeStringType>(type))
+        return true;
+    return false;
+}
+
 bool SemanticsVisitor::shouldSkipChecking(Decl* decl, DeclCheckState state)
 {
     if (state < DeclCheckState::DefinitionChecked)
