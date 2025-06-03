@@ -911,11 +911,13 @@ void RenderTestApp::_initializeAccelerationStructure()
 
 void RenderTestApp::setProjectionMatrix(IShaderObject* rootObject)
 {
-    auto info = m_device->getDeviceInfo();
+    float identityProjectionMatrix[16];
+    static const float kIdentity[] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+        ::memcpy(identityProjectionMatrix, kIdentity, sizeof(kIdentity));
     ShaderCursor(rootObject)
         .getField("Uniforms")
         .getDereferenced()
-        .setData(info.identityProjectionMatrix, sizeof(float) * 16);
+        .setData(identityProjectionMatrix, sizeof(float) * 16);
 }
 
 void RenderTestApp::finalize()
@@ -972,14 +974,11 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
 
 Result RenderTestApp::writeScreen(const String& filename)
 {
-    size_t rowPitch, pixelSize;
     ComPtr<ISlangBlob> blob;
+    SubresourceLayout layout;
     SLANG_RETURN_ON_FAIL(
-        m_device->readTexture(m_colorBuffer, blob.writeRef(), &rowPitch, &pixelSize));
-    auto bufferSize = blob->getBufferSize();
-    uint32_t width = static_cast<uint32_t>(rowPitch / pixelSize);
-    uint32_t height = static_cast<uint32_t>(bufferSize / rowPitch);
-    return PngSerializeUtil::write(filename.getBuffer(), blob, width, height);
+        m_device->readTexture(m_colorBuffer, 0, 0, blob.writeRef(), &layout));
+    return PngSerializeUtil::write(filename.getBuffer(), blob, layout.size.width, layout.size.height);
 }
 
 Result RenderTestApp::update()
@@ -1490,7 +1489,7 @@ static SlangResult _innerMain(
     // Print adapter info after device creation but before any other operations
     if (options.showAdapterInfo)
     {
-        auto info = device->getDeviceInfo();
+        auto info = device->getInfo();
         auto out = stdWriters->getOut();
         out.print("Using graphics adapter: %s\n", info.adapterName);
     }
