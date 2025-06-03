@@ -20,17 +20,17 @@ private:
 
     std::string flagsToString(IROpFlags flags)
     {
-        if (flags == kIROpFlags_None)
+        if (flags == IROpFlags::None)
             return "0";
 
         std::vector<std::string> flag_names;
-        if (flags & kIROpFlag_Parent)
+        if ((flags & IROpFlags::Parent) != IROpFlags::None)
             flag_names.push_back("PARENT");
-        if (flags & kIROpFlag_UseOther)
+        if ((flags & IROpFlags::UseOther) != IROpFlags::None)
             flag_names.push_back("USE_OTHER");
-        if (flags & kIROpFlag_Hoistable)
+        if ((flags & IROpFlags::Hoistable) != IROpFlags::None)
             flag_names.push_back("HOISTABLE");
-        if (flags & kIROpFlag_Global)
+        if ((flags & IROpFlags::Global) != IROpFlags::None)
             flag_names.push_back("GLOBAL");
 
         std::string result;
@@ -128,30 +128,35 @@ public:
     std::string generate(const InstructionSet& inst_set)
     {
         // Generate prelude
-        output << "// slang-ir-inst-defs.h\n\n";
-        output << "// clang-format off\n\n";
-        output << "#ifndef INST\n";
-        output << "#error Must #define `INST` before including `ir-inst-defs.h`\n";
-        output << "#endif\n\n";
-        output << "#ifndef INST_RANGE\n";
-        output << "#define INST_RANGE(BASE, FIRST, LAST) /* empty */\n";
-        output << "#endif\n\n";
-        output << "#define PARENT kIROpFlag_Parent\n";
-        output << "#define USE_OTHER kIROpFlag_UseOther\n";
-        output << "#define HOISTABLE kIROpFlag_Hoistable\n";
-        output << "#define GLOBAL kIROpFlag_Global\n\n";
+        output << R"(// slang-ir-inst-defs.h
+
+#ifndef INST
+#error Must #define `INST` before including `ir-inst-defs.h`
+#endif
+
+#ifndef INST_RANGE
+#define INST_RANGE(BASE, FIRST, LAST) /* empty */
+#endif
+
+#define PARENT kIROpFlag_Parent
+#define USE_OTHER kIROpFlag_UseOther
+#define HOISTABLE kIROpFlag_Hoistable
+#define GLOBAL kIROpFlag_Global
+
+)";
 
         // Generate instructions
         for (const auto& entry : inst_set.insts)
         {
-            generateEntry(entry.get(), kIROpFlags_None);
+            generateEntry(entry.get(), IROpFlags::None);
             output << "\n";
         }
 
-        output << "#undef PARENT\n";
-        output << "#undef USE_OTHER\n";
-        output << "#undef INST_RANGE\n";
-        output << "#undef INST\n";
+        output << R"(#undef PARENT
+#undef USE_OTHER
+#undef INST_RANGE
+#undef INST
+)";
 
         return output.str();
     }

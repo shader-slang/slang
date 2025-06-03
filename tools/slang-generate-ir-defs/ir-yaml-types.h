@@ -5,19 +5,26 @@
 #include <string>
 #include <vector>
 
-// IR Operation Flags
-enum : uint32_t
+// Only coincidence that this has the same members as in slang-ir.h
+enum class IROpFlags : uint32_t
 {
-    kIROpFlags_None = 0,
-    kIROpFlag_Parent = 1 << 0,   ///< This op is a parent op
-    kIROpFlag_UseOther = 1 << 1, ///< If set this op can use 'other bits' to store information
-    kIROpFlag_Hoistable =
-        1 << 2, ///< If set this op is a hoistable inst that needs to be deduplicated.
-    kIROpFlag_Global =
-        1 << 3, ///< If set this op should always be hoisted but should never be deduplicated.
+    None = 0,
+    Parent = 1 << 0,    // 0x01
+    UseOther = 1 << 1,  // 0x02
+    Hoistable = 1 << 2, // 0x04
+    Global = 1 << 3     // 0x08
 };
 
-using IROpFlags = uint32_t;
+inline IROpFlags operator|(IROpFlags lhs, IROpFlags rhs)
+{
+    return static_cast<IROpFlags>(static_cast<uint32_t>(lhs) | static_cast<uint32_t>(rhs));
+}
+
+inline IROpFlags operator&(IROpFlags lhs, IROpFlags rhs)
+{
+    return static_cast<IROpFlags>(static_cast<uint32_t>(lhs) & static_cast<uint32_t>(rhs));
+}
+
 
 // Forward declarations
 struct InstructionEntry;
@@ -43,7 +50,7 @@ struct InstructionEntry : Entry
     std::string type_name;
     int operands = 0;
     std::vector<std::string> flag_strings;
-    IROpFlags flags = kIROpFlags_None;
+    IROpFlags flags = IROpFlags::None;
 
     Type getType() const override { return INSTRUCTION; }
 };
@@ -54,7 +61,7 @@ struct RangeEntry : Entry
     std::string name;
     std::string comment;
     std::vector<std::string> flag_strings;
-    IROpFlags flags = kIROpFlags_None;
+    IROpFlags flags = IROpFlags::None;
     std::vector<std::unique_ptr<Entry>> insts;
 
     Type getType() const override { return RANGE; }

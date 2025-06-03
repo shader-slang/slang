@@ -1,15 +1,16 @@
 #include "ir-yaml-parser.h"
 
-#include <algorithm>
+#include "ir-yaml-types.h"
+
 #include <cctype>
 #include <fkYAML/node.hpp>
 
 // Map string flags to enum values
 const std::unordered_map<std::string, IROpFlags> FLAG_MAP = {
-    {"Parent", kIROpFlag_Parent},
-    {"UseOther", kIROpFlag_UseOther},
-    {"Hoistable", kIROpFlag_Hoistable},
-    {"Global", kIROpFlag_Global}};
+    {"Parent", IROpFlags::Parent},
+    {"UseOther", IROpFlags::UseOther},
+    {"Hoistable", IROpFlags::Hoistable},
+    {"Global", IROpFlags::Global}};
 
 // Helper function to convert snake_case to PascalCase
 std::string toPascalCase(const std::string& snake_case)
@@ -49,13 +50,13 @@ std::string toPascalCase(const std::string& snake_case)
 // Convert string flags to enum
 IROpFlags parseFlags(const std::vector<std::string>& flag_strings)
 {
-    IROpFlags result = kIROpFlags_None;
+    IROpFlags result = IROpFlags::None;
     for (const auto& flag : flag_strings)
     {
         auto it = FLAG_MAP.find(flag);
         if (it != FLAG_MAP.end())
         {
-            result |= it->second;
+            result = result | it->second;
         }
     }
     return result;
