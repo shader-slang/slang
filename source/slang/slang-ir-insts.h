@@ -3074,6 +3074,17 @@ struct IREach : IRInst
     IRInst* getElement() { return getOperand(0); }
 };
 
+struct IRMakeArray : IRInst
+{
+    IR_LEAF_ISA(MakeArray)
+};
+
+struct IRMakeArrayFromElement : IRInst
+{
+    IR_LEAF_ISA(MakeArrayFromElement)
+};
+
+
 // An Instruction that creates a tuple value.
 struct IRMakeTuple : IRInst
 {

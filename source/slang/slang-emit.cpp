@@ -56,6 +56,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-legalize-array-return-type.h"
 #include "slang-ir-legalize-binary-operator.h"
+#include "slang-ir-legalize-empty-array.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-image-subscript.h"
 #include "slang-ir-legalize-mesh-outputs.h"
@@ -1157,6 +1158,8 @@ Result linkAndOptimizeIR(
     {
         addUserTypeHintDecorations(irModule);
     }
+
+    legalizeEmptyArray(irModule, sink);
 
     // We don't need the legalize pass for C/C++ based types
     if (options.shouldLegalizeExistentialAndResourceTypes)
