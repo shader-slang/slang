@@ -302,4 +302,4 @@ jobs:
           # The install directory used in the packaging step
           path: |
             build/dist-${{matrix.config}}/**/ZIP/slang/*
-            build.em/
+            build.em/Release
