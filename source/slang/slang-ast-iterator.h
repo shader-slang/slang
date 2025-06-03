@@ -76,6 +76,13 @@ struct ASTIterator
             dispatchIfNotNull(expr->base);
         }
 
+        void visitTupleExpr(TupleExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            for (auto element : expr->elements)
+                dispatchIfNotNull(element);
+        }
+
         void visitAssignExpr(AssignExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
@@ -436,6 +443,20 @@ struct ASTIterator
         {
             iterator->maybeDispatchCallback(stmt);
             dispatchIfNotNull(stmt->statement);
+        }
+
+        void visitThrowStmt(ThrowStmt* stmt)
+        {
+            iterator->maybeDispatchCallback(stmt);
+            iterator->visitExpr(stmt->expression);
+        }
+
+        void visitCatchStmt(CatchStmt* stmt)
+        {
+            if (stmt->errorVar)
+                iterator->visitDecl(stmt->errorVar);
+            dispatchIfNotNull(stmt->tryBody);
+            dispatchIfNotNull(stmt->handleBody);
         }
 
         void visitWhileStmt(WhileStmt* stmt)

@@ -15,7 +15,6 @@ on:
       - "README.md"
     tags:
       - "v*"
-
 jobs:
   release:
     strategy:
@@ -28,7 +27,7 @@ jobs:
           - {
               os: linux,
               platform: x86_64,
-              runs-on: ubuntu-latest,
+              runs-on: ubuntu-22.04,
               compiler: gcc,
             }
           - {

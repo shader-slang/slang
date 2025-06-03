@@ -1570,6 +1570,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
         case ASTNodeType::DefaultDataLayoutType:
         case ASTNodeType::Std140DataLayoutType:
             return &kStd140LayoutRulesImpl_;
+        case ASTNodeType::DefaultPushConstantDataLayoutType:
         case ASTNodeType::Std430DataLayoutType:
             return &kStd430LayoutRulesImpl_;
         case ASTNodeType::ScalarDataLayoutType:
@@ -1771,11 +1772,11 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getVaryingOutputRules()
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getSpecializationConstantRules()
 {
-    return nullptr;
+    return &kCPULayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet&)
 {
-    return nullptr;
+    return &kCPULayoutRulesImpl_;
 }
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet&)
 {
@@ -1829,19 +1830,19 @@ LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getTextureBufferRules(CompilerOption
 
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getVaryingInputRules()
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getVaryingOutputRules()
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getSpecializationConstantRules()
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getShaderStorageBufferRules(CompilerOptionSet&)
 {
-    return nullptr;
+    return &kCUDALayoutRulesImpl_;
 }
 LayoutRulesImpl* CUDALayoutRulesFamilyImpl::getParameterBlockRules(CompilerOptionSet&)
 {

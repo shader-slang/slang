@@ -432,6 +432,9 @@ Extensions
 `SPV_NV_cluster_acceleration_structure`
 > Represents the SPIR-V extension for cluster acceleration structure.
 
+`SPV_NV_linear_swept_spheres`
+> Represents the SPIR-V extension for linear swept spheres.
+
 `SPV_NV_shader_image_footprint`
 > Represents the SPIR-V extension for shader image footprint.
 
@@ -555,6 +558,9 @@ Extensions
 `spvRayTracingClusterAccelerationStructureNV`
 > Represents the SPIR-V capability for cluster acceleration structure.
 
+`spvRayTracingLinearSweptSpheresGeometryNV`
+> Represents the SPIR-V capability for linear swept spheres.
+
 `spvShaderClockKHR`
 > Represents the SPIR-V capability for shader clock.
 
@@ -668,6 +674,9 @@ Extensions
 
 `GL_EXT_shader_atomic_int64`
 > Represents the GL_EXT_shader_atomic_int64 extension.
+
+`GL_EXT_shader_explicit_arithmetic_types`
+> Represents the GL_EXT_shader_explicit_arithmetic_types extension.
 
 `GL_EXT_shader_explicit_arithmetic_types_int64`
 > Represents the GL_EXT_shader_explicit_arithmetic_types_int64 extension.
@@ -960,9 +969,6 @@ Compound Capabilities
 
 `shadermemorycontrol`
 > (gfx targets) Capabilities needed to use memory barriers
-
-`wave_multi_prefix`
-> Capabilities needed to use HLSL tier wave operations
 
 `bufferreference`
 > Capabilities needed to use GLSL buffer-reference's
@@ -1263,6 +1269,9 @@ Compound Capabilities
 
 `raytracing_anyhit_closesthit`
 > Collection of capabilities for raytracing with the shader stages of anyhit and closesthit.
+
+`raytracing_lss`
+> Collection of capabilities for linear swept spheres.
 
 `raytracing_anyhit_closesthit_intersection`
 > Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.

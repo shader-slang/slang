@@ -79,6 +79,12 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     //
     SLANG_ASSERT(!as<IRConstant>(oldInst));
 
+    const auto canBeSpecConst = canOperationBeSpecConst(
+        oldInst->getOp(),
+        oldInst->getDataType(),
+        nullptr,
+        oldInst->getOperands());
+
     // Next we will iterate over the operands of `oldInst`
     // to find their replacements and install them as
     // the operands of `newInst`.
@@ -94,7 +100,7 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
 
         newOperands[ii] = newOperand;
 
-        if (isArithmeticInst(oldInst))
+        if (canBeSpecConst)
             newType = maybeAddRateType(builder, newOperand->getFullType(), newType);
     }
 
