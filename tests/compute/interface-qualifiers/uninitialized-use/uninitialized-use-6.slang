@@ -1,15 +1,21 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026 -DUSE_DYN
 
 // tests:
-// uninitialized val assigned to 'in' function param
+// returning initialized val
 
-// CHECK: error SOMETHING
+// CHECK: OpEntryPoint
+// CHECK-NOT: error
 
-interface IFoo
+#ifdef USE_DYN
+#define QUALIFIER dyn
+#else
+#define QUALIFIER some
+#endif
+
+dyn interface IFoo
 {
     int getVal();
-    [mutating]
-    void setVal(int v);
 }
 
 struct StructForIFoo1 : IFoo
@@ -23,11 +29,7 @@ struct StructForIFoo1 : IFoo
     {
         return a;
     }
-    [mutating]
-    void setVal(int v)
-    {
-        a = v;
-    }
+
 };
 struct StructForIFoo2 : IFoo
 {
@@ -40,21 +42,18 @@ struct StructForIFoo2 : IFoo
     {
         return a;
     }
-    [mutating]
-    void setVal(int v)
-    {
-        a = v;
-    }
+
 };
 
-void logic(in some IFoo v1)
+QUALIFIER IFoo logic()
 {
+    QUALIFIER IFoo v1 = StructForIFoo1(1);
+    return v1;
 }
 
 RWStructuredBuffer<int> buffer;
 void computeMain()
 {
-    some IFoo data1;
-    logic(data1);
+    QUALIFIER IFoo data1 = logic();
     buffer[0] = data1.getVal();
 }

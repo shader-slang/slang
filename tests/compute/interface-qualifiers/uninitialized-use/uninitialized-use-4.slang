@@ -1,15 +1,20 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026 -DUSE_DYN
 
 // tests:
 // uninitialized val assigned to 'out' function param
 
-// CHECK-NOT: error SOMETHING
+// CHECK: error 41018
 
-interface IFoo
+#ifdef USE_DYN
+#define QUALIFIER dyn
+#else
+#define QUALIFIER some
+#endif
+
+dyn interface IFoo
 {
     int getVal();
-    [mutating]
-    void setVal(int v);
 }
 
 struct StructForIFoo1 : IFoo
@@ -23,11 +28,7 @@ struct StructForIFoo1 : IFoo
     {
         return a;
     }
-    [mutating]
-    void setVal(int v)
-    {
-        a = v;
-    }
+
 };
 struct StructForIFoo2 : IFoo
 {
@@ -40,21 +41,17 @@ struct StructForIFoo2 : IFoo
     {
         return a;
     }
-    [mutating]
-    void setVal(int v)
-    {
-        a = v;
-    }
+
 };
 
-void logic(out some IFoo v1)
+void logic(out QUALIFIER IFoo v1)
 {
 }
 
 RWStructuredBuffer<int> buffer;
 void computeMain()
 {
-    some IFoo data1;
+    QUALIFIER IFoo data1;
     logic(data1);
     buffer[0] = data1.getVal();
 }

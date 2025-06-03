@@ -371,7 +371,9 @@ static void cloneRelevantDecorations(IRVar* var, IRInst* val)
             //
             // TODO: Should we include or exclude by default?
             break;
-
+        case kIROp_SomeTypeDecoration:
+            if (!val->findDecorationImpl(decoration->getOp()))
+                cloneDecoration(nullptr, decoration, val, var->getModule());
         case kIROp_PreciseDecoration:
             // Copy these decorations if the target doesn't already have them,
             // but don't make duplicate decorations on the target.

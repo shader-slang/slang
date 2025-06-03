@@ -12246,6 +12246,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         checkAutoDiffUsages(module, compileRequest->getSink());
 
         checkForOperatorShiftOverflow(module, linkage->m_optionSet, compileRequest->getSink());
+
+        // Validate dyn and some type usage. Must happen after loop-unrolling,
+        // else simple loops will not compile if assigning to an interface
+        validateDynAndSomeUsage(module, compileRequest->getSink());
     }
 
     // The "mandatory" optimization passes may make use of the

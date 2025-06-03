@@ -2395,8 +2395,14 @@ DIAGNOSTIC(
     profileImplicitlyUpgradedRestrictive,
     "entry point '$0' uses capabilities that are not part of the specified profile '$1'. Missing "
     "capabilities are: '$2'")
-DIAGNOSTIC(41015, Warning, usingUninitializedOut, "use of uninitialized out parameter '$0'")
-DIAGNOSTIC(41016, Warning, usingUninitializedVariable, "use of uninitialized variable '$0'")
+DIAGNOSTIC(41015, Warning, usingUninitializedOutWarning, "use of uninitialized out parameter '$0'")
+DIAGNOSTIC(41015, Error, usingUninitializedOutInterfaceError, "use of uninitialized 'out' interface-typed parameter '$0'")
+DIAGNOSTIC(41016, Warning, usingUninitializedVariableWarning, "use of uninitialized variable '$0'")
+DIAGNOSTIC(
+    41016,
+    Error,
+    usingUninitializedVariableInterfaceError,
+    "use of uninitialized interface-typed variable '$0'")
 DIAGNOSTIC(
     41017,
     Warning,
@@ -2405,8 +2411,13 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     41018,
     Warning,
-    returningWithUninitializedOut,
+    returningWithUninitializedOutWarning,
     "returning without initializing out parameter '$0'")
+DIAGNOSTIC(
+    41018,
+    Error,
+    returningWithUninitializedOutInterfaceError,
+    "returning without initializing 'out' interface-typed parameter '$0'")
 DIAGNOSTIC(
     41019,
     Warning,

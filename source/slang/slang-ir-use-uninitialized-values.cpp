@@ -163,10 +163,6 @@ static bool canIgnoreType(IRType* type, IRType* upper)
         return (count == 0);
     }
 
-    // Nothing to initialize for a pure interface
-    if (as<IRInterfaceType>(type))
-        return true;
-
     // We don't know what type it will be yet.
     if (as<IRParam>(type))
         return true;
@@ -567,6 +563,36 @@ static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, Di
     }
 }
 
+static void errorOrWarn(
+    DiagnosticSink* sink,
+    bool isError,
+    DiagnosticInfo warning,
+    DiagnosticInfo error,
+    IRInst* variable,
+    IRInst* location)
+{
+    if (!isError)
+        sink->diagnose(
+            location,
+            warning,
+            variable);
+    else
+        sink->diagnose(
+            location,
+            error,
+            variable);
+}
+
+static bool maybeEmitInterfaceError(IRInst* inst)
+{
+    auto type = inst->getFullType();
+    if (auto ptr = as<IRPtrTypeBase>(type))
+    {
+        type = ptr->getValueType();
+    }
+    return as<IRInterfaceType>(type);
+}
+
 static void checkParameterAsOut(
     ReachabilityContext& reachability,
     IRFunc* func,
@@ -576,11 +602,25 @@ static void checkParameterAsOut(
     auto loads = getUnresolvedParamLoads(reachability, func, param);
     for (auto load : loads)
     {
-        sink->diagnose(
-            load,
-            as<IRTerminatorInst>(load) ? Diagnostics::returningWithUninitializedOut
-                                       : Diagnostics::usingUninitializedOut,
-            param);
+        DiagnosticInfo warning;
+        DiagnosticInfo error;
+        if (as<IRTerminatorInst>(load))
+        {
+            warning = Diagnostics::returningWithUninitializedOutWarning;
+            error = Diagnostics::returningWithUninitializedOutInterfaceError;
+        }
+        else
+        {
+            warning = Diagnostics::usingUninitializedOutWarning;
+            error = Diagnostics::usingUninitializedOutInterfaceError;
+        }
+        errorOrWarn(
+            sink,
+            maybeEmitInterfaceError(param),
+            warning,
+            error,
+            param,
+            load);
     }
 }
 
@@ -637,7 +677,13 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
             auto loads = getUnresolvedVariableLoads(reachability, inst);
             for (auto load : loads)
             {
-                sink->diagnose(load, Diagnostics::usingUninitializedVariable, inst);
+
+                errorOrWarn(sink,
+                    maybeEmitInterfaceError(inst),
+                    Diagnostics::usingUninitializedVariableWarning,
+                    Diagnostics::usingUninitializedVariableInterfaceError,
+                    inst,
+                    load);
             }
         }
     }
