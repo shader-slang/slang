@@ -300,4 +300,6 @@ jobs:
         with:
           name: slang-build-${{matrix.os}}-${{matrix.platform}}-${{matrix.compiler}}-${{matrix.config}}
           # The install directory used in the packaging step
-          path: build/dist-${{matrix.config}}/**/ZIP/slang/*
+          path: |
+            build/dist-${{matrix.config}}/**/ZIP/slang/*
+            build.em/
