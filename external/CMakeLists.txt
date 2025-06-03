@@ -25,6 +25,20 @@ if(NOT SLANG_ENABLE_EXTERNAL_COMPILER_WARNINGS)
     endif()
 endif()
 
+# fkYAML
+if(NOT ${SLANG_USE_SYSTEM_FK_YAML})
+    if(NOT SLANG_OVERRIDE_FK_YAML_PATH)
+        add_subdirectory(fkYAML EXCLUDE_FROM_ALL ${system})
+    else()
+        add_subdirectory(
+            ${SLANG_OVERRIDE_FK_YAML_PATH}/fkYAML
+            fkYAML
+            EXCLUDE_FROM_ALL
+            ${system}
+        )
+    endif()
+endif()
+
 # Unordered dense
 if(NOT ${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     if(NOT SLANG_OVERRIDE_UNORDERED_DENSE_PATH)

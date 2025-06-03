@@ -1,0 +1,2172 @@
+insts:
+  - nop: {}
+  - Type:
+      insts:
+        - BasicType:
+            flags:
+              - Hoistable
+            insts:
+              - Void:
+                  type_name: VoidType
+              - Bool:
+                  type_name: BoolType
+              - Int8:
+                  type_name: Int8Type
+              - Int16:
+                  type_name: Int16Type
+              - Int:
+                  type_name: IntType
+              - Int64:
+                  type_name: Int64Type
+              - UInt8:
+                  type_name: UInt8Type
+              - UInt16:
+                  type_name: UInt16Type
+              - UInt:
+                  type_name: UIntType
+              - UInt64:
+                  type_name: UInt64Type
+              - Half:
+                  type_name: HalfType
+              - Float:
+                  type_name: FloatType
+              - Double:
+                  type_name: DoubleType
+              - Char:
+                  type_name: CharType
+              - IntPtr:
+                  type_name: IntPtrType
+              - UIntPtr:
+                  type_name: UIntPtrType
+        - StringTypeBase:
+            flags:
+              - Hoistable
+            insts:
+              - String:
+                  type_name: StringType
+              - NativeString:
+                  type_name: NativeStringType
+        - CapabilitySet:
+            type_name: CapabilitySetType
+            flags:
+              - Hoistable
+        - DynamicType:
+            flags:
+              - Hoistable
+        - AnyValueType:
+            operands: 1
+            flags:
+              - Hoistable
+        - RawPointerTypeBase:
+            flags:
+              - Hoistable
+            insts:
+              - RawPointerType: {}
+              - RTTIPointerType:
+                  operands: 1
+        - ArrayTypeBase:
+            flags:
+              - Hoistable
+            insts:
+              - Array:
+                  type_name: ArrayType
+                  operands: 2
+              - UnsizedArray:
+                  type_name: UnsizedArrayType
+                  operands: 1
+        - Func:
+            type_name: FuncType
+            flags:
+              - Hoistable
+        - BasicBlock:
+            type_name: BasicBlockType
+            flags:
+              - Hoistable
+        - Vec:
+            type_name: VectorType
+            operands: 2
+            flags:
+              - Hoistable
+        - Mat:
+            type_name: MatrixType
+            operands: 4
+            flags:
+              - Hoistable
+        - Conjunction:
+            type_name: ConjunctionType
+            flags:
+              - Hoistable
+        - Attributed:
+            type_name: AttributedType
+            flags:
+              - Hoistable
+        - Result:
+            type_name: ResultType
+            operands: 2
+            flags:
+              - Hoistable
+        - Optional:
+            type_name: OptionalType
+            operands: 1
+            flags:
+              - Hoistable
+        - Enum:
+            type_name: EnumType
+            operands: 1
+            flags:
+              - Parent
+        - DifferentialPairTypeBase:
+            flags:
+              - Hoistable
+            insts:
+              - DiffPair:
+                  type_name: DifferentialPairType
+                  operands: 1
+              - DiffPairUserCode:
+                  type_name: DifferentialPairUserCodeType
+                  operands: 1
+              - DiffRefPair:
+                  type_name: DifferentialPtrPairType
+                  operands: 1
+        - BwdDiffIntermediateCtxType:
+            type_name: BackwardDiffIntermediateContextType
+            operands: 1
+            flags:
+              - Hoistable
+        - TensorView:
+            type_name: TensorViewType
+            operands: 1
+            flags:
+              - Hoistable
+        - TorchTensor:
+            type_name: TorchTensorType
+            flags:
+              - Hoistable
+        - ArrayListVector:
+            type_name: ArrayListType
+            operands: 1
+            flags:
+              - Hoistable
+        - Atomic:
+            type_name: AtomicType
+            operands: 1
+            flags:
+              - Hoistable
+        - BindExistentialsTypeBase:
+            flags:
+              - Hoistable
+            insts:
+              - BindExistentials:
+                  comment: |-
+                    A `BindExistentials<B, T0,w0, T1,w1, ...>` represents
+                    taking type `B` and binding each of its existential type
+                    parameters, recursively, with the specified arguments,
+                    where each `Ti, wi` pair represents the concrete type
+                    and witness table to plug in for parameter `i`.
+                  type_name: BindExistentialsType
+                  operands: 1
+              - BoundInterface:
+                  comment: |-
+                    An `BindInterface<B, T0, w0>` represents the special case
+                    of a `BindExistentials` where the type `B` is known to be
+                    an interface type.
+                  type_name: BoundInterfaceType
+                  operands: 3
+        - Rate:
+            flags:
+              - Hoistable
+            insts:
+              - ConstExpr:
+                  type_name: ConstExprRate
+              - SpecConst:
+                  type_name: SpecConstRate
+              - GroupShared:
+                  type_name: GroupSharedRate
+              - ActualGlobalRate: {}
+        - RateQualified:
+            type_name: RateQualifiedType
+            operands: 2
+            flags:
+              - Hoistable
+        - Kind:
+            comment: |-
+              Kinds represent the "types of types."
+              They should not really be nested under `IRType`
+              in the overall hierarchy, but we can fix that later.
+            flags:
+              - Hoistable
+            insts:
+              - Type:
+                  type_name: TypeKind
+              - TypeParameterPack:
+                  type_name: TypeParameterPackKind
+              - Rate:
+                  type_name: RateKind
+              - Generic:
+                  type_name: GenericKind
+        - PtrTypeBase:
+            flags:
+              - Hoistable
+            insts:
+              - Ptr:
+                  type_name: PtrType
+                  operands: 1
+              - Ref:
+                  type_name: RefType
+                  operands: 1
+              - ConstRef:
+                  type_name: ConstRefType
+                  operands: 1
+              - PseudoPtr:
+                  comment: |-
+                    A `PsuedoPtr<T>` logically represents a pointer to a value of type
+                    `T` on a platform that cannot support pointers. The expectation
+                    is that the "pointer" will be legalized away by storing a value
+                    of type `T` somewhere out-of-line.
+                  type_name: PseudoPtrType
+                  operands: 1
+              - OutTypeBase:
+                  insts:
+                    - Out:
+                        type_name: OutType
+                        operands: 1
+                    - InOut:
+                        type_name: InOutType
+                        operands: 1
+        - ComPtr:
+            comment: A ComPtr<T> type is treated as a opaque type that represents a reference-counted handle to a COM object.
+            type_name: ComPtrType
+            operands: 1
+            flags:
+              - Hoistable
+        - NativePtr:
+            comment: A NativePtr<T> type represents a native pointer to a managed resource.
+            type_name: NativePtrType
+            operands: 1
+            flags:
+              - Hoistable
+        - DescriptorHandle:
+            comment: A DescriptorHandle<T> type represents a bindless handle to an opaue resource type.
+            type_name: DescriptorHandleType
+            operands: 1
+            flags:
+              - Hoistable
+        - GLSLAtomicUint:
+            comment: An AtomicUint is a placeholder type for a storage buffer, and will be mangled during compiling.
+            type_name: GLSLAtomicUintType
+            flags:
+              - Hoistable
+        - SamplerStateTypeBase:
+            flags:
+              - Hoistable
+            insts:
+              - SamplerState:
+                  type_name: SamplerStateType
+              - SamplerComparisonState:
+                  type_name: SamplerComparisonStateType
+        - DefaultLayout:
+            type_name: DefaultBufferLayoutType
+            flags:
+              - Hoistable
+        - Std140Layout:
+            type_name: Std140BufferLayoutType
+            flags:
+              - Hoistable
+        - Std430Layout:
+            type_name: Std430BufferLayoutType
+            flags:
+              - Hoistable
+        - ScalarLayout:
+            type_name: ScalarBufferLayoutType
+            flags:
+              - Hoistable
+        - SubpassInputType:
+            operands: 2
+            flags:
+              - Hoistable
+        - TextureFootprintType:
+            operands: 1
+            flags:
+              - Hoistable
+        - TextureShape1DType:
+            flags:
+              - Hoistable
+        - TextureShape1DType:
+            type_name: TextureShape2DType
+            flags:
+              - Hoistable
+        - TextureShape1DType:
+            type_name: TextureShape3DType
+            flags:
+              - Hoistable
+        - TextureShape1DType:
+            type_name: TextureShapeCubeType
+            flags:
+              - Hoistable
+        - TextureShapeBufferType:
+            flags:
+              - Hoistable
+        - ResourceTypeBase:
+            comment: |-
+              TODO: Why do we have all this hierarchy here, when everything
+              that actually matters is currently nested under `TextureTypeBase`?
+            insts:
+              - ResourceType:
+                  insts:
+                    - TextureTypeBase:
+                        insts:
+                          - TextureType:
+                              operands: 8
+                              flags:
+                                - Hoistable
+                          - GLSLImageType:
+                              flags:
+                                - UseOther
+                                - Hoistable
+        - UntypedBufferResourceType:
+            flags:
+              - Hoistable
+            insts:
+              - ByteAddressBufferTypeBase:
+                  insts:
+                    - ByteAddressBuffer:
+                        type_name: HLSLByteAddressBufferType
+                    - RWByteAddressBuffer:
+                        type_name: HLSLRWByteAddressBufferType
+                    - RasterizerOrderedByteAddressBuffer:
+                        type_name: HLSLRasterizerOrderedByteAddressBufferType
+              - RaytracingAccelerationStructure:
+                  type_name: RaytracingAccelerationStructureType
+        - HLSLPatchType:
+            flags:
+              - Hoistable
+            insts:
+              - InputPatch:
+                  type_name: HLSLInputPatchType
+                  operands: 2
+              - OutputPatch:
+                  type_name: HLSLOutputPatchType
+                  operands: 2
+        - GLSLInputAttachment:
+            type_name: GLSLInputAttachmentType
+            flags:
+              - Hoistable
+        - BuiltinGenericType:
+            flags:
+              - Hoistable
+            insts:
+              - HLSLStreamOutputType:
+                  insts:
+                    - PointStream:
+                        type_name: HLSLPointStreamType
+                        operands: 1
+                    - LineStream:
+                        type_name: HLSLLineStreamType
+                        operands: 1
+                    - TriangleStream:
+                        type_name: HLSLTriangleStreamType
+                        operands: 1
+              - MeshOutputType:
+                  insts:
+                    - Vertices:
+                        type_name: VerticesType
+                        operands: 2
+                    - Indices:
+                        type_name: IndicesType
+                        operands: 2
+                    - Primitives:
+                        type_name: PrimitivesType
+                        operands: 2
+              - metal::mesh:
+                  type_name: MetalMeshType
+                  operands: 5
+              - mesh_grid_properties:
+                  type_name: MetalMeshGridPropertiesType
+              - HLSLStructuredBufferTypeBase:
+                  comment: |-
+                    Metal Mesh Type
+                    Metal Mesh Grid Properties
+                  insts:
+                    - StructuredBuffer:
+                        type_name: HLSLStructuredBufferType
+                    - RWStructuredBuffer:
+                        type_name: HLSLRWStructuredBufferType
+                    - RasterizerOrderedStructuredBuffer:
+                        type_name: HLSLRasterizerOrderedStructuredBufferType
+                    - AppendStructuredBuffer:
+                        type_name: HLSLAppendStructuredBufferType
+                    - ConsumeStructuredBuffer:
+                        type_name: HLSLConsumeStructuredBufferType
+              - PointerLikeType:
+                  insts:
+                    - ParameterGroupType:
+                        insts:
+                          - UniformParameterGroupType:
+                              insts:
+                                - ConstantBuffer:
+                                    type_name: ConstantBufferType
+                                    operands: 1
+                                - TextureBuffer:
+                                    type_name: TextureBufferType
+                                    operands: 1
+                                - ParameterBlock:
+                                    type_name: ParameterBlockType
+                                    operands: 1
+                          - VaryingParameterGroupType:
+                              insts:
+                                - GLSLInputParameterGroup:
+                                    type_name: GLSLInputParameterGroupType
+                                - GLSLOutputParameterGroup:
+                                    type_name: GLSLOutputParameterGroupType
+                          - GLSLShaderStorageBuffer:
+                              type_name: GLSLShaderStorageBufferType
+                              operands: 1
+        - RayQuery:
+            comment: Types
+            type_name: RayQueryType
+            operands: 1
+            flags:
+              - Hoistable
+        - HitObject:
+            type_name: HitObjectType
+            flags:
+              - Hoistable
+        - CoopVectorType:
+            operands: 2
+            flags:
+              - Hoistable
+        - CoopMatrixType:
+            operands: 5
+            flags:
+              - Hoistable
+        - TensorAddressingTensorLayoutType:
+            operands: 2
+            flags:
+              - Hoistable
+        - TensorAddressingTensorViewType:
+            operands: 3
+            flags:
+              - Hoistable
+        - MakeTensorAddressingTensorLayout: {}
+        - MakeTensorAddressingTensorView: {}
+        - DynamicResource:
+            comment: Opaque type that can be dynamically cast to other resource types.
+            type_name: DynamicResourceType
+            flags:
+              - Hoistable
+        - struct:
+            comment: |-
+              A user-defined structure declaration at the IR level.
+              Unlike in the AST where there is a distinction between
+              a `StructDecl` and a `DeclRefType` that refers to it,
+              at the IR level the struct declaration and the type
+              are the same IR instruction.
+
+              This is a parent instruction that holds zero or more
+              `field` instructions.
+            type_name: StructType
+            flags:
+              - Parent
+        - class:
+            type_name: ClassType
+            flags:
+              - Parent
+        - interface:
+            type_name: InterfaceType
+            flags:
+              - Global
+        - associated_type:
+            flags:
+              - Hoistable
+        - this_type:
+            flags:
+              - Hoistable
+        - rtti_type:
+            type_name: RTTIType
+            flags:
+              - Hoistable
+        - rtti_handle_type:
+            type_name: RTTIHandleType
+            flags:
+              - Hoistable
+        - TupleTypeBase:
+            flags:
+              - Hoistable
+            insts:
+              - tuple_type: {}
+              - TypePack: {}
+        - TargetTuple:
+            type_name: TargetTupleType
+            flags:
+              - Hoistable
+        - ExpandTypeOrVal:
+            operands: 1
+            flags:
+              - Hoistable
+        - spirvLiteralType:
+            comment: A type that identifies it's contained type as being emittable as `spirv_literal.
+            type_name: SPIRVLiteralType
+            operands: 1
+            flags:
+              - Hoistable
+        - type_t:
+            comment: |-
+              A TypeType-typed IRValue represents a IRType.
+              It is used to represent a type parameter/argument in a generics.
+            flags:
+              - Hoistable
+        - WitnessTableTypeBase:
+            comment: IRWitnessTableTypeBase
+            flags:
+              - Hoistable
+            insts:
+              - witness_table_t:
+                  comment: An `IRWitnessTable` has type `WitnessTableType`.
+                  operands: 1
+              - witness_table_id_t:
+                  comment: |-
+                    An integer type representing a witness table for targets where
+                    witness tables are represented as integer IDs. This type is used
+                    during the lower-generics pass while generating dynamic dispatch
+                    code and will eventually lower into an uint type.
+                  type_name: WitnessTableIDType
+                  operands: 1
+  - GlobalValueWithCode:
+      comment: IRGlobalValueWithCode
+      insts:
+        - GlobalValueWithParams:
+            comment: IRGlobalValueWithParams
+            flags:
+              - Parent
+            insts:
+              - func: {}
+              - generic: {}
+        - global_var:
+            flags:
+              - Global
+  - global_param:
+      flags:
+        - Global
+  - globalConstant:
+      flags:
+        - Global
+  - key:
+      type_name: StructKey
+      flags:
+        - Global
+  - global_generic_param:
+      flags:
+        - Global
+  - witness_table:
+      flags:
+        - Hoistable
+  - indexedFieldKey:
+      operands: 2
+      flags:
+        - Hoistable
+  - thisTypeWitness:
+      comment: |-
+        A placeholder witness that ThisType implements the enclosing interface.
+        Used only in interface definitions.
+      operands: 1
+  - TypeEqualityWitness:
+      comment: A placeholder witness for the fact that two types are equal.
+      operands: 2
+      flags:
+        - Hoistable
+  - global_hashed_string_literals: {}
+  - module:
+      flags:
+        - Parent
+  - block:
+      flags:
+        - Parent
+  - Constant:
+      comment: IRConstant
+      insts:
+        - boolConst:
+            type_name: BoolLit
+        - integer_constant:
+            type_name: IntLit
+        - float_constant:
+            type_name: FloatLit
+        - ptr_constant:
+            type_name: PtrLit
+        - string_constant:
+            type_name: StringLit
+        - string_constant:
+            type_name: BlobLit
+        - void_constant:
+            type_name: VoidLit
+  - CapabilitySet:
+      flags:
+        - Hoistable
+      insts:
+        - capabilityConjunction: {}
+        - capabilityDisjunction: {}
+  - undefined:
+      type_name: undefined
+  - defaultConstruct:
+      comment: |-
+        A `defaultConstruct` operation creates an initialized
+        value of the result type, and can only be used for types
+        where default construction is a meaningful thing to do.
+  - MakeDifferentialPairBase:
+      insts:
+        - MakeDiffPair:
+            type_name: MakeDifferentialPair
+            operands: 2
+        - MakeDiffPairUserCode:
+            type_name: MakeDifferentialPairUserCode
+            operands: 2
+        - MakeDiffRefPair:
+            type_name: MakeDifferentialPtrPair
+            operands: 2
+  - DifferentialPairGetDifferentialBase:
+      insts:
+        - GetDifferential:
+            type_name: DifferentialPairGetDifferential
+            operands: 1
+        - GetDifferentialUserCode:
+            type_name: DifferentialPairGetDifferentialUserCode
+            operands: 1
+        - GetDifferentialPtr:
+            type_name: DifferentialPtrPairGetDifferential
+            operands: 1
+  - DifferentialPairGetPrimalBase:
+      insts:
+        - GetPrimal:
+            type_name: DifferentialPairGetPrimal
+            operands: 1
+        - GetPrimalUserCode:
+            type_name: DifferentialPairGetPrimalUserCode
+            operands: 1
+        - GetPrimalRef:
+            type_name: DifferentialPtrPairGetPrimal
+            operands: 1
+  - specialize:
+      operands: 2
+      flags:
+        - Hoistable
+  - lookupWitness:
+      operands: 2
+      flags:
+        - Hoistable
+  - GetSequentialID:
+      operands: 1
+      flags:
+        - Hoistable
+  - bind_global_generic_param:
+      operands: 2
+  - allocObj: {}
+  - globalValueRef:
+      operands: 1
+  - makeUInt64:
+      operands: 2
+  - makeVector: {}
+  - makeMatrix: {}
+  - makeMatrixFromScalar:
+      operands: 1
+  - matrixReshape:
+      operands: 1
+  - vectorReshape:
+      operands: 1
+  - makeArray: {}
+  - makeArrayFromElement:
+      operands: 1
+  - makeCoopVector: {}
+  - makeCoopVectorFromValuePack:
+      operands: 1
+  - makeStruct: {}
+  - makeTuple: {}
+  - makeTuple:
+      type_name: MakeTargetTuple
+  - makeValuePack: {}
+  - getTargetTupleElement: {}
+  - getTupleElement:
+      operands: 2
+  - LoadResourceDescriptorFromHeap:
+      operands: 1
+  - LoadSamplerDescriptorFromHeap:
+      operands: 1
+  - MakeCombinedTextureSamplerFromHandle:
+      operands: 1
+  - MakeWitnessPack:
+      flags:
+        - Hoistable
+  - Expand:
+      operands: 1
+  - Each:
+      operands: 1
+      flags:
+        - Hoistable
+  - makeResultValue:
+      operands: 1
+  - makeResultError:
+      operands: 1
+  - isResultError:
+      operands: 1
+  - getResultError:
+      operands: 1
+  - getResultValue:
+      operands: 1
+  - getOptionalValue:
+      operands: 1
+  - optionalHasValue:
+      operands: 1
+  - makeOptionalValue:
+      operands: 1
+  - makeOptionalNone:
+      operands: 1
+  - CombinedTextureSamplerGetTexture:
+      operands: 1
+  - CombinedTextureSamplerGetSampler:
+      operands: 1
+  - call:
+      operands: 1
+  - rtti_object:
+      type_name: RTTIObject
+  - alloca:
+      operands: 1
+  - updateElement:
+      operands: 2
+  - detachDerivative:
+      operands: 1
+  - bitfieldExtract:
+      operands: 3
+  - bitfieldInsert:
+      operands: 4
+  - packAnyValue:
+      operands: 1
+  - unpackAnyValue:
+      operands: 1
+  - witness_table_entry:
+      operands: 2
+  - interface_req_entry:
+      type_name: InterfaceRequirementEntry
+      operands: 2
+      flags:
+        - Global
+  - GetWorkGroupSize:
+      comment: |-
+        An inst to represent the workgroup size of the calling entry point.
+        We will materialize this inst during `translateGlobalVaryingVar`.
+      flags:
+        - Hoistable
+  - GetCurrentStage:
+      comment: An inst that returns the current stage of the calling entry point.
+  - param: {}
+  - field:
+      type_name: StructField
+      operands: 2
+  - var: {}
+  - load:
+      operands: 1
+  - store:
+      operands: 2
+  - atomicLoad:
+      comment: Atomic Operations
+      operands: 1
+  - atomicStore:
+      operands: 2
+  - atomicExchange:
+      operands: 2
+  - atomicCompareExchange:
+      operands: 3
+  - atomicAdd:
+      operands: 2
+  - atomicSub:
+      operands: 2
+  - atomicAnd:
+      operands: 2
+  - atomicOr:
+      operands: 2
+  - atomicXor:
+      operands: 2
+  - atomicMin:
+      operands: 2
+  - atomicMax:
+      operands: 2
+  - atomicInc:
+      operands: 1
+  - atomicDec:
+      operands: 1
+  - LoadReverseGradient:
+      comment: |-
+        Produced and removed during backward auto-diff pass as a temporary placeholder representing the
+        currently accumulated derivative to pass to some dOut argument in a nested call.
+      operands: 1
+  - ReverseGradientDiffPairRef:
+      comment: |-
+        Produced and removed during backward auto-diff pass as a temporary placeholder containing the
+        primal and accumulated derivative values to pass to an inout argument in a nested call.
+      operands: 2
+  - PrimalParamRef:
+      comment: |-
+        Produced and removed during backward auto-diff pass. This inst is generated by the splitting step
+        to represent a reference to an inout parameter for use in the primal part of the computation.
+      operands: 1
+  - DiffParamRef:
+      comment: |-
+        Produced and removed during backward auto-diff pass. This inst is generated by the splitting step
+        to represent a reference to an inout parameter for use in the back-prop part of the computation.
+      operands: 1
+  - IsDifferentialNull:
+      comment: Check that the value is a differential null value.
+      operands: 1
+  - get_field:
+      type_name: FieldExtract
+      operands: 2
+  - get_field_addr:
+      type_name: FieldAddress
+      operands: 2
+  - getElement:
+      operands: 2
+  - getElementPtr:
+      operands: 2
+  - getOffsetPtr:
+      comment: "Pointer offset: computes pBase + offset_in_elements"
+      operands: 2
+  - getAddr:
+      operands: 1
+  - castDynamicResource:
+      operands: 1
+  - getNativeStr:
+      comment: Get an unowned NativeString from a String.
+      type_name: getNativeStr
+      operands: 1
+  - makeString:
+      comment: Make String from a NativeString.
+      operands: 1
+  - getNativePtr:
+      comment: Get a native ptr from a ComPtr or RefPtr
+      operands: 1
+  - getManagedPtrWriteRef:
+      comment: Get a write reference to a managed ptr var (operand must be Ptr<ComPtr<T>> or Ptr<RefPtr<T>>).
+      operands: 1
+  - ManagedPtrAttach:
+      comment: Attach a managedPtr var to a NativePtr without changing its ref count.
+      operands: 1
+  - ManagedPtrDetach:
+      comment: Attach a managedPtr var to a NativePtr without changing its ref count.
+      operands: 1
+  - imageSubscript:
+      comment: '"Subscript" an image at a pixel coordinate to get pointer'
+      operands: 2
+  - imageLoad:
+      comment: Load from an Image.
+      operands: 2
+  - imageStore:
+      comment: Store into an Image.
+      operands: 3
+  - byteAddressBufferLoad:
+      comment: |-
+        Load (almost) arbitrary-type data from a byte-address buffer
+        %dst = byteAddressBufferLoad(%buffer, %offset, %alignment)
+        where
+        - `buffer` is a value of some `ByteAddressBufferTypeBase` type
+        - `offset` is an `int`
+        - `alignment` is an `int`
+        - `dst` is a value of some type containing only ordinary data
+      operands: 3
+  - byteAddressBufferStore:
+      comment: |-
+        Store (almost) arbitrary-type data to a byte-address buffer
+        byteAddressBufferLoad(%buffer, %offset, %alignment, %src)
+        where
+        - `buffer` is a value of some `ByteAddressBufferTypeBase` type
+        - `offset` is an `int`
+        - `alignment` is an `int`
+        - `src` is a value of some type containing only ordinary data
+      operands: 4
+  - structuredBufferLoad:
+      comment: |-
+        Load data from a structured buffer
+        %dst = structuredBufferLoad(%buffer, %index)
+        where
+        - `buffer` is a value of some `StructuredBufferTypeBase` type with element type T
+        - `offset` is an `int`
+        - `dst` is a value of type T
+      operands: 2
+  - structuredBufferLoadStatus:
+      operands: 3
+  - rwstructuredBufferLoad:
+      type_name: RWStructuredBufferLoad
+      operands: 2
+  - rwstructuredBufferLoadStatus:
+      type_name: RWStructuredBufferLoadStatus
+      operands: 3
+  - rwstructuredBufferStore:
+      comment: |-
+        Store data to a structured buffer
+        structuredBufferLoad(%buffer, %offset, %src)
+        where
+        - `buffer` is a value of some `StructuredBufferTypeBase` type with element type T
+        - `offset` is an `int`
+        - `src` is a value of type T
+      type_name: RWStructuredBufferStore
+      operands: 3
+  - rwstructuredBufferGetElementPtr:
+      type_name: RWStructuredBufferGetElementPtr
+      operands: 2
+  - StructuredBufferAppend:
+      comment: Append/Consume-StructuredBuffer operations
+      operands: 1
+  - StructuredBufferConsume:
+      operands: 1
+  - StructuredBufferGetDimensions:
+      operands: 1
+  - nonUniformResourceIndex:
+      comment: Resource qualifiers for dynamically varying index
+      operands: 1
+  - getNaturalStride:
+      operands: 1
+  - meshOutputRef:
+      operands: 2
+  - meshOutputSet:
+      operands: 3
+  - metalSetVertex:
+      comment: |-
+        only two parameters as they are effectively static
+        TODO: make them reference the _slang_mesh object directly
+      operands: 2
+  - metalSetPrimitive:
+      operands: 2
+  - metalSetIndices:
+      operands: 2
+  - MetalCastToDepthTexture:
+      operands: 1
+  - MakeVectorFromScalar:
+      comment: |-
+        Construct a vector from a scalar
+        %dst = MakeVectorFromScalar %T %N %val
+        where
+        - `T` is a `Type`
+        - `N` is a (compile-time) `Int`
+        - `val` is a `T`
+        - dst is a `Vec<T,N>`
+      operands: 3
+  - swizzle:
+      comment: |-
+        A swizzle of a vector:
+        %dst = swizzle %src %idx0 %idx1 ...
+        where:
+        - `src` is a vector<T,N>
+        - `dst` is a vector<T,M>
+        - `idx0` through `idx[M-1]` are literal integers
+      type_name: swizzle
+      operands: 1
+  - swizzleSet:
+      comment: |-
+        Setting a vector via swizzle
+
+        %dst = swizzle %base %src %idx0 %idx1 ...
+
+        where:
+        - `base` is a vector<T,N>
+        - `dst` is a vector<T,N>
+        - `src` is a vector<T,M>
+        - `idx0` through `idx[M-1]` are literal integers
+
+        The semantics of the op is:
+
+          dst = base;
+          for(ii : 0 ... M-1 )
+            dst[ii] = src[idx[ii]];
+      type_name: swizzleSet
+      operands: 2
+  - swizzledStore:
+      comment: |-
+        Store to memory with a swizzle
+
+        TODO: eventually this should be reduced to just
+        a write mask by moving the actual swizzle to the RHS.
+
+        swizzleStore %dst %src %idx0 %idx1 ...
+
+        where:
+        - `dst` is a vector<T,N>
+        - `src` is a vector<T,M>
+        - `idx0` through `idx[M-1]` are literal integers
+
+        The semantics of the op is:
+
+          for(ii : 0 ... M-1 )
+            dst[ii] = src[idx[ii]];
+      operands: 2
+  - TerminatorInst:
+      insts:
+        - return_val:
+            type_name: Return
+            operands: 1
+        - yield:
+            operands: 1
+        - UnconditionalBranch:
+            comment: IRUnconditionalBranch
+            insts:
+              - unconditionalBranch:
+                  comment: unconditionalBranch <target>
+                  type_name: unconditionalBranch
+                  operands: 1
+              - loop:
+                  comment: loop <target> <breakLabel> <continueLabel>
+                  type_name: loop
+                  operands: 3
+        - ConditionalBranch:
+            comment: IRTerminatorInst
+            insts:
+              - conditionalBranch:
+                  comment: conditionalBranch <condition> <trueBlock> <falseBlock>
+                  type_name: conditionalBranch
+                  operands: 3
+              - ifElse:
+                  comment: ifElse <condition> <trueBlock> <falseBlock> <mergeBlock>
+                  type_name: ifElse
+                  operands: 4
+        - throw:
+            comment: IRConditionalbranch
+            operands: 1
+        - tryCall:
+            comment: tryCall <successBlock> <failBlock> <callee> <args>...
+            operands: 3
+        - switch:
+            comment: switch <val> <break> <default> <caseVal1> <caseBlock1> ...
+            operands: 3
+        - targetSwitch:
+            comment: target_switch <break> <targetName1> <block1> ...
+            operands: 1
+        - GenericAsm:
+            comment: A generic asm inst has an return semantics that terminates the control flow.
+            operands: 1
+        - Unreachable:
+            insts:
+              - missingReturn:
+                  comment: IRUnreachable
+              - unreachable: {}
+        - defer:
+            operands: 3
+  - discard:
+      type_name: discard
+  - RequirePrelude:
+      operands: 1
+  - RequireTargetExtension:
+      operands: 1
+  - RequireComputeDerivative: {}
+  - StaticAssert:
+      operands: 2
+  - Printf:
+      operands: 1
+  - RequireMaximallyReconverges:
+      comment: Quad control execution modes.
+  - RequireQuadDerivatives: {}
+  - add:
+      comment: |-
+        TODO: We should consider splitting the basic arithmetic/comparison
+        ops into cases for signed integers, unsigned integers, and floating-point
+        values, to better match downstream targets that want to treat them
+        all differently (e.g., SPIR-V).
+      operands: 2
+  - sub:
+      operands: 2
+  - mul:
+      operands: 2
+  - div:
+      operands: 2
+  - irem:
+      comment: |-
+        Remainder of division.
+        Note: this is distinct from modulus, and we should have a separate
+        opcode for `mod` if we ever need to support it.
+      type_name: IRem
+      operands: 2
+  - frem:
+      type_name: FRem
+      operands: 2
+  - shl:
+      type_name: Lsh
+      operands: 2
+  - shr:
+      type_name: Rsh
+      operands: 2
+  - cmpEQ:
+      type_name: Eql
+      operands: 2
+  - cmpNE:
+      type_name: Neq
+      operands: 2
+  - cmpGT:
+      type_name: Greater
+      operands: 2
+  - cmpLT:
+      type_name: Less
+      operands: 2
+  - cmpGE:
+      type_name: Geq
+      operands: 2
+  - cmpLE:
+      type_name: Leq
+      operands: 2
+  - and:
+      type_name: BitAnd
+      operands: 2
+  - xor:
+      type_name: BitXor
+      operands: 2
+  - or:
+      type_name: BitOr
+      operands: 2
+  - logicalAnd:
+      type_name: And
+      operands: 2
+  - logicalOr:
+      type_name: Or
+      operands: 2
+  - neg:
+      operands: 1
+  - not:
+      operands: 1
+  - bitnot:
+      type_name: BitNot
+      operands: 1
+  - select:
+      operands: 3
+  - checkpointObj:
+      type_name: CheckpointObject
+      operands: 1
+  - loopExitValue:
+      operands: 1
+  - getStringHash:
+      operands: 1
+  - waveGetActiveMask: {}
+  - waveMaskBallot:
+      comment: trueMask = waveMaskBallot(mask, condition)
+      operands: 2
+  - waveMaskMatch:
+      comment: matchMask = waveMaskBallot(mask, value)
+      operands: 2
+  - sample:
+      comment: Texture sampling operation of the form `t.Sample(s,u)`
+      operands: 3
+  - sampleGrad:
+      operands: 4
+  - GroupMemoryBarrierWithGroupSync: {}
+  - ControlBarrier: {}
+  - gpuForeach:
+      comment: GPU_FOREACH loop of the form
+      operands: 3
+  - getOptiXRayPayloadPtr:
+      comment: |-
+        Wrapper for OptiX intrinsics used to load and store ray payload data using
+        a pointer represented by two payload registers.
+      flags:
+        - Hoistable
+  - getOptiXHitAttribute:
+      comment: |-
+        Wrapper for OptiX intrinsics used to load a single hit attribute
+        Takes two arguments: the type (either float or int), and the hit
+        attribute index
+      operands: 2
+  - getOptiXSbtDataPointer:
+      comment: |-
+        Wrapper for OptiX intrinsics used to load shader binding table record data
+        using a pointer.
+      type_name: GetOptiXSbtDataPtr
+  - GetVulkanRayTracingPayloadLocation:
+      operands: 1
+  - GetLegalizedSPIRVGlobalParamAddr:
+      operands: 1
+  - GetPerVertexInputArray:
+      operands: 1
+      flags:
+        - Hoistable
+  - ResolveVaryingInputRef:
+      operands: 1
+      flags:
+        - Hoistable
+  - ForceVarIntoStructTemporarily:
+      insts:
+        - ForceVarIntoStructTemporarily:
+            operands: 1
+        - ForceVarIntoRayPayloadStructTemporarily:
+            operands: 1
+  - MetalAtomicCast:
+      operands: 1
+  - IsTextureAccess:
+      operands: 1
+  - IsTextureScalarAccess:
+      operands: 1
+  - IsTextureArrayAccess:
+      operands: 1
+  - ExtractTextureFromTextureAccess:
+      operands: 1
+  - ExtractCoordFromTextureAccess:
+      operands: 1
+  - ExtractArrayCoordFromTextureAccess:
+      operands: 1
+  - makeArrayList: {}
+  - makeTensorView: {}
+  - allocTorchTensor:
+      type_name: AllocateTorchTensor
+  - TorchGetCudaStream: {}
+  - TorchTensorGetView: {}
+  - CoopMatMapElementIFunc:
+      operands: 2
+  - allocateOpaqueHandle: {}
+  - BindingQuery:
+      insts:
+        - getRegisterIndex:
+            comment: Return the register index thtat a resource is bound to.
+            operands: 1
+        - getRegisterSpace:
+            comment: Return the registe space that a resource is bound to.
+            operands: 1
+  - Decoration:
+      insts:
+        - highLevelDecl:
+            type_name: HighLevelDeclDecoration
+            operands: 1
+        - layout:
+            type_name: LayoutDecoration
+            operands: 1
+        - branch:
+            type_name: BranchDecoration
+        - flatten:
+            type_name: FlattenDecoration
+        - loopControl:
+            type_name: LoopControlDecoration
+            operands: 1
+        - loopMaxIters:
+            type_name: LoopMaxItersDecoration
+            operands: 1
+        - loopExitPrimalValue:
+            type_name: LoopExitPrimalValueDecoration
+            operands: 2
+        - intrinsicOp:
+            type_name: IntrinsicOpDecoration
+            operands: 1
+        - TargetSpecificDecoration:
+            insts:
+              - TargetSpecificDefinitionDecoration:
+                  insts:
+                    - target:
+                        type_name: TargetDecoration
+                        operands: 1
+                    - targetIntrinsic:
+                        type_name: TargetIntrinsicDecoration
+                        operands: 2
+              - requirePrelude:
+                  type_name: RequirePreludeDecoration
+                  operands: 2
+        - glslOuterArray:
+            type_name: GLSLOuterArrayDecoration
+            operands: 1
+        - TargetSystemValue:
+            type_name: TargetSystemValueDecoration
+            operands: 2
+        - interpolationMode:
+            type_name: InterpolationModeDecoration
+            operands: 1
+        - nameHint:
+            type_name: NameHintDecoration
+            operands: 1
+        - PhysicalType:
+            type_name: PhysicalTypeDecoration
+            operands: 1
+        - AlignedAddressDecoration:
+            comment: Mark an address instruction as aligned to a specific byte boundary.
+            operands: 1
+        - BinaryInterfaceType:
+            comment: |-
+              Marks a type as being used as binary interface (e.g. shader parameters).
+              This prevents the legalizeEmptyType() pass from eliminating it on C++/CUDA targets.
+            type_name: BinaryInterfaceTypeDecoration
+        - transitory:
+            comment: |-
+              *  The decorated _instruction_ is transitory. Such a decoration should NEVER be found on an output instruction a module.
+                  Typically used mark an instruction so can be specially handled - say when creating a IRConstant literal, and the payload of
+                  needs to be special cased for lookup.
+            type_name: TransitoryDecoration
+        - ResultWitness:
+            comment: |-
+              The result witness table that the functon's return type is a subtype of an interface.
+              This is used to keep track of the original witness table in a function that used to
+              return an existential value but now returns a concrete type after specialization.
+            type_name: ResultWitnessDecoration
+            operands: 1
+        - vulkanRayPayload:
+            type_name: VulkanRayPayloadDecoration
+        - vulkanRayPayloadIn:
+            type_name: VulkanRayPayloadInDecoration
+        - vulkanHitAttributes:
+            type_name: VulkanHitAttributesDecoration
+        - vulkanHitObjectAttributes:
+            type_name: VulkanHitObjectAttributesDecoration
+        - GlobalVariableShadowingGlobalParameterDecoration:
+            operands: 2
+        - requireSPIRVVersion:
+            type_name: RequireSPIRVVersionDecoration
+            operands: 1
+        - requireGLSLVersion:
+            type_name: RequireGLSLVersionDecoration
+            operands: 1
+        - requireGLSLExtension:
+            type_name: RequireGLSLExtensionDecoration
+            operands: 1
+        - requireWGSLExtension:
+            type_name: RequireWGSLExtensionDecoration
+            operands: 1
+        - requireCUDASMVersion:
+            type_name: RequireCUDASMVersionDecoration
+            operands: 1
+        - requireCapabilityAtom:
+            type_name: RequireCapabilityAtomDecoration
+            operands: 1
+        - HasExplicitHLSLBinding:
+            type_name: HasExplicitHLSLBindingDecoration
+        - DefaultValue:
+            type_name: DefaultValueDecoration
+            operands: 1
+        - readNone:
+            type_name: ReadNoneDecoration
+        - vulkanCallablePayload:
+            type_name: VulkanCallablePayloadDecoration
+        - vulkanCallablePayloadIn:
+            type_name: VulkanCallablePayloadInDecoration
+        - earlyDepthStencil:
+            type_name: EarlyDepthStencilDecoration
+        - precise:
+            type_name: PreciseDecoration
+        - public:
+            type_name: PublicDecoration
+        - hlslExport:
+            type_name: HLSLExportDecoration
+        - downstreamModuleExport:
+            type_name: DownstreamModuleExportDecoration
+        - downstreamModuleImport:
+            type_name: DownstreamModuleImportDecoration
+        - patchConstantFunc:
+            type_name: PatchConstantFuncDecoration
+            operands: 1
+        - maxTessFactor:
+            type_name: MaxTessFactorDecoration
+            operands: 1
+        - outputControlPoints:
+            type_name: OutputControlPointsDecoration
+            operands: 1
+        - outputTopology:
+            type_name: OutputTopologyDecoration
+            operands: 2
+        - partioning:
+            type_name: PartitioningDecoration
+            operands: 1
+        - domain:
+            type_name: DomainDecoration
+            operands: 1
+        - maxVertexCount:
+            type_name: MaxVertexCountDecoration
+            operands: 1
+        - instance:
+            type_name: InstanceDecoration
+            operands: 1
+        - numThreads:
+            type_name: NumThreadsDecoration
+            operands: 3
+        - waveSize:
+            type_name: WaveSizeDecoration
+            operands: 1
+        - availableInDownstreamIR:
+            type_name: AvailableInDownstreamIRDecoration
+            operands: 1
+        - GeometryInputPrimitiveTypeDecoration:
+            insts:
+              - pointPrimitiveType:
+                  comment: Added to IRParam parameters to an entry point
+                  type_name: PointInputPrimitiveTypeDecoration
+              - linePrimitiveType:
+                  type_name: LineInputPrimitiveTypeDecoration
+              - trianglePrimitiveType:
+                  type_name: TriangleInputPrimitiveTypeDecoration
+              - lineAdjPrimitiveType:
+                  type_name: LineAdjInputPrimitiveTypeDecoration
+              - triangleAdjPrimitiveType:
+                  type_name: TriangleAdjInputPrimitiveTypeDecoration
+        - streamOutputTypeDecoration:
+            operands: 1
+        - entryPoint:
+            comment: An `[entryPoint]` decoration marks a function that represents a shader entry point
+            type_name: EntryPointDecoration
+            operands: 2
+        - CudaKernel:
+            type_name: CudaKernelDecoration
+        - CudaHost:
+            type_name: CudaHostDecoration
+        - TorchEntryPoint:
+            type_name: TorchEntryPointDecoration
+        - AutoPyBindCUDA:
+            type_name: AutoPyBindCudaDecoration
+        - CudaKernelFwdDiffRef:
+            type_name: CudaKernelForwardDerivativeDecoration
+        - CudaKernelBwdDiffRef:
+            type_name: CudaKernelBackwardDerivativeDecoration
+        - PyBindExportFuncInfo:
+            type_name: AutoPyBindExportInfoDecoration
+        - PyExportDecoration: {}
+        - entryPointParam:
+            comment: |-
+              Used to mark parameters that are moved from entry point parameters to global params as coming from the entry
+              point.
+            type_name: EntryPointParamDecoration
+        - dependsOn:
+            comment: |-
+              A `[dependsOn(x)]` decoration indicates that the parent instruction depends on `x`
+              even if it does not otherwise reference it.
+            type_name: DependsOnDecoration
+            operands: 1
+        - keepAlive:
+            comment: A `[keepAlive]` decoration marks an instruction that should not be eliminated.
+            type_name: KeepAliveDecoration
+        - noSideEffect:
+            comment: A `[NoSideEffect]` decoration marks a callee to be side-effect free.
+            type_name: NoSideEffectDecoration
+        - bindExistentialSlots:
+            type_name: BindExistentialSlotsDecoration
+        - format:
+            comment: A `[format(f)]` decoration specifies that the format of an image should be `f`
+            type_name: FormatDecoration
+            operands: 1
+        - unsafeForceInlineEarly:
+            comment: |-
+              An `[unsafeForceInlineEarly]` decoration specifies that calls to this function should be inline after initial
+              codegen
+            type_name: UnsafeForceInlineEarlyDecoration
+        - ForceInline:
+            comment: A `[ForceInline]` decoration indicates the callee should be inlined by the Slang compiler.
+            type_name: ForceInlineDecoration
+        - ForceUnroll:
+            comment: A `[ForceUnroll]` decoration indicates the loop should be unrolled by the Slang compiler.
+            type_name: ForceUnrollDecoration
+        - SizeAndAlignment:
+            comment: |-
+              A `[SizeAndAlignment(l,s,a)]` decoration is attached to a type to indicate that is has size `s` and alignment
+              `a` under layout rules `l`.
+            type_name: SizeAndAlignmentDecoration
+            operands: 3
+        - Offset:
+            comment: |-
+              A `[Offset(l, o)]` decoration is attached to a field to indicate that it has offset `o` in the parent type
+              under layout rules `l`.
+            type_name: OffsetDecoration
+            operands: 2
+        - LinkageDecoration:
+            insts:
+              - import:
+                  type_name: ImportDecoration
+                  operands: 1
+              - export:
+                  type_name: ExportDecoration
+                  operands: 1
+        - TargetBuiltinVar:
+            comment: Mark a global variable as a target builtin variable.
+            type_name: TargetBuiltinVarDecoration
+            operands: 1
+        - UserExtern:
+            comment: Marks an inst as coming from an `extern` symbol defined in the user code.
+            type_name: UserExternDecoration
+        - externCpp:
+            comment: An extern_cpp decoration marks the inst to emit its name without mangling for C++ interop.
+            type_name: ExternCppDecoration
+            operands: 1
+        - externC:
+            comment: An externC decoration marks a function should be emitted inside an extern "C" block.
+            type_name: ExternCDecoration
+        - dllImport:
+            comment: |-
+              An dllImport decoration marks a function as imported from a DLL. Slang will generate dynamic function loading
+              logic to use this function at runtime.
+            type_name: DllImportDecoration
+            operands: 2
+        - dllExport:
+            comment: |-
+              An dllExport decoration marks a function as an export symbol. Slang will generate a native wrapper function
+              that is exported to DLL.
+            type_name: DllExportDecoration
+            operands: 1
+        - cudaDeviceExport:
+            comment: An cudaDeviceExport decoration marks a function to be exported as a cuda __device__ function.
+            type_name: CudaDeviceExportDecoration
+            operands: 1
+        - COMInterface:
+            comment: Marks an interface as a COM interface declaration.
+            type_name: ComInterfaceDecoration
+        - KnownBuiltinDecoration:
+            comment: |-
+              Attaches a name to this instruction so that it can be identified
+              later in the compiler reliably
+            operands: 1
+        - RTTI_typeSize:
+            comment: Decorations for RTTI objects
+            type_name: RTTITypeSizeDecoration
+            operands: 1
+        - AnyValueSize:
+            type_name: AnyValueSizeDecoration
+            operands: 1
+        - SpecializeDecoration: {}
+        - SequentialIDDecoration:
+            operands: 1
+        - DynamicDispatchWitnessDecoration: {}
+        - StaticRequirementDecoration: {}
+        - DispatchFuncDecoration:
+            operands: 1
+        - TypeConstraintDecoration:
+            operands: 1
+        - BuiltinDecoration: {}
+        - requiresNVAPI:
+            comment: The decorated instruction requires NVAPI to be included via prelude when compiling for D3D.
+            type_name: RequiresNVAPIDecoration
+        - nvapiMagic:
+            comment: The decorated instruction is part of the NVAPI "magic" and should always use its original name
+            type_name: NVAPIMagicDecoration
+            operands: 1
+        - nvapiSlot:
+            comment: |-
+              A decoration that applies to an entire IR module, and indicates the register/space binding
+              that the NVAPI shader parameter intends to use.
+            type_name: NVAPISlotDecoration
+            operands: 2
+        - noInline:
+            comment: Applie to an IR function and signals that inlining should not be performed unless unavoidable.
+            type_name: NoInlineDecoration
+        - noRefInline:
+            type_name: NoRefInlineDecoration
+        - DerivativeGroupQuad:
+            type_name: DerivativeGroupQuadDecoration
+        - DerivativeGroupLinear:
+            type_name: DerivativeGroupLinearDecoration
+        - MaximallyReconverges:
+            type_name: MaximallyReconvergesDecoration
+        - QuadDerivatives:
+            type_name: QuadDerivativesDecoration
+        - RequireFullQuads:
+            type_name: RequireFullQuadsDecoration
+        - TempCallArgVar:
+            type_name: TempCallArgVarDecoration
+        - nonCopyable:
+            comment: Marks a type to be non copyable, causing SSA pass to skip turning variables of the the type into SSA values.
+            type_name: NonCopyableTypeDecoration
+        - DynamicUniform:
+            comment: Marks a value to be dynamically uniform.
+            type_name: DynamicUniformDecoration
+        - alwaysFold:
+            comment: A call to the decorated function should always be folded into its use site.
+            type_name: AlwaysFoldIntoUseSiteDecoration
+        - output:
+            type_name: GlobalOutputDecoration
+        - input:
+            type_name: GlobalInputDecoration
+        - glslLocation:
+            type_name: GLSLLocationDecoration
+            operands: 1
+        - glslOffset:
+            type_name: GLSLOffsetDecoration
+            operands: 1
+        - vkStructOffset:
+            type_name: VkStructOffsetDecoration
+            operands: 1
+        - payload:
+            type_name: PayloadDecoration
+        - raypayload:
+            type_name: RayPayloadDecoration
+        - MeshOutputDecoration:
+            comment: Mesh Shader outputs
+            insts:
+              - vertices:
+                  type_name: VerticesDecoration
+                  operands: 1
+              - indices:
+                  type_name: IndicesDecoration
+                  operands: 1
+              - primitives:
+                  type_name: PrimitivesDecoration
+                  operands: 1
+        - payload:
+            type_name: HLSLMeshPayloadDecoration
+        - perprimitive:
+            type_name: GLSLPrimitivesRateDecoration
+        - PositionOutput:
+            comment: Marks an inst that represents the gl_Position output.
+            type_name: GLPositionOutputDecoration
+        - PositionInput:
+            comment: Marks an inst that represents the gl_Position input.
+            type_name: GLPositionInputDecoration
+        - PerVertex:
+            comment: Marks a fragment shader input as per-vertex.
+            type_name: PerVertexDecoration
+        - StageAccessDecoration:
+            insts:
+              - stageReadAccess:
+                  type_name: StageReadAccessDecoration
+              - stageWriteAccess:
+                  type_name: StageWriteAccessDecoration
+        - semantic:
+            type_name: SemanticDecoration
+            operands: 2
+        - constructor:
+            type_name: ConstructorDecoration
+            operands: 1
+        - method:
+            type_name: MethodDecoration
+        - packoffset:
+            type_name: PackOffsetDecoration
+            operands: 2
+        - SpecializationConstantDecoration:
+            operands: 1
+        - UserTypeName:
+            comment: Reflection metadata for a shader parameter that provides the original type name.
+            type_name: UserTypeNameDecoration
+            operands: 1
+        - CounterBuffer:
+            comment: Reflection metadata for a shader parameter that refers to the associated counter buffer of a UAV.
+            type_name: CounterBufferDecoration
+            operands: 1
+        - RequireSPIRVDescriptorIndexingExtensionDecoration: {}
+        - spirvOpDecoration:
+            type_name: SPIRVOpDecoration
+            operands: 1
+        - forwardDifferentiable:
+            comment: Decorated function is marked for the forward-mode differentiation pass.
+            type_name: ForwardDifferentiableDecoration
+        - AutoDiffOriginalValueDecoration:
+            comment: Decorates a auto-diff transcribed value with the original value that the inst is transcribed from.
+            operands: 1
+        - AutoDiffBuiltinDecoration:
+            comment: Decorates a type as auto-diff builtin type.
+        - fwdDerivative:
+            comment: |-
+              Used by the auto-diff pass to hold a reference to the
+              generated derivative function.
+            type_name: ForwardDerivativeDecoration
+            operands: 1
+        - backwardDifferentiable:
+            comment: |-
+              Used by the auto-diff pass to hold a reference to the
+              generated derivative function.
+            type_name: BackwardDifferentiableDecoration
+            operands: 1
+        - primalSubstFunc:
+            comment: |-
+              Used by the auto-diff pass to hold a reference to the
+              primal substitute function.
+            type_name: PrimalSubstituteDecoration
+            operands: 1
+        - backwardDiffPrimalReference:
+            comment: Decorations to associate an original function with compiler generated backward derivative functions.
+            type_name: BackwardDerivativePrimalDecoration
+            operands: 1
+        - backwardDiffPropagateReference:
+            type_name: BackwardDerivativePropagateDecoration
+            operands: 1
+        - backwardDiffIntermediateTypeReference:
+            type_name: BackwardDerivativeIntermediateTypeDecoration
+            operands: 1
+        - backwardDiffReference:
+            type_name: BackwardDerivativeDecoration
+            operands: 1
+        - userDefinedBackwardDiffReference:
+            type_name: UserDefinedBackwardDerivativeDecoration
+            operands: 1
+        - BackwardDerivativePrimalContextDecoration:
+            operands: 1
+        - BackwardDerivativePrimalReturnDecoration:
+            operands: 1
+        - PrimalContextDecoration:
+            comment: Mark a parameter as autodiff primal context.
+        - loopCounterDecoration: {}
+        - loopCounterUpdateDecoration: {}
+        - AutodiffInstDecoration:
+            comment: Auto-diff inst decorations
+            insts:
+              - primalInstDecoration:
+                  comment: |-
+                    Used by the auto-diff pass to mark insts that compute
+                    a primal value.
+              - diffInstDecoration:
+                  comment: |-
+                    Used by the auto-diff pass to mark insts that compute
+                    a differential value.
+                  type_name: DifferentialInstDecoration
+                  operands: 1
+              - mixedDiffInstDecoration:
+                  comment: |-
+                    Used by the auto-diff pass to mark insts that compute
+                    BOTH a differential and a primal value.
+                  type_name: MixedDifferentialInstDecoration
+                  operands: 1
+              - RecomputeBlockDecoration: {}
+        - primalValueKey:
+            comment: |-
+              Used by the auto-diff pass to mark insts whose result is stored
+              in an intermediary struct for reuse in backward propagation phase.
+            type_name: PrimalValueStructKeyDecoration
+            operands: 1
+        - primalElementType:
+            comment: |-
+              Used by the auto-diff pass to mark the primal element type of an
+              forward-differentiated updateElement inst.
+            type_name: PrimalElementTypeDecoration
+            operands: 1
+        - IntermediateContextFieldDifferentialTypeDecoration:
+            comment: Used by the auto-diff pass to mark the differential type of an intermediate context field.
+            operands: 1
+        - derivativeMemberDecoration:
+            comment: |-
+              Used by the auto-diff pass to hold a reference to a
+              differential member of a type in its associated differential type.
+            operands: 1
+        - treatAsDifferentiableDecoration:
+            comment: Treat a function as differentiable function
+        - treatCallAsDifferentiableDecoration:
+            comment: Treat a call to arbitrary function as a differentiable call.
+        - differentiableCallDecoration:
+            comment: Mark a call as explicitly calling a differentiable function.
+        - optimizableTypeDecoration:
+            comment: |-
+              Mark a type as being eligible for trimming if necessary. If
+              any fields don't have any effective loads from them, they can be
+              removed.
+        - ignoreSideEffectsDecoration:
+            comment: |-
+              Informs the DCE pass to ignore side-effects on this call for
+              the purposes of dead code elimination, even if the call does have
+              side-effects.
+        - CheckpointHintDecoration:
+            insts:
+              - PreferCheckpointDecoration:
+                  comment: Hint that the result from a call to the decorated function should be stored in backward prop function.
+              - PreferRecomputeDecoration:
+                  comment: Hint that the result from a call to the decorated function should be recomputed in backward prop function.
+              - CheckpointIntermediateDecoration:
+                  comment: Hint that a struct is used for reverse mode checkpointing
+                  operands: 1
+        - NonDynamicUniformReturnDecoration:
+            comment: Marks a function whose return value is never dynamic uniform.
+        - COMWitnessDecoration:
+            comment: |-
+              Marks a class type as a COM interface implementation, which enables
+              the witness table to be easily picked up by emit.
+            operands: 1
+        - DifferentiableTypeDictionaryDecoration:
+            comment: Differentiable Type Dictionary
+            flags:
+              - Parent
+        - FloatingPointModeOverride:
+            comment: Overrides the floating mode for the target function
+            type_name: FloatingPointModeOverrideDecoration
+            operands: 1
+        - spvBufferBlock:
+            comment: Recognized by SPIRV-emit pass so we can emit a SPIRV `BufferBlock` decoration.
+            type_name: SPIRVBufferBlockDecoration
+        - DebugLocation:
+            comment: Decorates an inst with a debug source location (IRDebugSource, IRIntLit(line), IRIntLit(col)).
+            type_name: DebugLocationDecoration
+            operands: 3
+        - DebugFunction:
+            comment: Decorates a function with a link to its debug function representation
+            type_name: DebugFunctionDecoration
+            operands: 1
+        - spvBlock:
+            comment: Recognized by SPIRV-emit pass so we can emit a SPIRV `Block` decoration.
+            type_name: SPIRVBlockDecoration
+        - NonUniformResource:
+            comment: |-
+              Decorates a SPIRV-inst as `NonUniformResource` to guarantee non-uniform index lookup of
+              - a resource within an array of resources via IRGetElement.
+              - an IRLoad that takes a pointer within a memory buffer via IRGetElementPtr.
+              - an IRIntCast to a resource that is casted from signed to unsigned or viceversa.
+              - an IRGetElementPtr itself when using the pointer on an intrinsic operation.
+            type_name: SPIRVNonUniformResourceDecoration
+        - MemoryQualifierSetDecoration:
+            comment: Stores flag bits of which memory qualifiers an object has
+            operands: 1
+        - BitFieldAccessorDecoration:
+            comment: |-
+              Marks a function as one which access a bitfield with the specified
+              backing value key, width and offset
+            operands: 3
+  - makeExistential:
+      comment: |-
+        Decoration
+        A `makeExistential(v : C, w) : I` instruction takes a value `v` of type `C`
+        and produces a value of interface type `I` by using the witness `w` which
+        shows that `C` conforms to `I`.
+      operands: 2
+  - makeExistentialWithRTTI:
+      comment: |-
+        A `MakeExistentialWithRTTI(v, w, t)` is the same with `MakeExistential`,
+        but with the type of `v` being an explict operand.
+      operands: 3
+  - createExistentialObject:
+      comment: |-
+        A 'CreateExistentialObject<I>(typeID, T)` packs user-provided `typeID` and a
+        value of any type, and constructs an existential value of type `I`.
+      operands: 2
+  - wrapExistential:
+      comment: |-
+        A `wrapExistential(v, T0,w0, T1,w0) : T` instruction is similar to `makeExistential`.
+        but applies to a value `v` that is of type `BindExistentials(T, T0,w0, ...)`. The
+        result of the `wrapExistentials` operation is a value of type `T`, allowing us to
+        "smuggle" a value of specialized type into computations that expect an unspecialized type.
+      operands: 1
+  - getValueFromBoundInterface:
+      comment: |-
+        A `GetValueFromBoundInterface` takes a `BindInterface<I, T, w0>` value and returns the
+        value of concrete type `T` value that is being stored.
+      operands: 1
+  - extractExistentialValue:
+      operands: 1
+  - extractExistentialType:
+      operands: 1
+      flags:
+        - Hoistable
+  - extractExistentialWitnessTable:
+      operands: 1
+      flags:
+        - Hoistable
+  - extractTaggedUnionTag:
+      operands: 1
+  - extractTaggedUnionPayload:
+      operands: 1
+  - BuiltinCast:
+      operands: 1
+  - bitCast:
+      operands: 1
+  - reinterpret:
+      operands: 1
+  - unmodified:
+      operands: 1
+  - outImplicitCast:
+      operands: 1
+  - inOutImplicitCast:
+      operands: 1
+  - intCast:
+      operands: 1
+  - floatCast:
+      operands: 1
+  - castIntToFloat:
+      operands: 1
+  - castFloatToInt:
+      operands: 1
+  - CastPtrToBool:
+      operands: 1
+  - CastPtrToInt:
+      operands: 1
+  - CastIntToPtr:
+      operands: 1
+  - castToVoid:
+      operands: 1
+  - PtrCast:
+      operands: 1
+  - CastEnumToInt:
+      operands: 1
+  - CastIntToEnum:
+      operands: 1
+  - EnumCast:
+      operands: 1
+  - CastUInt2ToDescriptorHandle:
+      operands: 1
+  - CastDescriptorHandleToUInt2:
+      operands: 1
+  - CastDescriptorHandleToResource:
+      comment: |-
+        Represents a no-op cast to convert a resource pointer to a resource on targets where the resource handles are
+        already concrete types.
+      operands: 1
+  - TreatAsDynamicUniform:
+      operands: 1
+  - sizeOf:
+      operands: 1
+  - alignOf:
+      operands: 1
+  - countOf:
+      operands: 1
+  - GetArrayLength:
+      operands: 1
+  - IsType:
+      operands: 3
+  - TypeEquals:
+      operands: 2
+  - IsInt:
+      operands: 1
+  - IsBool:
+      operands: 1
+  - IsFloat:
+      operands: 1
+  - IsHalf:
+      operands: 1
+  - IsUnsignedInt:
+      operands: 1
+  - IsSignedInt:
+      operands: 1
+  - IsVector:
+      operands: 1
+  - GetDynamicResourceHeap:
+      flags:
+        - Hoistable
+  - ForwardDifferentiate:
+      operands: 1
+  - BackwardDifferentiatePrimal:
+      comment: |-
+        Produces the primal computation of backward derivatives, will return an intermediate context for
+        backward derivative func.
+      operands: 1
+  - BackwardDifferentiatePropagate:
+      comment: |-
+        Produces the actual backward derivative propagate function, using the intermediate context returned by the
+        primal func produced from `BackwardDifferentiatePrimal`.
+      operands: 1
+  - BackwardDifferentiate:
+      comment: |-
+        Represents the conceptual backward derivative function. Only produced by lower-to-ir and will be
+        replaced with `BackwardDifferentiatePrimal` and `BackwardDifferentiatePropagate`.
+      operands: 1
+  - PrimalSubstitute:
+      operands: 1
+  - DispatchKernel:
+      operands: 3
+  - CudaKernelLaunch:
+      operands: 6
+  - getEquivalentStructuredBuffer:
+      comment: Converts other resources (such as ByteAddressBuffer) to the equivalent StructuredBuffer
+      operands: 1
+  - getStructuredBufferPtr:
+      comment: Gets a T[] pointer to the underlying data of a StructuredBuffer etc...
+      operands: 1
+  - getUntypedBufferPtr:
+      comment: Gets a uint[] pointer to the underlying data of a ByteAddressBuffer etc...
+      operands: 1
+  - Layout:
+      flags:
+        - Hoistable
+      insts:
+        - varLayout:
+            operands: 1
+        - TypeLayout:
+            insts:
+              - typeLayout:
+                  type_name: TypeLayoutBase
+              - parameterGroupTypeLayout:
+                  operands: 2
+              - arrayTypeLayout:
+                  operands: 1
+              - streamOutputTypeLayout:
+                  operands: 1
+              - matrixTypeLayout:
+                  operands: 1
+              - existentialTypeLayout: {}
+              - structTypeLayout: {}
+              - tupleTypeLayout: {}
+              - structuredBufferTypeLayout:
+                  operands: 1
+              - ptrTypeLayout:
+                  comment: |-
+                    "TODO(JS): Ideally we'd have the layout to the pointed to value type (ie 1 instead of 0 here). But to
+                    avoid infinite recursion we don't."
+                  type_name: PointerTypeLayout
+        - EntryPointLayout:
+            operands: 1
+  - Attr:
+      flags:
+        - Hoistable
+      insts:
+        - pendingLayout:
+            type_name: PendingLayoutAttr
+            operands: 1
+        - stage:
+            type_name: StageAttr
+            operands: 1
+        - fieldLayout:
+            type_name: StructFieldLayoutAttr
+            operands: 2
+        - fieldLayout:
+            type_name: TupleFieldLayoutAttr
+            operands: 1
+        - caseLayout:
+            type_name: CaseTypeLayoutAttr
+            operands: 1
+        - unorm:
+            type_name: UNormAttr
+        - snorm:
+            type_name: SNormAttr
+        - no_diff:
+            type_name: NoDiffAttr
+        - nonuniform:
+            type_name: NonUniformAttr
+        - Aligned:
+            type_name: AlignedAttr
+            operands: 1
+        - SemanticAttr:
+            insts:
+              - userSemantic:
+                  type_name: UserSemanticAttr
+                  operands: 2
+              - systemValueSemantic:
+                  type_name: SystemValueSemanticAttr
+                  operands: 2
+        - LayoutResourceInfoAttr:
+            insts:
+              - size:
+                  type_name: TypeSizeAttr
+                  operands: 2
+              - offset:
+                  type_name: VarOffsetAttr
+                  operands: 2
+        - FuncThrowType:
+            type_name: FuncThrowTypeAttr
+            operands: 1
+  - LiveRangeMarker:
+      comment: Liveness
+      insts:
+        - liveRangeStart:
+            operands: 2
+        - liveRangeEnd: {}
+  - SpecializationDictionaryItem:
+      comment: IRSpecialization
+  - GenericSpecializationDictionary:
+      flags:
+        - Parent
+  - ExistentialFuncSpecializationDictionary:
+      flags:
+        - Parent
+  - ExistentialTypeSpecializationDictionary:
+      flags:
+        - Parent
+  - DifferentiableTypeDictionaryItem:
+      comment: Differentiable Type Dictionary
+  - DifferentiableTypeAnnotation:
+      comment: Differentiable Type Annotation (for run-time types)
+      operands: 2
+      flags:
+        - Hoistable
+  - BeginFragmentShaderInterlock: {}
+  - BeginFragmentShaderInterlock:
+      type_name: EndFragmentShaderInterlock
+  - DebugSource:
+      comment: DebugInfo
+      operands: 2
+      flags:
+        - Hoistable
+  - DebugLine:
+      operands: 5
+  - DebugVar:
+      operands: 4
+  - DebugValue:
+      operands: 2
+  - DebugInlinedAt:
+      operands: 5
+  - DebugFunction:
+      operands: 5
+  - DebugInlinedVariable:
+      operands: 2
+  - DebugScope:
+      operands: 2
+  - DebugNoScope:
+      operands: 1
+  - EmbeddedDownstreamIR:
+      comment: Embedded Precompiled Libraries
+      operands: 2
+  - SPIRVAsm:
+      comment: Inline assembly
+      flags:
+        - Parent
+  - SPIRVAsmInst:
+      operands: 1
+  - SPIRVAsmOperand:
+      insts:
+        - SPIRVAsmOperandLiteral:
+            comment: |-
+              These instruction serve to inform the backend precisely how to emit each
+              instruction, consider the difference between emitting a literal integer
+              and a reference to a literal integer instruction
+              A literal string or 32-bit integer to be passed as operands
+            operands: 1
+            flags:
+              - Hoistable
+        - SPIRVAsmOperandInst:
+            comment: |-
+              A reference to a slang IRInst, either a value or a type
+              This isn't hoistable, as we sometimes need to change the used value and
+              instructions around the specific asm block
+            operands: 1
+        - SPIRVAsmOperandConvertTexel:
+            operands: 1
+        - SPIRVAsmOperandRayPayloadFromLocation:
+            comment: a late resolving type to handle the case of ray objects (resolving late due to constexpr data requirment)
+            operands: 1
+        - SPIRVAsmOperandRayAttributeFromLocation:
+            operands: 1
+        - SPIRVAsmOperandRayCallableFromLocation:
+            operands: 1
+        - SPIRVAsmOperandEnum:
+            comment: |-
+              A named enumerator, the value is stored as a constant operand
+              It may have a second operand, which if present is a type with which to
+              construct a constant id to pass, instead of a literal constant
+            operands: 1
+            flags:
+              - Hoistable
+        - SPIRVAsmOperandBuiltinVar:
+            comment: A reference to a builtin variable.
+            operands: 1
+            flags:
+              - Hoistable
+        - SPIRVAsmOperandGLSL450Set:
+            comment: A reference to the glsl450 instruction set.
+            flags:
+              - Hoistable
+        - SPIRVAsmOperandDebugPrintfSet:
+            flags:
+              - Hoistable
+        - SPIRVAsmOperandId:
+            comment: |-
+              A string which is given a unique ID in the backend, used to refer to
+              results of other instrucions in the same asm block
+            operands: 1
+            flags:
+              - Hoistable
+        - SPIRVAsmOperandResult:
+            comment: |-
+              A special instruction which marks the place to insert the generated
+              result operand
+            flags:
+              - Hoistable
+        - __truncate:
+            comment: |-
+              A special instruction which represents a type directed truncation
+              operation where extra components are dropped
+            type_name: SPIRVAsmOperandTruncate
+            flags:
+              - Hoistable
+        - __entryPoint:
+            comment: A special instruction which represents an ID of an entry point that references the current function.
+            type_name: SPIRVAsmOperandEntryPoint
+            flags:
+              - Hoistable
+        - __sampledType:
+            comment: |-
+              A type function which returns the result type of sampling an image of
+              this component type
+            type_name: SPIRVAsmOperandSampledType
+            operands: 1
+            flags:
+              - Hoistable
+        - __imageType:
+            comment: A type function which returns the equivalent OpTypeImage type of sampled image value
+            type_name: SPIRVAsmOperandImageType
+            operands: 1
+            flags:
+              - Hoistable
+        - __sampledImageType:
+            comment: A type function which returns the equivalent OpTypeImage type of sampled image value
+            type_name: SPIRVAsmOperandSampledImageType
+            operands: 1
+            flags:
+              - Hoistable
