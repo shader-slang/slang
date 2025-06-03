@@ -3046,7 +3046,11 @@ FrontEndCompileRequest::FrontEndCompileRequest(
 struct FrontEndPreprocessorHandler : PreprocessorHandler
 {
 public:
-    FrontEndPreprocessorHandler(Module* module, ASTBuilder* astBuilder, DiagnosticSink* sink, TranslationUnitRequest* translationUnit)
+    FrontEndPreprocessorHandler(
+        Module* module,
+        ASTBuilder* astBuilder,
+        DiagnosticSink* sink,
+        TranslationUnitRequest* translationUnit)
         : m_module(module)
         , m_astBuilder(astBuilder)
         , m_sink(sink)
@@ -4929,7 +4933,11 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
     fileDecl->parentDecl = module->getModuleDecl();
     module->getIncludedSourceFileMap().add(sourceFile, fileDecl);
 
-    FrontEndPreprocessorHandler preprocessorHandler(module, module->getASTBuilder(), sink, translationUnit);
+    FrontEndPreprocessorHandler preprocessorHandler(
+        module,
+        module->getASTBuilder(),
+        sink,
+        translationUnit);
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
     SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
     SlangLanguageVersion slangLanguageVersion = module->getModuleDecl()->languageVersion;
