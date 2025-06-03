@@ -1570,6 +1570,7 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
         case ASTNodeType::DefaultDataLayoutType:
         case ASTNodeType::Std140DataLayoutType:
             return &kStd140LayoutRulesImpl_;
+        case ASTNodeType::DefaultPushConstantDataLayoutType:
         case ASTNodeType::Std430DataLayoutType:
             return &kStd430LayoutRulesImpl_;
         case ASTNodeType::ScalarDataLayoutType:

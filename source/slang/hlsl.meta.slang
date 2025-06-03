@@ -30,6 +30,12 @@ struct DefaultDataLayout : IBufferDataLayout
 {};
 
 /// @category misc_types
+__intrinsic_type($(kIROp_Std430BufferLayoutType))
+__magic_type(DefaultPushConstantDataLayoutType)
+struct DefaultPushConstantDataLayout : IBufferDataLayout
+{};
+
+/// @category misc_types
 __intrinsic_type($(kIROp_Std140BufferLayoutType))
 [require(spirv)]
 [require(glsl)]
@@ -503,6 +509,7 @@ struct __ShapeCube : __ITextureShape
 /// @category misc_types
 __magic_type(TextureShapeBufferType)
 __intrinsic_type($(kIROp_TextureShapeBufferType))
+[require(cpp_cuda_glsl_hlsl_metal_spirv)]
 struct __ShapeBuffer : __ITextureShape
 {
     static const int flavor = $(SLANG_TEXTURE_BUFFER);
@@ -24434,9 +24441,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 result:$$CoopVec<T, N> = OpCompositeConstructReplicateEXT $t;
             };
         case hlsl:
-            for(int i = 0; i < N; ++i)
-                this[i] = t;
-            return;
+             __intrinsic_asm "$0 = $1";
         case hlsl_coopvec_poc:
             __intrinsic_asm ".Fill";
         default:
@@ -26367,9 +26372,14 @@ CoopVec<T, M> coopVecMatMulPacked(
         let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
         let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixPtr = matrix.GetBufferPointer();
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
 
     case hlsl:
@@ -26898,9 +26908,14 @@ CoopVec<T, M> coopVecMatMulPacked(
         let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
         let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixPtr = __getStructuredBufferPtr(matrix);
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
     }
 }

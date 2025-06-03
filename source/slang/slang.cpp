@@ -1601,7 +1601,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
         RefPtr<Module> module =
             loadModuleImpl(name, pathInfo, source, SourceLoc(), &sink, nullptr, blobType);
         sink.getBlobIfNeeded(outDiagnostics);
-        return asExternal(module.detach());
+        return asExternal(module.get());
     }
     catch (const AbortCompilationException& e)
     {
