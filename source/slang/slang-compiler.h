@@ -1888,7 +1888,7 @@ public:
     /// Add both the artifact and the sourceFile.
     void addSource(IArtifact* sourceArtifact, SourceFile* sourceFile);
 
-    void _addSourceFile(SourceFile* sourceFile);
+    void addIncludedSourceFileIfNotExist(SourceFile* sourceFile);
 
     // The entry points associated with this translation unit
     List<RefPtr<EntryPoint>> const& getEntryPoints() { return module->getEntryPoints(); }
@@ -1926,6 +1926,7 @@ public:
     }
 
 protected:
+    void _addSourceFile(SourceFile* sourceFile);
     /* Given an artifact, find a PathInfo.
     If no PathInfo can be found will return an unknown PathInfo */
     PathInfo _findSourcePathInfo(IArtifact* artifact);

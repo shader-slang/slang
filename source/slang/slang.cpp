@@ -2515,6 +2515,14 @@ void TranslationUnitRequest::addSource(IArtifact* sourceArtifact, SourceFile* so
     _addSourceFile(sourceFile);
 }
 
+void TranslationUnitRequest::addIncludedSourceFileIfNotExist(SourceFile* sourceFile)
+{
+    if (!m_sourceFiles.contains(sourceFile)) {
+        sourceFile->setIncludedFile();
+        m_sourceFiles.add(sourceFile);
+    }
+}
+
 PathInfo TranslationUnitRequest::_findSourcePathInfo(IArtifact* artifact)
 {
     auto pathRep = findRepresentation<IPathArtifactRepresentation>(artifact);
@@ -3074,7 +3082,7 @@ protected:
     void handleFileDependency(SourceFile* sourceFile) SLANG_OVERRIDE
     {
         m_module->addFileDependency(sourceFile);
-        m_translationUnit->_addSourceFile(sourceFile);
+        m_translationUnit->addIncludedSourceFileIfNotExist(sourceFile);
     }
 
     // The second task that this handler deals with is detecting
@@ -3341,6 +3349,9 @@ static void _outputIncludes(
     // For all the source files
     for (SourceFile* sourceFile : sourceFiles)
     {
+        if (sourceFile->isIncludedFile())
+            continue;
+
         // Find an initial view (this is the view of this file, that doesn't have an initiating loc)
         SourceView* sourceView = _findInitialSourceView(sourceFile);
         if (!sourceView)
