@@ -5485,10 +5485,7 @@ static Type* createSomeTypeDeclType(ASTBuilder* astBuilder, SomeTypeExpr* expr)
 Expr* SemanticsExprVisitor::visitSomeTypeExpr(SomeTypeExpr* expr)
 {
     if (expr->base.type)
-    {
-        expr->type = createSomeTypeDeclType(m_astBuilder, expr);
         return expr;
-    }
 
     expr->base = CheckProperType(expr->base);
     if (as<ErrorType>(expr->base.type))
@@ -5504,8 +5501,8 @@ Expr* SemanticsExprVisitor::visitSomeTypeExpr(SomeTypeExpr* expr)
                 expr->base.type);
         }
 
-        auto interfaceType = as<InterfaceDecl>(declRefType->getDeclRefBase()->getDecl());
-        if (!interfaceType)
+        
+        if (!as<InterfaceDecl>(declRefType->getDeclRefBase()->getDecl()))
         {
             getSink()->diagnose(
                 expr,

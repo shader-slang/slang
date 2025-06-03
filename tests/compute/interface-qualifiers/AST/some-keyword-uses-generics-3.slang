@@ -51,6 +51,5 @@ void computeMain()
     some IFooGeneric<float> data2 = StructForIFooGeneric<float>(1);
     logic1<float>(data1);
     logic2<float>(data1, data2);
-    buffer[0] = int(data1.getVal() == 
-                + data2.getVal());
+    buffer[0] = int(data1.getVal() == + data2.getVal());
 }

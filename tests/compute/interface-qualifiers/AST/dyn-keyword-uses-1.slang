@@ -2,8 +2,6 @@
 
 // ensure `dyn` is only allowed with `dyn interface`
 
-// CHECK-DAG: error 33090
-// CHECK-NOT: error 33090
 interface NonDynInterface
 {
 }
@@ -11,6 +9,8 @@ dyn interface DynInterface
 {
 }
 
+// CHECK-DAG: error 33090
+// CHECK-NOT: error 33090
 static dyn NonDynInterface nonDynInterfaceVar;
 static dyn DynInterface dynInterfaceVar;
 

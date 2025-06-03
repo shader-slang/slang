@@ -163,7 +163,7 @@ struct structWithNonCopyable1 : IBase6
 [__NonCopyableType]
 struct NonCopyableStruct2<T : IArithmetic>
 {
-    T v;
+	T v;
 }
 struct structWithNonCopyable2 : IBase6
 {

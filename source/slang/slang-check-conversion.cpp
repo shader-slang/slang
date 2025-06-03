@@ -1197,7 +1197,9 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
-    // unwrap SomeTypeDecl's
+    // Manages coerce rules for `SomeTypeDecl` and `UnboundSomeTypeDecl`.
+    // Primarily this function diagnoses incorrect `SomeTypeDecl` coercing.
+    // To coerce this function unwraps the inner interface type of a `SomeTypeDecl`.
     if (tryCoerceSomeType(site, toType, outToExpr, fromType, fromExpr, sink, outCost))
         return true;
 
@@ -1883,7 +1885,8 @@ bool SemanticsVisitor::tryCoerceSomeType(
     // basic restrictions
     if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(toType))
     {
-        // if `some T = some U` `some T = unbound_some U`
+        // if `some T = some U` `some T = unbound_some U`.
+        // We do not error if `some` is an argument since `some` can be passed as an argument to a `some` parameter
         if (site != CoercionSite::Argument && isDeclRefTypeOf<SomeTypeDecl>(fromType))
         {
             if (!isDeclRefTypeOf<UnboundSomeTypeDecl>(toType))
@@ -1912,10 +1915,10 @@ bool SemanticsVisitor::tryCoerceSomeType(
             outCost);
     }
 
-    // `T = some IFoo<T>` is allowed, need to unwrap SomeType
+    // we are allowed to assign a `some` type to any non `some` type. Due to this
+    // we will unwrap the SomeType.
     if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(fromType))
     {
-        //`SomeType` needs implicit unwrap to be assigned to non-some-type
         return _coerce(
             site,
             toType,

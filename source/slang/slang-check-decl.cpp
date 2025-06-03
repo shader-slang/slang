@@ -55,17 +55,17 @@ static bool allowExperimentalDynamicDispatch(
            isSlang2025OrOlder(visitor);
 }
 
-bool isImplicitDyn(SemanticsVisitor* visitor)
+static bool isImplicitDyn(SemanticsVisitor* visitor)
 {
     return isSlang2025OrOlder(visitor);
 }
 
-bool validateVarDeclDyn(SemanticsVisitor* visitor)
+static bool validateVarDeclDyn(SemanticsVisitor* visitor)
 {
     return isSlang2026OrNewer(visitor);
 }
 
-bool isImplicitSome(SemanticsVisitor* visitor)
+static bool isImplicitSome(SemanticsVisitor* visitor)
 {
     return isSlang2026OrNewer(visitor);
 }
@@ -14056,10 +14056,6 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
 
 DeclVisibility SemanticsVisitor::getDeclVisibility(Decl* decl)
 {
-    if (auto someType = as<SomeTypeDecl>(decl))
-    {
-        return getTypeVisibility(someType->interfaceType.type);
-    }
     if (as<GenericTypeParamDeclBase>(decl) || as<GenericValueParamDecl>(decl) ||
         as<GenericTypeConstraintDecl>(decl))
     {

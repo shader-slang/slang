@@ -137,7 +137,7 @@ class LetDecl : public VarDecl
     FIDDLE(...)
 };
 
-// SomeType<IFoo>
+// Represents the type `SomeType<IFoo>`
 FIDDLE()
 class SomeTypeDecl : public Decl
 {
@@ -145,7 +145,7 @@ class SomeTypeDecl : public Decl
     FIDDLE() TypeExp interfaceType;
 };
 
-// UnboundSomeType<IFoo>
+// Represents the type `UnboundSomeType<IFoo>`
 FIDDLE()
 class UnboundSomeTypeDecl : public SomeTypeDecl
 {

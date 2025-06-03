@@ -32,6 +32,5 @@ void computeMain()
     data1 = StructForIFooGeneric<float>(1);
     some IFooGeneric<float> data2 = StructForIFooGeneric<float>(1);
 
-    buffer[0] = data1.getVal() 
-                + data2.getVal() + 2;
+    buffer[0] = data1.getVal() + data2.getVal() + 2;
 }
