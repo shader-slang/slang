@@ -247,7 +247,7 @@ void GLSLSourceEmitter::emitStructFieldAttributes(
 
     if (forceScalarOffsets)
     {
-        if (auto offsetDecoration = structKey->findDecoration<IROffsetDecoration>())
+        if (auto offsetDecoration = field->findDecoration<IROffsetDecoration>())
         {
             m_writer->emit("layout(offset = ");
             m_writer->emit(offsetDecoration->getOffset());
