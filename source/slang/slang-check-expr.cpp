@@ -1992,26 +1992,31 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
 
     // The values of specialization constants aren't known at compile time even
     // if they're marked `const`.
-    if ((decl->hasModifier<SpecializationConstantAttribute>() ||
-         decl->hasModifier<VkConstantIdAttribute>()) &&
-        kind == ConstantFoldingKind::SpecializationConstant)
+    if (decl->hasModifier<SpecializationConstantAttribute>() ||
+        decl->hasModifier<VkConstantIdAttribute>())
     {
-        // Float-to-inst casts cannot be`OpSpecConstOp` operations in SPIR-V,
-        // which means they need to be local instructions can cannot be hoisted to the
-        // global scope. Deduplication logic is run for `IntVal`s however and without hoisting
-        // instructions using this `IntVal` will trigger error. Hence we emit error here
-        // to not allow such cases.
-        //
-        // Note that float-to-inst casts for non-`IntVal`s are allowed.
-        if (!isScalarIntegerType(decl->getType()))
+        if (kind == ConstantFoldingKind::SpecializationConstant)
         {
-            getSink()->diagnose(declRef, Diagnostics::intValFromNonIntSpecConstEncountered);
-            return nullptr;
-        }
+            // Float-to-inst casts cannot be`OpSpecConstOp` operations in SPIR-V,
+            // which means they need to be local instructions can cannot be hoisted to the
+            // global scope. Deduplication logic is run for `IntVal`s however and without hoisting
+            // instructions using this `IntVal` will trigger error. Hence we emit error here
+            // to not allow such cases.
+            //
+            // Note that float-to-inst casts for non-`IntVal`s are allowed.
+            if (!isScalarIntegerType(decl->getType()))
+            {
+                getSink()->diagnose(declRef, Diagnostics::intValFromNonIntSpecConstEncountered);
+                return nullptr;
+            }
 
-        return m_astBuilder->getOrCreate<DeclRefIntVal>(
-            declRef.substitute(m_astBuilder, decl->getType()),
-            declRef);
+            return m_astBuilder->getOrCreate<DeclRefIntVal>(
+                declRef.substitute(m_astBuilder, decl->getType()),
+                declRef);
+        }
+        // Don't fold on other folding passes, we don't actually know the
+        // values.
+        return nullptr;
     }
 
     if (decl->hasModifier<ExternModifier>())
