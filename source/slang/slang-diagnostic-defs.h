@@ -2889,6 +2889,7 @@ DIAGNOSTIC(
     40001,
     Error,
     rayPayloadInvalidStageInAccessQualifier,
-    "invalid stage name '$0' in ray payload access qualifier; valid stages are 'anyhit', 'closesthit', 'miss', and 'caller'")
+    "invalid stage name '$0' in ray payload access qualifier; valid stages are 'anyhit', "
+    "'closesthit', 'miss', and 'caller'")
 
 #undef DIAGNOSTIC
