@@ -5489,25 +5489,13 @@ static Type* createSomeTypeDeclType(ASTBuilder* astBuilder, SomeTypeExpr* expr)
 
 Expr* SemanticsExprVisitor::visitSomeTypeExpr(SomeTypeExpr* expr)
 {
-    if (expr->base.type)
-        return expr;
-
     expr->base = CheckProperType(expr->base);
+
     if (as<ErrorType>(expr->base.type))
         expr->type = expr->base.type;
     else
     {
-        auto declRefType = as<DeclRefType>(expr->base.type);
-        if (!declRefType)
-        {
-            getSink()->diagnose(
-                expr,
-                Diagnostics::cannotDeclareNonInterfaceSomeType,
-                expr->base.type);
-        }
-
-        
-        if (!as<InterfaceDecl>(declRefType->getDeclRefBase()->getDecl()))
+        if (!isDeclRefTypeOf<InterfaceDecl>(expr->base.type))
         {
             getSink()->diagnose(
                 expr,

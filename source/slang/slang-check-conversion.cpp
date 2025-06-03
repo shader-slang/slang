@@ -1882,11 +1882,11 @@ bool SemanticsVisitor::tryCoerceSomeType(
     DiagnosticSink* sink,
     ConversionCost* outCost)
 {
-    // basic restrictions
+    // Restrictions
     if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(toType))
     {
-        // if `some T = some U` `some T = unbound_some U`.
-        // We do not error if `some` is an argument since `some` can be passed as an argument to a `some` parameter
+        // Handles the following case: `some T = some U` `some T = unbound_some U`.
+        // We do not error if `some` is an argument since `some` can be passed as an argument to a `some` parameter.
         if (site != CoercionSite::Argument && isDeclRefTypeOf<SomeTypeDecl>(fromType))
         {
             if (!isDeclRefTypeOf<UnboundSomeTypeDecl>(toType))
@@ -1897,7 +1897,7 @@ bool SemanticsVisitor::tryCoerceSomeType(
                 return false;
             }
         }
-        // not allowed to assign 'dyn' to 'unboundSomeType'
+        // Assigning `dyn` to `some` (`UnboundSomeType` and `SomeType`) is always an error.
         else if (
             !isDeclRefTypeOf<SomeTypeDecl>(fromType) && isDeclRefTypeOf<InterfaceDecl>(fromType))
         {
@@ -1915,7 +1915,7 @@ bool SemanticsVisitor::tryCoerceSomeType(
             outCost);
     }
 
-    // we are allowed to assign a `some` type to any non `some` type. Due to this
+    // We are allowed to assign a `some` type to any non `some` type. Due to this
     // we will unwrap the SomeType.
     if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(fromType))
     {

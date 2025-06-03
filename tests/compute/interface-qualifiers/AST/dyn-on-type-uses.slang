@@ -2,22 +2,12 @@
 //TEST:SIMPLE(filecheck=CHECK_2025_OR_EXP): -target spirv -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK_2025_OR_EXP): -target spirv -stage compute -entry computeMain -lang slang -std 2026 -enable-experimental-dynamic-dispatch
 
-// Validate AST side of `dyn` keyword use-cases
-
-// `experimental-dynamic-dispatch` and `-lang 2025` have fewer restrictions
-//
-// CHECK_2025_OR_EXP-NOT: error 33072
-// CHECK_2025_OR_EXP-NOT: error 33073
-// CHECK_2025_OR_EXP-NOT: error 33074
-// CHECK_2025_OR_EXP-NOT: error 33075
-// CHECK_2025_OR_EXP-NOT: error 33076
-// CHECK_2025_OR_EXP-NOT: error 33077
-// CHECK_2025_OR_EXP-NOT: error 33078
-// CHECK_2025_OR_EXP-NOT: error 33082
-
-/////////////////////////////////////////////////////
+// Validate AST side of `dyn` keyword use-cases.
+// `experimental-dynamic-dispatch` and `-lang 2025` have fewer restrictions,
+// so less tests fail.
 
 // `dyn` interfaces are not allowed to be generics
+// CHECK_2025_OR_EXP-NOT: error 33072
 // CHECK_2026-DAG: error 33072
 dyn interface interface1<T>
 {
@@ -25,6 +15,7 @@ dyn interface interface1<T>
 };
 
 // `dyn` interfaces must not define any associated types.
+// CHECK_2025_OR_EXP-NOT: error 33073
 // CHECK_2026-DAG: error 33073
 interface IBase1
 {
@@ -35,6 +26,7 @@ dyn interface interface2
 };
 
 // `dyn` interfaces must not define any generic methods.
+// CHECK_2025_OR_EXP-NOT: error 33074
 // CHECK_2026-DAG: error 33074
 dyn interface interface3
 {
@@ -45,6 +37,7 @@ dyn interface interface3
 };
 
 // `dyn` interfaces must not define any mutating methods
+// CHECK_2025_OR_EXP-NOT: error 33075
 // CHECK_2026-DAG: error 33075
 dyn interface interface4
 {
@@ -53,6 +46,7 @@ dyn interface interface4
 };
 
 // `dyn` interfaces cannot inherit from any interfaces that are not dyn.
+// CHECK_2025_OR_EXP-NOT: error 33077
 // CHECK_2026-DAG: error 33077
 interface IBase2
 {
@@ -79,6 +73,7 @@ dyn interface interface6 : IBase3
 };
 
 // `dyn` interfaces cannot contain any function requirements that are marked as [Differentiable].
+// CHECK_2025_OR_EXP-NOT: error 33076
 // CHECK_2026-DAG: error 33076
 dyn interface interface7
 {
@@ -90,6 +85,7 @@ dyn interface interface7
 };
 
 // The type which is conforming to a dyn (myType in interface myType : IBase) cannot be generic.
+// CHECK_2025_OR_EXP-NOT: error 33082
 // CHECK_2026-DAG: error 33082
 // CHECK_2026-DAG: error 33082
 dyn interface IBase4
@@ -115,6 +111,7 @@ interface genericInterface1<T : IArithmetic> : IBase4
 };
 
 // Extensions that make a type conform/inherit to dyn interfaces are not allowed.
+// CHECK_2025_OR_EXP-NOT: error 33078
 // CHECK_2026-DAG: error 33078
 dyn interface IBase5
 {

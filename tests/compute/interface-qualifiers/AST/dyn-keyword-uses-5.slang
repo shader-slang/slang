@@ -7,19 +7,25 @@
 interface IFoo
 {
 }
+
+struct StructForIFoo : IFoo
+{
+	__init(int v)
+	{
+	}
+}
+
 dyn interface ReturnsSomeTypeAndSomeParam
 {
-// CHECK_2026-DAG: error 33086
-// CHECK_2026-DAG: error 33087
-
 // CHECK_2025_OR_EXP-NOT: error 33086
-// CHECK_2025_OR_EXP-NOT: error 33087
-
+// CHECK_2026-DAG: error 33086
     some IFoo getIFoo()
 	{
 		return StructForIFoo(1);
 	}
 
+// CHECK_2025_OR_EXP-NOT: error 33087
+// CHECK_2026-DAG: error 33087
     void lookAtIFoo(some IFoo v)
 	{
 	}

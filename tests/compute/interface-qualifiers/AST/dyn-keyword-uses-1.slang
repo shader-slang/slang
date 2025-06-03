@@ -9,7 +9,7 @@ dyn interface DynInterface
 {
 }
 
-// CHECK-DAG: error 33090
+// CHECK: error 33090
 // CHECK-NOT: error 33090
 static dyn NonDynInterface nonDynInterfaceVar;
 static dyn DynInterface dynInterfaceVar;
