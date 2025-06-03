@@ -5,29 +5,33 @@
 set(SLANG_FIDDLE_INPUT_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 set(SLANG_FIDDLE_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/fiddle")
 
-file(GLOB SLANG_FIDDLE_INPUT_FILE_NAMES
+file(
+    GLOB SLANG_FIDDLE_INPUT_FILE_NAMES
     CONFIGURE_DEPENDS
     RELATIVE "${SLANG_FIDDLE_INPUT_DIR}"
     "*.h"
-    "*.cpp")
+    "*.cpp"
+)
 
-list(TRANSFORM SLANG_FIDDLE_INPUT_FILE_NAMES
+list(
+    TRANSFORM SLANG_FIDDLE_INPUT_FILE_NAMES
     PREPEND "${SLANG_FIDDLE_INPUT_DIR}/"
-    OUTPUT_VARIABLE SLANG_FIDDLE_INPUTS)
+    OUTPUT_VARIABLE SLANG_FIDDLE_INPUTS
+)
 
-list(TRANSFORM SLANG_FIDDLE_INPUT_FILE_NAMES
+list(
+    TRANSFORM SLANG_FIDDLE_INPUT_FILE_NAMES
     APPEND ".fiddle"
-    OUTPUT_VARIABLE SLANG_FIDDLE_OUTPUTS)
-list(TRANSFORM SLANG_FIDDLE_OUTPUTS
-    PREPEND "${SLANG_FIDDLE_OUTPUT_DIR}/")
+    OUTPUT_VARIABLE SLANG_FIDDLE_OUTPUTS
+)
+list(TRANSFORM SLANG_FIDDLE_OUTPUTS PREPEND "${SLANG_FIDDLE_OUTPUT_DIR}/")
 
 add_custom_command(
     OUTPUT ${SLANG_FIDDLE_OUTPUTS}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_FIDDLE_OUTPUT_DIR}
-    COMMAND slang-fiddle
-        -i "${SLANG_FIDDLE_INPUT_DIR}/"
-        -o "${SLANG_FIDDLE_OUTPUT_DIR}/"
-        ${SLANG_FIDDLE_INPUT_FILE_NAMES}
+    COMMAND
+        slang-fiddle -i "${SLANG_FIDDLE_INPUT_DIR}/" -o
+        "${SLANG_FIDDLE_OUTPUT_DIR}/" ${SLANG_FIDDLE_INPUT_FILE_NAMES}
     DEPENDS ${SLANG_FIDDLE_INPUTS} slang-fiddle
     VERBATIM
 )
@@ -41,6 +45,35 @@ set_target_properties(slang-fiddle-output PROPERTIES FOLDER generated)
 target_include_directories(
     slang-fiddle-output
     INTERFACE ${SLANG_FIDDLE_OUTPUT_DIR}
+)
+
+#
+# Invoke the "inst-def-gen" tool to generate source
+#
+
+set(SLANG_INST_GEN_INPUT "${CMAKE_CURRENT_LIST_DIR}/slang-ir-inst-defs.yaml")
+set(SLANG_INST_GEN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/inst-defs")
+set(SLANG_INST_GEN_OUTPUT "${SLANG_INST_GEN_OUTPUT_DIR}/slang-ir-inst-defs.h")
+
+add_custom_command(
+    OUTPUT ${SLANG_INST_GEN_OUTPUT}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_INST_GEN_OUTPUT_DIR}
+    COMMAND
+        slang-generate-ir-defs "${SLANG_INST_GEN_INPUT}"
+        "${SLANG_INST_GEN_OUTPUT}"
+    DEPENDS ${SLANG_INST_GEN_INPUT} slang-generate-ir-defs
+    VERBATIM
+)
+add_library(
+    slang-inst-gen-output
+    INTERFACE
+    EXCLUDE_FROM_ALL
+    ${SLANG_INST_GEN_OUTPUT}
+)
+set_target_properties(slang-inst-gen-output PROPERTIES FOLDER generated)
+target_include_directories(
+    slang-inst-gen-output
+    INTERFACE ${SLANG_INST_GEN_OUTPUT_DIR}
 )
 
 #
@@ -225,6 +258,7 @@ set(slang_link_args
     slang-capability-defs
     slang-capability-lookup
     slang-fiddle-output
+    slang-inst-gen-output
     slang-lookup-tables
     SPIRV-Headers
 )

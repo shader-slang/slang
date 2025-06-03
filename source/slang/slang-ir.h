@@ -64,7 +64,7 @@ of an instruction is manifest in its opcode, operands, and children.
 enum IROp : int32_t
 {
 #define INST(ID, MNEMONIC, ARG_COUNT, FLAGS) kIROp_##ID,
-#include "slang-ir-inst-defs.h"
+#include <slang-ir-inst-defs.h>
 
     /// The total number of valid opcodes
     kIROpCount,
@@ -76,7 +76,7 @@ enum IROp : int32_t
 #define INST_RANGE(BASE, FIRST, LAST) \
     kIROp_First##BASE = kIROp_##FIRST, kIROp_Last##BASE = kIROp_##LAST,
 
-#include "slang-ir-inst-defs.h"
+#include <slang-ir-inst-defs.h>
 };
 
 /* IROpMeta describes values for the layout of IROps */

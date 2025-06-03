@@ -106,6 +106,7 @@ if(SLANG_ENABLE_SLANGD)
             compiler-core
             slang
             slang-fiddle-output
+            slang-inst-gen-output
             slang-capability-defs
             Threads::Threads
         INSTALL
