@@ -778,9 +778,6 @@ Result linkAndOptimizeIR(
         break;
     }
 
-    if (requiredLoweringPassSet.optionalType)
-        lowerOptionalType(irModule, sink);
-
     switch (target)
     {
     case CodeGenTarget::CUDASource:
@@ -789,20 +786,6 @@ Result linkAndOptimizeIR(
 
     default:
         removeTorchAndCUDAEntryPoints(irModule);
-        break;
-    }
-
-    switch (target)
-    {
-    case CodeGenTarget::CPPSource:
-    case CodeGenTarget::HostCPPSource:
-        {
-            lowerComInterfaces(irModule, artifactDesc.style, sink);
-            generateDllImportFuncs(codeGenContext->getTargetProgram(), irModule, sink);
-            generateDllExportFuncs(irModule, sink);
-            break;
-        }
-    default:
         break;
     }
 
@@ -947,12 +930,6 @@ Result linkAndOptimizeIR(
             break;
     }
 
-    // Lower `Result<T,E>` types into ordinary struct types. This must happen
-    // after specialization, since otherwise incompatible copies of the lowered
-    // result structure are generated.
-    if (requiredLoweringPassSet.resultType)
-        lowerResultType(irModule, sink);
-
     // Report checkpointing information
     if (codeGenContext->shouldReportCheckpointIntermediates())
     {
@@ -977,6 +954,29 @@ Result linkAndOptimizeIR(
     }
 
     finalizeSpecialization(irModule);
+
+    // Lower `Result<T,E>` types into ordinary struct types. This must happen
+    // after specialization, since otherwise incompatible copies of the lowered
+    // result structure are generated.
+    if (requiredLoweringPassSet.resultType)
+        lowerResultType(irModule, sink);
+
+    if (requiredLoweringPassSet.optionalType)
+        lowerOptionalType(irModule, sink);
+
+    switch (target)
+    {
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::HostCPPSource:
+        {
+            lowerComInterfaces(irModule, artifactDesc.style, sink);
+            generateDllImportFuncs(codeGenContext->getTargetProgram(), irModule, sink);
+            generateDllExportFuncs(irModule, sink);
+            break;
+        }
+    default:
+        break;
+    }
 
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());

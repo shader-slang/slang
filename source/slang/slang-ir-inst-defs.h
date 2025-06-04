@@ -1225,7 +1225,7 @@ INST(GetValueFromBoundInterface,        getValueFromBoundInterface,     1, 0)
 INST(ExtractExistentialValue,           extractExistentialValue,        1, 0)
 INST(ExtractExistentialType,            extractExistentialType,         1, HOISTABLE)
 INST(ExtractExistentialWitnessTable,    extractExistentialWitnessTable, 1, HOISTABLE)
-
+INST(IsNullExistential,                 isNullExistential,              1, 0)
 INST(ExtractTaggedUnionTag,             extractTaggedUnionTag,      1, 0)
 INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 
