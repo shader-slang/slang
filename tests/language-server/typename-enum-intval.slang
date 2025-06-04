@@ -1,4 +1,4 @@
-//DISABLE_TEST:LANG_SERVER(filecheck=CHECK):
+//TEST:LANG_SERVER(filecheck=CHECK):
 
 namespace ns {
 enum Test : uint32_t

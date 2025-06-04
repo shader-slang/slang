@@ -1,4 +1,4 @@
-//DISABLE_TEST:LANG_SERVER(filecheck=CHECK):
+//TEST:LANG_SERVER(filecheck=CHECK):
 //
 __generic < T : struct> extension T
 {
