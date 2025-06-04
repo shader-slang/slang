@@ -45,7 +45,7 @@ static bool isSlang2026OrNewer(SemanticsVisitor* visitor)
     return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
            SLANG_LANGUAGE_VERSION_2026;
 }
-  
+
 static bool allowExperimentalDynamicDispatch(
     SemanticsVisitor* visitor,
     CompilerOptionSet& optionSet)
