@@ -1308,6 +1308,32 @@ InstPair ForwardDiffTranscriber::transcribeGetTupleElement(IRBuilder* builder, I
     return InstPair(primalGetElement, diffGetElement);
 }
 
+InstPair ForwardDiffTranscriber::transcribeGetOptionalValue(
+    IRBuilder* builder,
+    IRInst* originalInst)
+{
+    IRInst* origBase = originalInst->getOperand(0);
+    auto primalBase = findOrTranscribePrimalInst(builder, origBase);
+
+    auto primalType = (IRType*)findOrTranscribePrimalInst(builder, originalInst->getDataType());
+
+    IRInst* primalGetOptionalVal =
+        builder->emitIntrinsicInst(primalType, originalInst->getOp(), 1, &primalBase);
+
+    IRInst* diffGetOptionalVal = nullptr;
+
+    if (auto diffType = differentiateType(builder, primalGetOptionalVal->getDataType()))
+    {
+        if (auto diffBase = findOrTranscribeDiffInst(builder, origBase))
+        {
+            diffGetOptionalVal =
+                builder->emitIntrinsicInst(diffType, originalInst->getOp(), 1, &diffBase);
+        }
+    }
+
+    return InstPair(primalGetOptionalVal, diffGetOptionalVal);
+}
+
 InstPair ForwardDiffTranscriber::transcribeUpdateElement(IRBuilder* builder, IRInst* originalInst)
 {
     auto updateInst = as<IRUpdateElement>(originalInst);
@@ -2020,6 +2046,8 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_MakeArray:
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeTuple:
+    case kIROp_MakeOptionalValue:
+    case kIROp_MakeResultValue:
     case kIROp_MakeValuePack:
     case kIROp_BuiltinCast:
         return transcribeConstruct(builder, origInst);
@@ -2063,6 +2091,8 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
 
     case kIROp_GetTupleElement:
         return transcribeGetTupleElement(builder, origInst);
+    case kIROp_GetOptionalValue:
+        return transcribeGetOptionalValue(builder, origInst);
 
     case kIROp_ifElse:
         return transcribeIfElse(builder, as<IRIfElse>(origInst));
@@ -2197,6 +2227,12 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_MakeCoopVectorFromValuePack:
     case kIROp_GetCurrentStage:
     case kIROp_GetOffsetPtr:
+    case kIROp_IsNullExistential:
+    case kIROp_MakeResultError:
+    case kIROp_IsResultError:
+    case kIROp_GetResultError:
+    case kIROp_MakeOptionalNone:
+    case kIROp_OptionalHasValue:
         return transcribeNonDiffInst(builder, origInst);
 
         // A call to createDynamicObject<T>(arbitraryData) cannot provide a diff value,

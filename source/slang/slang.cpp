@@ -2029,6 +2029,31 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
     return SLANG_OK;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getDynamicObjectRTTIBytes(
+    slang::TypeReflection* type,
+    slang::TypeReflection* interfaceType,
+    uint32_t* outBuffer,
+    uint32_t bufferSize)
+{
+    // Slang RTTI header format:
+    // byte 0-7: pointer to RTTI struct describing the type. (not used for now, set to 1 for valid
+    // types, and 0 to represent null).
+    // byte 8-11: 32-bit sequential ID of the type conformance witness.
+    // byte 12-15: unused.
+
+    if (bufferSize < 16)
+        return SLANG_E_BUFFER_TOO_SMALL;
+
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
+    SLANG_RETURN_ON_FAIL(getTypeConformanceWitnessSequentialID(type, interfaceType, outBuffer + 2));
+
+    // Make the RTTI part non zero.
+    outBuffer[0] = 1;
+
+    return SLANG_OK;
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentType(
     slang::TypeReflection* type,
     slang::TypeReflection* interfaceType,
