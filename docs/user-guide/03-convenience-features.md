@@ -448,7 +448,7 @@ int caller()
 
 ## `Conditional<T, bool condition>` Type
 
-A `Conditional` type can be used to define struct fields that maybe specialized away. If `condition` is `false`, the field will be removed
+A `Conditional` type can be used to define struct fields that can be specialized away. If `condition` is `false`, the field will be removed
 by the compiler from the target code. This is useful for scenarios where a developer would like to make sure a field is not defined in a
 specialized shader variant when it is not used by the shader.
 
