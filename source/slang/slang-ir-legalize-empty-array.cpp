@@ -124,8 +124,14 @@ struct EmptyArrayLoweringContext
                            : nullptr;
             },
             // The following should match any instruction which can construct a 0-sized array.
-            [&](IRMakeArray*) { return builder.getVoidValue(); },
-            [&](IRMakeArrayFromElement*) { return builder.getVoidValue(); });
+            [&](IRMakeArray* makeArray) {
+                return hasEmptyArrayType(makeArray->getDataType()) ? builder.getVoidValue()
+                                                                   : nullptr;
+            },
+            [&](IRMakeArrayFromElement* makeArray) {
+                return hasEmptyArrayType(makeArray->getDataType()) ? builder.getVoidValue()
+                                                                   : nullptr;
+            });
 
         // If we did get a replacement, add that to our mapping and return
         // it, otherwise return the original (to maybe be updated later)
