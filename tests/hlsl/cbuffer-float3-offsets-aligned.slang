@@ -41,6 +41,12 @@ cbuffer Constants
 
     // float v7 should be packed in with float3 from v6.
     float v7;
+
+    // float3[2] v8 should be aligned to offset 128.
+    float3 v8[2] : packoffset(c8);
+
+    // float2 v9 should be aligned to next 16 byte boundary
+    float2 v9;
 };
 
 // For spirv, check that the offsets are correct.
@@ -52,6 +58,8 @@ cbuffer Constants
 // SPIRV: OpMemberDecorate {{.*}} 5 Offset 64
 // SPIRV: OpMemberDecorate {{.*}} 6 Offset 80
 // SPIRV: OpMemberDecorate {{.*}} 7 Offset 92
+// SPIRV: OpMemberDecorate {{.*}} 8 Offset 128
+// SPIRV: OpMemberDecorate {{.*}} 9 Offset 160
 
 // For glsl, check that we're using the lowest common denominator for the uniform block.
 // Could also test:

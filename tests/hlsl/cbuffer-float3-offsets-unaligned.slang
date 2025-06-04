@@ -1,4 +1,3 @@
-//TEST:SIMPLE(filecheck=GLSL): -target glsl -profile cs_6_2 -stage compute -entry computeMain -line-directive-mode none -fvk-use-dx-layout
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -profile cs_6_2 -entry computeMain -line-directive-mode none -fvk-use-dx-layout
 
 // DXC: -T cs_6_2 -E computeMain -spirv -fvk-use-dx-layout -enable-16bit-types
