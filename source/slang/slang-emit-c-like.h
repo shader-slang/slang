@@ -404,7 +404,7 @@ public:
     void emitStruct(IRStructType* structType);
     // This is used independently of `emitStruct` by some GLSL parameter group
     // output functionality
-    void emitStructDeclarationsBlock(IRStructType* structType, bool allowOffsetLayout, bool forceScalarOffsets);
+    void emitStructDeclarationsBlock(IRStructType* structType, bool allowOffsetLayout);
     void emitClass(IRClassType* structType);
 
     void emitStructDeclarationSeparator() { emitStructDeclarationSeparatorImpl(); }
@@ -417,8 +417,7 @@ public:
     virtual void emitStructFieldAttributes(
         IRStructType* /* structType */,
         IRStructField* /* field */,
-        bool /* allowOffsetLayout */,
-        bool /* forceScalarOffsets */){};
+        bool /* allowOffsetLayout */){};
     void emitInterpolationModifiers(IRInst* varInst, IRType* valueType, IRVarLayout* layout);
     void emitMeshShaderModifiers(IRInst* varInst);
     virtual void emitPackOffsetModifier(

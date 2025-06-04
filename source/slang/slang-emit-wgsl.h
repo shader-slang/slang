@@ -45,8 +45,7 @@ public:
     virtual void emitStructFieldAttributes(
         IRStructType* structType,
         IRStructField* field,
-        bool allowOffsetLayout,
-        bool forceScalarOffsets) SLANG_OVERRIDE;
+        bool allowOffsetLayout) SLANG_OVERRIDE;
     virtual void emitCallArg(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitInterpolationModifiersImpl(
         IRInst* varInst,

@@ -4426,7 +4426,7 @@ void CLikeSourceEmitter::emitStruct(IRStructType* structType)
 
     m_writer->emit(getName(structType));
 
-    emitStructDeclarationsBlock(structType, false, false);
+    emitStructDeclarationsBlock(structType, false);
     m_writer->emit(";\n\n");
 }
 
@@ -4437,8 +4437,7 @@ void CLikeSourceEmitter::emitStructDeclarationSeparatorImpl()
 
 void CLikeSourceEmitter::emitStructDeclarationsBlock(
     IRStructType* structType,
-    bool allowOffsetLayout,
-    bool forceScalarOffsets)
+    bool allowOffsetLayout)
 {
     m_writer->emit("\n{\n");
     m_writer->indent();
@@ -4459,7 +4458,7 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(
             emitInterpolationModifiers(fieldKey, fieldType, nullptr);
         }
 
-        if (allowOffsetLayout && !forceScalarOffsets)
+        if (allowOffsetLayout)
         {
             if (auto packOffsetDecoration = fieldKey->findDecoration<IRPackOffsetDecoration>())
             {
@@ -4467,7 +4466,7 @@ void CLikeSourceEmitter::emitStructDeclarationsBlock(
             }
         }
         emitSemanticsPrefix(fieldKey);
-        emitStructFieldAttributes(structType, ff, allowOffsetLayout, forceScalarOffsets);
+        emitStructFieldAttributes(structType, ff, allowOffsetLayout);
         emitMemoryQualifiers(fieldKey);
         emitType(fieldType, getName(fieldKey));
         emitSemantics(fieldKey, allowOffsetLayout);
