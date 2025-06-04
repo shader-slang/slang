@@ -343,6 +343,14 @@ Treat enums types as unscoped by default.
 Preserve all resource parameters in the output code, even if they are not used by the shader. 
 
 
+<a id="conformance"></a>
+### -conformance
+
+**-conformance &lt;typeName&gt;:&lt;interfaceName&gt;\[=&lt;sequentialID&gt;\]**
+
+Include additional type conformance during linking for dynamic dispatch. 
+
+
 <a id="reflection-json"></a>
 ### -reflection-json
 
