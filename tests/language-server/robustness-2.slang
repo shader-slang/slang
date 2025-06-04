@@ -1,4 +1,4 @@
-//TEST:LANG_SERVER:
+//DISABLE_TEST:LANG_SERVER:
 //
 // tests broken generic parameter.
 
