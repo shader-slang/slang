@@ -27,6 +27,7 @@ struct StructForIFoo1 : IFoo
         a = v;
     }
 };
+
 struct StructForIFoo2 : IFoo
 {
     __init(int v)

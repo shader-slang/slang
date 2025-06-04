@@ -10,36 +10,7 @@
 #define QUALIFIER some
 #endif
 
-dyn interface IFoo
-{
-    int getVal();
-}
-
-struct StructForIFoo1 : IFoo
-{
-    __init(int v)
-    {
-        a = v;
-    }
-    int a = 0;
-    int getVal()
-    {
-        return a;
-    }
-};
-struct StructForIFoo2 : IFoo
-{
-    __init(int v)
-    {
-        a = v*10;
-    }
-    int a = 0;
-    int getVal()
-    {
-        return a;
-    }
-};
-
+import common;
 void logic(out QUALIFIER IFoo v1, out QUALIFIER IFoo v2)
 {
 // CHECK: error 41015

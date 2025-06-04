@@ -1,30 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -lang slang -std 2026
 
-interface IFoo
-{
-    int getVal();
-    [mutating]
-    void setVal(int v);
-}
-
-struct StructForIFoo1 : IFoo
-{
-    __init(int v)
-    {
-        a = v;
-    }
-    int a = 0;
-    int getVal()
-    {
-        return a;
-    }
-    [mutating]
-    void setVal(int v)
-    {
-        a = v;
-    }
-};
-
+import common;
 some IFoo nestedReturnLogic()
 {
     return StructForIFoo1(1);

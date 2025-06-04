@@ -3,31 +3,7 @@
 // What this tests:
 // Test multiple cases happening at once and that multiple supporting erors are emitted
 
-interface IFoo
-{
-    int getVal();
-    [mutating]
-    void setVal(int v);
-}
-
-struct StructForIFoo1 : IFoo
-{
-    __init(int v)
-    {
-        a = v;
-    }
-    int a = 0;
-    int getVal()
-    {
-        return a;
-    }
-    [mutating]
-    void setVal(int v)
-    {
-        a = v;
-    }
-};
-
+import common;
 some IFoo nestedReturnLogic()
 {
     return StructForIFoo1(1);

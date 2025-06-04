@@ -3,48 +3,7 @@
 // What this tests:
 // This mix of things causes Slang specialization system issues
 
-interface IFoo
-{
-    int getVal();
-    [mutating]
-    void setVal(int v);
-}
-
-struct StructForIFoo1 : IFoo
-{
-    __init(int v)
-    {
-        a = v;
-    }
-    int a = 0;
-    int getVal()
-    {
-        return a;
-    }
-    [mutating]
-    void setVal(int v)
-    {
-        a = v;
-    }
-};
-struct StructForIFoo2 : IFoo
-{
-    __init(int v)
-    {
-        a = v*10;
-    }
-    int a = 0;
-    int getVal()
-    {
-        return a;
-    }
-    [mutating]
-    void setVal(int v)
-    {
-        a = v;
-    }
-};
-
+import common;
 some IFoo nestedReturnLogic()
 {
     return StructForIFoo1(1);

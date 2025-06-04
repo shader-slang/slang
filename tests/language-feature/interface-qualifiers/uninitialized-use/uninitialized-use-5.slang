@@ -10,38 +10,7 @@
 #define QUALIFIER some
 #endif
 
-dyn interface IFoo
-{
-    int getVal();
-}
-
-struct StructForIFoo1 : IFoo
-{
-    __init(int v)
-    {
-        a = v;
-    }
-    int a = 0;
-    int getVal()
-    {
-        return a;
-    }
-
-};
-struct StructForIFoo2 : IFoo
-{
-    __init(int v)
-    {
-        a = v*10;
-    }
-    int a = 0;
-    int getVal()
-    {
-        return a;
-    }
-};
-
-
+import common;
 RWStructuredBuffer<int> buffer;
 void computeMain()
 {

@@ -5,31 +5,7 @@
 // since all functions must return the same type. Note that
 // every `some` type is different (and the function return is a `some`) 
 
-interface IFoo
-{
-    int getVal();
-    [mutating]
-    void setVal(int v);
-}
-
-struct StructForIFoo1 : IFoo
-{
-    __init(int v)
-    {
-        a = v;
-    }
-    int a = 0;
-    int getVal()
-    {
-        return a;
-    }
-    [mutating]
-    void setVal(int v)
-    {
-        a = v;
-    }
-};
-
+import common;
 some IFoo nestedReturnLogic1()
 {
     return StructForIFoo1(1);

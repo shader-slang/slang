@@ -3,48 +3,7 @@
 // tests:
 // loop with write
 
-interface IFoo
-{
-    int getVal();
-    [mutating]
-    void setVal(int v);
-}
-
-struct StructForIFoo1 : IFoo
-{
-    __init(int v)
-    {
-        a = v;
-    }
-    int a = 0;
-    int getVal()
-    {
-        return a;
-    }
-    [mutating]
-    void setVal(int v)
-    {
-        a = v;
-    }
-};
-struct StructForIFoo2 : IFoo
-{
-    __init(int v)
-    {
-        a = v*10;
-    }
-    int a = 0;
-    int getVal()
-    {
-        return a;
-    }
-    [mutating]
-    void setVal(int v)
-    {
-        a = v;
-    }
-};
-
+import common;
 RWBuffer<int> thing;
 void logic(out some IFoo v1)
 {
