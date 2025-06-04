@@ -3221,6 +3221,56 @@ __forceinline__ __device__ void* optixTrace(
         r1);
 }
 
+__forceinline__ __device__ float4 optixGetSpherePositionAndRadius()
+{
+    float4 data[1];
+    optixGetSphereData(data);
+    return data[0];
+}
+
+__forceinline__ __device__ float4
+optixHitObjectGetSpherePositionAndRadius(OptixTraversableHandle* Obj)
+{
+    float4 data[1];
+    optixHitObjectGetSphereData(data);
+    return data[0];
+}
+
+__forceinline__ __device__ Matrix<float, 2, 4> optixGetLssPositionsAndRadii()
+{
+    float4 data[2];
+    optixGetLinearCurveVertexData(data);
+    return makeMatrix<float, 2, 4>(data[0], data[1]);
+}
+
+__forceinline__ __device__ Matrix<float, 2, 4> optixHitObjectGetLssPositionsAndRadii(
+    OptixTraversableHandle* Obj)
+{
+    float4 data[2];
+    optixHitObjectGetLinearCurveVertexData(data);
+    return makeMatrix<float, 2, 4>(data[0], data[1]);
+}
+
+__forceinline__ __device__ bool optixIsSphereHit()
+{
+    return optixGetPrimitiveType() == OPTIX_PRIMITIVE_TYPE_SPHERE;
+}
+
+__forceinline__ __device__ bool optixHitObjectIsSphereHit(OptixTraversableHandle* Obj)
+{
+    return optixGetPrimitiveType(optixHitObjectGetHitKind()) == OPTIX_PRIMITIVE_TYPE_SPHERE;
+}
+
+__forceinline__ __device__ bool optixIsLSSHit()
+{
+    return optixGetPrimitiveType() == OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR;
+}
+
+__forceinline__ __device__ bool optixHitObjectIsLSSHit(OptixTraversableHandle* Obj)
+{
+    return optixGetPrimitiveType(optixHitObjectGetHitKind()) == OPTIX_PRIMITIVE_TYPE_ROUND_LINEAR;
+}
+
 template<typename T>
 __forceinline__ __device__ void* optixTraverse(
     OptixTraversableHandle AccelerationStructure,

@@ -1601,7 +1601,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
         RefPtr<Module> module =
             loadModuleImpl(name, pathInfo, source, SourceLoc(), &sink, nullptr, blobType);
         sink.getBlobIfNeeded(outDiagnostics);
-        return asExternal(module.detach());
+        return asExternal(module.get());
     }
     catch (const AbortCompilationException& e)
     {
@@ -2026,6 +2026,31 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
     mapMangledNameToRTTIObjectIndex[name] = resultIndex;
     if (outId)
         *outId = resultIndex;
+    return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getDynamicObjectRTTIBytes(
+    slang::TypeReflection* type,
+    slang::TypeReflection* interfaceType,
+    uint32_t* outBuffer,
+    uint32_t bufferSize)
+{
+    // Slang RTTI header format:
+    // byte 0-7: pointer to RTTI struct describing the type. (not used for now, set to 1 for valid
+    // types, and 0 to represent null).
+    // byte 8-11: 32-bit sequential ID of the type conformance witness.
+    // byte 12-15: unused.
+
+    if (bufferSize < 16)
+        return SLANG_E_BUFFER_TOO_SMALL;
+
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
+    SLANG_RETURN_ON_FAIL(getTypeConformanceWitnessSequentialID(type, interfaceType, outBuffer + 2));
+
+    // Make the RTTI part non zero.
+    outBuffer[0] = 1;
+
     return SLANG_OK;
 }
 
@@ -2730,7 +2755,8 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
     // We need to temporarily replace the SourceManager for this CompileRequest
     ScopeReplaceSourceManager scopeReplaceSourceManager(this, &localSourceManager);
 
-    SourceLanguage sourceLanguage;
+    SourceLanguage sourceLanguage = SourceLanguage::Slang;
+    SlangLanguageVersion languageVersion = m_optionSet.getLanguageVersion();
 
     auto tokens = preprocessSource(
         srcFile,
@@ -2738,7 +2764,8 @@ Expr* Linkage::parseTermString(String typeStr, Scope* scope)
         nullptr,
         Dictionary<String, String>(),
         this,
-        sourceLanguage);
+        sourceLanguage,
+        languageVersion);
 
     if (sourceLanguage == SourceLanguage::Unknown)
         sourceLanguage = SourceLanguage::Slang;
@@ -3408,7 +3435,9 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
-        SourceLanguage sourceLanguage = SourceLanguage::Unknown;
+        SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
+        SlangLanguageVersion languageVersion =
+            translationUnit->compileRequest->optionSet.getLanguageVersion();
         auto tokens = preprocessSource(
             sourceFile,
             getSink(),
@@ -3416,7 +3445,10 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
             combinedPreprocessorDefinitions,
             getLinkage(),
             sourceLanguage,
+            languageVersion,
             &preprocessorHandler);
+
+        translationUnitSyntax->languageVersion = languageVersion;
 
         if (sourceLanguage == SourceLanguage::Unknown)
             sourceLanguage = translationUnit->sourceLanguage;
@@ -4912,11 +4944,13 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
     // Create a transparent FileDecl to hold all children from the included file.
     auto fileDecl = module->getASTBuilder()->create<FileDecl>();
     fileDecl->nameAndLoc.name = name;
+    fileDecl->parentDecl = module->getModuleDecl();
     module->getIncludedSourceFileMap().add(sourceFile, fileDecl);
 
     FrontEndPreprocessorHandler preprocessorHandler(module, module->getASTBuilder(), sink);
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
-    SourceLanguage sourceLanguage = SourceLanguage::Unknown;
+    SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
+    SlangLanguageVersion slangLanguageVersion = module->getModuleDecl()->languageVersion;
     auto tokens = preprocessSource(
         sourceFile,
         sink,
@@ -4924,10 +4958,18 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
         combinedPreprocessorDefinitions,
         this,
         sourceLanguage,
+        slangLanguageVersion,
         &preprocessorHandler);
 
     if (sourceLanguage == SourceLanguage::Unknown)
         sourceLanguage = translationUnit->sourceLanguage;
+
+    if (slangLanguageVersion != module->getModuleDecl()->languageVersion)
+    {
+        sink->diagnose(
+            tokens.begin()->getLoc(),
+            Diagnostics::languageVersionDiffersFromIncludingModule);
+    }
 
     auto outerScope = module->getModuleDecl()->ownedScope;
     parseSourceFile(

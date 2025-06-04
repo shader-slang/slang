@@ -34,21 +34,18 @@ static bool isAssociatedTypeDecl(Decl* decl)
     return false;
 }
 
-static bool isSlang2026(CompilerOptionSet& optionSet)
+bool isSlang2026OrLater(SemanticsVisitor* visitor)
 {
-    if (!optionSet.hasOption(CompilerOptionName::Language))
-        return false;
-    return SLANG_SOURCE_LANGUAGE_SLANG ==
-               SlangSourceLanguage(
-                   optionSet.getEnumOption<SlangSourceLanguage>(CompilerOptionName::Language)) &&
-           SLANG_STD_REVISION_2026 ==
-               optionSet.getEnumOption<SlangStdRevision>(CompilerOptionName::StdRevision);
+    return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
+           SLANG_LANGUAGE_VERSION_2026;
 }
 
-static bool allowExperimentalDynamicDispatch(CompilerOptionSet& optionSet)
+static bool allowExperimentalDynamicDispatch(
+    SemanticsVisitor* visitor,
+    CompilerOptionSet& optionSet)
 {
     return optionSet.getBoolOption(CompilerOptionName::EnableExperimentalDynamicDispatch) ||
-           !isSlang2026(optionSet);
+           !isSlang2026OrLater(visitor);
 }
 
 static void validateDynInterfaceUsage(
@@ -57,7 +54,7 @@ static void validateDynInterfaceUsage(
     CompilerOptionSet& optionSet,
     InterfaceDecl* decl)
 {
-    if (allowExperimentalDynamicDispatch(optionSet))
+    if (allowExperimentalDynamicDispatch(visitor, optionSet))
         return;
 
     if (!decl->hasModifier<DynModifier>())
@@ -134,7 +131,7 @@ static void validateDynInterfaceUseWithInheritanceDecl(
     if (!interfaceDeclIsDyn)
         return;
 
-    if (!allowExperimentalDynamicDispatch(optionSet))
+    if (!allowExperimentalDynamicDispatch(visitor, optionSet))
     {
         if (auto extensionDeclParent = as<ExtensionDecl>(decl->parentDecl))
         {
@@ -661,6 +658,13 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitParenExpr(ParenExpr* expr) { dispatchIfNotNull(expr->base); }
 
+    void visitTupleExpr(TupleExpr* expr)
+    {
+        for (auto element : expr->elements)
+            dispatchIfNotNull(element);
+    }
+
+
     void visitAssignExpr(AssignExpr* expr)
     {
         dispatchIfNotNull(expr->left);
@@ -712,6 +716,13 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         // Pass down the callee location
         processDeclModifiers(expr->declRef.getDecl(), expr->loc);
     }
+
+    void visitMemberExpr(MemberExpr* expr)
+    {
+        dispatchIfNotNull(expr->baseExpression);
+        visitDeclRefExpr(expr);
+    }
+
     void visitStaticMemberExpr(StaticMemberExpr* expr)
     {
         dispatchIfNotNull(expr->declRef.declRefBase);
@@ -1588,6 +1599,23 @@ EnumDecl* isEnumType(Type* type)
     return nullptr;
 }
 
+bool isNullableType(Type* type)
+{
+    if (as<PtrTypeBase>(type))
+        return true;
+    if (isDeclRefTypeOf<InterfaceDecl>(type))
+        return true;
+    if (isDeclRefTypeOf<ClassDecl>(type))
+        return true;
+    if (as<OptionalType>(type))
+        return true;
+    if (as<RefTypeBase>(type))
+        return true;
+    if (as<NativeStringType>(type))
+        return true;
+    return false;
+}
+
 bool SemanticsVisitor::shouldSkipChecking(Decl* decl, DeclCheckState state)
 {
     if (state < DeclCheckState::DefinitionChecked)
@@ -2010,7 +2038,7 @@ void SemanticsDeclHeaderVisitor::checkPushConstantBufferType(VarDeclBase* varDec
             {
                 varDecl->type.type = getConstantBufferType(
                     cbufferType->getElementType(),
-                    m_astBuilder->getStd430LayoutType());
+                    m_astBuilder->getDefaultPushConstantLayoutType());
             }
         }
         else if (isGlobalShaderParameter(varDecl))
@@ -2018,8 +2046,9 @@ void SemanticsDeclHeaderVisitor::checkPushConstantBufferType(VarDeclBase* varDec
             // If this is a global variable with [vk::push_constant] attribute,
             // we need to make sure to wrap it in a `ConstantBuffer`.
             //
-            varDecl->type.type =
-                getConstantBufferType(varDecl->type, m_astBuilder->getStd430LayoutType());
+            varDecl->type.type = getConstantBufferType(
+                varDecl->type,
+                m_astBuilder->getDefaultPushConstantLayoutType());
         }
     }
 }
@@ -2462,6 +2491,17 @@ bool DiagnoseIsAllowedInitExpr(VarDeclBase* varDecl, DiagnosticSink* sink)
     {
         if (sink && varDecl->initExpr)
             sink->diagnose(varDecl, Diagnostics::cannotHaveInitializer, varDecl, "groupshared");
+        return false;
+    }
+
+    if (as<InterfaceDecl>(varDecl->parentDecl))
+    {
+        if (sink && varDecl->initExpr)
+            sink->diagnose(
+                varDecl,
+                Diagnostics::cannotHaveInitializer,
+                varDecl,
+                "an interface requirement");
         return false;
     }
 
@@ -10078,7 +10118,7 @@ void SemanticsVisitor::validateArraySizeForVariable(VarDeclBase* varDecl)
 
     // TODO(tfoley): How to handle the case where bound isn't known?
     auto elementCount = arrayType->getElementCount();
-    if (GetMinBound(elementCount) <= 0)
+    if (GetMinBound(elementCount) < 0)
     {
         getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
         return;
@@ -13771,8 +13811,12 @@ CapabilitySet SemanticsDeclCapabilityVisitor::getDeclaredCapabilitySet(Decl* dec
     // For every existing target, we want to join their requirements together.
     // If the the parent defines additional targets, we want to add them to the disjunction set.
     // For example:
-    //    [require(glsl)] struct Parent { [require(glsl, glsl_ext_1)] [require(spirv)] void
-    //    foo(); }
+    //    [require(glsl)]
+    //    struct Parent {
+    //        [require(glsl, glsl_ext_1)]
+    //        [require(spirv)]
+    //        void foo();
+    //    }
     // The requirement for `foo` should be glsl+glsl_ext_1 | spirv.
     //
     CapabilitySet declaredCaps;
@@ -13943,7 +13987,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
             if (!implDecl)
                 continue;
 
-            if (getModuleDecl(implDecl.getDecl())->isInLegacyLanguage)
+            if (getModuleDecl(implDecl.getDecl())->languageVersion == SLANG_LANGUAGE_VERSION_LEGACY)
                 break;
 
             ensureDecl(requirementDecl, DeclCheckState::CapabilityChecked);
@@ -14006,8 +14050,9 @@ DeclVisibility getDeclVisibility(Decl* decl)
     auto defaultVis = DeclVisibility::Default;
     if (auto parentModule = getModuleDecl(decl))
     {
-        defaultVis = parentModule->isInLegacyLanguage ? DeclVisibility::Public
-                                                      : parentModule->defaultVisibility;
+        defaultVis = parentModule->languageVersion == SLANG_LANGUAGE_VERSION_LEGACY
+                         ? DeclVisibility::Public
+                         : parentModule->defaultVisibility;
     }
 
     // Members of other agg type decls will have their default visibility capped to the
@@ -14307,19 +14352,18 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
         }
     }
 
-    //// The second scenario is when the callee is using a capability that is not provided by
-    /// the
-    /// requirement. / For example: /     [require(hlsl,b,c)] /     void caller() /     { /
-    /// useD();
-    ///// require capability (hlsl,d) /     } / In this case we should report that useD() is
-    /// using a
-    /// capability that is not declared by caller.
-    ////
+    // The second scenario is when the callee is using a capability that is not provided by the
+    // requirement. For example:
+    //     [require(hlsl,b,c)]
+    //     void caller()
+    //     {
+    //         useD();    // requires capability (hlsl,d)
+    //     }
+    // In this case we should report that useD() is using a capability that is not declared by
+    // caller. If we reach here, we are case 2. We will produce all failed atoms. This is important
+    // since provenance of multiple atoms can come from multiple referenced items in a function
+    // body.
 
-    //// If we reach here, we are case 2.
-
-    // We will produce all failed atoms. This is important since provenance of multiple atoms
-    // can come from multiple referenced items in a function body.
     HashSet<Decl*> printedDecls;
     auto simplifiedFailedAtomsSet = failedAtomsInsideAvailableSet.newSetWithoutImpliedAtoms();
     for (auto i : simplifiedFailedAtomsSet)
