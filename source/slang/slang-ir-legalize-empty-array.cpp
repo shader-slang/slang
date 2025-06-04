@@ -50,13 +50,10 @@ struct EmptyArrayLoweringContext
         return ptr && isEmptyArray(ptr->getValueType());
     }
 
-    // If necessary, this returns a new instruction to replace the original one whose
-    // operand is a 0-array.
-    IRInst* getReplacement(IRInst* inst)
+    // Visit each instruction and replace it with legalized instructiosn if necessary.
+    void processInst(IRInst* inst)
     {
         IRInst* replacement = nullptr;
-        if (replacements.tryGetValue(inst, replacement))
-            return replacement;
 
         IRBuilder builder(module);
         builder.setInsertBefore(inst);
@@ -74,35 +71,78 @@ struct EmptyArrayLoweringContext
             [&](IRGetElementPtr* gep)
             {
                 const auto base = gep->getBase();
-                return hasEmptyArrayPtrType(base)
-                           ? builder.emitVar(as<IRPtrTypeBase>(gep->getDataType())->getValueType())
+                return hasEmptyArrayPtrType(base) || base->getOp() == kIROp_undefined
+                           ? builder.emitUndefined(gep->getDataType())
+                           : nullptr;
+            },
+            [&](IRFieldAddress* gep)
+            {
+                const auto base = gep->getBase();
+                return base->getOp() == kIROp_undefined ? builder.emitUndefined(gep->getDataType())
+                                                        : nullptr;
+            },
+            [&](IRLoad* load)
+            {
+                return load->getOperand(0)->getOp() == kIROp_undefined
+                           ? builder.emitUndefined(load->getDataType())
+                           : nullptr;
+            },
+            [&](IRImageLoad* load)
+            {
+                return load->getOperand(0)->getOp() == kIROp_undefined
+                           ? builder.emitUndefined(load->getDataType())
+                           : nullptr;
+            },
+            [&](IRStore* store)
+            {
+                if (store->getPtr()->getOp() == kIROp_undefined)
+                    store->removeAndDeallocate();
+                return nullptr;
+            },
+            [&](IRAtomicStore* store)
+            {
+                if (store->getPtr()->getOp() == kIROp_undefined)
+                    store->removeAndDeallocate();
+                return nullptr;
+            },
+            [&](IRImageStore* store)
+            {
+                if (store->getImage()->getOp() == kIROp_undefined)
+                    store->removeAndDeallocate();
+                return nullptr;
+            },
+            [&](IRImageSubscript* subscript)
+            {
+                return subscript->getImage()->getOp() == kIROp_undefined
+                           ? builder.emitUndefined(subscript->getDataType())
+                           : nullptr;
+            },
+            [&](IRAtomicOperation* atomic)
+            {
+                return atomic->getOperand(0)->getOp() == kIROp_undefined
+                           ? builder.emitUndefined(atomic->getDataType())
                            : nullptr;
             },
             // The following should match any instruction which can construct a 0-sized array.
             [&](IRMakeArray*) { return builder.getVoidValue(); },
-            [&](IRMakeArrayFromElement*) { return builder.getVoidValue(); },
-            // Otherwise if this is a 0-array type itself, replace it with
-            // void type.
-            [&](IRArrayType* arrayType)
-            { return isEmptyArray(arrayType) ? builder.getVoidType() : nullptr; });
-
-        // Sadly it's not really possible to catch missing cases here, as
-        // there are heaps of instructions which don't do anything special
-        // with vectors, but can take or return vector types, for example
-        // arithmetic, IRGetElement, IRGetField etc...
+            [&](IRMakeArrayFromElement*) { return builder.getVoidValue(); });
 
         // If we did get a replacement, add that to our mapping and return
         // it, otherwise return the original (to maybe be updated later)
         if (replacement)
         {
-            replacements.set(inst, replacement);
-
-            // We need to add the replacement to the work list so that if it needs further
-            // lowering, we will process it and register more entries into `replacements`.
+            inst->replaceUsesWith(replacement);
+            inst->removeAndDeallocate();
             addToWorkList(replacement);
+            for (auto use = replacement->firstUse; use; use = use->nextUse)
+            {
+                addToWorkList(use->getUser());
+            }
         }
-
-        return replacement ? replacement : inst;
+        else if (isEmptyArray((IRType*)inst))
+        {
+            replacements.add(inst, builder.getVoidType());
+        }
     }
 
     void processModule()
@@ -117,7 +157,7 @@ struct EmptyArrayLoweringContext
             workListSet.remove(inst);
 
             // Run this inst through the replacer
-            getReplacement(inst);
+            processInst(inst);
 
             for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
             {
@@ -125,7 +165,7 @@ struct EmptyArrayLoweringContext
             }
         }
 
-        // Apply all replacements
+        // Apply all deferred replacements
         //
         // It's important to defer this as if we were updating things
         // on-the-fly we would be losing information about what was
