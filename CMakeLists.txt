@@ -160,6 +160,7 @@ advanced_option(
     "Build using system unordered dense"
     OFF
 )
+advanced_option(SLANG_USE_SYSTEM_FK_YAML "Build using system fkYAML" OFF)
 
 option(
     SLANG_SPIRV_HEADERS_INCLUDE_DIR
@@ -181,6 +182,11 @@ advanced_option(
 advanced_option(
     SLANG_OVERRIDE_UNORDERED_DENSE_PATH
     "Build using user defined path for unordered_dense"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_FK_YAML_PATH
+    "Build using user defined path for fkYAML"
     OFF
 )
 advanced_option(

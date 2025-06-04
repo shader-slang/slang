@@ -117,7 +117,7 @@ static const IROpMapEntry kIROps[] = {
          ARG_COUNT,                          \
          FLAGS,                              \
      }},
-#include "slang-ir-inst-defs.h"
+#include <slang-ir-inst-defs.h>
 
     // Invalid op sentinel value comes after all the valid ones
     {kIROp_Invalid, {"invalid", 0, 0}},

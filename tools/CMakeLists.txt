@@ -63,6 +63,7 @@ else()
     )
 endif()
 generator(slang-embed)
+generator(slang-generate-ir-defs LINK_WITH_PRIVATE fkYAML::fkYAML)
 generator(slang-generate USE_FEWER_WARNINGS)
 generator(slang-lookup-generator LINK_WITH_PRIVATE compiler-core)
 generator(slang-capability-generator LINK_WITH_PRIVATE compiler-core)
@@ -105,6 +106,7 @@ if(SLANG_ENABLE_SLANGD)
             compiler-core
             slang
             slang-fiddle-output
+            slang-inst-gen-output
             slang-capability-defs
             Threads::Threads
         INSTALL
