@@ -1,14 +1,25 @@
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -profile cs_6_2 -stage compute -entry computeMain -line-directive-mode none -fvk-use-dx-layout
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -profile cs_6_2 -entry computeMain -line-directive-mode none -fvk-use-dx-layout
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-slang -compute -dx12 -use-dxil -profile cs_6_2 -Xslang... -Xdxc -fvk-use-dx-layout -Xdxc -enable-16bit-types -X. -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-slang -compute -vk -profile cs_6_2 -Xslang... -fvk-use-dx-layout -X. -output-using-type
 
-// DXC: -T cs_6_2 -E computeMain -spirv -fvk-use-dx-layout -enable-16bit-types
+// dxc: -T cs_6_2 -E computeMain -spirv -fvk-use-dx-layout -enable-16bit-types
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=16):out,name=outputBuffer
-RWStructuredBuffer<float4> outputBuffer;
+//TEST_INPUT:ubuffer(stride=4, count=25):out,name=outputBuffer
+RWStructuredBuffer<float> outputBuffer;
 
-//TEST_INPUT:set Constants.v0={1.0,2.0,3.0,4.0}
-//TEST_INPUT:set Constants.v1=8.0
-//TEST_INPUT:set Constants.v2={5.0,6.0,7.0}
+//TEST_INPUT:set Constants.v0={1.0,2.0,3.0}
+//TEST_INPUT:set Constants.v1=4.0
+//TEST_INPUT:set Constants.v2=5.0
+//TEST_INPUT:set Constants.v3[0]={6.0,7.0,8.0}
+//TEST_INPUT:set Constants.v3[1]={9.0,10.0,11.0}
+//TEST_INPUT:set Constants.v4=12.0
+//TEST_INPUT:set Constants.v5=13.0
+//TEST_INPUT:set Constants.v6[0]={14.0,15.0,16.0}
+//TEST_INPUT:set Constants.v7=17.0
+//TEST_INPUT:set Constants.v8[0]={18.0,19.0,20.0}
+//TEST_INPUT:set Constants.v8[1]={21.0,22.0,23.0}
+//TEST_INPUT:set Constants.v9={24.0,25.0}
 
 // HLSL allows 3-element vectors to occur at non-power-of-two offsets
 // in cbuffers, as long as they don't cross a 16-byte boundary.
@@ -61,13 +72,65 @@ cbuffer Constants
 // SPIRV: OpMemberDecorate {{.*}} 8 Offset 128
 // SPIRV: OpMemberDecorate {{.*}} 9 Offset 160
 
-// For glsl, check that we're using the lowest common denominator for the uniform block.
-// Could also test:
-// - not using layout(offset = N)
+// For glsl, check that we're using the lowest common denominator for the uniform block:
 // GLSL: layout(std140) uniform block
+// Also check for the offset related to the packoffset usage:
+// GLSL: layout(offset = 128)
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    outputBuffer[dispatchThreadID.x] = float4(v0, v1);
+    int i = 0;
+    outputBuffer[i++] = v0.x;
+    outputBuffer[i++] = v0.y;
+    outputBuffer[i++] = v0.z;
+    outputBuffer[i++] = v1;
+    outputBuffer[i++] = v2;
+    outputBuffer[i++] = v3[0].x;
+    outputBuffer[i++] = v3[0].y;
+    outputBuffer[i++] = v3[0].z;
+    outputBuffer[i++] = v3[1].x;
+    outputBuffer[i++] = v3[1].y;
+    outputBuffer[i++] = v3[1].z;
+    outputBuffer[i++] = v4;
+    outputBuffer[i++] = v5;
+    outputBuffer[i++] = v6[0].x;
+    outputBuffer[i++] = v6[0].y;
+    outputBuffer[i++] = v6[0].z;
+    outputBuffer[i++] = v7;
+    outputBuffer[i++] = v8[0].x;
+    outputBuffer[i++] = v8[0].y;
+    outputBuffer[i++] = v8[0].z;
+    outputBuffer[i++] = v8[1].x;
+    outputBuffer[i++] = v8[1].y;
+    outputBuffer[i++] = v8[1].z;
+    outputBuffer[i++] = v9.x;
+    outputBuffer[i++] = v9.y;
+
+    // BUFFER: 1
+    // BUFFER-NEXT: 2
+    // BUFFER-NEXT: 3
+    // BUFFER-NEXT: 4
+    // BUFFER-NEXT: 5
+    // BUFFER-NEXT: 6
+    // BUFFER-NEXT: 7
+    // BUFFER-NEXT: 8
+    // BUFFER-NEXT: 9
+    // BUFFER-NEXT: 10
+    // BUFFER-NEXT: 11
+    // BUFFER-NEXT: 12
+    // BUFFER-NEXT: 13
+    // BUFFER-NEXT: 14
+    // BUFFER-NEXT: 15
+    // BUFFER-NEXT: 16
+    // BUFFER-NEXT: 17
+    // BUFFER-NEXT: 18
+    // BUFFER-NEXT: 19
+    // BUFFER-NEXT: 20
+    // BUFFER-NEXT: 21
+    // BUFFER-NEXT: 22
+    // BUFFER-NEXT: 23
+    // BUFFER-NEXT: 24
+    // BUFFER-NEXT: 25
 }
+
