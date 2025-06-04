@@ -40,7 +40,7 @@ static bool isSlang2025OrOlder(SemanticsVisitor* visitor)
            SLANG_LANGUAGE_VERSION_2025;
 }
 
-static bool isSlang2026OrNewer(SemanticsVisitor* visitor)
+static bool isSlang2026OrLater(SemanticsVisitor* visitor)
 {
     return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
            SLANG_LANGUAGE_VERSION_2026;
@@ -61,12 +61,12 @@ static bool isImplicitDyn(SemanticsVisitor* visitor)
 
 static bool validateVarDeclDyn(SemanticsVisitor* visitor)
 {
-    return isSlang2026OrNewer(visitor);
+    return isSlang2026OrLater(visitor);
 }
 
 static bool isImplicitSome(SemanticsVisitor* visitor)
 {
-    return isSlang2026OrNewer(visitor);
+    return isSlang2026OrLater(visitor);
 }
 
 static Type* createSomeTypeDeclType(ASTBuilder* astBuilder, TypeExp type, SourceLoc loc)
