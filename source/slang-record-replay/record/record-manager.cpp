@@ -1,10 +1,12 @@
 #include "record-manager.h"
 
 #include "../../core/slang-io.h"
+#include "../../core/slang-platform.h"
 #include "../util/record-utility.h"
 
 #include <sstream>
 #include <thread>
+#include <cstdlib>
 
 namespace SlangRecord
 {
@@ -14,7 +16,19 @@ RecordManager::RecordManager(uint64_t globalSessionHandle)
     std::stringstream ss;
     ss << "gs-" << globalSessionHandle << "-t-" << std::this_thread::get_id() << ".cap";
 
-    m_recordFileDirectory = Slang::Path::combine(m_recordFileDirectory, "slang-record");
+    // Check for custom record directory from environment variable
+    Slang::StringBuilder customRecordDirBuilder;
+    if (SLANG_SUCCEEDED(Slang::PlatformUtil::getEnvironmentVariable(
+        Slang::UnownedStringSlice::fromLiteral("SLANG_RECORD_DIRECTORY"),
+        customRecordDirBuilder)))
+    {
+        m_recordFileDirectory = customRecordDirBuilder.toString();
+    }
+    else
+    {
+        m_recordFileDirectory = Slang::Path::combine(m_recordFileDirectory, "slang-record");
+    }
+
     if (!Slang::File::exists(m_recordFileDirectory))
     {
         if (!Slang::Path::createDirectoryRecursive(m_recordFileDirectory))
