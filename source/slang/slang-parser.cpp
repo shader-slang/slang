@@ -6139,11 +6139,6 @@ Stmt* Parser::parseIfLetStatement()
     tempVarDecl->nameAndLoc = NameLoc(getName(this, "$OptVar"), identifierToken.loc);
     tempVarDecl->initExpr = initExpr;
     AddMember(currentScope->containerDecl, tempVarDecl);
-    if (semanticsVisitor)
-        semanticsVisitor->ensureDecl(
-            (Decl*)tempVarDecl,
-            DeclCheckState::DefinitionChecked,
-            nullptr);
 
     DeclStmt* tmpVarDeclStmt = astBuilder->create<DeclStmt>();
     FillPosition(tmpVarDeclStmt);

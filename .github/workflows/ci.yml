@@ -81,7 +81,7 @@ jobs:
             full-gpu-tests: true
             runs-on: [Windows, self-hosted, "GCP-T4"]
             has-gpu: true
-            server-count: 2
+            server-count: 8
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
@@ -197,7 +197,6 @@ jobs:
               -category ${{ matrix.test-category }} \
               -api all-cpu \
               -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
               -enable-debug-layers false
@@ -207,7 +206,6 @@ jobs:
               -category ${{ matrix.test-category }} \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info  \
@@ -218,7 +216,6 @@ jobs:
               -category ${{ matrix.test-category }} \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \

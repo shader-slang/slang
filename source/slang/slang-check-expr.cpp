@@ -2430,10 +2430,10 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                 nullptr,
                 ConstantFoldingKind::SpecializationConstant);
 
-            // Validate that array size is greater than zero
+            // Validate that array size is non-negative.
             if (auto constElementCount = as<ConstantIntVal>(elementCount))
             {
-                if (constElementCount->getValue() <= 0)
+                if (constElementCount->getValue() < 0)
                 {
                     getSink()->diagnose(
                         subscriptExpr->indexExprs[0],
