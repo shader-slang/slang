@@ -2517,10 +2517,12 @@ void TranslationUnitRequest::addSource(IArtifact* sourceArtifact, SourceFile* so
 
 void TranslationUnitRequest::addIncludedSourceFileIfNotExist(SourceFile* sourceFile)
 {
-    if (!m_sourceFiles.contains(sourceFile)) {
-        sourceFile->setIncludedFile();
-        m_sourceFiles.add(sourceFile);
-    }
+    if (m_includedFileSet.contains(sourceFile))
+        return;
+
+    sourceFile->setIncludedFile();
+    m_sourceFiles.add(sourceFile);
+    m_includedFileSet.add(sourceFile);
 }
 
 PathInfo TranslationUnitRequest::_findSourcePathInfo(IArtifact* artifact)
