@@ -136,7 +136,7 @@ void serialize(Serializer const& serializer, SemanticVersion& value)
 
 void serialize(Serializer const& serializer, SyntaxClass<NodeBase>& value)
 {
-    ASTNodeType raw;
+    ASTNodeType raw = ASTNodeType(0);
     if (isWriting(serializer))
     {
         raw = value.getTag();
@@ -277,7 +277,7 @@ void serialize(Serializer const& serializer, CapabilityAtomSet& value)
     {
         while (hasElements(serializer))
         {
-            CapabilityAtom atom;
+            CapabilityAtom atom = CapabilityAtom(0);
             serialize(serializer, atom);
             value.add(UInt(atom));
         }
@@ -769,7 +769,7 @@ void ASTDecodingContext::handleASTNode(NodeBase*& outNode)
 {
     ASTSerializer serializer(this);
 
-    ASTNodeType typeTag;
+    ASTNodeType typeTag = ASTNodeType(0);
     serialize(serializer, typeTag);
     switch (_getPseudoASTNodeType(typeTag))
     {
