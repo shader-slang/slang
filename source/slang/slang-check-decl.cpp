@@ -10640,7 +10640,7 @@ void SemanticsDeclHeaderVisitor::visitAbstractStorageDeclCommon(ContainerDecl* d
 
 void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
 {
-        decl->returnType = CheckUsableType(decl->returnType, decl);
+    decl->returnType = CheckUsableType(decl->returnType, decl);
 
     visitAbstractStorageDeclCommon(decl);
 

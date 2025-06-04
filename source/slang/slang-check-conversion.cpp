@@ -1891,7 +1891,8 @@ bool SemanticsVisitor::tryCoerceSomeType(
     if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(toType))
     {
         // Handles the following case: `some T = some U` `some T = unbound_some U`.
-        // We do not error if `some` is an argument since `some` can be passed as an argument to a `some` parameter.
+        // We do not error if `some` is an argument since `some` can be passed as an argument to a
+        // `some` parameter.
         if (site != CoercionSite::Argument && isDeclRefTypeOf<SomeTypeDecl>(fromType))
         {
             if (!isDeclRefTypeOf<UnboundSomeTypeDecl>(toType))
