@@ -34,6 +34,7 @@
 #include "slang-ir-use-uninitialized-values.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
+#include "slang-ir-validate-dyn-and-some.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
@@ -493,6 +494,13 @@ struct SharedIRGenContext
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
 
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
+
+    // Map to manage all functions returning a `some` type to ensure
+    // all returned types are equivlent in value
+    Dictionary<FunctionDeclBase*, ReturnStmt*> promisedTypeOfReturn;
+
+    // Map to manage all Out parameters of `some` type to ensure
+    // all complete assignments are equivlent in value
 
     void setGlobalValue(Decl* decl, LoweredValInfo value)
     {
@@ -3641,38 +3649,6 @@ struct ExprLoweringContext
         }
     }
 
-    /// Return `expr` with any outer casts to interface types stripped away
-    Expr* maybeIgnoreCastToInterface(Expr* expr)
-    {
-        auto e = expr;
-        while (auto castExpr = as<CastToSuperTypeExpr>(e))
-        {
-            if (auto declRefType = as<DeclRefType>(e->type))
-            {
-                if (declRefType->getDeclRef().as<InterfaceDecl>())
-                {
-                    e = castExpr->valueArg;
-                    continue;
-                }
-            }
-            else if (auto andType = as<AndType>(e->type))
-            {
-                // TODO: We might eventually need to tell the difference
-                // between conjunctions of interfaces and conjunctions
-                // that might include non-interface types.
-                //
-                // For now we assume that any case to a conjunction
-                // is effectively a cast to an interface type.
-                //
-                e = castExpr->valueArg;
-                continue;
-            }
-            break;
-        }
-        return e;
-    }
-
-
     // Lower an expression that should have the same l-value-ness
     // as the visitor itself.
     LoweredValInfo lowerSubExpr(Expr* expr)
@@ -3955,7 +3931,7 @@ struct ExprLoweringContext
                 // which case we don't want to emit the result of the cast, but instead
                 // the source.
                 //
-                baseExpr = this->maybeIgnoreCastToInterface(baseExpr);
+                baseExpr = maybeIgnoreCastToInterface(baseExpr);
             }
 
             // If the thing being invoked is a subscript operation,
@@ -4585,7 +4561,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto loweredType = lowerType(context, expr->type);
 
         auto baseExpr = expr->baseExpression;
-        baseExpr = sharedLoweringContext.maybeIgnoreCastToInterface(baseExpr);
+        baseExpr = maybeIgnoreCastToInterface(baseExpr);
         auto loweredBase = lowerSubExpr(baseExpr);
 
         auto declRef = expr->declRef;
@@ -6639,6 +6615,14 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         lowerStmt(context, stmt->body);
 
         popScopeBlock(prevScopeEndBlock, false);
+    }
+
+    // TODO: unduplicate this func from SemanticsVisitor::getWrappedType
+    Type* getWrappedType(Type* type)
+    {
+        if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(type))
+            return someTypeDeclRef.getDecl()->interfaceType;
+        return type;
     }
 
     void visitReturnStmt(ReturnStmt* stmt)

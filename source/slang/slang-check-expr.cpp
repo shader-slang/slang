@@ -128,7 +128,7 @@ Expr* SemanticsVisitor::maybeMoveTemp(Expr* const& expr, F const& func)
     return moveTemp(expr, func);
 }
 
-static Type* getWrappedType(Type* type)
+Type* SemanticsVisitor::getWrappedType(Type* type)
 {
     if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(type))
         return someTypeDeclRef.getDecl()->interfaceType;

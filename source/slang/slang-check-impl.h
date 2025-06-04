@@ -681,6 +681,9 @@ struct SharedSemanticsContext : public RefObject
 
     GLSLBindingOffsetTracker m_glslBindingOffsetTracker;
 
+    Dictionary<FunctionDeclBase*, ReturnStmt*> promisedTypeOfReturn;
+    Dictionary<FunctionDeclBase*, ParamDecl*> promisedTypeOfOutParam;
+
 public:
     SharedSemanticsContext(
         Linkage* linkage,
@@ -1275,6 +1278,9 @@ public:
     ///
     template<typename F>
     Expr* maybeMoveTemp(Expr* const& expr, F const& func);
+
+    // unwraps wrapped typed if needed
+    Type* getWrappedType(Type* type);
 
     /// Return an expression that represents "opening" the existential `expr`.
     ///

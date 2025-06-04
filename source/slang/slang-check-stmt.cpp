@@ -543,6 +543,94 @@ void SemanticsStmtVisitor::visitDiscardStmt(DiscardStmt*)
     // Nothing to do
 }
 
+/// Return `expr` with any outer casts to interface types stripped away
+Expr* maybeIgnoreCastToInterface(Expr* expr)
+{
+    auto e = expr;
+    while (auto castExpr = as<CastToSuperTypeExpr>(e))
+    {
+        if (auto declRefType = as<DeclRefType>(e->type))
+        {
+            if (declRefType->getDeclRef().as<InterfaceDecl>())
+            {
+                e = castExpr->valueArg;
+                continue;
+            }
+        }
+        else if (auto andType = as<AndType>(e->type))
+        {
+            // TODO: We might eventually need to tell the difference
+            // between conjunctions of interfaces and conjunctions
+            // that might include non-interface types.
+            //
+            // For now we assume that any case to a conjunction
+            // is effectively a cast to an interface type.
+            //
+            e = castExpr->valueArg;
+            continue;
+        }
+        break;
+    }
+    return e;
+}
+
+static bool resolveValueTypeExprEquality(
+    Expr* promisedExpr,
+    Expr* givenExpr)
+{
+    // First case is to check if the VarExpr being returned is the same.
+    if (auto promisedReturnVarExpr = as<VarExpr>(promisedExpr))
+    {
+        if (auto givenReturnVarExpr = as<VarExpr>(givenExpr))
+        {
+            if (promisedReturnVarExpr->declRef == promisedReturnVarExpr->declRef)
+                return true;
+        }
+    }
+    
+    Type* promisedTypeToCompare = maybeIgnoreCastToInterface(promisedExpr)->type.type;
+    Type* givenTypeToCompare = maybeIgnoreCastToInterface(givenExpr)->type.type;
+    // simple case, type of promise is same as given type to compare to
+    if (promisedTypeToCompare->equals(givenTypeToCompare))
+        return true;
+    return false;
+}
+
+static void maybeValidateSomeTypeReturnStmt(
+    SemanticsVisitor* visitor,
+    ReturnStmt* stmt,
+    FunctionDeclBase* parentFunc)
+{
+    if (!stmt->expression || !parentFunc)
+        return;
+
+    auto shared = visitor->getShared();
+    if (!isDeclRefTypeOf<SomeTypeDecl>(parentFunc->returnType))
+        return;
+
+    // If we have a promised type we must ensure the incoming-return-type has an equal type
+    //
+    // If we have no promised type, we are visiting our first return of the
+    // function, we must set the promised type.
+    if (auto promisedReturnPtr = shared->promisedTypeOfReturn.tryGetValue(parentFunc))
+    {
+        if (resolveValueTypeExprEquality(
+                (*promisedReturnPtr)->expression,
+                stmt->expression))
+            return;
+
+        auto sink = visitor->getSink();
+        sink->diagnose(
+            stmt,
+            Diagnostics::returningDifferentSomeTypesFromSameFunction);
+        sink->diagnose((*promisedReturnPtr), Diagnostics::seeUseSite);
+    }
+    else
+    {
+        shared->promisedTypeOfReturn.add(parentFunc, stmt);
+    }
+}
+
 void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
 {
     auto function = getParentFunc();
@@ -568,6 +656,7 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
     {
         stmt->expression = CheckTerm(stmt->expression);
         returnType = stmt->expression->type.type;
+        maybeValidateSomeTypeReturnStmt(this, stmt, function);
         if (!stmt->expression->type->equals(m_astBuilder->getErrorType()))
         {
             if (!m_parentLambdaExpr && expectedReturnType)

@@ -929,6 +929,17 @@ DIAGNOSTIC(
     Error,
     cannotAssignDynTypeToSomeType,
     "cannot assign a 'dyn' type to a 'some' type")
+DIAGNOSTIC(
+    33093,
+    Error,
+    returningDifferentSomeTypesFromSameFunction,
+    "cannot return potentially different 'some' types from the same function")
+DIAGNOSTIC(
+    33094,
+    Error,
+    assigningDifferentTypesToOutSomeType,
+    "cannot potentially assign different types to 'out some' types")
+
 
 DIAGNOSTIC(
     -1,
