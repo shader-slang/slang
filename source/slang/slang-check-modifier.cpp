@@ -2212,11 +2212,7 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
     }
 
     // Define valid stage names
-    HashSet<String> validStages;
-    validStages.add("anyhit");
-    validStages.add("closesthit");
-    validStages.add("miss");
-    validStages.add("caller");
+    const HashSet<String> validStages("anyhit", "closesthit", "miss", "caller");
 
     // Check each field in the struct
     for (auto member : structDecl->members)
@@ -2243,7 +2239,7 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
         }
 
         // Check stage names in read qualifier
-        if (hasReadModifier)
+        if (readModifier)
         {
             for (auto& stageToken : readModifier->stageNameTokens)
             {
@@ -2259,7 +2255,7 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
         }
 
         // Check stage names in write qualifier
-        if (hasWriteModifier)
+        if (writeModifier)
         {
             for (auto& stageToken : writeModifier->stageNameTokens)
             {
