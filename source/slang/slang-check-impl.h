@@ -681,8 +681,9 @@ struct SharedSemanticsContext : public RefObject
 
     GLSLBindingOffsetTracker m_glslBindingOffsetTracker;
 
+    // Tracks the first return of a funcDecl. Primarily used with `some` types
+    // to ensure that the type of the return is consistent.
     Dictionary<FunctionDeclBase*, ReturnStmt*> promisedTypeOfReturn;
-    Dictionary<FunctionDeclBase*, ParamDecl*> promisedTypeOfOutParam;
 
 public:
     SharedSemanticsContext(
@@ -1278,9 +1279,6 @@ public:
     ///
     template<typename F>
     Expr* maybeMoveTemp(Expr* const& expr, F const& func);
-
-    // unwraps wrapped typed if needed
-    Type* getWrappedType(Type* type);
 
     /// Return an expression that represents "opening" the existential `expr`.
     ///

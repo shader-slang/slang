@@ -2412,7 +2412,7 @@ DIAGNOSTIC(41016, Warning, usingUninitializedVariableWarning, "use of uninitiali
 DIAGNOSTIC(
     41016,
     Error,
-    usingUninitializedVariableInterfaceError,
+    usingUninitializedInterfaceVariableError,
     "use of uninitialized interface-typed variable '$0'")
 DIAGNOSTIC(
     41017,

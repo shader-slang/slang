@@ -677,11 +677,10 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
             auto loads = getUnresolvedVariableLoads(reachability, inst);
             for (auto load : loads)
             {
-
                 errorOrWarn(sink,
                     maybeEmitInterfaceError(inst),
                     Diagnostics::usingUninitializedVariableWarning,
-                    Diagnostics::usingUninitializedVariableInterfaceError,
+                    Diagnostics::usingUninitializedInterfaceVariableError,
                     inst,
                     load);
             }

@@ -54,4 +54,5 @@ void validateVectorsAndMatrices(
     IRModule* module,
     DiagnosticSink* sink,
     TargetRequest* targetRequest);
+
 } // namespace Slang

@@ -495,13 +495,6 @@ struct SharedIRGenContext
 
     Dictionary<IntVal*, IRInst*> mapSpecConstValToIRInst;
 
-    // Map to manage all functions returning a `some` type to ensure
-    // all returned types are equivlent in value
-    Dictionary<FunctionDeclBase*, ReturnStmt*> promisedTypeOfReturn;
-
-    // Map to manage all Out parameters of `some` type to ensure
-    // all complete assignments are equivlent in value
-
     void setGlobalValue(Decl* decl, LoweredValInfo value)
     {
         globalEnv.mapDeclToValue[decl] = value;
@@ -6615,14 +6608,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         lowerStmt(context, stmt->body);
 
         popScopeBlock(prevScopeEndBlock, false);
-    }
-
-    // TODO: unduplicate this func from SemanticsVisitor::getWrappedType
-    Type* getWrappedType(Type* type)
-    {
-        if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(type))
-            return someTypeDeclRef.getDecl()->interfaceType;
-        return type;
     }
 
     void visitReturnStmt(ReturnStmt* stmt)

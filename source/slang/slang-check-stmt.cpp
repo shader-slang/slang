@@ -656,7 +656,6 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
     {
         stmt->expression = CheckTerm(stmt->expression);
         returnType = stmt->expression->type.type;
-        maybeValidateSomeTypeReturnStmt(this, stmt, function);
         if (!stmt->expression->type->equals(m_astBuilder->getErrorType()))
         {
             if (!m_parentLambdaExpr && expectedReturnType)
@@ -686,6 +685,8 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
     {
         getSink()->diagnose(stmt, Diagnostics::returnInsideDefer);
     }
+
+    maybeValidateSomeTypeReturnStmt(this, stmt, function);
 }
 
 void SemanticsStmtVisitor::visitWhileStmt(WhileStmt* stmt)
