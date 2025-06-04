@@ -267,7 +267,10 @@ static SlangResult runExample(
     return SLANG_OK;
 }
 
-static SlangResult replayExample(UnitTestContext* context, const String& recordDir, List<entryHashInfo>& outHashes)
+static SlangResult replayExample(
+    UnitTestContext* context,
+    const String& recordDir,
+    List<entryHashInfo>& outHashes)
 {
     List<String> fileNames;
     findRecordFileName(&fileNames, recordDir);
@@ -387,9 +390,7 @@ static SlangResult cleanupRecordFiles(const String& recordDir)
     {
         StringBuilder msgBuilder;
         msgBuilder << "Failed to remove '" << recordDir << "' directory\n";
-        getTestReporter()->message(
-            TestMessageType::TestFailure,
-            msgBuilder.toString().getBuffer());
+        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
     }
 
     return res;
@@ -401,11 +402,11 @@ static SlangResult runTest(UnitTestContext* context, const char* testName)
     StringBuilder recordDirBuilder;
     recordDirBuilder << "slang-record-" << testName;
     String recordDir = recordDirBuilder.toString();
-    
+
     List<entryHashInfo> expectHashes;
     List<entryHashInfo> resultHashes;
     SlangResult res = SLANG_OK;
-    
+
     // Run the example to generate recording
     res = runExample(context, testName, recordDir, expectHashes);
     if (SLANG_SUCCEEDED(res))
@@ -418,7 +419,7 @@ static SlangResult runTest(UnitTestContext* context, const char* testName)
             res = resultCompare(expectHashes, resultHashes);
         }
     }
-    
+
     // Always cleanup, regardless of success or failure
     cleanupRecordFiles(recordDir);
     return res;

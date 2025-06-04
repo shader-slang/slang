@@ -4,9 +4,9 @@
 #include "../../core/slang-platform.h"
 #include "../util/record-utility.h"
 
+#include <cstdlib>
 #include <sstream>
 #include <thread>
-#include <cstdlib>
 
 namespace SlangRecord
 {
@@ -19,8 +19,8 @@ RecordManager::RecordManager(uint64_t globalSessionHandle)
     // Check for custom record directory from environment variable
     Slang::StringBuilder customRecordDirBuilder;
     if (SLANG_SUCCEEDED(Slang::PlatformUtil::getEnvironmentVariable(
-        Slang::UnownedStringSlice::fromLiteral("SLANG_RECORD_DIRECTORY"),
-        customRecordDirBuilder)))
+            Slang::UnownedStringSlice::fromLiteral("SLANG_RECORD_DIRECTORY"),
+            customRecordDirBuilder)))
     {
         m_recordFileDirectory = customRecordDirBuilder.toString();
     }
