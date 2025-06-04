@@ -1872,6 +1872,11 @@ bool SemanticsVisitor::_coerce(
     return _failedCoercion(toType, outToExpr, fromExpr, sink);
 }
 
+static bool isDynGivenType(Type* type)
+{
+    return !isDeclRefTypeOf<SomeTypeDecl>(type) && isDeclRefTypeOf<InterfaceDecl>(type);
+}
+
 // TODO make member of SemanticsVisitor
 bool SemanticsVisitor::tryCoerceSomeType(
     CoercionSite site,
@@ -1898,12 +1903,12 @@ bool SemanticsVisitor::tryCoerceSomeType(
             }
         }
         // Assigning `dyn` to `some` (`UnboundSomeType` and `SomeType`) is always an error.
-        else if (
-            !isDeclRefTypeOf<SomeTypeDecl>(fromType) && isDeclRefTypeOf<InterfaceDecl>(fromType))
+        else if (isDynGivenType(fromType))
         {
             sink->diagnose(fromExpr->loc, Diagnostics::cannotAssignDynTypeToSomeType);
             return false;
         }
+
         // implicit unwrap
         return _coerce(
             site,
@@ -1915,20 +1920,19 @@ bool SemanticsVisitor::tryCoerceSomeType(
             outCost);
     }
 
-    // We are allowed to assign a `some` type to any non `some` type. Due to this
-    // we will unwrap the SomeType.
+    // If we have a SomeType on RHS, we are only allowed to copy if LHS is `dyn`
     if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(fromType))
     {
-        return _coerce(
-            site,
-            toType,
-            outToExpr,
-            someTypeDeclRef.getDecl()->interfaceType.type,
-            fromExpr,
-            sink,
-            outCost);
+        if (isDynGivenType(toType))
+            return _coerce(
+                site,
+                toType,
+                outToExpr,
+                someTypeDeclRef.getDecl()->interfaceType.type,
+                fromExpr,
+                sink,
+                outCost);
     }
-
     return false;
 }
 

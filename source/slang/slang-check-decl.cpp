@@ -10640,7 +10640,7 @@ void SemanticsDeclHeaderVisitor::visitAbstractStorageDeclCommon(ContainerDecl* d
 
 void SemanticsDeclHeaderVisitor::visitSubscriptDecl(SubscriptDecl* decl)
 {
-    decl->returnType = CheckUsableType(decl->returnType, decl);
+        decl->returnType = CheckUsableType(decl->returnType, decl);
 
     visitAbstractStorageDeclCommon(decl);
 
@@ -14101,6 +14101,10 @@ DeclVisibility SemanticsVisitor::getDeclVisibility(Decl* decl)
             return DeclVisibility::Internal;
         else if (as<PrivateModifier>(modifier))
             return DeclVisibility::Private;
+    }
+    if (auto someTypeDecl = as<SomeTypeDecl>(decl))
+    {
+        return getTypeVisibility(someTypeDecl->interfaceType);
     }
     // Interface members will always have the same visibility as the interface itself.
     if (auto interfaceDecl = findParentInterfaceDecl(decl))
