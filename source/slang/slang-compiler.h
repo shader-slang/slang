@@ -2198,6 +2198,11 @@ public:
         slang::TypeReflection* type,
         slang::TypeReflection* interfaceType,
         uint32_t* outId) override;
+    SLANG_NO_THROW SlangResult SLANG_MCALL getDynamicObjectRTTIBytes(
+        slang::TypeReflection* type,
+        slang::TypeReflection* interfaceType,
+        uint32_t* outBytes,
+        uint32_t bufferSize) override;
     SLANG_NO_THROW SlangResult SLANG_MCALL createTypeConformanceComponentType(
         slang::TypeReflection* type,
         slang::TypeReflection* interfaceType,
