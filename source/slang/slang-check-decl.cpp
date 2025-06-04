@@ -10120,7 +10120,7 @@ void SemanticsVisitor::validateArraySizeForVariable(VarDeclBase* varDecl)
 
     // TODO(tfoley): How to handle the case where bound isn't known?
     auto elementCount = arrayType->getElementCount();
-    if (GetMinBound(elementCount) <= 0)
+    if (GetMinBound(elementCount) < 0)
     {
         getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
         return;
