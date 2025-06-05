@@ -250,6 +250,13 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
         as<PtrType>(type))
         return cacheResult(true);
 
+    // Slang 2026 language fix: an interface type is not C-style.
+    if (isSlang2026OrLater(this))
+    {
+        // TODO: some/dyn types are also not C-style.
+        if (isDeclRefTypeOf<InterfaceDecl>(type))
+            return cacheResult(false);
+    }
 
     // A tuple type is C-style if all of its members are C-style.
     if (auto tupleType = as<TupleType>(type))
@@ -1197,10 +1204,16 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
-    // unwrap SomeTypeDecl's
-    if (tryCoerceSomeType(site, toType, outToExpr, fromType, fromExpr, sink, outCost))
-        return true;
-
+    // Manages coerce rules for `SomeTypeDecl` and `UnboundSomeTypeDecl`.
+    // Primarily this function diagnoses incorrect `SomeTypeDecl` coercing.
+    // To coerce this function unwraps the inner interface type of a `SomeTypeDecl`.
+    if (isDeclRefTypeOf<SomeTypeDecl>(toType) || isDeclRefTypeOf<SomeTypeDecl>(fromType))
+    {
+        // We do not immediatly error since conversions may still happen
+        // later on
+        if (tryCoerceSomeType(site, toType, outToExpr, fromType, fromExpr, sink, outCost))
+            return true;
+    }
     // Assume string literals are convertible to any string type.
     if (as<StringLiteralExpr>(fromExpr) && as<StringTypeBase>(toType))
     {
@@ -1870,6 +1883,11 @@ bool SemanticsVisitor::_coerce(
     return _failedCoercion(toType, outToExpr, fromExpr, sink);
 }
 
+static bool isDynType(Type* type)
+{
+    return !isDeclRefTypeOf<SomeTypeDecl>(type) && isDeclRefTypeOf<InterfaceDecl>(type);
+}
+
 // TODO make member of SemanticsVisitor
 bool SemanticsVisitor::tryCoerceSomeType(
     CoercionSite site,
@@ -1880,10 +1898,12 @@ bool SemanticsVisitor::tryCoerceSomeType(
     DiagnosticSink* sink,
     ConversionCost* outCost)
 {
-    // basic restrictions
+    // Restrictions
     if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(toType))
     {
-        // if `some T = some U` `some T = unbound_some U`
+        // Handles the following case: `some T = some U` `some T = unbound_some U`.
+        // We do not error if `some` is an argument since `some` can be passed as an argument to a
+        // `some` parameter.
         if (site != CoercionSite::Argument && isDeclRefTypeOf<SomeTypeDecl>(fromType))
         {
             if (!isDeclRefTypeOf<UnboundSomeTypeDecl>(toType))
@@ -1894,13 +1914,13 @@ bool SemanticsVisitor::tryCoerceSomeType(
                 return false;
             }
         }
-        // not allowed to assign 'dyn' to 'unboundSomeType'
-        else if (
-            !isDeclRefTypeOf<SomeTypeDecl>(fromType) && isDeclRefTypeOf<InterfaceDecl>(fromType))
+        // Assigning `dyn` to `some` (`UnboundSomeType` and `SomeType`) is always an error.
+        else if (isDynType(fromType))
         {
             sink->diagnose(fromExpr->loc, Diagnostics::cannotAssignDynTypeToSomeType);
             return false;
         }
+
         // implicit unwrap
         return _coerce(
             site,
@@ -1912,20 +1932,19 @@ bool SemanticsVisitor::tryCoerceSomeType(
             outCost);
     }
 
-    // `T = some IFoo<T>` is allowed, need to unwrap SomeType
+    // If we have a SomeType on RHS, we are only allowed to copy if LHS is `dyn`
     if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(fromType))
     {
-        //`SomeType` needs implicit unwrap to be assigned to non-some-type
-        return _coerce(
-            site,
-            toType,
-            outToExpr,
-            someTypeDeclRef.getDecl()->interfaceType.type,
-            fromExpr,
-            sink,
-            outCost);
+        if (isDynType(toType))
+            return _coerce(
+                site,
+                toType,
+                outToExpr,
+                someTypeDeclRef.getDecl()->interfaceType.type,
+                fromExpr,
+                sink,
+                outCost);
     }
-
     return false;
 }
 

@@ -868,9 +868,9 @@ void ASTPrinter::addExpr(Expr* expr)
     else if (const auto someTypeExpr = as<SomeTypeExpr>(expr))
     {
         sb << "some ";
-        if (pointerTypeExpr->base.type)
+        if (someTypeExpr->base.type)
         {
-            addType(pointerTypeExpr->base.type);
+            addType(someTypeExpr->base.type);
         }
         else
         {

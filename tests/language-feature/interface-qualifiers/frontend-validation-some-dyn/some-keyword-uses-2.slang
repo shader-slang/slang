@@ -59,7 +59,5 @@ void computeMain()
     some IFoo data2;
     logic(data1, data2);
 
-    buffer[0] = data1.getVal() 
-                + data2.getVal()
-                ;
+    buffer[0] = data1.getVal() + data2.getVal();
 }

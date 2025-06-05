@@ -81,7 +81,7 @@ jobs:
             full-gpu-tests: true
             runs-on: [Windows, self-hosted, "GCP-T4"]
             has-gpu: true
-            server-count: 2
+            server-count: 8
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
@@ -197,32 +197,29 @@ jobs:
               -category ${{ matrix.test-category }} \
               -api all-cpu \
               -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              ${{ matrix.config == 'debug' && '-disable-debug-layers' || '' }}
+              -enable-debug-layers false
           elif [[ "${{matrix.has-gpu}}" == "true" ]]; then
             "$bin_dir/slang-test" \
               -use-test-server \
               -category ${{ matrix.test-category }} \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info  \
-              ${{ matrix.config == 'debug' && '-disable-debug-layers' || '' }}
+              -enable-debug-layers false
           else
             "$bin_dir/slang-test" \
               -use-test-server \
               -category ${{ matrix.test-category }} \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              ${{ matrix.config == 'debug' && '-disable-debug-layers' || '' }}
+              -enable-debug-layers false
           fi
       - name: Run Slang examples
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests

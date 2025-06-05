@@ -137,7 +137,10 @@ class LetDecl : public VarDecl
     FIDDLE(...)
 };
 
-// SomeType<IFoo>
+// Represents the type of `some Type` for `some Type varName;`.
+// This decl of `some Type` is not assignable since it already
+// has a given value.
+// The wrapped type is a concrete interface named `interfaceType`.
 FIDDLE()
 class SomeTypeDecl : public Decl
 {
@@ -145,7 +148,11 @@ class SomeTypeDecl : public Decl
     FIDDLE() TypeExp interfaceType;
 };
 
-// UnboundSomeType<IFoo>
+// Represents the type of `some Type` for `some Type varName`
+// when `varName` is unassigned/unbound. This decl simmilarly
+// represents the `out some Type` type.
+// This variant of `some Type` is assignable since it is either
+// a new variable without value or equivlent.
 FIDDLE()
 class UnboundSomeTypeDecl : public SomeTypeDecl
 {

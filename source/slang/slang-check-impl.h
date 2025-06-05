@@ -42,6 +42,8 @@ bool isUnsafeForceInlineFunc(FunctionDeclBase* funcDecl);
 
 bool isUniformParameterType(Type* type);
 
+bool isSlang2026OrLater(SemanticsVisitor* visitor);
+
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 
@@ -3129,6 +3131,10 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 bool isUnsizedArrayType(Type* type);
 
 bool isInterfaceType(Type* type);
+
+// Check if `type` is nullable. An `Optional<T>` will occupy the same space as `T`, if `T`
+// is nullable.
+bool isNullableType(Type* type);
 
 EnumDecl* isEnumType(Type* type);
 

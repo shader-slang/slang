@@ -4117,6 +4117,7 @@ static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
             }
             else
             {
+                parser->diagnose(decl->loc, Diagnostics::subscriptMustHaveReturnType);
                 decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
             }
 
@@ -4983,8 +4984,9 @@ static DeclBase* ParseDeclWithModifiers(
                 };
                 if (AdvanceIf(parser, "buffer"))
                 {
-                    decl = as<Decl>(
-                        parseGLSLShaderStorageBufferDecl(parser, getLayoutArg("Std430DataLayout")));
+                    decl = as<Decl>(parseGLSLShaderStorageBufferDecl(
+                        parser,
+                        getLayoutArg("DefaultDataLayout")));
                     break;
                 }
                 else if (auto mod = findPotentialGLSLInterfaceBlockModifier(parser, modifiers))
@@ -6137,11 +6139,6 @@ Stmt* Parser::parseIfLetStatement()
     tempVarDecl->nameAndLoc = NameLoc(getName(this, "$OptVar"), identifierToken.loc);
     tempVarDecl->initExpr = initExpr;
     AddMember(currentScope->containerDecl, tempVarDecl);
-    if (semanticsVisitor)
-        semanticsVisitor->ensureDecl(
-            (Decl*)tempVarDecl,
-            DeclCheckState::DefinitionChecked,
-            nullptr);
 
     DeclStmt* tmpVarDeclStmt = astBuilder->create<DeclStmt>();
     FillPosition(tmpVarDeclStmt);
