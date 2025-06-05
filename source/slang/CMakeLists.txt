@@ -164,7 +164,7 @@ slang_add_target(
         ${SLANG_LOOKUP_GENERATED_SOURCE}
         ${SLANG_SPIRV_CORE_GRAMMAR_SOURCE}
     EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
-    LINK_WITH_PRIVATE core SPIRV-Headers
+    LINK_WITH_PRIVATE core SPIRV-Headers::SPIRV-Headers
     EXCLUDE_FROM_ALL
     FOLDER generated
 )
@@ -226,7 +226,7 @@ set(slang_link_args
     slang-capability-lookup
     slang-fiddle-output
     slang-lookup-tables
-    SPIRV-Headers
+    SPIRV-Headers::SPIRV-Headers
 )
 set(slang_interface_args INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include)
 set(slang_public_lib_args
