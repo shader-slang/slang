@@ -25,6 +25,7 @@ Modules and Access Control <04-modules-and-access-control>
 Capabilities <05-capabilities>
 Interfaces and Generics <06-interfaces-generics>
 Automatic Differentiation <07-autodiff>
+Language Version <11-language-version>
 Compiling Code with Slang <08-compiling>
 Using the Reflection API <09-reflection>
 Supported Compilation Targets <09-targets>
