@@ -14110,7 +14110,7 @@ DeclVisibility SemanticsVisitor::getDeclVisibility(Decl* decl)
         else if (as<PrivateModifier>(modifier))
             return DeclVisibility::Private;
     }
-    if (auto someTypeDecl = as<SomeTypeDecl>(decl))
+    if (as<SomeTypeDecl>(decl))
     {
         if(auto parentContainor = this->getParentFuncOfVisitor())
             return getDeclVisibility(parentContainor);
