@@ -2500,7 +2500,14 @@ struct IRLoad : IRInst
     IRInst* getPtr() { return ptr.get(); }
 };
 
-struct IRAtomicLoad : IRInst
+struct IRAtomicOperation : IRInst
+{
+    IR_PARENT_ISA(AtomicOperation);
+
+    IRInst* getPtr() { return getOperand(0); }
+};
+
+struct IRAtomicLoad : IRAtomicOperation
 {
     IRUse ptr;
     IR_LEAF_ISA(AtomicLoad)
@@ -2521,7 +2528,7 @@ struct IRStore : IRInst
     IRUse* getValUse() { return &val; }
 };
 
-struct IRAtomicStore : IRInst
+struct IRAtomicStore : IRAtomicOperation
 {
     IRUse ptr;
     IRUse val;
@@ -3074,6 +3081,17 @@ struct IREach : IRInst
     IRInst* getElement() { return getOperand(0); }
 };
 
+struct IRMakeArray : IRInst
+{
+    IR_LEAF_ISA(MakeArray)
+};
+
+struct IRMakeArrayFromElement : IRInst
+{
+    IR_LEAF_ISA(MakeArrayFromElement)
+};
+
+
 // An Instruction that creates a tuple value.
 struct IRMakeTuple : IRInst
 {
@@ -3342,6 +3360,12 @@ struct IRExtractExistentialWitnessTable : IRInst
 {
     IR_LEAF_ISA(ExtractExistentialWitnessTable);
 };
+
+struct IRIsNullExistential : IRInst
+{
+    IR_LEAF_ISA(IsNullExistential);
+};
+
 
 /* Base class for instructions that track liveness */
 struct IRLiveRangeMarker : IRInst
@@ -4058,6 +4082,9 @@ public:
 
     /// Given an existential value, extract the underlying "real" type
     IRType* emitExtractExistentialType(IRInst* existentialValue);
+
+    /// Given an existential value, return if it is empty/null.
+    IRInst* emitIsNullExistential(IRInst* existentialValue);
 
     /// Given an existential value, extract the witness table showing how the value conforms to the
     /// existential type.

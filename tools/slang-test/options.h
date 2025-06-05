@@ -84,13 +84,7 @@ struct Options
     bool dumpOutputOnFailure = false;
 
     // When true it will run with debug layer (e.g. vulkan validation layer)
-#if _DEBUG
-    // Default is true for debug build
-    bool debugLayerEnabled = true;
-#else
-    // Default is false for release build
-    bool debugLayerEnabled = false;
-#endif
+    bool enableDebugLayers = false;
 
     // Set the default spawn type to use
     // Having tests isolated, slows down testing considerably, so using UseSharedLibrary is the most

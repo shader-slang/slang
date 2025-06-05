@@ -3394,6 +3394,11 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
         ioCmdLine.addArg("-capability");
         ioCmdLine.addArg(capability);
     }
+
+    if (options.enableDebugLayers)
+    {
+        ioCmdLine.addArg("-enable-debug-layers");
+    }
 }
 
 static SlangResult _extractProfileTime(const UnownedStringSlice& text, double& timeOut)
@@ -3601,17 +3606,6 @@ TestResult runComputeComparisonImpl(
     cmdLine.addArg("-o");
     auto actualOutputFile = outputStem + ".actual.txt";
     cmdLine.addArg(actualOutputFile);
-
-#if _DEBUG
-    // When using test server, any validation warning printed from the backend
-    // gets misinterpreted as the result from the test.
-    // This is due to the limitation that Slang RPC implementation expects only
-    // one time communication.
-    if (context->options.debugLayerEnabled && input.spawnType != SpawnType::UseTestServer)
-    {
-        cmdLine.addArg("-enable-debug-layers");
-    }
-#endif
 
     if (context->isExecuting())
     {
@@ -4705,7 +4699,7 @@ static SlangResult runUnitTestModule(
     unitTestContext.slangGlobalSession = context->getSession();
     unitTestContext.workDirectory = "";
     unitTestContext.enabledApis = context->options.enabledApis;
-    unitTestContext.enableDebugLayers = context->options.debugLayerEnabled;
+    unitTestContext.enableDebugLayers = context->options.enableDebugLayers;
     unitTestContext.executableDirectory = context->exeDirectoryPath.getBuffer();
 
     auto testCount = testModule->getTestCount();
@@ -4749,6 +4743,7 @@ static SlangResult runUnitTestModule(
         {
             TestServerProtocol::ExecuteUnitTestArgs args;
             args.enabledApis = context->options.enabledApis;
+            args.enableDebugLayers = context->options.enableDebugLayers;
             args.moduleName = moduleName;
             args.testName = test.testName;
 
@@ -5068,8 +5063,7 @@ SlangResult innerMain(int argc, char** argv)
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);
 
-            // Try the unit tests up to 3 times
-            for (bool isRetry : {false, true, true})
+            for (bool isRetry : {false, true})
             {
                 auto spawnType = context.getFinalSpawnType();
                 context.isRetry = isRetry;
