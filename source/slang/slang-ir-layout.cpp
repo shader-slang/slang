@@ -172,13 +172,6 @@ static Result _calcSizeAndAlignment(
                 {
                     offset = offsetDecor->getOffset()->getValue();
                 }
-                else if (auto packOffsetDecoration =
-                        field->getKey()->findDecoration<IRPackOffsetDecoration>())
-                {
-                    offset =
-                        packOffsetDecoration->getRegisterOffset()->getValue() * 16 +
-                        packOffsetDecoration->getComponentOffset()->getValue() * 4;
-                }
                 else
                 {
                     offset = rules->adjustOffset(
