@@ -5333,7 +5333,8 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
         // Skip resource types in this pass.
         if (isResourceType(inst->getDataType()))
             continue;
-
+        if (as<IRInterfaceRequirementEntry>(inst))
+            continue;
         ensureGlobalInst(&ctx, inst, EmitAction::Level::Definition);
     }
 }
