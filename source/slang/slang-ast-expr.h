@@ -760,6 +760,7 @@ class PointerTypeExpr : public Expr
     FIDDLE() TypeExp base;
 };
 
+/// A type expression that represents a some type, e.g. `some T`
 FIDDLE()
 class SomeTypeExpr : public Expr
 {
