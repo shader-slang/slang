@@ -34,12 +34,6 @@ static bool isAssociatedTypeDecl(Decl* decl)
     return false;
 }
 
-static bool isSlang2025OrOlder(SemanticsVisitor* visitor)
-{
-    return visitor->getShared()->m_module->getModuleDecl()->languageVersion <=
-           SLANG_LANGUAGE_VERSION_2025;
-}
-
 bool isSlang2026OrLater(SemanticsVisitor* visitor)
 {
     return visitor->getShared()->m_module->getModuleDecl()->languageVersion >=
@@ -51,12 +45,12 @@ static bool allowExperimentalDynamicDispatch(
     CompilerOptionSet& optionSet)
 {
     return optionSet.getBoolOption(CompilerOptionName::EnableExperimentalDynamicDispatch) ||
-           isSlang2025OrOlder(visitor);
+           !isSlang2026OrLater(visitor);
 }
 
 static bool isImplicitDyn(SemanticsVisitor* visitor)
 {
-    return isSlang2025OrOlder(visitor);
+    return !isSlang2026OrLater(visitor);
 }
 
 static bool validateVarDeclDyn(SemanticsVisitor* visitor)
@@ -90,75 +84,71 @@ static Type* createUnboundSomeTypeDeclType(
     return DeclRefType::create(astBuilder, decl);
 }
 
-static void maybeCreateUnboundSomeTypeDeclFromReturnType(FuncDecl* funcDecl, ASTBuilder* astBuilder)
+static void maybeCreateUnboundSomeType(Decl* decl, ASTBuilder* astBuilder)
 {
-    // If type is `out` (not implementing complex-expression `Out<>`) or uninitialized VarDecl we
-    // make an UnboundSomeType given a SomeType
-    auto someType = isDeclRefTypeOf<SomeTypeDecl>(funcDecl->returnType.type);
-    if (!someType)
-        return;
-    funcDecl->returnType.type =
-        createUnboundSomeTypeDeclType(astBuilder, someType.getDecl(), funcDecl->loc);
-}
-
-static void maybeCreateUnboundSomeTypeDeclFromVarDecl(VarDeclBase* varDecl, ASTBuilder* astBuilder)
-{
-    // If type is `out` or uninitialized we
-    // make an UnboundSomeType
-    auto someType = isDeclRefTypeOf<SomeTypeDecl>(varDecl->type.type);
-    if (someType &&
-        (as<VarDecl>(varDecl) || as<ParamDecl>(varDecl) && !varDecl->hasModifier<InOutModifier>() &&
-                                     varDecl->hasModifier<OutModifier>()))
+    if(auto varDecl = as<VarDeclBase>(decl))
     {
-        varDecl->type.type =
-            createUnboundSomeTypeDeclType(astBuilder, someType.getDecl(), varDecl->loc);
+        // If type is `out` or a local-var we make an UnboundSomeType
+        auto someType = isDeclRefTypeOf<SomeTypeDecl>(varDecl->type.type);
+        if (someType &&
+            (as<VarDecl>(varDecl) || as<ParamDecl>(varDecl) && !varDecl->hasModifier<InOutModifier>() &&
+                                        varDecl->hasModifier<OutModifier>()))
+        {
+            varDecl->type.type =
+                createUnboundSomeTypeDeclType(astBuilder, someType.getDecl(), varDecl->loc);
+        }
+    }
+    else if(auto funcDecl = as<FuncDecl>(decl))
+    {
+        // This case assumes a FuncDecl input means we want to change the return-type.
+        // All returns are an `UnboundSomeType` since we need to assign types to
+        // a `some` type when returning, this is the purpose of the `UnboundSomeType`.
+        auto someType = isDeclRefTypeOf<SomeTypeDecl>(funcDecl->returnType.type);
+        if (!someType)
+            return;
+        funcDecl->returnType.type =
+            createUnboundSomeTypeDeclType(astBuilder, someType.getDecl(), funcDecl->loc);
     }
 }
 
-static void forceInterfaceQualifierToType(Decl* decl, TypeExp& type, SemanticsVisitor* visitor)
+static void forceInterfaceQualifierToType(SemanticsVisitor* visitor, Decl* decl, TypeExp type)
 {
     ASTBuilder* astBuilder = visitor->getASTBuilder();
-
-    auto declType = type.type;
-    auto explicitSome = isDeclRefTypeOf<SomeTypeDecl>(declType);
     auto explicitDyn = decl->hasModifier<DynModifier>();
 
-    if (explicitSome && explicitDyn)
+    if(auto interfaceDecl = as<InterfaceDecl>(decl))
     {
-        visitor->getSink()->diagnose(decl, Diagnostics::cannotBeSomeTypeAndDynType);
-        return;
+        // AnyValueSize means we are dyn, it is equivlent to having an explicit "dyn"
+        if (!explicitDyn && interfaceDecl->hasModifier<AnyValueSizeAttribute>())
+            addModifier(interfaceDecl, astBuilder->create<DynModifier>());
     }
-
-    // Add implicit qualifers
-    if (!explicitSome && !explicitDyn)
+    else
     {
-        auto interfaceTypeDeclRef = isDeclRefTypeOf<InterfaceDecl>(type.type);
-        if (!interfaceTypeDeclRef)
+        auto declType = type.type;
+        auto explicitSome = isDeclRefTypeOf<SomeTypeDecl>(declType);
+
+        if (explicitSome && explicitDyn)
+        {
+            visitor->getSink()->diagnose(decl, Diagnostics::cannotBeSomeTypeAndDynType);
             return;
+        }
 
-        if (isImplicitDyn(visitor))
-            addModifier(decl, astBuilder->create<DynModifier>());
-        else if (isImplicitSome(visitor))
-            type.type = createSomeTypeDeclType(astBuilder, type, decl->loc);
+        // Add implicit qualifers
+        if (!explicitSome && !explicitDyn)
+        {
+            auto interfaceTypeDeclRef = isDeclRefTypeOf<InterfaceDecl>(type.type);
+            if (!interfaceTypeDeclRef)
+                return;
+
+            if (isImplicitDyn(visitor))
+                addModifier(decl, astBuilder->create<DynModifier>());
+            else if (isImplicitSome(visitor))
+                type.type = createSomeTypeDeclType(astBuilder, type, decl->loc);
+        }
     }
 }
 
-static void assignInterfaceDefinitionDynModifier(
-    SemanticsDeclVisitorBase* visitor,
-    InterfaceDecl* interfaceDecl)
-{
-    if (interfaceDecl->hasModifier<DynModifier>())
-        return;
-
-    // AnyValueSize means we are dyn
-    if (interfaceDecl->hasModifier<AnyValueSizeAttribute>())
-    {
-        addModifier(interfaceDecl, visitor->getASTBuilder()->create<DynModifier>());
-        return;
-    }
-}
-
-static bool isVarDeclBaseSomeType(VarDeclBase* varDeclBase)
+static bool isSomeTypeDecl(VarDeclBase* varDeclBase)
 {
     if (!varDeclBase)
         return false;
@@ -182,16 +172,16 @@ static void validateSomeAndDynVarDeclUsage(SemanticsDeclVisitorBase* visitor, Va
     auto sink = visitor->getSink();
     auto optionSet = visitor->getOptionSet();
 
-    forceInterfaceQualifierToType(decl, decl->type, visitor);
+    forceInterfaceQualifierToType(visitor, decl, decl->type);
 
-    if (isVarDeclBaseSomeType(decl))
+    if (isSomeTypeDecl(decl))
     {
         if (as<StructDecl>(decl->parentDecl))
             sink->diagnose(decl, Diagnostics::cannotHaveSomeTypeStructMember);
         if (isGlobalDecl(decl))
             sink->diagnose(decl, Diagnostics::cannotHaveSomeTypeGlobalVariable);
 
-        maybeCreateUnboundSomeTypeDeclFromVarDecl(decl, visitor->getASTBuilder());
+        maybeCreateUnboundSomeType(decl, visitor->getASTBuilder());
     }
     else if (isVarDeclBaseDynType(decl))
     {
@@ -287,13 +277,15 @@ static void validateDynInterfaceUsage(SemanticsDeclVisitorBase* visitor, Interfa
 
 static void validateSomeAndDynFuncDeclUsage(SemanticsDeclVisitorBase* visitor, FuncDecl* funcDecl)
 {
-    forceInterfaceQualifierToType(funcDecl, funcDecl->returnType, visitor);
-    maybeCreateUnboundSomeTypeDeclFromReturnType(funcDecl, visitor->getASTBuilder());
+    forceInterfaceQualifierToType(visitor, funcDecl, funcDecl->returnType);
+    maybeCreateUnboundSomeType(funcDecl, visitor->getASTBuilder());
 
     CompilerOptionSet& optionSet = visitor->getOptionSet();
     if (allowExperimentalDynamicDispatch(visitor, optionSet))
         return;
 
+    // The rest of the function validates use of the `funcDecl` 
+    // as a child of a `dyn interface` type.
     if (!funcDecl->parentDecl->hasModifier<DynModifier>())
         return;
 
@@ -318,7 +310,7 @@ static void validateSomeAndDynFuncDeclUsage(SemanticsDeclVisitorBase* visitor, F
     if (funcDecl->returnType && isDeclRefTypeOf<SomeTypeDecl>(funcDecl->returnType.type))
         sink->diagnose(funcDecl, Diagnostics::cannotReturnSomeTypeInDynInterface);
     for (auto param : funcDecl->getParameters())
-        if (isVarDeclBaseSomeType(param))
+        if (isSomeTypeDecl(param))
             sink->diagnose(funcDecl, Diagnostics::cannotHaveSomeTypeParamInDynInterface);
 }
 
@@ -1906,7 +1898,7 @@ void SemanticsDeclModifiersVisitor::visitInterfaceDecl(InterfaceDecl* interfaceD
 {
     visitDecl(interfaceDecl);
 
-    assignInterfaceDefinitionDynModifier(this, interfaceDecl);
+    forceInterfaceQualifierToType(this, interfaceDecl, {});
     validateDynInterfaceUsage(this, interfaceDecl);
 }
 
@@ -14120,7 +14112,8 @@ DeclVisibility SemanticsVisitor::getDeclVisibility(Decl* decl)
     }
     if (auto someTypeDecl = as<SomeTypeDecl>(decl))
     {
-        return getTypeVisibility(someTypeDecl->interfaceType);
+        if(auto parentContainor = this->getParentFuncOfVisitor())
+            return getDeclVisibility(parentContainor);
     }
     // Interface members will always have the same visibility as the interface itself.
     if (auto interfaceDecl = findParentInterfaceDecl(decl))

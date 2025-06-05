@@ -2441,6 +2441,13 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                     return CreateErrorExpr(subscriptExpr);
                 }
             }
+            // Validate that the base-array type is of valid type
+            if (auto someTypeDecl = isDeclRefTypeOf<SomeTypeDecl>(baseTypeType->getType()))
+            {
+                getSink()->diagnose(
+                    subscriptExpr,
+                    Diagnostics::someCannotAppearInComplexExpression);
+            }
         }
         else if (subscriptExpr->indexExprs.getCount() != 0)
         {

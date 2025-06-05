@@ -27,6 +27,9 @@ void computeMain()
     some Tuple<some IFoo, int> bad4;
 // CHECK-DAG: error 33088
     IFooGeneric<some IFoo> bad5;
+    // CHECK-DAG: error 33088
+    some IFoo bad6[2];
+
 
     buffer[0] = 0;
 }

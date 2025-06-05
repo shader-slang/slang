@@ -1207,9 +1207,13 @@ bool SemanticsVisitor::_coerce(
     // Manages coerce rules for `SomeTypeDecl` and `UnboundSomeTypeDecl`.
     // Primarily this function diagnoses incorrect `SomeTypeDecl` coercing.
     // To coerce this function unwraps the inner interface type of a `SomeTypeDecl`.
-    if (tryCoerceSomeType(site, toType, outToExpr, fromType, fromExpr, sink, outCost))
-        return true;
-
+    if(isDeclRefTypeOf<SomeTypeDecl>(toType) || isDeclRefTypeOf<SomeTypeDecl>(fromType))
+    {
+        // We do not immediatly error since conversions may still happen
+        // later on
+        if(tryCoerceSomeType(site, toType, outToExpr, fromType, fromExpr, sink, outCost))
+            return true;
+    }
     // Assume string literals are convertible to any string type.
     if (as<StringLiteralExpr>(fromExpr) && as<StringTypeBase>(toType))
     {
@@ -1879,7 +1883,7 @@ bool SemanticsVisitor::_coerce(
     return _failedCoercion(toType, outToExpr, fromExpr, sink);
 }
 
-static bool isDynGivenType(Type* type)
+static bool isDynType(Type* type)
 {
     return !isDeclRefTypeOf<SomeTypeDecl>(type) && isDeclRefTypeOf<InterfaceDecl>(type);
 }
@@ -1911,7 +1915,7 @@ bool SemanticsVisitor::tryCoerceSomeType(
             }
         }
         // Assigning `dyn` to `some` (`UnboundSomeType` and `SomeType`) is always an error.
-        else if (isDynGivenType(fromType))
+        else if (isDynType(fromType))
         {
             sink->diagnose(fromExpr->loc, Diagnostics::cannotAssignDynTypeToSomeType);
             return false;
@@ -1931,7 +1935,7 @@ bool SemanticsVisitor::tryCoerceSomeType(
     // If we have a SomeType on RHS, we are only allowed to copy if LHS is `dyn`
     if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(fromType))
     {
-        if (isDynGivenType(toType))
+        if (isDynType(toType))
             return _coerce(
                 site,
                 toType,
