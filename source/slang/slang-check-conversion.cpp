@@ -1888,7 +1888,6 @@ static bool isDynType(Type* type)
     return !isDeclRefTypeOf<SomeTypeDecl>(type) && isDeclRefTypeOf<InterfaceDecl>(type);
 }
 
-// TODO make member of SemanticsVisitor
 bool SemanticsVisitor::tryCoerceSomeType(
     CoercionSite site,
     Type* toType,
