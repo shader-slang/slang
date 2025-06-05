@@ -6,7 +6,6 @@
 // CHECK: optixCoopVecAdd
 // CHECK: optixCoopVecCvt
 // CHECK: optixCoopVecFFMA
-// CHECK__: optixCoopVecMatMul
 // CHECK: optixCoopVecMax
 // CHECK: optixCoopVecMin
 // CHECK: optixCoopVecMul

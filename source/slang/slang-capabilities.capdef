@@ -244,7 +244,7 @@ def _cuda_sm_6_0 : _cuda_sm_5_0;
 def _cuda_sm_7_0 : _cuda_sm_6_0;
 def _cuda_sm_8_0 : _cuda_sm_7_0;
 def _cuda_sm_9_0 : _cuda_sm_8_0;
-/// Represents capabilities required optix cooperative vector support.
+/// Represents capabilities required for optix cooperative vector support.
 def optix_coopvec : _cuda_sm_9_0;
 
 /// All code-gen targets

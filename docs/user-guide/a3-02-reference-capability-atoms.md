@@ -1323,7 +1323,7 @@ Other
 *Capabilities which may be deprecated*
 
 `optix_coopvec`
-> Represents capabilities required optix cooperative vector support.
+> Represents capabilities required for optix cooperative vector support.
 
 `SPIRV_1_0`
 > Use `spirv_1_0` instead

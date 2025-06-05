@@ -24416,7 +24416,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         case hlsl_coopvec_poc:
             __intrinsic_asm ".CopyFrom";
         case optix_coopvec:
-            __intrinsic_asm "optixCoopVecCvt<$T0>(*($0));";
+            __intrinsic_asm "optixCoopVecCvt<$TR>(*($0));";
         default:
             if (__isFloat<T>() && __isInt<U>())
                 this = __int_to_float_cast<T>(other);
@@ -26791,25 +26791,20 @@ CoopVec<T, M> coopVecMatMulAdd(
 {
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
                  , "for packed inputInterpretation values please use coopVecMatMulPacked and specify k manually");
-
-    __target_switch
-    {
-    default:
-        return coopVecMatMulAddPacked<
-            T, M, K, U>(
-            input,
-            inputInterpretation,
-            K,
-            matrix,
-            matrixOffset,
-            matrixInterpretation,
-            bias,
-            biasOffset,
-            biasInterpretation,
-            memoryLayout,
-            transpose,
-            matrixStride);
-    }
+    return coopVecMatMulAddPacked<
+        T, M, K, U>(
+        input,
+        inputInterpretation,
+        K,
+        matrix,
+        matrixOffset,
+        matrixInterpretation,
+        bias,
+        biasOffset,
+        biasInterpretation,
+        memoryLayout,
+        transpose,
+        matrixStride);
 }
 
 //

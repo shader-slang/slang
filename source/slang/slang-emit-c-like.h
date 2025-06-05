@@ -745,6 +745,7 @@ protected:
     // Indicates if we are emiting for DXC cooperative vector POC.
     bool isCoopvecPoc = false;
 
+    // Indicates if we are emiting for Optix cooperative vector.
     bool isOptixCoopVec = false;
 };
 
