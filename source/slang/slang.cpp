@@ -2029,6 +2029,31 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
     return SLANG_OK;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getDynamicObjectRTTIBytes(
+    slang::TypeReflection* type,
+    slang::TypeReflection* interfaceType,
+    uint32_t* outBuffer,
+    uint32_t bufferSize)
+{
+    // Slang RTTI header format:
+    // byte 0-7: pointer to RTTI struct describing the type. (not used for now, set to 1 for valid
+    // types, and 0 to represent null).
+    // byte 8-11: 32-bit sequential ID of the type conformance witness.
+    // byte 12-15: unused.
+
+    if (bufferSize < 16)
+        return SLANG_E_BUFFER_TOO_SMALL;
+
+    SLANG_AST_BUILDER_RAII(getASTBuilder());
+
+    SLANG_RETURN_ON_FAIL(getTypeConformanceWitnessSequentialID(type, interfaceType, outBuffer + 2));
+
+    // Make the RTTI part non zero.
+    outBuffer[0] = 1;
+
+    return SLANG_OK;
+}
+
 SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createTypeConformanceComponentType(
     slang::TypeReflection* type,
     slang::TypeReflection* interfaceType,
@@ -2515,6 +2540,16 @@ void TranslationUnitRequest::addSource(IArtifact* sourceArtifact, SourceFile* so
     _addSourceFile(sourceFile);
 }
 
+void TranslationUnitRequest::addIncludedSourceFileIfNotExist(SourceFile* sourceFile)
+{
+    if (m_includedFileSet.contains(sourceFile))
+        return;
+
+    sourceFile->setIncludedFile();
+    m_sourceFiles.add(sourceFile);
+    m_includedFileSet.add(sourceFile);
+}
+
 PathInfo TranslationUnitRequest::_findSourcePathInfo(IArtifact* artifact)
 {
     auto pathRep = findRepresentation<IPathArtifactRepresentation>(artifact);
@@ -2627,7 +2662,6 @@ void TranslationUnitRequest::_addSourceFile(SourceFile* sourceFile)
 
 List<SourceFile*> const& TranslationUnitRequest::getSourceFiles()
 {
-    SLANG_ASSERT(m_sourceArtifacts.getCount() == m_sourceFiles.getCount());
     return m_sourceFiles;
 }
 
@@ -3047,8 +3081,15 @@ FrontEndCompileRequest::FrontEndCompileRequest(
 struct FrontEndPreprocessorHandler : PreprocessorHandler
 {
 public:
-    FrontEndPreprocessorHandler(Module* module, ASTBuilder* astBuilder, DiagnosticSink* sink)
-        : m_module(module), m_astBuilder(astBuilder), m_sink(sink)
+    FrontEndPreprocessorHandler(
+        Module* module,
+        ASTBuilder* astBuilder,
+        DiagnosticSink* sink,
+        TranslationUnitRequest* translationUnit)
+        : m_module(module)
+        , m_astBuilder(astBuilder)
+        , m_sink(sink)
+        , m_translationUnit(translationUnit)
     {
     }
 
@@ -3056,6 +3097,7 @@ protected:
     Module* m_module;
     ASTBuilder* m_astBuilder;
     DiagnosticSink* m_sink;
+    TranslationUnitRequest* m_translationUnit = nullptr;
 
     // The first task that this handler tries to deal with is
     // capturing all the files on which a module is dependent.
@@ -3067,6 +3109,7 @@ protected:
     void handleFileDependency(SourceFile* sourceFile) SLANG_OVERRIDE
     {
         m_module->addFileDependency(sourceFile);
+        m_translationUnit->addIncludedSourceFileIfNotExist(sourceFile);
     }
 
     // The second task that this handler deals with is detecting
@@ -3333,6 +3376,9 @@ static void _outputIncludes(
     // For all the source files
     for (SourceFile* sourceFile : sourceFiles)
     {
+        if (sourceFile->isIncludedFile())
+            continue;
+
         // Find an initial view (this is the view of this file, that doesn't have an initiating loc)
         SourceView* sourceView = _findInitialSourceView(sourceFile);
         if (!sourceView)
@@ -3404,7 +3450,7 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
     // preprocessoing can be communicated to later phases of
     // compilation.
     //
-    FrontEndPreprocessorHandler preprocessorHandler(module, astBuilder, getSink());
+    FrontEndPreprocessorHandler preprocessorHandler(module, astBuilder, getSink(), translationUnit);
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
@@ -4136,6 +4182,9 @@ void Linkage::loadParsedModule(
         if (errorCountAfter != errorCountBefore)
         {
             // There must have been an error in the loaded module.
+            // Remove from maps if there were errors during semantic checking
+            mapPathToLoadedModule.remove(mostUniqueIdentity);
+            mapNameToLoadedModules.remove(name);
         }
         else
         {
@@ -4925,7 +4974,11 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
     fileDecl->parentDecl = module->getModuleDecl();
     module->getIncludedSourceFileMap().add(sourceFile, fileDecl);
 
-    FrontEndPreprocessorHandler preprocessorHandler(module, module->getASTBuilder(), sink);
+    FrontEndPreprocessorHandler preprocessorHandler(
+        module,
+        module->getASTBuilder(),
+        sink,
+        translationUnit);
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
     SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
     SlangLanguageVersion slangLanguageVersion = module->getModuleDecl()->languageVersion;

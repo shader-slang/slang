@@ -5063,8 +5063,7 @@ SlangResult innerMain(int argc, char** argv)
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);
 
-            // Try the unit tests up to 3 times
-            for (bool isRetry : {false, true, true})
+            for (bool isRetry : {false, true})
             {
                 auto spawnType = context.getFinalSpawnType();
                 context.isRetry = isRetry;
