@@ -7,7 +7,7 @@ permalink: /user-guide/glsl-target-specific
 
 This page documents features and behaviors unique to the GLSL target in Slang. For any features or translation rules that are identical to the SPIR-V target, see the [SPIR-V Target Specific](./a2-01-spirv-target-specific.md) page.
 
-> **Note:** The GLSL target in Slang is currently less mature than the SPIR-V target and has several known limitations. While basic functionality works, some advanced features may not be fully supported or may behave differently than expected. Due to fundamental differences between GLSL and HLSL/SPIR-V, the GLSL target is not expected to achieve feature parity with the SPIR-V backend. We recommend using the SPIR-V target for more complete and reliable shader compilation. This document is a work in progress and will be updated as the GLSL target matures and more limitations are documented.
+> **Note:** The GLSL target in Slang is currently less mature than the SPIR-V target and has several known limitations. While basic functionality works, some advanced features may not be fully supported or may behave differently than expected. Due to fundamental limitations of GLSL, the GLSL target is not expected to achieve feature parity with other backends. For cross-platform use cases, we recommend using the SPIR-V target for more complete and reliable shader compilation. This document is a work in progress and will be updated as the GLSL target matures and more limitations are documented.
 
 ## Combined Texture Sampler
 
@@ -66,15 +66,15 @@ Slang attributes such as `[[vk::location]]`, `[[vk::binding]]`, etc., are mapped
 Relevant options for GLSL output:
 
 ### -profile glsl_<version>
-Select the GLSL version to target (e.g., -profile glsl_450).
+Select the GLSL version to target (e.g., `-profile glsl_450`).
 
 ### -force-glsl-scalar-layout
 Use scalar layout for buffer types.
-Note that scalar layout is generally only supported by Vulkan consumers of GLSL, and likely aren't usable for OpenGL.
+
+> **Note:** Scalar layout is generally only supported by Vulkan consumers of GLSL, and is not expected to be usable for OpenGL.
 
 ### -fvk-use-dx-layout
 Use D3D buffer layout rules.
-The GLSL target does not correctly handle the constant buffer packing case where a float3 would not be aligned to 16 bytes.
 
 ### -fvk-use-gl-layout
 Use std430 layout for raw buffer load/stores.
@@ -84,5 +84,7 @@ Emit GLSL-style `#line` directives.
 
 ### -default-downstream-compiler glsl <compiler>
 Set the downstream GLSL compiler (e.g., glslang).
+
+> **Note:** The GLSL target has a known limitation with constant buffer packing for 3-element vectors, where it cannot always reproduce the same exact buffer layout. For example, when a 3-element vector follows a scalar in a constant buffer, the alignment differs from a 4-element vector, causing incorrect packing.
 
 For all other behaviors, translation rules, and advanced features, refer to the [SPIR-V Target Specific](./a2-01-spirv-target-specific.md) page.
