@@ -1106,7 +1106,7 @@ struct SpecializationContext
                     // existential specialization, simplifications, etc.)
                     //
                     if (inst->hasUses() || inst->mightHaveSideEffects() || isWitnessTableType(inst))
-                    { 
+                    {
                         hasSpecialization |= maybeSpecializeInst(inst);
                     }
 

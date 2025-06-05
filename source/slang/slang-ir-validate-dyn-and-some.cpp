@@ -85,12 +85,6 @@ struct ValidateDynAndSomeUsage
                     // We assume worst case, so if 1 block has 1 assignment
                     // and rest have 0, we assume the entire block to have 1 assignment.
 
-                    /*
-                    we need to step through a mini cfg since `uses` does not store which
-                    if-else-chain a inst comes from; this is important because 1 write inside an if
-                    and 1 write inside an else block is considered 1 write total
-                    */
-
                     IRIfElse* ifElseOp = as<IRIfElse>(instToCheck);
                     int total = 0;
 
@@ -119,10 +113,10 @@ struct ValidateDynAndSomeUsage
                     // are not-unrollable, therefore if this loop runs with an
                     // assignment we must fail.
                     //
-                    // part of loop logic is TargetBlock->BreakBlock. This is an
+                    // Part of loop logic is TargetBlock->BreakBlock. This is an
                     // issue since the BreakBlock is outside the loop, so we need to
                     // visit the BreakBlock first to ensure we can remove the total
-                    // assignments from the BreakBlock from the for-loop assignment count
+                    // assignments from the BreakBlock from the for-loop assignment count.
 
                     int totalAssignmentsPostLoop =
                         collectAssignmentsInBlock(var, loopOp->getBreakBlock());
@@ -139,6 +133,7 @@ struct ValidateDynAndSomeUsage
                 }
             case kIROp_Switch:
                 {
+                    // Run through each `case` block.
                     IRSwitch* switchOp = as<IRSwitch>(instToCheck);
                     int total = 0;
                     for (auto i = 0; i < switchOp->getCaseCount(); i++)
@@ -153,7 +148,7 @@ struct ValidateDynAndSomeUsage
                 }
             case kIROp_unconditionalBranch:
                 {
-                    // just run through all elements of the branch
+                    // Just run through all elements of the branch.
                     IRUnconditionalBranch* branchOp = as<IRUnconditionalBranch>(instToCheck);
                     int totalAssignments =
                         collectAssignmentsInBlock(var, branchOp->getTargetBlock());
@@ -183,7 +178,6 @@ struct ValidateDynAndSomeUsage
             if (!block)
                 return 0;
 
-
             // any repeat blocks found need to be fetched from cache
             if (auto cachedTotal = getFromCache(block))
                 return *cachedTotal;
@@ -211,20 +205,16 @@ struct ValidateDynAndSomeUsage
             return total;
         }
 
-        // returns nullptr if the var was not written more than once,
-        // otherwise returns the inst that wrote it more than once.
         void ensureLocalVarIsWrittenOnce(IRInst* var)
         {
-            // Idea here is we need to walk every IRBlock to figure out if we have 2 assignments to
-            // our variable in question. We cannot look at IRUse's since these would show 2
-            // `IRStore` in cases with branches without a clear connection between the 2:
-            /*
-                some Type myVar;
-                if(thing[0])
-                    myVar = Thing();
-                else
-                    myVar = Thing();
-            */
+            // We need to walk every IRBlock to figure out if it is possible
+            // for our variable to be assigned 2+ times in a program.
+            //
+            // We need to step through the control-flow of the IR since `uses` does not store which
+            // if-else-chain/block a inst comes from. This is important because 1 write inside an if
+            // and 1 write inside an else block is considered 1 write total and we need to
+            // track this.
+
             auto parentToTraverse = as<IRBlock>(var->getParent());
             collectAssignmentsInBlock(var, parentToTraverse);
         }
@@ -249,7 +239,8 @@ struct ValidateDynAndSomeUsage
         ValidateDynAndSomeUsage* m_context = nullptr;
         IRInst* promisedValueType = nullptr;
         IRInst* originalPromisedInst = nullptr;
-        // Essentially, we are breaking down every IR op into such a way that
+        
+        // We are breaking down every IR op into such a way that
         // either we are exactly the same (type or value) or not the same at all
         IRInst* getValueToCompareWith(IRInst* inst)
         {
@@ -293,22 +284,20 @@ struct ValidateDynAndSomeUsage
                     {
                     case kIROp_Store:
                         {
-                            // always considered 1 assignment
+                            // Always considered an assignment
                             IRStore* storeOp = as<IRStore>(user);
                             if (storeOp->getPtr() != var)
                                 return;
-
                             validateAgainstPromisedOutValueType(storeOp->getVal());
                             return;
                         }
                     case kIROp_Call:
                         {
-                            // If `var` is an `out` param, we need to add 1 to the total assignments
+                            // If `var` is an `out` param, we have an assignment
                             IRCall* callOp = as<IRCall>(user);
                             auto outParamType = m_context->isVarAnOutParam(var, callOp);
                             if (!outParamType)
                                 return;
-
                             validateAgainstPromisedOutValueType(callOp);
                             return;
                         }
@@ -346,10 +335,9 @@ struct ValidateDynAndSomeUsage
                     // Ensure written once
                     ValidateSingleWrite(this, inst);
                     
-                    // Ensure `out` var is only written by the same value-type
+                    // Ensure `out` var is only assigned the same value-types
                     if (op != kIROp_Param || !as<IROutType>(inst->getFullType()))
                         continue;
-
                     ValidateWritingSameValueTypeToOut(this, inst);
                 }
             }
@@ -359,9 +347,6 @@ struct ValidateDynAndSomeUsage
 
 void validateDynAndSomeUsage(IRModule* module, DiagnosticSink* sink)
 {
-    
-    //Validation happening here:
-    // * ensure `some` var is assigned once
     ValidateDynAndSomeUsage(module, sink);
 }
 

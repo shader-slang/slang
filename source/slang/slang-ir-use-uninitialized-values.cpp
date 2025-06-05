@@ -563,27 +563,7 @@ static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, Di
     }
 }
 
-static void errorOrWarn(
-    DiagnosticSink* sink,
-    bool isError,
-    DiagnosticInfo warning,
-    DiagnosticInfo error,
-    IRInst* variable,
-    IRInst* location)
-{
-    if (!isError)
-        sink->diagnose(
-            location,
-            warning,
-            variable);
-    else
-        sink->diagnose(
-            location,
-            error,
-            variable);
-}
-
-static bool maybeEmitInterfaceError(IRInst* inst)
+static bool isUnusedInterfaceType(IRInst* inst)
 {
     auto type = inst->getFullType();
     if (auto ptr = as<IRPtrTypeBase>(type))
@@ -602,25 +582,22 @@ static void checkParameterAsOut(
     auto loads = getUnresolvedParamLoads(reachability, func, param);
     for (auto load : loads)
     {
-        DiagnosticInfo warning;
-        DiagnosticInfo error;
+        DiagnosticInfo diagnostic;
         if (as<IRTerminatorInst>(load))
         {
-            warning = Diagnostics::returningWithUninitializedOutWarning;
-            error = Diagnostics::returningWithUninitializedOutInterfaceError;
+            diagnostic = isUnusedInterfaceType(param) ? Diagnostics::returningWithUninitializedOutWarning
+                : Diagnostics::returningWithUninitializedOutInterfaceError;
         }
         else
         {
-            warning = Diagnostics::usingUninitializedOutWarning;
-            error = Diagnostics::usingUninitializedOutInterfaceError;
+          diagnostic = isUnusedInterfaceType(param) ? Diagnostics::usingUninitializedOutWarning
+                : Diagnostics::usingUninitializedOutInterfaceError;
         }
-        errorOrWarn(
-            sink,
-            maybeEmitInterfaceError(param),
-            warning,
-            error,
-            param,
-            load);
+
+        sink->diagnose(
+            load,
+            diagnostic,
+            param);
     }
 }
 
@@ -677,12 +654,11 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
             auto loads = getUnresolvedVariableLoads(reachability, inst);
             for (auto load : loads)
             {
-                errorOrWarn(sink,
-                    maybeEmitInterfaceError(inst),
-                    Diagnostics::usingUninitializedVariableWarning,
-                    Diagnostics::usingUninitializedInterfaceVariableError,
-                    inst,
-                    load);
+                Diagnostics diagnostic = maybeEmitInterfaceError(inst) ? Diagnostics::usingUninitializedVariableWarning : Diagnostics::usingUninitializedInterfaceVariableError;
+                sink->diagnose(
+                    load,
+                    diagnostic,
+                    inst);
             }
         }
     }

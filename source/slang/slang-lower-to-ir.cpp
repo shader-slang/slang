@@ -9089,7 +9089,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         LoweredValInfo varVal = createVar(context, varType, decl);
         maybeAddDebugLocationDecoration(context, varVal.val);
-        
+
         if (auto initExpr = decl->initExpr)
         {
             assignExpr(context, varVal, initExpr, decl->loc);
