@@ -37,5 +37,5 @@ Slang language version 2025 brings these changes on top of the legacy language:
 
 Slang language 2026 brings these changes on top of Slang 2025:
 
-- Comma expression is removed when it is used inside a parenthesis. The expression `(a, b)` no longer evaluates to have `b`'s type as in C/C++. Instead, `(a,b)` means `makeTuple(a,b)` and returns a tuple consists of `a` and `b`.
+- Comma expression is removed when it is used inside a parenthesis. The expression `(a, b)` no longer evaluates to have `b`'s type as in C/C++. Instead, `(a,b)` means `makeTuple(a,b)` and returns a tuple consists of `a` and `b`. See [SP#027](https://github.com/shader-slang/spec/blob/main/proposals/027-tuple-syntax.md) for details.
 - User must explicitly opt-in to enable dynamic dispatch with `dyn` keyword. More rigorous validation are enabled to make sure dynamic dispatch is not triggerred accidentally. See [SP#024](https://github.com/shader-slang/spec/blob/main/proposals/024-any-dyn-types.md) for details.
