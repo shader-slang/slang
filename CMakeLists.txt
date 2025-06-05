@@ -241,16 +241,8 @@ advanced_option(
     OFF
 )
 
-if(${SLANG_USE_SYSTEM_LZ4})
-    add_compile_definitions(SLANG_USE_SYSTEM_LZ4_HEADER)
-endif()
-
 if(${SLANG_USE_SYSTEM_SPIRV_HEADERS})
     add_compile_definitions(SLANG_USE_SYSTEM_SPIRV_HEADER)
-endif()
-
-if(${SLANG_USE_SYSTEM_UNORDERED_DENSE})
-    add_compile_definitions(SLANG_USE_SYSTEM_UNORDERED_DENSE_HEADER)
 endif()
 
 if(SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
