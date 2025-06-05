@@ -27,7 +27,7 @@ struct CompilerOptionSet;
 /// Align `value` to the next multiple of `alignment`, which must be a power of two.
 inline IRIntegerValue align(IRIntegerValue value, int alignment)
 {
-    //SLANG_ASSERT((alignment != 0U) && ((alignment - 1U) & alignment) == 0U);
+    // SLANG_ASSERT((alignment != 0U) && ((alignment - 1U) & alignment) == 0U);
     return (value + alignment - 1) & ~IRIntegerValue(alignment - 1);
 }
 

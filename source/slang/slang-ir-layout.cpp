@@ -152,7 +152,7 @@ static Result _calcSizeAndAlignment(
             IRSizeAndAlignment structLayout;
             IRIntegerValue offset = 0;
             IRIntegerValue lastFieldAlignment = 0;
-            IRType *lastFieldType = NULL;
+            IRType* lastFieldType = NULL;
             bool seenFinalUnsizedArrayField = false;
             for (auto field : structType->getFields())
             {
@@ -576,8 +576,7 @@ struct Std430LayoutRules : IRTypeLayoutRules
         IRIntegerValue lastFieldAlignment)
     {
         SLANG_UNUSED(elementSize);
-        if (as<IRMatrixType>(lastFieldType) ||
-            as<IRArrayTypeBase>(lastFieldType) ||
+        if (as<IRMatrixType>(lastFieldType) || as<IRArrayTypeBase>(lastFieldType) ||
             as<IRStructType>(lastFieldType))
         {
             return align(offset, (int)lastFieldAlignment);
@@ -614,8 +613,7 @@ struct Std140LayoutRules : IRTypeLayoutRules
         IRIntegerValue lastFieldAlignment)
     {
         SLANG_UNUSED(elementSize);
-        if (as<IRMatrixType>(lastFieldType) ||
-            as<IRArrayTypeBase>(lastFieldType) ||
+        if (as<IRMatrixType>(lastFieldType) || as<IRArrayTypeBase>(lastFieldType) ||
             as<IRStructType>(lastFieldType))
         {
             return align(offset, (int)lastFieldAlignment);
