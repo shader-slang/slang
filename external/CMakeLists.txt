@@ -103,29 +103,31 @@ target_include_directories(
 )
 
 # SPIRV-Headers
-if(NOT ${SLANG_USE_SYSTEM_SPIRV_HEADERS})
-    if(NOT SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
-        add_subdirectory(spirv-headers EXCLUDE_FROM_ALL ${system})
-    else()
-        add_subdirectory(
-            ${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/spirv-headers
-            spirv-headers
-            EXCLUDE_FROM_ALL
-            ${system}
-        )
-    endif()
+if(${SLANG_USE_SYSTEM_SPIRV_HEADERS})
+    find_package(SPIRV-Headers REQUIRED)
+elseif(NOT SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
+    add_subdirectory(spirv-headers EXCLUDE_FROM_ALL ${system})
+else()
+    add_subdirectory(
+        ${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/spirv-headers
+        spirv-headers
+        EXCLUDE_FROM_ALL
+        ${system}
+    )
 endif()
 
 if(SLANG_ENABLE_SLANG_GLSLANG)
+    # When using spirv headers via find_package, SPIRV-Headers_SOURCE_DIR is not set
+    # SPIRV-Tools requires that variable, as it uses it to detect if SPIRV-Headers is provided by the consumer.
+    # Fake a source build by setting it here. Ideally SPIRV-Tools should not depend on _SOURCE_DIR
+    if (${SLANG_USE_SYSTEM_SPIRV_HEADERS})
+        get_target_property(SPIRV-Headers_SOURCE_DIR SPIRV-Headers::SPIRV-Headers INTERFACE_INCLUDE_DIRECTORIES)
+        cmake_path(GET SPIRV-Headers_SOURCE_DIR PARENT_PATH SPIRV-Headers_SOURCE_DIR)
+    endif()
+
     # SPIRV-Tools
     set(SPIRV_TOOLS_BUILD_STATIC ON)
     set(SPIRV_WERROR OFF)
-    # Headers
-    if(NOT SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
-        set(SPIRV_HEADER_DIR "${CMAKE_CURRENT_LIST_DIR}/spirv-headers/")
-    else()
-        set(SPIRV_HEADER_DIR ${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/spirv-headers)
-    endif()
     set(SPIRV_SKIP_TESTS ON)
     # Tools
     if(NOT SLANG_OVERRIDE_SPIRV_TOOLS_PATH)

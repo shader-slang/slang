@@ -100,17 +100,7 @@ slang_add_target(
 # generated lookup tables
 #
 
-if(NOT SLANG_USE_SYSTEM_SPIRV_HEADERS)
-    if(NOT SLANG_OVERRIDE_SPIRV_HEADERS_PATH)
-        set(SLANG_SPIRV_HEADERS_INCLUDE_DIR
-            "${slang_SOURCE_DIR}/external/spirv-headers/include"
-        )
-    else()
-        set(SLANG_SPIRV_HEADERS_INCLUDE_DIR
-            "${SLANG_OVERRIDE_SPIRV_HEADERS_PATH}/spirv-headers/include"
-        )
-    endif()
-endif()
+get_target_property(SLANG_SPIRV_HEADERS_INCLUDE_DIR SPIRV-Headers::SPIRV-Headers INTERFACE_INCLUDE_DIRECTORIES)
 
 set(SLANG_LOOKUP_GENERATOR_INPUT_JSON
     "${SLANG_SPIRV_HEADERS_INCLUDE_DIR}/spirv/unified1/extinst.glsl.std.450.grammar.json"
