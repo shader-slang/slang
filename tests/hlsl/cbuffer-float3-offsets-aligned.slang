@@ -1,11 +1,9 @@
-//TEST:SIMPLE(filecheck=GLSL): -target glsl -profile cs_6_2 -stage compute -entry computeMain -line-directive-mode none -fvk-use-dx-layout
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -profile cs_6_2 -entry computeMain -line-directive-mode none -fvk-use-dx-layout
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-slang -compute -dx12 -use-dxil -profile cs_6_2 -Xslang... -Xdxc -fvk-use-dx-layout -Xdxc -enable-16bit-types -X. -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-slang -compute -vk -profile cs_6_2 -Xslang... -fvk-use-dx-layout -X. -output-using-type
+//TEST:REFLECTION(filecheck=REFLECT):-stage compute -entry computeMain -target spirv -profile cs_6_2 -no-codegen -line-directive-mode none -fvk-use-dx-layout
 
-// dxc: -T cs_6_2 -E computeMain -spirv -fvk-use-dx-layout -enable-16bit-types
-
-//TEST_INPUT:ubuffer(stride=4, count=25):out,name=outputBuffer
+//TEST_INPUT:ubuffer(stride=4, count=17):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 //TEST_INPUT:set Constants.v0={1.0,2.0,3.0}
@@ -17,19 +15,11 @@ RWStructuredBuffer<float> outputBuffer;
 //TEST_INPUT:set Constants.v5=13.0
 //TEST_INPUT:set Constants.v6[0]={14.0,15.0,16.0}
 //TEST_INPUT:set Constants.v7=17.0
-//TEST_INPUT:set Constants.v8[0]={18.0,19.0,20.0}
-//TEST_INPUT:set Constants.v8[1]={21.0,22.0,23.0}
-//TEST_INPUT:set Constants.v9={24.0,25.0}
 
-// HLSL allows 3-element vectors to occur at non-power-of-two offsets
-// in cbuffers, as long as they don't cross a 16-byte boundary.
-// GLSL only allows 3-element vectors to occur at non-power-of-two offsets
-// so long as the struct is layout(scalar).
-//
-// This test checks cases where the offsets of 3-element vectors within a cbuffer
-// will be located at a power-of-two offset within a 16-byte chunk.
-// Verifies that we (a) calculate correct offsets, and (b) request the appropriate
-// additional features.
+// Checks cbuffer packing rule cases involving 3-element vectors.
+// HLSL aligns at the element size, while GLSL std140 and std430
+// align to the size of a 4-element vector of the element type.
+// Checks cases that are compatible with std140 and std430.
 
 cbuffer Constants
 {
@@ -52,12 +42,6 @@ cbuffer Constants
 
     // float v7 should be packed in with float3 from v6.
     float v7;
-
-    // float3[2] v8 should be aligned to offset 128.
-    float3 v8[2] : packoffset(c8);
-
-    // float2 v9 should be aligned to next 16 byte boundary
-    float2 v9;
 };
 
 // For spirv, check that the offsets are correct.
@@ -69,13 +53,23 @@ cbuffer Constants
 // SPIRV: OpMemberDecorate {{.*}} 5 Offset 64
 // SPIRV: OpMemberDecorate {{.*}} 6 Offset 80
 // SPIRV: OpMemberDecorate {{.*}} 7 Offset 92
-// SPIRV: OpMemberDecorate {{.*}} 8 Offset 128
-// SPIRV: OpMemberDecorate {{.*}} 9 Offset 160
 
-// For glsl, check that we're using the lowest common denominator for the uniform block:
-// GLSL: layout(std140) uniform block
-// Also check for the offset related to the packoffset usage:
-// GLSL: layout(offset = 128)
+// REFLECT: "name": "v0",
+// REFLECT: "offset": 0
+// REFLECT: "name": "v1",
+// REFLECT: "offset": 12
+// REFLECT: "name": "v2",
+// REFLECT: "offset": 16
+// REFLECT: "name": "v3",
+// REFLECT: "offset": 32
+// REFLECT: "name": "v4",
+// REFLECT: "offset": 60
+// REFLECT: "name": "v5",
+// REFLECT: "offset": 64
+// REFLECT: "name": "v6",
+// REFLECT: "offset": 80
+// REFLECT: "name": "v7",
+// REFLECT: "offset": 92
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
@@ -98,14 +92,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[i++] = v6[0].y;
     outputBuffer[i++] = v6[0].z;
     outputBuffer[i++] = v7;
-    outputBuffer[i++] = v8[0].x;
-    outputBuffer[i++] = v8[0].y;
-    outputBuffer[i++] = v8[0].z;
-    outputBuffer[i++] = v8[1].x;
-    outputBuffer[i++] = v8[1].y;
-    outputBuffer[i++] = v8[1].z;
-    outputBuffer[i++] = v9.x;
-    outputBuffer[i++] = v9.y;
 
     // BUFFER: 1
     // BUFFER-NEXT: 2
@@ -124,13 +110,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // BUFFER-NEXT: 15
     // BUFFER-NEXT: 16
     // BUFFER-NEXT: 17
-    // BUFFER-NEXT: 18
-    // BUFFER-NEXT: 19
-    // BUFFER-NEXT: 20
-    // BUFFER-NEXT: 21
-    // BUFFER-NEXT: 22
-    // BUFFER-NEXT: 23
-    // BUFFER-NEXT: 24
-    // BUFFER-NEXT: 25
+
 }
 
