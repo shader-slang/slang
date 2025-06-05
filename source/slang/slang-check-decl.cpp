@@ -86,19 +86,19 @@ static Type* createUnboundSomeTypeDeclType(
 
 static void maybeCreateUnboundSomeType(Decl* decl, ASTBuilder* astBuilder)
 {
-    if(auto varDecl = as<VarDeclBase>(decl))
+    if (auto varDecl = as<VarDeclBase>(decl))
     {
         // If type is `out` or a local-var we make an UnboundSomeType
         auto someType = isDeclRefTypeOf<SomeTypeDecl>(varDecl->type.type);
-        if (someType &&
-            (as<VarDecl>(varDecl) || as<ParamDecl>(varDecl) && !varDecl->hasModifier<InOutModifier>() &&
-                                        varDecl->hasModifier<OutModifier>()))
+        if (someType && (as<VarDecl>(varDecl) || as<ParamDecl>(varDecl) &&
+                                                     !varDecl->hasModifier<InOutModifier>() &&
+                                                     varDecl->hasModifier<OutModifier>()))
         {
             varDecl->type.type =
                 createUnboundSomeTypeDeclType(astBuilder, someType.getDecl(), varDecl->loc);
         }
     }
-    else if(auto funcDecl = as<FuncDecl>(decl))
+    else if (auto funcDecl = as<FuncDecl>(decl))
     {
         // This case assumes a FuncDecl input means we want to change the return-type.
         // All returns are an `UnboundSomeType` since we need to assign types to
@@ -116,7 +116,7 @@ static void forceInterfaceQualifierToType(SemanticsVisitor* visitor, Decl* decl,
     ASTBuilder* astBuilder = visitor->getASTBuilder();
     auto explicitDyn = decl->hasModifier<DynModifier>();
 
-    if(auto interfaceDecl = as<InterfaceDecl>(decl))
+    if (auto interfaceDecl = as<InterfaceDecl>(decl))
     {
         // AnyValueSize means we are dyn, it is equivlent to having an explicit "dyn"
         if (!explicitDyn && interfaceDecl->hasModifier<AnyValueSizeAttribute>())
@@ -284,7 +284,7 @@ static void validateSomeAndDynFuncDeclUsage(SemanticsDeclVisitorBase* visitor, F
     if (allowExperimentalDynamicDispatch(visitor, optionSet))
         return;
 
-    // The rest of the function validates use of the `funcDecl` 
+    // The rest of the function validates use of the `funcDecl`
     // as a child of a `dyn interface` type.
     if (!funcDecl->parentDecl->hasModifier<DynModifier>())
         return;
@@ -14112,7 +14112,7 @@ DeclVisibility SemanticsVisitor::getDeclVisibility(Decl* decl)
     }
     if (auto someTypeDecl = as<SomeTypeDecl>(decl))
     {
-        if(auto parentContainor = this->getParentFuncOfVisitor())
+        if (auto parentContainor = this->getParentFuncOfVisitor())
             return getDeclVisibility(parentContainor);
     }
     // Interface members will always have the same visibility as the interface itself.
