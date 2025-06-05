@@ -150,7 +150,7 @@ class SomeTypeDecl : public Decl
 
 // Represents the type of `some Type` for `some Type varName`
 // when `varName` is unassigned/unbound. This decl simmilarly
-// represents the `out some Type` type.  
+// represents the `out some Type` type.
 // This variant of `some Type` is assignable since it is either
 // a new variable without value or equivlent.
 FIDDLE()

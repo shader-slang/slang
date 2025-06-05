@@ -1207,11 +1207,11 @@ bool SemanticsVisitor::_coerce(
     // Manages coerce rules for `SomeTypeDecl` and `UnboundSomeTypeDecl`.
     // Primarily this function diagnoses incorrect `SomeTypeDecl` coercing.
     // To coerce this function unwraps the inner interface type of a `SomeTypeDecl`.
-    if(isDeclRefTypeOf<SomeTypeDecl>(toType) || isDeclRefTypeOf<SomeTypeDecl>(fromType))
+    if (isDeclRefTypeOf<SomeTypeDecl>(toType) || isDeclRefTypeOf<SomeTypeDecl>(fromType))
     {
         // We do not immediatly error since conversions may still happen
         // later on
-        if(tryCoerceSomeType(site, toType, outToExpr, fromType, fromExpr, sink, outCost))
+        if (tryCoerceSomeType(site, toType, outToExpr, fromType, fromExpr, sink, outCost))
             return true;
     }
     // Assume string literals are convertible to any string type.
