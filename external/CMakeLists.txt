@@ -182,6 +182,7 @@ target_include_directories(
 # slang-rhi
 if(SLANG_ENABLE_SLANG_RHI)
     set(SLANG_RHI_BUILD_FROM_SLANG_REPO ON)
+    set(SLANG_RHI_BUILD_TESTS ON)
     set(SLANG_RHI_INSTALL OFF)
     set(SLANG_RHI_BINARY_DIR ${CMAKE_BINARY_DIR}/$<CONFIG>/bin)
     set(SLANG_RHI_FETCH_SLANG OFF)
@@ -209,6 +210,9 @@ if(SLANG_ENABLE_SLANG_RHI)
             ${system}
         )
     endif()
+
+    # Output slang-rhi-tests to the bin directory so we can it easily.
+    set_target_properties(slang-rhi-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/bin)
 endif()
 
 # Tidy things up:
