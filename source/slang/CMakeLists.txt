@@ -53,27 +53,32 @@ target_include_directories(
 
 set(SLANG_INST_GEN_INPUT "${CMAKE_CURRENT_LIST_DIR}/slang-ir-inst-defs.yaml")
 set(SLANG_INST_GEN_OUTPUT_DIR "${CMAKE_CURRENT_BINARY_DIR}/inst-defs")
-set(SLANG_INST_GEN_OUTPUT "${SLANG_INST_GEN_OUTPUT_DIR}/slang-ir-inst-defs.h")
+set(SLANG_INST_GEN_OUTPUT_ENUM
+    "${SLANG_INST_GEN_OUTPUT_DIR}/slang-ir-insts-enum.h"
+)
+set(SLANG_INST_GEN_OUTPUT_INFO
+    "${SLANG_INST_GEN_OUTPUT_DIR}/slang-ir-insts-info.cpp"
+)
 
 add_custom_command(
-    OUTPUT ${SLANG_INST_GEN_OUTPUT}
+    OUTPUT ${SLANG_INST_GEN_OUTPUT_ENUM} ${SLANG_INST_GEN_OUTPUT_INFO}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_INST_GEN_OUTPUT_DIR}
     COMMAND
-        slang-generate-ir-defs "${SLANG_INST_GEN_INPUT}"
-        "${SLANG_INST_GEN_OUTPUT}"
+        slang-generate-ir-defs "${SLANG_INST_GEN_INPUT}" --ir-enum-file
+        "${SLANG_INST_GEN_OUTPUT_ENUM}" --ir-info-file
+        "${SLANG_INST_GEN_OUTPUT_INFO}"
     DEPENDS ${SLANG_INST_GEN_INPUT} slang-generate-ir-defs
     VERBATIM
 )
-add_library(
+slang_add_target(
     slang-inst-gen-output
-    INTERFACE
+    OBJECT
+    EXPLICIT_SOURCE ${SLANG_INST_GEN_OUTPUT_INFO}
+    LINK_WITH_PRIVATE core
+    INCLUDE_DIRECTORIES_PRIVATE "${slang_SOURCE_DIR}/source/slang"
+    INCLUDE_DIRECTORIES_PUBLIC ${SLANG_INST_GEN_OUTPUT_DIR}
     EXCLUDE_FROM_ALL
-    ${SLANG_INST_GEN_OUTPUT}
-)
-set_target_properties(slang-inst-gen-output PROPERTIES FOLDER generated)
-target_include_directories(
-    slang-inst-gen-output
-    INTERFACE ${SLANG_INST_GEN_OUTPUT_DIR}
+    FOLDER generated
 )
 
 #

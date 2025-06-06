@@ -94,63 +94,6 @@ IRInst* cloneGlobalValueWithLinkage(
     IRInst* originalVal,
     IRLinkageDecoration* originalLinkage);
 
-struct IROpMapEntry
-{
-    IROp op;
-    IROpInfo info;
-};
-
-// TODO: We should ideally be speeding up the name->inst
-// mapping by using a dictionary, or even by pre-computing
-// a hash table to be stored as a `static const` array.
-//
-// NOTE! That this array is now constructed in such a way that looking up
-// an entry from an op is fast, by keeping blocks of main, and pseudo ops in same order
-// as the ops themselves. Care must be taken to keep this constraint.
-static const IROpMapEntry kIROps[] = {
-
-// Main ops in order
-#define INST(ID, MNEMONIC, ARG_COUNT, FLAGS) \
-    {kIROp_##ID,                             \
-     {                                       \
-         #MNEMONIC,                          \
-         ARG_COUNT,                          \
-         FLAGS,                              \
-     }},
-#include <slang-ir-inst-defs.h>
-
-    // Invalid op sentinel value comes after all the valid ones
-    {kIROp_Invalid, {"invalid", 0, 0}},
-};
-
-IROpInfo getIROpInfo(IROp opIn)
-{
-    const int op = opIn & kIROpMask_OpMask;
-    if (op < kIROpCount)
-    {
-        // It's a main op
-        const auto& entry = kIROps[op];
-        SLANG_ASSERT(entry.op == op);
-        return entry.info;
-    }
-
-    // Don't know what this is
-    SLANG_ASSERT(!"Invalid op");
-    SLANG_ASSERT(kIROps[kIROpCount].op == kIROp_Invalid);
-    return kIROps[kIROpCount].info;
-}
-
-IROp findIROp(const UnownedStringSlice& name)
-{
-    for (auto ee : kIROps)
-    {
-        if (name == ee.info.name)
-            return ee.op;
-    }
-
-    return IROp(kIROp_Invalid);
-}
-
 
 //
 
@@ -8487,7 +8430,7 @@ void IRInst::transferDecorationsTo(IRInst* target)
 bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
 {
     // TODO: We should drive this based on flags specified
-    // in `ir-inst-defs.h` isntead of hard-coding things here,
+    // in `ir-inst-defs.yaml` isntead of hard-coding things here,
     // but this is good enough for now if we are conservative:
 
     if (as<IRType>(this))

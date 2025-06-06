@@ -12,6 +12,7 @@
 #include "../core/slang-basic.h"
 #include "../core/slang-memory-arena.h"
 #include "slang-container-pool.h"
+#include "slang-ir-insts-enum.h"
 #include "slang-type-system-shared.h"
 
 #include <bit>
@@ -46,37 +47,6 @@ enum : IROpFlags
         1 << 2, ///< If set this op is a hoistable inst that needs to be deduplicated.
     kIROpFlag_Global =
         1 << 3, ///< If set this op should always be hoisted but should never be deduplicated.
-};
-
-/* Bit usage of IROp is a follows
-
-          MainOp | Other
-Bit range: 0-10   | Remaining bits
-
-For doing range checks (for example for doing isa tests), the value is masked by kIROpMask_OpMask,
-such that the Other bits don't interfere. The other bits can be used for storage for anything that
-needs to identify as a different 'op' or 'type'. It is currently used currently for storing the
-TextureFlavor of a IRResourceTypeBase derived types for example.
-
-TODO: We should eliminate the use of the "other" bits so that the entire value/state
-of an instruction is manifest in its opcode, operands, and children.
-*/
-enum IROp : int32_t
-{
-#define INST(ID, MNEMONIC, ARG_COUNT, FLAGS) kIROp_##ID,
-#include <slang-ir-inst-defs.h>
-
-    /// The total number of valid opcodes
-    kIROpCount,
-
-    /// An invalid opcode used to represent a missing or unknown opcode value.
-    kIROp_Invalid = kIROpCount,
-
-#define INST(ID, MNEMONIC, ARG_COUNT, FLAGS) /* empty */
-#define INST_RANGE(BASE, FIRST, LAST) \
-    kIROp_First##BASE = kIROp_##FIRST, kIROp_Last##BASE = kIROp_##LAST,
-
-#include <slang-ir-inst-defs.h>
 };
 
 /* IROpMeta describes values for the layout of IROps */
