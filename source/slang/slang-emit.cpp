@@ -619,7 +619,7 @@ static void unexportNonEmbeddableIR(CodeGenTarget target, IRModule* irModule)
 
 // Helper function to convert a 20 byte SHA1 to a hexadecimal string,
 // needed for the build identifier instruction.
-String getBuildIdentifierString(ComponentType *component)
+String getBuildIdentifierString(ComponentType* component)
 {
     ComPtr<ISlangBlob> hashBlob;
     component->getEntryPointHash(0, 0, hashBlob.writeRef());
@@ -2152,7 +2152,10 @@ public:
     // An instruction in the SPIRV blob. This points to the first word of the instruction.
     struct SpvInstruction
     {
-        SpvInstruction(SpvWord* word) : word(word) {}
+        SpvInstruction(SpvWord* word)
+            : word(word)
+        {
+        }
 
         uint16_t getOpCode() const { return word[0] & 0xFFFF; }
         uint16_t getWordCountForInst() const { return (word[0] >> 16) & 0xFFFF; }
@@ -2193,7 +2196,9 @@ public:
 
         // Populate the full array of SPIR-V words.
         m_words.clear();
-        m_words.addRange(reinterpret_cast<const SpvWord*>(spirvBlob->getBufferPointer()), spirvBlob->getBufferSize() / sizeof(SpvWord));
+        m_words.addRange(
+            reinterpret_cast<const SpvWord*>(spirvBlob->getBufferPointer()),
+            spirvBlob->getBufferSize() / sizeof(SpvWord));
 
         // Populate the header words. These are the first 5 words of the SPIR-V
         // blob and are treated differently from the rest of the instructions.
@@ -2204,26 +2209,26 @@ public:
     }
 
     // Get the header words.
-    List<SpvWord> getHeaderWords() const
-    {
-        return m_headerWords;
-    }
+    List<SpvWord> getHeaderWords() const { return m_headerWords; }
 
-    // Visit all SPIRV instructions (excluding header words), invoking the callback for each instruction.
-    // The callback should be a function or lambda with signature: void(const SpvInstruction&).
-    template <typename Func>
+    // Visit all SPIRV instructions (excluding header words), invoking the callback for each
+    // instruction. The callback should be a function or lambda with signature: void(const
+    // SpvInstruction&).
+    template<typename Func>
     void visitInstructions(Func&& callback)
     {
         // Instructions start after the header (first 5 words)
-        constexpr size_t kHeaderWordCount = static_cast<size_t>(SpvWordIndex::SPV_INDEX_INSTRUCTION_START);
+        constexpr size_t kHeaderWordCount =
+            static_cast<size_t>(SpvWordIndex::SPV_INDEX_INSTRUCTION_START);
         size_t i = kHeaderWordCount;
-        while (i < (size_t) m_words.getCount())
+        while (i < (size_t)m_words.getCount())
         {
             SpvWord* wordPtr = m_words.getBuffer() + i;
             SpvInstruction inst(wordPtr);
             callback(inst);
             uint16_t wordCount = inst.getWordCountForInst();
-            if (wordCount == 0) break; // Prevent infinite loop on malformed input
+            if (wordCount == 0)
+                break; // Prevent infinite loop on malformed input
             i += wordCount;
         }
     }
@@ -2255,8 +2260,7 @@ static SlangResult stripDbgSpirvFromArtifact(
         SpvOpMemberName,
         SpvOpModuleProcessed,
         SpvOpLine,
-        SpvOpNoLine
-    };
+        SpvOpNoLine};
     // If the instruction is an extended instruction, then we also need
     // to check if the instruction number is for a debug instruction as
     // listed in slang-emit-spirv-ops-debug-info-ext.h
@@ -2308,49 +2312,51 @@ static SlangResult stripDbgSpirvFromArtifact(
     // First find the DebugBuildIdentifier instruction, and keep track of which string
     // it refers to, this string needs to be kept in the final output.
     SpvWord debugStringId = 0;
-    spirvInstructionHelper.visitInstructions([&](const SpirvInstructionHelper::SpvInstruction& inst)
-    {
-        if (inst.getOpCode() == SpvOpExtInst)
+    spirvInstructionHelper.visitInstructions(
+        [&](const SpirvInstructionHelper::SpvInstruction& inst)
         {
-            if (inst.getOperand(3) == NonSemanticShaderDebugInfo100DebugBuildIdentifier)
+            if (inst.getOpCode() == SpvOpExtInst)
             {
-                debugStringId = inst.getOperand(4);
-                return;
+                if (inst.getOperand(3) == NonSemanticShaderDebugInfo100DebugBuildIdentifier)
+                {
+                    debugStringId = inst.getOperand(4);
+                    return;
+                }
             }
-        }
-    });
+        });
 
     // Iterate over the instructions from the artifact and add them to the list
     // only if they are not debug instructions. We also get the debug build hash
     // to use as the filename for the debug spirv file.
     String debugBuildHash;
-    spirvInstructionHelper.visitInstructions([&](const SpirvInstructionHelper::SpvInstruction& inst)
-    {
-        if (debugOpCodes.contains(inst.getOpCode()))
+    spirvInstructionHelper.visitInstructions(
+        [&](const SpirvInstructionHelper::SpvInstruction& inst)
         {
-            // We can only strip strings if they are not being used by the
-            // DebugBuildIdentifier instruction.
-            bool foundDebugString = false;
-            if (inst.getOpCode() == SpvOpString && inst.getOperand(0) == debugStringId)
+            if (debugOpCodes.contains(inst.getOpCode()))
             {
-                debugBuildHash = inst.getStringFromInst();
-                foundDebugString = true;
+                // We can only strip strings if they are not being used by the
+                // DebugBuildIdentifier instruction.
+                bool foundDebugString = false;
+                if (inst.getOpCode() == SpvOpString && inst.getOperand(0) == debugStringId)
+                {
+                    debugBuildHash = inst.getStringFromInst();
+                    foundDebugString = true;
+                }
+                if (!foundDebugString)
+                    return;
             }
-            if (!foundDebugString)
-                return;
-        }
-        // Also check if the instruction is an extended instruction containing DebugInfo.
-        if (inst.getOpCode() == SpvOpExtInst)
-        {
-            // Ignore this if the instruction contains DebugInfo.
-            if (debugExtInstNumbers.contains(inst.getOperand(3)))
-                return;
-        }
-        // Otherwise this is a non-debug instruction and should be included.
-        spirvWordsList.addRange(
-            reinterpret_cast<const uint8_t*>(inst.word),
-            inst.getWordCountForInst() * sizeof(SpvWord));
-    });
+            // Also check if the instruction is an extended instruction containing DebugInfo.
+            if (inst.getOpCode() == SpvOpExtInst)
+            {
+                // Ignore this if the instruction contains DebugInfo.
+                if (debugExtInstNumbers.contains(inst.getOperand(3)))
+                    return;
+            }
+            // Otherwise this is a non-debug instruction and should be included.
+            spirvWordsList.addRange(
+                reinterpret_cast<const uint8_t*>(inst.word),
+                inst.getWordCountForInst() * sizeof(SpvWord));
+        });
 
     // Create the stripped artifact using the above created instruction list.
     strippedArtifact->addRepresentationUnknown(ListBlob::moveCreate(spirvWordsList));
@@ -2514,7 +2520,8 @@ static SlangResult createArtifactFromIR(
             if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
             {
                 auto strippedArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
-                SLANG_RETURN_ON_FAIL(stripDbgSpirvFromArtifact(optimizedArtifact, strippedArtifact));
+                SLANG_RETURN_ON_FAIL(
+                    stripDbgSpirvFromArtifact(optimizedArtifact, strippedArtifact));
                 artifact = _Move(strippedArtifact);
                 dbgArtifact = _Move(optimizedArtifact);
             }
@@ -2553,8 +2560,10 @@ SlangResult emitSPIRVForEntryPointsDirectly(
     // Create the artifact containing the main SPIRV data, and the debug SPIRV
     // data if requested by the command line arg -separate-debug-info.
     Slang::ComPtr<Slang::IArtifact> dbgArtifact;
-    auto artifact = ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
-    SLANG_RETURN_ON_FAIL(createArtifactFromIR(codeGenContext, irModule, irEntryPoints, artifact, dbgArtifact));
+    auto artifact =
+        ArtifactUtil::createArtifactForCompileTarget(asExternal(codeGenContext->getTargetFormat()));
+    SLANG_RETURN_ON_FAIL(
+        createArtifactFromIR(codeGenContext, irModule, irEntryPoints, artifact, dbgArtifact));
     ArtifactUtil::addAssociated(artifact, linkedIR.metadata);
 
     // Associate the debug artifact with the main artifact.

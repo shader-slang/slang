@@ -1025,7 +1025,7 @@ typedef uint32_t SlangSizeT;
         SkipDownstreamLinking, // bool, experimental
         DumpModule,
 
-        EmitSeparateDebug,     // bool
+        EmitSeparateDebug, // bool
         CountOf,
     };
 
@@ -4178,7 +4178,11 @@ struct IMetadata : public ISlangCastable
  */
 struct ICompileResult : public ISlangCastable
 {
-    SLANG_COM_INTERFACE(0x5fa9380e, 0xb62f, 0x41e5, {0x9f, 0x12, 0x4b, 0xad, 0x4d, 0x9e, 0xaa, 0xe4})
+    SLANG_COM_INTERFACE(
+        0x5fa9380e,
+        0xb62f,
+        0x41e5,
+        {0x9f, 0x12, 0x4b, 0xad, 0x4d, 0x9e, 0xaa, 0xe4})
 
     virtual uint32_t getItemCount() = 0;
     virtual SlangResult getItemData(uint32_t index, IBlob** outblob) = 0;
