@@ -258,7 +258,7 @@ if(SLANG_ENABLE_TESTS)
         EXCLUDE_FROM_ALL
         LINK_WITH_PRIVATE core compiler-core slang
         INCLUDE_FROM_PRIVATE
-	    unit-test
+            unit-test
             $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
         FOLDER test
     )
