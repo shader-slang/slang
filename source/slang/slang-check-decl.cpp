@@ -3591,19 +3591,19 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
         _registerBuiltinDeclsRec(getSession(), moduleDecl);
     }
 
-    if (auto firstMember = moduleDecl->getFirstDirectMemberDecl())
+    if (auto firstDeclInModule = moduleDecl->getFirstDirectMemberDecl())
     {
-        if (as<ImplementingDecl>(firstMember))
+        if (as<ImplementingDecl>(firstDeclInModule))
         {
             if (!getShared()->isInLanguageServer())
             {
                 // A primary module file can't start with an "implementing" declaration.
                 getSink()->diagnose(
-                    firstMember,
+                    firstDeclInModule,
                     Diagnostics::primaryModuleFileCannotStartWithImplementingDecl);
             }
         }
-        else if (!as<ModuleDeclarationDecl>(firstMember))
+        else if (!as<ModuleDeclarationDecl>(firstDeclInModule))
         {
             // A primary module file must start with a `module` declaration.
             // TODO: this warning is disabled for now to free users from massive change for now.
@@ -10914,11 +10914,11 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
     if (!isNew)
         return;
 
-    auto firstMember = fileDecl->getFirstDirectMemberDecl();
-    if (!firstMember)
+    auto firstDeclInFile = fileDecl->getFirstDirectMemberDecl();
+    if (!firstDeclInFile)
         return;
 
-    if (auto moduleDeclaration = as<ModuleDeclarationDecl>(firstMember))
+    if (auto moduleDeclaration = as<ModuleDeclarationDecl>(firstDeclInFile))
     {
         // We are trying to include a file that defines a module, the user could mean "import"
         // instead.
@@ -10932,25 +10932,25 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
 
     importFileDeclIntoScope(moduleDecl->ownedScope, fileDecl);
 
-    if (auto implementing = as<ImplementingDecl>(firstMember))
+    if (auto implementing = as<ImplementingDecl>(firstDeclInFile))
     {
         // The file we are including must be implementing the current module.
         auto moduleName = getSimpleModuleName(implementing->moduleNameAndLoc.name);
         auto expectedModuleName = moduleDecl->getName();
         bool shouldSkipDiagnostic = false;
 
-        if (auto firstDeclaration = moduleDecl->getFirstDirectMemberDecl())
+        if (auto firstDeclInModule = moduleDecl->getFirstDirectMemberDecl())
         {
-            if (auto moduleDeclarationDecl = as<ModuleDeclarationDecl>(firstDeclaration))
+            if (auto moduleDeclarationDecl = as<ModuleDeclarationDecl>(firstDeclInModule))
             {
                 expectedModuleName = moduleDeclarationDecl->getName();
             }
             else if (getShared()->isInLanguageServer())
             {
-                auto moduleDeclarationDecls = findExistingModuleDeclarationDecl(moduleDecl);
-                if (moduleDeclarationDecls)
+                auto moduleDeclarationDecl = findExistingModuleDeclarationDecl(moduleDecl);
+                if (moduleDeclarationDecl)
                 {
-                    expectedModuleName = moduleDeclarationDecls->getName();
+                    expectedModuleName = moduleDeclarationDecl->getName();
                 }
                 else
                 {
@@ -11035,15 +11035,15 @@ void SemanticsDeclScopeWiringVisitor::visitImplementingDecl(ImplementingDecl* de
     if (!fileDecl)
         return;
 
-    auto firstMember = fileDecl->getFirstDirectMemberDecl();
-    if (!firstMember)
+    auto firstDeclInFile = fileDecl->getFirstDirectMemberDecl();
+    if (!firstDeclInFile)
         return;
 
-    if (as<ModuleDeclarationDecl>(firstMember))
+    if (as<ModuleDeclarationDecl>(firstDeclInFile))
     {
         // We are trying to implement a file that defines a module, this is expected.
     }
-    else if (as<ImplementingDecl>(firstMember))
+    else if (as<ImplementingDecl>(firstDeclInFile))
     {
         getSink()->diagnose(
             decl->moduleNameAndLoc.loc,
