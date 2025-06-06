@@ -2,6 +2,4 @@
 
 #include "ir-yaml-types.h"
 
-#include <iostream>
-
-InstructionSet parseInstDefs(std::istream& input);
+InstructionSet parseInstDefs(const Slang::String& filename, const Slang::String& contents);

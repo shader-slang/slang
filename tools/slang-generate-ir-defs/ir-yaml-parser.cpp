@@ -1,26 +1,11 @@
 #include "ir-yaml-parser.h"
 
 #include "core/slang-dictionary.h"
-#include "core/slang-smart-pointer.h"
 #include "ir-yaml-types.h"
 
-#include <cctype>
-#include <fkYAML/node.hpp>
+#include <ryml.hpp>
 
 using namespace Slang;
-
-//
-//
-//
-
-namespace Slang
-{
-// In the Slang namespace to ADL works
-void from_node(const fkyaml::node& n, String& b)
-{
-    b = n.get_value<std::string>().c_str();
-}
-}; // namespace Slang
 
 //
 //
@@ -67,17 +52,42 @@ static String toPascalCase(const String& snake_case)
     return result;
 }
 
+// Helper to convert ryml substring to String
+static String fromSubstr(ryml::csubstr s)
+{
+    return String(s.data(), s.data() + s.size());
+}
+
+// Helper to get source location info
+static String getLocation(const ryml::Parser& parser, const ryml::ConstNodeRef& node)
+{
+    auto loc = parser.location(node);
+    return fromSubstr(parser.filename()) + ":" + String(loc.line + 1) + ":" + String(loc.col + 1);
+}
+
 // Convert string flags to enum
-static IROpFlags parseFlags(const fkyaml::node& flags_node)
+static IROpFlags parseFlags(const ryml::Parser& parser, const ryml::ConstNodeRef& flags_node)
 {
     IROpFlags result = IROpFlags::None;
+
+    if (!flags_node.is_seq())
+    {
+        String error = "Expected sequence for flags at " + getLocation(parser, flags_node);
+        throw std::runtime_error(error.getBuffer());
+    }
+
     for (const auto& flag : flags_node)
     {
-        String flag_str = flag.get_value<String>();
+        String flag_str = fromSubstr(flag.val());
         const auto it = s_flagMap.tryGetValue(flag_str);
         if (it)
         {
             result = result | *it;
+        }
+        else
+        {
+            String error = "Unknown flag '" + flag_str + "' at " + getLocation(parser, flag);
+            throw std::runtime_error(error.getBuffer());
         }
     }
     return result;
@@ -111,37 +121,47 @@ const Entry* Entry::findLastInstruction() const
     return nullptr;
 }
 
-static Entry parseEntry(const fkyaml::node& entry_node)
+static Entry parseEntry(const ryml::Parser& parser, const ryml::ConstNodeRef& entry_node)
 {
-    if (!entry_node.is_mapping() || entry_node.size() != 1)
+    if (!entry_node.is_map() || entry_node.num_children() != 1)
     {
-        throw std::runtime_error("Invalid entry format");
+        String error =
+            "Invalid entry format: expected single-key map at " + getLocation(parser, entry_node);
+        throw std::runtime_error(error.getBuffer());
     }
 
-    auto it = entry_node.begin();
-    String key = it.key().get_value<String>();
-    const fkyaml::node& value = it.value();
+    auto child = entry_node.first_child();
+    String key = fromSubstr(child.key());
 
     Entry entry;
     entry.name = key;
 
-    if (value.is_mapping() && value.contains("insts"))
+    if (child.is_map() && child.has_child("insts"))
     {
         entry.flavor = Entry::Range;
 
-        if (value.contains("comment"))
-            entry.comment = value["comment"].get_value<String>();
-
-        if (value.contains("flags"))
+        if (child.has_child("comment"))
         {
-            entry.flags = parseFlags(value["flags"]);
+            entry.comment = fromSubstr(child["comment"].val());
+        }
+
+        if (child.has_child("flags"))
+        {
+            entry.flags = parseFlags(parser, child["flags"]);
         }
 
         // Parse nested entries
-        const auto& insts_array = value["insts"];
-        for (const auto& child : insts_array)
+        auto insts_node = child["insts"];
+        if (!insts_node.is_seq())
         {
-            entry.children.add(parseEntry(child));
+            String error =
+                String("Expected sequence for 'insts' at ") + getLocation(parser, insts_node);
+            throw std::runtime_error(error.getBuffer());
+        }
+
+        for (const auto& inst_child : insts_node)
+        {
+            entry.children.add(parseEntry(parser, inst_child));
         }
     }
     else
@@ -149,20 +169,41 @@ static Entry parseEntry(const fkyaml::node& entry_node)
         entry.flavor = Entry::Instruction;
         entry.type_name = toPascalCase(key);
 
-        if (value.is_mapping() && !value.empty())
+        if (child.is_map() && child.num_children() > 0)
         {
-            if (value.contains("comment"))
-                entry.comment = value["comment"].get_value<String>();
-
-            if (value.contains("type_name"))
-                entry.type_name = value["type_name"].get_value<String>();
-
-            if (value.contains("operands"))
-                entry.operands = value["operands"].get_value<int>();
-
-            if (value.contains("flags"))
+            if (child.has_child("comment"))
             {
-                entry.flags = parseFlags(value["flags"]);
+                entry.comment = fromSubstr(child["comment"].val());
+            }
+
+            if (child.has_child("type_name"))
+            {
+                entry.type_name = fromSubstr(child["type_name"].val());
+            }
+
+            if (child.has_child("operands"))
+            {
+                auto operands_node = child["operands"];
+                if (!operands_node.is_keyval())
+                {
+                    String error = String("Expected scalar value for 'operands' at ") +
+                                   getLocation(parser, operands_node);
+                    throw std::runtime_error(error.getBuffer());
+                }
+
+                int operands;
+                if (!ryml::atoi(operands_node.val(), &operands))
+                {
+                    String error = String("Invalid integer value for 'operands' at ") +
+                                   getLocation(parser, operands_node);
+                    throw std::runtime_error(error.getBuffer());
+                }
+                entry.operands = operands;
+            }
+
+            if (child.has_child("flags"))
+            {
+                entry.flags = parseFlags(parser, child["flags"]);
             }
         }
     }
@@ -170,18 +211,33 @@ static Entry parseEntry(const fkyaml::node& entry_node)
     return entry;
 }
 
-InstructionSet parseInstDefs(std::istream& input)
+InstructionSet parseInstDefs(const String& filename, const String& contents)
 {
     InstructionSet result;
-    auto root = fkyaml::node::deserialize(input);
 
-    if (!root.contains("insts"))
-        throw std::runtime_error("Missing 'insts' key in root");
+    // Parse YAML
+    ryml::EventHandlerTree evt_handler = {};
+    ryml::Parser parser(&evt_handler, ryml::ParserOptions().locations(true));
+    ryml::Tree tree =
+        ryml::parse_in_arena(&parser, filename.getBuffer(), ryml::csubstr(contents.getBuffer()));
+    ryml::ConstNodeRef root = tree.rootref();
 
-    const auto& insts_array = root["insts"];
-    for (size_t i = 0; i < insts_array.size(); ++i)
+    if (!root.has_child("insts"))
     {
-        result.entries.add(parseEntry(insts_array[i]));
+        throw std::runtime_error("Missing 'insts' key in root");
+    }
+
+    auto insts_node = root["insts"];
+    if (!insts_node.is_seq())
+    {
+        String error =
+            String("Expected sequence for 'insts' at ") + getLocation(parser, insts_node);
+        throw std::runtime_error(error.getBuffer());
+    }
+
+    for (const auto& inst : insts_node)
+    {
+        result.entries.add(parseEntry(parser, inst));
     }
 
     return result;

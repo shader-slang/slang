@@ -1,8 +1,11 @@
 #include "ir-yaml-parser.h"
 
+#include <core/slang-io.h>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+
+using namespace Slang;
 
 class IRDefsGenerator
 {
@@ -168,17 +171,16 @@ int main(int argc, char* argv[])
 
     try
     {
-        // Open input file
-        std::ifstream input_file(argv[1]);
-        if (!input_file.is_open())
+        const String filename{argv[1]};
+        String contents;
+        if (!SLANG_SUCCEEDED(File::readAllText(filename, contents)))
         {
             std::cerr << "Error: Cannot open input file '" << argv[1] << "'\n";
             return 1;
         }
 
         // Parse YAML
-        InstructionSet inst_set = parseInstDefs(input_file);
-        input_file.close();
+        InstructionSet inst_set = parseInstDefs(filename, contents);
 
         // Generate output
         IRDefsGenerator generator;
