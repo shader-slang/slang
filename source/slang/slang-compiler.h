@@ -1953,6 +1953,7 @@ public:
     {
         m_sourceArtifacts.clear();
         m_sourceFiles.clear();
+        m_includedFileSet.clear();
     }
 
     /// Add a source artifact
@@ -1960,6 +1961,8 @@ public:
 
     /// Add both the artifact and the sourceFile.
     void addSource(IArtifact* sourceArtifact, SourceFile* sourceFile);
+
+    void addIncludedSourceFileIfNotExist(SourceFile* sourceFile);
 
     // The entry points associated with this translation unit
     List<RefPtr<EntryPoint>> const& getEntryPoints() { return module->getEntryPoints(); }
@@ -2009,6 +2012,9 @@ protected:
     // NOTE! This member is generated lazily from m_sourceArtifacts
     // it is *necessary* to call requireSourceFiles to ensure it's in sync.
     List<SourceFile*> m_sourceFiles;
+
+    // Track all the included source files added in m_sourceFiles
+    HashSet<SourceFile*> m_includedFileSet;
 };
 
 enum class FloatingPointMode : SlangFloatingPointModeIntegral
