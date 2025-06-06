@@ -3393,6 +3393,13 @@ IRInst* IRBuilder::emitDebugSource(UnownedStringSlice fileName, UnownedStringSli
     IRInst* args[] = {getStringValue(fileName), getStringValue(source)};
     return emitIntrinsicInst(getVoidType(), kIROp_DebugSource, 2, args);
 }
+IRInst* IRBuilder::emitDebugBuildIdentifier(
+    UnownedStringSlice buildIdentifier,
+    IRIntegerValue flags)
+{
+    IRInst* args[] = {getStringValue(buildIdentifier), getIntValue(getUIntType(), flags)};
+    return emitIntrinsicInst(getVoidType(), kIROp_DebugBuildIdentifier, 2, args);
+}
 IRInst* IRBuilder::emitDebugLine(
     IRInst* source,
     IRIntegerValue lineStart,
