@@ -1580,6 +1580,7 @@ DIAGNOSTIC(
     Error,
     invalidConstraintSubType,
     "type '$0' is not a valid left hand side of a type constraint.")
+DIAGNOSTIC(30403, Error, unusedGenericParameter, "generic parameter '$0' is not used")
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
