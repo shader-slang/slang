@@ -4,6 +4,7 @@
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-ir-util.h"
 
 namespace Slang
 {
@@ -60,7 +61,10 @@ bool isConstExpr(IRInst* value)
     case kIROp_WitnessTable:
     case kIROp_Generic:
         return true;
-
+    case kIROp_Param:
+        if (isGenericParam(value)) 
+            return true;
+        break;
     default:
         break;
     }
@@ -177,6 +181,8 @@ IRLoop* isLoopPhi(IRParam* param)
 
 bool opCanBeConstExprByBackwardPass(IRInst* value)
 {
+    if (value->getOp() == kIROp_Param)
+         return isLoopPhi(as<IRParam, IRDynamicCastBehavior::NoUnwrap>(value));
     if (opCanBeConstExpr(value->getOp()))
         return true;
     if (auto callInst = as<IRCall>(value))
@@ -451,6 +457,14 @@ bool propagateConstExprBackward(PropagateConstExprContext* context, IRGlobalValu
                                     {
                                         changedThisIteration = true;
                                     }
+                                    // If arg is not constexpr after this, meaning it can't be marked constexpr for some reason,
+                                    // but the param requires that. This is not expected.
+                                    if (!isConstExpr(arg)) {
+                                        context->getSink()->diagnose(
+                                            callInst->sourceLoc,
+                                            Diagnostics::argIsNotConstexpr, paramIndex+1, calleeFunc);
+                                        return false;
+                                    }
                                 }
                             }
                         }
@@ -478,6 +492,14 @@ bool propagateConstExprBackward(PropagateConstExprContext* context, IRGlobalValu
                                     if (maybeMarkConstExprBackwardPass(context, arg))
                                     {
                                         changedThisIteration = true;
+                                    }
+                                    // If arg is not constexpr after this, meaning it can't be marked constexpr for some reason,
+                                    // but the param requires that. This is not expected.
+                                    if (!isConstExpr(arg)) {
+                                        context->getSink()->diagnose(
+                                            callInst->sourceLoc,
+                                            Diagnostics::argIsNotConstexpr, pp+1, calleeFunc);
+                                        return false;
                                     }
                                 }
                             }
