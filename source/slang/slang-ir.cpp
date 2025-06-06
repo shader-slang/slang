@@ -1827,7 +1827,7 @@ IRInst* IRBuilder::_createInst(
     m_dedupContext->getInstReplacementMap().tryGetValue(type, instReplacement);
     type = (IRType*)instReplacement;
 
-    if (isInstHoistable(op, type))
+    if (isInstHoistable(op, type, fixedArgs))
     {
         return _findOrEmitHoistableInst(
             type,
@@ -3515,6 +3515,14 @@ IRInst* IRBuilder::emitExtractExistentialValue(IRType* type, IRInst* existential
     return inst;
 }
 
+IRInst* IRBuilder::emitIsNullExistential(IRInst* existentialValue)
+{
+    auto inst =
+        createInst<IRInst>(this, kIROp_IsNullExistential, getBoolType(), 1, &existentialValue);
+    addInst(inst);
+    return inst;
+}
+
 IRType* IRBuilder::emitExtractExistentialType(IRInst* existentialValue)
 {
     auto type = getTypeKind();
@@ -4465,6 +4473,12 @@ IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, UInt element
         break;
     }
     return emitGetTupleElement(type, tuple, getIntValue(getIntType(), element));
+}
+
+IRInst* IRBuilder::emitCoopMatMapElementFunc(IRType* type, IRInst* tuple, IRInst* func)
+{
+    IRInst* args[] = {tuple, func};
+    return emitIntrinsicInst(type, kIROp_CoopMatMapElementIFunc, 2, args);
 }
 
 IRInst* IRBuilder::emitMakeResultError(IRType* resultType, IRInst* errorVal)
@@ -8642,6 +8656,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ExtractExistentialType:
     case kIROp_ExtractExistentialValue:
     case kIROp_ExtractExistentialWitnessTable:
+    case kIROp_IsNullExistential:
     case kIROp_WrapExistential:
     case kIROp_BuiltinCast:
     case kIROp_BitCast:

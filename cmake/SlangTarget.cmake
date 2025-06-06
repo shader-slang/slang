@@ -430,14 +430,14 @@ function(slang_add_target dir type)
         target_include_directories(
             ${target}
             PRIVATE
-                $<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>
+                $<$<BOOL:${include_from}>:$<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>>
         )
     endforeach()
     foreach(include_from ${ARG_INCLUDE_FROM_PUBLIC})
         target_include_directories(
             ${target}
             PUBLIC
-                $<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>
+                $<$<BOOL:${include_from}>:$<TARGET_PROPERTY:${include_from},INTERFACE_INCLUDE_DIRECTORIES>>
         )
     endforeach()
 

@@ -260,7 +260,7 @@ public:
         uint32_t extOp,
         ArrayView<VMOperand> operands)
     {
-        VMInstHeader instHeader;
+        VMInstHeader instHeader = {};
         instHeader.opcode = op;
         instHeader.opcodeExtension = extOp;
         instHeader.operandCount = (uint16_t)operands.getCount();

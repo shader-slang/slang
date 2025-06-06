@@ -428,19 +428,20 @@ INST(Load, load, 1, 0)
 INST(Store, store, 2, 0)
 
 // Atomic Operations
-INST(AtomicLoad, atomicLoad, 1, 0)
-INST(AtomicStore, atomicStore, 2, 0)
-INST(AtomicExchange, atomicExchange, 2, 0)
-INST(AtomicCompareExchange, atomicCompareExchange, 3, 0)
-INST(AtomicAdd, atomicAdd, 2, 0)
-INST(AtomicSub, atomicSub, 2, 0)
-INST(AtomicAnd, atomicAnd, 2, 0)
-INST(AtomicOr, atomicOr, 2, 0)
-INST(AtomicXor, atomicXor, 2, 0)
-INST(AtomicMin, atomicMin, 2, 0)
-INST(AtomicMax, atomicMax, 2, 0)
-INST(AtomicInc, atomicInc, 1, 0)
-INST(AtomicDec, atomicDec, 1, 0)
+    INST(AtomicLoad, atomicLoad, 1, 0)
+    INST(AtomicStore, atomicStore, 2, 0)
+    INST(AtomicExchange, atomicExchange, 2, 0)
+    INST(AtomicCompareExchange, atomicCompareExchange, 3, 0)
+    INST(AtomicAdd, atomicAdd, 2, 0)
+    INST(AtomicSub, atomicSub, 2, 0)
+    INST(AtomicAnd, atomicAnd, 2, 0)
+    INST(AtomicOr, atomicOr, 2, 0)
+    INST(AtomicXor, atomicXor, 2, 0)
+    INST(AtomicMin, atomicMin, 2, 0)
+    INST(AtomicMax, atomicMax, 2, 0)
+    INST(AtomicInc, atomicInc, 1, 0)
+    INST(AtomicDec, atomicDec, 1, 0)
+INST_RANGE(AtomicOperation, AtomicLoad, AtomicDec)
 
 // Produced and removed during backward auto-diff pass as a temporary placeholder representing the
 // currently accumulated derivative to pass to some dOut argument in a nested call.
@@ -788,6 +789,8 @@ INST(MakeTensorView, makeTensorView, 0, 0)
 INST(AllocateTorchTensor, allocTorchTensor, 0, 0)
 INST(TorchGetCudaStream, TorchGetCudaStream, 0, 0)
 INST(TorchTensorGetView, TorchTensorGetView, 0, 0)
+
+INST(CoopMatMapElementIFunc, CoopMatMapElementIFunc, 2, 0)
 
 INST(AllocateOpaqueHandle, allocateOpaqueHandle, 0, 0)
 
@@ -1223,7 +1226,7 @@ INST(GetValueFromBoundInterface,        getValueFromBoundInterface,     1, 0)
 INST(ExtractExistentialValue,           extractExistentialValue,        1, 0)
 INST(ExtractExistentialType,            extractExistentialType,         1, HOISTABLE)
 INST(ExtractExistentialWitnessTable,    extractExistentialWitnessTable, 1, HOISTABLE)
-
+INST(IsNullExistential,                 isNullExistential,              1, 0)
 INST(ExtractTaggedUnionTag,             extractTaggedUnionTag,      1, 0)
 INST(ExtractTaggedUnionPayload,         extractTaggedUnionPayload,  1, 0)
 

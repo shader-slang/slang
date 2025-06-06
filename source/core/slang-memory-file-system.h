@@ -27,7 +27,7 @@ TODO(JS):
 * We may want to make saveFile take a blob, or have a version that does. Doing so would allow the
 application to handle memory management around the blob.
 */
-class MemoryFileSystem : public ISlangMutableFileSystem, public ComBaseObject
+class MemoryFileSystem : public ComBaseObject, public ISlangMutableFileSystem
 {
 public:
     // ISlangUnknown

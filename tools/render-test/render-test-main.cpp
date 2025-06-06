@@ -911,11 +911,13 @@ void RenderTestApp::_initializeAccelerationStructure()
 
 void RenderTestApp::setProjectionMatrix(IShaderObject* rootObject)
 {
-    auto info = m_device->getDeviceInfo();
+    float kIdentity[16] =
+        {1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 0.f, 1.f};
+    auto info = m_device->getInfo();
     ShaderCursor(rootObject)
         .getField("Uniforms")
         .getDereferenced()
-        .setData(info.identityProjectionMatrix, sizeof(float) * 16);
+        .setData(kIdentity, sizeof(kIdentity));
 }
 
 void RenderTestApp::finalize()
@@ -972,14 +974,15 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
 
 Result RenderTestApp::writeScreen(const String& filename)
 {
-    size_t rowPitch, pixelSize;
+    rhi::SubresourceLayout layout;
     ComPtr<ISlangBlob> blob;
-    SLANG_RETURN_ON_FAIL(
-        m_device->readTexture(m_colorBuffer, blob.writeRef(), &rowPitch, &pixelSize));
-    auto bufferSize = blob->getBufferSize();
-    uint32_t width = static_cast<uint32_t>(rowPitch / pixelSize);
-    uint32_t height = static_cast<uint32_t>(bufferSize / rowPitch);
-    return PngSerializeUtil::write(filename.getBuffer(), blob, width, height);
+    SLANG_RETURN_ON_FAIL(m_device->readTexture(m_colorBuffer, 0, 0, blob.writeRef(), &layout));
+    return PngSerializeUtil::write(
+        filename.getBuffer(),
+        blob,
+        layout.size.width,
+        layout.size.height,
+        layout.rowPitch);
 }
 
 Result RenderTestApp::update()
@@ -1396,10 +1399,8 @@ static SlangResult _innerMain(
         DeviceDesc desc = {};
         desc.deviceType = options.deviceType;
 
-#if _DEBUG
-        desc.enableValidation = true;
+        desc.enableValidation = options.enableDebugLayers;
         desc.debugCallback = &debugCallback;
-#endif
 
         desc.slang.lineDirectiveMode = SLANG_LINE_DIRECTIVE_MODE_NONE;
         if (options.generateSPIRVDirectly)
@@ -1490,7 +1491,7 @@ static SlangResult _innerMain(
     // Print adapter info after device creation but before any other operations
     if (options.showAdapterInfo)
     {
-        auto info = device->getDeviceInfo();
+        auto info = device->getInfo();
         auto out = stdWriters->getOut();
         out.print("Using graphics adapter: %s\n", info.adapterName);
     }

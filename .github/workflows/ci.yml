@@ -33,7 +33,7 @@ jobs:
           - { os: macos, compiler: gcc }
           - { os: macos, compiler: cl }
         include:
-          - { os: linux, runs-on: ubuntu-latest }
+          - { os: linux, runs-on: ubuntu-22.04 }
           - { os: macos, runs-on: macos-latest }
           - { os: windows, runs-on: windows-latest }
           # Warnings are treated as errors by default.
@@ -81,7 +81,7 @@ jobs:
             full-gpu-tests: true
             runs-on: [Windows, self-hosted, "GCP-T4"]
             has-gpu: true
-            server-count: 2
+            server-count: 8
       fail-fast: false
     runs-on: ${{ matrix.runs-on }}
 
@@ -123,6 +123,11 @@ jobs:
               sudo apt-get update
               sudo apt-get install -y libx11-dev
           fi
+      - name: Setup Node.js
+        if: matrix.os == 'linux'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
       - name: Setup
         if: steps.filter.outputs.should-run == 'true'
         uses: ./.github/actions/common-setup
@@ -183,6 +188,36 @@ jobs:
       - name: Test Slang
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && (matrix.platform != 'aarch64' || matrix.os == 'macos')
         run: |
+          smokeResult=$("$bin_dir/slang-test" tests/render/check-backend-support-on-ci.slang)
+          supportedBackends="$(echo "$smokeResult" | grep 'Supported backends: ')"
+
+          # LLVM is required to run the filecheck
+          echo "Checking llvm ..." && echo "$supportedBackends" | grep -q llvm
+
+          if [[ "${{matrix.full-gpu-tests}}" == "true" ]]
+          then
+            for backend in fxc dxc glslang visualstudio genericcpp nvrtc metal tint # clang gcc
+            do
+              echo "Checking $backend ..." && echo "$supportedBackends" | grep -q "$backend"
+            done
+            for api in 'vk,vulkan' 'dx12,d3d12' 'dx11,d3d11' 'cuda' 'wgpu,webgpu'
+            do
+              echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
+            done
+          fi
+
+          if [[ "${{matrix.os}}" == "macos" ]]
+          then
+            for backend in metal
+            do
+              echo "Checking $backend ..." && echo "$supportedBackends" | grep -q "$backend"
+            done
+            for api in 'mtl,metal'
+            do
+              echo "Checking $api ..." && echo "$smokeResult" | grep -q "Check $api: Supported"
+            done
+          fi
+
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
           if [[ "${{matrix.full-gpu-tests}}" == "true" ]]; then
@@ -192,32 +227,29 @@ jobs:
               -category ${{ matrix.test-category }} \
               -api all-cpu \
               -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              ${{ matrix.config == 'debug' && '-disable-debug-layers' || '' }}
+              -enable-debug-layers false
           elif [[ "${{matrix.has-gpu}}" == "true" ]]; then
             "$bin_dir/slang-test" \
               -use-test-server \
               -category ${{ matrix.test-category }} \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info  \
-              ${{ matrix.config == 'debug' && '-disable-debug-layers' || '' }}
+              -enable-debug-layers false
           else
             "$bin_dir/slang-test" \
               -use-test-server \
               -category ${{ matrix.test-category }} \
               -api all-dx12 \
               -expected-failure-list tests/expected-failure-github.txt \
-              -expected-failure-list tests/expected-failure-record-replay-tests.txt \
               -expected-failure-list tests/expected-failure-github-runner.txt \
               -skip-reference-image-generation \
               -show-adapter-info \
-              ${{ matrix.config == 'debug' && '-disable-debug-layers' || '' }}
+              -enable-debug-layers false
           fi
       - name: Run Slang examples
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
@@ -246,6 +278,31 @@ jobs:
             -expected-failure-list tests/expected-failure.txt \
             -skip-reference-image-generation \
             -show-adapter-info
+      - name: Run slang-rhi tests
+        if: false # steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
+        shell: pwsh
+        run: |
+          if (!(Test-Path -Path "external/slang-rhi/build")) {
+            Write-Host "Building slang-rhi if it doesn't exist"
+            Push-Location external/slang-rhi
+            cmake --preset msvc -S . -B build
+            cmake --build build --config ${{matrix.config}}
+            Write-Host "Copying DLLs from bin directory to slang-rhi build location..."
+            Copy-Item -Path "$bin_dir\*.dll" -Destination "build\${{matrix.config}}" -Force
+            Pop-Location
+          }
+          $testExe = Get-ChildItem -Path "external/slang-rhi/build" -Recurse -Filter "slang-rhi-tests.exe" | Select-Object -First 1
+          if ($testExe) {
+              Write-Host "Found slang-rhi tests executable at: $($testExe.FullName)"
+              $testDir = $testExe.Directory.FullName
+              Push-Location $testDir
+              Write-Host "Running slang-rhi tests..."
+              .\slang-rhi-tests.exe -check-devices -tce="ray-tracing-*,cmd-query-resolve-host"
+              Pop-Location
+          } else {
+              Write-Error "Could not find slang-rhi-tests.exe"
+              exit 1
+          }
       - name: Run slangpy tests
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         shell: pwsh

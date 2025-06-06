@@ -48,7 +48,7 @@ private:
     static DefaultSharedLibraryLoader s_singleton;
 };
 
-class DefaultSharedLibrary : public ISlangSharedLibrary, public ComBaseObject
+class DefaultSharedLibrary : public ComBaseObject, public ISlangSharedLibrary
 {
 public:
     SLANG_CLASS_GUID(0xe7f2597b, 0xf803, 0x4b6e, {0xaf, 0x8b, 0xcb, 0xe3, 0xa2, 0x21, 0xfd, 0x5a})
