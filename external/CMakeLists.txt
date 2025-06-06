@@ -187,12 +187,17 @@ if(SLANG_ENABLE_SLANG_RHI)
     set(SLANG_RHI_FETCH_SLANG OFF)
     set(SLANG_RHI_SLANG_INCLUDE_DIR ${slang_SOURCE_DIR}/include)
     set(SLANG_RHI_SLANG_BINARY_DIR ${CMAKE_BINARY_DIR})
-
-    # Not disabling these break tests (issue #5474)
-    set(SLANG_RHI_FETCH_DXC OFF)
-    set(SLANG_RHI_ENABLE_AGILITY_SDK OFF)
-
     set(SLANG_RHI_ENABLE_NVAPI ${SLANG_ENABLE_NVAPI})
+
+    # CoopVec requires 1.717.0-preview, but we cannot use the version until slang-rhi
+    # allow slang to override D3D12Version value
+    #set(SLANG_RHI_AGILITY_SDK_VERSION D3D12_PREVIEW_SDK_VERSION)
+    #set(SLANG_RHI_FETCH_AGILITY_SDK_VERSION
+    #    "1.717.0-preview"
+    #    CACHE STRING
+    #    "Agility SDK version to fetch"
+    #    FORCE
+    #)
 
     if(SLANG_ENABLE_DX_ON_VK)
         set(SLANG_RHI_HAS_D3D12 ON)

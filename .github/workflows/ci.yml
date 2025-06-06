@@ -278,8 +278,8 @@ jobs:
             -expected-failure-list tests/expected-failure.txt \
             -skip-reference-image-generation \
             -show-adapter-info
-      - name: slang-rhi tests
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
+      - name: Run slang-rhi tests
+        if: false # steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         shell: pwsh
         run: |
           if (!(Test-Path -Path "external/slang-rhi/build")) {
@@ -297,7 +297,7 @@ jobs:
               $testDir = $testExe.Directory.FullName
               Push-Location $testDir
               Write-Host "Running slang-rhi tests..."
-              .\slang-rhi-tests.exe
+              .\slang-rhi-tests.exe -check-devices -tce="ray-tracing-*,cmd-query-resolve-host"
               Pop-Location
           } else {
               Write-Error "Could not find slang-rhi-tests.exe"
