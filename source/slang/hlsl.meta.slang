@@ -25955,7 +25955,7 @@ CoopVec<T, N> exp2<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
             ret[i] = exp2(x[i]);
         return ret;
     case optix_coopvec:
-        case cuda: __intrinsic_asm "optixCoopVecExp2($0)";
+        __intrinsic_asm "optixCoopVecExp2($0)";
     }
 }
 
