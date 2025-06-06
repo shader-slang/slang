@@ -11484,11 +11484,12 @@ LoweredValInfo ensureDecl(IRGenContext* context, Decl* decl)
         return *valInfoPtr;
     }
 
-    // If we have a decl that's a generic value/type decl then something has gone seriously
-    // wrong
+    // If we have a decl that's a generic value/type decl, this typically indicates
+    // an unused generic parameter. Emit an error in this case.
     if (as<GenericValueParamDecl>(decl) || as<GenericTypeParamDecl>(decl))
     {
-        SLANG_UNEXPECTED("Generic type/value shouldn't be handled here!");
+        context->getSink()->diagnose(decl->loc, Diagnostics::unusedGenericParameter, decl->getName());
+        return LoweredValInfo();
     }
 
     IRBuilder subIRBuilder(context->irBuilder->getModule());
