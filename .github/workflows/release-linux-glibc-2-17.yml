@@ -18,7 +18,7 @@ jobs:
       - name: Run the build process with Docker
         uses: addnab/docker-run-action@v3
         with:
-          # image: slangdeveloper/centos7-gcc9:cmake
+          # TODO: Move the image to a more appropriate registry
           image: gztong/ubuntu18-gcc11:glibc2.28
           options: -v ${{ github.workspace }}:/home/app -v /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt
           run: |
