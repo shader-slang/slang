@@ -3,6 +3,7 @@
 
 #include "../core/slang-blob.h"
 #include "slang-ast-support-types.h"
+#include "slang.h"
 
 template<typename T>
 struct Range
@@ -56,6 +57,7 @@ namespace Slang
 static void emitReflectionVarInfoJSON(PrettyWriter& writer, slang::VariableReflection* var);
 static void emitReflectionTypeLayoutJSON(PrettyWriter& writer, slang::TypeLayoutReflection* type);
 static void emitReflectionTypeJSON(PrettyWriter& writer, slang::TypeReflection* type);
+static slang::ShaderReflection* g_inProgramLayout = nullptr;
 
 static void emitReflectionVarBindingInfoJSON(
     PrettyWriter& writer,
@@ -361,6 +363,22 @@ static void emitUserAttributes(PrettyWriter& writer, slang::FunctionReflection* 
     }
 }
 
+static slang::TypeLayoutReflection* maybeChangeTypeLayoutToAgumentBufferTier2(slang::VariableLayoutReflection* varLayout)
+{
+    if (varLayout->getCategoryCount() != 0)
+    {
+        for (unsigned int categoryIdx = 0; categoryIdx < varLayout->getCategoryCount(); categoryIdx++)
+        {
+            auto category = varLayout->getCategoryByIndex(categoryIdx);
+            if (category == slang::MetalArgumentBufferElement)
+            {
+                return g_inProgramLayout->getTypeLayout(varLayout->getTypeLayout()->getType(), slang::LayoutRules::MetalArgumentBufferTier2);
+            }
+        }
+    }
+    return nullptr;
+}
+
 static void emitReflectionVarLayoutJSON(PrettyWriter& writer, slang::VariableLayoutReflection* var)
 {
     writer << "{\n";
@@ -376,7 +394,14 @@ static void emitReflectionVarLayoutJSON(PrettyWriter& writer, slang::VariableLay
 
     writer.maybeComma();
     writer << "\"type\": ";
-    emitReflectionTypeLayoutJSON(writer, var->getTypeLayout());
+    if (auto newTypeLayout = maybeChangeTypeLayoutToAgumentBufferTier2(var))
+    {
+        emitReflectionTypeLayoutJSON(writer, newTypeLayout);
+    }
+    else
+    {
+        emitReflectionTypeLayoutJSON(writer, var->getTypeLayout());
+    }
 
     emitReflectionModifierInfoJSON(writer, var->getVariable());
 
@@ -693,7 +718,17 @@ static void emitReflectionParameterGroupTypeLayoutInfoJSON(
     writer << "\"";
 
     writer << ",\n\"elementType\": ";
-    emitReflectionTypeLayoutJSON(writer, typeLayout->getElementTypeLayout());
+
+    if (auto newElementTypeLayout = maybeChangeTypeLayoutToAgumentBufferTier2(typeLayout->getElementVarLayout()))
+    {
+        // If we are in argument buffer tier 2, we need to use the new type layout
+        // that has the correct binding information.
+        emitReflectionTypeLayoutJSON(writer, newElementTypeLayout);
+    }
+    else
+    {
+        emitReflectionTypeLayoutJSON(writer, typeLayout->getElementTypeLayout());
+    }
 
     // Note: There is a subtle detail below when it comes to the
     // container/element variable layouts that get nested inside
@@ -1231,6 +1266,7 @@ void emitReflectionJSON(
     PrettyWriter& writer)
 {
     auto programReflection = (slang::ShaderReflection*)reflection;
+    g_inProgramLayout = programReflection;
     emitReflectionJSON(writer, request, programReflection);
 }
 
