@@ -110,11 +110,12 @@ namespace Slang
 // add more fine-grained resource kinds (e.g.,
 // if we ever add an explicit resource kind
 // for geometry shader output streams).
-static const LayoutResourceKindFlags flags = LayoutResourceKindFlag::make(LayoutResourceKind::VaryingInput) |
-                                             LayoutResourceKindFlag::make(LayoutResourceKind::VaryingOutput) |
-                                             LayoutResourceKindFlag::make(LayoutResourceKind::CallablePayload) |
-                                             LayoutResourceKindFlag::make(LayoutResourceKind::HitAttributes) |
-                                             LayoutResourceKindFlag::make(LayoutResourceKind::RayPayload);
+static const LayoutResourceKindFlags flags =
+    LayoutResourceKindFlag::make(LayoutResourceKind::VaryingInput) |
+    LayoutResourceKindFlag::make(LayoutResourceKind::VaryingOutput) |
+    LayoutResourceKindFlag::make(LayoutResourceKind::CallablePayload) |
+    LayoutResourceKindFlag::make(LayoutResourceKind::HitAttributes) |
+    LayoutResourceKindFlag::make(LayoutResourceKind::RayPayload);
 
 bool isVaryingParameter(IRTypeLayout* typeLayout)
 {
@@ -128,7 +129,7 @@ bool isVaryingParameter(IRTypeLayout* typeLayout)
     {
         for (auto fieldAttr : structTypeLayout->getFieldLayoutAttrs())
         {
-            if(!isVaryingParameter(fieldAttr->getLayout()))
+            if (!isVaryingParameter(fieldAttr->getLayout()))
                 return false;
         }
         // If we made it here, all struct fields were varying.
@@ -193,7 +194,8 @@ bool isVaryingParameter(IRVarLayout* varLayout)
         return true;
     }
 
-    if (varLayout->usesResourceFromKinds(flags)) {
+    if (varLayout->usesResourceFromKinds(flags))
+    {
         return true;
     }
 
