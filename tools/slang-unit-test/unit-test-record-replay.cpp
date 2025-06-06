@@ -146,7 +146,7 @@ static bool disableLogInReplayer()
     return retCode == 0;
 }
 
-static void findRecordFileName(List<String>* fileNames)
+static void findRecordFileName(List<String>* fileNames, const String& recordDir)
 {
     struct Visitor : Path::Visitor
     {
@@ -165,7 +165,7 @@ static void findRecordFileName(List<String>* fileNames)
     };
 
     Visitor visitor(fileNames);
-    Path::find("slang-record", "*.cap", &visitor);
+    Path::find(recordDir.getBuffer(), "*.cap", &visitor);
 }
 
 static SlangResult launchProcessAndReadStdout(
@@ -216,6 +216,7 @@ static SlangResult launchProcessAndReadStdout(
 static SlangResult runExample(
     UnitTestContext* context,
     const char* exampleName,
+    const String& recordDir,
     List<entryHashInfo>& outHashes)
 {
     SlangResult finalRes = SLANG_OK;
@@ -228,6 +229,8 @@ static SlangResult runExample(
     StringBuilder msgBuilder;
     SlangResult res = SLANG_OK;
 
+    // Set unique record directory for this test
+    writeEnvironmentVariable("SLANG_RECORD_DIRECTORY", recordDir.getBuffer());
     enableRecordLayer();
     res = launchProcessAndReadStdout(context, optArgs, exampleName, process, exeRes);
     disableRecordLayer();
@@ -264,10 +267,13 @@ static SlangResult runExample(
     return SLANG_OK;
 }
 
-static SlangResult replayExample(UnitTestContext* context, List<entryHashInfo>& outHashes)
+static SlangResult replayExample(
+    UnitTestContext* context,
+    const String& recordDir,
+    List<entryHashInfo>& outHashes)
 {
     List<String> fileNames;
-    findRecordFileName(&fileNames);
+    findRecordFileName(&fileNames, recordDir);
     if (fileNames.getCount() == 0)
     {
         getTestReporter()->message(TestMessageType::TestFailure, "No record files found\n");
@@ -275,7 +281,7 @@ static SlangResult replayExample(UnitTestContext* context, List<entryHashInfo>& 
     }
 
     List<String> optArgs;
-    String recordFileName = Path::combine("slang-record", fileNames[0]);
+    String recordFileName = Path::combine(recordDir, fileNames[0]);
     optArgs.add(recordFileName.getBuffer());
 
     RefPtr<Process> process;
@@ -377,14 +383,14 @@ static SlangResult resultCompare(
     return SLANG_OK;
 }
 
-static SlangResult cleanupRecordFiles()
+static SlangResult cleanupRecordFiles(const String& recordDir)
 {
-    SlangResult res = Path::removeNonEmpty("slang-record");
+    SlangResult res = Path::removeNonEmpty(recordDir.getBuffer());
     if (SLANG_FAILED(res))
     {
-        getTestReporter()->message(
-            TestMessageType::TestFailure,
-            "Failed to remove 'slang-record' directory\n");
+        StringBuilder msgBuilder;
+        msgBuilder << "Failed to remove '" << recordDir << "' directory\n";
+        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
     }
 
     return res;
@@ -392,67 +398,81 @@ static SlangResult cleanupRecordFiles()
 
 static SlangResult runTest(UnitTestContext* context, const char* testName)
 {
+    // Create unique directory for this test to avoid conflicts
+    StringBuilder recordDirBuilder;
+    recordDirBuilder << "slang-record-" << testName;
+    String recordDir = recordDirBuilder.toString();
+
     List<entryHashInfo> expectHashes;
     List<entryHashInfo> resultHashes;
     SlangResult res = SLANG_OK;
-    if ((res = runExample(context, testName, expectHashes)) != SLANG_OK)
+
+    // Run the example to generate recording
+    res = runExample(context, testName, recordDir, expectHashes);
+    if (SLANG_SUCCEEDED(res))
     {
-        goto error;
-    }
-
-    if ((res = replayExample(context, resultHashes)) != SLANG_OK)
-    {
-        goto error;
-    }
-
-    if ((res = resultCompare(expectHashes, resultHashes)) != SLANG_OK)
-    {
-        goto error;
-    }
-
-error:
-    cleanupRecordFiles();
-    return res;
-}
-
-static SlangResult runTests(UnitTestContext* context)
-{
-    const char* testBinaryNames[] = {
-        "cpu-hello-world",
-        "triangle",
-        "ray-tracing",
-        "ray-tracing-pipeline",
-        "autodiff-texture",
-        "gpu-printing"
-        // "shader-object", // these examples requires reflection API to replay, we have to disable
-        // it for now. "model-viewer",
-    };
-
-    SlangResult finalRes = SLANG_OK;
-    for (const auto& testBinaryName : testBinaryNames)
-    {
-        SlangResult res = runTest(context, testBinaryName);
-        if (SLANG_FAILED(res))
+        // Replay the recording
+        res = replayExample(context, recordDir, resultHashes);
+        if (SLANG_SUCCEEDED(res))
         {
-            StringBuilder msgBuilder;
-            msgBuilder << "Failed subtest: '" << testBinaryName << "'\n\n\n";
-            getTestReporter()->message(
-                TestMessageType::TestFailure,
-                msgBuilder.toString().getBuffer());
-            finalRes = res;
+            // Compare results
+            res = resultCompare(expectHashes, resultHashes);
         }
     }
 
-    return finalRes;
+    // Always cleanup, regardless of success or failure
+    cleanupRecordFiles(recordDir);
+    return res;
 }
 
 // Those examples all depend on the Vulkan, so we only run them on non-Apple platforms.
 // In the future, we may be able to modify the examples further to remove all the render APIs
 // such that it can be ran on Apple platforms.
 #if !(SLANG_APPLE_FAMILY)
-SLANG_UNIT_TEST(RecordReplay)
+
+SLANG_UNIT_TEST(RecordReplay_cpu_hello_world)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTests(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "cpu-hello-world")));
 }
+
+SLANG_UNIT_TEST(RecordReplay_triangle)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "triangle")));
+}
+
+SLANG_UNIT_TEST(RecordReplay_ray_tracing)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing")));
+}
+
+SLANG_UNIT_TEST(RecordReplay_ray_tracing_pipeline)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing-pipeline")));
+}
+
+SLANG_UNIT_TEST(RecordReplay_autodiff_texture)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "autodiff-texture")));
+}
+
+SLANG_UNIT_TEST(RecordReplay_gpu_printing)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "gpu-printing")));
+}
+
+#if 0
+// These examples requires reflection API to replay, we have to disable
+// it for now. "model-viewer",
+
+SLANG_UNIT_TEST(RecordReplay_shader_object)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "shader-object")));
+}
+
+SLANG_UNIT_TEST(RecordReplay_model_viewer)
+{
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "model-viewer")));
+}
+#endif
 
 #endif
