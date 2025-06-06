@@ -1142,6 +1142,15 @@ public:
         return m_shared->getGLSLBindingOffsetTracker();
     }
 
+    void setCheckBlockName(bool enabled)
+    {
+        m_checkBlockName = enabled;
+    }
+
+    bool isCheckBlockNameEnabled()
+    {
+        return m_checkBlockName;
+    }
 private:
     SharedSemanticsContext* m_shared = nullptr;
 
@@ -1152,6 +1161,8 @@ private:
     Decl* m_declToExcludeFromLookup = nullptr;
 
     bool m_excludeTransparentMembersFromLookup = false;
+
+    bool m_checkBlockName = false;
 
 protected:
     // TODO: consider making more of this state `private`...

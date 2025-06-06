@@ -1264,6 +1264,7 @@ FIDDLE() namespace Slang
         IgnoreInheritance =
             1 << 4, ///< Lookup only non inheritance children of a struct (including `extension`)
         IgnoreTransparentMembers = 1 << 5,
+        CheckBlockName = 1 << 6,
     };
     inline LookupOptions operator&(LookupOptions a, LookupOptions b)
     {
