@@ -405,6 +405,10 @@ void DeclRefBase::toText(StringBuilder& out)
                 getTargetType(getCurrentASTBuilder(), getParent())->toText(out);
             }
         }
+        else if (auto someTypeDecl = as<SomeTypeDecl>(decl))
+        {
+            out << "some " << someTypeDecl->interfaceType;
+        }
     }
 }
 
