@@ -139,6 +139,22 @@ Name* getReflectionName(VarDeclBase* varDecl);
 
 inline Type* getType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> declRef)
 {
+    auto declRefType = declRef.getDecl()->getType();
+    // Unwrap-type for substituting
+    if (auto someTypeDeclRef = isDeclRefTypeOf<SomeTypeDecl>(declRefType))
+    {
+        auto subType = declRef.substitute(
+            astBuilder,
+            as<DeclRefType>(someTypeDeclRef.getDecl()->interfaceType));
+        SomeTypeDecl* newDecl;
+        if (auto unboundSomeTypeDeclRef = isDeclRefTypeOf<UnboundSomeTypeDecl>(declRefType))
+            newDecl = astBuilder->create<UnboundSomeTypeDecl>();
+        else
+            newDecl = astBuilder->create<SomeTypeDecl>();
+        newDecl->loc = declRef.getDecl()->loc;
+        newDecl->interfaceType = TypeExp(subType);
+        return DeclRefType::create(astBuilder, newDecl);
+    }
     return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
 }
 

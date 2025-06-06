@@ -32,4 +32,7 @@ OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericCon
 OrderedDictionary<Type*, List<Type*>> getCanonicalGenericConstraints2(
     ASTBuilder* builder,
     DeclRef<ContainerDecl> genericDecl);
+
+/// Return `expr` with any outer casts to interface types stripped away
+Expr* maybeIgnoreCastToInterface(Expr* expr);
 } // namespace Slang

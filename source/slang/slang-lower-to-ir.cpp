@@ -34,6 +34,7 @@
 #include "slang-ir-use-uninitialized-values.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
+#include "slang-ir-validate-dyn-and-some.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
 #include "slang-type-layout.h"
@@ -2495,6 +2496,13 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         }
         builder->addMeshOutputDecoration(op, inst, t->getMaxElementCount());
     }
+
+    if (auto vardeclBase = as<VarDeclBase>(decl))
+    {
+        // SomeType var's must be tagged accordingly
+        if (isDeclRefTypeOf<SomeTypeDecl>(vardeclBase->getType()))
+            builder->addDecoration(inst, kIROp_SomeTypeDecoration);
+    }
 }
 
 /// If `decl` has a modifier that should turn into a
@@ -3399,7 +3407,6 @@ void _lowerFuncDeclBaseTypeInfo(
     auto& parameterLists = outInfo.parameterLists;
     collectParameterLists(
         context,
-
         declRef,
         &parameterLists,
         kParameterListCollectMode_Default,
@@ -3634,38 +3641,6 @@ struct ExprLoweringContext
             // return false;
         }
     }
-
-    /// Return `expr` with any outer casts to interface types stripped away
-    Expr* maybeIgnoreCastToInterface(Expr* expr)
-    {
-        auto e = expr;
-        while (auto castExpr = as<CastToSuperTypeExpr>(e))
-        {
-            if (auto declRefType = as<DeclRefType>(e->type))
-            {
-                if (declRefType->getDeclRef().as<InterfaceDecl>())
-                {
-                    e = castExpr->valueArg;
-                    continue;
-                }
-            }
-            else if (auto andType = as<AndType>(e->type))
-            {
-                // TODO: We might eventually need to tell the difference
-                // between conjunctions of interfaces and conjunctions
-                // that might include non-interface types.
-                //
-                // For now we assume that any case to a conjunction
-                // is effectively a cast to an interface type.
-                //
-                e = castExpr->valueArg;
-                continue;
-            }
-            break;
-        }
-        return e;
-    }
-
 
     // Lower an expression that should have the same l-value-ness
     // as the visitor itself.
@@ -3949,7 +3924,7 @@ struct ExprLoweringContext
                 // which case we don't want to emit the result of the cast, but instead
                 // the source.
                 //
-                baseExpr = this->maybeIgnoreCastToInterface(baseExpr);
+                baseExpr = maybeIgnoreCastToInterface(baseExpr);
             }
 
             // If the thing being invoked is a subscript operation,
@@ -4579,7 +4554,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto loweredType = lowerType(context, expr->type);
 
         auto baseExpr = expr->baseExpression;
-        baseExpr = sharedLoweringContext.maybeIgnoreCastToInterface(baseExpr);
+        baseExpr = maybeIgnoreCastToInterface(baseExpr);
         auto loweredBase = lowerSubExpr(baseExpr);
 
         auto declRef = expr->declRef;
@@ -5574,6 +5549,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitPointerTypeExpr(PointerTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("'*' type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitSomeTypeExpr(SomeTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("'some' type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
@@ -8258,6 +8239,16 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     LoweredValInfo visitGenericTypeParamDecl(GenericTypeParamDecl* /*decl*/)
     {
         return LoweredValInfo();
+    }
+
+    LoweredValInfo visitSomeTypeDecl(SomeTypeDecl* decl)
+    {
+        auto declRefType = as<DeclRefType>(decl->interfaceType.type);
+        SLANG_ASSERT(declRefType);
+        auto loweredType = lowerType(this->context, declRefType);
+        if (!loweredType->findDecoration<IRSomeTypeDecoration>())
+            context->irBuilder->addDecoration(loweredType, kIROp_SomeTypeDecoration);
+        return loweredType;
     }
 
     LoweredValInfo visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
@@ -12224,6 +12215,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         checkAutoDiffUsages(module, compileRequest->getSink());
 
         checkForOperatorShiftOverflow(module, linkage->m_optionSet, compileRequest->getSink());
+
+        // Validate dyn and some type usage. Must happen after loop-unrolling,
+        // else simple loops will not compile if assigning to an interface
+        validateDynAndSomeUsage(module, compileRequest->getSink());
     }
 
     // The "mandatory" optimization passes may make use of the

@@ -137,6 +137,28 @@ class LetDecl : public VarDecl
     FIDDLE(...)
 };
 
+// Represents the type of `some Type` for `some Type varName;`.
+// This decl of `some Type` is not assignable since it already
+// has a given value.
+// The wrapped type is a concrete interface named `interfaceType`.
+FIDDLE()
+class SomeTypeDecl : public Decl
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp interfaceType;
+};
+
+// Represents the type of `some Type` for `some Type varName`
+// when `varName` is unassigned/unbound. This decl simmilarly
+// represents the `out some Type` type.
+// This variant of `some Type` is assignable since it is either
+// a new variable without value or equivlent.
+FIDDLE()
+class UnboundSomeTypeDecl : public SomeTypeDecl
+{
+    FIDDLE(...)
+};
+
 // An `AggTypeDeclBase` captures the shared functionality
 // between true aggregate type declarations and extension
 // declarations:

@@ -306,6 +306,22 @@ public:
         return interfaceDecl;
     }
 
+    SomeTypeDecl* createSomeTypeDecl(SourceLoc loc, TypeExp typeExp)
+    {
+        auto someTypeDecl = create<SomeTypeDecl>();
+        someTypeDecl->loc = loc;
+        someTypeDecl->interfaceType = typeExp;
+        return someTypeDecl;
+    }
+
+    UnboundSomeTypeDecl* createSomeTypeDecl(SomeTypeDecl* decl)
+    {
+        auto unboundSomeTypeDecl = create<UnboundSomeTypeDecl>();
+        unboundSomeTypeDecl->loc = decl->loc;
+        unboundSomeTypeDecl->interfaceType = decl->interfaceType;
+        return unboundSomeTypeDecl;
+    }
+
     template<typename T>
     DeclRef<T> getDirectDeclRef(
         T* decl,
@@ -356,7 +372,7 @@ public:
                 break;
             }
         }
-        else if (auto directDeclRef = as<DirectDeclRef>(parent.declRefBase))
+        else if (as<DirectDeclRef>(parent.declRefBase))
         {
             return makeDeclRef(memberDecl);
         }

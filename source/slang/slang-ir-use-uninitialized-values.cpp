@@ -163,10 +163,6 @@ static bool canIgnoreType(IRType* type, IRType* upper)
         return (count == 0);
     }
 
-    // Nothing to initialize for a pure interface
-    if (as<IRInterfaceType>(type))
-        return true;
-
     // We don't know what type it will be yet.
     if (as<IRParam>(type))
         return true;
@@ -567,6 +563,16 @@ static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, Di
     }
 }
 
+static bool isUnusedInterfaceType(IRInst* inst)
+{
+    auto type = inst->getFullType();
+    if (auto ptr = as<IRPtrTypeBase>(type))
+    {
+        type = ptr->getValueType();
+    }
+    return as<IRInterfaceType>(type);
+}
+
 static void checkParameterAsOut(
     ReachabilityContext& reachability,
     IRFunc* func,
@@ -576,10 +582,21 @@ static void checkParameterAsOut(
     auto loads = getUnresolvedParamLoads(reachability, func, param);
     for (auto load : loads)
     {
+        DiagnosticInfo diagnostic;
+        if (as<IRTerminatorInst>(load))
+        {
+            diagnostic = isUnusedInterfaceType(param) ? Diagnostics::returningWithUninitializedOutWarning
+                : Diagnostics::returningWithUninitializedOutInterfaceError;
+        }
+        else
+        {
+          diagnostic = isUnusedInterfaceType(param) ? Diagnostics::usingUninitializedOutWarning
+                : Diagnostics::usingUninitializedOutInterfaceError;
+        }
+
         sink->diagnose(
             load,
-            as<IRTerminatorInst>(load) ? Diagnostics::returningWithUninitializedOut
-                                       : Diagnostics::usingUninitializedOut,
+            diagnostic,
             param);
     }
 }
@@ -637,7 +654,11 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
             auto loads = getUnresolvedVariableLoads(reachability, inst);
             for (auto load : loads)
             {
-                sink->diagnose(load, Diagnostics::usingUninitializedVariable, inst);
+                Diagnostics diagnostic = maybeEmitInterfaceError(inst) ? Diagnostics::usingUninitializedVariableWarning : Diagnostics::usingUninitializedInterfaceVariableError;
+                sink->diagnose(
+                    load,
+                    diagnostic,
+                    inst);
             }
         }
     }
