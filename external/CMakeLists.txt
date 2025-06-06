@@ -212,7 +212,10 @@ if(SLANG_ENABLE_SLANG_RHI)
     endif()
 
     # Output slang-rhi-tests to the bin directory so we can it easily.
-    set_target_properties(slang-rhi-tests PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/bin)
+    set_target_properties(
+        slang-rhi-tests
+        PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/bin
+    )
 endif()
 
 # Tidy things up:
