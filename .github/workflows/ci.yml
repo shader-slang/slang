@@ -69,7 +69,7 @@ jobs:
             platform: x86_64
             test-category: full
             full-gpu-tests: true
-            runs-on: [Windows, self-hosted, GCP-T4]
+            runs-on: [Windows, self-hosted, GCP-T4, test-machine]
             has-gpu: true
             server-count: 8
           # Self-hosted full gpu build - debug
@@ -79,7 +79,7 @@ jobs:
             platform: x86_64
             test-category: full
             full-gpu-tests: true
-            runs-on: [Windows, self-hosted, "GCP-T4"]
+            runs-on: [Windows, self-hosted, "GCP-T4", test-machine]
             has-gpu: true
             server-count: 8
       fail-fast: false
@@ -181,7 +181,8 @@ jobs:
               # cache in the setup phase
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
-                -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}}
+                -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}} \
+                -DOptix_ROOT_DIR="C:/ProgramData/NVIDIA Corporation/OptiX SDK 9.0.0"
               cmake --workflow --preset "${{matrix.config}}"
             fi
           fi
