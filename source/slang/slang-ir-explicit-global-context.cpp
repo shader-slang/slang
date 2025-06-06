@@ -661,6 +661,12 @@ struct IntroduceExplicitGlobalContextPass
                 ptr = builder.emitLoad(ptr);
             use->set(ptr);
         }
+
+        // We've replaced all uses of the global var so we should remove it.
+        // We leave decorations on the global var above, so if we do not remove it
+        // here, the global var will not be processed for elimination in
+        // eliminateDeadCode.
+        globalVar->removeAndDeallocate();
     }
 
     IRInst* findOrCreateContextPtrForInst(IRInst* inst)
