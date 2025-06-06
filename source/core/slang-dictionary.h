@@ -339,6 +339,7 @@ protected:
     DictionaryType dict;
 
 private:
+    void init() {} // Base case for recursion
     template<typename... Args>
     void init(const T& v, Args... args)
     {
@@ -406,6 +407,8 @@ public:
 template<typename T>
 class HashSet : public HashSetBase<T, Dictionary<T, _DummyClass>>
 {
+public:
+    using HashSetBase<T, Dictionary<T, _DummyClass>>::HashSetBase;
 };
 
 template<typename TKey, typename TValue>

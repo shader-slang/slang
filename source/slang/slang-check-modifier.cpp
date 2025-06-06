@@ -2211,6 +2211,9 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
         return;
     }
 
+    // Define valid stage names
+    const HashSet<String> validStages("anyhit", "closesthit", "miss", "caller");
+
     // Check each field in the struct
     for (auto member : structDecl->members)
     {
@@ -2220,8 +2223,11 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
             continue;
         }
 
-        bool hasReadModifier = fieldVarDecl->findModifier<RayPayloadReadSemantic>() != nullptr;
-        bool hasWriteModifier = fieldVarDecl->findModifier<RayPayloadWriteSemantic>() != nullptr;
+        auto readModifier = fieldVarDecl->findModifier<RayPayloadReadSemantic>();
+        auto writeModifier = fieldVarDecl->findModifier<RayPayloadWriteSemantic>();
+
+        bool hasReadModifier = readModifier != nullptr;
+        bool hasWriteModifier = writeModifier != nullptr;
 
         if (!hasReadModifier && !hasWriteModifier)
         {
@@ -2230,6 +2236,38 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
                 fieldVarDecl,
                 Diagnostics::rayPayloadFieldMissingAccessQualifiers,
                 fieldVarDecl->getName());
+        }
+
+        // Check stage names in read qualifier
+        if (readModifier)
+        {
+            for (auto& stageToken : readModifier->stageNameTokens)
+            {
+                String stageName = stageToken.getContent();
+                if (!validStages.contains(stageName))
+                {
+                    getSink()->diagnose(
+                        stageToken,
+                        Diagnostics::rayPayloadInvalidStageInAccessQualifier,
+                        stageName);
+                }
+            }
+        }
+
+        // Check stage names in write qualifier
+        if (writeModifier)
+        {
+            for (auto& stageToken : writeModifier->stageNameTokens)
+            {
+                String stageName = stageToken.getContent();
+                if (!validStages.contains(stageName))
+                {
+                    getSink()->diagnose(
+                        stageToken,
+                        Diagnostics::rayPayloadInvalidStageInAccessQualifier,
+                        stageName);
+                }
+            }
         }
     }
 }
