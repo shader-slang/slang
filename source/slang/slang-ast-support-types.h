@@ -1096,12 +1096,6 @@ FIDDLE() namespace Slang
         MemberFilterStyle m_filterStyle;
     };
 
-    struct TransparentMemberInfo
-    {
-        // The declaration of the transparent member
-        Decl* decl = nullptr;
-    };
-
     template<typename T>
     struct FilteredMemberRefList
     {

@@ -526,21 +526,24 @@ void appendDefinitionLocation(StringBuilder& sb, Workspace* workspace, const Hum
 
 HumaneSourceLoc getModuleLoc(SourceManager* manager, ContainerDecl* moduleDecl)
 {
-    if (moduleDecl)
-    {
-        if (moduleDecl->members.getCount() && moduleDecl->members[0])
-        {
-            auto loc = moduleDecl->members[0]->loc;
-            if (loc.isValid())
-            {
-                auto location = manager->getHumaneLoc(loc, SourceLocType::Actual);
-                location.line = 1;
-                location.column = 1;
-                return location;
-            }
-        }
-    }
-    return HumaneSourceLoc();
+    if (!moduleDecl)
+        return HumaneSourceLoc();
+
+    if (moduleDecl->getDirectMemberDeclCount() == 0)
+        return HumaneSourceLoc();
+
+    auto firstDecl = moduleDecl->getDirectMemberDecl(0);
+    if (!firstDecl)
+        return HumaneSourceLoc();
+
+    auto loc = firstDecl->loc;
+    if (!loc.isValid())
+        return HumaneSourceLoc();
+
+    auto location = manager->getHumaneLoc(loc, SourceLocType::Actual);
+    location.line = 1;
+    location.column = 1;
+    return location;
 }
 
 SlangResult LanguageServer::hover(

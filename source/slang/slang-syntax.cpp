@@ -1093,44 +1093,44 @@ ModuleDecl* getModuleDecl(Scope* scope)
     return nullptr;
 }
 
-Decl* getParentDecl(Decl* decl)
+ContainerDecl* getParentDecl(Decl* decl)
 {
-    decl = decl->parentDecl;
-    while (as<GenericDecl>(decl))
-        decl = decl->parentDecl;
-    return decl;
+    auto parentDecl = decl->parentDecl;
+    while (auto genericDecl = as<GenericDecl>(parentDecl))
+        parentDecl = genericDecl->parentDecl;
+    return parentDecl;
 }
 
-Decl* getParentAggTypeDecl(Decl* decl)
+AggTypeDecl* getParentAggTypeDecl(Decl* decl)
 {
     decl = decl->parentDecl;
     while (decl)
     {
-        if (as<AggTypeDecl>(decl))
-            return decl;
-        decl = decl->parentDecl;
-    }
-    return nullptr;
-}
-
-Decl* getParentAggTypeDeclBase(Decl* decl)
-{
-    decl = decl->parentDecl;
-    while (decl)
-    {
-        if (as<AggTypeDeclBase>(decl))
-            return decl;
+        if (auto found = as<AggTypeDecl>(decl))
+            return found;
         decl = decl->parentDecl;
     }
     return nullptr;
 }
 
-Decl* getParentFunc(Decl* decl)
+AggTypeDeclBase* getParentAggTypeDeclBase(Decl* decl)
+{
+    decl = decl->parentDecl;
+    while (decl)
+    {
+        if (auto found = as<AggTypeDeclBase>(decl))
+            return found;
+        decl = decl->parentDecl;
+    }
+    return nullptr;
+}
+
+FunctionDeclBase* getParentFunc(Decl* decl)
 {
     while (decl)
     {
-        if (as<FunctionDeclBase>(decl))
-            return decl;
+        if (auto found = as<FunctionDeclBase>(decl))
+            return found;
         decl = decl->parentDecl;
     }
     return nullptr;

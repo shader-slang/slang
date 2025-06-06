@@ -541,7 +541,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     // should have been filled with the resolved types and values for the
     // generic parameters. We can now verify if they are complete and consolidate
     // them into final argument list.
-    for (auto member : genericDeclRef.getDecl()->members)
+    for (auto member : genericDeclRef.getDecl()->getDirectMemberDecls())
     {
         if (auto typeParam = as<GenericTypeParamDeclBase>(member))
         {
