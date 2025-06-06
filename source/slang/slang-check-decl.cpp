@@ -10947,10 +10947,10 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
             }
             else if (getShared()->isInLanguageServer())
             {
-                auto moduleDeclarationDecl = findExistingModuleDeclarationDecl(moduleDecl);
-                if (moduleDeclarationDecl)
+                auto existingModuleDeclarationDecl = findExistingModuleDeclarationDecl(moduleDecl);
+                if (existingModuleDeclarationDecl)
                 {
-                    expectedModuleName = moduleDeclarationDecl->getName();
+                    expectedModuleName = existingModuleDeclarationDecl->getName();
                 }
                 else
                 {
