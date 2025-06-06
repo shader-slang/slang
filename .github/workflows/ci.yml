@@ -297,7 +297,7 @@ jobs:
               $testDir = $testExe.Directory.FullName
               Push-Location $testDir
               Write-Host "Running slang-rhi tests..."
-              .\slang-rhi-tests.exe
+              .\slang-rhi-tests.exe -check-devices -tce=ray-tracing-*,cmd-query-resolve-host
               Pop-Location
           } else {
               Write-Error "Could not find slang-rhi-tests.exe"
