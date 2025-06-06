@@ -281,7 +281,7 @@ jobs:
       - name: Run slang-rhi tests
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         run: |
-          "$bin_dir/slang-rhi-tests" -check-devices -tce=ray-tracing-*,cmd-query-resolve-host
+          "$bin_dir/slang-rhi-tests" -check-devices -tce=ray-tracing-*,cmd-query-resolve-host,fence-*
       - name: Run slangpy tests
         if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         shell: pwsh
