@@ -11,7 +11,6 @@
 #include "slang-ir.h"
 
 #include <functional>
-
 #include <spirv/unified1/spirv.h>
 
 namespace Slang
