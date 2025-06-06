@@ -1,4 +1,4 @@
-//DISABLE_TEST:LANG_SERVER:
+//TEST:LANG_SERVER:
 //
 //Broken syntax
 //HOVER:1,1
