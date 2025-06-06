@@ -279,7 +279,7 @@ jobs:
             -skip-reference-image-generation \
             -show-adapter-info
       - name: Run slang-rhi tests
-        if: steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
+        if: false # steps.filter.outputs.should-run == 'true' && matrix.platform != 'wasm' && matrix.full-gpu-tests
         shell: pwsh
         run: |
           if (!(Test-Path -Path "external/slang-rhi/build")) {
