@@ -7300,10 +7300,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             // Perform unsigned conversion first to an unsigned integer of the same width as the
             // result then perform bit cast to the signed result type. This is done because SPIRV's
             // unsigned conversion (`OpUConvert`) requires result type to be unsigned.
+            auto builderType = builder.getType(getOppositeSignIntTypeOp(toType->getOp()));
+            auto elementCount = 1;
+            if (auto vecType = as<IRVectorType>(toTypeV))
+            {
+                if (auto count = as<IRIntLit>(vecType->getElementCount()))
+                    elementCount = count->getValue();
+            }
+            // If the type is a vector type then we need to create the appropriate builder type
+            if (elementCount > 1)
+            {
+                builderType = builder.getVectorType(builderType, elementCount);
+            }
+
             auto unsignedV = emitOpUConvert(
                 parent,
                 nullptr,
-                builder.getType(getOppositeSignIntTypeOp(toType->getOp())),
+                builderType,
                 inst->getOperand(0));
             return emitOpBitcast(parent, inst, toTypeV, unsignedV);
         }
