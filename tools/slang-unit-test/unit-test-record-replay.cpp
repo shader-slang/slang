@@ -425,39 +425,6 @@ static SlangResult runTest(UnitTestContext* context, const char* testName)
     return res;
 }
 
-#if 0
-static SlangResult runTests(UnitTestContext* context)
-{
-    const char* testBinaryNames[] = {
-        "cpu-hello-world",
-        "triangle",
-        "ray-tracing",
-        "ray-tracing-pipeline",
-        "autodiff-texture",
-        "gpu-printing"
-        // "shader-object", // these examples requires reflection API to replay, we have to disable
-        // it for now. "model-viewer",
-    };
-
-    SlangResult finalRes = SLANG_OK;
-    for (const auto& testBinaryName : testBinaryNames)
-    {
-        SlangResult res = runTest(context, testBinaryName);
-        if (SLANG_FAILED(res))
-        {
-            StringBuilder msgBuilder;
-            msgBuilder << "Failed subtest: '" << testBinaryName << "'\n\n\n";
-            getTestReporter()->message(
-                TestMessageType::TestFailure,
-                msgBuilder.toString().getBuffer());
-            finalRes = res;
-        }
-    }
-
-    return finalRes;
-}
-#endif
-
 // Those examples all depend on the Vulkan, so we only run them on non-Apple platforms.
 // In the future, we may be able to modify the examples further to remove all the render APIs
 // such that it can be ran on Apple platforms.
