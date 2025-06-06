@@ -43,18 +43,17 @@ private:
         return result;
     }
 
-    void generateEntry(const Entry* entry, IROpFlags inherited_flags)
+    void generateEntry(const Entry& entry, IROpFlags inherited_flags)
     {
-        if (entry->getType() == Entry::INSTRUCTION)
+        if (entry.isInstruction())
         {
-            const auto* inst = static_cast<const InstructionEntry*>(entry);
-            IROpFlags combined_flags = inst->flags | inherited_flags;
+            IROpFlags combined_flags = entry.flags | inherited_flags;
 
             // Print comment if present
-            if (!inst->comment.empty())
+            if (entry.comment.getLength())
             {
                 // Handle multi-line comments
-                std::istringstream comment_stream(inst->comment);
+                std::istringstream comment_stream(entry.comment.getBuffer());
                 std::string line;
                 bool first_line = true;
                 while (std::getline(comment_stream, line))
@@ -73,18 +72,16 @@ private:
             }
 
             indent();
-            output << "INST(" << inst->type_name << ", " << inst->mnemonic << ", " << inst->operands
+            output << "INST(" << entry.type_name << ", " << entry.name << ", " << entry.operands
                    << ", " << flagsToString(combined_flags) << ")\n";
         }
-        else
+        else // It's a range
         {
-            const auto* range = static_cast<const RangeEntry*>(entry);
-
             // Print range comment if present
-            if (!range->comment.empty())
+            if (entry.comment.getLength())
             {
                 // Handle multi-line comments
-                std::istringstream comment_stream(range->comment);
+                std::istringstream comment_stream(entry.comment.getBuffer());
                 std::string line;
                 while (std::getline(comment_stream, line))
                 {
@@ -95,34 +92,33 @@ private:
 
             // Add comment for range name
             indent();
-            output << "/* " << range->name << " */\n";
+            output << "/* " << entry.name << " */\n";
 
             // Increase indent for range contents
             current_indent++;
 
             // Generate nested entries
-            IROpFlags combined_flags = range->flags | inherited_flags;
-            for (const auto& nested : range->insts)
+            IROpFlags combined_flags = entry.flags | inherited_flags;
+            for (const auto& nested : entry.children)
             {
-                generateEntry(nested.get(), combined_flags);
+                generateEntry(nested, combined_flags);
             }
 
             // Decrease indent
             current_indent--;
 
             // Generate INST_RANGE
-            const auto* first = range->findFirstInstruction();
-            const auto* last = range->findLastInstruction();
+            const auto* first = entry.findFirstInstruction();
+            const auto* last = entry.findLastInstruction();
 
             if (first && last)
             {
                 indent();
-                output << "INST_RANGE(" << range->name << ", " << first->type_name << ", "
+                output << "INST_RANGE(" << entry.name << ", " << first->type_name << ", "
                        << last->type_name << ")\n";
             }
         }
     }
-
 
 public:
     std::string generate(const InstructionSet& inst_set)
@@ -146,9 +142,9 @@ public:
 )";
 
         // Generate instructions
-        for (const auto& entry : inst_set.insts)
+        for (const auto& entry : inst_set.entries)
         {
-            generateEntry(entry.get(), IROpFlags::None);
+            generateEntry(entry, IROpFlags::None);
             output << "\n";
         }
 
@@ -181,8 +177,7 @@ int main(int argc, char* argv[])
         }
 
         // Parse YAML
-        YAMLInstructionParser parser;
-        InstructionSet inst_set = parser.parse(input_file);
+        InstructionSet inst_set = parseInstDefs(input_file);
         input_file.close();
 
         // Generate output

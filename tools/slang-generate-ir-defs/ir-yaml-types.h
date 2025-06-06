@@ -1,9 +1,9 @@
 #pragma once
 
+#include "core/slang-list.h"
+#include "core/slang-string.h"
+
 #include <cstdint>
-#include <memory>
-#include <string>
-#include <vector>
 
 // Only coincidence that this has the same members as in slang-ir.h
 enum class IROpFlags : uint32_t
@@ -26,53 +26,36 @@ inline IROpFlags operator&(IROpFlags lhs, IROpFlags rhs)
 }
 
 
-// Forward declarations
-struct InstructionEntry;
-struct RangeEntry;
-
-// Base class for entries (either instruction or range)
 struct Entry
 {
-    enum Type
+    enum Flavor
     {
-        INSTRUCTION,
-        RANGE
+        Instruction,
+        Range
     };
-    virtual Type getType() const = 0;
-    virtual ~Entry() = default;
-};
 
-// Instruction definition
-struct InstructionEntry : Entry
-{
-    std::string mnemonic;
-    std::string comment;
-    std::string type_name;
+    Flavor flavor;
+    Slang::String name; // mnemonic for instructions, name for ranges
+    Slang::String comment;
+    IROpFlags flags = IROpFlags::None;
+
+    // Instruction-specific fields (only used when type == INSTRUCTION)
+    Slang::String type_name;
     int operands = 0;
-    std::vector<std::string> flag_strings;
-    IROpFlags flags = IROpFlags::None;
 
-    Type getType() const override { return INSTRUCTION; }
-};
+    // Range-specific fields (only used when type == RANGE)
+    Slang::List<Entry> children; // Nested entries for ranges
 
-// Range definition
-struct RangeEntry : Entry
-{
-    std::string name;
-    std::string comment;
-    std::vector<std::string> flag_strings;
-    IROpFlags flags = IROpFlags::None;
-    std::vector<std::unique_ptr<Entry>> insts;
-
-    Type getType() const override { return RANGE; }
+    // Helper methods
+    bool isInstruction() const { return flavor == Instruction; }
+    bool isRange() const { return flavor == Range; }
 
     // Helper to find first and last instruction in range
-    const InstructionEntry* findFirstInstruction() const;
-    const InstructionEntry* findLastInstruction() const;
+    const Entry* findFirstInstruction() const;
+    const Entry* findLastInstruction() const;
 };
 
-// Root structure
 struct InstructionSet
 {
-    std::vector<std::unique_ptr<Entry>> insts;
+    Slang::List<Entry> entries;
 };
