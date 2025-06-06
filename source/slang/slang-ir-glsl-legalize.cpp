@@ -3575,28 +3575,40 @@ void legalizeEntryPointParameterForGLSL(
 
                 auto key = dec->getOperand(1);
                 IRInst* realGlobalVar = nullptr;
-                if (globalValue.flavor != ScalarizedVal::Flavor::tuple)
-                    continue;
-                if (auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl))
+
+                // When we relate a "global variable" to a "global parameter" using
+                // kIROp_GlobalVariableShadowingGlobalParameterDecoration, the globalValue flavor
+                // is dependent on the global parameter's type. Struct types for example will relate
+                // to the tuple flavor, while vector types will be related to the address flavor.
+                if (globalValue.flavor == ScalarizedVal::Flavor::tuple)
                 {
-                    for (auto elem : tupleVal->elements)
+                    if (auto tupleVal = as<ScalarizedTupleValImpl>(globalValue.impl))
                     {
-                        if (elem.key == key)
+                        for (auto elem : tupleVal->elements)
                         {
-                            realGlobalVar = elem.val.irValue;
-                            if (!realGlobalVar &&
-                                ScalarizedVal::Flavor::typeAdapter == elem.val.flavor)
+                            if (elem.key == key)
                             {
-                                if (auto typeAdapterVal =
-                                        as<ScalarizedTypeAdapterValImpl>(elem.val.impl))
+                                realGlobalVar = elem.val.irValue;
+                                if (!realGlobalVar &&
+                                    ScalarizedVal::Flavor::typeAdapter == elem.val.flavor)
                                 {
-                                    realGlobalVar = typeAdapterVal->val.irValue;
+                                    if (auto typeAdapterVal =
+                                            as<ScalarizedTypeAdapterValImpl>(elem.val.impl))
+                                    {
+                                        realGlobalVar = typeAdapterVal->val.irValue;
+                                    }
                                 }
+                                break;
                             }
-                            break;
                         }
                     }
                 }
+                else if (globalValue.flavor == ScalarizedVal::Flavor::address)
+                {
+                    realGlobalVar = globalValue.irValue;
+                }
+                else
+                    continue;
                 SLANG_ASSERT(realGlobalVar);
 
                 // Remove all stores into the global var introduced during
