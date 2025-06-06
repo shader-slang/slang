@@ -107,7 +107,11 @@ SLANG_UNIT_TEST(separateDebug)
     const char* debugBuildIdentifier = nullptr;
 
     ComPtr<slang::ICompileResult> compileResult;
-    auto result = linkedProgram->getEntryPointCompileResult(0, 0, compileResult.writeRef(), diagnosticBlob.writeRef());
+    auto result = linkedProgram->getEntryPointCompileResult(
+        0,
+        0,
+        compileResult.writeRef(),
+        diagnosticBlob.writeRef());
     SLANG_CHECK(result == SLANG_OK);
     SLANG_CHECK(compileResult != nullptr);
     SLANG_CHECK(compileResult->getItemCount() == 2);

@@ -175,7 +175,8 @@ uint32_t Artifact::getItemCount()
     // Ignore the metadata when counting items, and the base artifact is item 0.
     uint32_t count = 1;
     for (auto artifact : m_associated)
-        if (artifact->getDesc().payload != ArtifactPayload::Metadata && artifact->getDesc().payload != ArtifactPayload::PostEmitMetadata)
+        if (artifact->getDesc().payload != ArtifactPayload::Metadata &&
+            artifact->getDesc().payload != ArtifactPayload::PostEmitMetadata)
             count++;
     return count;
 }
@@ -189,7 +190,8 @@ SlangResult Artifact::getItemData(uint32_t index, slang::IBlob** outblob)
     uint32_t count = 1;
     for (auto artifact : m_associated)
     {
-        if (artifact->getDesc().payload == ArtifactPayload::Metadata || artifact->getDesc().payload == ArtifactPayload::PostEmitMetadata)
+        if (artifact->getDesc().payload == ArtifactPayload::Metadata ||
+            artifact->getDesc().payload == ArtifactPayload::PostEmitMetadata)
             continue;
         if (count == index)
             return artifact->loadBlob(ArtifactKeep::Yes, outblob);

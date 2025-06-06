@@ -95,8 +95,10 @@ public:
     }
 
     virtual SLANG_NO_THROW uint32_t SLANG_MCALL getItemCount() SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getItemData(uint32_t index, slang::IBlob** outblob) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getMetadata(slang::IMetadata** outMetadata) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getItemData(uint32_t index, slang::IBlob** outblob) SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getMetadata(slang::IMetadata** outMetadata)
+        SLANG_OVERRIDE;
 
 protected:
     /// Ctor

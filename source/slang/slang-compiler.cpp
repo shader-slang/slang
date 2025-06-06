@@ -1865,8 +1865,9 @@ static IArtifact* _getSeparateDbgArtifact(IArtifact* artifact)
     if (!artifact)
         return nullptr;
 
-    // The first associated artifact of kind ObjectCode and SPIRV payload should be the debug artifact.
-    for (auto *associated : artifact->getAssociated())
+    // The first associated artifact of kind ObjectCode and SPIRV payload should be the debug
+    // artifact.
+    for (auto* associated : artifact->getAssociated())
     {
         auto desc = associated->getDesc();
         if (desc.kind == ArtifactKind::ObjectCode && desc.payload == ArtifactPayload::SPIRV)
@@ -1922,7 +1923,8 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
                 // and the debug spirv to be associated with is.
                 for (auto associated : intermediateArtifact->getAssociated())
                 {
-                    if (associated->getDesc().payload == ArtifactPayload::Metadata || associated->getDesc().payload == ArtifactPayload::PostEmitMetadata)
+                    if (associated->getDesc().payload == ArtifactPayload::Metadata ||
+                        associated->getDesc().payload == ArtifactPayload::PostEmitMetadata)
                     {
                         disassemblyArtifact->addAssociated(associated);
                         break;
@@ -2178,8 +2180,7 @@ SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
     const String& path,
     IArtifact* artifact)
 {
-    if (targetProgram->getOptionSet().getBoolOption(
-        CompilerOptionName::EmitSeparateDebug))
+    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmitSeparateDebug))
     {
         const auto dbgArtifact = _getSeparateDbgArtifact(artifact);
         // The artifact's name may have been set to the debug build id hash, use
