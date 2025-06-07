@@ -220,11 +220,11 @@ def _sm_6_9 : _sm_6_8;
 def hlsl_nvapi : hlsl;
 
 
-/// Represet HLSL compatibility support.
+/// Represent HLSL compatibility support.
 /// [Version]
 def hlsl_2018 : _sm_5_1;
 
-/// Represet compatibility support for the deprecated POC DXC
+/// Represent compatibility support for the deprecated POC DXC
 /// [Version]
 def hlsl_coopvec_poc : _sm_6_8;
 
@@ -244,6 +244,8 @@ def _cuda_sm_6_0 : _cuda_sm_5_0;
 def _cuda_sm_7_0 : _cuda_sm_6_0;
 def _cuda_sm_8_0 : _cuda_sm_7_0;
 def _cuda_sm_9_0 : _cuda_sm_8_0;
+/// Represents capabilities required for optix cooperative vector support.
+def optix_coopvec : _cuda_sm_9_0;
 
 /// All code-gen targets
 /// [Compound]

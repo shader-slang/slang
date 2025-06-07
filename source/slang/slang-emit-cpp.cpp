@@ -1152,8 +1152,16 @@ void CPPSourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
             auto arrayType = static_cast<IRArrayType*>(type);
             auto elementType = arrayType->getElementType();
             int elementCount = int(getIntVal(arrayType->getElementCount()));
-
-            m_writer->emit("FixedArray<");
+            auto nameHint = arrayType->findDecoration<IRNameHintDecoration>();
+            bool isCoopVec = nameHint && (nameHint->getName() == UnownedStringSlice("CoopVec"));
+            if (isCoopVec && isOptixCoopVec)
+            {
+                m_writer->emit("OptixCoopVec<");
+            }
+            else
+            {
+                m_writer->emit("FixedArray<");
+            }
             _emitType(elementType, nullptr);
             m_writer->emit(", ");
             m_writer->emit(elementCount);
