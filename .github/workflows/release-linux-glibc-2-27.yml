@@ -38,7 +38,7 @@ jobs:
           else
             version=$triggering_ref
           fi
-          base=$(pwd)/slang-${version}-linux-x86_64-glibc-2.17
+          base=$(pwd)/slang-${version}-linux-x86_64-glibc-2.27
           sudo mv "$(pwd)/build/dist-release/slang.zip" "${base}.zip"
           echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> "$GITHUB_OUTPUT"
           sudo mv "$(pwd)/build/dist-release/slang.tar.gz" "${base}.tar.gz"
