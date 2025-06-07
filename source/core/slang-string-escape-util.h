@@ -79,6 +79,9 @@ struct StringEscapeUtil
         return isQuoted(handler->getQuoteChar(), slice);
     }
 
+    /// Given a command line arg slice, if it is quoted, unquotes it, else returns the slice as is.
+    static UnownedStringSlice maybeUnquoteCommandLineArg(UnownedStringSlice slice);
+
     /// If quoting is needed appends to out quoted
     static SlangResult appendMaybeQuoted(
         Handler* handler,

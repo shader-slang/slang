@@ -328,28 +328,28 @@ void printVMInst(StringBuilder& sb, VMModuleView* moduleView, VMInstHeader* inst
             {
             case OperandDataType::Int32:
                 {
-                    int32_t val;
+                    int32_t val = 0;
                     moduleView->getConstant<int32_t>(operand, val);
                     sb << "i32(" << val << ")";
                     continue;
                 }
             case OperandDataType::Int64:
                 {
-                    int64_t val;
+                    int64_t val = 0;
                     moduleView->getConstant<int64_t>(operand, val);
                     sb << "i64(" << val << ")";
                     continue;
                 }
             case OperandDataType::Float32:
                 {
-                    float val;
+                    float val = 0.f;
                     moduleView->getConstant<float>(operand, val);
                     sb << "f32(" << val << ")";
                     continue;
                 }
             case OperandDataType::Float64:
                 {
-                    double val;
+                    double val = 0.0;
                     moduleView->getConstant<double>(operand, val);
                     sb << "f32(" << val << ")";
                     continue;

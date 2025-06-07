@@ -446,9 +446,65 @@ int caller()
 }
 ```
 
+## `Conditional<T, bool condition>` Type
+
+A `Conditional` type can be used to define struct fields that can be specialized away. If `condition` is `false`, the field will be removed
+by the compiler from the target code. This is useful for scenarios where a developer would like to make sure a field is not defined in a
+specialized shader variant when it is not used by the shader.
+
+For example, a common use case is to define the vertex shader output / fragment shader input:
+
+```slang
+interface IVertex
+{
+    property float3 position{get;}
+    property Optional<float3> normal{get;}
+    property Optional<float3> color{get;}
+}
+
+struct Vertex<bool hasNormal, bool hasColor> : IVertex
+{
+    private float3 m_position;
+    private Conditional<float3, hasNormal> m_normal;
+    private Conditional<float3, hasColor> m_color;
+
+    __init(float3 position, float3 normal, float3 color)
+    {
+        m_position = position;
+        m_normal = normal;
+        m_color = color;
+    }
+
+    property float3 position
+    {
+        get { return m_position; }
+    }
+    property Optional<float3> normal
+    {
+        get { return m_normal; }
+    }
+    property Optional<float3> color
+    {
+        get { return m_color; }
+    }
+}
+```
+
+In this example, `Vertex` type is parameterized on `hasNormal` and `hasColor`. If `hasNormal` is false, the `m_normal` field will be eliminated in the target code, allowing a specialized vertex shader to declare minimum output fields. For example, a vertex shader
+can be defined as follows:
+
+```slang
+[shader("vertex")]
+Vertex<hasNormal, hasColor> vertMain<bool hasNormal, bool hasColor>(VertexIn inputVertex)
+{
+    ...
+}
+```
+
+
 ## `if_let` syntax
-Slang supports `if (let name = expr)` syntax to simplify the code when working with `Optional<T>` value. The syntax is similar to Rust's
-`if let` syntax, the value expression must be an `Optional<T>` type, for example:
+Slang supports `if (let name = expr)` syntax to simplify the code when working with `Optional<T>` or `Conditional<T, hasValue>` value. The syntax is similar to Rust's
+`if let` syntax, the value expression must be an `Optional<T>` or `Conditional<T, hasValue>` type, for example:
 
 ```csharp
 Optional<int> getOptInt() { ... }

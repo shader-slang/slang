@@ -802,13 +802,33 @@ struct PeepholeContext : InstPassBase
             {
                 if (inst->getOperand(0)->getOp() == kIROp_MakeOptionalValue)
                 {
-                    IRBuilder builder(module);
-                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
-                    builder.setInsertBefore(inst);
-                    auto trueVal = builder.getBoolValue(true);
-                    inst->replaceUsesWith(trueVal);
-                    maybeRemoveOldInst(inst);
-                    changed = true;
+                    auto getHasValue = as<IROptionalHasValue>(inst);
+                    auto optionalType =
+                        as<IROptionalType>(getHasValue->getOptionalOperand()->getDataType());
+                    if (!optionalType)
+                        break;
+                    if (as<IROptionalType>(optionalType->getValueType()))
+                    {
+                        // HasValue(o : Optional<Optional<T>>) ==> HasValue(o.value).
+                        IRBuilder builder(module);
+                        IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                        builder.setInsertBefore(inst);
+                        auto newVal = builder.emitOptionalHasValue(
+                            builder.emitGetOptionalValue(getHasValue->getOptionalOperand()));
+                        inst->replaceUsesWith(newVal);
+                        maybeRemoveOldInst(inst);
+                        changed = true;
+                    }
+                    else
+                    {
+                        IRBuilder builder(module);
+                        IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                        builder.setInsertBefore(inst);
+                        auto trueVal = builder.getBoolValue(true);
+                        inst->replaceUsesWith(trueVal);
+                        maybeRemoveOldInst(inst);
+                        changed = true;
+                    }
                 }
                 else if (inst->getOperand(0)->getOp() == kIROp_MakeOptionalNone)
                 {

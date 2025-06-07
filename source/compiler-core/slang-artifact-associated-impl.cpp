@@ -339,5 +339,10 @@ SlangResult ArtifactPostEmitMetadata::isParameterLocationUsed(
     return SLANG_OK;
 }
 
+const char* ArtifactPostEmitMetadata::getDebugBuildIdentifier()
+{
+    return m_debugBuildIdentifier.getBuffer();
+}
+
 
 } // namespace Slang

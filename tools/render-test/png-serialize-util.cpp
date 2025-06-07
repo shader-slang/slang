@@ -17,10 +17,11 @@ using namespace Slang;
     const char* filename,
     ISlangBlob* pixels,
     uint32_t width,
-    uint32_t height)
+    uint32_t height,
+    uint32_t rowPitch)
 {
     int stbResult =
-        stbi_write_png(filename, width, height, 4, pixels->getBufferPointer(), width * 4);
+        stbi_write_png(filename, width, height, 4, pixels->getBufferPointer(), rowPitch);
 
     return stbResult ? SLANG_OK : SLANG_FAIL;
 }

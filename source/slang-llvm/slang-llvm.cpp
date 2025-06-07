@@ -175,7 +175,7 @@ public:
 
 /* This implementation uses atomic ref counting to ensure the shared libraries lifetime can outlive
 the LLVMDownstreamCompileResult and the compilation that created it */
-class LLVMJITSharedLibrary : public ISlangSharedLibrary, public ComBaseObject
+class LLVMJITSharedLibrary : public ComBaseObject, public ISlangSharedLibrary
 {
 public:
     // ISlangUnknown

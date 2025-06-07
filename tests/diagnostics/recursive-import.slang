@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DISABLE_DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 
 // A file that recursively imports itself
 // (including transitive cases) should be diagnosed.

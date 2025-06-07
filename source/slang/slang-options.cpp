@@ -530,6 +530,10 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Preserve all resource parameters in the output code, even if they are not used by the "
          "shader."},
+        {OptionKind::TypeConformance,
+         "-conformance",
+         "-conformance <typeName>:<interfaceName>[=<sequentialID>]",
+         "Include additional type conformance during linking for dynamic dispatch."},
         {OptionKind::EmitReflectionJSON,
          "-reflection-json",
          "reflection-json <path>",
@@ -816,7 +820,11 @@ void initCommandOptions(CommandOptions& options)
          "-verify-debug-serial-ir",
          nullptr,
          "Verify IR in the front-end."},
-        {OptionKind::DumpModule, "-dump-module", nullptr, "Disassemble and print the module IR."}};
+        {OptionKind::DumpModule, "-dump-module", nullptr, "Disassemble and print the module IR."},
+        {OptionKind::EmitSeparateDebug,
+         "-separate-debug-info",
+         nullptr,
+         "Emit debug data to a separate file, and strip it from the main output file."}};
     _addOptions(makeConstArrayView(debuggingOpts), options);
 
     /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Experimental !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
@@ -2736,6 +2744,17 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 m_compileRequest->addSearchPath(String(slice).getBuffer());
                 break;
             }
+        case OptionKind::TypeConformance:
+            {
+                if (!m_reader.hasArg())
+                    break;
+                CommandLineArg operand;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(operand));
+                auto unquoted =
+                    StringEscapeUtil::maybeUnquoteCommandLineArg(operand.value.getUnownedSlice());
+                linkage->m_optionSet.add(OptionKind::TypeConformance, unquoted);
+                break;
+            }
         case OptionKind::Output:
             {
                 //
@@ -3062,6 +3081,14 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 }
 
 
+                break;
+            }
+        case OptionKind::EmitSeparateDebug:
+            {
+                // This will emit a separate debug file, containing all debug info in
+                // a .dbg.spv file. The main output SPIRV will have all debug info stripped.
+                m_compileRequest->setDebugInfoLevel(SLANG_DEBUG_INFO_LEVEL_MAXIMAL);
+                linkage->m_optionSet.set(OptionKind::EmitSeparateDebug, true);
                 break;
             }
         default:

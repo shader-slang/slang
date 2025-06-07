@@ -4,6 +4,7 @@
 #include "slang-ast-builder.h"
 
 // For BaseInfo
+#include "slang-check-impl.h"
 #include "slang-compiler.h"
 
 namespace Slang
@@ -163,6 +164,15 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
             size.append(curSize);
         }
 
+        return size;
+    }
+    else if (auto optionalType = as<OptionalType>(type))
+    {
+        if (isNullableType(optionalType->getValueType()))
+            return calcSize(optionalType->getValueType());
+        NaturalSize size = NaturalSize::makeEmpty();
+        size.append(calcSize(m_astBuilder->getBoolType()));
+        size.append(calcSize(optionalType->getValueType()));
         return size;
     }
     else if (auto declRefType = as<DeclRefType>(type))

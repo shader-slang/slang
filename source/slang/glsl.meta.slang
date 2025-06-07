@@ -4764,7 +4764,12 @@ public property uint3 gl_LaunchSizeEXT
     }
 }
 
-internal in int __gl_PrimitiveID : SV_PrimitiveID;
+// While the glsl spec defines gl_PrimitiveID as an "in int",
+// we need to use uint here and cast to an int below. This is due
+// __gl_PrimitiveID being picked up as a global variable regardless
+// of the stage used below. Using int __gl_PrimitiveID leads to a
+// casting conflict due to the spirv implementation of PrimitiveIndex().
+internal in uint __gl_PrimitiveID : SV_PrimitiveID;
 
 public property int gl_PrimitiveID 
 {
@@ -4779,7 +4784,7 @@ public property int gl_PrimitiveID
             setupExtForRayTracingBuiltIn();
             return PrimitiveIndex();
         default:
-            return __gl_PrimitiveID;   
+            return __intCast<int32_t>(__gl_PrimitiveID);
         }
     }
 }

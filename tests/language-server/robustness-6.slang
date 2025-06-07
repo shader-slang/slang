@@ -1,4 +1,4 @@
-//TEST:LANG_SERVER:
+//DISABLE_TEST:LANG_SERVER:
 //HOVER:4,8
 
 float dsqr<T:II

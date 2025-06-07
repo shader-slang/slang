@@ -331,6 +331,12 @@ public:
         m_sourceMapKind = sourceMapKind;
     }
 
+    /// Set the source file as an included file
+    void setIncludedFile() { m_included = true; }
+
+    /// Check if the source file is an included file
+    bool isIncludedFile() { return m_included; }
+
     /// Ctor
     SourceFile(SourceManager* sourceManager, const PathInfo& pathInfo, size_t contentSize);
     /// Dtor
@@ -360,6 +366,9 @@ protected:
     ComPtr<IBoxValue<SourceMap>> m_sourceMap;
     // What kind of source map it is (if  there is one)
     SourceMapKind m_sourceMapKind = SourceMapKind::Normal;
+
+    // Indicate if the source file is an included file
+    bool m_included = false;
 };
 
 enum class SourceLocType

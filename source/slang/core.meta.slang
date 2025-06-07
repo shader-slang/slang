@@ -1463,7 +1463,7 @@ typealias __Addr<T> = Ptr<T, $( (uint64_t)AddressSpace::Generic)ULL>;
 __generic<T>
 __magic_type(OptionalType)
 __intrinsic_type($(kIROp_OptionalType))
-struct Optional
+struct Optional : IDefaultInitializable
 {
     /// Return `true` iff this `Optional` contains a value of type `T`
     property bool hasValue
@@ -1482,6 +1482,9 @@ struct Optional
     __implicit_conversion($(kConversionCost_ValToOptional))
     __intrinsic_op($(kIROp_MakeOptionalValue))
     __init(T val);
+
+    [__unsafeForceInlineEarly]
+    __init() { this = none; }
 };
 
 //@hidden:
@@ -1508,6 +1511,50 @@ __generic<T>
 bool operator!=(__none_t noneVal, Optional<T> val)
 {
     return val.hasValue;
+}
+
+struct Conditional<T, bool hasValue>
+{
+    internal T storage[hasValue];
+
+    __implicit_conversion($(kConversionCost_ValToOptional))
+    [__unsafeForceInlineEarly]
+    __init(T val) { if (hasValue) storage[0] = val;}
+
+    [__unsafeForceInlineEarly]
+    public Optional<T> get()
+    {
+        if (hasValue)
+        {
+            return Optional<T>(storage[0]);
+        }
+        else
+        {
+            return none;
+        }
+    }
+
+    [__unsafeForceInlineEarly]
+    [mutating]
+    public void set(T value)
+    {
+        if (hasValue)
+            storage[0] = value;
+    }
+}
+
+extension<T> Optional<T>
+{
+    __implicit_conversion($(kConversionCost_ImplicitDereference))
+    __generic<bool condHasValue>
+    [__unsafeForceInlineEarly]
+    __init(Conditional<T, condHasValue> condVal)
+    {
+        if (condHasValue)
+            this = Optional<T>(condVal.storage[0]);
+        else
+            this = none;
+    }
 }
 
 //@public:

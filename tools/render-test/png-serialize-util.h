@@ -12,7 +12,8 @@ struct PngSerializeUtil
         const char* filename,
         ISlangBlob* pixels,
         uint32_t width,
-        uint32_t height);
+        uint32_t height,
+        uint32_t rowPitch);
 };
 
 } // namespace renderer_test

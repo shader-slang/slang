@@ -2174,6 +2174,11 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
                 // regardless if the source files participate in the line table or not.
                 cloneValue(context, inst);
                 break;
+            case kIROp_DebugBuildIdentifier:
+                // The debug build identifier won't be referenced by anything,
+                // but we still need to keep it around if it is in the IR.
+                cloneValue(context, inst);
+                break;
             }
         }
     }

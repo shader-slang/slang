@@ -320,6 +320,7 @@ struct DifferentiableTypeConformanceContext
             }
         case kIROp_TupleType:
         case kIROp_TypePack:
+        case kIROp_OptionalType:
             {
                 return differentiateType(builder, origType);
             }

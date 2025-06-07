@@ -249,6 +249,17 @@ DIAGNOSTIC(
     cannotMatchOutputFileToEntryPoint,
     "the output path '$0' is not associated with any entry point; a '-o' option for a compiled "
     "kernel must follow the '-entry' option for its corresponding entry point")
+DIAGNOSTIC(
+    71,
+    Error,
+    invalidTypeConformanceOptionString,
+    "syntax error in type conformance option '$0'.")
+DIAGNOSTIC(
+    72,
+    Error,
+    invalidTypeConformanceOptionNoType,
+    "invalid conformance option '$0', type '$0' is not found.")
+DIAGNOSTIC(73, Error, cannotCreateTypeConformance, "cannot create type conformance '$0'.")
 
 DIAGNOSTIC(
     80,
@@ -646,7 +657,7 @@ DIAGNOSTIC(
     Error,
     cannotConvertArrayOfSmallerToLargerSize,
     "Cannot convert array of size $0 to array of size $1 as this would truncate data")
-DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be larger than zero.")
+DIAGNOSTIC(30025, Error, invalidArraySize, "array size must be non-negative.")
 DIAGNOSTIC(
     30026,
     Error,
@@ -2885,5 +2896,11 @@ DIAGNOSTIC(
     Error,
     rayPayloadFieldMissingAccessQualifiers,
     "field '$0' in ray payload struct must have either 'read' OR 'write' access qualifiers")
+DIAGNOSTIC(
+    40001,
+    Error,
+    rayPayloadInvalidStageInAccessQualifier,
+    "invalid stage name '$0' in ray payload access qualifier; valid stages are 'anyhit', "
+    "'closesthit', 'miss', and 'caller'")
 
 #undef DIAGNOSTIC
