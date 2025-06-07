@@ -4,6 +4,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
@@ -127,6 +128,7 @@ IROp getTypeStyle(IROp op)
     case kIROp_HalfType:
     case kIROp_FloatType:
     case kIROp_DoubleType:
+    case kIROp_BFloat16Type:
         {
             // All float like
             return kIROp_FloatType;
@@ -159,6 +161,7 @@ IROp getTypeStyle(BaseType op)
     case BaseType::Half:
     case BaseType::Float:
     case BaseType::Double:
+    case BaseType::BFloat16:
         return kIROp_FloatType;
     default:
         return kIROp_Invalid;
@@ -461,6 +464,9 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         break;
     case kIROp_DoubleType:
         sb << "double";
+        break;
+    case kIROp_BFloat16Type:
+        sb << "bfloat16";
         break;
     case kIROp_IntType:
         sb << "int";
@@ -1873,6 +1879,8 @@ UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
         return UnownedStringSlice::fromLiteral("half");
     case kIROp_DoubleType:
         return UnownedStringSlice::fromLiteral("double");
+    case kIROp_BFloat16Type:
+        return UnownedStringSlice::fromLiteral("bfloat16");
     case kIROp_BoolType:
         return UnownedStringSlice::fromLiteral("bool");
     case kIROp_VoidType:
