@@ -37,7 +37,7 @@ Sampler1DArray<float4> st1DArray_f32v4;
 //TEST_INPUT: TextureSampler2D(size=4, content = one, arrayLength=2):name st2DArray_f32v4
 Sampler2DArray<float4> st2DArray_f32v4;
 
-//TEST_INPUT: TextureSampler2D(size=4, content = one):name st2DMS_f32v4
+//TEST_INPUT: TextureSampler2D(size=4, content = one, sampleCount = two, mipMaps=1):name st2DMS_f32v4
  Sampler2DMS<float4> st2DMS_f32v4;
 
 //
