@@ -10,7 +10,6 @@
 layout (location = 0) in highp vec2 v_texCoord;
 
 layout (binding = 0) uniform highp sampler2D u_sampler;
-layout (binding = 1) uniform offset { highp ivec2 u_offset; };
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 buffer MyBlockName
@@ -21,7 +20,8 @@ buffer MyBlockName
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     //SPV:OpImageGather %
-    //SPV-NOT:Const
-    //SPV-SAME: Offset %
-    outputBuffer.result = textureGatherOffset(u_sampler, v_texCoord, u_offset);
+    //SPV-SAME: ConstOffset %
+    // Can textureGatherOffset take non-const offset? 
+    constexpr ivec2 offset2D = ivec2(2);
+    outputBuffer.result = textureGatherOffset(u_sampler, v_texCoord, offset2D);
 }
