@@ -1900,12 +1900,11 @@ SlangResult ForwardDiffTranscriber::prepareFuncForForwardDiff(IRFunc* func)
 
     if (SLANG_SUCCEEDED(result))
     {
-        disableIRValidationAtInsert();
+        auto validationScope = disableIRValidationScope();
         auto simplifyOptions = IRSimplificationOptions::getDefault(nullptr);
         simplifyOptions.removeRedundancy = true;
         simplifyOptions.hoistLoopInvariantInsts = true;
         simplifyFunc(autoDiffSharedContext->targetProgram, func, simplifyOptions);
-        enableIRValidationAtInsert();
     }
     return result;
 }

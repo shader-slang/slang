@@ -36,8 +36,38 @@ void validateIRModuleIfEnabled(CompileRequestBase* compileRequest, IRModule* mod
 
 void validateIRModuleIfEnabled(CodeGenContext* codeGenContext, IRModule* module);
 
-void disableIRValidationAtInsert();
-void enableIRValidationAtInsert();
+// RAII class to manage IR validation state in an exception-safe manner
+class [[nodiscard]] IRValidationScope
+{
+public:
+    // Constructor saves current state and sets new state
+    explicit IRValidationScope(bool enableValidation);
+
+    // Destructor automatically restores previous state
+    ~IRValidationScope();
+
+    // Non-copyable to prevent accidental copies
+    IRValidationScope(const IRValidationScope&) = delete;
+    IRValidationScope& operator=(const IRValidationScope&) = delete;
+
+    // Non-movable to keep it simple
+    IRValidationScope(IRValidationScope&&) = delete;
+    IRValidationScope& operator=(IRValidationScope&&) = delete;
+
+private:
+    bool m_previousState;
+};
+
+// Convenience functions to create scoped guards
+[[nodiscard]] inline IRValidationScope enableIRValidationScope()
+{
+    return IRValidationScope(true);
+}
+
+[[nodiscard]] inline IRValidationScope disableIRValidationScope()
+{
+    return IRValidationScope(false);
+}
 
 // Validate that the destination of an atomic operation is appropriate, meaning it's
 // either 'groupshared' or in a device buffer.

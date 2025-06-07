@@ -436,9 +436,8 @@ struct DiffUnzipPass
 
         if (intermediateVar)
         {
-            disableIRValidationAtInsert();
+            auto validationScope = disableIRValidationScope();
             diffBuilder->addBackwardDerivativePrimalContextDecoration(callInst, intermediateVar);
-            enableIRValidationAtInsert();
         }
 
         IRInst* diffVal = nullptr;
