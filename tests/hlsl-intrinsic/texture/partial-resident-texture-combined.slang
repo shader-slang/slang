@@ -71,9 +71,9 @@ typealias CombinedDepth2d_array = _Texture<
 >;
 
 
-//TEST_INPUT: TextureSampler2D(size=4, content = zero):name cd2D
+//TEST_INPUT: TextureSampler2D(size=4, content = zero, format=D32Float):name cd2D
 CombinedDepth2d<float> cd2D;
-//TEST_INPUT: TextureSampler2D(size=4, content = zero, arrayLength=2):name cd2DArray
+//TEST_INPUT: TextureSampler2D(size=4, content = zero, arrayLength=2, format=D32Float):name cd2DArray
 CombinedDepth2d_array<float> cd2DArray;
 
 uint getNotMapped()
