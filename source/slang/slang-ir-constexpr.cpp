@@ -177,10 +177,11 @@ IRLoop* isLoopPhi(IRParam* param)
 
 bool opCanBeConstExprByBackwardPass(IRInst* value)
 {
-    if (value->getOp() == kIROp_Param)
-        return isLoopPhi(as<IRParam, IRDynamicCastBehavior::NoUnwrap>(value));
     if (opCanBeConstExpr(value->getOp()))
+    {
         return true;
+    }
+
     if (auto callInst = as<IRCall>(value))
     {
         return !callInst->mightHaveSideEffects();
@@ -228,7 +229,7 @@ bool maybeMarkConstExprBackwardPass(PropagateConstExprContext* context, IRInst* 
         {
             // We've just changed a function parameter to
             // be `constexpr`. We need to remember that
-            // fact so taht we can mark callers of this
+            // fact so that we can mark callers of this
             // function as `constexpr` themselves.
 
             for (auto u = code->firstUse; u; u = u->nextUse)
@@ -343,11 +344,155 @@ bool propagateConstExprForward(PropagateConstExprContext* context, IRGlobalValue
     }
 }
 
+// a help function to propagate constexpr from an instruction or the func call of an instruction
+bool checkInstConstExprRecursively(PropagateConstExprContext* context, IRInst* inst)
+{
+    bool changedInThisInst = false;
+
+    if (isConstExpr(inst))
+    {
+        // If this instruction is `constexpr`, then its operands should be too.
+        UInt argCount = inst->getOperandCount();
+        for (UInt aa = 0; aa < argCount; ++aa)
+        {
+            auto arg = inst->getOperand(aa);
+            if (isConstExpr(arg))
+                continue;
+
+            if (!opCanBeConstExprByBackwardPass(arg))
+                continue;
+
+            if (maybeMarkConstExprBackwardPass(context, arg))
+            {
+                changedInThisInst = true;
+            }
+        }
+    }
+    else if (inst->getOp() == kIROp_Call)
+    {
+        // A non-constexpr call might be calling a function with one or
+        // more constexpr parameters. We should check if we can resolve
+        // the callee for this call statically, and if so try to propagate
+        // constexpr from the parameters back to the arguments.
+        auto callInst = (IRCall*)inst;
+
+        UInt operandCount = callInst->getOperandCount();
+
+        UInt firstCallArg = 1;
+        UInt callArgCount = operandCount - firstCallArg;
+
+        auto callee = callInst->getOperand(0);
+
+        // If we are calling a generic operation, then
+        // try to follow through the `specialize` chain
+        // and find the callee.
+        //
+        // TODO: This probably shouldn't be required,
+        // since we can hopefully use the type of the
+        // callee in all cases.
+        //
+        while (auto specInst = as<IRSpecialize>(callee))
+        {
+            auto genericInst = as<IRGeneric>(specInst->getBase());
+            if (!genericInst)
+                break;
+
+            auto returnVal = findGenericReturnVal(genericInst);
+            if (!returnVal)
+                break;
+
+            callee = returnVal;
+        }
+
+        auto calleeFunc = as<IRFunc>(callee);
+        if (calleeFunc && isDefinition(calleeFunc))
+        {
+            // We have an IR-level function definition we are calling,
+            // and thus we can propagate `constexpr` information
+            // through its `IRParam`s.
+
+            auto calleeFuncType = calleeFunc->getDataType();
+
+            UInt callParamCount = calleeFuncType->getParamCount();
+            SLANG_RELEASE_ASSERT(callParamCount == callArgCount);
+
+            // If the callee has a definition, then we can read `constexpr`
+            // information off of the parameters of its first IR block.
+            if (auto calleeFirstBlock = calleeFunc->getFirstBlock())
+            {
+                UInt paramCounter = 0;
+                for (auto pp = calleeFirstBlock->getFirstParam(); pp; pp = pp->getNextParam())
+                {
+                    UInt paramIndex = paramCounter++;
+
+                    auto param = pp;
+                    auto arg = callInst->getOperand(firstCallArg + paramIndex);
+
+                    if (isConstExpr(param))
+                    {
+                        if (maybeMarkConstExprBackwardPass(context, arg))
+                        {
+                            changedInThisInst = true;
+                        }
+                    }
+                }
+            }
+            // Iterate through all instructions in all blocks
+            for (auto block : calleeFunc->getBlocks())
+            {
+                for (auto ii : block->getOrdinaryInsts())
+                {
+                    // skip for recursive calls
+                    if (ii == inst)
+                    {
+                        continue;
+                    }
+                    // If we find a call instruction to check
+                    if (as<IRCall>(ii))
+                    {
+                        changedInThisInst = checkInstConstExprRecursively(context, ii);
+                    }
+                }
+            }
+        }
+        else
+        {
+            // If we don't have a concrete callee function
+            // definition, then we need to extract the
+            // type of the callee instruction, and try to work
+            // with that.
+            //
+            // Note that this does not allow us to propagate
+            // `constexpr` information from the body of a callee
+            // back to call sites.
+            auto calleeType = callee->getDataType();
+            if (auto caleeFuncType = as<IRFuncType>(calleeType))
+            {
+                auto paramCount = caleeFuncType->getParamCount();
+                for (UInt pp = 0; pp < paramCount; ++pp)
+                {
+                    auto paramType = caleeFuncType->getParamType(pp);
+                    auto arg = callInst->getOperand(firstCallArg + pp);
+                    if (isConstExpr(paramType))
+                    {
+                        if (maybeMarkConstExprBackwardPass(context, arg))
+                        {
+                            changedInThisInst = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return changedInThisInst;
+}
 
 // Propagate `constexpr`-ness in a backward direction, from an instruction
 // to its operands.
 bool propagateConstExprBackward(PropagateConstExprContext* context, IRGlobalValueWithCode* code)
 {
+
     IRBuilder builder(context->getModule());
     builder.setInsertInto(code);
 
@@ -367,130 +512,12 @@ bool propagateConstExprBackward(PropagateConstExprContext* context, IRGlobalValu
         {
             for (auto ii = bb->getLastInst(); ii; ii = ii->getPrevInst())
             {
-                if (isConstExpr(ii))
-                {
-                    // If this instruction is `constexpr`, then its operands should be too.
-                    UInt argCount = ii->getOperandCount();
-                    for (UInt aa = 0; aa < argCount; ++aa)
-                    {
-                        auto arg = ii->getOperand(aa);
-                        if (isConstExpr(arg))
-                            continue;
-
-                        if (!opCanBeConstExprByBackwardPass(arg))
-                            continue;
-
-                        if (maybeMarkConstExprBackwardPass(context, arg))
-                        {
-                            changedThisIteration = true;
-                        }
-                    }
-                }
-                else if (ii->getOp() == kIROp_Call)
-                {
-                    // A non-constexpr call might be calling a function with one or
-                    // more constexpr parameters. We should check if we can resolve
-                    // the callee for this call statically, and if so try to propagate
-                    // constexpr from the parameters back to the arguments.
-                    auto callInst = (IRCall*)ii;
-
-                    UInt operandCount = callInst->getOperandCount();
-
-                    UInt firstCallArg = 1;
-                    UInt callArgCount = operandCount - firstCallArg;
-
-                    auto callee = callInst->getOperand(0);
-
-                    // If we are calling a generic operation, then
-                    // try to follow through the `specialize` chain
-                    // and find the callee.
-                    //
-                    // TODO: This probably shouldn't be required,
-                    // since we can hopefully use the type of the
-                    // callee in all cases.
-                    //
-                    while (auto specInst = as<IRSpecialize>(callee))
-                    {
-                        auto genericInst = as<IRGeneric>(specInst->getBase());
-                        if (!genericInst)
-                            break;
-
-                        auto returnVal = findGenericReturnVal(genericInst);
-                        if (!returnVal)
-                            break;
-
-                        callee = returnVal;
-                    }
-
-                    auto calleeFunc = as<IRFunc>(callee);
-                    if (calleeFunc && isDefinition(calleeFunc))
-                    {
-                        // We have an IR-level function definition we are calling,
-                        // and thus we can propagate `constexpr` information
-                        // through its `IRParam`s.
-
-                        auto calleeFuncType = calleeFunc->getDataType();
-
-                        UInt callParamCount = calleeFuncType->getParamCount();
-                        SLANG_RELEASE_ASSERT(callParamCount == callArgCount);
-
-                        // If the callee has a definition, then we can read `constexpr`
-                        // information off of the parameters of its first IR block.
-                        if (auto calleeFirstBlock = calleeFunc->getFirstBlock())
-                        {
-                            UInt paramCounter = 0;
-                            for (auto pp = calleeFirstBlock->getFirstParam(); pp;
-                                 pp = pp->getNextParam())
-                            {
-                                UInt paramIndex = paramCounter++;
-
-                                auto param = pp;
-                                auto arg = callInst->getOperand(firstCallArg + paramIndex);
-
-                                if (isConstExpr(param))
-                                {
-                                    if (maybeMarkConstExprBackwardPass(context, arg))
-                                    {
-                                        changedThisIteration = true;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // If we don't have a concrete callee function
-                        // definition, then we need to extract the
-                        // type of the callee instruction, and try to work
-                        // with that.
-                        //
-                        // Note that this does not allow us to propagate
-                        // `constexpr` information from the body of a callee
-                        // back to call sites.
-                        auto calleeType = callee->getDataType();
-                        if (auto caleeFuncType = as<IRFuncType>(calleeType))
-                        {
-                            auto paramCount = caleeFuncType->getParamCount();
-                            for (UInt pp = 0; pp < paramCount; ++pp)
-                            {
-                                auto paramType = caleeFuncType->getParamType(pp);
-                                auto arg = callInst->getOperand(firstCallArg + pp);
-                                if (isConstExpr(paramType))
-                                {
-                                    if (maybeMarkConstExprBackwardPass(context, arg))
-                                    {
-                                        changedThisIteration = true;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                changedThisIteration |= checkInstConstExprRecursively(context, ii);
             }
 
             if (bb != code->getFirstBlock())
             {
-                // A parameter in anything butr the first block is
+                // A parameter in anything but the first block is
                 // conceptually a phi node, which means its operands
                 // are the corresponding values from the terminating
                 // branch in a predecessor block.
