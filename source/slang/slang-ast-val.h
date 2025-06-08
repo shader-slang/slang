@@ -832,6 +832,34 @@ class ExtractFromConjunctionSubtypeWitness : public SubtypeWitness
     ConversionCost _getOverloadResolutionCostOverride();
 };
 
+/// A witness that sub may or may not be a subtype of sup.
+FIDDLE()
+class OptionalSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+
+    bool hasWitness() { return getOperandCount() == 3; }
+    SubtypeWitness* getWitness() { return hasWitness() ? as<SubtypeWitness>(getOperand(2)) : nullptr; }
+
+    OptionalSubtypeWitness(Type* sub, Type* sup)
+    {
+        setOperands(sub);
+        addOperands(sup);
+    }
+
+    OptionalSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* witness)
+    {
+        setOperands(sub);
+        addOperands(sup);
+        addOperands(ValNodeOperand(witness));
+    }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+
+    ConversionCost _getOverloadResolutionCostOverride();
+};
+
 /// A value that represents a modifier attached to some other value
 FIDDLE()
 class ModifierVal : public Val

@@ -642,6 +642,9 @@ public:
         Type* toType,
         DeclRef<Decl> declRef);
 
+    OptionalSubtypeWitness* getOptionalSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* value);
+    OptionalSubtypeWitness* getOptionalSubtypeWitnessNone(Type* sub, Type* sup);
+
     /// Helpers to get type info from the SharedASTBuilder
     SyntaxClass<NodeBase> findSyntaxClass(const UnownedStringSlice& slice)
     {

@@ -2650,6 +2650,7 @@ public:
     struct ValUnificationContext
     {
         Index indexInTypePack = 0;
+        bool optionalConstraint = false;
     };
 
     // Try to find a unification for two values

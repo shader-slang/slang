@@ -123,6 +123,7 @@ FIDDLE() namespace Slang
         kConversionCost_ValToOptional = 150,
         kConversionCost_NullPtrToPtr = 150,
         kConversionCost_PtrToVoidPtr = 150,
+        kConversionCost_UnfulfilledOptionalConformance = 150,
 
         // Conversions that are lossless, but change "kind"
         kConversionCost_UnsignedToSignedPromotion = 200,

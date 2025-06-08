@@ -896,6 +896,45 @@ Val* TypeCoercionWitness::_resolveImplOverride()
     return this;
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! OptionalSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void OptionalSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("OptionalSubtypeWitness(");
+    if (auto witness = getWitness())
+        witness->toText(out);
+    else
+        out << "none";
+    out << toSlice(")");
+}
+
+Val* OptionalSubtypeWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    if (hasWitness())
+    {
+        int diff = 0;
+        SubtypeWitness* newWitness =
+            as<SubtypeWitness>(getWitness()->substituteImpl(astBuilder, subst, &diff));
+
+        if (!diff)
+            return this;
+
+        (*ioDiff)++;
+        return astBuilder->getOptionalSubtypeWitness(getSub(), getSup(), newWitness);
+    }
+    return this;
+}
+
+ConversionCost OptionalSubtypeWitness::_getOverloadResolutionCostOverride()
+{
+    if (!hasWitness())
+        return kConversionCost_UnfulfilledOptionalConformance;
+    return kConversionCost_None;
+}
+
 // UNormModifierVal
 
 void UNormModifierVal::_toTextOverride(StringBuilder& out)

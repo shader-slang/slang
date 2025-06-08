@@ -917,6 +917,7 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
     SourceLoc whereTokenLoc = SourceLoc();
 
     FIDDLE() bool isEqualityConstraint = false;
+    FIDDLE() bool isOptionalConstraint = false;
 
     // Overrides should be public so base classes can access
     const TypeExp& _getSupOverride() const { return sup; }
