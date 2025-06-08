@@ -360,9 +360,11 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     for (auto constraintDeclRef :
          getMembersOfType<GenericTypeConstraintDecl>(m_astBuilder, genericDeclRef))
     {
+        ValUnificationContext unificationContext;
+        unificationContext.optionalConstraint = constraintDeclRef.getDecl()->isOptionalConstraint;
         if (!TryUnifyTypes(
                 *system,
-                ValUnificationContext(),
+                unificationContext,
                 getSub(m_astBuilder, constraintDeclRef),
                 getSup(m_astBuilder, constraintDeclRef)))
             return DeclRef<Decl>();
@@ -485,10 +487,15 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 // in the next iteration.
                 //
                 auto joinType = TryJoinTypes(system, type, cType);
+
+
                 if (!joinType)
                 {
-                    // failure!
-                    return DeclRef<Decl>();
+                    if (c.isOptional)
+                        joinType = type;
+                    else
+                        // failure!
+                        return DeclRef<Decl>();
                 }
                 type = QualType(joinType, type.isLeftValue || cType.isLeftValue);
             }
@@ -694,6 +701,19 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
             // the witness is equality witness.
             if (!isTypeEqualityWitness(subTypeWitness))
                 subTypeWitness = nullptr;
+        }
+
+        if (constraintDecl->isOptionalConstraint)
+        {
+            // Wrap the witness in Optional<>
+            if (subTypeWitness)
+            {
+                subTypeWitness = m_astBuilder->getOptionalSubtypeWitness(sub, sup, subTypeWitness);
+            }
+            else
+            {
+                subTypeWitness = m_astBuilder->getOptionalSubtypeWitnessNone(sub, sup);
+            }
         }
 
         if (subTypeWitness)
@@ -946,6 +966,7 @@ bool SemanticsVisitor::TryUnifyTypeParam(
     constraint.indexInPack = unificationContext.indexInTypePack;
     constraint.val = type;
     constraint.isUsedAsLValue = type.isLeftValue;
+    constraint.isOptional = unificationContext.optionalConstraint;
     constraints.constraints.add(constraint);
 
     return true;
