@@ -1,86 +1,125 @@
 #include "ir-yaml-parser.h"
 
 #include <core/slang-io.h>
-#include <fstream>
-#include <iostream>
-#include <sstream>
-#include <vector>
 
 using namespace Slang;
 
-class IREnumGenerator
+
+static String flagsToString(IROpFlags flags)
 {
-private:
-    struct InstructionInfo
-    {
-        String name;
-        String type_name;
-        String comment;
-        int operands;
-        IROpFlags flags;
-    };
+    if (flags == IROpFlags::None)
+        return "0";
 
-    struct RangeInfo
-    {
-        String name;
-        String first_type;
-        String last_type;
-    };
+    List<String> flag_names;
+    if ((flags & IROpFlags::Parent) != IROpFlags::None)
+        flag_names.add("kIROpFlag_Parent");
+    if ((flags & IROpFlags::UseOther) != IROpFlags::None)
+        flag_names.add("kIROpFlag_UseOther");
+    if ((flags & IROpFlags::Hoistable) != IROpFlags::None)
+        flag_names.add("kIROpFlag_Hoistable");
+    if ((flags & IROpFlags::Global) != IROpFlags::None)
+        flag_names.add("kIROpFlag_Global");
 
-    std::vector<InstructionInfo> instructions;
-    std::vector<RangeInfo> ranges;
-
-    void collectEntry(const Entry& entry, IROpFlags inherited_flags)
+    StringBuilder result;
+    for (size_t i = 0; i < flag_names.getCount(); ++i)
     {
-        if (entry.isInstruction())
+        if (i > 0)
+            result << " | ";
+        result << flag_names[i];
+    }
+    return result;
+}
+
+// Process entry for enum generation
+static void processEntryForEnum(
+    const Entry& entry,
+    IROpFlags inherited_flags,
+    StringBuilder& output,
+    bool& isFirst,
+    String& firstInRange,
+    String& lastInRange)
+{
+    if (entry.isInstruction())
+    {
+        // Add comment if present
+        if (entry.comment.getLength())
         {
-            InstructionInfo info;
-            info.name = entry.name;
-            info.type_name = entry.type_name;
-            info.comment = entry.comment;
-            info.operands = entry.operands;
-            info.flags = entry.flags | inherited_flags;
-            instructions.push_back(info);
+            output << "    /* " << entry.comment << " */\n";
         }
-        else // It's a range
+
+        output << "    kIROp_" << entry.type_name;
+        if (isFirst)
         {
-            // Process nested entries first
-            IROpFlags combined_flags = entry.flags | inherited_flags;
-            size_t start_index = instructions.size();
+            output << " = 0";
+        }
+        output << ",\n";
 
-            for (const auto& nested : entry.children)
-            {
-                collectEntry(nested, combined_flags);
-            }
 
-            // Add range info if we added any instructions
-            if (instructions.size() > start_index)
-            {
-                RangeInfo range;
-                range.name = entry.name;
-                range.first_type = instructions[start_index].type_name;
-                range.last_type = instructions.back().type_name;
-                ranges.push_back(range);
-            }
+        if (firstInRange.getLength() == 0)
+            firstInRange = entry.type_name;
+        lastInRange = entry.type_name;
+
+        isFirst = false;
+    }
+    else // It's a range
+    {
+        IROpFlags combined_flags = entry.flags | inherited_flags;
+        String rangeFirst, rangeLast;
+
+        // Process nested entries
+        for (const auto& nested : entry.children)
+        {
+            processEntryForEnum(nested, combined_flags, output, isFirst, rangeFirst, rangeLast);
+        }
+
+        // Generate range constants if we processed any instructions
+        if (rangeFirst.getLength() > 0)
+        {
+            output << "    kIROp_First" << entry.name << " = kIROp_" << rangeFirst << ",\n";
+            output << "    kIROp_Last" << entry.name << " = kIROp_" << rangeLast << ",\n";
+
+            // Update parent range tracking
+            if (firstInRange.getLength() == 0)
+                firstInRange = rangeFirst;
+            lastInRange = rangeLast;
         }
     }
+}
 
-public:
-    std::string generate(const InstructionSet& inst_set)
+// Process entry for info table generation
+static void processEntryForInfo(
+    const Entry& entry,
+    IROpFlags inherited_flags,
+    StringBuilder& output)
+{
+    if (entry.isInstruction())
     {
-        // Collect all instructions and ranges
-        instructions.clear();
-        ranges.clear();
+        IROpFlags combined_flags = entry.flags | inherited_flags;
+        output << "    {kIROp_" << entry.type_name << ",\n";
+        output << "     {\n";
+        output << "         \"" << entry.name << "\",\n";
+        output << "         " << entry.operands << ",\n";
+        output << "         " << flagsToString(combined_flags) << ",\n";
+        output << "     }},\n";
+    }
+    else // It's a range
+    {
+        IROpFlags combined_flags = entry.flags | inherited_flags;
 
-        for (const auto& entry : inst_set.entries)
+        // Process nested entries
+        for (const auto& nested : entry.children)
         {
-            collectEntry(entry, IROpFlags::None);
+            processEntryForInfo(nested, combined_flags, output);
         }
+    }
+}
 
-        std::ostringstream output;
+static String generateEnum(const InstructionSet& inst_set)
+{
+    StringBuilder output;
 
-        // Generate header
-        output << R"(#pragma once
+    // Generate header
+    output << R"(#pragma once
 // Auto-generated file - do not edit directly
 
 #pragma once
@@ -106,66 +145,32 @@ enum IROp : int32_t
 {
 )";
 
-        // Generate enum values
-        for (size_t i = 0; i < instructions.size(); ++i)
-        {
-            const auto& inst = instructions[i];
+    // Process all entries
+    bool isFirst = true;
+    for (const auto& entry : inst_set.entries)
+    {
+        String dummy1, dummy2;
+        processEntryForEnum(entry, IROpFlags::None, output, isFirst, dummy1, dummy2);
+    }
 
-            // Add comment if present
-            if (inst.comment.getLength() > 0)
-            {
-                output << "    /* " << inst.comment << " */\n";
-            }
-
-            output << "    kIROp_" << inst.type_name;
-            if (i == 0)
-            {
-                output << " = 0";
-            }
-            output << ",\n";
-        }
-
-        output << R"(
+    output << R"(
     /// The total number of valid opcodes
     kIROpCount,
 
     /// An invalid opcode used to represent a missing or unknown opcode value.
     kIROp_Invalid = kIROpCount,
-)";
-
-        // Generate range constants
-        if (!ranges.empty())
-        {
-            output << "\n    // Range constants\n";
-            for (const auto& range : ranges)
-            {
-                output << "    kIROp_First" << range.name << " = kIROp_" << range.first_type
-                       << ",\n";
-                output << "    kIROp_Last" << range.name << " = kIROp_" << range.last_type << ",\n";
-            }
-        }
-
-        output << R"(};
+};
 } // namespace Slang
 )";
 
-        return output.str();
-    }
+    return output;
+}
 
-    std::string generateInfoTable(const InstructionSet& inst_set)
-    {
-        // Collect all instructions
-        instructions.clear();
-        ranges.clear();
+static String generateInfoTable(const InstructionSet& inst_set)
+{
+    StringBuilder output;
 
-        for (const auto& entry : inst_set.entries)
-        {
-            collectEntry(entry, IROpFlags::None);
-        }
-
-        std::ostringstream output;
-
-        output << R"(// slang-ir-opcodes-info.cpp
+    output << R"(// slang-ir-opcodes-info.cpp
 // Auto-generated file - do not edit directly
 
 #include "slang-ir.h"
@@ -191,45 +196,13 @@ static const IROpMapEntry kIROps[] = {
 // Main ops in order
 )";
 
-        // Generate info table entries
-        for (const auto& inst : instructions)
-        {
-            output << "    {kIROp_" << inst.type_name << ",\n";
-            output << "     {\n";
-            output << "         \"" << inst.name << "\",\n";
-            output << "         " << inst.operands << ",\n";
+    // Process all entries
+    for (const auto& entry : inst_set.entries)
+    {
+        processEntryForInfo(entry, IROpFlags::None, output);
+    }
 
-            // Convert flags to string representation
-            if (inst.flags == IROpFlags::None)
-            {
-                output << "         0,\n";
-            }
-            else
-            {
-                output << "         ";
-                std::vector<std::string> flag_names;
-                if ((inst.flags & IROpFlags::Parent) != IROpFlags::None)
-                    flag_names.push_back("kIROpFlag_Parent");
-                if ((inst.flags & IROpFlags::UseOther) != IROpFlags::None)
-                    flag_names.push_back("kIROpFlag_UseOther");
-                if ((inst.flags & IROpFlags::Hoistable) != IROpFlags::None)
-                    flag_names.push_back("kIROpFlag_Hoistable");
-                if ((inst.flags & IROpFlags::Global) != IROpFlags::None)
-                    flag_names.push_back("kIROpFlag_Global");
-
-                for (size_t i = 0; i < flag_names.size(); ++i)
-                {
-                    if (i > 0)
-                        output << " | ";
-                    output << flag_names[i];
-                }
-                output << ",\n";
-            }
-
-            output << "     }},\n";
-        }
-
-        output << R"(
+    output << R"(
     // Invalid op sentinel value comes after all the valid ones
     {kIROp_Invalid, {"invalid", 0, 0}},
 };
@@ -265,9 +238,8 @@ IROp findIROp(const UnownedStringSlice& name)
 } // namespace Slang
 )";
 
-        return output.str();
-    }
-};
+    return output;
+}
 
 int main(int argc, char* argv[])
 {
@@ -278,7 +250,7 @@ int main(int argc, char* argv[])
     // Parse command line arguments
     for (int i = 1; i < argc; ++i)
     {
-        std::string arg = argv[i];
+        String arg = argv[i];
 
         if (arg == "--ir-enum-file" && i + 1 < argc)
         {
@@ -290,7 +262,7 @@ int main(int argc, char* argv[])
         }
         else if (input_file.getLength() == 0)
         {
-            input_file = arg.c_str();
+            input_file = arg;
         }
         else
         {
@@ -318,39 +290,27 @@ int main(int argc, char* argv[])
         // Parse YAML
         InstructionSet inst_set = parseInstDefs(input_file, contents);
 
-        // Generate enum header
-        IREnumGenerator generator;
-        std::string enum_output = generator.generate(inst_set);
-
         // Write enum header file
-        std::ofstream enum_file(enum_output_file.getBuffer());
-        if (!enum_file.is_open())
+        if (enum_output_file.getLength())
         {
-            std::cerr << "Error: Cannot create output file '" << enum_output_file << "'\n";
-            return 1;
+            String enum_output = generateEnum(inst_set);
+            if (!SLANG_SUCCEEDED(File::writeAllText(enum_output_file, enum_output)))
+            {
+                std::cerr << "Error: Cannot create output file '" << enum_output_file << "'\n";
+                return 1;
+            }
         }
-
-        enum_file << enum_output;
-        enum_file.close();
-
-        std::cout << "Successfully generated " << enum_output_file << "\n";
 
         // Generate info table if requested
         if (info_output_file.getLength() > 0)
         {
-            std::string info_output = generator.generateInfoTable(inst_set);
+            String info_output = generateInfoTable(inst_set);
 
-            std::ofstream info_file(info_output_file.getBuffer());
-            if (!info_file.is_open())
+            if (!SLANG_SUCCEEDED(File::writeAllText(info_output_file, info_output)))
             {
                 std::cerr << "Error: Cannot create output file '" << info_output_file << "'\n";
                 return 1;
             }
-
-            info_file << info_output;
-            info_file.close();
-
-            std::cout << "Successfully generated " << info_output_file << "\n";
         }
     }
     catch (const std::exception& e)

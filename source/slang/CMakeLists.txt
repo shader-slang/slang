@@ -71,7 +71,7 @@ add_custom_command(
     VERBATIM
 )
 slang_add_target(
-    slang-inst-gen-output
+    slang-ir-defs
     OBJECT
     EXPLICIT_SOURCE ${SLANG_INST_GEN_OUTPUT_INFO}
     LINK_WITH_PRIVATE core
@@ -263,7 +263,7 @@ set(slang_link_args
     slang-capability-defs
     slang-capability-lookup
     slang-fiddle-output
-    slang-inst-gen-output
+    slang-ir-defs
     slang-lookup-tables
     SPIRV-Headers
 )

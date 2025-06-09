@@ -61,7 +61,7 @@ set(core_module_source_common_args
     core
     slang-capability-defs
     slang-fiddle-output
-    slang-inst-gen-output
+    slang-ir-defs
     SPIRV-Headers
     INCLUDE_DIRECTORIES_PRIVATE
     ../slang
