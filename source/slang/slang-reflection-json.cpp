@@ -363,16 +363,20 @@ static void emitUserAttributes(PrettyWriter& writer, slang::FunctionReflection* 
     }
 }
 
-static slang::TypeLayoutReflection* maybeChangeTypeLayoutToAgumentBufferTier2(slang::VariableLayoutReflection* varLayout)
+static slang::TypeLayoutReflection* maybeChangeTypeLayoutToAgumentBufferTier2(
+    slang::VariableLayoutReflection* varLayout)
 {
     if (varLayout->getCategoryCount() != 0)
     {
-        for (unsigned int categoryIdx = 0; categoryIdx < varLayout->getCategoryCount(); categoryIdx++)
+        for (unsigned int categoryIdx = 0; categoryIdx < varLayout->getCategoryCount();
+             categoryIdx++)
         {
             auto category = varLayout->getCategoryByIndex(categoryIdx);
             if (category == slang::MetalArgumentBufferElement)
             {
-                return g_inProgramLayout->getTypeLayout(varLayout->getTypeLayout()->getType(), slang::LayoutRules::MetalArgumentBufferTier2);
+                return g_inProgramLayout->getTypeLayout(
+                    varLayout->getTypeLayout()->getType(),
+                    slang::LayoutRules::MetalArgumentBufferTier2);
             }
         }
     }
@@ -719,7 +723,8 @@ static void emitReflectionParameterGroupTypeLayoutInfoJSON(
 
     writer << ",\n\"elementType\": ";
 
-    if (auto newElementTypeLayout = maybeChangeTypeLayoutToAgumentBufferTier2(typeLayout->getElementVarLayout()))
+    if (auto newElementTypeLayout =
+            maybeChangeTypeLayoutToAgumentBufferTier2(typeLayout->getElementVarLayout()))
     {
         // If we are in argument buffer tier 2, we need to use the new type layout
         // that has the correct binding information.
