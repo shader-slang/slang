@@ -259,7 +259,9 @@ if(SLANG_ENABLE_TESTS)
         EXECUTABLE
         EXCLUDE_FROM_ALL
         LINK_WITH_PRIVATE core compiler-core slang
-        INCLUDE_FROM_PRIVATE unit-test
+        INCLUDE_FROM_PRIVATE
+            unit-test
+            $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
         FOLDER test
     )
     slang_add_target(
@@ -282,6 +284,7 @@ if(SLANG_ENABLE_TESTS)
             stb
             ${CMAKE_DL_LIBS}
             Threads::Threads
+        INCLUDE_FROM_PRIVATE $<$<BOOL:${SLANG_ENABLE_SLANG_RHI}>:slang-rhi>
         REQUIRES
             # Shared libraries dlopened by slang-test
             slang-reflection-test

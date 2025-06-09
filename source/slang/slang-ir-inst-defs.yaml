@@ -764,33 +764,35 @@ insts:
       operands: 1
   - store:
       operands: 2
-  - atomicLoad:
+  - AtomicOperation:
       comment: Atomic Operations
-      operands: 1
-  - atomicStore:
-      operands: 2
-  - atomicExchange:
-      operands: 2
-  - atomicCompareExchange:
-      operands: 3
-  - atomicAdd:
-      operands: 2
-  - atomicSub:
-      operands: 2
-  - atomicAnd:
-      operands: 2
-  - atomicOr:
-      operands: 2
-  - atomicXor:
-      operands: 2
-  - atomicMin:
-      operands: 2
-  - atomicMax:
-      operands: 2
-  - atomicInc:
-      operands: 1
-  - atomicDec:
-      operands: 1
+      insts:
+        - atomicLoad:
+            operands: 1
+        - atomicStore:
+            operands: 2
+        - atomicExchange:
+            operands: 2
+        - atomicCompareExchange:
+            operands: 3
+        - atomicAdd:
+            operands: 2
+        - atomicSub:
+            operands: 2
+        - atomicAnd:
+            operands: 2
+        - atomicOr:
+            operands: 2
+        - atomicXor:
+            operands: 2
+        - atomicMin:
+            operands: 2
+        - atomicMax:
+            operands: 2
+        - atomicInc:
+            operands: 1
+        - atomicDec:
+            operands: 1
   - LoadReverseGradient:
       comment: |-
         Produced and removed during backward auto-diff pass as a temporary placeholder representing the
@@ -1831,6 +1833,8 @@ insts:
       operands: 1
       flags:
         - Hoistable
+  - isNullExistential:
+     operands: 1
   - extractTaggedUnionTag:
       operands: 1
   - extractTaggedUnionPayload:
@@ -2070,6 +2074,8 @@ insts:
       operands: 2
   - DebugNoScope:
       operands: 1
+  - DebugBuildIdentifier:
+     operands: 2
   - EmbeddedDownstreamIR:
       comment: Embedded Precompiled Libraries
       operands: 2

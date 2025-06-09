@@ -46,21 +46,12 @@
 #include <atomic>
 #include <thread>
 
-using namespace Slang;
-
 #if defined(_WIN32)
-// https://devblogs.microsoft.com/directx/gettingstarted-dx12agility/#2.-set-agility-sdk-parameters
-
-extern "C"
-{
-    __declspec(dllexport) extern const uint32_t D3D12SDKVersion = 711;
-}
-
-extern "C"
-{
-    __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\";
-}
+#include <slang-rhi/agility-sdk.h>
+SLANG_RHI_EXPORT_AGILITY_SDK
 #endif
+
+using namespace Slang;
 
 // Options for a particular test
 struct TestOptions
@@ -5063,8 +5054,7 @@ SlangResult innerMain(int argc, char** argv)
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);
 
-            // Try the unit tests up to 3 times
-            for (bool isRetry : {false, true, true})
+            for (bool isRetry : {false, true})
             {
                 auto spawnType = context.getFinalSpawnType();
                 context.isRetry = isRetry;
