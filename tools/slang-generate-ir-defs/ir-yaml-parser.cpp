@@ -62,7 +62,8 @@ static String fromSubstr(ryml::csubstr s)
 static String getLocation(const ryml::Parser& parser, const ryml::ConstNodeRef& node)
 {
     auto loc = parser.location(node);
-    return fromSubstr(parser.filename()) + ":" + String(loc.line + 1) + ":" + String(loc.col + 1);
+    return fromSubstr(parser.filename()) + ":" + String(uint64_t{loc.line + 1}) + ":" +
+           String(uint64_t{loc.col + 1});
 }
 
 // Convert string flags to enum

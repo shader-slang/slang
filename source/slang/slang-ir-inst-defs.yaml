@@ -1834,7 +1834,7 @@ insts:
       flags:
         - Hoistable
   - isNullExistential:
-     operands: 1
+      operands: 1
   - extractTaggedUnionTag:
       operands: 1
   - extractTaggedUnionPayload:
@@ -2075,7 +2075,7 @@ insts:
   - DebugNoScope:
       operands: 1
   - DebugBuildIdentifier:
-     operands: 2
+      operands: 2
   - EmbeddedDownstreamIR:
       comment: Embedded Precompiled Libraries
       operands: 2
