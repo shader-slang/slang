@@ -18,10 +18,10 @@ ParameterBlock<MyBlock> block2;
 
 // REFLECT: "elementVarLayout": {
 // REFLECT: "name": "b1",
-// REFLECT: "binding": {"kind": "metalArgumentBufferElement", "index": 0}
+// REFLECT: "binding": {"kind": "uniform", "offset": 0, "size": 8}
 
 // REFLECT: "name": "b2",
-// REFLECT: "binding": {"kind": "metalArgumentBufferElement", "index": 1}
+// REFLECT: "binding": {"kind": "uniform", "offset": 8, "size": 8}
 
 // REFLECT: "binding": {"kind": "metalArgumentBufferElement", "index": 0, "count": 2}
 

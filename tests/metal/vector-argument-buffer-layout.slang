@@ -1,6 +1,17 @@
 //TEST:REFLECTION(filecheck=CHECK): -target metal
-//CHECK: "binding": {"kind": "metalArgumentBufferElement", "index": 0}
-//CHECK: "binding": {"kind": "metalArgumentBufferElement", "index": 1}
+
+
+//CHECK: "name": "o",
+//CHECK: "binding": {"kind": "constantBuffer", "index": 0},
+
+//CHECK: "name": "gParams",
+//CHECK: "binding": {"kind": "constantBuffer", "index": 1},
+
+
+//CHECK: "dir"
+//CHECK: "binding": {"kind": "uniform", "offset": 0, "size": 16}
+//CHECK: "color"
+//CHECK: "binding": {"kind": "uniform", "offset": 16, "size": 16}
 
 struct Params
 {
