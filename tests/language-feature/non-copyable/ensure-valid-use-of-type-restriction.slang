@@ -4,7 +4,6 @@
 // CHECK_PASS: OpEntryPoint
 // CHECK_PASS-NOT: error
 // CHECK_FAIL: error 38043
-
 __generic<T>
 struct Foo
 #ifdef PASS

@@ -2609,6 +2609,7 @@ static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclB
     }
 }
 
+// Validates case where type uses `Atomic` somewhere in its type
 static void validateAtomicElementTypeUseSite(
     SemanticsVisitor* visitor,
     Type* type,
@@ -2619,7 +2620,6 @@ static void validateAtomicElementTypeUseSite(
    
     GenericAppDeclRef* genericAppDeclRef = nullptr;
     
-    // validates case where VarDecl contains Atomic<> and when BuildIn type uses Atomic<>
     if (auto declRefType = as<DeclRefType>(type))
     {
         genericAppDeclRef = as <GenericAppDeclRef>(declRefType->getDeclRefBase());
@@ -2628,7 +2628,7 @@ static void validateAtomicElementTypeUseSite(
     if (!genericAppDeclRef)
         return;
 
-    // Start checking generic args, Atomic<> can only be direct child to Ptr, RWStructuredBuffer, and GLSLShaderStorageBuffer.
+    // Start checking generic args, `Atomic` can only be direct child to Ptr, RWStructuredBuffer, and GLSLShaderStorageBuffer.
     for (auto i : genericAppDeclRef->getArgs())
     {
         if (auto arg = as<AtomicType>(i))
@@ -2641,6 +2641,7 @@ static void validateAtomicElementTypeUseSite(
         validateAtomicElementTypeUseSite(visitor, as<Type>(i), loc);
     }
 }
+
 void SemanticsVisitor::ensureValidAtomicTypeUseSite(
     DeclRef<Decl> declRef)
 {
@@ -2650,8 +2651,8 @@ void SemanticsVisitor::ensureValidAtomicTypeUseSite(
         auto varDecl = varDeclRef.getDecl();
         auto type = getType(getASTBuilder(), varDeclRef);
         
-        // Allowed group shared Atomic<>
-        // not allowed any raw Atomic<> type
+        // Allowed group shared `Atomic`.
+        // Not allowed simple `Atomic` type
         if (!varDecl->hasModifier<HLSLGroupSharedModifier>()
             && as<AtomicType>(type))
         {
@@ -2663,7 +2664,7 @@ void SemanticsVisitor::ensureValidAtomicTypeUseSite(
     }
     else if (auto aggTypeDeclRef = as<AggTypeDecl>(declRef))
     {
-        // Ensure `Atomic<>` is not a member
+        // Ensure `Atomic` appears as a valid member
         for (auto m : aggTypeDeclRef.getDecl()->getMembersOfType<VarDeclBase>())
         {
             ensureValidAtomicTypeUseSite(m);

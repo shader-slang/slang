@@ -791,7 +791,6 @@ public:
     {
         m_isCStyleTypeCache.addIfNotExists(type, isCStyle);
     }
-
     // Get the inner most generic decl that a decl-ref is dependent on.
     // For example, `Foo<T>` depends on the generic decl that defines `T`.
     //
@@ -1580,7 +1579,6 @@ public:
         DeclRef<Decl> declRef);
 
 public:
-
     bool ValuesAreEqual(IntVal* left, IntVal* right);
 
     // Compute the cost of using a particular declaration to
@@ -3193,4 +3191,5 @@ bool getExtensionTargetDeclList(
     DeclRefType* targetDeclRefType,
     ExtensionDecl* extDeclRef,
     ShortList<AggTypeDecl*>& targetDecls);
+
 } // namespace Slang
