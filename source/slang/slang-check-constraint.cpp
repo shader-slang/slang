@@ -330,7 +330,9 @@ Type* SemanticsVisitor::TryJoinTypes(ConstraintSystem* constraints, QualType lef
     return nullptr;
 }
 
-void SemanticsVisitor::validateGenericTypeRestrictions(DeclRef<GenericDecl> genericDeclRef, List<Val*>& args)
+void SemanticsVisitor::validateGenericTypeRestrictions(
+    DeclRef<GenericDecl> genericDeclRef,
+    List<Val*>& args)
 {
     for (auto constraintDecl :
          genericDeclRef.getDecl()->getMembersOfType<GenericTypeParamDeclBase>())
@@ -339,7 +341,7 @@ void SemanticsVisitor::validateGenericTypeRestrictions(DeclRef<GenericDecl> gene
 
         if (args.getCount() < constraintDecl->parameterIndex)
             break;
-            
+
         auto type = as<Type>(args[constraintDecl->parameterIndex]);
 
         if (!type)
@@ -667,11 +669,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
          genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>())
     {
         DeclRef<GenericTypeConstraintDecl> constraintDeclRef =
-            m_astBuilder
-                ->getGenericAppDeclRef(
-                    genericDeclRef,
-                    args.getArrayView(),
-                    constraintDecl)
+            m_astBuilder->getGenericAppDeclRef(genericDeclRef, args.getArrayView(), constraintDecl)
                 .as<GenericTypeConstraintDecl>();
 
         // Extract the (substituted) sub- and super-type from the constraint.
@@ -755,11 +753,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
          genericDeclRef.getDecl()->getMembersOfType<TypeCoercionConstraintDecl>())
     {
         DeclRef<TypeCoercionConstraintDecl> constraintDeclRef =
-            m_astBuilder
-                ->getGenericAppDeclRef(
-                    genericDeclRef,
-                    args.getArrayView(),
-                    constraintDecl)
+            m_astBuilder->getGenericAppDeclRef(genericDeclRef, args.getArrayView(), constraintDecl)
                 .as<TypeCoercionConstraintDecl>();
         auto fromType = constraintDeclRef.substitute(m_astBuilder, constraintDecl->fromType.Ptr());
         auto toType = constraintDeclRef.substitute(m_astBuilder, constraintDecl->toType.Ptr());

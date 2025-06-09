@@ -827,7 +827,8 @@ DIAGNOSTIC(
     30079,
     Error,
     InvalidAtomicTypeUseSite,
-    "Invalid use of 'Atomic' type. 'Atomic' may only be an element type of 'NonCopyablePtr', 'NonCopyableRWStructuredBuffer' or 'NonCopyableGLSLShaderStorageBuffer'.")
+    "Invalid use of 'Atomic' type. 'Atomic' may only be an element type of 'NonCopyablePtr', "
+    "'NonCopyableRWStructuredBuffer' or 'NonCopyableGLSLShaderStorageBuffer'.")
 
 DIAGNOSTIC(
     30100,
@@ -2115,13 +2116,15 @@ DIAGNOSTIC(
     38042,
     Error,
     genericTypeDefaultAttributeCopyableViolated,
-    "generic argument '$0' is assumed to be copyable. Provided non-copyable argument '$1'. To allow non-copyable argument add 'noncopyable' constraint.")
+    "generic argument '$0' is assumed to be copyable. Provided non-copyable argument '$1'. To "
+    "allow non-copyable argument add 'noncopyable' constraint.")
 
 DIAGNOSTIC(
     38043,
     Error,
     cannotApplyTypeRestrictionToTypeNotChildOfParentGeneric,
-    "cannot apply type restriction to type '$0'. Type restriction can only be applied to children of the parent generic.")
+    "cannot apply type restriction to type '$0'. Type restriction can only be applied to children "
+    "of the parent generic.")
 
 
 DIAGNOSTIC(38200, Error, recursiveModuleImport, "module `$0` recursively imports itself")

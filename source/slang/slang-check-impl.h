@@ -1571,12 +1571,9 @@ public:
         VarDeclBase* varDecl,
         DerivativeMemberAttribute* derivativeMemberAttr);
 
-    void validateGenericTypeRestrictions(
-        DeclRef<GenericDecl> genericDeclRef,
-        List<Val*>& args);
+    void validateGenericTypeRestrictions(DeclRef<GenericDecl> genericDeclRef, List<Val*>& args);
 
-    void ensureValidAtomicTypeUseSite(
-        DeclRef<Decl> declRef);
+    void ensureValidAtomicTypeUseSite(DeclRef<Decl> declRef);
 
 public:
     bool ValuesAreEqual(IntVal* left, IntVal* right);

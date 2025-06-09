@@ -2610,30 +2610,28 @@ static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclB
 }
 
 // Validates case where type uses `Atomic` somewhere in its type
-static void validateAtomicElementTypeUseSite(
-    SemanticsVisitor* visitor,
-    Type* type,
-    SourceLoc loc)
+static void validateAtomicElementTypeUseSite(SemanticsVisitor* visitor, Type* type, SourceLoc loc)
 {
     if (!type)
         return;
-   
+
     GenericAppDeclRef* genericAppDeclRef = nullptr;
-    
+
     if (auto declRefType = as<DeclRefType>(type))
     {
-        genericAppDeclRef = as <GenericAppDeclRef>(declRefType->getDeclRefBase());
+        genericAppDeclRef = as<GenericAppDeclRef>(declRefType->getDeclRefBase());
     }
-    
+
     if (!genericAppDeclRef)
         return;
 
-    // Start checking generic args, `Atomic` can only be direct child to Ptr, RWStructuredBuffer, and GLSLShaderStorageBuffer.
+    // Start checking generic args, `Atomic` can only be direct child to Ptr, RWStructuredBuffer,
+    // and GLSLShaderStorageBuffer.
     for (auto i : genericAppDeclRef->getArgs())
     {
         if (as<AtomicType>(i))
         {
-            if(!as<PtrType>(type) && !as<HLSLRWStructuredBufferType>(type) &&
+            if (!as<PtrType>(type) && !as<HLSLRWStructuredBufferType>(type) &&
                 !as<GLSLShaderStorageBufferType>(type))
                 visitor->getSink()->diagnose(loc, Diagnostics::InvalidAtomicTypeUseSite);
             continue;
@@ -2642,19 +2640,17 @@ static void validateAtomicElementTypeUseSite(
     }
 }
 
-void SemanticsVisitor::ensureValidAtomicTypeUseSite(
-    DeclRef<Decl> declRef)
+void SemanticsVisitor::ensureValidAtomicTypeUseSite(DeclRef<Decl> declRef)
 {
     auto sink = getSink();
     if (auto varDeclRef = as<VarDeclBase>(declRef))
     {
         auto varDecl = varDeclRef.getDecl();
         auto type = getType(getASTBuilder(), varDeclRef);
-        
+
         // Allowed group shared `Atomic`.
         // Not allowed simple `Atomic` type
-        if (!varDecl->hasModifier<HLSLGroupSharedModifier>()
-            && as<AtomicType>(type))
+        if (!varDecl->hasModifier<HLSLGroupSharedModifier>() && as<AtomicType>(type))
         {
             sink->diagnose(varDecl, Diagnostics::localAndGlobalVarCannotBeAtomicType);
             return;
@@ -2669,7 +2665,6 @@ void SemanticsVisitor::ensureValidAtomicTypeUseSite(
         {
             ensureValidAtomicTypeUseSite(m);
         }
-
     }
 }
 
@@ -3301,7 +3296,8 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
         decl->toType = TranslateTypeNodeForced(decl->toType);
 }
 
-void SemanticsDeclHeaderVisitor::visitTypeRestrictionConstraintDecl(TypeRestrictionConstraintDecl* decl)
+void SemanticsDeclHeaderVisitor::visitTypeRestrictionConstraintDecl(
+    TypeRestrictionConstraintDecl* decl)
 {
     CheckConstraintSubType(decl->type);
     if (!decl->type.type)
@@ -3384,9 +3380,10 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
 
     // At this step we will look at all generic-type-restrictions annotated to this GenericDecl
     // and apply info to the restricted as needed, considering a restriction to be a type-contract.
-    // 
+    //
     // There are 2 cases
-    // 1. The type specified by the restriction is part of `this`. Here we will add info to the type.
+    // 1. The type specified by the restriction is part of `this`. Here we will add info to the
+    // type.
     // 2. The type specified by the restriction is not part of `this`. We will error for now since
     //    such an operation is not currently supported by Slang.
     for (auto constraint : genericDecl->getMembersOfType<TypeRestrictionConstraintDecl>())
@@ -3394,7 +3391,8 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
         ensureDecl(constraint, DeclCheckState::SignatureChecked);
         auto declRefTypeOfConstraint =
             isDeclRefTypeOf<GenericTypeParamDeclBase>(constraint->type.type);
-        if (!declRefTypeOfConstraint || !genericTypeParams.contains(declRefTypeOfConstraint.getDecl()))
+        if (!declRefTypeOfConstraint ||
+            !genericTypeParams.contains(declRefTypeOfConstraint.getDecl()))
         {
             getSink()->diagnose(
                 constraint,
