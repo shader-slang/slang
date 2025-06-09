@@ -25848,27 +25848,6 @@ CoopVec<T, N> step<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> ed
     }
 }
 
-[ForceInline]
-[require(cooperative_vector)]
-[require(optix_coopvec)]
-static CoopVec<OutType,N> coopVecConvert<OutType: __BuiltinArithmeticType, InType : __BuiltinArithmeticType, let N : int>(CoopVec<InType,N> other)
-{
-    __target_switch 
-    { 
-    case optix_coopvec:
-        __intrinsic_asm "optixCoopVecCvt<$T0>($0);";
-    default:
-        if (__isFloat<OutType>() && __isInt<InType>())
-            return __int_to_float_cast<OutType>(other);
-        else if (__isInt<OutType>() && __isFloat<InType>())
-            return __float_to_int_cast<OutType>(other);
-        else if (__isFloat<OutType>() && __isFloat<InType>())
-            return __real_cast<OutType>(other);
-        else
-            return __int_cast<OutType>(other);
-    } 
-}
-
 // [ForceInline]
 [require(cooperative_vector)]
 [require(hlsl_coopvec_poc)]

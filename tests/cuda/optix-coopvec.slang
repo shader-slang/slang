@@ -67,7 +67,7 @@ void closestHitShader(inout RayPayload payload, in BuiltInTriangleIntersectionAt
     let resultAdd = vec1 + vec2;
 
     CoopVec<float, 4> resultCopy = coopVecLoad<4, float>(input1);
-    resultCopy = coopVecConvert<float, float, 4>(vec2);
+    resultCopy.copyFrom<float>(vec2);
 
     CoopVec<float, 4> resultFMA = fma(vec1, vec2, vec3);
     
