@@ -1013,6 +1013,8 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         }
     }
 
+    validateGenericTypeRestrictions(genericDeclRef, newArgs);
+
     candidate.subst =
         SubstitutionSet(m_astBuilder->getGenericAppDeclRef(genericDeclRef, newArgs.getArrayView()));
 

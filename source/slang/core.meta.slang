@@ -1259,7 +1259,7 @@ struct __none_t
 __generic<T, let addrSpace : uint64_t = $( (uint64_t)AddressSpace::UserPointer)ULL>
 __magic_type(PtrType)
 __intrinsic_type($(kIROp_PtrType))
-struct Ptr
+struct Ptr where noncopyable(T)
 {
     __generic<U>
     __intrinsic_op($(kIROp_BitCast))
@@ -1573,7 +1573,7 @@ extension<T> Optional<T>
 /// The number of elements in a tuple is given by the `countof` function.
 __generic<each T>
 __magic_type(TupleType)
-struct Tuple
+struct Tuple where noncopyable(T)
 {
     __intrinsic_op($(kIROp_MakeTuple))
     __init(expand each T);
@@ -1581,10 +1581,12 @@ struct Tuple
 
 /// Construct a tuple from several values in order
 __intrinsic_op($(kIROp_MakeTuple))
-Tuple<T> makeTuple<each T>(T v);
+Tuple<T> makeTuple<each T>(T v) where noncopyable(T);
 
 /// Return a tuple containing the values of both input tuples in order
 Tuple<T, U> concat<each T, each U>(Tuple<T> t, Tuple<U> u)
+    where noncopyable(T)
+    where noncopyable(U)
 {
     return makeTuple(expand each t, expand each u);
 }
@@ -3570,6 +3572,7 @@ extension half : IArithmeticAtomicable {}
 /// operate on `Atomic<T>`.
 __magic_type(AtomicType)
 __intrinsic_type($(kIROp_AtomicType))
+[__NonCopyableType]
 [require(cuda_glsl_hlsl_metal_spirv_wgsl)]
 struct Atomic<T : IAtomicable>
 {
