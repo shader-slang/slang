@@ -718,17 +718,17 @@ bool CapabilityTargetSet::tryJoin(const CapabilityTargetSets& other)
     return true;
 }
 
-void CapabilitySet::join(const CapabilitySet& other)
+CapabilitySet& CapabilitySet::join(const CapabilitySet& other)
 {
     if (this->isEmpty() || other.isInvalid())
     {
         *this = other;
-        return;
+        return *this;
     }
     if (this->isInvalid())
-        return;
+        return *this;
     if (other.isEmpty())
-        return;
+        return *this;
 
     List<CapabilityAtom> destroySet;
     destroySet.reserve(this->m_targetSets.getCount());
@@ -746,6 +746,7 @@ void CapabilitySet::join(const CapabilitySet& other)
     // join made a invalid CapabilitySet
     if (this->m_targetSets.getCount() == 0)
         this->m_targetSets[CapabilityAtom::Invalid].target = CapabilityAtom::Invalid;
+    return *this;
 }
 
 static uint32_t _calcAtomListDifferenceScore(
