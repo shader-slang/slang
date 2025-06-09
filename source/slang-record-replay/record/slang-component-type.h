@@ -71,6 +71,15 @@ public:
         SlangInt targetIndex,
         slang::IMetadata** outMetadata,
         slang::IBlob** outDiagnostics = nullptr) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
+        SlangInt entryPointIndex,
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
+        SlangInt targetIndex,
+        slang::ICompileResult** outCompileResult,
+        slang::IBlob** outDiagnostics = nullptr) override;
 
 protected:
     virtual ApiClassId getClassId() = 0;

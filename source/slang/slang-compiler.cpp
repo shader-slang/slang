@@ -1860,6 +1860,23 @@ static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
     }
 }
 
+static IArtifact* _getSeparateDbgArtifact(IArtifact* artifact)
+{
+    if (!artifact)
+        return nullptr;
+
+    // The first associated artifact of kind ObjectCode and SPIRV payload should be the debug
+    // artifact.
+    for (auto* associated : artifact->getAssociated())
+    {
+        auto desc = associated->getDesc();
+        if (desc.kind == ArtifactKind::ObjectCode && desc.payload == ArtifactPayload::SPIRV)
+            return associated;
+    }
+
+    return nullptr;
+}
+
 /// Function to simplify the logic around emitting, and dissassembling
 SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
 {
@@ -1889,6 +1906,32 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
                 intermediateArtifact,
                 getSink(),
                 disassemblyArtifact.writeRef()));
+
+            // Also disassemble the debug artifact if one exists.
+            auto debugArtifact = _getSeparateDbgArtifact(intermediateArtifact);
+            ComPtr<IArtifact> disassemblyDebugArtifact;
+            if (debugArtifact)
+            {
+                SLANG_RETURN_ON_FAIL(ArtifactOutputUtil::dissassembleWithDownstream(
+                    getSession(),
+                    debugArtifact,
+                    getSink(),
+                    disassemblyDebugArtifact.writeRef()));
+                disassemblyDebugArtifact->setName(debugArtifact->getName());
+
+                // The disassembly needs both the metadata for the debug build identifier
+                // and the debug spirv to be associated with is.
+                for (auto associated : intermediateArtifact->getAssociated())
+                {
+                    if (associated->getDesc().payload == ArtifactPayload::Metadata ||
+                        associated->getDesc().payload == ArtifactPayload::PostEmitMetadata)
+                    {
+                        disassemblyArtifact->addAssociated(associated);
+                        break;
+                    }
+                }
+                disassemblyArtifact->addAssociated(disassemblyDebugArtifact);
+            }
 
             outArtifact.swap(disassemblyArtifact);
             return SLANG_OK;
@@ -2108,6 +2151,46 @@ SlangResult EndToEndCompileRequest::_maybeWriteArtifact(const String& path, IArt
     else
     {
         SLANG_RETURN_ON_FAIL(_writeArtifact(path, artifact));
+    }
+
+    return SLANG_OK;
+}
+
+// These helper functions are used by the -separate-debug-info command line
+// arg to extract the associated artifact containing the debug SPIRV data
+// and save it to a file with a .dbg.spv extension.
+static String _getDebugSpvPath(const String& basePath)
+{
+    // Find the last occurrence of ".spv" at the end of the string.
+    static const char ext[] = ".spv";
+    static const char dbgExt[] = ".dbg.spv";
+    Index extLen = 4;
+    if (basePath.getLength() >= extLen && basePath.endsWith(ext))
+    {
+        // Replace the ".spv" extension with ".dbg.spv"
+        String prefix = String(basePath.subString(0, basePath.getLength() - extLen));
+        return prefix + dbgExt;
+    }
+    // If it doesn't end with .spv, just append .dbg.spv
+    return basePath + dbgExt;
+}
+
+SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
+    TargetProgram* targetProgram,
+    const String& path,
+    IArtifact* artifact)
+{
+    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmitSeparateDebug))
+    {
+        const auto dbgArtifact = _getSeparateDbgArtifact(artifact);
+        // The artifact's name may have been set to the debug build id hash, use
+        // it as the filename if it exists.
+        String dbgPath = dbgArtifact->getName();
+        if (dbgPath.getLength() == 0)
+            dbgPath = _getDebugSpvPath(path);
+        else
+            dbgPath.append(".dbg.spv");
+        return _maybeWriteArtifact(dbgPath, dbgArtifact);
     }
 
     return SLANG_OK;
@@ -2612,6 +2695,10 @@ void EndToEndCompileRequest::generateOutput()
                     const auto path = _getWholeProgramPath(targetReq);
 
                     _maybeWriteArtifact(path, artifact);
+
+                    // If we are compiling separate debug info, check for the additional
+                    // SPIRV artifact and write that if needed.
+                    _maybeWriteDebugArtifact(targetProgram, path, artifact);
                 }
             }
             else
@@ -2624,6 +2711,10 @@ void EndToEndCompileRequest::generateOutput()
                         const auto path = _getEntryPointPath(targetReq, ee);
 
                         _maybeWriteArtifact(path, artifact);
+
+                        // If we are compiling separate debug info, check for the additional
+                        // SPIRV artifact and write that if needed.
+                        _maybeWriteDebugArtifact(targetProgram, path, artifact);
                     }
                 }
             }
@@ -2851,7 +2942,7 @@ void Module::_discoverEntryPointsImpl(
     DiagnosticSink* sink,
     const List<RefPtr<TargetRequest>>& targets)
 {
-    for (auto globalDecl : containerDecl->members)
+    for (auto globalDecl : containerDecl->getDirectMemberDecls())
     {
         auto maybeFuncDecl = globalDecl;
         if (auto genericDecl = as<GenericDecl>(maybeFuncDecl))

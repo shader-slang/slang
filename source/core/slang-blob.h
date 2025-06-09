@@ -15,7 +15,7 @@ namespace Slang
 
 /** Base class for simple blobs.
  */
-class BlobBase : public ISlangBlob, public ICastable, public ComBaseObject
+class BlobBase : public ComBaseObject, public ISlangBlob, public ICastable
 {
 public:
     // ISlangUnknown

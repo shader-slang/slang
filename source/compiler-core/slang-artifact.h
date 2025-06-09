@@ -407,8 +407,11 @@ considered as a kind of side channel to associate arbitrary data including tempo
 artifact.
 
 A `child artifact` belongs to the artifact, within the hierarchy of artifacts.
+
+This also uses the ICompileResult interface to more easily allow the Slang API to retrieve
+multiple associated artifacts in cases where both base and debug spirv are needed.
 */
-class IArtifact : public ICastable
+class IArtifact : public slang::ICompileResult
 {
 public:
     SLANG_COM_INTERFACE(
