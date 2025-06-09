@@ -76,10 +76,9 @@ void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
     // Make sure to fully check all nested agg type decls first.
     if (stmt->scopeDecl)
     {
-        for (auto decl : stmt->scopeDecl->members)
+        for (auto aggDecl : stmt->scopeDecl->getDirectMemberDeclsOfType<AggTypeDeclBase>())
         {
-            if (as<AggTypeDeclBase>(decl))
-                ensureAllDeclsRec(decl, DeclCheckState::DefinitionChecked);
+            ensureAllDeclsRec(aggDecl, DeclCheckState::DefinitionChecked);
         }
 
         // Consider this code:

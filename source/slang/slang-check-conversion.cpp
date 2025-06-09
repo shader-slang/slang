@@ -1886,7 +1886,7 @@ bool SemanticsVisitor::tryCoerceLambdaToFuncType(
     // If it does, we can't convert it to a function type.
     auto operatorName = getName("()");
 
-    for (auto member : lambdaStruct.getDecl()->members)
+    for (auto member : lambdaStruct.getDecl()->getDirectMemberDecls())
     {
         if (auto field = as<VarDecl>(member))
         {
