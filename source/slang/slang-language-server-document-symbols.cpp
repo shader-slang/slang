@@ -139,7 +139,7 @@ static void _getDocumentSymbolsImpl(
     if (!context.processedDecls.add(parent))
         return;
     auto srcManager = context.linkage->getSourceManager();
-    for (auto child : containerDecl->members)
+    for (auto child : containerDecl->getDirectMemberDecls())
     {
         if (auto genericDecl = as<GenericDecl>(child))
         {
