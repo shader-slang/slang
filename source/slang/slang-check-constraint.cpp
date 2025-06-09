@@ -336,13 +336,6 @@ void SemanticsVisitor::validateGenericTypeRestrictions(DeclRef<GenericDecl> gene
          genericDeclRef.getDecl()->getMembersOfType<GenericTypeParamDeclBase>())
     {
         ensureDecl(constraintDecl, DeclCheckState::SignatureChecked);
-        DeclRef<GenericTypeParamDeclBase> constraintDeclRef =
-            m_astBuilder
-                ->getGenericAppDeclRef(
-                    genericDeclRef,
-                    args.getArrayView(),
-                    constraintDecl)
-                .as<GenericTypeParamDeclBase>();
 
         if (args.getCount() < constraintDecl->parameterIndex)
             break;

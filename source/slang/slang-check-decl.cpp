@@ -2631,7 +2631,7 @@ static void validateAtomicElementTypeUseSite(
     // Start checking generic args, `Atomic` can only be direct child to Ptr, RWStructuredBuffer, and GLSLShaderStorageBuffer.
     for (auto i : genericAppDeclRef->getArgs())
     {
-        if (auto arg = as<AtomicType>(i))
+        if (as<AtomicType>(i))
         {
             if(!as<PtrType>(type) && !as<HLSLRWStructuredBufferType>(type) &&
                 !as<GLSLShaderStorageBufferType>(type))
