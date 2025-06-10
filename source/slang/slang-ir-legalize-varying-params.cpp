@@ -4022,6 +4022,17 @@ private:
 void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointInfo& entryPoint)
 {
     const auto oldFunc = entryPoint.entryPointFunc;
+
+    // We can avoid this lowering if it's a simple scalar return as it's
+    // handled further down the pipeline
+    const bool hasOutParameters = anyOf(
+        oldFunc->getParams(),
+        [](auto param) { return as<IROutTypeBase>(param->getFullType()); });
+
+    auto returnType = oldFunc->getResultType();
+    if (!as<IRStructType>(returnType) && !hasOutParameters)
+        return;
+
     const bool alwaysUseReturnStruct = true;
     entryPoint.entryPointFunc = lowerOutParameters(oldFunc, sink, alwaysUseReturnStruct);
 
@@ -4043,6 +4054,7 @@ void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointIn
         decor->removeFromParent();
     }
 }
+
 
 void legalizeEntryPointVaryingParamsForMetal(
     IRModule* module,

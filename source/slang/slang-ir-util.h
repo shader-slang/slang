@@ -398,6 +398,25 @@ bool canOperationBeSpecConst(
     IRInst* const* fixedArgs,
     IRUse* operands);
 bool isInstHoistable(IROp op, IRType* type, IRInst* const* fixedArgs);
+
+// most of <algorithm> doesn't work on out non-const iterators, so define this
+// version
+template<typename Range, typename Predicate>
+constexpr bool anyOf(Range&& range, Predicate&& pred)
+{
+    // Handle both const and non-const ranges
+    auto first = range.begin();
+    auto last = range.end();
+
+    for (; first != last; ++first)
+    {
+        if (pred(*first))
+        {
+            return true;
+        }
+    }
+    return false;
+}
 } // namespace Slang
 
 #endif

@@ -8,9 +8,7 @@ struct VertexOut
     float4 position : SV_Position; 
 }
 // Vertex Shader which writes to position in a returned struct (as metal expects)
-VertexOut vertexMain()
+void vertexMain(out VertexOut o)
 {
-    VertexOut o;
     o.position = float4(1,2,3,4);
-    return o;
 }
