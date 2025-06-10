@@ -7022,6 +7022,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (destPtrType->hasAddressSpace())
             addrSpace = destPtrType->getAddressSpace();
         auto ptrElementType = builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace);
+
+        // Get the destination element type so we can checked signedness with source element type
+        auto destValueType = destPtrType->getValueType();
+        auto destElementType = destValueType;
+        if (auto destVectorType = as<IRVectorType>(destValueType))
+        {
+            destElementType = destVectorType->getElementType();
+        }
+
         for (UInt i = 0; i < inst->getElementCount(); i++)
         {
             auto index = inst->getElementIndex(i);
@@ -7037,11 +7046,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 sourceElementType,
                 inst->getSource(),
                 makeArray(SpvLiteralInteger::from32((int32_t)i)));
+
+            // If sign doesn't match, emit a bitcast
+            if (isSignedType(destElementType) != isSignedType(sourceElementType))
+            {
+                val = emitOpBitcast(parent, nullptr, destElementType, val);
+            }
+
             result =
                 emitOpStore(parent, (i == inst->getElementCount() - 1 ? inst : nullptr), addr, val);
         }
         return result;
     }
+
 
     SpvInst* emitSwizzleSet(SpvInstParent* parent, IRSwizzleSet* inst)
     {
