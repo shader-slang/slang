@@ -112,6 +112,7 @@ CLikeSourceEmitter::CLikeSourceEmitter(const Desc& desc)
 
     auto targetCaps = getTargetReq()->getTargetCaps();
     isCoopvecPoc = targetCaps.implies(CapabilityAtom::hlsl_coopvec_poc);
+    isOptixCoopVec = targetCaps.implies(CapabilityAtom::optix_coopvec);
 }
 
 SlangResult CLikeSourceEmitter::init()
