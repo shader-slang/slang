@@ -2994,17 +2994,14 @@ static void collectExportedConstantInContainer(
     ASTBuilder* builder,
     ContainerDecl* containerDecl)
 {
-    for (auto m : containerDecl->members)
+    for (auto varMember : containerDecl->getDirectMemberDeclsOfType<VarDeclBase>())
     {
-        auto varMember = as<VarDeclBase>(m);
-        if (!varMember)
-            continue;
         if (!varMember->val)
             continue;
         bool isExported = false;
         bool isConst = false;
         bool isExtern = false;
-        for (auto modifier : m->modifiers)
+        for (auto modifier : varMember->modifiers)
         {
             if (as<HLSLExportModifier>(modifier))
                 isExported = true;
@@ -3018,14 +3015,14 @@ static void collectExportedConstantInContainer(
         }
         if (isExported && isConst)
         {
-            auto mangledName = getMangledName(builder, m);
+            auto mangledName = getMangledName(builder, varMember);
             if (isExtern && dict.containsKey(mangledName))
                 continue;
             dict[mangledName] = varMember->val;
         }
     }
 
-    for (auto member : containerDecl->members)
+    for (auto member : containerDecl->getDirectMemberDecls())
     {
         if (as<NamespaceDecl>(member) || as<FileDecl>(member))
         {
@@ -5262,7 +5259,7 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
     // If it's a container process it's children
     if (auto containerDecl = as<ContainerDecl>(decl))
     {
-        for (auto child : containerDecl->members)
+        for (auto child : containerDecl->getDirectMemberDecls())
         {
             _processFindDeclsExportSymbolsRec(child);
         }
@@ -6809,12 +6806,9 @@ SlangResult Linkage::loadSerializedModuleContents(
     module->_discoverEntryPoints(sink, targets);
 
     // Hook up fileDecl's scope to module's scope.
-    for (auto globalDecl : moduleDecl->members)
+    for (auto fileDecl : moduleDecl->getDirectMemberDeclsOfType<FileDecl>())
     {
-        if (auto fileDecl = as<FileDecl>(globalDecl))
-        {
-            addSiblingScopeForContainerDecl(m_astBuilder, moduleDecl->ownedScope, fileDecl);
-        }
+        addSiblingScopeForContainerDecl(m_astBuilder, moduleDecl->ownedScope, fileDecl);
     }
 
     return SLANG_OK;
