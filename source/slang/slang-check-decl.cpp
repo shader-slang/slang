@@ -10818,6 +10818,11 @@ void SemanticsVisitor::importModuleIntoScope(Scope* scope, ModuleDecl* moduleDec
 
 void SemanticsDeclHeaderVisitor::visitImportDecl(ImportDecl* decl)
 {
+    // If we've already encountered errors, then we should bail out
+    // unless we are in a language server context.
+    if ((getSink()->getErrorCount() != 0) && !getShared()->isInLanguageServer())
+        return;
+
     // We need to look for a module with the specified name
     // (whether it has already been loaded, or needs to
     // be loaded), and then put its declarations into
