@@ -10,6 +10,7 @@
 
 namespace Slang
 {
+
 // TODO(tfoley): have the parser export this, or a utility function
 // for initializing a `SyntaxDecl` in the common case.
 //
@@ -434,6 +435,11 @@ void serialize(ASTSerializer const& serializer, NameLoc& value)
     serialize(serializer, value.loc);
 }
 
+void serialize(ASTSerializer const& serializer, ContainerDeclDirectMemberDecls& value)
+{
+    serialize(serializer, value._refDecls());
+}
+
 #if 0 // FIDDLE TEMPLATE:
 %for _,T in ipairs(Slang.NodeBase.subclasses) do
 void _serializeASTNodeContents(ASTSerializer const& serializer, $T* value)
@@ -594,7 +600,7 @@ private:
     void _assignGenericParameterIndices(GenericDecl* genericDecl)
     {
         int parameterCounter = 0;
-        for (auto m : genericDecl->members)
+        for (auto m : genericDecl->getDirectMemberDecls())
         {
             if (auto typeParam = as<GenericTypeParamDeclBase>(m))
             {
