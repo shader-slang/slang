@@ -2,6 +2,8 @@ tests/language-feature/saturated-cooperation/simple.slang (vk)
 tests/language-feature/saturated-cooperation/fuse3.slang (vk)
 tests/language-feature/saturated-cooperation/fuse-product.slang (vk)
 tests/language-feature/saturated-cooperation/fuse.slang (vk)
+tests/language-server/robustness-8.slang
+tests/language-server/vector-member.slang
 tests/render/render0.hlsl (mtl)
 tests/render/multiple-stage-io-locations.slang (mtl)
 tests/render/nointerpolation.hlsl (mtl)
