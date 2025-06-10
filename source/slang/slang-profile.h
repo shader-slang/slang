@@ -128,6 +128,8 @@ Stage findStageByName(String const& name);
 UnownedStringSlice getStageText(Stage stage);
 
 Stage getStageFromAtom(CapabilityAtom atom);
+CapabilityAtom getAtomFromStage(Stage stage);
+
 } // namespace Slang
 
 #endif

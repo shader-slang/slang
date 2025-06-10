@@ -157,7 +157,7 @@ public:
     /// Join two capability sets to form ('this' & 'other').
     /// Destroy incompatible targets/sets apart of 'this' between ('this' & 'other').
     /// `this` may be made invalid if other is fully disjoint.
-    void join(const CapabilitySet& other);
+    CapabilitySet& join(const CapabilitySet& other);
 
     /// Join two capability sets to form ('this' & 'other').
     /// If a target/set has an incompatible atom, do not destroy the target/set.

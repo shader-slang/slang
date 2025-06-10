@@ -11,6 +11,7 @@ In this chapter:
 1. [SPIR-V target specific](./a2-01-spirv-target-specific.md)
 2. [Metal target specific](./a2-02-metal-target-specific.md)
 3. [WGSL target specific](./a2-03-wgsl-target-specific.md)
+4. [GLSL target specific](./a2-04-glsl-target-specific.md)
 
 <!-- RTD-TOC-START
 ```{toctree}
