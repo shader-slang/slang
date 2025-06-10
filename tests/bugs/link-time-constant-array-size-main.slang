@@ -4,6 +4,7 @@
 
 extern static const int N;
 
+// SPIRV: ([[# @LINE+1]]): warning 31000
 struct S { int xs[N]; }
 
 RWStructuredBuffer<S> b;
