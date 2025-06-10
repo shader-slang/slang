@@ -173,7 +173,7 @@ bool ContainerDeclDirectMemberDecls::isUsingOnDemandDeserialization() const
 
 bool ContainerDeclDirectMemberDecls::_areLookupAcceleratorsValid() const
 {
-   return _directMemberDecls.accelerators.declCountWhenLastUpdated ==
+    return _directMemberDecls.accelerators.declCountWhenLastUpdated ==
            _directMemberDecls.decls.getCount();
 }
 
