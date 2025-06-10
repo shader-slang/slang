@@ -55,6 +55,7 @@ public:
 
 private:
     friend class ContainerDecl;
+    friend class ModuleDecl;
     friend struct ASTDumpContext;
 
     bool _areLookupAcceleratorsValid() const;
@@ -230,11 +231,7 @@ class ContainerDecl : public Decl
 
     /// Is this declaration using on-demand deserialization for its direct members?
     ///
-    bool isUsingOnDemandDeserialization();
-
-    ///
-    Decl* findExportedDeclByMangledNameInSerializedModule(UnownedStringSlice const& slice);
-
+    bool isUsingOnDemandDeserializationForDirectMembers();
 
     //
     // NOTE: The operations after this point are *not* considered part of
@@ -774,6 +771,14 @@ class ModuleDecl : public NamespaceDeclBase
     /// This mapping is filled in during semantic checking, as `ExtensionDecl`s get checked.
     ///
     FIDDLE() Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> mapTypeToCandidateExtensions;
+
+    /// Is this module using on-demand deserialization for its exports?
+    ///
+    bool isUsingOnDemandDeserializationForExports();
+
+    /// Find a declaration exported from this module by its `mangledName`.
+    ///
+    Decl* _findSerializedDeclByMangledExportName(UnownedStringSlice const& mangledName);
 };
 
 // Represents a transparent scope of declarations that are defined in a single source file.

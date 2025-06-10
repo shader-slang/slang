@@ -81,13 +81,18 @@ List<Decl*> const& ContainerDeclDirectMemberDecls::getDecls() const
         // trigger each of them to get deserialized (if it
         // hasn't already been done).
         //
-        // Once we are done with that loop, we can turn off
-        // on-demand deserialization, since everything
-        // will have already been loaded.
+        // Once we are done with that loop, we can in
+        // principle turn off on-demand deserialization,
+        // since everything will already have been loaded.
         //
-        // TODO(tfoley): Validate the above claim, considering
-        // that the mangled name lookup path also uses the
-        // test being described here.
+        // TODO: Actually do something to turn off on-demand
+        // deserialization (setting `onDemandDeserializaton.data`
+        // to null should suffice), and then do the work required
+        // to make sure that works correctly with the rest of
+        // the accessors. In particular, if we turn off on-demand
+        // deserialization then we probably need to invalidate
+        // the by-name lookup accelerator so that it will get
+        // rebuilt from the now-fully-deserialized member list.
         //
         auto declCount = getDeclCount();
         for (Index i = 0; i < declCount; ++i)
@@ -168,13 +173,13 @@ List<Decl*> const& ContainerDeclDirectMemberDecls::getTransparentDecls() const
 
 bool ContainerDeclDirectMemberDecls::isUsingOnDemandDeserialization() const
 {
-    return onDemandDeserialization.context != nullptr;
+    return onDemandDeserialization.data != nullptr;
 }
 
 bool ContainerDeclDirectMemberDecls::_areLookupAcceleratorsValid() const
 {
-    return _directMemberDecls.accelerators.declCountWhenLastUpdated ==
-           _directMemberDecls.decls.getCount();
+    return accelerators.declCountWhenLastUpdated ==
+           decls.getCount();
 }
 
 void ContainerDeclDirectMemberDecls::_invalidateLookupAccelerators() const
@@ -309,7 +314,7 @@ Decl* ContainerDecl::getPrevDirectMemberDeclWithSameName(Decl* decl)
     SLANG_ASSERT(decl);
     SLANG_ASSERT(decl->parentDecl == this);
 
-    if (isUsingOnDemandDeserialization())
+    if (isUsingOnDemandDeserializationForDirectMembers())
     {
         // Note: in the case of on-demand deserialization,
         // we trust that the caller has previously
@@ -333,7 +338,7 @@ Decl* ContainerDecl::getPrevDirectMemberDeclWithSameName(Decl* decl)
 
 void ContainerDecl::addDirectMemberDecl(Decl* decl)
 {
-    if (isUsingOnDemandDeserialization())
+    if (isUsingOnDemandDeserializationForDirectMembers())
     {
         SLANG_UNEXPECTED("this operation shouldn't be performed on deserialized declarations");
     }
@@ -350,9 +355,14 @@ List<Decl*> const& ContainerDecl::getTransparentDirectMemberDecls()
     return _directMemberDecls.getTransparentDecls();
 }
 
-bool ContainerDecl::isUsingOnDemandDeserialization()
+bool ContainerDecl::isUsingOnDemandDeserializationForDirectMembers()
 {
     return _directMemberDecls.isUsingOnDemandDeserialization();
+}
+
+bool ModuleDecl::isUsingOnDemandDeserializationForExports()
+{
+    return _directMemberDecls.onDemandDeserialization.context != nullptr;
 }
 
 bool ContainerDecl::_areLookupAcceleratorsValid()
@@ -375,7 +385,7 @@ void ContainerDecl::
         UnscopedEnumAttribute* unscopedEnumAttr,
         TransparentModifier* transparentModifier)
 {
-    if (isUsingOnDemandDeserialization())
+    if (isUsingOnDemandDeserializationForDirectMembers())
     {
         SLANG_UNEXPECTED("this operation shouldn't be performed on deserialized declarations");
     }
@@ -393,7 +403,7 @@ void ContainerDecl::
     _removeDirectMemberConstructorDeclBecauseSynthesizedAnotherDefaultConstructorInstead(
         ConstructorDecl* decl)
 {
-    if (isUsingOnDemandDeserialization())
+    if (isUsingOnDemandDeserializationForDirectMembers())
     {
         SLANG_UNEXPECTED("this operation shouldn't be performed on deserialized declarations");
     }
@@ -410,7 +420,7 @@ void ContainerDecl::
         VarDecl* oldDecl,
         PropertyDecl* newDecl)
 {
-    if (isUsingOnDemandDeserialization())
+    if (isUsingOnDemandDeserializationForDirectMembers())
     {
         SLANG_UNEXPECTED("this operation shouldn't be performed on deserialized declarations");
     }
@@ -429,7 +439,7 @@ void ContainerDecl::_insertDirectMemberDeclAtIndexForBitfieldPropertyBackingMemb
     Index index,
     VarDecl* backingVarDecl)
 {
-    if (isUsingOnDemandDeserialization())
+    if (isUsingOnDemandDeserializationForDirectMembers())
     {
         SLANG_UNEXPECTED("this operation shouldn't be performed on deserialized declarations");
     }

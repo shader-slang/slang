@@ -5287,9 +5287,9 @@ Decl* Module::findExportedDeclByMangledName(const UnownedStringSlice& mangledNam
     // to be baked into the serialized file, rather than attempt
     // to enumerate all of the declarations in the module here.
     //
-    if (this->m_moduleDecl->isUsingOnDemandDeserialization())
+    if (this->m_moduleDecl->isUsingOnDemandDeserializationForExports())
     {
-        return m_moduleDecl->findExportedDeclByMangledNameInSerializedModule(mangledName);
+        return m_moduleDecl->_findSerializedDeclByMangledExportName(mangledName);
     }
 
     ensureExportLookupAcceleratorBuilt();

@@ -115,9 +115,6 @@ set(glsl_module_generated_header_dir
 )
 set(glsl_module_generated_header ${glsl_module_generated_header} PARENT_SCOPE)
 
-# debug print the command we wil lrun next
-message(STATUS "SLANG_BOOTSTRAP: -archive-type riff-lz4 -save-core-module-bin-source ${core_module_generated_header} -save-glsl-module-bin-source ${glsl_module_generated_header}")
-
 add_custom_command(
     OUTPUT ${core_module_generated_header} ${glsl_module_generated_header}
     COMMAND

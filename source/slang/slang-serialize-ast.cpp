@@ -2122,10 +2122,10 @@ ModuleDecl* readSerializedModuleAST(
     return moduleDecl;
 }
 
-Decl* ContainerDecl::findExportedDeclByMangledNameInSerializedModule(
+Decl* ModuleDecl::_findSerializedDeclByMangledExportName(
     UnownedStringSlice const& mangledName)
 {
-    SLANG_ASSERT(isUsingOnDemandDeserialization());
+    SLANG_ASSERT(isUsingOnDemandDeserializationForExports());
 
     auto sharedContext =
         as<ASTSerialReadContext>(_directMemberDecls.onDemandDeserialization.context);
