@@ -189,7 +189,7 @@ static void _lookUpDirectAndTransparentMembers(
     {
         // If we are looking up for completion suggestions,
         // return all the members that are available.
-        for (auto member : containerDecl->members)
+        for (auto member : containerDecl->getDirectMemberDecls())
         {
             if (!request.shouldConsiderAllLocalNames() && _isUncheckedLocalVar(member))
                 continue;
@@ -204,15 +204,13 @@ static void _lookUpDirectAndTransparentMembers(
     }
     else
     {
-        // Look up the declarations with the chosen name in the container.
-        Decl* firstDecl = nullptr;
-        containerDecl->getMemberDictionary().tryGetValue(name, firstDecl);
-
-        // Now iterate over those declarations (if any) and see if
-        // we find any that meet our filtering criteria.
+        // Iterate over the declarations with the chosen name in the container
+        // (if any), and see if we find any that meet our filtering criteria.
+        //
         // For example, we might be filtering so that we only consider
         // type declarations.
-        for (auto m = firstDecl; m; m = m->nextInContainerWithSameName)
+        //
+        for (auto m : containerDecl->getDirectMemberDeclsOfName(name))
         {
             // Skip this declaration if we are checking and this hasn't been
             // checked yet. Because we traverse block statements in order, if
@@ -247,12 +245,12 @@ static void _lookUpDirectAndTransparentMembers(
     if (((int)request.options & (int)LookupOptions::IgnoreTransparentMembers) != 0)
         return;
 
-    for (auto transparentInfo : containerDecl->getTransparentMembers())
+    for (auto transparentMemberDecl : containerDecl->getTransparentDirectMemberDecls())
     {
         // The reference to the transparent member should use the same
         // path as we used in referring to its parent.
         DeclRef<Decl> transparentMemberDeclRef =
-            astBuilder->getMemberDeclRef(parentDeclRef, transparentInfo.decl);
+            astBuilder->getMemberDeclRef(parentDeclRef, transparentMemberDecl);
         if (transparentMemberDeclRef.getDecl() == request.declToExclude)
             continue;
 
